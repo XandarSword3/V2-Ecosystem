@@ -469,6 +469,20 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
 
+-- Reviews table for testimonials
+CREATE TABLE IF NOT EXISTS reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) NOT NULL,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  text TEXT NOT NULL,
+  service_type VARCHAR(50) DEFAULT 'general',
+  is_approved BOOLEAN DEFAULT false,
+  approved_by UUID REFERENCES users(id),
+  approved_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);

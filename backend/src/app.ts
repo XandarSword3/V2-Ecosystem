@@ -16,6 +16,7 @@ import chaletRoutes from './modules/chalets/chalet.routes.js';
 import poolRoutes from './modules/pool/pool.routes.js';
 import paymentRoutes from './modules/payments/payment.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
+import reviewsRoutes from './modules/reviews/reviews.routes.js';
 
 const app = express();
 
@@ -73,6 +74,7 @@ app.use('/api/chalets', chaletRoutes);
 app.use('/api/pool', poolRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/reviews', reviewsRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {

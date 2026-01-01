@@ -6,6 +6,7 @@ import { Toaster } from 'sonner';
 import { defaultLocale, getLocaleFromCookie, type Locale } from '@/i18n';
 import Header from '@/components/layout/Header';
 import { WeatherEffects } from '@/components/effects/WeatherEffects';
+import { PageTransition } from '@/components/effects/PageTransition';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -47,7 +48,11 @@ export default function RootLayout({
         <Providers>
           <WeatherEffects />
           <Header />
-          <main>{children}</main>
+          <main>
+            <PageTransition>
+              {children}
+            </PageTransition>
+          </main>
           <Toaster position={isRtl ? 'top-left' : 'top-right'} richColors />
         </Providers>
       </body>

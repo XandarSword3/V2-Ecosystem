@@ -108,11 +108,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [authChecked, setAuthChecked] = useState(false);
 
-  // Check authentication
+  // Check authentication - wait for auth to fully load
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login?redirect=/admin');
+    if (!isLoading) {
+      setAuthChecked(true);
+      if (!isAuthenticated) {
+        router.push('/login?redirect=/admin');
+      }
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -128,7 +132,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     router.push('/');
   };
 
-  if (isLoading) {
+  if (isLoading || !authChecked || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
         <motion.div

@@ -19,6 +19,12 @@ import {
 import { fadeInUp, staggerContainer, scaleIn } from '@/lib/animations/presets';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import dynamic from 'next/dynamic';
+
+// Dynamically import heavy components for better performance
+const InteractiveResortMap = dynamic(() => import('@/components/InteractiveResortMap'), { ssr: false });
+const LiveChatWidget = dynamic(() => import('@/components/LiveChatWidget'), { ssr: false });
+const TestimonialsCarousel = dynamic(() => import('@/components/TestimonialsCarousel'), { ssr: false });
 
 export default function HomePage() {
   const t = useTranslations();
@@ -411,6 +417,13 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Testimonials Section */}
+      <section className="py-20 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <TestimonialsCarousel />
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-700 dark:to-primary-900 relative overflow-hidden">
         <motion.div
@@ -459,6 +472,16 @@ export default function HomePage() {
           </motion.div>
         </div>
       </section>
+
+      {/* Resort Map Section */}
+      <section className="py-20 bg-white dark:bg-slate-800">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <InteractiveResortMap />
+        </div>
+      </section>
+
+      {/* Live Chat Widget */}
+      <LiveChatWidget />
 
       {/* Footer */}
       <footer className="bg-slate-900 dark:bg-slate-950 text-white py-16">

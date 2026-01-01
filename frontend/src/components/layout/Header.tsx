@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { ThemeToggle } from '../ThemeToggle';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { CurrencySwitcher } from '../CurrencySwitcher';
+import { UserPreferencesModal } from '../settings/UserPreferencesModal';
 import { 
   UtensilsCrossed, 
   Home, 
@@ -15,7 +16,8 @@ import {
   Menu, 
   X, 
   User,
-  ShoppingCart
+  ShoppingCart,
+  Settings
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
@@ -26,6 +28,7 @@ export default function Header() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const restaurantCount = useCartStore((s) => s.getRestaurantCount());
   const snackCount = useCartStore((s) => s.getSnackCount());
@@ -138,6 +141,17 @@ export default function Header() {
             <CurrencySwitcher />
             <LanguageSwitcher />
             <ThemeToggle />
+            
+            {/* Settings Button */}
+            <motion.button
+              whileHover={{ scale: 1.05, rotate: 15 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setPreferencesOpen(true)}
+              className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+              aria-label={t('settings')}
+            >
+              <Settings className="h-5 w-5" />
+            </motion.button>
             
             {/* Auth Buttons - Desktop */}
             <div className="hidden md:flex items-center gap-2 ml-2">
@@ -301,6 +315,12 @@ export default function Header() {
           )}
         </AnimatePresence>
       </div>
+      
+      {/* User Preferences Modal */}
+      <UserPreferencesModal 
+        isOpen={preferencesOpen} 
+        onClose={() => setPreferencesOpen(false)} 
+      />
     </motion.header>
   );
 }
