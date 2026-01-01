@@ -6,7 +6,9 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { snackApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Cookie, ShoppingCart, AlertCircle } from 'lucide-react';
+import { useCartStore } from '@/lib/stores/cartStore';
+import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { Loader2, Cookie, ShoppingCart, AlertCircle, Plus, Minus } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SnackItem {
@@ -20,15 +22,21 @@ interface SnackItem {
   isAvailable: boolean;
 }
 
-interface CartItem extends SnackItem {
-  quantity: number;
-}
-
 export default function SnackBarPage() {
   const t = useTranslations('snackBar');
   const tCommon = useTranslations('common');
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const currency = useSettingsStore((s) => s.currency);
+
+  // Use the cart store
+  const snackItems = useCartStore((s) => s.snackItems);
+  const addToSnack = useCartStore((s) => s.addToSnack);
+  const removeFromSnack = useCartStore((s) => s.removeFromSnack);
+  const getSnackTotal = useCartStore((s) => s.getSnackTotal);
+  const getSnackCount = useCartStore((s) => s.getSnackCount);
+
+  const cartTotal = getSnackTotal();
+  const cartCount = getSnackCount();
 
   const categoryLabels: Record<string, string> = {
     sandwich: `🥪 ${t('categories.sandwiches')}`,
@@ -50,20 +58,20 @@ export default function SnackBarPage() {
     : items;
 
   const addToCart = (item: SnackItem) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prev, { ...item, quantity: 1 }];
+    addToSnack({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      category: item.category,
+      imageUrl: item.imageUrl,
     });
     toast.success(`${item.name} added`);
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const getItemQuantity = (itemId: string) => {
+    const item = snackItems.find((i) => i.id === itemId);
+    return item?.quantity || 0;
+  };
 
   if (isLoading) {
     return (
@@ -140,15 +148,36 @@ export default function SnackBarPage() {
                 <h3 className="font-medium text-slate-900 dark:text-white truncate">{item.name}</h3>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-lg font-bold text-yellow-600 dark:text-yellow-400">
-                    {formatCurrency(item.price)}
+                    {formatCurrency(item.price, currency)}
                   </span>
-                  <button
-                    onClick={() => addToCart(item)}
-                    disabled={!item.isAvailable}
-                    className="btn btn-primary px-3 py-1 text-sm"
-                  >
-                    {t('order.addToCart')}
-                  </button>
+                  {getItemQuantity(item.id) > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => removeFromSnack(item.id)}
+                        className="btn btn-outline px-2 py-1 text-sm"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="font-bold text-slate-900 dark:text-white min-w-[20px] text-center">
+                        {getItemQuantity(item.id)}
+                      </span>
+                      <button
+                        onClick={() => addToCart(item)}
+                        disabled={!item.isAvailable}
+                        className="btn btn-primary px-2 py-1 text-sm"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => addToCart(item)}
+                      disabled={!item.isAvailable}
+                      className="btn btn-primary px-3 py-1 text-sm"
+                    >
+                      {t('order.addToCart')}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -165,12 +194,12 @@ export default function SnackBarPage() {
       </main>
 
       {/* Cart Bar */}
-      {cart.length > 0 && (
+      {cartCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shadow-lg p-4">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-400">{cartCount} {tCommon('items')}</p>
-              <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(cartTotal)}</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(cartTotal, currency)}</p>
             </div>
             <button className="btn btn-primary">
               {t('placeOrder')}
