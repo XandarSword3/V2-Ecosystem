@@ -132,13 +132,13 @@ function ToggleSwitch({
   return (
     <div className="flex items-center justify-between py-4">
       <div>
-        <p className="font-medium text-slate-900">{label}</p>
-        {description && <p className="text-sm text-slate-500">{description}</p>}
+        <p className="font-medium text-slate-900 dark:text-white">{label}</p>
+        {description && <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>}
       </div>
       <button
         onClick={() => onChange(!enabled)}
         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-          enabled ? 'bg-primary-600' : 'bg-slate-200'
+          enabled ? 'bg-primary-600' : 'bg-slate-200 dark:bg-slate-700'
         }`}
       >
         <span
@@ -207,11 +207,11 @@ export default function AppearanceSettingsPage() {
       {/* Header */}
       <motion.div variants={fadeInUp} className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <Palette className="w-8 h-8 text-primary-600" />
             Appearance Settings
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
             Customize the look and feel of V2 Resort for all visitors
           </p>
         </div>
@@ -255,20 +255,20 @@ export default function AppearanceSettingsPage() {
             {/* Current theme details */}
             <motion.div
               layout
-              className="mt-6 p-4 bg-slate-50 rounded-xl"
+              className="mt-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl"
             >
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-3xl">{resortThemes[resortTheme].icon}</span>
                 <div>
-                  <h3 className="font-semibold text-slate-900">{resortThemes[resortTheme].name}</h3>
-                  <p className="text-sm text-slate-500">{resortThemes[resortTheme].description}</p>
+                  <h3 className="font-semibold text-slate-900 dark:text-white">{resortThemes[resortTheme].name}</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{resortThemes[resortTheme].description}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">Color palette:</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">Color palette:</span>
                 <div className={`w-6 h-6 rounded-full bg-primary-600 shadow`} title="Primary" />
                 <div className={`w-6 h-6 rounded-full ${resortThemes[resortTheme].accent} shadow`} title="Accent" />
-                <div className={`w-6 h-6 rounded-full ${resortThemes[resortTheme].background} shadow border border-slate-200`} title="Background" />
+                <div className={`w-6 h-6 rounded-full ${resortThemes[resortTheme].background} shadow border border-slate-200 dark:border-slate-600`} title="Background" />
               </div>
             </motion.div>
           </CardContent>

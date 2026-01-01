@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { ThemeToggle } from '../ThemeToggle';
 import { LanguageSwitcher } from '../LanguageSwitcher';
+import { CurrencySwitcher } from '../CurrencySwitcher';
 import { 
   UtensilsCrossed, 
   Home, 
@@ -134,6 +135,7 @@ export default function Header() {
               </Link>
             )}
 
+            <CurrencySwitcher />
             <LanguageSwitcher />
             <ThemeToggle />
             

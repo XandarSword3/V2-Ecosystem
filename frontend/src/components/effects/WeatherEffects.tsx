@@ -172,23 +172,39 @@ function SunnyEffect() {
         ))}
       </motion.div>
       
-      {/* Floating sparkles */}
-      {Array.from({ length: 15 }).map((_, i) => (
+      {/* Floating sparkles - using deterministic positions */}
+      {[
+        { left: 15, top: 20 },
+        { left: 35, top: 45 },
+        { left: 55, top: 15 },
+        { left: 25, top: 55 },
+        { left: 70, top: 30 },
+        { left: 85, top: 50 },
+        { left: 45, top: 25 },
+        { left: 60, top: 60 },
+        { left: 30, top: 35 },
+        { left: 75, top: 18 },
+        { left: 20, top: 42 },
+        { left: 50, top: 55 },
+        { left: 40, top: 12 },
+        { left: 65, top: 48 },
+        { left: 80, top: 22 },
+      ].map((pos, i) => (
         <motion.div
           key={i}
           className="absolute w-1 h-1 bg-yellow-300 rounded-full"
           style={{
-            left: `${10 + Math.random() * 80}%`,
-            top: `${10 + Math.random() * 60}%`,
+            left: `${pos.left}%`,
+            top: `${pos.top}%`,
           }}
           animate={{
             opacity: [0, 1, 0],
             scale: [0.5, 1.5, 0.5],
           }}
           transition={{
-            duration: 2 + Math.random() * 2,
+            duration: 2 + (i % 3) * 0.7,
             repeat: Infinity,
-            delay: Math.random() * 3,
+            delay: (i % 5) * 0.6,
           }}
         />
       ))}

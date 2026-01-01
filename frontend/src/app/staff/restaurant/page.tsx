@@ -172,7 +172,7 @@ export default function RestaurantKitchenPage() {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <span className="font-bold text-slate-900">#{order.orderNumber}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">#{order.orderNumber}</span>
                         <span className={`ml-2 badge ${
                           order.orderType === 'dine_in' ? 'badge-info' :
                           order.orderType === 'takeaway' ? 'badge-warning' : 'badge-primary'
@@ -180,13 +180,13 @@ export default function RestaurantKitchenPage() {
                           {order.orderType.replace('_', ' ')}
                         </span>
                       </div>
-                      <span className="text-xs text-slate-500 flex items-center">
+                      <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center">
                         <Clock className="w-3 h-3 mr-1" />
                         {formatTime(order.createdAt)}
                       </span>
                     </div>
 
-                    <div className="text-sm text-slate-600 mb-2">
+                    <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
                       {order.customerName}
                       {order.tableNumber && (
                         <span className="ml-2 font-medium">• Table {order.tableNumber}</span>

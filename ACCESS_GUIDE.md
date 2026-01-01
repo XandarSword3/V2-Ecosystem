@@ -28,25 +28,25 @@ The V2 Resort Management System consists of three main portals:
 
 ### Super Admin
 - **Email**: `admin@v2resort.com`
-- **Password**: `Admin@2026!`
+- **Password**: `admin123`
 - **Role**: `super_admin`
 - **Access**: Full system access including user management, analytics, and settings
 
 ### Restaurant Manager
 - **Email**: `restaurant@v2resort.com`
-- **Password**: `Staff@2026!`
+- **Password**: `admin123`
 - **Role**: `restaurant_manager`
 - **Access**: Menu management, order processing, table reservations
 
 ### Pool Manager
 - **Email**: `pool@v2resort.com`
-- **Password**: `Staff@2026!`
+- **Password**: `admin123`
 - **Role**: `pool_manager`
 - **Access**: Pool session bookings, ticket validation
 
 ### Chalet Manager
 - **Email**: `chalets@v2resort.com`
-- **Password**: `Staff@2026!`
+- **Password**: `admin123`
 - **Role**: `chalet_manager`
 - **Access**: Chalet bookings, calendar management
 

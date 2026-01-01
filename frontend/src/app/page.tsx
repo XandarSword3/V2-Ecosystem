@@ -86,16 +86,23 @@ export default function HomePage() {
       <section className="relative min-h-[90vh] flex items-center justify-center bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 dark:from-primary-800 dark:via-primary-900 dark:to-slate-900 text-white overflow-hidden">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden">
-          {/* Floating circles */}
-          {[...Array(6)].map((_, i) => (
+          {/* Floating circles - using deterministic values to prevent hydration mismatch */}
+          {[
+            { width: 180, height: 180, left: 10, top: 20 },
+            { width: 280, height: 280, left: 80, top: 60 },
+            { width: 220, height: 220, left: 30, top: 70 },
+            { width: 150, height: 150, left: 60, top: 15 },
+            { width: 320, height: 320, left: 45, top: 45 },
+            { width: 200, height: 200, left: 75, top: 85 },
+          ].map((circle, i) => (
             <motion.div
               key={i}
               className="absolute rounded-full bg-white/10 dark:bg-white/5"
               style={{
-                width: Math.random() * 300 + 100,
-                height: Math.random() * 300 + 100,
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
+                width: circle.width,
+                height: circle.height,
+                left: `${circle.left}%`,
+                top: `${circle.top}%`,
               }}
               animate={{
                 y: [0, -30, 0],
@@ -103,7 +110,7 @@ export default function HomePage() {
                 scale: [1, 1.1, 1],
               }}
               transition={{
-                duration: Math.random() * 5 + 5,
+                duration: 5 + i * 0.8,
                 repeat: Infinity,
                 ease: 'easeInOut',
                 delay: i * 0.5,
@@ -546,7 +553,7 @@ export default function HomePage() {
             </motion.div>
           </div>
 
-          <div className="border-t border-slate-800 dark:border-slate-700 pt-8 text-center text-slate-500">
+          <div className="border-t border-slate-800 dark:border-slate-700 pt-8 text-center text-slate-400 dark:text-slate-500">
             <p>{tFooter('copyright', { year: new Date().getFullYear() })}</p>
           </div>
         </div>

@@ -1,15 +1,24 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { Currency, exchangeRates, currencySymbols } from './stores/settingsStore';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency = 'USD'): string {
+export function formatCurrency(amount: number, currency: Currency = 'USD'): string {
+  // Convert from USD base price to target currency
+  const convertedAmount = amount * exchangeRates[currency];
+  
+  if (currency === 'LBP') {
+    // For LBP, format without decimals and use custom symbol
+    return `${currencySymbols.LBP} ${Math.round(convertedAmount).toLocaleString()}`;
+  }
+  
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  }).format(amount);
+  }).format(convertedAmount);
 }
 
 export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
