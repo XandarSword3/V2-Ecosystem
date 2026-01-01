@@ -50,7 +50,21 @@
     "checkBackLater": "Revenez plus tard pour les mises à jour",
     "andMore": "+{count} de plus",
     "items": "articles",
-    "total": "Total"
+    "total": "Total",
+    "optional": "(Optionnel)",
+    "contactUs": "Contactez-nous",
+    "weAreHereToHelp": "Nous sommes là pour vous aider",
+    "messageSent": "Message envoyé!",
+    "weWillGetBack": "Nous vous répondrons dès que possible.",
+    "name": "Nom",
+    "email": "Email",
+    "message": "Message",
+    "send": "Envoyer",
+    "selectSubject": "Sélectionnez un sujet",
+    "reservation": "Réservation",
+    "generalInquiry": "Demande générale",
+    "feedback": "Commentaires",
+    "complaint": "Réclamation"
   },
   "nav": {
     "home": "Accueil",
@@ -153,15 +167,26 @@
   "restaurant": {
     "title": "Restaurant",
     "menu": "Notre Menu",
-    "menuSubtitle": "Découvrez notre délicieuse cuisine libanaise et internationale",
+    "menuSubtitle": "Découvrez notre délicieuse cuisine libanaise et internationale, préparée avec passion",
     "featured": "En Vedette",
+    "featuredDishes": "Plats Vedettes du Chef",
+    "showAll": "Tout Afficher",
+    "viewFeatured": "Voir les Vedettes",
+    "authenticLebanese": "Cuisine Libanaise Authentique",
+    "dishes": "Plats",
+    "categories": "Catégories",
+    "rating": "Note",
+    "minutes": "min",
+    "loadingMenu": "Chargement du menu...",
     "vegetarian": "Végétarien",
     "vegan": "Végan",
     "glutenFree": "Sans Gluten",
     "addToCart": "Ajouter au Panier",
+    "addedToCart": "{item} ajouté au panier",
     "unavailable": "Indisponible",
-    "proceedToCheckout": "Passer à la Caisse",
+    "proceedToCheckout": "Paiement",
     "itemsInCart": "{count} articles dans le panier",
+    "tryDifferentCategory": "Essayez de sélectionner une autre catégorie",
     "categories": {
       "appetizers": "Entrées",
       "mains": "Plats Principaux",
@@ -243,14 +268,17 @@
     "sessions": "Sessions Piscine",
     "tickets": "Obtenir des Billets",
     "currentCapacity": "Capacité Actuelle",
+    "capacity": "Capacité",
     "available": "Disponible",
     "sold": "Vendu",
-    "selectDate": "Sélectionner la Date",
-    "availableSessions": "Sessions Disponibles pour {date}",
+    "selectDate": "Sélectionner une Date",
+    "availableSessions": "Sessions Disponibles pour le {date}",
     "yourBooking": "Votre Réservation",
     "numberOfGuests": "Nombre d'Invités",
     "purchaseTickets": "Acheter des Billets",
     "nonRefundable": "Les billets ne sont pas remboursables. Veuillez arriver à l'heure.",
+    "noSessionsAvailable": "Aucune session disponible",
+    "selectDifferentDate": "Veuillez sélectionner une autre date",
     "poolInfo": {
       "title": "Informations Piscine",
       "hoursTitle": "Horaires de la Piscine",
@@ -282,17 +310,22 @@
   },
   "snackBar": {
     "title": "Snack-Bar",
-    "subtitle": "En-cas et rafraîchissements",
+    "subtitle": "En-cas et rafraîchissements au bord de la piscine",
+    "freshlyMade": "Fraîchement Préparé sur Commande",
     "menu": "Menu Snack",
     "allItems": "Tous les Articles",
     "placeOrder": "Passer la Commande",
+    "unavailable": "Actuellement Indisponible",
+    "tryDifferentCategory": "Essayez de sélectionner une autre catégorie",
+    "addedToCart": "{name} ajouté au panier",
     "categories": {
       "snacks": "En-cas",
       "drinks": "Boissons Fraîches",
-      "iceCream": "Glaces"
+      "iceCream": "Glaces",
+      "sandwiches": "Sandwichs"
     },
     "order": {
-      "addToCart": "Ajouter",
+      "addToCart": "Ajouter au Panier",
       "cart": "Votre Panier",
       "checkout": "Payer",
       "pickupNumber": "Numéro de Retrait"
@@ -445,5 +478,89 @@
     "email": "info@v2resort.com",
     "followUs": "Suivez-nous",
     "copyright": "© {year} V2 Resort. Tous droits réservés."
+  },
+  "settings": {
+    "preferences": {
+      "title": "Préférences",
+      "subtitle": "Personnalisez votre expérience",
+      "done": "Terminé",
+      "animations": {
+        "title": "Animations",
+        "enableAll": "Activer les Animations",
+        "enableAllDesc": "Activer ou désactiver toutes les animations"
+      },
+      "transitions": {
+        "title": "Transitions de Page",
+        "enable": "Activer les Transitions",
+        "enableDesc": "Animer lors de la navigation entre les pages",
+        "style": "Style de Transition"
+      },
+      "loading": {
+        "title": "Écran de Chargement",
+        "enable": "Afficher l'Animation de Chargement",
+        "enableDesc": "Afficher l'animation d'introduction à la première visite"
+      }
+    }
+  },
+  "resortMap": {
+    "title": "Plan du Resort",
+    "subtitle": "Explorez nos installations",
+    "explore": "Explorer",
+    "restaurant": "Restaurant",
+    "pool": "Piscine",
+    "chalets": "Chalets",
+    "snackBar": "Snack Bar",
+    "reception": "Réception"
+  },
+  "testimonials": {
+    "badge": "Avis des Clients",
+    "title": "Ce Que Disent Nos Clients",
+    "subtitle": "Lisez les avis authentiques de clients ayant séjourné au V2 Resort",
+    "averageRating": "Note Moyenne",
+    "happyGuests": "Clients Satisfaits",
+    "recommend": "Recommandent"
+  },
+  "weather": {
+    "location": "V2 Resort, Liban",
+    "goodMorning": "Bonjour",
+    "goodAfternoon": "Bon Après-midi",
+    "goodEvening": "Bonsoir",
+    "sunny": "Ensoleillé",
+    "cloudy": "Nuageux",
+    "rainy": "Pluvieux",
+    "partlyCloudy": "Partiellement Nuageux",
+    "humidity": "Humidité",
+    "wind": "Vent",
+    "sunrise": "Lever",
+    "sunset": "Coucher",
+    "showForecast": "Voir Prévisions 5 Jours",
+    "hideForecast": "Masquer Prévisions",
+    "fiveDayForecast": "Prévisions 5 Jours",
+    "perfectFor": "Parfait pour",
+    "poolAndDining": "Piscine & Repas en Plein Air"
+  },
+  "wishlist": {
+    "title": "Ma Liste de Souhaits",
+    "itemCount": "{count} éléments sauvegardés",
+    "emptyTitle": "Votre liste est vide",
+    "emptyDescription": "Sauvegardez vos favoris pour les réserver plus tard",
+    "exploreNow": "Explorer",
+    "addToWishlist": "Ajouter aux favoris",
+    "removeFromWishlist": "Retirer des favoris",
+    "addedToWishlist": "Ajouté aux favoris",
+    "removedFromWishlist": "Retiré des favoris",
+    "clearAll": "Tout Effacer",
+    "clearedWishlist": "Liste effacée",
+    "type": {
+      "chalet": "Chalet",
+      "menu-item": "Plat",
+      "pool-session": "Session Piscine"
+    }
+  },
+  "chat": {
+    "title": "Assistant V2",
+    "online": "En ligne",
+    "placeholder": "Écrivez votre message...",
+    "suggestions": "Questions rapides"
   }
 }

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { ResortTheme, WeatherEffect, defaultTheme, defaultWeather } from '../theme-config';
 
 export type Currency = 'USD' | 'EUR' | 'LBP';
+export type TransitionStyle = 'fade' | 'slideRight' | 'slideUp' | 'scale' | 'reveal';
 
 export const currencySymbols: Record<Currency, string> = {
   USD: '$',
@@ -30,6 +31,11 @@ interface SettingsState {
   animationsEnabled: boolean;
   reducedMotion: boolean;
   
+  // Transition settings
+  enableTransitions: boolean;
+  transitionStyle: TransitionStyle;
+  enableLoadingAnimation: boolean;
+  
   // Sound settings
   soundEnabled: boolean;
   notificationSound: boolean;
@@ -45,6 +51,9 @@ interface SettingsState {
   setSoundEnabled: (enabled: boolean) => void;
   setNotificationSound: (enabled: boolean) => void;
   setCurrency: (currency: Currency) => void;
+  setEnableTransitions: (enabled: boolean) => void;
+  setTransitionStyle: (style: TransitionStyle) => void;
+  setEnableLoadingAnimation: (enabled: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -58,6 +67,9 @@ export const useSettingsStore = create<SettingsState>()(
       soundEnabled: true,
       notificationSound: true,
       currency: 'USD',
+      enableTransitions: true,
+      transitionStyle: 'reveal' as TransitionStyle,
+      enableLoadingAnimation: true,
       
       // Actions
       setResortTheme: (theme) => set({ resortTheme: theme }),
@@ -67,6 +79,9 @@ export const useSettingsStore = create<SettingsState>()(
       setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
       setNotificationSound: (enabled) => set({ notificationSound: enabled }),
       setCurrency: (currency) => set({ currency }),
+      setEnableTransitions: (enabled) => set({ enableTransitions: enabled }),
+      setTransitionStyle: (style) => set({ transitionStyle: style }),
+      setEnableLoadingAnimation: (enabled) => set({ enableLoadingAnimation: enabled }),
     }),
     {
       name: 'v2-resort-settings',
