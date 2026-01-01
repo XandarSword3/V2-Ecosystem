@@ -309,7 +309,8 @@
       "password": "Password",
       "forgotPassword": "Forgot Password?",
       "noAccount": "Don't have an account?",
-      "signUp": "Sign Up"
+      "signUp": "Sign Up",
+      "signingIn": "Signing in..."
     },
     "register": {
       "title": "Create Account",

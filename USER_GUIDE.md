@@ -203,7 +203,7 @@ Each business unit (Restaurant, Chalets, Pool) can have an admin with full contr
 
 **Test Account:**
 - Email: `admin@v2resort.com`
-- Password: `superadmin123`
+- Password: `admin123`
 - Role: `super_admin`
 
 **Main Features:**
