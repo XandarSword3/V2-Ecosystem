@@ -309,7 +309,8 @@
       "password": "Mot de passe",
       "forgotPassword": "Mot de passe oublié?",
       "noAccount": "Pas encore de compte?",
-      "signUp": "S'inscrire"
+      "signUp": "S'inscrire",
+      "signingIn": "Connexion en cours..."
     },
     "register": {
       "title": "Créer un Compte",
