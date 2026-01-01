@@ -1,0 +1,443 @@
+{
+  "common": {
+    "welcome": "مرحباً بكم في منتجع V2",
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ",
+    "retry": "إعادة المحاولة",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "add": "إضافة",
+    "search": "بحث",
+    "filter": "تصفية",
+    "sort": "ترتيب",
+    "close": "إغلاق",
+    "confirm": "تأكيد",
+    "back": "رجوع",
+    "next": "التالي",
+    "submit": "إرسال",
+    "view": "عرض",
+    "viewAll": "عرض الكل",
+    "viewDetails": "عرض التفاصيل",
+    "seeMore": "المزيد",
+    "learnMore": "اعرف المزيد",
+    "language": "اللغة",
+    "theme": "المظهر",
+    "darkMode": "الوضع الداكن",
+    "lightMode": "الوضع الفاتح",
+    "system": "النظام",
+    "logout": "تسجيل الخروج",
+    "login": "تسجيل الدخول",
+    "register": "إنشاء حساب",
+    "from": "ابتداءً من",
+    "perNight": "/ليلة",
+    "perPerson": "للشخص",
+    "guests": "ضيوف",
+    "bedrooms": "غرف نوم",
+    "bathrooms": "حمامات",
+    "spotsLeft": "{count} أماكن متبقية",
+    "soldOut": "نفدت الكمية",
+    "all": "الكل",
+    "unavailable": "غير متوفر",
+    "noItemsFound": "لم يتم العثور على عناصر",
+    "rememberMe": "تذكرني",
+    "forgotPassword": "نسيت كلمة المرور؟",
+    "fullName": "الاسم الكامل",
+    "phone": "الهاتف",
+    "confirmPassword": "تأكيد كلمة المرور"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "restaurant": "المطعم",
+    "chalets": "الشاليهات",
+    "pool": "المسبح",
+    "snackBar": "البوفيه",
+    "admin": "الإدارة",
+    "staff": "الموظفين",
+    "profile": "الملف الشخصي",
+    "settings": "الإعدادات",
+    "signIn": "تسجيل الدخول",
+    "myProfile": "ملفي الشخصي"
+  },
+  "home": {
+    "hero": {
+      "title": "مرحباً بكم في منتجع V2",
+      "titleHighlight": "منتجع V2",
+      "subtitle": "وجهتك المميزة للمأكولات الفاخرة والشاليهات المريحة وتجارب المسبح المنعشة في قلب لبنان.",
+      "cta": "اكتشف الآن",
+      "badge": "تجربة المنتجع الأولى في لبنان"
+    },
+    "services": {
+      "title": "خدماتنا",
+      "subtitle": "اكتشف كل ما يقدمه منتجع V2 لتجربة لا تُنسى",
+      "whatWeOffer": "ما نقدمه",
+      "restaurant": {
+        "title": "المطعم",
+        "description": "مأكولات فاخرة لبنانية وعالمية"
+      },
+      "snackBar": {
+        "title": "البوفيه",
+        "description": "وجبات خفيفة ومشروبات منعشة بجانب المسبح"
+      },
+      "chalets": {
+        "title": "الشاليهات",
+        "description": "شاليهات مريحة مع إطلالات جبلية خلابة"
+      },
+      "pool": {
+        "title": "المسبح",
+        "description": "جلسات مسبح منعشة لجميع أفراد العائلة"
+      }
+    },
+    "features": {
+      "title": "لماذا تختار منتجع V2؟",
+      "subtitle": "لماذا تختارنا",
+      "primeLocation": {
+        "title": "موقع مميز",
+        "description": "يقع في أحضان الجبال اللبنانية الجميلة مع إطلالات خلابة"
+      },
+      "authenticCuisine": {
+        "title": "مأكولات أصيلة",
+        "description": "أطباق لبنانية تقليدية يُعدّها طهاة متخصصون"
+      },
+      "modernAmenities": {
+        "title": "مرافق حديثة",
+        "description": "جميع الشاليهات مجهزة بواي فاي ومكيف ومطبخ والمزيد"
+      },
+      "familyFriendly": {
+        "title": "مناسب للعائلات",
+        "description": "مثالي للتجمعات العائلية والاحتفالات"
+      },
+      "restaurant": {
+        "title": "مأكولات فاخرة",
+        "description": "استمتع بأشهى المأكولات اللبنانية والعالمية"
+      },
+      "chalets": {
+        "title": "شاليهات فاخرة",
+        "description": "ملاذ جبلي مريح مع إطلالات خلابة"
+      },
+      "pool": {
+        "title": "مسبح وترفيه",
+        "description": "مسابح منعشة وأنشطة ممتعة لجميع أفراد العائلة"
+      },
+      "snackBar": {
+        "title": "البوفيه",
+        "description": "وجبات خفيفة ومشروبات منعشة بجانب المسبح"
+      }
+    },
+    "stats": {
+      "businessUnits": "وحدات الأعمال",
+      "restaurant": "المطعم",
+      "chalets": "الشاليهات",
+      "pool": "المسبح",
+      "snackBar": "البوفيه",
+      "menuItems": "+{count} صنف في القائمة",
+      "chaletUnits": "{count} وحدات",
+      "poolSessions": "{count} جلسات",
+      "fastService": "خدمة سريعة"
+    },
+    "cta": {
+      "viewMenu": "عرض القائمة",
+      "bookChalet": "احجز شاليه",
+      "bookNow": "احجز الآن",
+      "readyGetaway": "مستعد لعطلتك المثالية؟",
+      "bookStayNow": "احجز إقامتك الآن واستمتع بأفضل ما تقدمه الضيافة اللبنانية في منتجع V2",
+      "bookYourChaletNow": "احجز شاليهك الآن"
+    }
+  },
+  "restaurant": {
+    "title": "المطعم",
+    "menu": "قائمة الطعام",
+    "menuSubtitle": "اكتشف أشهى المأكولات اللبنانية والعالمية",
+    "featured": "مميز",
+    "vegetarian": "نباتي",
+    "vegan": "نباتي صرف",
+    "glutenFree": "خالي من الغلوتين",
+    "addToCart": "أضف للسلة",
+    "unavailable": "غير متوفر",
+    "proceedToCheckout": "المتابعة للدفع",
+    "itemsInCart": "{count} عناصر في السلة",
+    "categories": {
+      "appetizers": "المقبلات",
+      "mains": "الأطباق الرئيسية",
+      "desserts": "الحلويات",
+      "drinks": "المشروبات"
+    },
+    "order": {
+      "title": "طلبك",
+      "empty": "سلة التسوق فارغة",
+      "total": "المجموع",
+      "subtotal": "المجموع الفرعي",
+      "tax": "الضريبة",
+      "placeOrder": "تأكيد الطلب",
+      "orderPlaced": "تم تأكيد الطلب بنجاح!",
+      "tableNumber": "رقم الطاولة",
+      "scanQR": "امسح رمز QR للطلب"
+    },
+    "cart": {
+      "title": "سلة التسوق",
+      "empty": "سلة التسوق فارغة",
+      "clearCart": "إفراغ السلة",
+      "browseMenu": "تصفح القائمة",
+      "subtotal": "المجموع الفرعي",
+      "tax": "الضريبة ({rate}%)",
+      "total": "المجموع"
+    },
+    "status": {
+      "pending": "قيد الانتظار",
+      "confirmed": "تم التأكيد",
+      "preparing": "قيد التحضير",
+      "ready": "جاهز",
+      "served": "تم التقديم",
+      "cancelled": "ملغي"
+    }
+  },
+  "chalets": {
+    "title": "الشاليهات",
+    "subtitle": "اعثر على ملاذك المثالي في شاليهاتنا الجبلية المريحة",
+    "available": "الشاليهات المتاحة",
+    "book": "احجز الآن",
+    "details": "تفاصيل الشاليه",
+    "amenities": "المرافق",
+    "capacity": "السعة",
+    "pricePerNight": "السعر لليلة",
+    "addOns": "إضافات",
+    "from": "ابتداءً من",
+    "perNight": "/ليلة",
+    "weekendRate": "سعر نهاية الأسبوع",
+    "viewDetailsBook": "عرض التفاصيل والحجز",
+    "bookingInfo": {
+      "title": "معلومات الحجز",
+      "checkIn": "تسجيل الوصول",
+      "checkOut": "تسجيل المغادرة",
+      "deposit": "العربون",
+      "cancellationPolicy": "سياسة الإلغاء",
+      "checkInTime": "3:00 مساءً",
+      "checkOutTime": "12:00 ظهراً",
+      "depositPercent": "يتطلب عربون {percent}%",
+      "cancellationText": "إلغاء مجاني حتى 48 ساعة قبل تسجيل الوصول"
+    },
+    "booking": {
+      "checkIn": "تاريخ الوصول",
+      "checkOut": "تاريخ المغادرة",
+      "guests": "عدد الضيوف",
+      "confirm": "تأكيد الحجز",
+      "success": "تم تأكيد الحجز!",
+      "reference": "رقم الحجز"
+    },
+    "types": {
+      "standard": "عادي",
+      "deluxe": "ديلوكس",
+      "premium": "بريميوم",
+      "family": "جناح عائلي"
+    }
+  },
+  "pool": {
+    "title": "تذاكر المسبح",
+    "subtitle": "احجز تجربة مسبح منعشة",
+    "sessions": "جلسات المسبح",
+    "tickets": "احصل على تذاكر",
+    "currentCapacity": "السعة الحالية",
+    "available": "متاح",
+    "sold": "مباع",
+    "selectDate": "اختر التاريخ",
+    "availableSessions": "الجلسات المتاحة ليوم {date}",
+    "yourBooking": "حجزك",
+    "numberOfGuests": "عدد الضيوف",
+    "purchaseTickets": "شراء التذاكر",
+    "nonRefundable": "التذاكر غير قابلة للاسترداد. يرجى الحضور في الوقت المحدد.",
+    "poolInfo": {
+      "title": "معلومات المسبح",
+      "hoursTitle": "ساعات العمل",
+      "hours": "9:00 صباحاً - 7:00 مساءً",
+      "whatToBring": "ما يجب إحضاره",
+      "whatToBringList": "ملابس سباحة، منشفة، واقي شمس",
+      "amenitiesTitle": "المرافق",
+      "amenitiesList": "غرف تبديل، دوشات، خزائن، بوفيه"
+    },
+    "session": {
+      "morning": "الفترة الصباحية",
+      "afternoon": "فترة بعد الظهر",
+      "evening": "الفترة المسائية"
+    },
+    "pricing": {
+      "adult": "بالغ",
+      "child": "طفل (3-12)",
+      "infant": "رضيع (0-2)",
+      "free": "مجاني"
+    },
+    "purchase": {
+      "selectSession": "اختر الجلسة",
+      "quantity": "الكمية",
+      "totalPrice": "السعر الإجمالي",
+      "buyTickets": "شراء التذاكر",
+      "success": "تم شراء التذاكر!",
+      "qrCode": "أظهر رمز QR عند الدخول"
+    }
+  },
+  "snackBar": {
+    "title": "البوفيه",
+    "subtitle": "وجبات خفيفة ومشروبات منعشة",
+    "menu": "قائمة الوجبات الخفيفة",
+    "allItems": "جميع الأصناف",
+    "placeOrder": "تأكيد الطلب",
+    "categories": {
+      "snacks": "وجبات خفيفة",
+      "drinks": "مشروبات باردة",
+      "iceCream": "آيس كريم"
+    },
+    "order": {
+      "addToCart": "أضف للسلة",
+      "cart": "سلة التسوق",
+      "checkout": "الدفع",
+      "pickupNumber": "رقم الاستلام"
+    }
+  },
+  "auth": {
+    "welcomeBack": "مرحباً بعودتك",
+    "signInToAccount": "سجّل الدخول إلى حسابك",
+    "createAccount": "إنشاء حساب",
+    "joinUs": "انضم إلينا لتجربة مميزة",
+    "login": {
+      "title": "تسجيل الدخول",
+      "email": "البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "forgotPassword": "نسيت كلمة المرور؟",
+      "noAccount": "ليس لديك حساب؟",
+      "signUp": "إنشاء حساب"
+    },
+    "register": {
+      "title": "إنشاء حساب جديد",
+      "firstName": "الاسم الأول",
+      "lastName": "اسم العائلة",
+      "email": "البريد الإلكتروني",
+      "phone": "رقم الهاتف",
+      "password": "كلمة المرور",
+      "confirmPassword": "تأكيد كلمة المرور",
+      "hasAccount": "لديك حساب بالفعل؟",
+      "signIn": "تسجيل الدخول"
+    },
+    "errors": {
+      "invalidEmail": "البريد الإلكتروني غير صالح",
+      "invalidPassword": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
+      "passwordMismatch": "كلمات المرور غير متطابقة",
+      "loginFailed": "فشل تسجيل الدخول. يرجى التحقق من بياناتك.",
+      "registerFailed": "فشل إنشاء الحساب. يرجى المحاولة مرة أخرى."
+    }
+  },
+  "admin": {
+    "dashboard": "لوحة التحكم",
+    "users": "المستخدمين",
+    "orders": "الطلبات",
+    "inventory": "المخزون",
+    "reports": "التقارير",
+    "settings": "الإعدادات",
+    "appearance": "المظهر",
+    "menuItems": "أصناف القائمة",
+    "categories": "التصنيفات",
+    "tables": "الطاولات",
+    "chalets": "الشاليهات",
+    "pool": "المسبح",
+    "snackBar": "البوفيه",
+    "content": "المحتوى",
+    "policies": "السياسات",
+    "pricing": "التسعير",
+    "systemOnline": "النظام يعمل",
+    "stats": {
+      "totalRevenue": "إجمالي الإيرادات",
+      "todayOrders": "طلبات اليوم",
+      "todayRevenue": "إيرادات اليوم",
+      "activeBookings": "الحجوزات النشطة",
+      "poolVisitors": "زوار المسبح",
+      "vsYesterday": "مقارنة بالأمس"
+    },
+    "nav": {
+      "dashboard": "لوحة التحكم",
+      "restaurant": "المطعم",
+      "menuItems": "أصناف القائمة",
+      "menu": "القائمة",
+      "categories": "التصنيفات",
+      "orders": "الطلبات",
+      "tables": "الطاولات",
+      "chalets": "الشاليهات",
+      "allChalets": "جميع الشاليهات",
+      "bookings": "الحجوزات",
+      "pricingRules": "قواعد التسعير",
+      "addons": "الإضافات",
+      "pool": "المسبح",
+      "sessions": "الجلسات",
+      "tickets": "التذاكر",
+      "capacity": "السعة",
+      "snackBar": "الوجبات الخفيفة",
+      "users": "المستخدمون",
+      "reports": "التقارير",
+      "settings": "الإعدادات",
+      "general": "عام",
+      "appearance": "المظهر",
+      "payments": "الدفعات",
+      "notifications": "الإشعارات",
+      "auditLogs": "سجلات التدقيق"
+    }
+  },
+  "staff": {
+    "portal": "بوابة الموظفين",
+    "kitchen": {
+      "title": "شاشة المطبخ",
+      "newOrders": "طلبات جديدة",
+      "inProgress": "قيد التحضير",
+      "completed": "مكتملة"
+    },
+    "reception": {
+      "title": "الاستقبال",
+      "checkIns": "تسجيل الوصول اليوم",
+      "checkOuts": "تسجيل المغادرة اليوم"
+    },
+    "poolGuard": {
+      "title": "إدارة المسبح",
+      "currentGuests": "الضيوف الحاليين",
+      "scanTicket": "مسح التذكرة"
+    },
+    "nav": {
+      "kitchen": "المطبخ",
+      "snackBar": "البوفيه",
+      "chalets": "الشاليهات",
+      "pool": "المسبح",
+      "bookings": "الحجوزات",
+      "ticketScanner": "ماسح التذاكر"
+    },
+    "orders": {
+      "newOrder": "طلب جديد #{number}",
+      "orderUpdated": "تم تحديث الطلب إلى {status}",
+      "table": "طاولة {number}"
+    }
+  },
+  "payment": {
+    "method": "طريقة الدفع",
+    "cash": "نقداً",
+    "card": "بطاقة ائتمان",
+    "total": "المبلغ الإجمالي",
+    "processing": "جاري معالجة الدفع...",
+    "success": "تم الدفع بنجاح!",
+    "failed": "فشل الدفع. يرجى المحاولة مرة أخرى."
+  },
+  "notifications": {
+    "orderReady": "طلبك جاهز!",
+    "bookingConfirmed": "تم تأكيد الحجز!",
+    "paymentReceived": "تم استلام الدفع",
+    "newMessage": "رسالة جديدة"
+  },
+  "footer": {
+    "description": "وجهتك المميزة لتجارب استثنائية في لبنان.",
+    "quickLinks": "روابط سريعة",
+    "legal": "قانوني",
+    "privacyPolicy": "سياسة الخصوصية",
+    "termsOfService": "شروط الخدمة",
+    "cancellationPolicy": "سياسة الإلغاء",
+    "contact": "تواصل معنا",
+    "address": "منتجع V2، لبنان",
+    "phone": "+961 XX XXX XXX",
+    "email": "info@v2resort.com",
+    "followUs": "تابعنا",
+    "copyright": "© {year} منتجع V2. جميع الحقوق محفوظة."
+  }
+}

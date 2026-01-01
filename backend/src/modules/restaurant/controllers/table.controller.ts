@@ -1,0 +1,38 @@
+import { Request, Response, NextFunction } from 'express';
+import * as tableService from "../services/table.service";
+
+export async function getTables(req: Request, res: Response, next: NextFunction) {
+  try {
+    const tables = await tableService.getAllTables();
+    res.json({ success: true, data: tables });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createTable(req: Request, res: Response, next: NextFunction) {
+  try {
+    const table = await tableService.createTable(req.body);
+    res.status(201).json({ success: true, data: table });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateTable(req: Request, res: Response, next: NextFunction) {
+  try {
+    const table = await tableService.updateTable(req.params.id, req.body);
+    res.json({ success: true, data: table });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteTable(req: Request, res: Response, next: NextFunction) {
+  try {
+    await tableService.deleteTable(req.params.id);
+    res.json({ success: true, message: 'Table deleted' });
+  } catch (error) {
+    next(error);
+  }
+}

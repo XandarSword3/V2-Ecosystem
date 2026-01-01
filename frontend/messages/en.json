@@ -1,0 +1,443 @@
+{
+  "common": {
+    "welcome": "Welcome to V2 Resort",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "close": "Close",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "view": "View",
+    "viewAll": "View All",
+    "viewDetails": "View Details",
+    "seeMore": "See More",
+    "learnMore": "Learn more",
+    "language": "Language",
+    "theme": "Theme",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode",
+    "system": "System",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register",
+    "from": "From",
+    "perNight": "/night",
+    "perPerson": "per person",
+    "guests": "guests",
+    "bedrooms": "bedrooms",
+    "bathrooms": "bathrooms",
+    "spotsLeft": "{count} spots left",
+    "soldOut": "Sold Out",
+    "all": "All",
+    "unavailable": "Unavailable",
+    "noItemsFound": "No items found",
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot password?",
+    "fullName": "Full Name",
+    "phone": "Phone",
+    "confirmPassword": "Confirm Password"
+  },
+  "nav": {
+    "home": "Home",
+    "restaurant": "Restaurant",
+    "chalets": "Chalets",
+    "pool": "Pool",
+    "snackBar": "Snack Bar",
+    "admin": "Admin",
+    "staff": "Staff",
+    "profile": "Profile",
+    "settings": "Settings",
+    "signIn": "Sign In",
+    "myProfile": "My Profile"
+  },
+  "home": {
+    "hero": {
+      "title": "Welcome to V2 Resort",
+      "titleHighlight": "V2 Resort",
+      "subtitle": "Your premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences in the heart of Lebanon.",
+      "cta": "Explore Now",
+      "badge": "Lebanon's Premier Resort Experience"
+    },
+    "services": {
+      "title": "Our Services",
+      "subtitle": "Discover everything V2 Resort has to offer for an unforgettable experience",
+      "whatWeOffer": "What We Offer",
+      "restaurant": {
+        "title": "Restaurant",
+        "description": "Fine dining with Lebanese and international cuisine"
+      },
+      "snackBar": {
+        "title": "Snack Bar",
+        "description": "Quick bites and refreshments by the pool"
+      },
+      "chalets": {
+        "title": "Chalets",
+        "description": "Comfortable chalets with stunning mountain views"
+      },
+      "pool": {
+        "title": "Pool",
+        "description": "Refreshing pool sessions for the whole family"
+      }
+    },
+    "features": {
+      "title": "Why Choose V2 Resort?",
+      "subtitle": "Why Choose Us",
+      "primeLocation": {
+        "title": "Prime Location",
+        "description": "Nestled in the beautiful Lebanese mountains with stunning views"
+      },
+      "authenticCuisine": {
+        "title": "Authentic Cuisine",
+        "description": "Traditional Lebanese dishes prepared by expert chefs"
+      },
+      "modernAmenities": {
+        "title": "Modern Amenities",
+        "description": "All chalets equipped with WiFi, AC, kitchen, and more"
+      },
+      "familyFriendly": {
+        "title": "Family Friendly",
+        "description": "Perfect for family gatherings and celebrations"
+      },
+      "restaurant": {
+        "title": "Fine Dining",
+        "description": "Experience exquisite Lebanese and international cuisine"
+      },
+      "chalets": {
+        "title": "Luxury Chalets",
+        "description": "Cozy mountain retreats with stunning views"
+      },
+      "pool": {
+        "title": "Pool & Recreation",
+        "description": "Refreshing pools and exciting activities for the whole family"
+      },
+      "snackBar": {
+        "title": "Snack Bar",
+        "description": "Quick bites and refreshments by the pool"
+      }
+    },
+    "stats": {
+      "businessUnits": "Business Units",
+      "restaurant": "Restaurant",
+      "chalets": "Chalets",
+      "pool": "Pool",
+      "snackBar": "Snack Bar",
+      "menuItems": "{count}+ Menu Items",
+      "chaletUnits": "{count} Units",
+      "poolSessions": "{count} Sessions",
+      "fastService": "Fast Service"
+    },
+    "cta": {
+      "viewMenu": "View Menu",
+      "bookChalet": "Book a Chalet",
+      "bookNow": "Book Now",
+      "readyGetaway": "Ready for Your Perfect Getaway?",
+      "bookStayNow": "Book your stay now and experience the best of Lebanese hospitality at V2 Resort",
+      "bookYourChaletNow": "Book Your Chalet Now"
+    }
+  },
+  "restaurant": {
+    "title": "Restaurant",
+    "menu": "Our Menu",
+    "menuSubtitle": "Discover our delicious Lebanese and international cuisine",
+    "featured": "Featured",
+    "vegetarian": "Vegetarian",
+    "vegan": "Vegan",
+    "glutenFree": "Gluten-Free",
+    "addToCart": "Add to Cart",
+    "unavailable": "Unavailable",
+    "proceedToCheckout": "Proceed to Checkout",
+    "itemsInCart": "{count} items in cart",
+    "categories": {
+      "appetizers": "Appetizers",
+      "mains": "Main Courses",
+      "desserts": "Desserts",
+      "drinks": "Beverages"
+    },
+    "order": {
+      "title": "Your Order",
+      "empty": "Your cart is empty",
+      "total": "Total",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "placeOrder": "Place Order",
+      "orderPlaced": "Order placed successfully!",
+      "tableNumber": "Table Number",
+      "scanQR": "Scan QR code to order"
+    },
+    "cart": {
+      "title": "Shopping Cart",
+      "empty": "Your cart is empty",
+      "clearCart": "Clear Cart",
+      "browseMenu": "Browse Menu",
+      "subtotal": "Subtotal",
+      "tax": "Tax ({rate}%)",
+      "total": "Total"
+    },
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "preparing": "Preparing",
+      "ready": "Ready",
+      "served": "Served",
+      "cancelled": "Cancelled"
+    }
+  },
+  "chalets": {
+    "title": "Chalets",
+    "subtitle": "Find your perfect getaway in our comfortable mountain chalets",
+    "available": "Available Chalets",
+    "book": "Book Now",
+    "details": "Chalet Details",
+    "amenities": "Amenities",
+    "capacity": "Capacity",
+    "pricePerNight": "Price per Night",
+    "addOns": "Add-ons",
+    "from": "From",
+    "perNight": "/night",
+    "weekendRate": "Weekend Rate",
+    "viewDetailsBook": "View Details & Book",
+    "bookingInfo": {
+      "title": "Booking Information",
+      "checkIn": "Check-in",
+      "checkOut": "Check-out",
+      "deposit": "Deposit",
+      "cancellationPolicy": "Cancellation Policy",
+      "checkInTime": "3:00 PM",
+      "checkOutTime": "12:00 PM",
+      "depositPercent": "{percent}% deposit required",
+      "cancellationText": "Free cancellation up to 48 hours before check-in"
+    },
+    "booking": {
+      "checkIn": "Check-in Date",
+      "checkOut": "Check-out Date",
+      "guests": "Number of Guests",
+      "confirm": "Confirm Booking",
+      "success": "Booking confirmed!",
+      "reference": "Booking Reference"
+    },
+    "types": {
+      "standard": "Standard",
+      "deluxe": "Deluxe",
+      "premium": "Premium",
+      "family": "Family Suite"
+    }
+  },
+  "pool": {
+    "title": "Pool Tickets",
+    "subtitle": "Book your refreshing pool experience",
+    "sessions": "Pool Sessions",
+    "tickets": "Get Tickets",
+    "currentCapacity": "Current Capacity",
+    "available": "Available",
+    "sold": "Sold",
+    "selectDate": "Select Date",
+    "availableSessions": "Available Sessions for {date}",
+    "yourBooking": "Your Booking",
+    "numberOfGuests": "Number of Guests",
+    "purchaseTickets": "Purchase Tickets",
+    "nonRefundable": "Tickets are non-refundable. Please arrive on time.",
+    "poolInfo": {
+      "title": "Pool Information",
+      "hoursTitle": "Pool Hours",
+      "hours": "9:00 AM - 7:00 PM",
+      "whatToBring": "What to Bring",
+      "whatToBringList": "Swimsuit, Towel, Sunscreen",
+      "amenitiesTitle": "Amenities",
+      "amenitiesList": "Changing Rooms, Showers, Lockers, Snack Bar"
+    },
+    "session": {
+      "morning": "Morning Session",
+      "afternoon": "Afternoon Session",
+      "evening": "Evening Session"
+    },
+    "pricing": {
+      "adult": "Adult",
+      "child": "Child (3-12)",
+      "infant": "Infant (0-2)",
+      "free": "Free"
+    },
+    "purchase": {
+      "selectSession": "Select Session",
+      "quantity": "Quantity",
+      "totalPrice": "Total Price",
+      "buyTickets": "Buy Tickets",
+      "success": "Tickets purchased!",
+      "qrCode": "Show this QR code at entrance"
+    }
+  },
+  "snackBar": {
+    "title": "Snack Bar",
+    "subtitle": "Quick bites and refreshments",
+    "menu": "Snack Menu",
+    "allItems": "All Items",
+    "placeOrder": "Place Order",
+    "categories": {
+      "snacks": "Snacks",
+      "drinks": "Cold Drinks",
+      "iceCream": "Ice Cream"
+    },
+    "order": {
+      "addToCart": "Add",
+      "cart": "Your Cart",
+      "checkout": "Checkout",
+      "pickupNumber": "Pickup Number"
+    }
+  },
+  "auth": {
+    "welcomeBack": "Welcome Back",
+    "signInToAccount": "Sign in to your account",
+    "createAccount": "Create Account",
+    "joinUs": "Join us for an amazing experience",
+    "login": {
+      "title": "Login",
+      "email": "Email",
+      "password": "Password",
+      "forgotPassword": "Forgot Password?",
+      "noAccount": "Don't have an account?",
+      "signUp": "Sign Up"
+    },
+    "register": {
+      "title": "Create Account",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "phone": "Phone Number",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "hasAccount": "Already have an account?",
+      "signIn": "Sign In"
+    },
+    "errors": {
+      "invalidEmail": "Invalid email address",
+      "invalidPassword": "Password must be at least 8 characters",
+      "passwordMismatch": "Passwords do not match",
+      "loginFailed": "Login failed. Please check your credentials.",
+      "registerFailed": "Registration failed. Please try again."
+    }
+  },
+  "admin": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "orders": "Orders",
+    "inventory": "Inventory",
+    "reports": "Reports",
+    "settings": "Settings",
+    "appearance": "Appearance",
+    "menuItems": "Menu Items",
+    "categories": "Categories",
+    "tables": "Tables",
+    "chalets": "Chalets",
+    "pool": "Pool",
+    "snackBar": "Snack Bar",
+    "content": "Content",
+    "policies": "Policies",
+    "pricing": "Pricing",
+    "systemOnline": "System Online",
+    "stats": {
+      "totalRevenue": "Total Revenue",
+      "todayOrders": "Today's Orders",
+      "todayRevenue": "Today's Revenue",
+      "activeBookings": "Active Bookings",
+      "poolVisitors": "Pool Visitors",
+      "vsYesterday": "vs yesterday"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "restaurant": "Restaurant",
+      "menuItems": "Menu Items",
+      "menu": "Menu",
+      "categories": "Categories",
+      "orders": "Orders",
+      "tables": "Tables",
+      "chalets": "Chalets",
+      "allChalets": "All Chalets",
+      "bookings": "Bookings",
+      "pricingRules": "Pricing Rules",
+      "addons": "Add-ons",
+      "pool": "Pool",
+      "sessions": "Sessions",
+      "tickets": "Tickets",
+      "capacity": "Capacity",
+      "snackBar": "Snack Bar",
+      "users": "Users",
+      "reports": "Reports",
+      "settings": "Settings",
+      "general": "General",
+      "appearance": "Appearance",
+      "payments": "Payments",
+      "notifications": "Notifications",
+      "auditLogs": "Audit Logs"
+    }
+  },
+  "staff": {
+    "portal": "Staff Portal",
+    "kitchen": {
+      "title": "Kitchen Display",
+      "newOrders": "New Orders",
+      "inProgress": "In Progress",
+      "completed": "Completed"
+    },
+    "reception": {
+      "title": "Reception",
+      "checkIns": "Check-ins Today",
+      "checkOuts": "Check-outs Today"
+    },
+    "poolGuard": {
+      "title": "Pool Management",
+      "currentGuests": "Current Guests",
+      "scanTicket": "Scan Ticket"
+    },
+    "nav": {
+      "kitchen": "Kitchen",
+      "snackBar": "Snack Bar",
+      "chalets": "Chalets",
+      "pool": "Pool",
+      "bookings": "Bookings",
+      "ticketScanner": "Ticket Scanner"
+    },
+    "orders": {
+      "newOrder": "New order #{number}",
+      "orderUpdated": "Order updated to {status}",
+      "table": "Table {number}"
+    }
+  },
+  "payment": {
+    "method": "Payment Method",
+    "cash": "Cash",
+    "card": "Credit/Debit Card",
+    "total": "Total Amount",
+    "processing": "Processing payment...",
+    "success": "Payment successful!",
+    "failed": "Payment failed. Please try again."
+  },
+  "notifications": {
+    "orderReady": "Your order is ready!",
+    "bookingConfirmed": "Booking confirmed!",
+    "paymentReceived": "Payment received",
+    "newMessage": "New message"
+  },
+  "footer": {
+    "description": "Your premium destination for exceptional experiences in Lebanon.",
+    "quickLinks": "Quick Links",
+    "legal": "Legal",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
+    "cancellationPolicy": "Cancellation Policy",
+    "contact": "Contact",
+    "address": "V2 Resort, Lebanon",
+    "phone": "+961 XX XXX XXX",
+    "email": "info@v2resort.com",
+    "followUs": "Follow Us",
+    "copyright": "© {year} V2 Resort. All rights reserved."
+  }
+}
