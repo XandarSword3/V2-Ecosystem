@@ -1,0 +1,443 @@
+{
+  "common": {
+    "welcome": "Bienvenue à V2 Resort",
+    "loading": "Chargement...",
+    "error": "Une erreur s'est produite",
+    "retry": "Réessayer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "add": "Ajouter",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "sort": "Trier",
+    "close": "Fermer",
+    "confirm": "Confirmer",
+    "back": "Retour",
+    "next": "Suivant",
+    "submit": "Soumettre",
+    "view": "Voir",
+    "viewAll": "Voir tout",
+    "viewDetails": "Voir les détails",
+    "seeMore": "Voir plus",
+    "learnMore": "En savoir plus",
+    "language": "Langue",
+    "theme": "Thème",
+    "darkMode": "Mode sombre",
+    "lightMode": "Mode clair",
+    "system": "Système",
+    "logout": "Déconnexion",
+    "login": "Connexion",
+    "register": "S'inscrire",
+    "from": "À partir de",
+    "perNight": "/nuit",
+    "perPerson": "par personne",
+    "guests": "invités",
+    "bedrooms": "chambres",
+    "bathrooms": "salles de bain",
+    "spotsLeft": "{count} places restantes",
+    "soldOut": "Complet",
+    "all": "Tout",
+    "unavailable": "Indisponible",
+    "noItemsFound": "Aucun article trouvé",
+    "rememberMe": "Se souvenir de moi",
+    "forgotPassword": "Mot de passe oublié?",
+    "fullName": "Nom complet",
+    "phone": "Téléphone",
+    "confirmPassword": "Confirmer le mot de passe"
+  },
+  "nav": {
+    "home": "Accueil",
+    "restaurant": "Restaurant",
+    "chalets": "Chalets",
+    "pool": "Piscine",
+    "snackBar": "Snack-Bar",
+    "admin": "Administration",
+    "staff": "Personnel",
+    "profile": "Profil",
+    "settings": "Paramètres",
+    "signIn": "Connexion",
+    "myProfile": "Mon Profil"
+  },
+  "home": {
+    "hero": {
+      "title": "Bienvenue à V2 Resort",
+      "titleHighlight": "V2 Resort",
+      "subtitle": "Votre destination premium pour une gastronomie exceptionnelle, des chalets confortables et des expériences de piscine rafraîchissantes au cœur du Liban.",
+      "cta": "Explorer Maintenant",
+      "badge": "L'Expérience Resort Premium du Liban"
+    },
+    "services": {
+      "title": "Nos Services",
+      "subtitle": "Découvrez tout ce que V2 Resort a à offrir pour une expérience inoubliable",
+      "whatWeOffer": "Ce Que Nous Offrons",
+      "restaurant": {
+        "title": "Restaurant",
+        "description": "Gastronomie libanaise et internationale raffinée"
+      },
+      "snackBar": {
+        "title": "Snack-Bar",
+        "description": "En-cas et rafraîchissements au bord de la piscine"
+      },
+      "chalets": {
+        "title": "Chalets",
+        "description": "Chalets confortables avec vues imprenables sur la montagne"
+      },
+      "pool": {
+        "title": "Piscine",
+        "description": "Sessions de piscine rafraîchissantes pour toute la famille"
+      }
+    },
+    "features": {
+      "title": "Pourquoi Choisir V2 Resort?",
+      "subtitle": "Pourquoi Nous Choisir",
+      "primeLocation": {
+        "title": "Emplacement Privilégié",
+        "description": "Niché dans les belles montagnes libanaises avec des vues imprenables"
+      },
+      "authenticCuisine": {
+        "title": "Cuisine Authentique",
+        "description": "Plats libanais traditionnels préparés par des chefs experts"
+      },
+      "modernAmenities": {
+        "title": "Équipements Modernes",
+        "description": "Tous les chalets équipés de WiFi, climatisation, cuisine et plus"
+      },
+      "familyFriendly": {
+        "title": "Accueil Familial",
+        "description": "Parfait pour les réunions de famille et les célébrations"
+      },
+      "restaurant": {
+        "title": "Gastronomie",
+        "description": "Découvrez la cuisine libanaise et internationale raffinée"
+      },
+      "chalets": {
+        "title": "Chalets de Luxe",
+        "description": "Retraites de montagne confortables avec vues imprenables"
+      },
+      "pool": {
+        "title": "Piscine & Loisirs",
+        "description": "Piscines rafraîchissantes et activités pour toute la famille"
+      },
+      "snackBar": {
+        "title": "Snack-Bar",
+        "description": "En-cas et rafraîchissements au bord de la piscine"
+      }
+    },
+    "stats": {
+      "businessUnits": "Unités d'Affaires",
+      "restaurant": "Restaurant",
+      "chalets": "Chalets",
+      "pool": "Piscine",
+      "snackBar": "Snack-Bar",
+      "menuItems": "{count}+ Articles au Menu",
+      "chaletUnits": "{count} Unités",
+      "poolSessions": "{count} Sessions",
+      "fastService": "Service Rapide"
+    },
+    "cta": {
+      "viewMenu": "Voir le Menu",
+      "bookChalet": "Réserver un Chalet",
+      "bookNow": "Réserver Maintenant",
+      "readyGetaway": "Prêt pour Votre Escapade Parfaite?",
+      "bookStayNow": "Réservez votre séjour maintenant et découvrez le meilleur de l'hospitalité libanaise à V2 Resort",
+      "bookYourChaletNow": "Réservez Votre Chalet Maintenant"
+    }
+  },
+  "restaurant": {
+    "title": "Restaurant",
+    "menu": "Notre Menu",
+    "menuSubtitle": "Découvrez notre délicieuse cuisine libanaise et internationale",
+    "featured": "En Vedette",
+    "vegetarian": "Végétarien",
+    "vegan": "Végan",
+    "glutenFree": "Sans Gluten",
+    "addToCart": "Ajouter au Panier",
+    "unavailable": "Indisponible",
+    "proceedToCheckout": "Passer à la Caisse",
+    "itemsInCart": "{count} articles dans le panier",
+    "categories": {
+      "appetizers": "Entrées",
+      "mains": "Plats Principaux",
+      "desserts": "Desserts",
+      "drinks": "Boissons"
+    },
+    "order": {
+      "title": "Votre Commande",
+      "empty": "Votre panier est vide",
+      "total": "Total",
+      "subtotal": "Sous-total",
+      "tax": "TVA",
+      "placeOrder": "Passer la Commande",
+      "orderPlaced": "Commande passée avec succès!",
+      "tableNumber": "Numéro de Table",
+      "scanQR": "Scannez le QR code pour commander"
+    },
+    "cart": {
+      "title": "Panier",
+      "empty": "Votre panier est vide",
+      "clearCart": "Vider le Panier",
+      "browseMenu": "Parcourir le Menu",
+      "subtotal": "Sous-total",
+      "tax": "TVA ({rate}%)",
+      "total": "Total"
+    },
+    "status": {
+      "pending": "En attente",
+      "confirmed": "Confirmée",
+      "preparing": "En préparation",
+      "ready": "Prêt",
+      "served": "Servi",
+      "cancelled": "Annulé"
+    }
+  },
+  "chalets": {
+    "title": "Chalets",
+    "subtitle": "Trouvez votre escapade parfaite dans nos chalets de montagne confortables",
+    "available": "Chalets Disponibles",
+    "book": "Réserver",
+    "details": "Détails du Chalet",
+    "amenities": "Équipements",
+    "capacity": "Capacité",
+    "pricePerNight": "Prix par Nuit",
+    "addOns": "Options",
+    "from": "À partir de",
+    "perNight": "/nuit",
+    "weekendRate": "Tarif Week-end",
+    "viewDetailsBook": "Voir les Détails et Réserver",
+    "bookingInfo": {
+      "title": "Informations de Réservation",
+      "checkIn": "Arrivée",
+      "checkOut": "Départ",
+      "deposit": "Acompte",
+      "cancellationPolicy": "Politique d'Annulation",
+      "checkInTime": "15h00",
+      "checkOutTime": "12h00",
+      "depositPercent": "Acompte de {percent}% requis",
+      "cancellationText": "Annulation gratuite jusqu'à 48 heures avant l'arrivée"
+    },
+    "booking": {
+      "checkIn": "Date d'arrivée",
+      "checkOut": "Date de départ",
+      "guests": "Nombre d'invités",
+      "confirm": "Confirmer la Réservation",
+      "success": "Réservation confirmée!",
+      "reference": "Référence de Réservation"
+    },
+    "types": {
+      "standard": "Standard",
+      "deluxe": "Deluxe",
+      "premium": "Premium",
+      "family": "Suite Familiale"
+    }
+  },
+  "pool": {
+    "title": "Billets Piscine",
+    "subtitle": "Réservez votre expérience de piscine rafraîchissante",
+    "sessions": "Sessions Piscine",
+    "tickets": "Obtenir des Billets",
+    "currentCapacity": "Capacité Actuelle",
+    "available": "Disponible",
+    "sold": "Vendu",
+    "selectDate": "Sélectionner la Date",
+    "availableSessions": "Sessions Disponibles pour {date}",
+    "yourBooking": "Votre Réservation",
+    "numberOfGuests": "Nombre d'Invités",
+    "purchaseTickets": "Acheter des Billets",
+    "nonRefundable": "Les billets ne sont pas remboursables. Veuillez arriver à l'heure.",
+    "poolInfo": {
+      "title": "Informations Piscine",
+      "hoursTitle": "Horaires de la Piscine",
+      "hours": "9h00 - 19h00",
+      "whatToBring": "Quoi Apporter",
+      "whatToBringList": "Maillot de bain, Serviette, Crème solaire",
+      "amenitiesTitle": "Équipements",
+      "amenitiesList": "Vestiaires, Douches, Casiers, Snack-Bar"
+    },
+    "session": {
+      "morning": "Session Matinale",
+      "afternoon": "Session Après-midi",
+      "evening": "Session Soirée"
+    },
+    "pricing": {
+      "adult": "Adulte",
+      "child": "Enfant (3-12)",
+      "infant": "Bébé (0-2)",
+      "free": "Gratuit"
+    },
+    "purchase": {
+      "selectSession": "Sélectionner la Session",
+      "quantity": "Quantité",
+      "totalPrice": "Prix Total",
+      "buyTickets": "Acheter des Billets",
+      "success": "Billets achetés!",
+      "qrCode": "Présentez ce QR code à l'entrée"
+    }
+  },
+  "snackBar": {
+    "title": "Snack-Bar",
+    "subtitle": "En-cas et rafraîchissements",
+    "menu": "Menu Snack",
+    "allItems": "Tous les Articles",
+    "placeOrder": "Passer la Commande",
+    "categories": {
+      "snacks": "En-cas",
+      "drinks": "Boissons Fraîches",
+      "iceCream": "Glaces"
+    },
+    "order": {
+      "addToCart": "Ajouter",
+      "cart": "Votre Panier",
+      "checkout": "Payer",
+      "pickupNumber": "Numéro de Retrait"
+    }
+  },
+  "auth": {
+    "welcomeBack": "Bon Retour",
+    "signInToAccount": "Connectez-vous à votre compte",
+    "createAccount": "Créer un Compte",
+    "joinUs": "Rejoignez-nous pour une expérience incroyable",
+    "login": {
+      "title": "Connexion",
+      "email": "Email",
+      "password": "Mot de passe",
+      "forgotPassword": "Mot de passe oublié?",
+      "noAccount": "Pas encore de compte?",
+      "signUp": "S'inscrire"
+    },
+    "register": {
+      "title": "Créer un Compte",
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "email": "Email",
+      "phone": "Téléphone",
+      "password": "Mot de passe",
+      "confirmPassword": "Confirmer le Mot de passe",
+      "hasAccount": "Déjà un compte?",
+      "signIn": "Se connecter"
+    },
+    "errors": {
+      "invalidEmail": "Adresse email invalide",
+      "invalidPassword": "Le mot de passe doit contenir au moins 8 caractères",
+      "passwordMismatch": "Les mots de passe ne correspondent pas",
+      "loginFailed": "Échec de la connexion. Vérifiez vos identifiants.",
+      "registerFailed": "Échec de l'inscription. Veuillez réessayer."
+    }
+  },
+  "admin": {
+    "dashboard": "Tableau de Bord",
+    "users": "Utilisateurs",
+    "orders": "Commandes",
+    "inventory": "Inventaire",
+    "reports": "Rapports",
+    "settings": "Paramètres",
+    "appearance": "Apparence",
+    "menuItems": "Articles du Menu",
+    "categories": "Catégories",
+    "tables": "Tables",
+    "chalets": "Chalets",
+    "pool": "Piscine",
+    "snackBar": "Snack-Bar",
+    "content": "Contenu",
+    "policies": "Politiques",
+    "pricing": "Tarification",
+    "systemOnline": "Système en Ligne",
+    "stats": {
+      "totalRevenue": "Revenu Total",
+      "todayOrders": "Commandes du Jour",
+      "todayRevenue": "Revenu du Jour",
+      "activeBookings": "Réservations Actives",
+      "poolVisitors": "Visiteurs Piscine",
+      "vsYesterday": "vs hier"
+    },
+    "nav": {
+      "dashboard": "Tableau de Bord",
+      "restaurant": "Restaurant",
+      "menuItems": "Articles du Menu",
+      "menu": "Menu",
+      "categories": "Catégories",
+      "orders": "Commandes",
+      "tables": "Tables",
+      "chalets": "Chalets",
+      "allChalets": "Tous les Chalets",
+      "bookings": "Réservations",
+      "pricingRules": "Règles de Tarification",
+      "addons": "Options",
+      "pool": "Piscine",
+      "sessions": "Séances",
+      "tickets": "Billets",
+      "capacity": "Capacité",
+      "snackBar": "Snack-Bar",
+      "users": "Utilisateurs",
+      "reports": "Rapports",
+      "settings": "Paramètres",
+      "general": "Général",
+      "appearance": "Apparence",
+      "payments": "Paiements",
+      "notifications": "Notifications",
+      "auditLogs": "Journaux d'Audit"
+    }
+  },
+  "staff": {
+    "portal": "Portail du Personnel",
+    "kitchen": {
+      "title": "Affichage Cuisine",
+      "newOrders": "Nouvelles Commandes",
+      "inProgress": "En Cours",
+      "completed": "Terminées"
+    },
+    "reception": {
+      "title": "Réception",
+      "checkIns": "Arrivées Aujourd'hui",
+      "checkOuts": "Départs Aujourd'hui"
+    },
+    "poolGuard": {
+      "title": "Gestion Piscine",
+      "currentGuests": "Visiteurs Actuels",
+      "scanTicket": "Scanner Billet"
+    },
+    "nav": {
+      "kitchen": "Cuisine",
+      "snackBar": "Snack-Bar",
+      "chalets": "Chalets",
+      "pool": "Piscine",
+      "bookings": "Réservations",
+      "ticketScanner": "Scanner de Billets"
+    },
+    "orders": {
+      "newOrder": "Nouvelle commande #{number}",
+      "orderUpdated": "Commande mise à jour: {status}",
+      "table": "Table {number}"
+    }
+  },
+  "payment": {
+    "method": "Mode de Paiement",
+    "cash": "Espèces",
+    "card": "Carte de Crédit/Débit",
+    "total": "Montant Total",
+    "processing": "Traitement du paiement...",
+    "success": "Paiement réussi!",
+    "failed": "Échec du paiement. Veuillez réessayer."
+  },
+  "notifications": {
+    "orderReady": "Votre commande est prête!",
+    "bookingConfirmed": "Réservation confirmée!",
+    "paymentReceived": "Paiement reçu",
+    "newMessage": "Nouveau message"
+  },
+  "footer": {
+    "description": "Votre destination premium pour des expériences exceptionnelles au Liban.",
+    "quickLinks": "Liens Rapides",
+    "legal": "Mentions Légales",
+    "privacyPolicy": "Politique de Confidentialité",
+    "termsOfService": "Conditions d'Utilisation",
+    "cancellationPolicy": "Politique d'Annulation",
+    "contact": "Contact",
+    "address": "V2 Resort, Liban",
+    "phone": "+961 XX XXX XXX",
+    "email": "info@v2resort.com",
+    "followUs": "Suivez-nous",
+    "copyright": "© {year} V2 Resort. Tous droits réservés."
+  }
+}
