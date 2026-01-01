@@ -50,7 +50,21 @@
     "checkBackLater": "Check back later for updates",
     "andMore": "+{count} more",
     "items": "items",
-    "total": "Total"
+    "total": "Total",
+    "optional": "(Optional)",
+    "contactUs": "Contact Us",
+    "weAreHereToHelp": "We're here to help",
+    "messageSent": "Message Sent!",
+    "weWillGetBack": "We'll get back to you as soon as possible.",
+    "name": "Name",
+    "email": "Email",
+    "message": "Message",
+    "send": "Send",
+    "selectSubject": "Select a subject",
+    "reservation": "Reservation",
+    "generalInquiry": "General Inquiry",
+    "feedback": "Feedback",
+    "complaint": "Complaint"
   },
   "nav": {
     "home": "Home",
@@ -153,15 +167,26 @@
   "restaurant": {
     "title": "Restaurant",
     "menu": "Our Menu",
-    "menuSubtitle": "Discover our delicious Lebanese and international cuisine",
+    "menuSubtitle": "Discover our delicious Lebanese and international cuisine, crafted with passion",
     "featured": "Featured",
+    "featuredDishes": "Chef's Featured Dishes",
+    "showAll": "Show All",
+    "viewFeatured": "View Featured",
+    "authenticLebanese": "Authentic Lebanese Cuisine",
+    "dishes": "Dishes",
+    "categories": "Categories",
+    "rating": "Rating",
+    "minutes": "min",
+    "loadingMenu": "Loading our delicious menu...",
     "vegetarian": "Vegetarian",
     "vegan": "Vegan",
     "glutenFree": "Gluten-Free",
     "addToCart": "Add to Cart",
+    "addedToCart": "{item} added to cart",
     "unavailable": "Unavailable",
-    "proceedToCheckout": "Proceed to Checkout",
+    "proceedToCheckout": "Checkout",
     "itemsInCart": "{count} items in cart",
+    "tryDifferentCategory": "Try selecting a different category",
     "categories": {
       "appetizers": "Appetizers",
       "mains": "Main Courses",
@@ -243,6 +268,7 @@
     "sessions": "Pool Sessions",
     "tickets": "Get Tickets",
     "currentCapacity": "Current Capacity",
+    "capacity": "Capacity",
     "available": "Available",
     "sold": "Sold",
     "selectDate": "Select Date",
@@ -251,6 +277,8 @@
     "numberOfGuests": "Number of Guests",
     "purchaseTickets": "Purchase Tickets",
     "nonRefundable": "Tickets are non-refundable. Please arrive on time.",
+    "noSessionsAvailable": "No sessions available",
+    "selectDifferentDate": "Please select a different date",
     "poolInfo": {
       "title": "Pool Information",
       "hoursTitle": "Pool Hours",
@@ -282,17 +310,22 @@
   },
   "snackBar": {
     "title": "Snack Bar",
-    "subtitle": "Quick bites and refreshments",
+    "subtitle": "Quick bites and refreshments poolside",
+    "freshlyMade": "Freshly Made to Order",
     "menu": "Snack Menu",
     "allItems": "All Items",
     "placeOrder": "Place Order",
+    "unavailable": "Currently Unavailable",
+    "tryDifferentCategory": "Try selecting a different category",
+    "addedToCart": "{name} added to cart",
     "categories": {
       "snacks": "Snacks",
       "drinks": "Cold Drinks",
-      "iceCream": "Ice Cream"
+      "iceCream": "Ice Cream",
+      "sandwiches": "Sandwiches"
     },
     "order": {
-      "addToCart": "Add",
+      "addToCart": "Add to Cart",
       "cart": "Your Cart",
       "checkout": "Checkout",
       "pickupNumber": "Pickup Number"
@@ -445,5 +478,89 @@
     "email": "info@v2resort.com",
     "followUs": "Follow Us",
     "copyright": "© {year} V2 Resort. All rights reserved."
+  },
+  "settings": {
+    "preferences": {
+      "title": "Preferences",
+      "subtitle": "Customize your experience",
+      "done": "Done",
+      "animations": {
+        "title": "Animations",
+        "enableAll": "Enable Animations",
+        "enableAllDesc": "Toggle all animations on or off"
+      },
+      "transitions": {
+        "title": "Page Transitions",
+        "enable": "Enable Page Transitions",
+        "enableDesc": "Animate when navigating between pages",
+        "style": "Transition Style"
+      },
+      "loading": {
+        "title": "Loading Screen",
+        "enable": "Show Loading Animation",
+        "enableDesc": "Display grand intro animation on first visit"
+      }
+    }
+  },
+  "resortMap": {
+    "title": "Resort Map",
+    "subtitle": "Explore our facilities",
+    "explore": "Explore",
+    "restaurant": "Restaurant",
+    "pool": "Swimming Pool",
+    "chalets": "Chalets",
+    "snackBar": "Snack Bar",
+    "reception": "Reception"
+  },
+  "testimonials": {
+    "badge": "Guest Reviews",
+    "title": "What Our Guests Say",
+    "subtitle": "Read authentic reviews from guests who have experienced V2 Resort",
+    "averageRating": "Average Rating",
+    "happyGuests": "Happy Guests",
+    "recommend": "Would Recommend"
+  },
+  "weather": {
+    "location": "V2 Resort, Lebanon",
+    "goodMorning": "Good Morning",
+    "goodAfternoon": "Good Afternoon",
+    "goodEvening": "Good Evening",
+    "sunny": "Sunny",
+    "cloudy": "Cloudy",
+    "rainy": "Rainy",
+    "partlyCloudy": "Partly Cloudy",
+    "humidity": "Humidity",
+    "wind": "Wind",
+    "sunrise": "Sunrise",
+    "sunset": "Sunset",
+    "showForecast": "Show 5-Day Forecast",
+    "hideForecast": "Hide Forecast",
+    "fiveDayForecast": "5-Day Forecast",
+    "perfectFor": "Perfect for",
+    "poolAndDining": "Pool & Outdoor Dining"
+  },
+  "wishlist": {
+    "title": "My Wishlist",
+    "itemCount": "{count} items saved",
+    "emptyTitle": "Your wishlist is empty",
+    "emptyDescription": "Save your favorite items to book later",
+    "exploreNow": "Explore Now",
+    "addToWishlist": "Add to wishlist",
+    "removeFromWishlist": "Remove from wishlist",
+    "addedToWishlist": "Added to wishlist",
+    "removedFromWishlist": "Removed from wishlist",
+    "clearAll": "Clear All",
+    "clearedWishlist": "Wishlist cleared",
+    "type": {
+      "chalet": "Chalet",
+      "menu-item": "Menu Item",
+      "pool-session": "Pool Session"
+    }
+  },
+  "chat": {
+    "title": "V2 Assistant",
+    "online": "Online now",
+    "placeholder": "Type your message...",
+    "suggestions": "Quick questions"
   }
 }

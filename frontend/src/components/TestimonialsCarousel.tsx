@@ -1,0 +1,338 @@
+'use client';
+
+import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
+import { Star, Quote, ChevronLeft, ChevronRight, User, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+interface Testimonial {
+  id: string;
+  name: string;
+  role: string;
+  avatar?: string;
+  rating: number;
+  text: string;
+  date: string;
+}
+
+interface ReviewsResponse {
+  reviews: Array<{
+    id: string;
+    rating: number;
+    text: string;
+    service_type: string;
+    created_at: string;
+    user: {
+      first_name: string;
+      last_name: string;
+    };
+  }>;
+  stats: {
+    average_rating: number;
+    total_reviews: number;
+  };
+}
+
+// Fallback testimonials in case API is unavailable
+const fallbackTestimonials: Testimonial[] = [
+  {
+    id: '1',
+    name: 'Sarah Mitchell',
+    role: 'Tourist from UK',
+    rating: 5,
+    text: 'Absolutely stunning resort! The chalets have breathtaking mountain views and the staff went above and beyond to make our stay memorable.',
+    date: '2024-01-15',
+  },
+  {
+    id: '2',
+    name: 'أحمد خليل',
+    role: 'ضيف محلي',
+    rating: 5,
+    text: 'أفضل منتجع في لبنان! الطعام اللبناني الأصيل والخدمة الممتازة جعلت إقامتنا لا تُنسى. نوصي به بشدة!',
+    date: '2024-01-10',
+  },
+  {
+    id: '3',
+    name: 'Marie Dubois',
+    role: 'Touriste de France',
+    rating: 5,
+    text: 'Une expérience inoubliable! La piscine est magnifique et le snack-bar propose des plats délicieux. Nous reviendrons certainement!',
+    date: '2024-01-05',
+  },
+  {
+    id: '4',
+    name: 'James Wilson',
+    role: 'Business Traveler',
+    rating: 4,
+    text: 'Great facilities for both work and relaxation. The WiFi was excellent and the restaurant served delicious Lebanese cuisine.',
+    date: '2023-12-28',
+  },
+  {
+    id: '5',
+    name: 'لينا حداد',
+    role: 'زائرة متكررة',
+    rating: 5,
+    text: 'هذا المكان يشعرني بالراحة دائماً. فريق العمل يعرفني بالاسم والخدمة دائماً استثنائية. منزلي الثاني!',
+    date: '2023-12-20',
+  },
+];
+
+const serviceTypeLabels: Record<string, string> = {
+  general: 'Resort Guest',
+  restaurant: 'Restaurant Guest',
+  pool: 'Pool Guest',
+  chalets: 'Chalet Guest',
+  snack_bar: 'Snack Bar Guest',
+};
+
+export default function TestimonialsCarousel() {
+  const t = useTranslations('testimonials');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(fallbackTestimonials);
+  const [stats, setStats] = useState({ average_rating: 4.9, total_reviews: 500 });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch reviews from API
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/reviews`);
+        if (response.ok) {
+          const data: ReviewsResponse = await response.json();
+          if (data.reviews && data.reviews.length > 0) {
+            const mappedTestimonials: Testimonial[] = data.reviews.map((review) => ({
+              id: review.id,
+              name: `${review.user.first_name} ${review.user.last_name}`,
+              role: serviceTypeLabels[review.service_type] || 'Guest',
+              rating: review.rating,
+              text: review.text,
+              date: review.created_at.split('T')[0],
+            }));
+            setTestimonials(mappedTestimonials);
+            setStats(data.stats);
+          }
+        }
+      } catch (error) {
+        console.log('Using fallback testimonials');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchReviews();
+  }, []);
+
+  useEffect(() => {
+    if (!isAutoPlaying) return;
+    
+    const interval = setInterval(() => {
+      setDirection(1);
+      setCurrentIndex((prev) => (prev + 1) % testimonials.length);
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [isAutoPlaying]);
+
+  const slideVariants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? 300 : -300,
+      opacity: 0,
+      scale: 0.9,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+      scale: 1,
+      transition: {
+        x: { type: 'spring' as const, stiffness: 300, damping: 30 },
+        opacity: { duration: 0.3 },
+        scale: { duration: 0.3 },
+      },
+    },
+    exit: (direction: number) => ({
+      x: direction < 0 ? 300 : -300,
+      opacity: 0,
+      scale: 0.9,
+      transition: {
+        x: { type: 'spring' as const, stiffness: 300, damping: 30 },
+        opacity: { duration: 0.3 },
+        scale: { duration: 0.3 },
+      },
+    }),
+  };
+
+  const goTo = (index: number) => {
+    setDirection(index > currentIndex ? 1 : -1);
+    setCurrentIndex(index);
+    setIsAutoPlaying(false);
+    setTimeout(() => setIsAutoPlaying(true), 10000);
+  };
+
+  const goNext = () => {
+    setDirection(1);
+    setCurrentIndex((prev) => (prev + 1) % testimonials.length);
+    setIsAutoPlaying(false);
+    setTimeout(() => setIsAutoPlaying(true), 10000);
+  };
+
+  const goPrev = () => {
+    setDirection(-1);
+    setCurrentIndex((prev) => (prev - 1 + testimonials.length) % testimonials.length);
+    setIsAutoPlaying(false);
+    setTimeout(() => setIsAutoPlaying(true), 10000);
+  };
+
+  const currentTestimonial = testimonials[currentIndex];
+
+  return (
+    <div className="relative">
+      {/* Background decoration */}
+      <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-3xl" />
+      
+      {/* Quote decoration */}
+      <div className="absolute top-8 left-8 opacity-10">
+        <Quote className="w-24 h-24 text-amber-600" />
+      </div>
+      
+      <div className="relative px-8 py-12 md:px-16">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <span className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/30 rounded-full text-amber-700 dark:text-amber-400 text-sm font-medium mb-4">
+              <Star className="w-4 h-4 fill-current" />
+              {t('badge')}
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-2">
+              {t('title')}
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+              {t('subtitle')}
+            </p>
+          </motion.div>
+        </div>
+
+        {/* Carousel */}
+        <div className="relative max-w-3xl mx-auto">
+          {/* Navigation buttons */}
+          <button
+            onClick={goPrev}
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 md:-translate-x-12 z-10 w-12 h-12 rounded-full bg-white dark:bg-slate-700 shadow-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-amber-50 dark:hover:bg-slate-600 transition-colors"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <button
+            onClick={goNext}
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 md:translate-x-12 z-10 w-12 h-12 rounded-full bg-white dark:bg-slate-700 shadow-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-amber-50 dark:hover:bg-slate-600 transition-colors"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+
+          {/* Testimonial Card */}
+          <div className="overflow-hidden">
+            <AnimatePresence mode="wait" custom={direction}>
+              <motion.div
+                key={currentIndex}
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 md:p-10"
+              >
+                {/* Stars */}
+                <div className="flex gap-1 mb-6 justify-center">
+                  {[...Array(5)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, scale: 0 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.1 }}
+                    >
+                      <Star
+                        className={`w-6 h-6 ${
+                          i < currentTestimonial.rating
+                            ? 'text-yellow-400 fill-yellow-400'
+                            : 'text-slate-300 dark:text-slate-600'
+                        }`}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Quote text */}
+                <blockquote className="text-lg md:text-xl text-slate-700 dark:text-slate-300 text-center mb-8 leading-relaxed">
+                  "{currentTestimonial.text}"
+                </blockquote>
+
+                {/* Author */}
+                <div className="flex items-center justify-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-xl font-bold shadow-lg">
+                    {currentTestimonial.avatar ? (
+                      <img
+                        src={currentTestimonial.avatar}
+                        alt={currentTestimonial.name}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      currentTestimonial.name.charAt(0)
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold text-slate-900 dark:text-white">
+                      {currentTestimonial.name}
+                    </div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      {currentTestimonial.role}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Dots navigation */}
+          <div className="flex justify-center gap-2 mt-6">
+            {testimonials.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goTo(index)}
+                className={`w-2.5 h-2.5 rounded-full transition-all ${
+                  index === currentIndex
+                    ? 'bg-amber-500 w-8'
+                    : 'bg-slate-300 dark:bg-slate-600 hover:bg-amber-300'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.3 }}
+          className="grid grid-cols-3 gap-4 mt-12 max-w-2xl mx-auto"
+        >
+          <div className="text-center">
+            <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.average_rating.toFixed(1)}</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">{t('averageRating')}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.total_reviews}+</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">{t('happyGuests')}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">98%</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">{t('recommend')}</div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}

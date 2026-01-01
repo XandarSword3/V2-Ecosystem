@@ -120,14 +120,14 @@ export default function RestaurantKitchenPage() {
 
   return (
     <div className="space-y-6">
-        {/* Status Summary */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {[
-            { status: 'pending', label: 'Pending', icon: Bell, color: 'bg-yellow-500' },
-            { status: 'confirmed', label: 'Confirmed', icon: CheckCircle, color: 'bg-blue-500' },
-            { status: 'preparing', label: 'Preparing', icon: ChefHat, color: 'bg-orange-500' },
-            { status: 'ready', label: 'Ready', icon: UtensilsCrossed, color: 'bg-green-500' },
-          ].map(({ status, label, icon: Icon, color }) => (
+      {/* Status Summary */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        {[
+          { status: 'pending', label: 'Pending', icon: Bell, color: 'bg-yellow-500' },
+          { status: 'confirmed', label: 'Confirmed', icon: CheckCircle, color: 'bg-blue-500' },
+          { status: 'preparing', label: 'Preparing', icon: ChefHat, color: 'bg-orange-500' },
+          { status: 'ready', label: 'Ready', icon: UtensilsCrossed, color: 'bg-green-500' },
+        ].map(({ status, label, icon: Icon, color }) => (
             <button
               key={status}
               onClick={() => setSelectedStatus(selectedStatus === status ? null : status)}
@@ -231,7 +231,6 @@ export default function RestaurantKitchenPage() {
             </div>
           ))}
         </div>
-      </div>
     </div>
   );
 }

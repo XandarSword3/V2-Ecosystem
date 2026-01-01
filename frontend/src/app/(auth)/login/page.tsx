@@ -8,6 +8,33 @@ import { toast } from 'sonner';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
+// Helper function to determine redirect path based on user roles
+const getRedirectPath = (roles: string[]): string => {
+  // Check for admin roles first
+  if (roles.includes('super_admin') || roles.includes('admin')) {
+    return '/admin';
+  }
+  // Check for specific admin roles
+  if (roles.includes('restaurant_admin') || roles.includes('chalet_admin') || roles.includes('pool_admin')) {
+    return '/admin';
+  }
+  // Check for staff roles
+  if (roles.includes('restaurant_staff')) {
+    return '/staff/restaurant';
+  }
+  if (roles.includes('chalet_staff')) {
+    return '/staff/chalets';
+  }
+  if (roles.includes('pool_staff')) {
+    return '/staff/pool';
+  }
+  if (roles.includes('snack_staff')) {
+    return '/staff/snack-bar';
+  }
+  // Default to home for customers
+  return '/';
+};
+
 export default function LoginPage() {
   const t = useTranslations('auth');
   const tCommon = useTranslations('common');
@@ -23,12 +50,16 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
-      toast.success('Welcome back!');
-      router.push('/');
+      const user = await login(email, password);
+      toast.success(t('welcomeBack'));
+      
+      // Redirect based on user role
+      const redirectPath = getRedirectPath(user?.roles || []);
+      
+      // Use window.location for a full page navigation to ensure auth state is fresh
+      window.location.href = redirectPath;
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Invalid credentials');
-    } finally {
       setIsLoading(false);
     }
   };

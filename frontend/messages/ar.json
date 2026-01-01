@@ -50,7 +50,21 @@
     "checkBackLater": "تحقق مرة أخرى لاحقاً للحصول على التحديثات",
     "andMore": "+{count} المزيد",
     "items": "عناصر",
-    "total": "المجموع"
+    "total": "المجموع",
+    "optional": "(اختياري)",
+    "contactUs": "تواصل معنا",
+    "weAreHereToHelp": "نحن هنا للمساعدة",
+    "messageSent": "تم إرسال الرسالة!",
+    "weWillGetBack": "سنرد عليك في أقرب وقت ممكن.",
+    "name": "الاسم",
+    "email": "البريد الإلكتروني",
+    "message": "الرسالة",
+    "send": "إرسال",
+    "selectSubject": "اختر موضوعاً",
+    "reservation": "حجز",
+    "generalInquiry": "استفسار عام",
+    "feedback": "ملاحظات",
+    "complaint": "شكوى"
   },
   "nav": {
     "home": "الرئيسية",
@@ -153,15 +167,26 @@
   "restaurant": {
     "title": "المطعم",
     "menu": "قائمة الطعام",
-    "menuSubtitle": "اكتشف أشهى المأكولات اللبنانية والعالمية",
+    "menuSubtitle": "اكتشف أشهى المأكولات اللبنانية والعالمية، محضّرة بشغف",
     "featured": "مميز",
+    "featuredDishes": "أطباق الشيف المميزة",
+    "showAll": "عرض الكل",
+    "viewFeatured": "عرض المميز",
+    "authenticLebanese": "المطبخ اللبناني الأصيل",
+    "dishes": "طبق",
+    "categories": "الفئات",
+    "rating": "التقييم",
+    "minutes": "دقيقة",
+    "loadingMenu": "جاري تحميل القائمة...",
     "vegetarian": "نباتي",
     "vegan": "نباتي صرف",
     "glutenFree": "خالي من الغلوتين",
     "addToCart": "أضف للسلة",
+    "addedToCart": "تمت إضافة {item} إلى السلة",
     "unavailable": "غير متوفر",
-    "proceedToCheckout": "المتابعة للدفع",
+    "proceedToCheckout": "الدفع",
     "itemsInCart": "{count} عناصر في السلة",
+    "tryDifferentCategory": "جرب اختيار فئة مختلفة",
     "categories": {
       "appetizers": "المقبلات",
       "mains": "الأطباق الرئيسية",
@@ -243,6 +268,7 @@
     "sessions": "جلسات المسبح",
     "tickets": "احصل على تذاكر",
     "currentCapacity": "السعة الحالية",
+    "capacity": "السعة",
     "available": "متاح",
     "sold": "مباع",
     "selectDate": "اختر التاريخ",
@@ -251,6 +277,8 @@
     "numberOfGuests": "عدد الضيوف",
     "purchaseTickets": "شراء التذاكر",
     "nonRefundable": "التذاكر غير قابلة للاسترداد. يرجى الحضور في الوقت المحدد.",
+    "noSessionsAvailable": "لا توجد جلسات متاحة",
+    "selectDifferentDate": "يرجى اختيار تاريخ مختلف",
     "poolInfo": {
       "title": "معلومات المسبح",
       "hoursTitle": "ساعات العمل",
@@ -282,14 +310,19 @@
   },
   "snackBar": {
     "title": "البوفيه",
-    "subtitle": "وجبات خفيفة ومشروبات منعشة",
+    "subtitle": "وجبات خفيفة ومشروبات منعشة بجانب المسبح",
+    "freshlyMade": "طازجة حسب الطلب",
     "menu": "قائمة الوجبات الخفيفة",
     "allItems": "جميع الأصناف",
     "placeOrder": "تأكيد الطلب",
+    "unavailable": "غير متاح حالياً",
+    "tryDifferentCategory": "جرب اختيار فئة مختلفة",
+    "addedToCart": "تمت إضافة {name} إلى السلة",
     "categories": {
       "snacks": "وجبات خفيفة",
       "drinks": "مشروبات باردة",
-      "iceCream": "آيس كريم"
+      "iceCream": "آيس كريم",
+      "sandwiches": "سندويشات"
     },
     "order": {
       "addToCart": "أضف للسلة",
@@ -445,5 +478,89 @@
     "email": "info@v2resort.com",
     "followUs": "تابعنا",
     "copyright": "© {year} منتجع V2. جميع الحقوق محفوظة."
+  },
+  "settings": {
+    "preferences": {
+      "title": "التفضيلات",
+      "subtitle": "خصّص تجربتك",
+      "done": "تم",
+      "animations": {
+        "title": "الرسوم المتحركة",
+        "enableAll": "تفعيل الرسوم المتحركة",
+        "enableAllDesc": "تشغيل أو إيقاف جميع الرسوم المتحركة"
+      },
+      "transitions": {
+        "title": "انتقالات الصفحات",
+        "enable": "تفعيل انتقالات الصفحات",
+        "enableDesc": "تحريك عند التنقل بين الصفحات",
+        "style": "نمط الانتقال"
+      },
+      "loading": {
+        "title": "شاشة التحميل",
+        "enable": "إظهار رسوم التحميل",
+        "enableDesc": "عرض رسوم البداية الفخمة في أول زيارة"
+      }
+    }
+  },
+  "resortMap": {
+    "title": "خريطة المنتجع",
+    "subtitle": "استكشف مرافقنا",
+    "explore": "استكشف",
+    "restaurant": "المطعم",
+    "pool": "المسبح",
+    "chalets": "الشاليهات",
+    "snackBar": "السناك بار",
+    "reception": "الاستقبال"
+  },
+  "testimonials": {
+    "badge": "تقييمات الضيوف",
+    "title": "ماذا يقول ضيوفنا",
+    "subtitle": "اقرأ تقييمات حقيقية من ضيوف استمتعوا بتجربة منتجع V2",
+    "averageRating": "متوسط التقييم",
+    "happyGuests": "ضيوف سعداء",
+    "recommend": "يوصون به"
+  },
+  "weather": {
+    "location": "منتجع V2، لبنان",
+    "goodMorning": "صباح الخير",
+    "goodAfternoon": "مساء الخير",
+    "goodEvening": "مساء الخير",
+    "sunny": "مشمس",
+    "cloudy": "غائم",
+    "rainy": "ماطر",
+    "partlyCloudy": "غائم جزئياً",
+    "humidity": "الرطوبة",
+    "wind": "الرياح",
+    "sunrise": "الشروق",
+    "sunset": "الغروب",
+    "showForecast": "عرض توقعات 5 أيام",
+    "hideForecast": "إخفاء التوقعات",
+    "fiveDayForecast": "توقعات 5 أيام",
+    "perfectFor": "مثالي لـ",
+    "poolAndDining": "السباحة والعشاء في الهواء الطلق"
+  },
+  "wishlist": {
+    "title": "قائمة الأمنيات",
+    "itemCount": "{count} عناصر محفوظة",
+    "emptyTitle": "قائمة أمنياتك فارغة",
+    "emptyDescription": "احفظ العناصر المفضلة لحجزها لاحقاً",
+    "exploreNow": "استكشف الآن",
+    "addToWishlist": "أضف للمفضلة",
+    "removeFromWishlist": "إزالة من المفضلة",
+    "addedToWishlist": "تمت الإضافة للمفضلة",
+    "removedFromWishlist": "تمت الإزالة من المفضلة",
+    "clearAll": "مسح الكل",
+    "clearedWishlist": "تم مسح القائمة",
+    "type": {
+      "chalet": "شاليه",
+      "menu-item": "طبق",
+      "pool-session": "جلسة سباحة"
+    }
+  },
+  "chat": {
+    "title": "مساعد V2",
+    "online": "متصل الآن",
+    "placeholder": "اكتب رسالتك...",
+    "suggestions": "أسئلة سريعة"
   }
 }
