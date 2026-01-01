@@ -45,7 +45,12 @@
     "forgotPassword": "Mot de passe oublié?",
     "fullName": "Nom complet",
     "phone": "Téléphone",
-    "confirmPassword": "Confirmer le mot de passe"
+    "confirmPassword": "Confirmer le mot de passe",
+    "tryAgainLater": "Veuillez réessayer plus tard",
+    "checkBackLater": "Revenez plus tard pour les mises à jour",
+    "andMore": "+{count} de plus",
+    "items": "articles",
+    "total": "Total"
   },
   "nav": {
     "home": "Accueil",

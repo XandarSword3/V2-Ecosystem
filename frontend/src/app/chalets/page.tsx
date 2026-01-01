@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { chaletsApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { Loader2, Home, Users, Bed, Bath, Wifi, Wind, UtensilsCrossed, Car, AlertCircle } from 'lucide-react';
 
 interface Chalet {
@@ -32,6 +33,7 @@ const amenityIcons: Record<string, React.ElementType> = {
 export default function ChaletsPage() {
   const t = useTranslations('chalets');
   const tCommon = useTranslations('common');
+  const currency = useSettingsStore((s) => s.currency);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['chalets'],
@@ -99,7 +101,7 @@ export default function ChaletsPage() {
                   <div className="text-right">
                     <p className="text-sm text-slate-500 dark:text-slate-400">{tCommon('from')}</p>
                     <p className="text-xl font-bold text-green-600 dark:text-green-400">
-                      {formatCurrency(chalet.basePrice)}
+                      {formatCurrency(chalet.basePrice, currency)}
                       <span className="text-sm font-normal text-slate-500 dark:text-slate-400">{tCommon('perNight')}</span>
                     </p>
                   </div>
@@ -149,7 +151,7 @@ export default function ChaletsPage() {
                 {/* Weekend Price Notice */}
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3 mb-4">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    <strong>{t('weekendRate')}:</strong> {formatCurrency(chalet.weekendPrice)}{tCommon('perNight')} (Fri-Sat)
+                    <strong>{t('weekendRate')}:</strong> {formatCurrency(chalet.weekendPrice, currency)}{tCommon('perNight')} (Fri-Sat)
                   </p>
                 </div>
 

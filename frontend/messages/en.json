@@ -45,7 +45,12 @@
     "forgotPassword": "Forgot password?",
     "fullName": "Full Name",
     "phone": "Phone",
-    "confirmPassword": "Confirm Password"
+    "confirmPassword": "Confirm Password",
+    "tryAgainLater": "Please try again later",
+    "checkBackLater": "Check back later for updates",
+    "andMore": "+{count} more",
+    "items": "items",
+    "total": "Total"
   },
   "nav": {
     "home": "Home",

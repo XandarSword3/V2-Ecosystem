@@ -4,10 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { restaurantApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, UtensilsCrossed, ShoppingCart, Leaf, AlertCircle } from 'lucide-react';
+import { Loader2, UtensilsCrossed, ShoppingCart, Leaf, AlertCircle, Plus, Minus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
+import { useCartStore } from '@/lib/stores/cartStore';
+import { useSettingsStore } from '@/lib/stores/settingsStore';
 
 interface MenuItem {
   id: string;
@@ -29,16 +31,21 @@ interface MenuItem {
   isFeatured: boolean;
 }
 
-interface CartItem extends MenuItem {
-  quantity: number;
-  specialInstructions?: string;
-}
-
 export default function RestaurantMenuPage() {
   const t = useTranslations('restaurant');
   const tCommon = useTranslations('common');
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const currency = useSettingsStore((s) => s.currency);
+
+  // Use the cart store instead of local state
+  const restaurantItems = useCartStore((s) => s.restaurantItems);
+  const addToRestaurant = useCartStore((s) => s.addToRestaurant);
+  const removeFromRestaurant = useCartStore((s) => s.removeFromRestaurant);
+  const getRestaurantTotal = useCartStore((s) => s.getRestaurantTotal);
+  const getRestaurantCount = useCartStore((s) => s.getRestaurantCount);
+
+  const cartTotal = getRestaurantTotal();
+  const cartCount = getRestaurantCount();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['restaurant-menu'],
@@ -53,32 +60,20 @@ export default function RestaurantMenuPage() {
     : menuItems;
 
   const addToCart = (item: MenuItem) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prev, { ...item, quantity: 1 }];
+    addToRestaurant({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      category: item.category.name,
+      imageUrl: item.imageUrl,
     });
     toast.success(`${item.name} added to cart`);
   };
 
-  const removeFromCart = (itemId: string) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.id === itemId);
-      if (existing && existing.quantity > 1) {
-        return prev.map((i) =>
-          i.id === itemId ? { ...i, quantity: i.quantity - 1 } : i
-        );
-      }
-      return prev.filter((i) => i.id !== itemId);
-    });
+  const getItemQuantity = (itemId: string) => {
+    const item = restaurantItems.find((i) => i.id === itemId);
+    return item?.quantity || 0;
   };
-
-  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   if (isLoading) {
     return (
@@ -156,7 +151,7 @@ export default function RestaurantMenuPage() {
                     )}
                   </div>
                   <span className="text-lg font-bold text-primary-600">
-                    {formatCurrency(item.price)}
+                    {formatCurrency(item.price, currency)}
                   </span>
                 </div>
                 {item.description && (
@@ -175,13 +170,35 @@ export default function RestaurantMenuPage() {
                     <span className="badge badge-info">{t('glutenFree')}</span>
                   )}
                 </div>
-                <button
-                  onClick={() => addToCart(item)}
-                  disabled={!item.isAvailable}
-                  className="btn btn-primary w-full"
-                >
-                  {item.isAvailable ? t('addToCart') : t('unavailable')}
-                </button>
+                {/* Cart Controls */}
+                {getItemQuantity(item.id) > 0 ? (
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => removeFromRestaurant(item.id)}
+                      className="btn btn-outline p-2"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="text-lg font-bold text-slate-900 dark:text-white">
+                      {getItemQuantity(item.id)}
+                    </span>
+                    <button
+                      onClick={() => addToCart(item)}
+                      disabled={!item.isAvailable}
+                      className="btn btn-primary p-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => addToCart(item)}
+                    disabled={!item.isAvailable}
+                    className="btn btn-primary w-full"
+                  >
+                    {item.isAvailable ? t('addToCart') : t('unavailable')}
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -197,12 +214,12 @@ export default function RestaurantMenuPage() {
       </main>
 
       {/* Cart Summary Bar */}
-      {cart.length > 0 && (
+      {cartCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shadow-lg p-4">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-400">{t('itemsInCart', { count: cartCount })}</p>
-              <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(cartTotal)}</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(cartTotal, currency)}</p>
             </div>
             <Link href="/restaurant/checkout" className="btn btn-primary">
               {t('proceedToCheckout')}

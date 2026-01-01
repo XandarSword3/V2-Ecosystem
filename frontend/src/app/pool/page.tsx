@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { poolApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { Loader2, Waves, Users, Clock, Calendar, AlertCircle, Ticket } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -26,6 +27,7 @@ interface PoolSession {
 export default function PoolPage() {
   const t = useTranslations('pool');
   const tCommon = useTranslations('common');
+  const currency = useSettingsStore((s) => s.currency);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedSession, setSelectedSession] = useState<PoolSession | null>(null);
   const [guestCount, setGuestCount] = useState(1);
@@ -132,7 +134,7 @@ export default function PoolPage() {
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                            {formatCurrency(session.price)}
+                            {formatCurrency(session.price, currency)}
                           </p>
                           <p className="text-sm text-slate-500 dark:text-slate-400">{tCommon('perPerson')}</p>
                         </div>
@@ -211,16 +213,16 @@ export default function PoolPage() {
                     <div className="border-t dark:border-slate-700 pt-4">
                       <div className="flex justify-between mb-2">
                         <span className="text-slate-600 dark:text-slate-400">
-                          {guestCount} × {formatCurrency(selectedSession.price)}
+                          {guestCount} × {formatCurrency(selectedSession.price, currency)}
                         </span>
                         <span className="font-medium text-slate-900 dark:text-white">
-                          {formatCurrency(selectedSession.price * guestCount)}
+                          {formatCurrency(selectedSession.price * guestCount, currency)}
                         </span>
                       </div>
                       <div className="flex justify-between text-lg font-bold">
                         <span className="text-slate-900 dark:text-white">Total</span>
                         <span className="text-blue-600 dark:text-blue-400">
-                          {formatCurrency(selectedSession.price * guestCount)}
+                          {formatCurrency(selectedSession.price * guestCount, currency)}
                         </span>
                       </div>
                     </div>
