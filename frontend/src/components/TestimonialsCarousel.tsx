@@ -20,7 +20,25 @@ interface Testimonial {
 }
 
 interface ReviewsResponse {
-  reviews: Array<{
+  success?: boolean;
+  data?: {
+    reviews: Array<{
+      id: string;
+      rating: number;
+      text: string;
+      service_type: string;
+      created_at: string;
+      users: {
+        full_name: string;
+        profile_image_url?: string;
+      };
+    }>;
+    stats: {
+      totalReviews: number;
+      averageRating: number;
+    };
+  };
+  reviews?: Array<{
     id: string;
     rating: number;
     text: string;
@@ -31,55 +49,14 @@ interface ReviewsResponse {
       last_name: string;
     };
   }>;
-  stats: {
+  stats?: {
     average_rating: number;
     total_reviews: number;
   };
 }
 
-// Fallback testimonials in case API is unavailable
-const fallbackTestimonials: Testimonial[] = [
-  {
-    id: '1',
-    name: 'Sarah Mitchell',
-    role: 'Tourist from UK',
-    rating: 5,
-    text: 'Absolutely stunning resort! The chalets have breathtaking mountain views and the staff went above and beyond to make our stay memorable.',
-    date: '2024-01-15',
-  },
-  {
-    id: '2',
-    name: 'أحمد خليل',
-    role: 'ضيف محلي',
-    rating: 5,
-    text: 'أفضل منتجع في لبنان! الطعام اللبناني الأصيل والخدمة الممتازة جعلت إقامتنا لا تُنسى. نوصي به بشدة!',
-    date: '2024-01-10',
-  },
-  {
-    id: '3',
-    name: 'Marie Dubois',
-    role: 'Touriste de France',
-    rating: 5,
-    text: 'Une expérience inoubliable! La piscine est magnifique et le snack-bar propose des plats délicieux. Nous reviendrons certainement!',
-    date: '2024-01-05',
-  },
-  {
-    id: '4',
-    name: 'James Wilson',
-    role: 'Business Traveler',
-    rating: 4,
-    text: 'Great facilities for both work and relaxation. The WiFi was excellent and the restaurant served delicious Lebanese cuisine.',
-    date: '2023-12-28',
-  },
-  {
-    id: '5',
-    name: 'لينا حداد',
-    role: 'زائرة متكررة',
-    rating: 5,
-    text: 'هذا المكان يشعرني بالراحة دائماً. فريق العمل يعرفني بالاسم والخدمة دائماً استثنائية. منزلي الثاني!',
-    date: '2023-12-20',
-  },
-];
+// Empty placeholder - no fake testimonials
+const emptyTestimonials: Testimonial[] = [];
 
 const serviceTypeLabels: Record<string, string> = {
   general: 'Resort Guest',
@@ -95,8 +72,8 @@ export default function TestimonialsCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const [testimonials, setTestimonials] = useState<Testimonial[]>(fallbackTestimonials);
-  const [stats, setStats] = useState({ average_rating: 4.9, total_reviews: 500 });
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(emptyTestimonials);
+  const [stats, setStats] = useState({ average_rating: 0, total_reviews: 0 });
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewData, setReviewData] = useState({ rating: 5, text: '', service_type: 'general' });
   const [submitting, setSubmitting] = useState(false);
@@ -109,17 +86,40 @@ export default function TestimonialsCarousel() {
         const response = await fetch(`${API_BASE_URL}/reviews`);
         if (response.ok) {
           const data: ReviewsResponse = await response.json();
-          if (data.reviews && data.reviews.length > 0) {
-            const mappedTestimonials: Testimonial[] = data.reviews.map((review) => ({
-              id: review.id,
-              name: `${review.user.first_name} ${review.user.last_name}`,
-              role: serviceTypeLabels[review.service_type] || 'Guest',
-              rating: review.rating,
-              text: review.text,
-              date: review.created_at.split('T')[0],
-            }));
+          
+          // Handle new API format (success/data wrapper)
+          const reviewsData = data.data?.reviews || data.reviews || [];
+          const statsData = data.data?.stats || data.stats;
+          
+          if (reviewsData.length > 0) {
+            const mappedTestimonials: Testimonial[] = reviewsData.map((review: any) => {
+              // Handle both formats: users.full_name or user.first_name/last_name
+              const name = review.users?.full_name || 
+                (review.user ? `${review.user.first_name} ${review.user.last_name}` : 'Guest');
+              
+              return {
+                id: review.id,
+                name,
+                avatar: review.users?.profile_image_url,
+                role: serviceTypeLabels[review.service_type] || 'Guest',
+                rating: review.rating,
+                text: review.text,
+                date: review.created_at?.split('T')[0] || '',
+              };
+            });
             setTestimonials(mappedTestimonials);
-            setStats(data.stats);
+          }
+          
+          if (statsData) {
+            // Use type-safe access with fallback
+            const avgRating = 'averageRating' in statsData ? statsData.averageRating : 
+                              'average_rating' in statsData ? statsData.average_rating : 4.9;
+            const totalRevs = 'totalReviews' in statsData ? statsData.totalReviews :
+                              'total_reviews' in statsData ? statsData.total_reviews : 0;
+            setStats({
+              average_rating: avgRating,
+              total_reviews: totalRevs,
+            });
           }
         }
       } catch (error) {
@@ -132,7 +132,7 @@ export default function TestimonialsCarousel() {
   }, []);
 
   useEffect(() => {
-    if (!isAutoPlaying) return;
+    if (!isAutoPlaying || testimonials.length === 0) return;
     
     const interval = setInterval(() => {
       setDirection(1);
@@ -140,7 +140,7 @@ export default function TestimonialsCarousel() {
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [isAutoPlaying]);
+  }, [isAutoPlaying, testimonials.length]);
 
   const slideVariants = {
     enter: (direction: number) => ({
@@ -171,6 +171,7 @@ export default function TestimonialsCarousel() {
   };
 
   const goTo = (index: number) => {
+    if (testimonials.length === 0) return;
     setDirection(index > currentIndex ? 1 : -1);
     setCurrentIndex(index);
     setIsAutoPlaying(false);
@@ -178,6 +179,7 @@ export default function TestimonialsCarousel() {
   };
 
   const goNext = () => {
+    if (testimonials.length === 0) return;
     setDirection(1);
     setCurrentIndex((prev) => (prev + 1) % testimonials.length);
     setIsAutoPlaying(false);
@@ -185,6 +187,7 @@ export default function TestimonialsCarousel() {
   };
 
   const goPrev = () => {
+    if (testimonials.length === 0) return;
     setDirection(-1);
     setCurrentIndex((prev) => (prev - 1 + testimonials.length) % testimonials.length);
     setIsAutoPlaying(false);
@@ -223,7 +226,9 @@ export default function TestimonialsCarousel() {
               date: review.created_at.split('T')[0],
             }));
             setTestimonials(mappedTestimonials);
-            setStats(data.stats);
+            if (data.stats) {
+              setStats(data.stats);
+            }
           }
         }
       }
@@ -235,6 +240,146 @@ export default function TestimonialsCarousel() {
   };
 
   const currentTestimonial = testimonials[currentIndex];
+
+  // Review form modal component (inline)
+  const renderReviewModal = () => (
+    <AnimatePresence>
+      {showReviewForm && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowReviewForm(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                {t('writeReview') || 'Write a Review'}
+              </h3>
+              <button
+                onClick={() => setShowReviewForm(false)}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                {t('yourRating') || 'Your Rating'}
+              </label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setReviewData({ ...reviewData, rating: star })}
+                    className="p-1 hover:scale-110 transition-transform"
+                  >
+                    <Star
+                      className={`w-8 h-8 ${
+                        star <= reviewData.rating
+                          ? 'text-yellow-400 fill-yellow-400'
+                          : 'text-slate-300 dark:text-slate-600'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                {t('serviceType') || 'Service Type'}
+              </label>
+              <select
+                value={reviewData.service_type}
+                onChange={(e) => setReviewData({ ...reviewData, service_type: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="general">{t('serviceGeneral') || 'General Experience'}</option>
+                <option value="chalets">{t('serviceChalets') || 'Chalets'}</option>
+                <option value="restaurant">{t('serviceRestaurant') || 'Restaurant'}</option>
+                <option value="pool">{t('servicePool') || 'Pool'}</option>
+              </select>
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                {t('yourReview') || 'Your Review'}
+              </label>
+              <textarea
+                value={reviewData.text}
+                onChange={(e) => setReviewData({ ...reviewData, text: e.target.value })}
+                placeholder={t('reviewPlaceholder') || 'Share your experience (minimum 10 characters)...'}
+                rows={4}
+                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-500 resize-none"
+              />
+            </div>
+            <button
+              onClick={handleSubmitReview}
+              disabled={submitting}
+              className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-400 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  {t('submitting') || 'Submitting...'}
+                </>
+              ) : (
+                <>
+                  <Send className="w-5 h-5" />
+                  {t('submitReview') || 'Submit Review'}
+                </>
+              )}
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  // If no testimonials, show a message encouraging reviews
+  if (!isLoading && testimonials.length === 0) {
+    return (
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-3xl" />
+        <div className="relative px-8 py-12 md:px-16 text-center">
+          <span className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/30 rounded-full text-amber-700 dark:text-amber-400 text-sm font-medium mb-4">
+            <Star className="w-4 h-4 fill-current" />
+            {t('badge')}
+          </span>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">
+            {t('title')}
+          </h2>
+          <p className="text-slate-600 dark:text-slate-400 mb-8">
+            {t('noReviewsYet') || 'Be the first to share your experience!'}
+          </p>
+          {isAuthenticated ? (
+            <button
+              onClick={() => setShowReviewForm(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-medium transition-colors shadow-lg shadow-amber-500/25"
+            >
+              <Star className="w-5 h-5" />
+              {t('leaveReview') || 'Leave a Review'}
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-full font-medium transition-colors"
+            >
+              <User className="w-5 h-5" />
+              {t('loginToReview') || 'Login to Leave a Review'}
+            </Link>
+          )}
+          {renderReviewModal()}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
@@ -413,111 +558,7 @@ export default function TestimonialsCarousel() {
       </div>
 
       {/* Review Form Modal */}
-      <AnimatePresence>
-        {showReviewForm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowReviewForm(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                  {t('writeReview') || 'Write a Review'}
-                </h3>
-                <button
-                  onClick={() => setShowReviewForm(false)}
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5 text-slate-500" />
-                </button>
-              </div>
-
-              {/* Rating */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  {t('yourRating') || 'Your Rating'}
-                </label>
-                <div className="flex gap-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      onClick={() => setReviewData({ ...reviewData, rating: star })}
-                      className="p-1 hover:scale-110 transition-transform"
-                    >
-                      <Star
-                        className={`w-8 h-8 ${
-                          star <= reviewData.rating
-                            ? 'text-yellow-400 fill-yellow-400'
-                            : 'text-slate-300 dark:text-slate-600'
-                        }`}
-                      />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Service Type */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  {t('serviceType') || 'Service Type'}
-                </label>
-                <select
-                  value={reviewData.service_type}
-                  onChange={(e) => setReviewData({ ...reviewData, service_type: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
-                >
-                  <option value="general">{t('serviceGeneral') || 'General Experience'}</option>
-                  <option value="chalet">{t('serviceChalets') || 'Chalets'}</option>
-                  <option value="restaurant">{t('serviceRestaurant') || 'Restaurant'}</option>
-                  <option value="pool">{t('servicePool') || 'Pool'}</option>
-                </select>
-              </div>
-
-              {/* Review Text */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  {t('yourReview') || 'Your Review'}
-                </label>
-                <textarea
-                  value={reviewData.text}
-                  onChange={(e) => setReviewData({ ...reviewData, text: e.target.value })}
-                  placeholder={t('reviewPlaceholder') || 'Share your experience...'}
-                  rows={4}
-                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-500 resize-none"
-                />
-              </div>
-
-              {/* Submit Button */}
-              <button
-                onClick={handleSubmitReview}
-                disabled={submitting}
-                className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-400 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    {t('submitting') || 'Submitting...'}
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    {t('submitReview') || 'Submit Review'}
-                  </>
-                )}
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {renderReviewModal()}
     </div>
   );
 }

@@ -227,6 +227,7 @@
     "title": "Chalets",
     "subtitle": "Trouvez votre escapade parfaite dans nos chalets de montagne confortables",
     "available": "Chalets Disponibles",
+    "noChaletsAvailable": "Aucun chalet disponible pour le moment. Veuillez réessayer plus tard.",
     "book": "Réserver",
     "details": "Détails du Chalet",
     "amenities": "Équipements",
@@ -418,7 +419,8 @@
       "appearance": "Apparence",
       "payments": "Paiements",
       "notifications": "Notifications",
-      "auditLogs": "Journaux d'Audit"
+      "auditLogs": "Journaux d'Audit",
+      "reviews": "Avis"
     }
   },
   "staff": {
@@ -534,7 +536,8 @@
     "yourReview": "Votre Avis",
     "reviewPlaceholder": "Partagez votre expérience avec nous...",
     "submitReview": "Soumettre l'Avis",
-    "submitting": "Envoi en cours..."
+    "submitting": "Envoi en cours...",
+    "noReviewsYet": "Soyez le premier à partager votre expérience!"
   },
   "weather": {
     "location": "V2 Resort, Liban",

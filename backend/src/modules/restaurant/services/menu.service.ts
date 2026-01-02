@@ -150,6 +150,10 @@ export async function createMenuItem(data: {
   displayOrder?: number;
 }) {
   const supabase = getSupabase();
+  
+  // Ensure price is a valid number
+  const priceValue = typeof data.price === 'number' ? data.price : parseFloat(String(data.price)) || 0;
+  
   const { data: item, error } = await supabase
     .from('menu_items')
     .insert({
@@ -160,7 +164,7 @@ export async function createMenuItem(data: {
       description: data.description,
       description_ar: data.descriptionAr,
       description_fr: data.descriptionFr,
-      price: data.price.toString(),
+      price: priceValue.toString(),
       preparation_time_minutes: data.preparationTimeMinutes,
       calories: data.calories,
       is_vegetarian: data.isVegetarian || false,

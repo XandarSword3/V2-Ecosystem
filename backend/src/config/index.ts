@@ -1,6 +1,20 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Validate critical environment variables in production
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction) {
+  const requiredEnvVars = ['JWT_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
+  const missing = requiredEnvVars.filter(v => !process.env[v]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+  // Ensure JWT secret is strong in production
+  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters in production');
+  }
+}
+
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3001', 10),
@@ -8,7 +22,7 @@ export const config = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 
   database: {
-    url: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/v2_resort',
+    url: process.env.DATABASE_URL || (isProduction ? '' : 'postgresql://postgres:password@localhost:5432/v2_resort'),
   },
 
   supabase: {
@@ -18,7 +32,8 @@ export const config = {
   },
 
   jwt: {
-    secret: process.env.JWT_SECRET || 'development-secret-key',
+    secret: process.env.JWT_SECRET || (isProduction ? '' : 'development-secret-key-only-for-local'),
+    refreshSecret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || (isProduction ? '' : 'development-refresh-secret-key-only-for-local'),
     expiresIn: process.env.JWT_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
