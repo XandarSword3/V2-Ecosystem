@@ -145,6 +145,8 @@ export default function AdminReportsPage() {
 
   const data = reportData;
   const totalServiceRevenue = data.revenueByService ? Object.values(data.revenueByService).reduce((a, b) => a + b, 0) : 0;
+  const revenueByMonth = data.revenueByMonth || [];
+  const topItems = data.topItems || [];
 
   return (
     <motion.div
@@ -349,8 +351,8 @@ export default function AdminReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="h-64 flex items-end justify-between gap-2">
-                {data.revenueByMonth.map((item, index) => {
-                  const maxRevenue = Math.max(...data.revenueByMonth.map((r) => r.revenue));
+                {revenueByMonth.map((item, index) => {
+                  const maxRevenue = revenueByMonth.length > 0 ? Math.max(...revenueByMonth.map((r) => r.revenue)) : 0;
                   const heightPercent = maxRevenue > 0 ? (item.revenue / maxRevenue) * 100 : 0;
 
                   return (
@@ -403,7 +405,7 @@ export default function AdminReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.topItems.map((item, index) => (
+                  {topItems.map((item, index) => (
                     <motion.tr
                       key={item.name}
                       initial={{ opacity: 0, x: -20 }}
@@ -434,6 +436,11 @@ export default function AdminReportsPage() {
                   ))}
                 </tbody>
               </table>
+              {topItems.length === 0 && (
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                  No sales data available yet
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

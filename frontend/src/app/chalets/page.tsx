@@ -21,8 +21,8 @@ interface Chalet {
   capacity: number;
   bedroomCount: number;
   bathroomCount: number;
-  amenities: string[];
-  images: string[];
+  amenities?: string[] | null;
+  images?: string[] | null;
   basePrice: number;
   weekendPrice: number;
   isActive: boolean;
@@ -197,7 +197,7 @@ export default function ChaletsPage() {
 
                 {/* Amenities */}
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {chalet.amenities.slice(0, 4).map((amenity) => {
+                  {(chalet.amenities || []).slice(0, 4).map((amenity) => {
                     const Icon = amenityIcons[amenity] || Home;
                     return (
                       <span
@@ -209,9 +209,9 @@ export default function ChaletsPage() {
                       </span>
                     );
                   })}
-                  {chalet.amenities.length > 4 && (
+                  {(chalet.amenities || []).length > 4 && (
                     <span className="inline-flex items-center px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-full text-sm">
-                      +{chalet.amenities.length - 4} {tCommon('andMore')}
+                      +{(chalet.amenities || []).length - 4} {tCommon('andMore')}
                     </span>
                   )}
                 </div>
