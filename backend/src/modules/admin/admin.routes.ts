@@ -36,4 +36,7 @@ router.get('/audit-logs', adminController.getAuditLogs);
 router.get('/reports/overview', adminController.getOverviewReport);
 router.get('/reports/export', adminController.exportReport);
 
+// Notifications
+router.get('/notifications', adminController.getNotifications);
+
 export default router;

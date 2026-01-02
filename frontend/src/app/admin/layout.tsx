@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { api } from '@/lib/api';
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -27,6 +28,7 @@ import {
   Bell,
   Palette,
   Cloud,
+  Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -90,6 +92,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       ]
     },
     { name: t('nav.users'), href: '/admin/users', icon: Users },
+    { name: t('nav.reviews') || 'Reviews', href: '/admin/reviews', icon: Star },
     { name: t('nav.reports'), href: '/admin/reports', icon: BarChart3 },
     { 
       name: t('nav.settings'), 
@@ -110,11 +113,33 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [authChecked, setAuthChecked] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Array<{id: string; title: string; message: string; time: string; read: boolean}>>([
-    { id: '1', title: 'New Order', message: 'Order #R-250102-001 received', time: '5 min ago', read: false },
-    { id: '2', title: 'Booking Confirmed', message: 'Chalet booking for Jan 5-7', time: '1 hour ago', read: false },
-    { id: '3', title: 'Low Stock Alert', message: 'Cola running low in snack bar', time: '2 hours ago', read: true },
-  ]);
+  const [notifications, setNotifications] = useState<Array<{id: string; title: string; message: string; time: string; read: boolean}>>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
+
+  // Fetch real notifications from backend
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await api.get('/admin/notifications');
+        if (response.data?.success && response.data?.data) {
+          setNotifications(response.data.data);
+        }
+      } catch (error) {
+        // If endpoint doesn't exist yet, use empty array - no fake data
+        console.log('Notifications endpoint not available');
+        setNotifications([]);
+      } finally {
+        setLoadingNotifications(false);
+      }
+    };
+    
+    if (isAuthenticated) {
+      fetchNotifications();
+      // Refresh notifications every 30 seconds
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
   

@@ -227,6 +227,7 @@
     "title": "الشاليهات",
     "subtitle": "اعثر على ملاذك المثالي في شاليهاتنا الجبلية المريحة",
     "available": "الشاليهات المتاحة",
+    "noChaletsAvailable": "لا تتوفر شاليهات حالياً. يرجى المحاولة لاحقاً.",
     "book": "احجز الآن",
     "details": "تفاصيل الشاليه",
     "amenities": "المرافق",
@@ -418,7 +419,8 @@
       "appearance": "المظهر",
       "payments": "الدفعات",
       "notifications": "الإشعارات",
-      "auditLogs": "سجلات التدقيق"
+      "auditLogs": "سجلات التدقيق",
+      "reviews": "المراجعات"
     }
   },
   "staff": {
@@ -534,7 +536,8 @@
     "yourReview": "تقييمك",
     "reviewPlaceholder": "شاركنا تجربتك...",
     "submitReview": "إرسال التقييم",
-    "submitting": "جاري الإرسال..."
+    "submitting": "جاري الإرسال...",
+    "noReviewsYet": "كن أول من يشارك تجربته!"
   },
   "weather": {
     "location": "منتجع V2، لبنان",

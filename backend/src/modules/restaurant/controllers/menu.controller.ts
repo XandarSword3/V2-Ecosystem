@@ -127,10 +127,30 @@ export async function deleteCategory(req: Request, res: Response, next: NextFunc
 
 export async function createMenuItem(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, description, ...rest } = req.body;
+    const { name, description, categoryId, price, ...rest } = req.body;
+    
+    // Validate required fields
+    if (!categoryId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'categoryId is required' 
+      });
+    }
+    if (!name) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'name is required' 
+      });
+    }
+    if (price === undefined || price === null) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'price is required' 
+      });
+    }
     
     // Auto-translate name and description if not provided
-    let translatedData = { ...rest, name };
+    let translatedData = { ...rest, name, categoryId, price: Number(price) };
     
     if (name && !req.body.name_ar) {
       try {
@@ -157,7 +177,14 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
     
     const item = await menuService.createMenuItem(translatedData);
     res.status(201).json({ success: true, data: item, autoTranslated: true });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[MENU] Error creating menu item:', error);
+    if (error.code === '23503') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid category - category does not exist' 
+      });
+    }
     next(error);
   }
 }

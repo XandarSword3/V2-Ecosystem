@@ -40,9 +40,10 @@ export function generateTokens(payload: TokenPayload): GeneratedTokens {
     { expiresIn: accessExpiresIn }
   );
 
+  // Use separate secret for refresh tokens for better security
   const refreshToken = jwt.sign(
     { userId: payload.userId, type: 'refresh' },
-    config.jwt.secret,
+    config.jwt.refreshSecret,
     { expiresIn: refreshExpiresIn }
   );
 
@@ -55,7 +56,8 @@ export function verifyToken(token: string): TokenPayload {
 }
 
 export function verifyRefreshToken(token: string): { userId: string } {
-  const decoded = jwt.verify(token, config.jwt.secret) as { userId: string; type: string };
+  // Use separate secret for refresh tokens
+  const decoded = jwt.verify(token, config.jwt.refreshSecret) as { userId: string; type: string };
   if (decoded.type !== 'refresh') {
     throw new Error('Invalid token type');
   }

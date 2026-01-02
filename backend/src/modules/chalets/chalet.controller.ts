@@ -263,6 +263,32 @@ export async function cancelBooking(req: Request, res: Response, next: NextFunct
   try {
     const supabase = getSupabase();
     const { reason } = req.body;
+    const userId = req.user?.userId;
+    
+    // First, get the booking to verify ownership
+    const { data: booking, error: fetchError } = await supabase
+      .from('chalet_bookings')
+      .select('id, customer_id, status')
+      .eq('id', req.params.id)
+      .single();
+      
+    if (fetchError || !booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+    
+    // Only the booking owner or admin/staff can cancel
+    const isOwner = booking.customer_id === userId;
+    const userRoles = req.user?.roles || [];
+    const isAdminOrStaff = userRoles.includes('admin') || userRoles.includes('staff');
+    
+    if (!isOwner && !isAdminOrStaff) {
+      return res.status(403).json({ success: false, message: 'Not authorized to cancel this booking' });
+    }
+    
+    // Check if already cancelled
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({ success: false, message: 'Booking is already cancelled' });
+    }
 
     const { data, error } = await supabase
       .from('chalet_bookings')

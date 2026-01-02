@@ -227,6 +227,7 @@
     "title": "Chalets",
     "subtitle": "Find your perfect getaway in our comfortable mountain chalets",
     "available": "Available Chalets",
+    "noChaletsAvailable": "No chalets available at the moment. Please check back later.",
     "book": "Book Now",
     "details": "Chalet Details",
     "amenities": "Amenities",
@@ -418,7 +419,8 @@
       "appearance": "Appearance",
       "payments": "Payments",
       "notifications": "Notifications",
-      "auditLogs": "Audit Logs"
+      "auditLogs": "Audit Logs",
+      "reviews": "Reviews"
     }
   },
   "staff": {
@@ -534,7 +536,8 @@
     "yourReview": "Your Review",
     "reviewPlaceholder": "Share your experience with us...",
     "submitReview": "Submit Review",
-    "submitting": "Submitting..."
+    "submitting": "Submitting...",
+    "noReviewsYet": "Be the first to share your experience!"
   },
   "weather": {
     "location": "V2 Resort, Lebanon",

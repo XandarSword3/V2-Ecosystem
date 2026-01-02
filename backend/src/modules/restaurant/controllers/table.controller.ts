@@ -12,9 +12,26 @@ export async function getTables(req: Request, res: Response, next: NextFunction)
 
 export async function createTable(req: Request, res: Response, next: NextFunction) {
   try {
+    const { tableNumber, capacity } = req.body;
+    
+    // Validate required fields
+    if (!tableNumber || capacity === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields: tableNumber and capacity are required' 
+      });
+    }
+    
     const table = await tableService.createTable(req.body);
     res.status(201).json({ success: true, data: table });
-  } catch (error) {
+  } catch (error: any) {
+    // Handle duplicate table number
+    if (error.code === '23505' || error.message?.includes('duplicate')) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Table number already exists' 
+      });
+    }
     next(error);
   }
 }
