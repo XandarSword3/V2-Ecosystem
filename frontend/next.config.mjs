@@ -9,13 +9,14 @@ const nextConfig = {
   
   // Image optimization
   images: {
-    domains: ['localhost', 'v2resort.com'],
+    domains: ['localhost', 'v2resort.com', 'v2-resort-backend.onrender.com'],
     unoptimized: process.env.NODE_ENV === 'development',
   },
   
-  // Environment variables
+  // Environment variables - DO NOT add /api here, api.ts adds it
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-resort-backend.onrender.com' : 'http://localhost:3001'),
+    NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-resort-backend.onrender.com' : 'http://localhost:3001'),
   },
 };
 
