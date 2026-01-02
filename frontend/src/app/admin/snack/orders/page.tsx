@@ -62,7 +62,7 @@ export default function AdminSnackOrdersPage() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const response = await api.get('/snack/orders');
+      const response = await api.get('/snack/staff/orders');
       setOrders(response.data.data || []);
     } catch (error) {
       toast.error('Failed to fetch orders');
@@ -95,7 +95,7 @@ export default function AdminSnackOrdersPage() {
 
   const updateOrderStatus = async (orderId: string, status: string) => {
     try {
-      await api.put(`/snack/orders/${orderId}/status`, { status });
+      await api.patch(`/snack/staff/orders/${orderId}/status`, { status });
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: status as Order['status'] } : o)));
       toast.success('Order status updated');
     } catch (error) {

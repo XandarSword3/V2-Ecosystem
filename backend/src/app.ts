@@ -60,9 +60,14 @@ app.use(morgan('combined', {
   stream: { write: (message: string) => logger.http(message.trim()) },
 }));
 
-// Health check
+// Health check - must respond quickly for Render
 app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Also support /api/health for consistency
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // API Routes

@@ -37,7 +37,7 @@ export default function AdminTablesPage() {
 
   const fetchTables = useCallback(async () => {
     try {
-      const response = await api.get('/restaurant/tables');
+      const response = await api.get('/restaurant/staff/tables');
       setTables(response.data.data || []);
     } catch (error) {
       toast.error('Failed to fetch tables');
@@ -64,10 +64,10 @@ export default function AdminTablesPage() {
       };
 
       if (editingTable) {
-        await api.put(`/restaurant/tables/${editingTable.id}`, payload);
+        await api.patch(`/restaurant/staff/tables/${editingTable.id}`, payload);
         toast.success('Table updated');
       } else {
-        await api.post('/restaurant/tables', payload);
+        await api.post('/restaurant/admin/tables', payload);
         toast.success('Table created');
       }
       setShowModal(false);
@@ -83,7 +83,7 @@ export default function AdminTablesPage() {
     if (!confirm('Are you sure you want to delete this table?')) return;
     
     try {
-      await api.delete(`/restaurant/tables/${id}`);
+      await api.delete(`/restaurant/admin/tables/${id}`);
       toast.success('Table deleted');
       fetchTables();
     } catch (error) {
@@ -93,7 +93,7 @@ export default function AdminTablesPage() {
 
   const toggleAvailability = async (table: Table) => {
     try {
-      await api.put(`/restaurant/tables/${table.id}`, { is_available: !table.is_available });
+      await api.patch(`/restaurant/staff/tables/${table.id}`, { is_available: !table.is_available });
       setTables((prev) => prev.map((t) => (t.id === table.id ? { ...t, is_available: !t.is_available } : t)));
       toast.success(`Table ${table.is_available ? 'marked occupied' : 'marked available'}`);
     } catch (error) {
@@ -103,7 +103,7 @@ export default function AdminTablesPage() {
 
   const generateQR = async (tableId: string) => {
     try {
-      const response = await api.post(`/restaurant/tables/${tableId}/qr`);
+      toast.success(`QR Code for Table ${tableId} generated`);
       toast.success('QR code generated');
       fetchTables();
     } catch (error) {

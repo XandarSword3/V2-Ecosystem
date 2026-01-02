@@ -62,7 +62,7 @@ export default function AdminChaletAddonsPage() {
 
   const fetchAddons = useCallback(async () => {
     try {
-      const response = await api.get('/chalets/addons');
+      const response = await api.get('/chalets/add-ons');
       setAddons(response.data.data || []);
     } catch (error) {
       toast.error('Failed to fetch addons');
@@ -79,10 +79,10 @@ export default function AdminChaletAddonsPage() {
     e.preventDefault();
     try {
       if (editing) {
-        await api.put(`/chalets/addons/${editing.id}`, formData);
+        await api.put(`/chalets/admin/add-ons/${editing.id}`, formData);
         toast.success('Addon updated');
       } else {
-        await api.post('/chalets/addons', formData);
+        await api.post('/chalets/admin/add-ons', formData);
         toast.success('Addon created');
       }
       setShowModal(false);
@@ -110,7 +110,7 @@ export default function AdminChaletAddonsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this addon?')) return;
     try {
-      await api.delete(`/chalets/addons/${id}`);
+      await api.delete(`/chalets/admin/add-ons/${id}`);
       setAddons((prev) => prev.filter((a) => a.id !== id));
       toast.success('Addon deleted');
     } catch (error) {
@@ -120,7 +120,7 @@ export default function AdminChaletAddonsPage() {
 
   const toggleActive = async (addon: Addon) => {
     try {
-      await api.put(`/chalets/addons/${addon.id}`, { is_active: !addon.is_active });
+      await api.put(`/chalets/admin/add-ons/${addon.id}`, { is_active: !addon.is_active });
       setAddons((prev) =>
         prev.map((a) => (a.id === addon.id ? { ...a, is_active: !a.is_active } : a))
       );

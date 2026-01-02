@@ -58,7 +58,7 @@ export default function AdminPoolTicketsPage() {
 
   const fetchTickets = useCallback(async () => {
     try {
-      const response = await api.get('/pool/tickets');
+      const response = await api.get('/pool/staff/tickets/today');
       setTickets(response.data.data || []);
     } catch (error) {
       toast.error('Failed to fetch tickets');
