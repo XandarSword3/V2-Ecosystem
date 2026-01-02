@@ -16,6 +16,10 @@ router.get('/menu/items', menuController.getMenuItems);
 router.get('/menu/items/:id', menuController.getMenuItem);
 router.get('/menu/featured', menuController.getFeaturedItems);
 
+// Direct category endpoint (for admin page compatibility)
+router.get('/categories', menuController.getCategories);
+router.get('/items', menuController.getMenuItems);
+
 // ============================================
 // Customer Routes (Orders)
 // ============================================

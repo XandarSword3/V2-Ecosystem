@@ -4,24 +4,46 @@ import { loginSchema, registerSchema, changePasswordSchema } from "./auth.valida
 import { logger } from "../../utils/logger";
 
 export async function register(req: Request, res: Response, next: NextFunction) {
+  logger.info('=== REGISTER ATTEMPT ===');
+  logger.info('Request body:', JSON.stringify(req.body, null, 2));
   try {
     const data = registerSchema.parse(req.body);
+    logger.info('Validation passed for:', data.email);
     const result = await authService.register(data);
+    logger.info('Registration successful for:', data.email);
     res.status(201).json({ success: true, data: result });
-  } catch (error) {
+  } catch (error: any) {
+    logger.error('=== REGISTER ERROR ===');
+    logger.error('Error message:', error.message);
+    logger.error('Error stack:', error.stack);
     next(error);
   }
 }
 
 export async function login(req: Request, res: Response, next: NextFunction) {
+  logger.info('=== LOGIN ATTEMPT ===');
+  logger.info('Request body:', JSON.stringify({ email: req.body.email, passwordLength: req.body.password?.length }, null, 2));
+  logger.info('IP:', req.ip);
+  logger.info('User-Agent:', req.get('user-agent'));
   try {
     const data = loginSchema.parse(req.body);
+    logger.info('Validation passed for email:', data.email);
+    
     const result = await authService.login(data.email, data.password, {
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
     });
+    
+    logger.info('=== LOGIN SUCCESS ===');
+    logger.info('User ID:', result.user.id);
+    logger.info('User roles:', JSON.stringify(result.user.roles));
+    logger.info('Access token generated:', result.tokens.accessToken.substring(0, 20) + '...');
+    
     res.json({ success: true, data: result });
-  } catch (error) {
+  } catch (error: any) {
+    logger.error('=== LOGIN ERROR ===');
+    logger.error('Error message:', error.message);
+    logger.error('Error stack:', error.stack);
     next(error);
   }
 }

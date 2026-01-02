@@ -2,25 +2,25 @@
 
 import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
-import { Shield, Database, Lock, Cookie, UserCheck, Users, Mail, ArrowLeft } from 'lucide-react';
+import { FileText, CheckCircle, Briefcase, Calendar, Users, AlertTriangle, RefreshCw, Mail, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
-export default function PrivacyPage() {
-  const t = useTranslations('legal.privacy');
+export default function TermsPage() {
+  const t = useTranslations('legal.terms');
 
   const sections = [
-    { key: 'dataCollection', icon: Database },
-    { key: 'dataUsage', icon: Shield },
-    { key: 'dataSecurity', icon: Lock },
-    { key: 'cookies', icon: Cookie },
-    { key: 'yourRights', icon: UserCheck },
-    { key: 'thirdParty', icon: Users },
+    { key: 'acceptance', icon: CheckCircle },
+    { key: 'services', icon: Briefcase },
+    { key: 'bookings', icon: Calendar },
+    { key: 'conduct', icon: Users },
+    { key: 'liability', icon: AlertTriangle },
+    { key: 'changes', icon: RefreshCw },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
-      <div className="bg-gradient-to-r from-amber-600 to-amber-700 py-16">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 py-16">
         <div className="container mx-auto px-4">
           <Link 
             href="/"
@@ -36,7 +36,7 @@ export default function PrivacyPage() {
           >
             <div className="flex items-center gap-4 mb-4">
               <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
-                <Shield className="w-8 h-8 text-white" />
+                <FileText className="w-8 h-8 text-white" />
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-white">
                 {t('title')}
@@ -63,11 +63,11 @@ export default function PrivacyPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-white/10 hover:border-amber-500/30 transition-colors"
+                className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-white/10 hover:border-blue-500/30 transition-colors"
               >
                 <div className="flex items-start gap-4">
-                  <div className="p-3 bg-amber-500/10 rounded-xl shrink-0">
-                    <Icon className="w-6 h-6 text-amber-500" />
+                  <div className="p-3 bg-blue-500/10 rounded-xl shrink-0">
+                    <Icon className="w-6 h-6 text-blue-500" />
                   </div>
                   <div className="space-y-3">
                     <h2 className="text-2xl font-semibold text-white">
@@ -87,9 +87,9 @@ export default function PrivacyPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.7 }}
-            className="bg-gradient-to-r from-amber-600/20 to-amber-700/20 rounded-2xl p-8 border border-amber-500/30 text-center"
+            className="bg-gradient-to-r from-blue-600/20 to-blue-700/20 rounded-2xl p-8 border border-blue-500/30 text-center"
           >
-            <Mail className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+            <Mail className="w-12 h-12 text-blue-500 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-white mb-2">
               {t('questions')}
             </h3>
@@ -97,11 +97,11 @@ export default function PrivacyPage() {
               {t('contactUs')}
             </p>
             <a 
-              href="mailto:privacy@v2resort.com"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition-colors font-medium"
+              href="mailto:legal@v2resort.com"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-medium"
             >
               <Mail className="w-5 h-5" />
-              privacy@v2resort.com
+              legal@v2resort.com
             </a>
           </motion.div>
         </div>

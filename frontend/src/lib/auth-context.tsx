@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi } from './api';
 
 interface User {
   id: string;
@@ -19,9 +18,8 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<User>;
-  register: (data: { email: string; password: string; fullName: string; phone?: string }) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  logout: () => void;
+  refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,62 +30,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    checkAuth();
+    // Check for stored user on mount
+    const storedUser = localStorage.getItem('user');
+    const accessToken = localStorage.getItem('accessToken');
+    
+    console.log('[AUTH CONTEXT] Checking stored auth...');
+    console.log('[AUTH CONTEXT] Has stored user:', !!storedUser);
+    console.log('[AUTH CONTEXT] Has access token:', !!accessToken);
+    
+    if (storedUser && accessToken) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        console.log('[AUTH CONTEXT] Restored user:', parsedUser.email);
+        console.log('[AUTH CONTEXT] User roles:', parsedUser.roles);
+        setUser(parsedUser);
+      } catch (e) {
+        console.error('[AUTH CONTEXT] Failed to parse stored user');
+        localStorage.removeItem('user');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      }
+    }
+    
+    setIsLoading(false);
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        const response = await authApi.getProfile();
-        setUser(response.data.data.user);
-      }
-    } catch (error) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const login = async (email: string, password: string) => {
-    const response = await authApi.login(email, password);
-    const { accessToken, refreshToken, user } = response.data.data;
+  const login = async (email: string, password: string): Promise<User> => {
+    console.log('[AUTH CONTEXT] Login called for:', email);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
     
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-    setUser(user);
-    return user; // Return user for redirect logic
-  };
+    const response = await fetch(`${apiUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
 
-  const register = async (data: { email: string; password: string; fullName: string; phone?: string }) => {
-    const response = await authApi.register(data);
-    const { accessToken, refreshToken, user } = response.data.data;
-    
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-    setUser(user);
-  };
+    const data = await response.json();
+    console.log('[AUTH CONTEXT] Login response:', data);
 
-  const logout = async () => {
-    try {
-      await authApi.logout();
-    } catch (error) {
-      // Ignore errors during logout
-    } finally {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      setUser(null);
-      router.push('/');
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Login failed');
     }
+
+    const { user: userData, tokens } = data.data;
+    
+    localStorage.setItem('accessToken', tokens.accessToken);
+    localStorage.setItem('refreshToken', tokens.refreshToken);
+    localStorage.setItem('user', JSON.stringify(userData));
+    
+    setUser(userData);
+    console.log('[AUTH CONTEXT] User set:', userData);
+    
+    return userData;
   };
 
-  const refreshUser = async () => {
-    try {
-      const response = await authApi.getProfile();
-      setUser(response.data.data.user);
-    } catch (error) {
-      setUser(null);
+  const logout = () => {
+    console.log('[AUTH CONTEXT] Logout called');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    setUser(null);
+    router.push('/');
+  };
+
+  const refreshUser = () => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
     }
   };
 
@@ -98,7 +107,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         login,
-        register,
         logout,
         refreshUser,
       }}
@@ -110,8 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
 }

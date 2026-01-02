@@ -12,47 +12,125 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
 
+    console.log('[ADMIN] Loading dashboard data...');
+
     // Today's stats - run queries in parallel
     const [
-      restaurantResult,
-      snackResult,
-      chaletResult,
-      poolResult,
-      usersResult
+      restaurantOrdersResult,
+      restaurantRevenueResult,
+      snackOrdersResult,
+      snackRevenueResult,
+      chaletBookingsResult,
+      chaletRevenueResult,
+      poolTicketsResult,
+      poolRevenueResult,
+      usersResult,
+      recentOrdersResult
     ] = await Promise.all([
+      // Restaurant orders count
       supabase.from('restaurant_orders')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', today)
         .lte('created_at', endOfDay),
+      // Restaurant revenue
+      supabase.from('restaurant_orders')
+        .select('total_amount')
+        .gte('created_at', today)
+        .lte('created_at', endOfDay)
+        .eq('payment_status', 'paid'),
+      // Snack orders count
       supabase.from('snack_orders')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', today)
         .lte('created_at', endOfDay),
+      // Snack revenue
+      supabase.from('snack_orders')
+        .select('total_amount')
+        .gte('created_at', today)
+        .lte('created_at', endOfDay)
+        .eq('payment_status', 'paid'),
+      // Chalet bookings count
       supabase.from('chalet_bookings')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', today)
-        .lte('created_at', endOfDay),
+        .gte('check_in_date', today)
+        .lte('check_in_date', endOfDay),
+      // Chalet revenue
+      supabase.from('chalet_bookings')
+        .select('total_amount')
+        .gte('check_in_date', today)
+        .lte('check_in_date', endOfDay)
+        .eq('payment_status', 'paid'),
+      // Pool tickets count
       supabase.from('pool_tickets')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', today)
-        .lte('created_at', endOfDay),
+        .gte('ticket_date', today)
+        .lte('ticket_date', endOfDay),
+      // Pool revenue
+      supabase.from('pool_tickets')
+        .select('total_amount')
+        .gte('ticket_date', today)
+        .lte('ticket_date', endOfDay)
+        .eq('payment_status', 'paid'),
+      // Total users
       supabase.from('users')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true }),
+      // Recent orders
+      supabase.from('restaurant_orders')
+        .select('id, order_number, customer_name, status, total_amount, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5)
     ]);
+
+    // Calculate totals
+    const restaurantRevenue = (restaurantRevenueResult.data || []).reduce(
+      (sum, o) => sum + parseFloat(o.total_amount || 0), 0
+    );
+    const snackRevenue = (snackRevenueResult.data || []).reduce(
+      (sum, o) => sum + parseFloat(o.total_amount || 0), 0
+    );
+    const chaletRevenue = (chaletRevenueResult.data || []).reduce(
+      (sum, o) => sum + parseFloat(o.total_amount || 0), 0
+    );
+    const poolRevenue = (poolRevenueResult.data || []).reduce(
+      (sum, o) => sum + parseFloat(o.total_amount || 0), 0
+    );
+
+    const totalOrders = (restaurantOrdersResult.count || 0) + (snackOrdersResult.count || 0);
+    const totalRevenue = restaurantRevenue + snackRevenue + chaletRevenue + poolRevenue;
+
+    console.log('[ADMIN] Dashboard loaded:', {
+      todayOrders: totalOrders,
+      todayRevenue: totalRevenue,
+      todayBookings: chaletBookingsResult.count,
+      todayTickets: poolTicketsResult.count,
+      totalUsers: usersResult.count
+    });
 
     res.json({
       success: true,
       data: {
-        today: {
-          restaurantOrders: restaurantResult.count || 0,
-          snackOrders: snackResult.count || 0,
-          chaletBookings: chaletResult.count || 0,
-          poolTickets: poolResult.count || 0,
-        },
+        todayOrders: totalOrders,
+        todayRevenue: totalRevenue,
+        todayBookings: chaletBookingsResult.count || 0,
+        todayTickets: poolTicketsResult.count || 0,
         totalUsers: usersResult.count || 0,
+        recentOrders: recentOrdersResult.data || [],
+        revenueByUnit: {
+          restaurant: restaurantRevenue,
+          snackBar: snackRevenue,
+          chalets: chaletRevenue,
+          pool: poolRevenue,
+        },
+        breakdown: {
+          restaurantOrders: restaurantOrdersResult.count || 0,
+          snackOrders: snackOrdersResult.count || 0,
+          chaletBookings: chaletBookingsResult.count || 0,
+          poolTickets: poolTicketsResult.count || 0,
+        }
       },
     });
   } catch (error) {
+    console.error('[ADMIN] Dashboard error:', error);
     next(error);
   }
 }
