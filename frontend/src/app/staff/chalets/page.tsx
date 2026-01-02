@@ -411,7 +411,7 @@ export default function StaffChaletsPage() {
                               <Button size="sm" onClick={() => updateBookingStatus(booking.id, 'confirmed')}>
                                 Confirm
                               </Button>
-                              <Button size="sm" variant="destructive" onClick={() => updateBookingStatus(booking.id, 'cancelled')}>
+                              <Button size="sm" variant="danger" onClick={() => updateBookingStatus(booking.id, 'cancelled')}>
                                 Cancel
                               </Button>
                             </div>

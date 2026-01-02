@@ -62,7 +62,7 @@ export default function AdminChaletBookingsPage() {
 
   const fetchBookings = useCallback(async () => {
     try {
-      const response = await api.get('/chalets/bookings');
+      const response = await api.get('/chalets/staff/bookings');
       setBookings(response.data.data || []);
     } catch (error) {
       toast.error('Failed to fetch bookings');
@@ -77,7 +77,7 @@ export default function AdminChaletBookingsPage() {
 
   const updateBookingStatus = async (bookingId: string, status: string) => {
     try {
-      await api.put(`/chalets/bookings/${bookingId}/status`, { status });
+      await api.patch(`/chalets/staff/bookings/${bookingId}/status`, { status });
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: status as Booking['status'] } : b)));
       toast.success('Booking status updated');
     } catch (error) {
@@ -319,7 +319,7 @@ export default function AdminChaletBookingsPage() {
                             </Button>
                           )}
                           {(booking.status === 'pending' || booking.status === 'confirmed') && (
-                            <Button size="sm" variant="destructive" onClick={() => updateBookingStatus(booking.id, 'cancelled')}>
+                            <Button size="sm" variant="danger" onClick={() => updateBookingStatus(booking.id, 'cancelled')}>
                               Cancel
                             </Button>
                           )}
