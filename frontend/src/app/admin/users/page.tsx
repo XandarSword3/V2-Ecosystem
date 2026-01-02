@@ -31,12 +31,13 @@ import {
 interface User {
   id: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  full_name: string;
   phone?: string;
   roles: string[];
+  is_active: boolean;
+  email_verified: boolean;
   created_at: string;
-  last_login?: string;
+  last_login_at?: string;
 }
 
 interface Role {
@@ -79,7 +80,7 @@ export default function UsersManagementPage() {
     try {
       setLoading(true);
       const response = await api.get('/admin/users');
-      setUsers(response.data.users || []);
+      setUsers(response.data.data || []);
     } catch (error: any) {
       toast.error('Failed to fetch users');
       console.error(error);
@@ -91,7 +92,7 @@ export default function UsersManagementPage() {
   const fetchRoles = async () => {
     try {
       const response = await api.get('/admin/roles');
-      setRoles(response.data.roles || []);
+      setRoles(response.data.data || []);
     } catch (error: any) {
       console.error('Failed to fetch roles:', error);
     }
@@ -124,9 +125,9 @@ export default function UsersManagementPage() {
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      `${user.first_name} ${user.last_name}`.toLowerCase().includes(searchQuery.toLowerCase());
+      (user.full_name || '').toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesRole = selectedRole === 'all' || user.roles.includes(selectedRole);
+    const matchesRole = selectedRole === 'all' || (user.roles || []).includes(selectedRole);
     
     return matchesSearch && matchesRole;
   });
@@ -219,19 +220,19 @@ export default function UsersManagementPage() {
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <p className="text-sm text-slate-500 dark:text-slate-400">Admins</p>
           <p className="text-2xl font-bold text-purple-600">
-            {users.filter(u => u.roles.some(r => r.includes('admin'))).length}
+            {users.filter(u => (u.roles || []).some(r => r.includes('admin'))).length}
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <p className="text-sm text-slate-500 dark:text-slate-400">Staff</p>
           <p className="text-2xl font-bold text-blue-600">
-            {users.filter(u => u.roles.some(r => r.includes('staff'))).length}
+            {users.filter(u => (u.roles || []).some(r => r.includes('staff'))).length}
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <p className="text-sm text-slate-500 dark:text-slate-400">Customers</p>
           <p className="text-2xl font-bold text-emerald-600">
-            {users.filter(u => u.roles.includes('customer')).length}
+            {users.filter(u => (u.roles || []).includes('customer')).length}
           </p>
         </div>
       </motion.div>
@@ -275,11 +276,11 @@ export default function UsersManagementPage() {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-medium">
-                                {user.first_name?.[0] || user.email[0].toUpperCase()}
+                                {(user.full_name?.[0] || user.email[0]).toUpperCase()}
                               </div>
                               <div>
                                 <p className="font-medium text-slate-900 dark:text-white">
-                                  {user.first_name} {user.last_name}
+                                  {user.full_name || 'No Name'}
                                 </p>
                                 {user.phone && (
                                   <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
@@ -298,7 +299,7 @@ export default function UsersManagementPage() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-1">
-                              {user.roles.map(role => (
+                              {(user.roles || []).map(role => (
                                 <span
                                   key={role}
                                   className={`px-2 py-1 rounded-full text-xs font-medium ${roleColors[role] || roleColors.customer}`}
@@ -306,6 +307,11 @@ export default function UsersManagementPage() {
                                   {role.replace(/_/g, ' ')}
                                 </span>
                               ))}
+                              {(!user.roles || user.roles.length === 0) && (
+                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+                                  No roles
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4">
@@ -372,7 +378,7 @@ export default function UsersManagementPage() {
             >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  Manage Roles for {selectedUserForRoles.first_name}
+                  Manage Roles for {selectedUserForRoles.full_name || 'User'}
                 </h3>
                 <button
                   onClick={() => setShowRoleModal(false)}
@@ -384,14 +390,15 @@ export default function UsersManagementPage() {
 
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {roles.map(role => {
-                  const isSelected = selectedUserForRoles.roles.includes(role.name);
+                  const isSelected = (selectedUserForRoles.roles || []).includes(role.name);
                   return (
                     <button
                       key={role.id}
                       onClick={() => {
+                        const currentRoles = selectedUserForRoles.roles || [];
                         const newRoles = isSelected
-                          ? selectedUserForRoles.roles.filter(r => r !== role.name)
-                          : [...selectedUserForRoles.roles, role.name];
+                          ? currentRoles.filter(r => r !== role.name)
+                          : [...currentRoles, role.name];
                         setSelectedUserForRoles({ ...selectedUserForRoles, roles: newRoles });
                       }}
                       className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${

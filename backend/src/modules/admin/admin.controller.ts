@@ -204,7 +204,22 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
 
     if (error) throw error;
 
-    res.json({ success: true, data: usersList || [] });
+    // Fetch roles for all users
+    const usersWithRoles = await Promise.all(
+      (usersList || []).map(async (user) => {
+        const { data: userRoles } = await supabase
+          .from('user_roles')
+          .select('roles(name)')
+          .eq('user_id', user.id);
+        
+        return {
+          ...user,
+          roles: (userRoles || []).map((ur: any) => ur.roles?.name).filter(Boolean),
+        };
+      })
+    );
+
+    res.json({ success: true, data: usersWithRoles });
   } catch (error) {
     next(error);
   }

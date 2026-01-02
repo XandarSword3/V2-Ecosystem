@@ -60,7 +60,7 @@ export default function StaffPoolPage() {
   const [manualCode, setManualCode] = useState('');
   const [currentlyInPool, setCurrentlyInPool] = useState(0);
   const poolCapacity = 100; // This should come from settings
-  const socket = useSocket();
+  const { socket } = useSocket();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchTickets = useCallback(async () => {

@@ -56,7 +56,7 @@ export default function AdminPaymentsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [methodFilter, setMethodFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const socket = useSocket();
+  const { socket } = useSocket();
 
   const fetchPayments = useCallback(async () => {
     try {

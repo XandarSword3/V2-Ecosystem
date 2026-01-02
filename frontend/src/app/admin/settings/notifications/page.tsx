@@ -51,7 +51,7 @@ export default function AdminNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const socket = useSocket();
+  const { socket } = useSocket();
 
   // New notification form state
   const [newNotification, setNewNotification] = useState({
