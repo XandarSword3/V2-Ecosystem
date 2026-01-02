@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
+import api from '@/lib/api';
 import { 
   Settings,
   Save,
@@ -93,13 +94,13 @@ export default function AdminSettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/admin/settings');
-      if (response.ok) {
-        const data = await response.json();
-        setSettings({ ...defaultSettings, ...data });
+      const response = await api.get('/admin/settings');
+      if (response.data?.data) {
+        setSettings({ ...defaultSettings, ...response.data.data });
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
+      // Use default settings if API fails
     }
   };
 
@@ -108,17 +109,8 @@ export default function AdminSettingsPage() {
     setSaveMessage(null);
     
     try {
-      const response = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
-      });
-      
-      if (response.ok) {
-        setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
-      } else {
-        throw new Error('Failed to save');
-      }
+      await api.put('/admin/settings', settings);
+      setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
     } catch (error) {
       setSaveMessage({ type: 'error', text: 'Failed to save settings. Please try again.' });
     } finally {

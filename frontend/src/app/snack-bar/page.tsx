@@ -24,7 +24,9 @@ interface SnackItem {
   price: number;
   category: 'sandwich' | 'drink' | 'snack' | 'ice_cream';
   imageUrl?: string;
-  isAvailable: boolean;
+  image_url?: string;
+  isAvailable?: boolean;
+  is_available?: boolean;
 }
 
 const containerVariants = {
@@ -323,7 +325,7 @@ export default function SnackBarPage() {
                     </div>
 
                     {/* Availability Overlay */}
-                    {!item.isAvailable && (
+                    {!(item.isAvailable ?? item.is_available ?? true) && (
                       <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
                         <span className="bg-red-500 text-white px-4 py-2 rounded-full font-semibold text-sm">
                           {t('unavailable')}
@@ -366,7 +368,7 @@ export default function SnackBarPage() {
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => addToCart(item)}
-                            disabled={!item.isAvailable}
+                            disabled={!(item.isAvailable ?? item.is_available ?? true)}
                             className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 shadow-md flex items-center justify-center text-white disabled:opacity-50"
                           >
                             <Plus className="w-4 h-4" />
@@ -377,7 +379,7 @@ export default function SnackBarPage() {
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           onClick={() => addToCart(item)}
-                          disabled={!item.isAvailable}
+                          disabled={!(item.isAvailable ?? item.is_available ?? true)}
                           className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                         >
                           <Plus className="w-4 h-4" />
