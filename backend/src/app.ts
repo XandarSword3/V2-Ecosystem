@@ -111,6 +111,34 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Public site settings endpoint (no auth required)
+app.get('/api/settings', async (_req: Request, res: Response) => {
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const { config } = await import('./config/index.js');
+    const supabase = createClient(config.supabase.url, config.supabase.anonKey);
+    
+    const { data: settings, error } = await supabase
+      .from('site_settings')
+      .select('key, value');
+    
+    if (error) throw error;
+    
+    // Combine all settings into a flat object
+    const combinedSettings: Record<string, any> = {};
+    (settings || []).forEach((s: any) => {
+      if (typeof s.value === 'object') {
+        Object.assign(combinedSettings, s.value);
+      }
+    });
+    
+    res.json({ success: true, data: combinedSettings });
+  } catch (error) {
+    console.error('Error fetching public settings:', error);
+    res.status(500).json({ success: false, error: 'Failed to load settings' });
+  }
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

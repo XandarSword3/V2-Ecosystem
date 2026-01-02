@@ -144,6 +144,7 @@ export async function createMenuItem(data: {
   isVegetarian?: boolean;
   isVegan?: boolean;
   isGlutenFree?: boolean;
+  isAvailable?: boolean;
   allergens?: string[];
   imageUrl?: string;
   isFeatured?: boolean;
@@ -170,6 +171,7 @@ export async function createMenuItem(data: {
       is_vegetarian: data.isVegetarian || false,
       is_vegan: data.isVegan || false,
       is_gluten_free: data.isGlutenFree || false,
+      is_available: data.isAvailable !== undefined ? data.isAvailable : true,
       allergens: data.allergens || [],
       image_url: data.imageUrl,
       is_featured: data.isFeatured || false,
