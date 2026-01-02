@@ -22,6 +22,11 @@ export const metadata: Metadata = {
   title: 'V2 Resort | Restaurant, Chalets & Pool',
   description: 'Welcome to V2 Resort - Your premium destination for dining, chalets, and pool experiences in Lebanon.',
   keywords: 'resort, restaurant, chalets, pool, Lebanon, vacation, dining',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
   openGraph: {
     title: 'V2 Resort',
     description: 'Premium resort experience in Lebanon',
