@@ -113,6 +113,23 @@ export default function UsersManagementPage() {
     }
   };
 
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    
+    try {
+      await api.put(`/admin/users/${editingUser.id}`, {
+        full_name: editingUser.full_name,
+        phone: editingUser.phone,
+        email: editingUser.email,
+      });
+      toast.success('User updated successfully');
+      fetchUsers();
+      setEditingUser(null);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to update user');
+    }
+  };
+
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
     
@@ -591,6 +608,79 @@ export default function UsersManagementPage() {
                   disabled={creating}
                 >
                   {creating ? 'Creating...' : 'Create User'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit User Modal */}
+      <AnimatePresence>
+        {editingUser && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setEditingUser(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Edit User</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Full Name
+                  </label>
+                  <Input
+                    value={editingUser.full_name || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                    placeholder="Enter full name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Email
+                  </label>
+                  <Input
+                    type="email"
+                    value={editingUser.email}
+                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                    placeholder="Enter email"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Phone
+                  </label>
+                  <Input
+                    value={editingUser.phone || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setEditingUser(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-gradient-to-r from-violet-500 to-purple-600 text-white"
+                  onClick={handleUpdateUser}
+                >
+                  Save Changes
                 </Button>
               </div>
             </motion.div>

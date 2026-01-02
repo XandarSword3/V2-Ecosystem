@@ -153,6 +153,26 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
       throw orderError;
     }
 
+    // Security: Only order owner or admin/staff can view full order details
+    const userId = req.user?.userId;
+    const userRoles = req.user?.roles || [];
+    const isOwner = order.customer_id === userId;
+    const isAdminOrStaff = userRoles.includes('admin') || userRoles.includes('staff');
+    
+    if (!isOwner && !isAdminOrStaff) {
+      // For non-owners, only return limited info (status tracking)
+      return res.json({ 
+        success: true, 
+        data: { 
+          id: order.id, 
+          order_number: order.order_number,
+          status: order.status, 
+          created_at: order.created_at,
+          estimated_ready_time: order.estimated_ready_time
+        } 
+      });
+    }
+
     // Get order items with snack item details
     const { data: items, error: itemsError } = await supabase
       .from('snack_order_items')

@@ -219,6 +219,25 @@ export async function getTicket(req: Request, res: Response, next: NextFunction)
       throw ticketError;
     }
 
+    // Security: Only ticket owner or admin/staff can view full ticket details
+    const userId = req.user?.userId;
+    const userRoles = req.user?.roles || [];
+    const isOwner = ticket.customer_id === userId;
+    const isAdminOrStaff = userRoles.includes('admin') || userRoles.includes('staff');
+    
+    if (!isOwner && !isAdminOrStaff) {
+      // For non-owners, only return limited info (validation status)
+      return res.json({ 
+        success: true, 
+        data: { 
+          id: ticket.id, 
+          ticket_number: ticket.ticket_number,
+          status: ticket.status, 
+          ticket_date: ticket.ticket_date
+        } 
+      });
+    }
+
     // Get session info
     const { data: session, error: sessionError } = await supabase
       .from('pool_sessions')
@@ -434,20 +453,33 @@ export async function getTodayTickets(req: Request, res: Response, next: NextFun
 
 export async function createSession(req: Request, res: Response, next: NextFunction) {
   try {
+    const { name, startTime, endTime, maxCapacity, price } = req.body;
+    
+    // Validate required fields
+    if (!name || !startTime || !endTime || maxCapacity === undefined || price === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields: name, startTime, endTime, maxCapacity, price' 
+      });
+    }
+    
     const supabase = getSupabase();
     const { data: session, error } = await supabase
       .from('pool_sessions')
       .insert({
-        name: req.body.name,
-        start_time: req.body.startTime,
-        end_time: req.body.endTime,
-        max_capacity: req.body.maxCapacity,
-        price: req.body.price.toString(),
+        name,
+        start_time: startTime,
+        end_time: endTime,
+        max_capacity: Number(maxCapacity),
+        price: String(price),
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Pool session creation error:', error);
+      throw error;
+    }
 
     res.status(201).json({ success: true, data: session });
   } catch (error) {
@@ -551,9 +583,9 @@ export async function getPoolSettings(req: Request, res: Response, next: NextFun
   try {
     const supabase = getSupabase();
     
-    // Get settings from settings table with pool category
+    // Get settings from site_settings table with pool category
     const { data: settings, error } = await supabase
-      .from('settings')
+      .from('site_settings')
       .select('*')
       .eq('category', 'pool');
     
@@ -589,7 +621,7 @@ export async function updatePoolSettings(req: Request, res: Response, next: Next
     // Upsert each setting
     for (const [key, value] of Object.entries(settings)) {
       await supabase
-        .from('settings')
+        .from('site_settings')
         .upsert(
           { 
             key, 
@@ -597,7 +629,7 @@ export async function updatePoolSettings(req: Request, res: Response, next: Next
             category: 'pool',
             updated_at: new Date().toISOString()
           },
-          { onConflict: 'key' }
+          { onConflict: 'key,category' }
         );
     }
     
