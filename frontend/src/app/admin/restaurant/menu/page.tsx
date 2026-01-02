@@ -74,7 +74,7 @@ export default function MenuManagementPage() {
     try {
       setLoading(true);
       const [menuRes, catRes] = await Promise.all([
-        api.get('/restaurant/menu'),
+        api.get('/restaurant/items'),
         api.get('/restaurant/categories'),
       ]);
       setItems(menuRes.data.data || []);

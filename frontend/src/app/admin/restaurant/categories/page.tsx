@@ -58,10 +58,10 @@ export default function AdminCategoriesPage() {
 
     try {
       if (editingCategory) {
-        await api.put(`/restaurant/categories/${editingCategory.id}`, formData);
+        await api.put(`/restaurant/admin/categories/${editingCategory.id}`, formData);
         toast.success('Category updated');
       } else {
-        await api.post('/restaurant/categories', formData);
+        await api.post('/restaurant/admin/categories', formData);
         toast.success('Category created');
       }
       setShowModal(false);
@@ -77,7 +77,7 @@ export default function AdminCategoriesPage() {
     if (!confirm('Are you sure you want to delete this category?')) return;
     
     try {
-      await api.delete(`/restaurant/categories/${id}`);
+      await api.delete(`/restaurant/admin/categories/${id}`);
       toast.success('Category deleted');
       fetchCategories();
     } catch (error) {
