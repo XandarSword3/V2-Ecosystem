@@ -239,7 +239,7 @@ export default function TestimonialsCarousel() {
     }
   };
 
-  const currentTestimonial = testimonials[currentIndex];
+  const currentTestimonial = testimonials.length > 0 ? testimonials[currentIndex] : null;
 
   // Review form modal component (inline)
   const renderReviewModal = () => (
@@ -342,8 +342,21 @@ export default function TestimonialsCarousel() {
     </AnimatePresence>
   );
 
+  // If still loading, show a loading state
+  if (isLoading) {
+    return (
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-3xl" />
+        <div className="relative px-8 py-12 md:px-16 text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto" />
+          <p className="text-slate-500 dark:text-slate-400 mt-4">Loading reviews...</p>
+        </div>
+      </div>
+    );
+  }
+
   // If no testimonials, show a message encouraging reviews
-  if (!isLoading && testimonials.length === 0) {
+  if (testimonials.length === 0 || !currentTestimonial) {
     return (
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-3xl" />
