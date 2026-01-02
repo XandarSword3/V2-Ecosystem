@@ -114,7 +114,36 @@ export default function AdminReportsPage() {
     );
   }
 
-  const data = reportData!;
+  // Handle case when no data is available
+  if (!reportData) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+              Reports & Analytics
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400">
+              Business performance overview
+            </p>
+          </div>
+          <Button variant="outline" onClick={fetchReports}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <BarChart3 className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            <p className="text-lg font-medium text-slate-700 dark:text-slate-300">No report data available</p>
+            <p className="text-slate-500 dark:text-slate-400">Check back once there is transaction data in the system.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const data = reportData;
   const totalServiceRevenue = data.revenueByService ? Object.values(data.revenueByService).reduce((a, b) => a + b, 0) : 0;
 
   return (
