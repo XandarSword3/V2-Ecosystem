@@ -20,6 +20,7 @@ import { fadeInUp, staggerContainer, scaleIn } from '@/lib/animations/presets';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import dynamic from 'next/dynamic';
+import { useSiteSettings } from '@/lib/settings-context';
 
 // Dynamically import heavy components for better performance
 const InteractiveResortMap = dynamic(() => import('@/components/InteractiveResortMap'), { ssr: false });
@@ -32,6 +33,7 @@ export default function HomePage() {
   const tNav = useTranslations('nav');
   const tCommon = useTranslations('common');
   const tFooter = useTranslations('footer');
+  const { settings } = useSiteSettings();
 
   const services = [
     {
@@ -142,7 +144,7 @@ export default function HomePage() {
               className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 dark:bg-white/10 backdrop-blur-sm rounded-full text-sm font-medium mb-8"
             >
               <Sparkles className="w-4 h-4 text-amber-300" />
-              {tHome('hero.badge')}
+              {settings.tagline || tHome('hero.badge')}
               <Sparkles className="w-4 h-4 text-amber-300" />
             </motion.div>
 
@@ -155,7 +157,7 @@ export default function HomePage() {
               {tCommon('welcome').replace('V2 Resort', '')}{' '}
               <span className="relative">
                 <span className="relative z-10 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-300 bg-clip-text text-transparent">
-                  {tHome('hero.titleHighlight')}
+                  {settings.resortName || tHome('hero.titleHighlight')}
                 </span>
                 <motion.span
                   className="absolute -inset-1 bg-gradient-to-r from-amber-400/30 to-yellow-300/30 blur-lg"
@@ -171,7 +173,7 @@ export default function HomePage() {
               transition={{ delay: 0.5, duration: 0.8 }}
               className="text-xl md:text-2xl text-primary-100 dark:text-primary-200 mb-10 max-w-3xl mx-auto leading-relaxed"
             >
-              {tHome('hero.subtitle')}
+              {settings.description || tHome('hero.subtitle')}
             </motion.p>
 
             <motion.div
@@ -562,15 +564,15 @@ export default function HomePage() {
               <ul className="space-y-3 text-slate-400">
                 <li className="flex items-center gap-3">
                   <MapPin className="w-5 h-5 text-primary-400" />
-                  <span>{tFooter('address')}</span>
+                  <span>{settings.address || tFooter('address')}</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <Phone className="w-5 h-5 text-primary-400" />
-                  <span>{tFooter('phone')}</span>
+                  <span>{settings.phone || tFooter('phone')}</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <Mail className="w-5 h-5 text-primary-400" />
-                  <span>{tFooter('email')}</span>
+                  <span>{settings.email || tFooter('email')}</span>
                 </li>
               </ul>
             </motion.div>

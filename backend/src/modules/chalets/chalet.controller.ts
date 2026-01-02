@@ -456,17 +456,35 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
   try {
     const supabase = getSupabase();
     
-    // Ensure required fields have default values
+    // Validate required fields
+    if (!req.body.name) {
+      return res.status(400).json({ success: false, message: 'Chalet name is required' });
+    }
+    if (!req.body.base_price && req.body.base_price !== 0) {
+      return res.status(400).json({ success: false, message: 'Base price is required' });
+    }
+    
+    // Ensure all required fields have proper values
     const chaletData = {
-      ...req.body,
-      // Default weekend_price to base_price if not provided
-      weekend_price: req.body.weekend_price || req.body.base_price || 0,
-      // Ensure is_active defaults to true
+      name: req.body.name,
+      name_ar: req.body.name_ar || null,
+      name_fr: req.body.name_fr || null,
+      description: req.body.description || null,
+      description_ar: req.body.description_ar || null,
+      description_fr: req.body.description_fr || null,
+      capacity: req.body.capacity || 4,
+      bedroom_count: req.body.bedroom_count || 1,
+      bathroom_count: req.body.bathroom_count || 1,
+      base_price: parseFloat(req.body.base_price) || 0,
+      weekend_price: req.body.weekend_price ? parseFloat(req.body.weekend_price) : (parseFloat(req.body.base_price) || 0),
       is_active: req.body.is_active !== undefined ? req.body.is_active : true,
-      // Ensure arrays have defaults
+      is_featured: req.body.is_featured || false,
       amenities: req.body.amenities || [],
       images: req.body.images || [],
+      image_url: req.body.image_url || null,
     };
+    
+    console.log('[CHALETS] Creating chalet with data:', chaletData);
     
     const { data, error } = await supabase
       .from('chalets')
@@ -474,9 +492,22 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[CHALETS] Database error:', error);
+      throw error;
+    }
+    
+    console.log('[CHALETS] Chalet created successfully:', data?.id);
     res.status(201).json({ success: true, data });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[CHALETS] Error creating chalet:', error);
+    // Return more specific error message
+    if (error.code === '23502') {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Missing required field: ${error.column || 'unknown'}` 
+      });
+    }
     next(error);
   }
 }
