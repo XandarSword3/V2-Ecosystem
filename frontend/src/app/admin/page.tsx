@@ -40,6 +40,12 @@ interface DashboardStats {
     chalets: number;
     pool: number;
   };
+  trends?: {
+    orders: number;
+    revenue: number;
+    bookings: number;
+    tickets: number;
+  };
 }
 
 // Animated stat card with gradient background
@@ -276,8 +282,8 @@ export default function AdminDashboard() {
           title="Today's Orders"
           value={stats?.todayOrders || 0}
           icon={UtensilsCrossed}
-          trend="up"
-          trendValue="+12% from yesterday"
+          trend={stats?.trends?.orders !== undefined ? (stats.trends.orders >= 0 ? 'up' : 'down') : 'neutral'}
+          trendValue={stats?.trends?.orders !== undefined ? `${stats.trends.orders >= 0 ? '+' : ''}${stats.trends.orders}% from yesterday` : 'No data'}
           gradient="bg-gradient-to-br from-orange-400 to-rose-500"
           delay={0}
         />
@@ -285,8 +291,8 @@ export default function AdminDashboard() {
           title="Today's Revenue"
           value={formatCurrency(stats?.todayRevenue || 0)}
           icon={DollarSign}
-          trend="up"
-          trendValue="+8% from yesterday"
+          trend={stats?.trends?.revenue !== undefined ? (stats.trends.revenue >= 0 ? 'up' : 'down') : 'neutral'}
+          trendValue={stats?.trends?.revenue !== undefined ? `${stats.trends.revenue >= 0 ? '+' : ''}${stats.trends.revenue}% from yesterday` : 'No data'}
           gradient="bg-gradient-to-br from-emerald-400 to-teal-500"
           delay={0.1}
         />
@@ -294,8 +300,8 @@ export default function AdminDashboard() {
           title="Active Bookings"
           value={stats?.todayBookings || 0}
           icon={Home}
-          trend="down"
-          trendValue="-3% from last week"
+          trend={stats?.trends?.bookings !== undefined ? (stats.trends.bookings >= 0 ? 'up' : 'down') : 'neutral'}
+          trendValue={stats?.trends?.bookings !== undefined ? `${stats.trends.bookings >= 0 ? '+' : ''}${stats.trends.bookings}% from last week` : 'No data'}
           gradient="bg-gradient-to-br from-blue-400 to-indigo-500"
           delay={0.2}
         />
@@ -303,8 +309,8 @@ export default function AdminDashboard() {
           title="Pool Tickets"
           value={stats?.todayTickets || 0}
           icon={Waves}
-          trend="up"
-          trendValue="+25% from yesterday"
+          trend={stats?.trends?.tickets !== undefined ? (stats.trends.tickets >= 0 ? 'up' : 'down') : 'neutral'}
+          trendValue={stats?.trends?.tickets !== undefined ? `${stats.trends.tickets >= 0 ? '+' : ''}${stats.trends.tickets}% from yesterday` : 'No data'}
           gradient="bg-gradient-to-br from-cyan-400 to-blue-500"
           delay={0.3}
         />
