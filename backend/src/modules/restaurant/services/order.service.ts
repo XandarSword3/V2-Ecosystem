@@ -193,7 +193,13 @@ export async function getOrders(filters: { status?: string; date?: string }) {
     .order('created_at', { ascending: false });
 
   if (filters.status) {
-    query = query.eq('status', filters.status);
+    // Handle comma-separated status values
+    const statuses = filters.status.split(',').map(s => s.trim());
+    if (statuses.length > 1) {
+      query = query.in('status', statuses);
+    } else {
+      query = query.eq('status', filters.status);
+    }
   }
 
   if (filters.date) {
