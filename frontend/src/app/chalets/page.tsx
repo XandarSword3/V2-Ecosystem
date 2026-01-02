@@ -19,14 +19,21 @@ interface Chalet {
   description_ar?: string;
   description_fr?: string;
   capacity: number;
-  bedroomCount: number;
-  bathroomCount: number;
+  // Support both camelCase and snake_case from API
+  bedroomCount?: number;
+  bedroom_count?: number;
+  bathroomCount?: number;
+  bathroom_count?: number;
   amenities?: string[] | null;
   images?: string[] | null;
-  basePrice: number;
-  weekendPrice: number;
-  isActive: boolean;
+  basePrice?: number;
+  base_price?: number;
+  weekendPrice?: number;
+  weekend_price?: number;
+  isActive?: boolean;
+  is_active?: boolean;
   isFeatured?: boolean;
+  is_featured?: boolean;
 }
 
 const amenityIcons: Record<string, React.ElementType> = {
@@ -146,7 +153,7 @@ export default function ChaletsPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                 
                 {/* Featured badge */}
-                {chalet.isFeatured && (
+                {(chalet.isFeatured || chalet.is_featured) && (
                   <div className="absolute top-4 left-4 flex items-center bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                     <Star className="w-4 h-4 mr-1 fill-current" />
                     {tCommon('featured')}
@@ -157,7 +164,7 @@ export default function ChaletsPage() {
                 <div className="absolute bottom-4 right-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
                   <p className="text-xs text-slate-500 dark:text-slate-400">{tCommon('from')}</p>
                   <p className="text-xl font-bold text-green-600 dark:text-green-400">
-                    {formatCurrency(chalet.basePrice, currency)}
+                    {formatCurrency(chalet.basePrice ?? chalet.base_price ?? 0, currency)}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{tCommon('perNight')}</p>
                 </div>
@@ -185,12 +192,12 @@ export default function ChaletsPage() {
                   </div>
                   <div className="flex flex-col items-center text-center">
                     <Bed className="w-6 h-6 text-green-500 mb-1" />
-                    <span className="text-lg font-bold text-slate-900 dark:text-white">{chalet.bedroomCount}</span>
+                    <span className="text-lg font-bold text-slate-900 dark:text-white">{chalet.bedroomCount ?? chalet.bedroom_count ?? 0}</span>
                     <span className="text-xs text-slate-500 dark:text-slate-400">{tCommon('bedrooms')}</span>
                   </div>
                   <div className="flex flex-col items-center text-center">
                     <Bath className="w-6 h-6 text-green-500 mb-1" />
-                    <span className="text-lg font-bold text-slate-900 dark:text-white">{chalet.bathroomCount}</span>
+                    <span className="text-lg font-bold text-slate-900 dark:text-white">{chalet.bathroomCount ?? chalet.bathroom_count ?? 0}</span>
                     <span className="text-xs text-slate-500 dark:text-slate-400">{tCommon('bathrooms')}</span>
                   </div>
                 </div>
@@ -220,7 +227,7 @@ export default function ChaletsPage() {
                 <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg p-3 mb-4">
                   <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center">
                     <span className="font-semibold mr-2">{t('weekendRate')}:</span> 
-                    <span className="font-bold">{formatCurrency(chalet.weekendPrice, currency)}</span>
+                    <span className="font-bold">{formatCurrency(chalet.weekendPrice ?? chalet.weekend_price ?? 0, currency)}</span>
                     <span className="ml-1">{tCommon('perNight')} (Fri-Sat)</span>
                   </p>
                 </div>
