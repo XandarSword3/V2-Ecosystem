@@ -64,13 +64,13 @@ export default function StaffChaletsPage() {
 
   const fetchBookings = useCallback(async () => {
     try {
-      const response = await api.get('/chalets/bookings', {
+      const response = await api.get('/chalets/staff/bookings', {
         params: filter === 'today' ? { date: new Date().toISOString().split('T')[0] } : {},
       });
       setBookings(response.data.data || []);
     } catch (error) {
-      // Use mock data if API fails
-      setBookings(generateMockBookings());
+      toast.error('Failed to load bookings');
+      setBookings([]);
     } finally {
       setLoading(false);
     }
@@ -95,45 +95,6 @@ export default function StaffChaletsPage() {
       };
     }
   }, [socket]);
-
-  const generateMockBookings = (): ChaletBooking[] => {
-    const today = new Date().toISOString().split('T')[0];
-    return [
-      {
-        id: '1',
-        booking_number: 'CB-001',
-        status: 'confirmed',
-        check_in_date: today,
-        check_out_date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-        total_amount: 300,
-        guests: 4,
-        chalets: { name: 'Mountain View Chalet', capacity: 6 },
-        users: { full_name: 'John Doe', email: 'john@example.com', phone: '+961 71 123456' },
-      },
-      {
-        id: '2',
-        booking_number: 'CB-002',
-        status: 'checked_in',
-        check_in_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-        check_out_date: today,
-        total_amount: 450,
-        guests: 2,
-        chalets: { name: 'Garden Chalet', capacity: 4 },
-        users: { full_name: 'Jane Smith', email: 'jane@example.com' },
-      },
-      {
-        id: '3',
-        booking_number: 'CB-003',
-        status: 'pending',
-        check_in_date: today,
-        check_out_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-        total_amount: 200,
-        guests: 3,
-        chalets: { name: 'Luxury Villa', capacity: 8 },
-        users: { full_name: 'Mike Johnson', email: 'mike@example.com' },
-      },
-    ];
-  };
 
   const updateBookingStatus = async (bookingId: string, newStatus: string) => {
     try {
