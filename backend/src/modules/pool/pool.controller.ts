@@ -542,3 +542,67 @@ export async function getDailyReport(req: Request, res: Response, next: NextFunc
     next(error);
   }
 }
+
+// ============================================
+// Pool Settings
+// ============================================
+
+export async function getPoolSettings(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    
+    // Get settings from settings table with pool category
+    const { data: settings, error } = await supabase
+      .from('settings')
+      .select('*')
+      .eq('category', 'pool');
+    
+    if (error) throw error;
+    
+    // Convert to object format
+    const settingsObj: Record<string, string> = {};
+    (settings || []).forEach((s: { key: string; value: string }) => {
+      settingsObj[s.key] = s.value;
+    });
+    
+    // Default settings if none exist
+    const defaultSettings = {
+      maxCapacity: '100',
+      ticketPrice: '15.00',
+      childPrice: '10.00',
+      operatingHours: 'Open 8:00 AM - 8:00 PM',
+      isOpen: 'true',
+      ...settingsObj,
+    };
+    
+    res.json({ success: true, data: defaultSettings });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updatePoolSettings(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const settings = req.body;
+    
+    // Upsert each setting
+    for (const [key, value] of Object.entries(settings)) {
+      await supabase
+        .from('settings')
+        .upsert(
+          { 
+            key, 
+            value: String(value), 
+            category: 'pool',
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'key' }
+        );
+    }
+    
+    res.json({ success: true, message: 'Pool settings updated' });
+  } catch (error) {
+    next(error);
+  }
+}

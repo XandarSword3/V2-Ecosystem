@@ -246,7 +246,9 @@
       "checkInTime": "15h00",
       "checkOutTime": "12h00",
       "depositPercent": "Acompte de {percent}% requis",
-      "cancellationText": "Annulation gratuite jusqu'à 48 heures avant l'arrivée"
+      "cancellationText": "Annulation gratuite jusqu'à 48 heures avant l'arrivée",
+      "depositDescription": "L'acompte est requis pour confirmer votre réservation",
+      "cancellationDescription": "Les conditions d'annulation flexibles s'appliquent"
     },
     "booking": {
       "checkIn": "Date d'arrivée",
@@ -519,7 +521,20 @@
     "subtitle": "Lisez les avis authentiques de clients ayant séjourné au V2 Resort",
     "averageRating": "Note Moyenne",
     "happyGuests": "Clients Satisfaits",
-    "recommend": "Recommandent"
+    "recommend": "Recommandent",
+    "leaveReview": "Laisser un Avis",
+    "loginToReview": "Connectez-vous pour laisser un avis",
+    "writeReview": "Écrire un Avis",
+    "yourRating": "Votre Note",
+    "serviceType": "Type de Service",
+    "serviceGeneral": "Expérience Générale",
+    "serviceChalets": "Chalets",
+    "serviceRestaurant": "Restaurant",
+    "servicePool": "Piscine",
+    "yourReview": "Votre Avis",
+    "reviewPlaceholder": "Partagez votre expérience avec nous...",
+    "submitReview": "Soumettre l'Avis",
+    "submitting": "Envoi en cours..."
   },
   "weather": {
     "location": "V2 Resort, Liban",
@@ -625,6 +640,37 @@
       "changes": {
         "title": "Modifications des conditions",
         "content": "Nous nous réservons le droit de modifier ces conditions à tout moment. La poursuite de l'utilisation de nos services après les modifications constitue l'acceptation des nouvelles conditions."
+      }
+    },
+    "cancellation": {
+      "title": "Politique d'Annulation",
+      "subtitle": "Informations importantes sur notre politique d'annulation",
+      "lastUpdated": "Dernière mise à jour",
+      "questions": "Questions sur les annulations?",
+      "contactUs": "Contactez notre équipe support",
+      "general": {
+        "title": "Politique Générale d'Annulation",
+        "content": "Nous comprenons que les plans peuvent changer. Nous visons à fournir des politiques d'annulation flexibles tout en maintenant des pratiques commerciales équitables pour tous les clients."
+      },
+      "chalets": {
+        "title": "Réservations de Chalets",
+        "content": "• Remboursement complet si annulé 48+ heures avant l'arrivée\n• 50% de remboursement si annulé 24-48 heures avant\n• Pas de remboursement si annulé dans les 24 heures\n• Les non-présentations ne donnent droit à aucun remboursement"
+      },
+      "restaurant": {
+        "title": "Commandes de Restaurant",
+        "content": "• Les commandes peuvent être annulées avant la préparation\n• Les commandes en préparation ou terminées ne sont pas remboursables\n• Les commandes incorrectes seront refaites ou remboursées\n• Veuillez contacter le restaurant dès que possible"
+      },
+      "pool": {
+        "title": "Billets de Piscine",
+        "content": "• Les billets sont non-transférables mais peuvent être annulés\n• Remboursement complet jusqu'à 24 heures avant\n• Les fermetures météo donnent droit à des billets de remplacement\n• Les heures d'ouverture réduites ne donnent pas droit à remboursement"
+      },
+      "refunds": {
+        "title": "Délais de Remboursement",
+        "content": "• Les demandes de remboursement sont traitées sous 3-5 jours ouvrables\n• Les remboursements apparaissent sur votre compte sous 5-10 jours\n• Les remboursements sont émis sur le mode de paiement original\n• Des remboursements partiels peuvent s'appliquer"
+      },
+      "exceptions": {
+        "title": "Exceptions",
+        "content": "Des exceptions peuvent être faites pour:\n• Les urgences médicales (documentation requise)\n• Les conditions météorologiques extrêmes\n• La discrétion de la direction dans des circonstances spéciales"
       }
     }
   }

@@ -11,6 +11,10 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
     const supabase = getSupabase();
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
+    const yesterday = dayjs().subtract(1, 'day').startOf('day').toISOString();
+    const endOfYesterday = dayjs().subtract(1, 'day').endOf('day').toISOString();
+    const lastWeekStart = dayjs().subtract(7, 'day').startOf('day').toISOString();
+    const lastWeekEnd = dayjs().subtract(7, 'day').endOf('day').toISOString();
 
     console.log('[ADMIN] Loading dashboard data...');
 
@@ -25,7 +29,12 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
       poolTicketsResult,
       poolRevenueResult,
       usersResult,
-      recentOrdersResult
+      recentOrdersResult,
+      // Yesterday's stats for comparison
+      yesterdayOrdersResult,
+      yesterdayRevenueResult,
+      lastWeekBookingsResult,
+      yesterdayTicketsResult
     ] = await Promise.all([
       // Restaurant orders count
       supabase.from('restaurant_orders')
@@ -78,7 +87,28 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
       supabase.from('restaurant_orders')
         .select('id, order_number, customer_name, status, total_amount, created_at')
         .order('created_at', { ascending: false })
-        .limit(5)
+        .limit(5),
+      // Yesterday orders (restaurant + snack)
+      supabase.from('restaurant_orders')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', yesterday)
+        .lte('created_at', endOfYesterday),
+      // Yesterday revenue
+      supabase.from('restaurant_orders')
+        .select('total_amount')
+        .gte('created_at', yesterday)
+        .lte('created_at', endOfYesterday)
+        .eq('payment_status', 'paid'),
+      // Last week bookings
+      supabase.from('chalet_bookings')
+        .select('id', { count: 'exact', head: true })
+        .gte('check_in_date', lastWeekStart)
+        .lte('check_in_date', lastWeekEnd),
+      // Yesterday tickets
+      supabase.from('pool_tickets')
+        .select('id', { count: 'exact', head: true })
+        .gte('ticket_date', yesterday)
+        .lte('ticket_date', endOfYesterday)
     ]);
 
     // Calculate totals
@@ -97,6 +127,25 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
 
     const totalOrders = (restaurantOrdersResult.count || 0) + (snackOrdersResult.count || 0);
     const totalRevenue = restaurantRevenue + snackRevenue + chaletRevenue + poolRevenue;
+    
+    // Yesterday's calculations
+    const yesterdayOrders = yesterdayOrdersResult.count || 0;
+    const yesterdayRevenue = (yesterdayRevenueResult.data || []).reduce(
+      (sum, o) => sum + parseFloat(o.total_amount || 0), 0
+    );
+    const lastWeekBookings = lastWeekBookingsResult.count || 0;
+    const yesterdayTickets = yesterdayTicketsResult.count || 0;
+    
+    // Calculate trends
+    const calcTrend = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+    
+    const ordersTrend = calcTrend(totalOrders, yesterdayOrders);
+    const revenueTrend = calcTrend(totalRevenue, yesterdayRevenue);
+    const bookingsTrend = calcTrend(chaletBookingsResult.count || 0, lastWeekBookings);
+    const ticketsTrend = calcTrend(poolTicketsResult.count || 0, yesterdayTickets);
 
     console.log('[ADMIN] Dashboard loaded:', {
       todayOrders: totalOrders,
@@ -126,6 +175,12 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
           snackOrders: snackOrdersResult.count || 0,
           chaletBookings: chaletBookingsResult.count || 0,
           poolTickets: poolTicketsResult.count || 0,
+        },
+        trends: {
+          orders: ordersTrend,
+          revenue: revenueTrend,
+          bookings: bookingsTrend,
+          tickets: ticketsTrend,
         }
       },
     });
@@ -220,6 +275,69 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
     );
 
     res.json({ success: true, data: usersWithRoles });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { email, password, full_name, phone, roles = ['customer'] } = req.body;
+    
+    if (!email || !password || !full_name) {
+      return res.status(400).json({ success: false, error: 'Email, password, and full name are required' });
+    }
+    
+    // Check if email already exists
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .single();
+    
+    if (existing) {
+      return res.status(400).json({ success: false, error: 'Email already exists' });
+    }
+    
+    // Hash password
+    const bcrypt = await import('bcryptjs');
+    const passwordHash = await bcrypt.hash(password, 10);
+    
+    // Create user
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .insert({
+        email: email.toLowerCase(),
+        password_hash: passwordHash,
+        full_name,
+        phone,
+        is_active: true,
+        email_verified: true, // Admin-created users are auto-verified
+      })
+      .select('id, email, full_name, phone, is_active, created_at')
+      .single();
+    
+    if (userError) throw userError;
+    
+    // Assign roles
+    if (roles.length > 0) {
+      const { data: roleRecords } = await supabase
+        .from('roles')
+        .select('id, name')
+        .in('name', roles);
+      
+      if (roleRecords && roleRecords.length > 0) {
+        const roleInserts = roleRecords.map(role => ({
+          user_id: user.id,
+          role_id: role.id,
+        }));
+        
+        await supabase.from('user_roles').insert(roleInserts);
+      }
+    }
+    
+    res.status(201).json({ success: true, data: { ...user, roles } });
   } catch (error) {
     next(error);
   }

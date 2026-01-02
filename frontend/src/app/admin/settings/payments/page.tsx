@@ -56,7 +56,49 @@ export default function AdminPaymentsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [methodFilter, setMethodFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [exporting, setExporting] = useState(false);
   const { socket } = useSocket();
+
+  const exportPayments = async () => {
+    try {
+      setExporting(true);
+      // Filter payments based on current filters
+      const dataToExport = filteredPayments;
+      
+      // Create CSV content
+      const headers = ['Date', 'Amount', 'Method', 'Status', 'Reference Type', 'Customer'];
+      const rows = dataToExport.map(p => [
+        new Date(p.created_at).toLocaleDateString(),
+        p.amount.toFixed(2),
+        p.payment_method,
+        p.status,
+        p.reference_type,
+        p.users?.full_name || 'Guest'
+      ]);
+      
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+      
+      // Download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `payments_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Payments exported successfully');
+    } catch (error) {
+      toast.error('Failed to export payments');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const fetchPayments = useCallback(async () => {
     try {
@@ -190,9 +232,9 @@ export default function AdminPaymentsPage() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export
+          <Button variant="outline" onClick={exportPayments} disabled={exporting}>
+            <Download className={`w-4 h-4 mr-2 ${exporting ? 'animate-pulse' : ''}`} />
+            {exporting ? 'Exporting...' : 'Export'}
           </Button>
         </div>
       </div>

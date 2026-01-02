@@ -246,7 +246,9 @@
       "checkInTime": "3:00 PM",
       "checkOutTime": "12:00 PM",
       "depositPercent": "{percent}% deposit required",
-      "cancellationText": "Free cancellation up to 48 hours before check-in"
+      "cancellationText": "Free cancellation up to 48 hours before check-in",
+      "depositDescription": "A 30% deposit is required to confirm your booking. The remaining balance is due upon check-in.",
+      "cancellationDescription": "Free cancellation up to 48 hours before check-in. Late cancellations will incur a 50% charge."
     },
     "booking": {
       "checkIn": "Check-in Date",
@@ -519,7 +521,20 @@
     "subtitle": "Read authentic reviews from guests who have experienced V2 Resort",
     "averageRating": "Average Rating",
     "happyGuests": "Happy Guests",
-    "recommend": "Would Recommend"
+    "recommend": "Would Recommend",
+    "leaveReview": "Leave a Review",
+    "loginToReview": "Login to Leave a Review",
+    "writeReview": "Write a Review",
+    "yourRating": "Your Rating",
+    "serviceType": "Service Type",
+    "serviceGeneral": "General Experience",
+    "serviceChalets": "Chalets",
+    "serviceRestaurant": "Restaurant",
+    "servicePool": "Pool",
+    "yourReview": "Your Review",
+    "reviewPlaceholder": "Share your experience with us...",
+    "submitReview": "Submit Review",
+    "submitting": "Submitting..."
   },
   "weather": {
     "location": "V2 Resort, Lebanon",
@@ -625,6 +640,37 @@
       "changes": {
         "title": "Changes to Terms",
         "content": "We reserve the right to modify these terms at any time. Continued use of our services after changes constitutes acceptance of the new terms."
+      }
+    },
+    "cancellation": {
+      "title": "Cancellation Policy",
+      "subtitle": "Understanding our cancellation terms",
+      "lastUpdated": "Last Updated",
+      "questions": "Questions About Cancellations?",
+      "contactUs": "Contact our support team for assistance",
+      "general": {
+        "title": "General Policy",
+        "content": "We understand that plans change. Our cancellation policy is designed to be fair to both guests and our business. Please review the specific policies for each service type below."
+      },
+      "chalets": {
+        "title": "Chalet Bookings",
+        "content": "• Free cancellation up to 48 hours before check-in\n• Cancellations within 48 hours: 50% charge\n• No-shows: Full charge\n• Early departure: No refund for unused nights\n• Modifications: Subject to availability"
+      },
+      "restaurant": {
+        "title": "Restaurant Reservations",
+        "content": "• Free cancellation up to 2 hours before reservation\n• Late cancellations may affect future booking priority\n• Large group bookings (8+): 24-hour cancellation notice required\n• Pre-ordered meals: Subject to preparation costs"
+      },
+      "pool": {
+        "title": "Pool Tickets",
+        "content": "• Pool tickets are non-refundable once purchased\n• Tickets can be rescheduled up to 24 hours before the session\n• Weather cancellations: Full credit for future visit\n• Medical emergencies: Contact us for special consideration"
+      },
+      "refunds": {
+        "title": "Refund Process",
+        "content": "• Eligible refunds are processed within 5-7 business days\n• Refunds are issued to the original payment method\n• Credit card refunds may take additional time to appear\n• Store credit can be issued as an alternative"
+      },
+      "exceptions": {
+        "title": "Special Circumstances",
+        "content": "We may make exceptions for:\n• Medical emergencies with documentation\n• Natural disasters or severe weather\n• Government travel restrictions\n• Bereavement (immediate family)\n\nPlease contact us directly for these situations."
       }
     }
   }

@@ -14,6 +14,7 @@ router.get('/dashboard/revenue', adminController.getRevenueStats);
 
 // Users
 router.get('/users', adminController.getUsers);
+router.post('/users', adminController.createUser);
 router.get('/users/:id', adminController.getUser);
 router.put('/users/:id', adminController.updateUser);
 router.put('/users/:id/roles', adminController.updateUserRoles);
