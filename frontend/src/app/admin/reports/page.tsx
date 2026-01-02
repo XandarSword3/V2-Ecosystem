@@ -63,10 +63,11 @@ export default function AdminReportsPage() {
       const response = await api.get('/admin/reports/overview', {
         params: { range: dateRange },
       });
-      setReportData(response.data.data || generateMockData());
+      setReportData(response.data.data || null);
     } catch (error) {
-      // Use mock data if API fails
-      setReportData(generateMockData());
+      console.error('Failed to fetch reports:', error);
+      toast.error('Failed to fetch reports data');
+      setReportData(null);
     } finally {
       setLoading(false);
     }
@@ -75,38 +76,6 @@ export default function AdminReportsPage() {
   useEffect(() => {
     fetchReports();
   }, [fetchReports]);
-
-  const generateMockData = (): ReportData => ({
-    overview: {
-      totalRevenue: 45750,
-      totalOrders: 342,
-      totalBookings: 28,
-      totalUsers: 156,
-      revenueChange: 12.5,
-      ordersChange: 8.3,
-    },
-    revenueByService: {
-      restaurant: 22500,
-      snackBar: 8750,
-      chalets: 12000,
-      pool: 2500,
-    },
-    revenueByMonth: [
-      { month: 'Jan', revenue: 35000 },
-      { month: 'Feb', revenue: 42000 },
-      { month: 'Mar', revenue: 38000 },
-      { month: 'Apr', revenue: 45000 },
-      { month: 'May', revenue: 52000 },
-      { month: 'Jun', revenue: 48000 },
-    ],
-    topItems: [
-      { name: 'Chicken Shawarma Plate', quantity: 145, revenue: 2175 },
-      { name: 'Mixed Grill', quantity: 98, revenue: 2450 },
-      { name: 'Hummus', quantity: 234, revenue: 1170 },
-      { name: 'Falafel Wrap', quantity: 156, revenue: 1248 },
-      { name: 'Fresh Juice', quantity: 312, revenue: 1560 },
-    ],
-  });
 
   const exportReport = async () => {
     try {
@@ -146,7 +115,7 @@ export default function AdminReportsPage() {
   }
 
   const data = reportData!;
-  const totalServiceRevenue = Object.values(data.revenueByService).reduce((a, b) => a + b, 0);
+  const totalServiceRevenue = data.revenueByService ? Object.values(data.revenueByService).reduce((a, b) => a + b, 0) : 0;
 
   return (
     <motion.div

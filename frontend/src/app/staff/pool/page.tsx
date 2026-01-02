@@ -65,7 +65,7 @@ export default function StaffPoolPage() {
 
   const fetchTickets = useCallback(async () => {
     try {
-      const response = await api.get('/pool/tickets', {
+      const response = await api.get('/pool/staff/tickets/today', {
         params: { date: new Date().toISOString().split('T')[0] },
       });
       setTickets(response.data.data || []);
@@ -73,10 +73,9 @@ export default function StaffPoolPage() {
         response.data.data?.filter((t: PoolTicket) => t.status === 'active' && t.entry_time && !t.exit_time).length || 0
       );
     } catch (error) {
-      // Use mock data if API fails
-      const mockTickets = generateMockTickets();
-      setTickets(mockTickets);
-      setCurrentlyInPool(mockTickets.filter((t) => t.status === 'active' && t.entry_time && !t.exit_time).length);
+      toast.error('Failed to load tickets');
+      setTickets([]);
+      setCurrentlyInPool(0);
     } finally {
       setLoading(false);
     }
@@ -110,48 +109,6 @@ export default function StaffPoolPage() {
       };
     }
   }, [socket]);
-
-  const generateMockTickets = (): PoolTicket[] => {
-    const today = new Date().toISOString().split('T')[0];
-    return [
-      {
-        id: '1',
-        ticket_number: 'PT-001',
-        status: 'active',
-        ticket_type: 'adult',
-        valid_date: today,
-        entry_time: '10:30:00',
-        users: { full_name: 'John Doe', email: 'john@example.com' },
-      },
-      {
-        id: '2',
-        ticket_number: 'PT-002',
-        status: 'pending',
-        ticket_type: 'family',
-        valid_date: today,
-        users: { full_name: 'Jane Smith', email: 'jane@example.com' },
-      },
-      {
-        id: '3',
-        ticket_number: 'PT-003',
-        status: 'used',
-        ticket_type: 'vip',
-        valid_date: today,
-        entry_time: '09:00:00',
-        exit_time: '12:00:00',
-        users: { full_name: 'Mike Johnson', email: 'mike@example.com' },
-      },
-      {
-        id: '4',
-        ticket_number: 'PT-004',
-        status: 'active',
-        ticket_type: 'child',
-        valid_date: today,
-        entry_time: '11:00:00',
-        users: { full_name: 'Sarah Williams', email: 'sarah@example.com' },
-      },
-    ];
-  };
 
   const validateTicket = async (code: string) => {
     if (!code.trim()) return;
