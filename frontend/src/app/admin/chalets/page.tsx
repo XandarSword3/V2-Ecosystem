@@ -40,6 +40,7 @@ interface Chalet {
   description?: string;
   description_ar?: string;
   base_price: number;
+  weekend_price?: number;
   capacity: number;
   bedroom_count: number;
   bathroom_count: number;
@@ -590,8 +591,8 @@ export default function ChaletsManagementPage() {
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={formData.is_available ?? true}
-                      onChange={(e) => setFormData({ ...formData, is_available: e.target.checked })}
+                      checked={formData.is_active ?? true}
+                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                       className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                     />
                     <span className="text-sm text-slate-700 dark:text-slate-300">Available for booking</span>
