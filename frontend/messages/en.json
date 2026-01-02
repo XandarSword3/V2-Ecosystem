@@ -15,6 +15,7 @@
     "close": "Close",
     "confirm": "Confirm",
     "back": "Back",
+    "backToHome": "Back to Home",
     "next": "Next",
     "submit": "Submit",
     "view": "View",
@@ -187,7 +188,7 @@
     "proceedToCheckout": "Checkout",
     "itemsInCart": "{count} items in cart",
     "tryDifferentCategory": "Try selecting a different category",
-    "categories": {
+    "categoryNames": {
       "appetizers": "Appetizers",
       "mains": "Main Courses",
       "desserts": "Desserts",
@@ -562,5 +563,69 @@
     "online": "Online now",
     "placeholder": "Type your message...",
     "suggestions": "Quick questions"
+  },
+  "legal": {
+    "privacy": {
+      "title": "Privacy Policy",
+      "subtitle": "Your privacy is important to us",
+      "lastUpdated": "Last Updated",
+      "questions": "Questions About Privacy?",
+      "contactUs": "Contact our privacy team for any concerns",
+      "dataCollection": {
+        "title": "Information We Collect",
+        "content": "We collect information you provide directly, including:\n• Name, email address, and phone number\n• Booking and reservation details\n• Payment information (processed securely)\n• Order history and preferences\n• Device and browser information for improving our services"
+      },
+      "dataUsage": {
+        "title": "How We Use Your Information",
+        "content": "We use your information to:\n• Process bookings, orders, and payments\n• Send confirmations and important notifications\n• Improve our services and personalize your experience\n• Communicate special offers (with your consent)\n• Comply with legal obligations"
+      },
+      "dataSecurity": {
+        "title": "Data Security",
+        "content": "We implement industry-standard security measures including:\n• SSL encryption for all data transmission\n• Secure payment processing via trusted providers\n• Regular security audits and updates\n• Limited access to personal data on need-to-know basis"
+      },
+      "cookies": {
+        "title": "Cookies & Tracking",
+        "content": "We use cookies to:\n• Remember your preferences and settings\n• Analyze site traffic and usage patterns\n• Provide personalized content\n• Enable essential site functionality\n\nYou can control cookie settings in your browser."
+      },
+      "yourRights": {
+        "title": "Your Rights",
+        "content": "You have the right to:\n• Access your personal data\n• Request correction of inaccurate data\n• Request deletion of your data\n• Opt-out of marketing communications\n• Export your data in a portable format"
+      },
+      "thirdParty": {
+        "title": "Third-Party Services",
+        "content": "We may share limited data with:\n• Payment processors for secure transactions\n• Email service providers for communications\n• Analytics services (anonymized data only)\n\nWe never sell your personal information."
+      }
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "subtitle": "Please read these terms carefully",
+      "lastUpdated": "Last Updated",
+      "questions": "Questions About Our Terms?",
+      "contactUs": "Contact our legal team for clarification",
+      "acceptance": {
+        "title": "Acceptance of Terms",
+        "content": "By accessing or using V2 Resort's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services."
+      },
+      "services": {
+        "title": "Our Services",
+        "content": "V2 Resort provides:\n• Restaurant dining and food ordering\n• Chalet accommodations and bookings\n• Pool access and ticket reservations\n• Snack bar services\n\nAll services are subject to availability."
+      },
+      "bookings": {
+        "title": "Bookings & Reservations",
+        "content": "• All bookings require valid payment information\n• Cancellation policies vary by service type\n• Chalets: Free cancellation 48 hours before check-in\n• Pool tickets: Non-refundable\n• Restaurant reservations: Cancel 2 hours in advance"
+      },
+      "conduct": {
+        "title": "Guest Conduct",
+        "content": "Guests must:\n• Respect other guests and staff\n• Follow resort rules and safety guidelines\n• Not engage in illegal activities on premises\n• Report any issues to staff immediately\n• Supervise children at all times"
+      },
+      "liability": {
+        "title": "Limitation of Liability",
+        "content": "V2 Resort is not liable for:\n• Personal belongings left on premises\n• Injuries resulting from failure to follow safety rules\n• Weather-related service interruptions\n• Third-party service failures\n\nOur maximum liability is limited to the amount paid for services."
+      },
+      "changes": {
+        "title": "Changes to Terms",
+        "content": "We reserve the right to modify these terms at any time. Continued use of our services after changes constitutes acceptance of the new terms."
+      }
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as menuService from "../services/menu.service";
+import { translateText } from '../../../services/translation.service.js';
 
 // Get full menu with categories and items
 export async function getFullMenu(req: Request, res: Response, next: NextFunction) {
@@ -73,7 +74,33 @@ export async function getFeaturedItems(req: Request, res: Response, next: NextFu
 
 export async function createCategory(req: Request, res: Response, next: NextFunction) {
   try {
-    const category = await menuService.createCategory(req.body);
+    const { name, description, ...rest } = req.body;
+    
+    // Auto-translate name and description if not provided
+    let translatedData = { ...rest, name };
+    
+    if (name && !req.body.name_ar) {
+      try {
+        const nameTranslations = await translateText(name, 'en');
+        translatedData.name_ar = nameTranslations.ar;
+        translatedData.name_fr = nameTranslations.fr;
+      } catch (e) {
+        console.warn('[MENU] Auto-translation failed for category name');
+      }
+    }
+    
+    if (description && !req.body.description_ar) {
+      try {
+        const descTranslations = await translateText(description, 'en');
+        translatedData.description = description;
+        translatedData.description_ar = descTranslations.ar;
+        translatedData.description_fr = descTranslations.fr;
+      } catch (e) {
+        console.warn('[MENU] Auto-translation failed for category description');
+      }
+    }
+    
+    const category = await menuService.createCategory(translatedData);
     res.status(201).json({ success: true, data: category });
   } catch (error) {
     next(error);
@@ -100,8 +127,36 @@ export async function deleteCategory(req: Request, res: Response, next: NextFunc
 
 export async function createMenuItem(req: Request, res: Response, next: NextFunction) {
   try {
-    const item = await menuService.createMenuItem(req.body);
-    res.status(201).json({ success: true, data: item });
+    const { name, description, ...rest } = req.body;
+    
+    // Auto-translate name and description if not provided
+    let translatedData = { ...rest, name };
+    
+    if (name && !req.body.name_ar) {
+      try {
+        console.log('[MENU] Auto-translating item name:', name);
+        const nameTranslations = await translateText(name, 'en');
+        translatedData.name_ar = nameTranslations.ar;
+        translatedData.name_fr = nameTranslations.fr;
+        console.log('[MENU] Translations:', nameTranslations);
+      } catch (e) {
+        console.warn('[MENU] Auto-translation failed for item name');
+      }
+    }
+    
+    if (description && !req.body.description_ar) {
+      try {
+        const descTranslations = await translateText(description, 'en');
+        translatedData.description = description;
+        translatedData.description_ar = descTranslations.ar;
+        translatedData.description_fr = descTranslations.fr;
+      } catch (e) {
+        console.warn('[MENU] Auto-translation failed for item description');
+      }
+    }
+    
+    const item = await menuService.createMenuItem(translatedData);
+    res.status(201).json({ success: true, data: item, autoTranslated: true });
   } catch (error) {
     next(error);
   }
