@@ -311,7 +311,7 @@ export default function StaffPoolPage() {
         </div>
         <div className="flex gap-2">
           <Button
-            variant={scanMode ? 'default' : 'outline'}
+            variant={scanMode ? 'primary' : 'outline'}
             onClick={() => {
               setScanMode(!scanMode);
               setTimeout(() => inputRef.current?.focus(), 100);

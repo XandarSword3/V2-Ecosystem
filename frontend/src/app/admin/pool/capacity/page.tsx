@@ -38,9 +38,13 @@ export default function AdminPoolCapacityPage() {
 
   const fetchSettings = useCallback(async () => {
     try {
-      const response = await api.get('/pool/settings');
+      const response = await api.get('/pool/staff/capacity');
       if (response.data.data) {
-        setSettings(response.data.data);
+        setSettings(prev => ({
+          ...prev,
+          current_occupancy: response.data.data.current || 0,
+          max_capacity: response.data.data.max || 100,
+        }));
       }
     } catch (error) {
       // Use defaults

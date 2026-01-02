@@ -65,7 +65,7 @@ export default function AdminRestaurantOrdersPage() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const response = await api.get('/restaurant/orders');
+      const response = await api.get('/restaurant/staff/orders');
       setOrders(response.data.data || []);
     } catch (error) {
       toast.error('Failed to fetch orders');
@@ -98,7 +98,7 @@ export default function AdminRestaurantOrdersPage() {
 
   const updateOrderStatus = async (orderId: string, status: string) => {
     try {
-      await api.put(`/restaurant/orders/${orderId}/status`, { status });
+      await api.patch(`/restaurant/staff/orders/${orderId}/status`, { status });
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: status as Order['status'] } : o)));
       toast.success('Order status updated');
     } catch (error) {

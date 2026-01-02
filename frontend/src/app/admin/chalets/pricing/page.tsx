@@ -71,7 +71,7 @@ export default function AdminChaletPricingPage() {
   const fetchPricingRules = useCallback(async () => {
     try {
       const [rulesRes, chaletsRes] = await Promise.all([
-        api.get('/chalets/pricing'),
+        api.get('/chalets/admin/price-rules'),
         api.get('/chalets'),
       ]);
       setPricingRules(rulesRes.data.data || []);
@@ -91,10 +91,10 @@ export default function AdminChaletPricingPage() {
     e.preventDefault();
     try {
       if (editing) {
-        await api.put(`/chalets/pricing/${editing.id}`, formData);
+        await api.put(`/chalets/admin/price-rules/${editing.id}`, formData);
         toast.success('Pricing rule updated');
       } else {
-        await api.post('/chalets/pricing', formData);
+        await api.post('/chalets/admin/price-rules', formData);
         toast.success('Pricing rule created');
       }
       setShowModal(false);
@@ -126,7 +126,7 @@ export default function AdminChaletPricingPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this pricing rule?')) return;
     try {
-      await api.delete(`/chalets/pricing/${id}`);
+      await api.delete(`/chalets/admin/price-rules/${id}`);
       setPricingRules((prev) => prev.filter((r) => r.id !== id));
       toast.success('Pricing rule deleted');
     } catch (error) {
@@ -136,7 +136,7 @@ export default function AdminChaletPricingPage() {
 
   const toggleActive = async (rule: PricingRule) => {
     try {
-      await api.put(`/chalets/pricing/${rule.id}`, { is_active: !rule.is_active });
+      await api.put(`/chalets/admin/price-rules/${rule.id}`, { is_active: !rule.is_active });
       setPricingRules((prev) =>
         prev.map((r) => (r.id === rule.id ? { ...r, is_active: !r.is_active } : r))
       );

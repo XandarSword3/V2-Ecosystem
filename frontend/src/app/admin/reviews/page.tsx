@@ -412,7 +412,7 @@ export default function AdminReviewsPage() {
                             </Button>
                           )}
                           <Button
-                            variant="destructive"
+                            variant="danger"
                             size="sm"
                             onClick={() => deleteReview(review.id)}
                             disabled={actionLoading === review.id}

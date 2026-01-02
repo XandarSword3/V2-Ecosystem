@@ -7,23 +7,24 @@ import http from 'http';
 
 async function main() {
   try {
-    // Initialize database
-    await initializeDatabase();
-    logger.info('Database connected successfully');
-
-    // Create HTTP server
+    // Create HTTP server first (so health check works immediately)
     const server = http.createServer(app);
 
-    // Initialize WebSocket
-    initializeSocketServer(server);
-    logger.info('WebSocket server initialized');
-
-    // Start server
-    server.listen(config.port, () => {
+    // Start server immediately so Render health check passes
+    server.listen(config.port, '0.0.0.0', () => {
       logger.info(`🚀 Server running on port ${config.port}`);
       logger.info(`📍 Environment: ${config.env}`);
       logger.info(`🔗 API URL: ${config.apiUrl}`);
     });
+
+    // Initialize database in background (don't block startup)
+    initializeDatabase()
+      .then(() => logger.info('Database connected successfully'))
+      .catch((error) => logger.error('Database connection failed:', error));
+
+    // Initialize WebSocket
+    initializeSocketServer(server);
+    logger.info('WebSocket server initialized');
 
     // Graceful shutdown
     const shutdown = async () => {

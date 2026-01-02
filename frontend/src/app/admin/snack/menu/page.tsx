@@ -73,8 +73,8 @@ export default function SnackMenuManagementPage() {
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/snack/menu');
-      setItems(response.data.items || []);
+      const response = await api.get('/snack/items');
+      setItems(response.data.data || response.data.items || []);
     } catch (error: any) {
       toast.error('Failed to fetch snack menu');
       console.error(error);
