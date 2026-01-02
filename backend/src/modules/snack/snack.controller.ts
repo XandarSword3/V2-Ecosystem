@@ -288,17 +288,29 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
 export async function createItem(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
+    const body = req.body;
+    
+    // Validate required fields
+    if (!body.name) {
+      return res.status(400).json({ success: false, message: 'Name is required' });
+    }
+    if (body.price === undefined || body.price === null) {
+      return res.status(400).json({ success: false, message: 'Price is required' });
+    }
+    
     const { data: item, error } = await supabase
       .from('snack_items')
       .insert({
-        name: req.body.name,
-        name_ar: req.body.nameAr,
-        name_fr: req.body.nameFr,
-        description: req.body.description,
-        price: req.body.price.toString(),
-        category: req.body.category,
-        image_url: req.body.imageUrl,
-        display_order: req.body.displayOrder || 0,
+        name: body.name,
+        name_ar: body.nameAr || body.name_ar || null,
+        name_fr: body.nameFr || body.name_fr || null,
+        description: body.description || null,
+        description_ar: body.descriptionAr || body.description_ar || null,
+        price: String(body.price),
+        category: body.category || 'other',
+        image_url: body.imageUrl || body.image_url || null,
+        display_order: body.displayOrder || body.display_order || 0,
+        is_available: body.isAvailable !== undefined ? body.isAvailable : (body.is_available !== undefined ? body.is_available : true),
       })
       .select()
       .single();
@@ -314,19 +326,22 @@ export async function createItem(req: Request, res: Response, next: NextFunction
 export async function updateItem(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
+    const body = req.body;
     const updateData: Record<string, unknown> = { 
       updated_at: new Date().toISOString() 
     };
     
-    if (req.body.name !== undefined) updateData.name = req.body.name;
-    if (req.body.nameAr !== undefined) updateData.name_ar = req.body.nameAr;
-    if (req.body.nameFr !== undefined) updateData.name_fr = req.body.nameFr;
-    if (req.body.description !== undefined) updateData.description = req.body.description;
-    if (req.body.price !== undefined) updateData.price = req.body.price.toString();
-    if (req.body.category !== undefined) updateData.category = req.body.category;
-    if (req.body.imageUrl !== undefined) updateData.image_url = req.body.imageUrl;
-    if (req.body.displayOrder !== undefined) updateData.display_order = req.body.displayOrder;
-    if (req.body.isAvailable !== undefined) updateData.is_available = req.body.isAvailable;
+    // Handle both camelCase and snake_case field names
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.nameAr !== undefined || body.name_ar !== undefined) updateData.name_ar = body.nameAr || body.name_ar;
+    if (body.nameFr !== undefined || body.name_fr !== undefined) updateData.name_fr = body.nameFr || body.name_fr;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.descriptionAr !== undefined || body.description_ar !== undefined) updateData.description_ar = body.descriptionAr || body.description_ar;
+    if (body.price !== undefined) updateData.price = String(body.price);
+    if (body.category !== undefined) updateData.category = body.category;
+    if (body.imageUrl !== undefined || body.image_url !== undefined) updateData.image_url = body.imageUrl || body.image_url;
+    if (body.displayOrder !== undefined || body.display_order !== undefined) updateData.display_order = body.displayOrder || body.display_order;
+    if (body.isAvailable !== undefined || body.is_available !== undefined) updateData.is_available = body.isAvailable !== undefined ? body.isAvailable : body.is_available;
 
     const { data: item, error } = await supabase
       .from('snack_items')

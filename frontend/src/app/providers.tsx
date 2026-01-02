@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocaleFromCookie, defaultLocale, type Locale } from '@/i18n';
 import { LoadingScreen } from '@/components/effects/LoadingScreen';
+import { SettingsProvider } from '@/lib/settings-context';
 
 // Import all messages statically to avoid async loading issues
 import enMessages from '../../messages/en.json';
@@ -66,8 +67,10 @@ export function Providers({ children }: ProvidersProps) {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <AuthProvider>
-            <LoadingScreen />
-            {children}
+            <SettingsProvider>
+              <LoadingScreen />
+              {children}
+            </SettingsProvider>
           </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>
