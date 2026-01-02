@@ -24,6 +24,8 @@ router.get('/staff/tickets/today', authenticate, authorize(...staffRoles), poolC
 
 // Admin routes
 const adminRoles = ['pool_admin', 'super_admin'];
+router.get('/settings', poolController.getPoolSettings);
+router.put('/admin/settings', authenticate, authorize(...adminRoles), poolController.updatePoolSettings);
 router.post('/admin/sessions', authenticate, authorize(...adminRoles), poolController.createSession);
 router.put('/admin/sessions/:id', authenticate, authorize(...adminRoles), poolController.updateSession);
 router.delete('/admin/sessions/:id', authenticate, authorize(...adminRoles), poolController.deleteSession);

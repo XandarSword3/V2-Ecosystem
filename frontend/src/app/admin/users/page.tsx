@@ -70,6 +70,9 @@ export default function UsersManagementPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedUserForRoles, setSelectedUserForRoles] = useState<User | null>(null);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUser, setNewUser] = useState({ email: '', full_name: '', password: '', phone: '', roles: ['customer'] });
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -122,6 +125,26 @@ export default function UsersManagementPage() {
     }
   };
 
+  const handleCreateUser = async () => {
+    if (!newUser.email || !newUser.password || !newUser.full_name) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    
+    try {
+      setCreating(true);
+      await api.post('/admin/users', newUser);
+      toast.success('User created successfully');
+      fetchUsers();
+      setShowAddUserModal(false);
+      setNewUser({ email: '', full_name: '', password: '', phone: '', roles: ['customer'] });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to create user');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -170,7 +193,10 @@ export default function UsersManagementPage() {
             <RefreshCw className="w-4 h-4" />
             Refresh
           </Button>
-          <Button className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white">
+          <Button 
+            onClick={() => setShowAddUserModal(true)}
+            className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white"
+          >
             <UserPlus className="w-4 h-4" />
             Add User
           </Button>
@@ -438,6 +464,133 @@ export default function UsersManagementPage() {
                   onClick={() => handleUpdateRoles(selectedUserForRoles.id, selectedUserForRoles.roles)}
                 >
                   Save Changes
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add User Modal */}
+      <AnimatePresence>
+        {showAddUserModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowAddUserModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Add New User
+                </h3>
+                <button
+                  onClick={() => setShowAddUserModal(false)}
+                  className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Full Name *
+                  </label>
+                  <Input
+                    value={newUser.full_name}
+                    onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
+                    placeholder="Enter full name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Email *
+                  </label>
+                  <Input
+                    type="email"
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                    placeholder="Enter email address"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Password *
+                  </label>
+                  <Input
+                    type="password"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    placeholder="Enter password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Phone
+                  </label>
+                  <Input
+                    value={newUser.phone}
+                    onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                    placeholder="Enter phone number (optional)"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Roles
+                  </label>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {roles.map(role => {
+                      const isSelected = newUser.roles.includes(role.name);
+                      return (
+                        <label
+                          key={role.id}
+                          className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {
+                              if (isSelected) {
+                                setNewUser({ ...newUser, roles: newUser.roles.filter(r => r !== role.name) });
+                              } else {
+                                setNewUser({ ...newUser, roles: [...newUser.roles, role.name] });
+                              }
+                            }}
+                            className="rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                          />
+                          <span className="text-sm text-slate-700 dark:text-slate-300">
+                            {role.display_name || role.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowAddUserModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-gradient-to-r from-violet-500 to-purple-600 text-white"
+                  onClick={handleCreateUser}
+                  disabled={creating}
+                >
+                  {creating ? 'Creating...' : 'Create User'}
                 </Button>
               </div>
             </motion.div>

@@ -109,6 +109,22 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [authChecked, setAuthChecked] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Array<{id: string; title: string; message: string; time: string; read: boolean}>>([
+    { id: '1', title: 'New Order', message: 'Order #R-250102-001 received', time: '5 min ago', read: false },
+    { id: '2', title: 'Booking Confirmed', message: 'Chalet booking for Jan 5-7', time: '1 hour ago', read: false },
+    { id: '3', title: 'Low Stock Alert', message: 'Cola running low in snack bar', time: '2 hours ago', read: true },
+  ]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+  
+  const markAsRead = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+  
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
 
   // Check authentication - wait for auth to fully load
   useEffect(() => {
@@ -315,10 +331,78 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 relative">
-              <Bell className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 relative"
+              >
+                <Bell className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+                )}
+              </button>
+              
+              {/* Notifications Dropdown */}
+              <AnimatePresence>
+                {notificationsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 z-50 overflow-hidden"
+                  >
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                      <h3 className="font-semibold text-slate-900 dark:text-white">Notifications</h3>
+                      {unreadCount > 0 && (
+                        <button 
+                          onClick={markAllAsRead}
+                          className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-4 text-center text-slate-500 dark:text-slate-400">
+                          <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p>No notifications</p>
+                        </div>
+                      ) : (
+                        notifications.map(notification => (
+                          <div 
+                            key={notification.id}
+                            onClick={() => markAsRead(notification.id)}
+                            className={cn(
+                              "p-4 border-b border-slate-100 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                              !notification.read && "bg-blue-50 dark:bg-blue-900/20"
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-medium text-sm text-slate-900 dark:text-white">{notification.title}</p>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">{notification.message}</p>
+                              </div>
+                              {!notification.read && (
+                                <span className="w-2 h-2 bg-blue-600 rounded-full shrink-0 mt-1.5" />
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">{notification.time}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <Link 
+                      href="/admin/settings/notifications"
+                      onClick={() => setNotificationsOpen(false)}
+                      className="block p-3 text-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                    >
+                      View all notifications
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <ThemeToggle />
             <LanguageSwitcher />
           </div>
