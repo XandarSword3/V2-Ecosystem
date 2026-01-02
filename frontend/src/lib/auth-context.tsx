@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from './api';
 
 interface User {
   id: string;
@@ -57,9 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<User> => {
     console.log('[AUTH CONTEXT] Login called for:', email);
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
     
-    const response = await fetch(`${apiUrl}/api/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),

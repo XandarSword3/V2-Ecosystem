@@ -1,9 +1,16 @@
 import axios from 'axios';
 
+// API_URL should NOT include /api - we add it in baseURL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// Ensure we don't double up on /api
+const cleanUrl = API_URL.replace(/\/api\/?$/, '');
+
+// Export the base API URL for use in other files
+export const API_BASE_URL = `${cleanUrl}/api`;
+
 export const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -35,7 +42,7 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refreshToken');
         if (refreshToken) {
-          const response = await axios.post(`${API_URL}/api/auth/refresh`, {
+          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
             refreshToken,
           });
 

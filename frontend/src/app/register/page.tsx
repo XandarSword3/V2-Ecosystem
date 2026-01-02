@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Mail, Lock, User, Phone, Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 export default function RegisterPage() {
   const t = useTranslations('auth.register');
@@ -37,9 +38,7 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      
-      const response = await fetch(`${apiUrl}/api/auth/register`, {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

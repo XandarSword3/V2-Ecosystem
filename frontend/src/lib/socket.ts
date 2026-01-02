@@ -3,14 +3,18 @@
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
+// SOCKET_URL should NOT include /api
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+
+// Ensure we don't have /api suffix for socket connection
+const cleanSocketUrl = SOCKET_URL.replace(/\/api\/?$/, '');
 
 export function useSocket() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const socketInstance = io(SOCKET_URL, {
+    const socketInstance = io(cleanSocketUrl, {
       transports: ['websocket', 'polling'],
     });
 

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Star, Quote, ChevronLeft, ChevronRight, User, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 
 interface Testimonial {
   id: string;
@@ -98,7 +99,7 @@ export default function TestimonialsCarousel() {
   useEffect(() => {
     const fetchReviews = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/reviews`);
+        const response = await fetch(`${API_BASE_URL}/reviews`);
         if (response.ok) {
           const data: ReviewsResponse = await response.json();
           if (data.reviews && data.reviews.length > 0) {
