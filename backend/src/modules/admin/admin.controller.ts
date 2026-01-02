@@ -420,16 +420,54 @@ export async function updateRole(req: Request, res: Response, next: NextFunction
 
 export async function getSettings(req: Request, res: Response, next: NextFunction) {
   try {
-    // TODO: Implement settings table
-    res.json({
-      success: true,
-      data: {
-        businessName: 'V2 Resort',
-        currency: 'USD',
-        taxRate: 0.11,
-        timezone: 'Asia/Beirut',
-      },
+    const supabase = getSupabase();
+    
+    // Get all settings from database
+    const { data: settings, error } = await supabase
+      .from('site_settings')
+      .select('key, value');
+    
+    if (error) throw error;
+    
+    // Combine all settings into a flat object
+    const combinedSettings: Record<string, any> = {};
+    (settings || []).forEach(s => {
+      if (typeof s.value === 'object') {
+        Object.assign(combinedSettings, s.value);
+      }
     });
+    
+    // If no settings in DB, return defaults
+    if (Object.keys(combinedSettings).length === 0) {
+      res.json({
+        success: true,
+        data: {
+          resortName: 'V2 Resort',
+          tagline: "Lebanon's Premier Resort Experience",
+          description: 'Your premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences in the heart of Lebanon.',
+          phone: '+961 XX XXX XXX',
+          email: 'info@v2resort.com',
+          address: 'V2 Resort, Lebanon',
+          poolHours: '9:00 AM - 7:00 PM',
+          restaurantHours: '8:00 AM - 11:00 PM',
+          receptionHours: '24/7',
+          chaletCheckIn: '3:00 PM',
+          chaletCheckOut: '12:00 PM',
+          chaletDeposit: 50,
+          cancellationPolicy: 'Free cancellation up to 48 hours before check-in. 50% charge for late cancellations.',
+          poolAdultPrice: 15,
+          poolChildPrice: 10,
+          poolInfantPrice: 0,
+          poolCapacity: 100,
+          privacyPolicy: '',
+          termsOfService: '',
+          refundPolicy: '',
+        },
+      });
+      return;
+    }
+    
+    res.json({ success: true, data: combinedSettings });
   } catch (error) {
     next(error);
   }
@@ -437,8 +475,71 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
 
 export async function updateSettings(req: Request, res: Response, next: NextFunction) {
   try {
-    // TODO: Implement settings update
-    res.json({ success: true, message: 'Settings updated' });
+    const supabase = getSupabase();
+    const settings = req.body;
+    const userId = req.user?.userId;
+    
+    // Group settings by category for database update
+    const generalSettings = {
+      resortName: settings.resortName,
+      tagline: settings.tagline,
+      description: settings.description,
+    };
+    
+    const contactSettings = {
+      phone: settings.phone,
+      email: settings.email,
+      address: settings.address,
+    };
+    
+    const hoursSettings = {
+      poolHours: settings.poolHours,
+      restaurantHours: settings.restaurantHours,
+      receptionHours: settings.receptionHours,
+    };
+    
+    const chaletSettings = {
+      checkIn: settings.chaletCheckIn,
+      checkOut: settings.chaletCheckOut,
+      depositPercent: settings.chaletDeposit,
+      cancellationPolicy: settings.cancellationPolicy,
+    };
+    
+    const poolSettings = {
+      adultPrice: settings.poolAdultPrice,
+      childPrice: settings.poolChildPrice,
+      infantPrice: settings.poolInfantPrice,
+      capacity: settings.poolCapacity,
+    };
+    
+    const legalSettings = {
+      privacyPolicy: settings.privacyPolicy,
+      termsOfService: settings.termsOfService,
+      refundPolicy: settings.refundPolicy,
+    };
+    
+    // Upsert each settings category
+    const updates = [
+      { key: 'general', value: generalSettings },
+      { key: 'contact', value: contactSettings },
+      { key: 'hours', value: hoursSettings },
+      { key: 'chalets', value: chaletSettings },
+      { key: 'pool', value: poolSettings },
+      { key: 'legal', value: legalSettings },
+    ];
+    
+    for (const update of updates) {
+      await supabase
+        .from('site_settings')
+        .upsert({
+          key: update.key,
+          value: update.value,
+          updated_at: new Date().toISOString(),
+          updated_by: userId,
+        }, { onConflict: 'key' });
+    }
+    
+    res.json({ success: true, message: 'Settings saved successfully' });
   } catch (error) {
     next(error);
   }
@@ -470,17 +571,27 @@ export async function getAuditLogs(req: Request, res: Response, next: NextFuncti
 export async function getOverviewReport(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const { startDate, endDate } = req.query;
+    const { range = 'month' } = req.query;
     
-    const start = startDate ? dayjs(startDate as string).toISOString() : dayjs().startOf('month').toISOString();
-    const end = endDate ? dayjs(endDate as string).toISOString() : dayjs().endOf('month').toISOString();
+    // Calculate date range based on range parameter
+    let start: string;
+    let end: string = dayjs().endOf('day').toISOString();
+    
+    if (range === 'week') {
+      start = dayjs().subtract(7, 'day').startOf('day').toISOString();
+    } else if (range === 'year') {
+      start = dayjs().subtract(1, 'year').startOf('day').toISOString();
+    } else {
+      start = dayjs().subtract(1, 'month').startOf('day').toISOString();
+    }
 
     // Get all orders/bookings in period - run queries in parallel
     const [
       restaurantResult,
       snackResult,
       chaletResult,
-      poolResult
+      poolResult,
+      usersResult
     ] = await Promise.all([
       supabase.from('restaurant_orders')
         .select('*')
@@ -497,46 +608,54 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
       supabase.from('pool_tickets')
         .select('*')
         .gte('created_at', start)
-        .lte('created_at', end)
+        .lte('created_at', end),
+      supabase.from('users')
+        .select('id', { count: 'exact', head: true })
     ]);
 
     const restaurantOrdersList = restaurantResult.data || [];
     const snackOrdersList = snackResult.data || [];
     const chaletBookingsList = chaletResult.data || [];
     const poolTicketsList = poolResult.data || [];
+    const totalUsers = usersResult.count || 0;
+
+    // Calculate revenues
+    const restaurantRevenue = restaurantOrdersList
+      .filter(o => o.status === 'completed')
+      .reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
+    const snackRevenue = snackOrdersList
+      .filter(o => o.status === 'completed')
+      .reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
+    const chaletRevenue = chaletBookingsList
+      .filter(b => b.payment_status === 'paid')
+      .reduce((sum, b) => sum + parseFloat(b.total_amount || '0'), 0);
+    const poolRevenue = poolTicketsList
+      .filter(t => t.payment_status === 'paid')
+      .reduce((sum, t) => sum + parseFloat(t.total_amount || '0'), 0);
+
+    const totalRevenue = restaurantRevenue + snackRevenue + chaletRevenue + poolRevenue;
+    const totalOrders = restaurantOrdersList.length + snackOrdersList.length;
+    const totalBookings = chaletBookingsList.length + poolTicketsList.length;
 
     res.json({
       success: true,
       data: {
-        period: { start, end },
-        restaurant: {
-          totalOrders: restaurantOrdersList.length,
-          completedOrders: restaurantOrdersList.filter(o => o.status === 'completed').length,
-          revenue: restaurantOrdersList
-            .filter(o => o.status === 'completed')
-            .reduce((sum, o) => sum + parseFloat(o.total_amount), 0),
+        overview: {
+          totalRevenue,
+          totalOrders,
+          totalBookings,
+          totalUsers,
+          revenueChange: 0, // Would need previous period data
+          ordersChange: 0,
         },
-        snackBar: {
-          totalOrders: snackOrdersList.length,
-          completedOrders: snackOrdersList.filter(o => o.status === 'completed').length,
-          revenue: snackOrdersList
-            .filter(o => o.status === 'completed')
-            .reduce((sum, o) => sum + parseFloat(o.total_amount), 0),
+        revenueByService: {
+          restaurant: restaurantRevenue,
+          snackBar: snackRevenue,
+          chalets: chaletRevenue,
+          pool: poolRevenue,
         },
-        chalets: {
-          totalBookings: chaletBookingsList.length,
-          confirmedBookings: chaletBookingsList.filter(b => !['cancelled', 'no_show'].includes(b.status)).length,
-          revenue: chaletBookingsList
-            .filter(b => b.payment_status === 'paid')
-            .reduce((sum, b) => sum + parseFloat(b.total_amount), 0),
-        },
-        pool: {
-          totalTickets: poolTicketsList.length,
-          usedTickets: poolTicketsList.filter(t => t.status === 'used').length,
-          revenue: poolTicketsList
-            .filter(t => t.payment_status === 'paid')
-            .reduce((sum, t) => sum + parseFloat(t.total_amount), 0),
-        },
+        revenueByMonth: [], // Would need to aggregate by month
+        topItems: [], // Would need to join with order items
       },
     });
   } catch (error) {
