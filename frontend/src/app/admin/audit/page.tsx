@@ -80,8 +80,9 @@ export default function AdminAuditPage() {
       const response = await api.get('/admin/audit-logs');
       setLogs(response.data.data || []);
     } catch (error) {
-      // Use mock data if API fails
-      setLogs(generateMockLogs());
+      console.error('Failed to fetch audit logs:', error);
+      toast.error('Failed to fetch audit logs');
+      setLogs([]);
     } finally {
       setLoading(false);
     }
@@ -90,45 +91,6 @@ export default function AdminAuditPage() {
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
-
-  const generateMockLogs = (): AuditLog[] => [
-    {
-      id: '1',
-      action: 'create',
-      entity_type: 'menu_item',
-      entity_id: 'item-123',
-      created_at: new Date().toISOString(),
-      users: { full_name: 'Admin User', email: 'admin@v2resort.com' },
-      new_values: { name: 'New Dish', price: 15.99 },
-    },
-    {
-      id: '2',
-      action: 'update',
-      entity_type: 'chalet',
-      entity_id: 'chalet-456',
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      users: { full_name: 'Admin User', email: 'admin@v2resort.com' },
-      old_values: { price_per_night: 100 },
-      new_values: { price_per_night: 120 },
-    },
-    {
-      id: '3',
-      action: 'login',
-      entity_type: 'session',
-      created_at: new Date(Date.now() - 7200000).toISOString(),
-      users: { full_name: 'Staff Member', email: 'staff@v2resort.com' },
-      ip_address: '192.168.1.1',
-    },
-    {
-      id: '4',
-      action: 'delete',
-      entity_type: 'menu_item',
-      entity_id: 'item-789',
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      users: { full_name: 'Admin User', email: 'admin@v2resort.com' },
-      old_values: { name: 'Deleted Item' },
-    },
-  ];
 
   const filteredLogs = logs.filter((log) => {
     if (actionFilter !== 'all' && log.action !== actionFilter) return false;
