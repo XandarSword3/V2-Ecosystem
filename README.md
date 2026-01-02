@@ -1,274 +1,313 @@
 # V2 Resort Management System
 
-A comprehensive full-stack resort management system for a Lebanese resort with 4 business units: Restaurant, Snack Bar, Chalets, and Pool.
+<p align="center">
+  <img src="frontend/public/v2-logo.png" alt="V2 Resort Logo" width="200"/>
+</p>
+
+A comprehensive full-stack resort management system for V2 Resort in Lebanon, featuring 4 integrated business units: Restaurant, Snack Bar, Chalets, and Pool.
+
+## 🌟 Project Overview
+
+This project was built using **AI-assisted development with GitHub Copilot** and **Claude** to create a production-ready resort management ecosystem. The system handles everything from customer-facing bookings to staff operations and administrative analytics.
+
+### Live Deployments
+- **Frontend**: [https://v2-ecosystem.vercel.app](https://v2-ecosystem.vercel.app)
+- **Backend API**: [https://v2-resort-backend.onrender.com](https://v2-resort-backend.onrender.com)
 
 ## 🏗️ Architecture
 
 ```
 v2-resort/
-├── backend/          # Node.js + Express + TypeScript API
-├── frontend/         # Next.js 14 + React + Tailwind CSS
-├── shared/           # Shared TypeScript types
-├── nginx/            # Nginx reverse proxy config
-└── docker-compose.yml
+├── backend/                    # Node.js + Express + TypeScript API
+│   ├── src/
+│   │   ├── config/            # Environment configuration
+│   │   ├── database/          # Database connection & migrations
+│   │   ├── middleware/        # Auth, logging, error handling
+│   │   ├── modules/           # Feature modules (auth, restaurant, chalets, etc.)
+│   │   └── utils/             # Helpers, logger, translations
+│   └── package.json
+├── frontend/                   # Next.js 14 + React + Tailwind CSS
+│   ├── src/
+│   │   ├── app/               # Next.js App Router pages
+│   │   ├── components/        # Reusable UI components
+│   │   └── lib/               # API client, auth, utilities
+│   └── package.json
+├── Planning.txt               # Project planning document
+└── README.md
 ```
 
 ## 🚀 Features
 
-### Customer-Facing
-- **Restaurant**: Browse menu, place orders (dine-in/takeaway), track order status
-- **Snack Bar**: Quick ordering for poolside refreshments
-- **Chalets**: Browse, check availability, book with add-ons
-- **Pool**: View sessions, purchase tickets with QR codes
+### 🍽️ Restaurant Module
+- Multi-language menu browsing (English, Arabic, French)
+- Category-based menu organization
+- Real-time order placement (dine-in/takeaway/delivery)
+- Kitchen display system with Kanban-style order management
+- Auto-translation of menu items using Google Translate API
+- Dietary filters (vegetarian, vegan, gluten-free)
 
-### Staff Portal
-- **Kitchen Display**: Real-time order management (Kanban-style)
-- **Chalet Management**: Check-in/check-out, booking management
-- **Pool Operations**: Ticket validation, capacity tracking
+### 🏕️ Chalets Module
+- Chalet listings with amenities and image galleries
+- Real-time availability calendar
+- Online booking with add-ons (BBQ, extra beds, etc.)
+- Weekend/weekday pricing differentiation
+- Booking management for staff (check-in/check-out)
 
-### Admin Dashboard
-- **Analytics**: Revenue reports, order statistics by unit
-- **User Management**: Staff accounts, role assignments
-- **Content Management**: Menu items, chalets, pool sessions
-- **Settings**: Business hours, pricing rules, notifications
+### 🏊 Pool Module
+- Session-based pool access
+- QR code ticket generation
+- Capacity management and real-time tracking
+- Family/group ticket support
+- Staff ticket validation via scanner
+
+### 🍿 Snack Bar Module
+- Quick-order menu for poolside service
+- Simplified checkout flow
+- Order tracking and notifications
+
+### 👔 Staff Portal
+- Role-based dashboards for each business unit
+- Kitchen display with real-time order updates
+- QR code scanner for ticket validation
+- Booking management interface
+
+### 👤 Admin Dashboard
+- **Analytics**: Revenue reports, booking statistics, order trends
+- **User Management**: Staff accounts, role assignments, permissions
+- **Content Management**: Menu items, chalets, pool sessions, add-ons
+- **Settings**: Site configuration, testimonials, business hours
+- **Audit Logs**: Track all administrative actions
+- **Security**: Failed login monitoring, session management
 
 ## 🛠️ Tech Stack
 
 ### Backend
-- **Runtime**: Node.js 20+
-- **Framework**: Express.js
-- **Language**: TypeScript
-- **ORM**: Drizzle ORM
-- **Database**: PostgreSQL 15
-- **Auth**: JWT + Refresh Tokens, bcrypt
-- **Real-time**: Socket.IO
-- **Payments**: Stripe
-- **Validation**: Zod
-- **Logging**: Winston
+| Technology | Purpose |
+|------------|---------|
+| Node.js 20+ | Runtime environment |
+| Express.js | Web framework |
+| TypeScript | Type safety |
+| Supabase | PostgreSQL database hosting |
+| JWT + bcrypt | Authentication & password hashing |
+| Winston | Logging with file & console output |
+| Zod | Request validation |
+| Google Translate API | Auto-translation service |
 
 ### Frontend
-- **Framework**: Next.js 14 (App Router)
-- **UI**: React 18 + Tailwind CSS
-- **State**: Zustand + React Query
-- **Forms**: React Hook Form + Zod
-- **Real-time**: Socket.IO Client
+| Technology | Purpose |
+|------------|---------|
+| Next.js 14 | React framework with App Router |
+| React 18 | UI library |
+| Tailwind CSS | Utility-first styling |
+| Framer Motion | Animations |
+| next-intl | Internationalization (i18n) |
+| Sonner | Toast notifications |
+| Lucide React | Icon library |
 
 ### Infrastructure
-- **Containerization**: Docker + Docker Compose
-- **Reverse Proxy**: Nginx
-- **Cache**: Redis (optional)
+| Service | Purpose |
+|---------|---------|
+| Vercel | Frontend hosting (auto-deploy from GitHub) |
+| Render | Backend hosting (auto-deploy from GitHub) |
+| Supabase | PostgreSQL database + auth |
+| GitHub | Source control |
 
-## 📋 Prerequisites
+## 🔐 Security Features
 
+- **JWT Authentication** with short-lived access tokens (15 min) and refresh tokens (7 days)
+- **Separate Secrets** for access and refresh tokens
+- **Password Hashing** with bcrypt (10 salt rounds)
+- **Rate Limiting** on all API endpoints (100 requests/15 min general, 10/15 min for auth)
+- **CORS Protection** with whitelisted origins
+- **Helmet.js** for security headers
+- **Input Validation** with Zod schemas
+- **XSS Protection** built into React
+- **Audit Logging** for admin actions
+- **Owner Verification** for sensitive operations
+
+## 📋 Environment Variables
+
+### Backend (.env)
+```env
+# Server
+PORT=3001
+NODE_ENV=production
+
+# Database (Supabase)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-key
+
+# Auth
+JWT_SECRET=your-jwt-secret
+JWT_REFRESH_SECRET=your-refresh-secret
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+
+# Frontend URL (for CORS)
+FRONTEND_URL=https://your-frontend.vercel.app
+
+# Google Translate (optional)
+GOOGLE_API_KEY=your-google-api-key
+```
+
+### Frontend (.env.local)
+```env
+NEXT_PUBLIC_API_URL=https://your-backend.onrender.com/api
+```
+
+## 🏃‍♂️ Local Development
+
+### Prerequisites
 - Node.js 20+
-- PostgreSQL 15+
 - npm or yarn
-- Docker (optional, for containerized deployment)
+- Supabase account (or local PostgreSQL)
 
-## 🏃‍♂️ Quick Start
-
-### 1. Clone and Install
+### Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/v2-resort.git
-cd v2-resort
+git clone https://github.com/AlessandroFare/V2-Ecosystem.git
+cd V2-Ecosystem/v2-resort
 
-# Install all dependencies
-npm install
-```
-
-### 2. Configure Environment
-
-```bash
-# Backend
-cp backend/.env.example backend/.env
-# Edit backend/.env with your database credentials and secrets
-
-# Frontend
-cp frontend/.env.example frontend/.env
-# Edit frontend/.env with API URLs
-```
-
-### 3. Setup Database
-
-```bash
-# Create PostgreSQL database
-createdb v2resort
-
-# Run migrations
+# Install backend dependencies
 cd backend
-npm run migrate
+npm install
+cp .env.example .env  # Configure your environment variables
 
-# Seed initial data
-npm run seed
+# Install frontend dependencies
+cd ../frontend
+npm install
+cp .env.example .env.local  # Configure your environment variables
+
+# Run migrations (if needed)
+cd ../backend
+# Run the SQL migration in Supabase SQL Editor: src/database/migration.sql
+
+# Start development servers
+cd ..
+npm run dev  # Runs both backend and frontend concurrently
 ```
 
-### 4. Start Development
-
-```bash
-# From root directory - starts both backend and frontend
-npm run dev
-
-# Or separately:
-cd backend && npm run dev  # Backend on http://localhost:3001
-cd frontend && npm run dev # Frontend on http://localhost:3000
-```
-
-### 5. Access the Application
-
-- **Customer Portal**: http://localhost:3000
-- **Staff Portal**: http://localhost:3000/staff
+### Development URLs
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:3001/api
 - **Admin Dashboard**: http://localhost:3000/admin
-- **API**: http://localhost:3001/api
-
-**Default Admin Credentials:**
-- Email: admin@v2resort.com
-- Password: admin123
-
-## 🐳 Docker Deployment
-
-```bash
-# Build and start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-## 📁 Project Structure
-
-### Backend
-
-```
-backend/src/
-├── config/           # Environment configuration
-├── database/
-│   ├── connection.ts # Database connection
-│   ├── schema/       # Drizzle ORM schemas
-│   ├── migrate.ts    # Migration script
-│   └── seed.ts       # Seed data
-├── middleware/       # Express middleware
-├── modules/
-│   ├── auth/         # Authentication
-│   ├── restaurant/   # Restaurant orders & menu
-│   ├── snack/        # Snack bar
-│   ├── chalets/      # Chalet bookings
-│   ├── pool/         # Pool tickets
-│   ├── payments/     # Stripe integration
-│   └── admin/        # Admin dashboard
-├── socket/           # Socket.IO events
-├── utils/            # Helpers & logger
-├── app.ts            # Express app setup
-└── index.ts          # Entry point
-```
-
-### Frontend
-
-```
-frontend/src/
-├── app/              # Next.js App Router pages
-│   ├── (auth)/       # Login, register
-│   ├── restaurant/   # Restaurant menu & ordering
-│   ├── chalets/      # Chalet listings & booking
-│   ├── pool/         # Pool tickets
-│   ├── snack-bar/    # Snack bar menu
-│   ├── staff/        # Staff portals
-│   └── admin/        # Admin dashboard
-├── components/       # Reusable components
-├── lib/
-│   ├── api.ts        # API client
-│   ├── auth-context.tsx # Auth provider
-│   ├── socket.ts     # Socket.IO hooks
-│   └── utils.ts      # Utilities
-└── styles/           # Global CSS
-```
-
-## 🔐 Authentication
-
-The system uses JWT-based authentication with refresh tokens:
-
-- Access tokens expire in 15 minutes
-- Refresh tokens expire in 7 days
-- Tokens are stored in localStorage
-- Automatic token refresh on 401 responses
-
-### Roles
-
-- `customer` - Regular users
-- `restaurant_staff` - Kitchen/serving staff
-- `snack_bar_staff` - Snack bar operations
-- `chalet_staff` - Chalet check-in/out
-- `pool_staff` - Pool ticket validation
-- `super_admin` - Full system access
-
-## 💳 Payments
-
-Integrated with Stripe for online payments:
-
-- PaymentIntent flow for secure payments
-- Webhook handling for payment confirmation
-- Cash payment recording for staff
-- Support for partial payments (deposits)
-
-## 🔔 Real-time Features
-
-Socket.IO rooms for targeted updates:
-
-- `restaurant-kitchen` - New orders for kitchen staff
-- `order-{id}` - Status updates for specific orders
-- `chalets-staff` - New bookings
-- `pool-staff` - Ticket validations
+- **Staff Portal**: http://localhost:3000/staff
 
 ## 📊 API Endpoints
 
-### Public
-- `GET /api/restaurant/menu` - Menu items
-- `GET /api/chalets` - Available chalets
-- `GET /api/pool/sessions` - Pool sessions
-
-### Authenticated
-- `POST /api/restaurant/orders` - Create order
-- `POST /api/chalets/bookings` - Create booking
-- `POST /api/pool/tickets` - Purchase ticket
-
-### Staff
-- `GET /api/restaurant/staff/orders` - All orders
-- `PATCH /api/restaurant/staff/orders/:id/status` - Update status
-- `POST /api/chalets/staff/bookings/:id/check-in` - Check-in
-
-### Admin
-- `GET /api/admin/dashboard` - Dashboard stats
-- `GET /api/admin/reports/revenue` - Revenue reports
-- `POST /api/admin/users` - Create staff user
-
-## 🧪 Testing
-
-```bash
-# Run backend tests
-cd backend && npm test
-
-# Run frontend tests
-cd frontend && npm test
+### Authentication
+```
+POST /api/auth/register     - Register new user
+POST /api/auth/login        - Login and get tokens
+POST /api/auth/refresh      - Refresh access token
+POST /api/auth/logout       - Logout and invalidate refresh token
+GET  /api/auth/me           - Get current user profile
 ```
 
-## 📝 Lebanese Context
+### Restaurant
+```
+GET  /api/restaurant/menu/categories  - Get menu categories
+GET  /api/restaurant/menu/items       - Get menu items
+POST /api/restaurant/orders           - Create order
+GET  /api/restaurant/orders/:id       - Get order details
+```
 
-This system is designed for the Lebanese market:
+### Chalets
+```
+GET  /api/chalets                     - List all chalets
+GET  /api/chalets/:id                 - Get chalet details
+GET  /api/chalets/:id/availability    - Check availability
+POST /api/chalets/bookings            - Create booking
+GET  /api/chalets/add-ons             - Get available add-ons
+```
 
-- **Currency**: USD (default, common in Lebanon)
-- **Weekend**: Friday-Saturday pricing for chalets
-- **Languages**: English, Arabic (RTL support), French
-- **Payments**: Cash-first with optional card/online
-- **VAT**: 11% tax calculation
+### Pool
+```
+GET  /api/pool/sessions               - Get pool sessions
+POST /api/pool/tickets                - Purchase ticket
+GET  /api/pool/tickets/:id            - Get ticket details
+```
+
+### Admin (Protected)
+```
+GET  /api/admin/dashboard             - Dashboard statistics
+GET  /api/admin/users                 - List all users
+POST /api/admin/users                 - Create user
+PUT  /api/admin/roles/:id             - Update user roles
+GET  /api/admin/settings              - Get site settings
+PUT  /api/admin/settings              - Update site settings
+GET  /api/admin/audit-logs            - View audit logs
+```
+
+## 📁 Database Schema
+
+The database uses PostgreSQL with the following main tables:
+
+- **users** - User accounts and profiles
+- **roles** / **user_roles** - Role-based access control
+- **menu_categories** / **menu_items** - Restaurant menu
+- **restaurant_orders** / **order_items** - Order management
+- **chalets** / **chalet_bookings** - Chalet management
+- **chalet_add_ons** / **booking_add_ons** - Booking extras
+- **pool_sessions** / **pool_tickets** - Pool management
+- **snack_items** / **snack_orders** - Snack bar
+- **testimonials** - Customer reviews
+- **site_settings** - Dynamic configuration
+- **audit_logs** - Admin action tracking
+
+## 🌐 Internationalization
+
+The system supports three languages:
+- **English (en)** - Default
+- **Arabic (ar)** - RTL support
+- **French (fr)**
+
+Translation files are located in `frontend/messages/` and use the `next-intl` library.
+
+## 📝 Logging System
+
+The backend uses Winston for comprehensive logging:
+
+```
+logs/
+├── error.log    # Error-level logs only
+└── all.log      # All log levels
+```
+
+Log levels: `error` > `warn` > `info` > `http` > `debug`
+
+Request logging includes:
+- Request ID for tracking
+- Request body (sensitive fields redacted)
+- Response status and timing
+- Error stack traces
+
+## 🚢 Deployment
+
+### Frontend (Vercel)
+1. Connect GitHub repository to Vercel
+2. Set environment variables in Vercel dashboard
+3. Auto-deploys on push to `main` branch
+
+### Backend (Render)
+1. Connect GitHub repository to Render
+2. Set build command: `npm install && npm run build`
+3. Set start command: `npm start`
+4. Configure environment variables
+5. Auto-deploys on push to `main` branch
 
 ## 📄 License
 
-MIT License - see LICENSE file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with ❤️ for V2 Resort, Lebanon
+- AI-assisted development with GitHub Copilot & Claude
+- UI components inspired by shadcn/ui
 
 ---
 
-Built with ❤️ for V2 Resort
+**V2 Resort Management System** - *Making resort management seamless*
