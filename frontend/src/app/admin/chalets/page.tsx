@@ -40,16 +40,14 @@ interface Chalet {
   description?: string;
   description_ar?: string;
   base_price: number;
-  max_guests: number;
-  bedrooms: number;
-  bathrooms: number;
-  size_sqm?: number;
+  capacity: number;
+  bedroom_count: number;
+  bathroom_count: number;
   image_url?: string;
   images?: string[];
-  is_available: boolean;
-  is_featured: boolean;
+  is_active: boolean;
+  is_featured?: boolean;
   amenities?: string[];
-  location?: string;
 }
 
 const amenityOptions = [
@@ -81,7 +79,7 @@ export default function ChaletsManagementPage() {
     try {
       setLoading(true);
       const response = await api.get('/chalets');
-      setChalets(response.data.chalets || []);
+      setChalets(response.data.data || []);
     } catch (error: any) {
       toast.error('Failed to fetch chalets');
       console.error(error);
@@ -98,11 +96,10 @@ export default function ChaletsManagementPage() {
       description: '',
       description_ar: '',
       base_price: 0,
-      max_guests: 4,
-      bedrooms: 2,
-      bathrooms: 1,
-      size_sqm: 100,
-      is_available: true,
+      capacity: 4,
+      bedroom_count: 2,
+      bathroom_count: 1,
+      is_active: true,
       is_featured: false,
       amenities: [],
     });
@@ -154,10 +151,10 @@ export default function ChaletsManagementPage() {
   const toggleAvailability = async (chalet: Chalet) => {
     try {
       await api.put(`/chalets/admin/chalets/${chalet.id}`, {
-        is_available: !chalet.is_available,
+        is_active: !chalet.is_active,
       });
       fetchChalets();
-      toast.success(`Chalet ${chalet.is_available ? 'hidden' : 'shown'}`);
+      toast.success(`Chalet ${chalet.is_active ? 'hidden' : 'shown'}`);
     } catch (error) {
       toast.error('Failed to update availability');
     }
@@ -238,7 +235,7 @@ export default function ChaletsManagementPage() {
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <p className="text-sm text-slate-500 dark:text-slate-400">Available</p>
           <p className="text-2xl font-bold text-emerald-600">
-            {chalets.filter(c => c.is_available).length}
+            {chalets.filter(c => c.is_active).length}
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
@@ -250,7 +247,7 @@ export default function ChaletsManagementPage() {
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <p className="text-sm text-slate-500 dark:text-slate-400">Total Capacity</p>
           <p className="text-2xl font-bold text-blue-600">
-            {chalets.reduce((acc, c) => acc + (c.max_guests || 0), 0)} guests
+            {chalets.reduce((acc, c) => acc + (c.capacity || 0), 0)} guests
           </p>
         </div>
       </motion.div>
@@ -282,7 +279,7 @@ export default function ChaletsManagementPage() {
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <Card className={`overflow-hidden ${!chalet.is_available ? 'opacity-60' : ''}`}>
+                  <Card className={`overflow-hidden ${!chalet.is_active ? 'opacity-60' : ''}`}>
                     {/* Image */}
                     <div className="relative h-48 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800">
                       {chalet.image_url ? (
@@ -304,7 +301,7 @@ export default function ChaletsManagementPage() {
                             Featured
                           </span>
                         )}
-                        {!chalet.is_available && (
+                        {!chalet.is_active && (
                           <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full">
                             Unavailable
                           </span>
@@ -328,22 +325,16 @@ export default function ChaletsManagementPage() {
                       <div className="flex flex-wrap gap-3 mb-3 text-sm text-slate-600 dark:text-slate-400">
                         <span className="flex items-center gap-1">
                           <Users className="w-4 h-4" />
-                          {chalet.max_guests} guests
+                          {chalet.capacity} guests
                         </span>
                         <span className="flex items-center gap-1">
                           <Bed className="w-4 h-4" />
-                          {chalet.bedrooms} beds
+                          {chalet.bedroom_count} beds
                         </span>
                         <span className="flex items-center gap-1">
                           <Bath className="w-4 h-4" />
-                          {chalet.bathrooms} baths
+                          {chalet.bathroom_count} baths
                         </span>
-                        {chalet.size_sqm && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            {chalet.size_sqm}m²
-                          </span>
-                        )}
                       </div>
 
                       {/* Amenities */}
@@ -370,12 +361,12 @@ export default function ChaletsManagementPage() {
                         <button
                           onClick={() => toggleAvailability(chalet)}
                           className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm transition-colors ${
-                            chalet.is_available
+                            chalet.is_active
                               ? 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
                               : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30'
                           }`}
                         >
-                          {chalet.is_available ? (
+                          {chalet.is_active ? (
                             <>
                               <EyeOff className="w-4 h-4" />
                               Hide
@@ -511,12 +502,12 @@ export default function ChaletsManagementPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Max Guests
+                      Capacity (Max Guests)
                     </label>
                     <Input
                       type="number"
-                      value={formData.max_guests || ''}
-                      onChange={(e) => setFormData({ ...formData, max_guests: parseInt(e.target.value) })}
+                      value={formData.capacity || ''}
+                      onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
                     />
                   </div>
                   <div>
@@ -525,8 +516,8 @@ export default function ChaletsManagementPage() {
                     </label>
                     <Input
                       type="number"
-                      value={formData.bedrooms || ''}
-                      onChange={(e) => setFormData({ ...formData, bedrooms: parseInt(e.target.value) })}
+                      value={formData.bedroom_count || ''}
+                      onChange={(e) => setFormData({ ...formData, bedroom_count: parseInt(e.target.value) })}
                     />
                   </div>
                   <div>
@@ -535,8 +526,8 @@ export default function ChaletsManagementPage() {
                     </label>
                     <Input
                       type="number"
-                      value={formData.bathrooms || ''}
-                      onChange={(e) => setFormData({ ...formData, bathrooms: parseInt(e.target.value) })}
+                      value={formData.bathroom_count || ''}
+                      onChange={(e) => setFormData({ ...formData, bathroom_count: parseInt(e.target.value) })}
                     />
                   </div>
                 </div>
@@ -544,12 +535,13 @@ export default function ChaletsManagementPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Size (m²)
+                      Weekend Price
                     </label>
                     <Input
                       type="number"
-                      value={formData.size_sqm || ''}
-                      onChange={(e) => setFormData({ ...formData, size_sqm: parseInt(e.target.value) })}
+                      step="0.01"
+                      value={formData.weekend_price || ''}
+                      onChange={(e) => setFormData({ ...formData, weekend_price: parseFloat(e.target.value) })}
                     />
                   </div>
                   <div>

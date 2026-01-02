@@ -77,8 +77,8 @@ export default function MenuManagementPage() {
         api.get('/restaurant/menu'),
         api.get('/restaurant/categories'),
       ]);
-      setItems(menuRes.data.items || []);
-      setCategories(catRes.data.categories || []);
+      setItems(menuRes.data.data || []);
+      setCategories(catRes.data.data || []);
     } catch (error: any) {
       toast.error('Failed to fetch menu data');
       console.error(error);
