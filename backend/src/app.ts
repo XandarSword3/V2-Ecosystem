@@ -23,23 +23,43 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - allow multiple origins in development
-const allowedOrigins = config.env === 'development' 
-  ? ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003']
-  : [config.frontendUrl];
+// CORS configuration - allow Vercel preview URLs and production domains
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001', 
+  'http://localhost:3002',
+  'http://localhost:3003',
+  config.frontendUrl,
+  // Add Vercel domains
+  'https://v2-ecosystem.vercel.app',
+].filter(Boolean);
+
+// Function to check if origin is allowed (supports Vercel preview URLs)
+const isAllowedOrigin = (origin: string | undefined): boolean => {
+  if (!origin) return true; // Allow requests with no origin (mobile apps, Postman, etc.)
+  
+  // Check exact match
+  if (allowedOrigins.includes(origin)) return true;
+  
+  // Allow all Vercel preview URLs for this project
+  if (origin.includes('vercel.app') && origin.includes('alessandros-projects')) return true;
+  if (origin.includes('v2-ecosystem') && origin.includes('vercel.app')) return true;
+  
+  return false;
+};
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
+      logger.warn(`CORS blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
 // Rate limiting
