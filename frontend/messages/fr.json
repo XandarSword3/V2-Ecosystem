@@ -15,6 +15,7 @@
     "close": "Fermer",
     "confirm": "Confirmer",
     "back": "Retour",
+    "backToHome": "Retour à l'accueil",
     "next": "Suivant",
     "submit": "Soumettre",
     "view": "Voir",
@@ -187,7 +188,7 @@
     "proceedToCheckout": "Paiement",
     "itemsInCart": "{count} articles dans le panier",
     "tryDifferentCategory": "Essayez de sélectionner une autre catégorie",
-    "categories": {
+    "categoryNames": {
       "appetizers": "Entrées",
       "mains": "Plats Principaux",
       "desserts": "Desserts",
@@ -562,5 +563,69 @@
     "online": "En ligne",
     "placeholder": "Écrivez votre message...",
     "suggestions": "Questions rapides"
+  },
+  "legal": {
+    "privacy": {
+      "title": "Politique de Confidentialité",
+      "subtitle": "Votre vie privée compte pour nous",
+      "lastUpdated": "Dernière mise à jour",
+      "questions": "Questions sur la confidentialité?",
+      "contactUs": "Contactez notre équipe confidentialité",
+      "dataCollection": {
+        "title": "Informations que nous collectons",
+        "content": "Nous collectons les informations que vous fournissez directement, notamment:\n• Nom, email et numéro de téléphone\n• Détails de réservation\n• Informations de paiement (traitées de manière sécurisée)\n• Historique des commandes et préférences"
+      },
+      "dataUsage": {
+        "title": "Comment nous utilisons vos informations",
+        "content": "Nous utilisons vos informations pour:\n• Traiter les réservations, commandes et paiements\n• Envoyer des confirmations et notifications importantes\n• Améliorer nos services et personnaliser votre expérience\n• Communiquer sur les offres spéciales (avec votre consentement)"
+      },
+      "dataSecurity": {
+        "title": "Sécurité des données",
+        "content": "Nous mettons en œuvre des mesures de sécurité conformes aux normes de l'industrie:\n• Cryptage SSL pour tous les transferts de données\n• Traitement des paiements sécurisé via des fournisseurs de confiance\n• Audits de sécurité et mises à jour réguliers"
+      },
+      "cookies": {
+        "title": "Cookies",
+        "content": "Nous utilisons des cookies pour:\n• Mémoriser vos préférences et paramètres\n• Analyser le trafic du site\n• Fournir du contenu personnalisé\n\nVous pouvez contrôler les paramètres des cookies dans votre navigateur."
+      },
+      "yourRights": {
+        "title": "Vos droits",
+        "content": "Vous avez le droit de:\n• Accéder à vos données personnelles\n• Demander la correction des données inexactes\n• Demander la suppression de vos données\n• Vous désabonner des communications marketing"
+      },
+      "thirdParty": {
+        "title": "Services tiers",
+        "content": "Nous pouvons partager des données limitées avec:\n• Processeurs de paiement pour les transactions sécurisées\n• Fournisseurs de services email\n• Services d'analyse (données anonymisées uniquement)\n\nNous ne vendons jamais vos informations personnelles."
+      }
+    },
+    "terms": {
+      "title": "Conditions d'utilisation",
+      "subtitle": "Veuillez lire attentivement ces conditions",
+      "lastUpdated": "Dernière mise à jour",
+      "questions": "Questions sur nos conditions?",
+      "contactUs": "Contactez notre équipe juridique pour clarification",
+      "acceptance": {
+        "title": "Acceptation des conditions",
+        "content": "En utilisant les services de V2 Resort, vous acceptez d'être lié par ces Conditions d'utilisation. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser nos services."
+      },
+      "services": {
+        "title": "Nos services",
+        "content": "V2 Resort propose:\n• Restauration et commandes de repas\n• Hébergement en chalets et réservations\n• Accès à la piscine et billetterie\n• Services de buffet"
+      },
+      "bookings": {
+        "title": "Réservations",
+        "content": "• Toutes les réservations nécessitent des informations de paiement valides\n• Les politiques d'annulation varient selon le type de service\n• Chalets: Annulation gratuite 48h avant l'arrivée\n• Billets piscine: Non remboursables"
+      },
+      "conduct": {
+        "title": "Conduite des clients",
+        "content": "Les clients doivent:\n• Respecter les autres clients et le personnel\n• Suivre les règles du resort et les consignes de sécurité\n• Ne pas s'engager dans des activités illégales\n• Signaler tout problème au personnel immédiatement"
+      },
+      "liability": {
+        "title": "Limitation de responsabilité",
+        "content": "V2 Resort n'est pas responsable de:\n• Effets personnels laissés dans les locaux\n• Blessures résultant du non-respect des règles de sécurité\n• Interruptions de service dues aux conditions météorologiques"
+      },
+      "changes": {
+        "title": "Modifications des conditions",
+        "content": "Nous nous réservons le droit de modifier ces conditions à tout moment. La poursuite de l'utilisation de nos services après les modifications constitue l'acceptation des nouvelles conditions."
+      }
+    }
   }
 }

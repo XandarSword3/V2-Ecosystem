@@ -1,0 +1,7 @@
+# Ignore backend for Vercel deployment
+backend/
+*.md
+.git/
+.github/
+tools/
+Planning.txt
