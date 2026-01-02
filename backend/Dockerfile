@@ -38,12 +38,16 @@ RUN chown -R expressjs:nodejs /app
 # Switch to non-root user
 USER expressjs
 
-# Expose port
-EXPOSE 3001
+# Set default port (can be overridden by environment variable)
+ENV PORT=3001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
+# Expose port (Render uses PORT env var)
+EXPOSE ${PORT}
+
+# Health check - use environment variable for port
+# Note: Render ignores Docker HEALTHCHECK and uses its own
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health || exit 1
 
 # Start application
 CMD ["node", "dist/index.js"]
