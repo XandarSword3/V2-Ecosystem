@@ -41,7 +41,7 @@ export default function StaffDashboard() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
   const t = useTranslations('staff');
-  const socket = useSocket();
+  const { socket } = useSocket();
   
   const [stats, setStats] = useState<DashboardStats>({
     pendingOrders: 0,

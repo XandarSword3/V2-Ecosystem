@@ -53,7 +53,7 @@ export default function StaffSnackPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'active' | 'all'>('active');
   const [searchQuery, setSearchQuery] = useState('');
-  const socket = useSocket();
+  const { socket } = useSocket();
 
   const fetchOrders = useCallback(async () => {
     try {

@@ -60,7 +60,7 @@ export default function StaffChaletsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'today' | 'all'>('today');
   const [searchQuery, setSearchQuery] = useState('');
-  const socket = useSocket();
+  const { socket } = useSocket();
 
   const fetchBookings = useCallback(async () => {
     try {

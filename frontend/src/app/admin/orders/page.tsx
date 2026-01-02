@@ -68,7 +68,7 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const socket = useSocket();
+  const { socket } = useSocket();
 
   const fetchOrders = useCallback(async () => {
     try {
