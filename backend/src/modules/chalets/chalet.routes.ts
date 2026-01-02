@@ -4,11 +4,11 @@ import * as chaletController from "./chalet.controller";
 
 const router = Router();
 
-// Public routes
+// Public routes - specific routes BEFORE parameterized routes
+router.get('/add-ons', chaletController.getAddOns);
 router.get('/', chaletController.getChalets);
 router.get('/:id', chaletController.getChalet);
 router.get('/:id/availability', chaletController.getAvailability);
-router.get('/add-ons', chaletController.getAddOns);
 
 // Customer booking routes
 router.post('/bookings', optionalAuth, chaletController.createBooking);
@@ -36,6 +36,7 @@ router.post('/admin/add-ons', authenticate, authorize(...adminRoles), chaletCont
 router.put('/admin/add-ons/:id', authenticate, authorize(...adminRoles), chaletController.updateAddOn);
 router.delete('/admin/add-ons/:id', authenticate, authorize(...adminRoles), chaletController.deleteAddOn);
 
+router.get('/admin/price-rules', authenticate, authorize(...adminRoles), chaletController.getPriceRules);
 router.post('/admin/price-rules', authenticate, authorize(...adminRoles), chaletController.createPriceRule);
 router.put('/admin/price-rules/:id', authenticate, authorize(...adminRoles), chaletController.updatePriceRule);
 router.delete('/admin/price-rules/:id', authenticate, authorize(...adminRoles), chaletController.deletePriceRule);

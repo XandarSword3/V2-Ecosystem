@@ -522,6 +522,21 @@ export async function deleteAddOn(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function getPriceRules(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('chalet_price_rules')
+      .select('*, chalet:chalets(name)')
+      .order('start_date', { ascending: true });
+
+    if (error) throw error;
+    res.json({ success: true, data: data || [] });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function createPriceRule(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
