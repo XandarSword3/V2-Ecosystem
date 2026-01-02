@@ -22,7 +22,7 @@ export async function getApprovedReviews(req: Request, res: Response, next: Next
         text,
         service_type,
         created_at,
-        users (
+        users!reviews_user_id_fkey (
           full_name,
           profile_image_url
         )
@@ -126,7 +126,7 @@ export async function getAllReviews(req: Request, res: Response, next: NextFunct
         service_type,
         is_approved,
         created_at,
-        users (
+        users!reviews_user_id_fkey (
           id,
           full_name,
           email,

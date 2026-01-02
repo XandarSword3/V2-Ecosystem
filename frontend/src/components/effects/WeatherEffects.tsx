@@ -124,12 +124,12 @@ function CloudsEffect() {
             ease: 'linear',
           }}
         >
-          {/* Cloud shape using multiple circles */}
-          <div className="relative w-full h-full">
-            <div className="absolute bg-white/70 rounded-full w-1/2 h-full left-1/4 bottom-0 blur-sm" />
-            <div className="absolute bg-white/60 rounded-full w-1/3 h-3/4 left-0 bottom-0 blur-sm" />
-            <div className="absolute bg-white/60 rounded-full w-1/3 h-3/4 right-0 bottom-0 blur-sm" />
-            <div className="absolute bg-white/50 rounded-full w-1/4 h-1/2 left-1/6 bottom-1/3 blur-sm" />
+          {/* Cloud shape using multiple circles - with shadows for visibility on light backgrounds */}
+          <div className="relative w-full h-full drop-shadow-lg">
+            <div className="absolute bg-gray-200/90 dark:bg-white/80 rounded-full w-1/2 h-full left-1/4 bottom-0 blur-[2px] shadow-lg" />
+            <div className="absolute bg-gray-300/85 dark:bg-white/70 rounded-full w-1/3 h-3/4 left-0 bottom-0 blur-[2px] shadow-md" />
+            <div className="absolute bg-gray-300/85 dark:bg-white/70 rounded-full w-1/3 h-3/4 right-0 bottom-0 blur-[2px] shadow-md" />
+            <div className="absolute bg-gray-200/80 dark:bg-white/60 rounded-full w-1/4 h-1/2 left-1/6 bottom-1/3 blur-[2px]" />
           </div>
         </motion.div>
       ))}
