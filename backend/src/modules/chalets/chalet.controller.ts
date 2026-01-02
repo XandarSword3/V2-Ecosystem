@@ -455,9 +455,22 @@ export async function updateBookingStatus(req: Request, res: Response, next: Nex
 export async function createChalet(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
+    
+    // Ensure required fields have default values
+    const chaletData = {
+      ...req.body,
+      // Default weekend_price to base_price if not provided
+      weekend_price: req.body.weekend_price || req.body.base_price || 0,
+      // Ensure is_active defaults to true
+      is_active: req.body.is_active !== undefined ? req.body.is_active : true,
+      // Ensure arrays have defaults
+      amenities: req.body.amenities || [],
+      images: req.body.images || [],
+    };
+    
     const { data, error } = await supabase
       .from('chalets')
-      .insert(req.body)
+      .insert(chaletData)
       .select()
       .single();
 

@@ -127,10 +127,14 @@ export async function deleteCategory(req: Request, res: Response, next: NextFunc
 
 export async function createMenuItem(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, description, categoryId, price, ...rest } = req.body;
+    // Accept both camelCase and snake_case field names for flexibility
+    const { name, description, categoryId, category_id, price, ...rest } = req.body;
+    
+    // Use categoryId or category_id (frontend may send either)
+    const resolvedCategoryId = categoryId || category_id;
     
     // Validate required fields
-    if (!categoryId) {
+    if (!resolvedCategoryId) {
       return res.status(400).json({ 
         success: false, 
         message: 'categoryId is required' 
@@ -150,7 +154,7 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
     }
     
     // Auto-translate name and description if not provided
-    let translatedData = { ...rest, name, categoryId, price: Number(price) };
+    let translatedData = { ...rest, name, categoryId: resolvedCategoryId, price: Number(price) };
     
     if (name && !req.body.name_ar) {
       try {
@@ -191,7 +195,32 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
 
 export async function updateMenuItem(req: Request, res: Response, next: NextFunction) {
   try {
-    const item = await menuService.updateMenuItem(req.params.id, req.body);
+    // Convert snake_case to camelCase for service compatibility
+    const body = req.body;
+    const normalizedData: Record<string, any> = {};
+    
+    // Map snake_case fields to camelCase
+    if (body.category_id !== undefined) normalizedData.categoryId = body.category_id;
+    if (body.categoryId !== undefined) normalizedData.categoryId = body.categoryId;
+    if (body.name !== undefined) normalizedData.name = body.name;
+    if (body.name_ar !== undefined) normalizedData.nameAr = body.name_ar;
+    if (body.name_fr !== undefined) normalizedData.nameFr = body.name_fr;
+    if (body.description !== undefined) normalizedData.description = body.description;
+    if (body.description_ar !== undefined) normalizedData.descriptionAr = body.description_ar;
+    if (body.description_fr !== undefined) normalizedData.descriptionFr = body.description_fr;
+    if (body.price !== undefined) normalizedData.price = Number(body.price);
+    if (body.preparation_time_minutes !== undefined) normalizedData.preparationTimeMinutes = body.preparation_time_minutes;
+    if (body.calories !== undefined) normalizedData.calories = body.calories;
+    if (body.is_vegetarian !== undefined) normalizedData.isVegetarian = body.is_vegetarian;
+    if (body.is_vegan !== undefined) normalizedData.isVegan = body.is_vegan;
+    if (body.is_gluten_free !== undefined) normalizedData.isGlutenFree = body.is_gluten_free;
+    if (body.allergens !== undefined) normalizedData.allergens = body.allergens;
+    if (body.image_url !== undefined) normalizedData.imageUrl = body.image_url;
+    if (body.is_available !== undefined) normalizedData.isAvailable = body.is_available;
+    if (body.is_featured !== undefined) normalizedData.isFeatured = body.is_featured;
+    if (body.display_order !== undefined) normalizedData.displayOrder = body.display_order;
+    
+    const item = await menuService.updateMenuItem(req.params.id, normalizedData);
     res.json({ success: true, data: item });
   } catch (error) {
     next(error);

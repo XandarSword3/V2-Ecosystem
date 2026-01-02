@@ -6,6 +6,8 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
+import { requestLogger, errorLogger } from './middleware/requestLogger.middleware.js';
+import { normalizeBody } from './middleware/normalizeBody.middleware.js';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes.js';
@@ -88,10 +90,16 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(compression());
 
+// Normalize request body field names (supports both snake_case and camelCase)
+app.use(normalizeBody);
+
 // Logging
 app.use(morgan('combined', {
   stream: { write: (message: string) => logger.http(message.trim()) },
 }));
+
+// Enhanced request logging - logs detailed request/response info for debugging
+app.use(requestLogger);
 
 // Health check - must respond quickly for Render
 app.get('/health', (_req: Request, res: Response) => {
@@ -119,11 +127,16 @@ app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Not Found' });
 });
 
+// Enhanced error logging middleware - logs full error details
+app.use(errorLogger);
+
 // Global error handler
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  logger.error('Unhandled error:', err);
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+  const requestId = (req as any).requestId || 'unknown';
+  logger.error(`[${requestId}] Unhandled error:`, err);
   res.status(500).json({
     error: config.env === 'production' ? 'Internal Server Error' : err.message,
+    requestId: requestId, // Include request ID for tracking
   });
 });
 
