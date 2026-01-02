@@ -9,7 +9,14 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001'
 // Ensure we don't have /api suffix for socket connection
 const cleanSocketUrl = SOCKET_URL.replace(/\/api\/?$/, '');
 
-export function useSocket() {
+interface UseSocketReturn {
+  socket: Socket | null;
+  isConnected: boolean;
+  joinRoom: (room: string) => void;
+  leaveRoom: (room: string) => void;
+}
+
+export function useSocket(): UseSocketReturn {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 

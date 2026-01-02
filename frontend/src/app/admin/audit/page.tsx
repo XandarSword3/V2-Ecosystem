@@ -107,8 +107,8 @@ export default function AdminAuditPage() {
     return true;
   });
 
-  const uniqueActions = Array.from(new Set(logs.map((l) => l.action)));
-  const uniqueEntities = Array.from(new Set(logs.map((l) => l.entity_type)));
+  const uniqueActions = Array.from(new Set(logs.map((l: AuditLog) => l.action)));
+  const uniqueEntities = Array.from(new Set(logs.map((l: AuditLog) => l.entity_type)));
 
   if (loading) {
     return (
