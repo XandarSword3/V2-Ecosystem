@@ -19,6 +19,8 @@ import {
   Clock,
   Calendar,
   CheckCircle2,
+  Eye,
+  X,
 } from 'lucide-react';
 
 interface PoolTicket {
@@ -29,9 +31,13 @@ interface PoolTicket {
   status: 'pending' | 'active' | 'used' | 'expired' | 'cancelled';
   valid_date: string;
   created_at: string;
+  payment_status?: string;
+  payment_method?: string;
+  number_of_guests?: number;
   users?: {
     full_name: string;
     email: string;
+    phone?: string;
   };
 }
 
@@ -55,6 +61,7 @@ export default function AdminPoolTicketsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [selectedTicket, setSelectedTicket] = useState<PoolTicket | null>(null);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -246,8 +253,8 @@ export default function AdminPoolTicketsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium text-white ${ticketTypeColors[ticket.ticket_type]}`}>
-                          {ticket.ticket_type.charAt(0).toUpperCase() + ticket.ticket_type.slice(1)}
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium text-white ${ticketTypeColors[ticket.ticket_type] || 'bg-slate-500'}`}>
+                          {(ticket.ticket_type || 'unknown').charAt(0).toUpperCase() + (ticket.ticket_type || 'unknown').slice(1)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -265,11 +272,14 @@ export default function AdminPoolTicketsPage() {
                         {formatCurrency(ticket.price)}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[ticket.status]}`}>
-                          {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[ticket.status] || 'bg-slate-100 text-slate-800'}`}>
+                          {(ticket.status || 'unknown').charAt(0).toUpperCase() + (ticket.status || 'unknown').slice(1)}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(ticket)}>
+                          <Eye className="w-4 h-4 text-slate-500" />
+                        </Button>
                         {(ticket.status === 'pending' || ticket.status === 'active') && (
                           <Button variant="ghost" size="sm" onClick={() => cancelTicket(ticket.id)}>
                             <Trash2 className="w-4 h-4 text-red-500" />
@@ -284,6 +294,82 @@ export default function AdminPoolTicketsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Ticket Details Modal */}
+      <AnimatePresence>
+        {selectedTicket && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Ticket Details</h2>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(null)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-slate-500">Ticket Number</p>
+                    <p className="font-mono font-medium">{selectedTicket.ticket_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Status</p>
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[selectedTicket.status]}`}>
+                      {selectedTicket.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Type</p>
+                    <p className="font-medium capitalize">{selectedTicket.ticket_type}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Price</p>
+                    <p className="font-medium">{formatCurrency(selectedTicket.price)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Valid Date</p>
+                    <p className="font-medium">{selectedTicket.valid_date}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Created At</p>
+                    <p className="font-medium">{new Date(selectedTicket.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Payment Status</p>
+                    <p className="font-medium capitalize">{selectedTicket.payment_status || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Payment Method</p>
+                    <p className="font-medium capitalize">{selectedTicket.payment_method || 'N/A'}</p>
+                  </div>
+                </div>
+                
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <h3 className="font-medium mb-2">Guest Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-slate-500">Name</p>
+                      <p className="font-medium">{selectedTicket.users?.full_name || 'Guest'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Email</p>
+                      <p className="font-medium">{selectedTicket.users?.email || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
+                <Button onClick={() => setSelectedTicket(null)}>Close</Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
