@@ -10,7 +10,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { useContentTranslation } from '@/lib/translate';
 import { useAuth } from '@/lib/auth-context';
-import { Loader2, Waves, Users, Clock, Calendar, AlertCircle, Ticket, Droplets, Sun, Umbrella } from 'lucide-react';
+import { Loader2, Waves, Users, Clock, Calendar, AlertCircle, Ticket, Droplets, Sun, Umbrella, QrCode, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
@@ -19,14 +19,31 @@ interface PoolSession {
   name: string;
   name_ar?: string;
   name_fr?: string;
-  startTime: string;
-  endTime: string;
-  maxCapacity: number;
-  price: number;
-  isActive: boolean;
+  // Support both snake_case (from API) and camelCase
+  start_time?: string;
+  end_time?: string;
+  max_capacity?: number;
+  is_active?: boolean;
+  startTime?: string;
+  endTime?: string;
+  maxCapacity?: number;
+  price: number | string; // API may return as string
+  isActive?: boolean;
   availability?: {
     ticketsSold: number;
     remaining: number;
+  };
+}
+
+// Helper to normalize session data from API
+function normalizeSession(session: any): PoolSession {
+  return {
+    ...session,
+    startTime: session.startTime || session.start_time,
+    endTime: session.endTime || session.end_time,
+    maxCapacity: session.maxCapacity || session.max_capacity || 50,
+    isActive: session.isActive ?? session.is_active ?? true,
+    price: Number(session.price) || 0,
   };
 }
 
@@ -63,6 +80,14 @@ export default function PoolPage() {
     queryFn: () => poolApi.getSessions(selectedDate),
   });
 
+  // Fetch user's tickets if logged in
+  const { data: myTicketsData } = useQuery({
+    queryKey: ['my-pool-tickets'],
+    queryFn: () => poolApi.getMyTickets(),
+    enabled: !!user,
+  });
+  const myTickets = myTicketsData?.data?.data || [];
+
   const purchaseMutation = useMutation({
     mutationFn: (data: any) => poolApi.purchaseTicket(data),
     onSuccess: (response) => {
@@ -75,7 +100,8 @@ export default function PoolPage() {
     },
   });
 
-  const sessions: PoolSession[] = data?.data?.data || [];
+  const rawSessions = data?.data?.data || [];
+  const sessions: PoolSession[] = rawSessions.map(normalizeSession);
 
   const handlePurchase = async () => {
     if (!selectedSession) {
@@ -193,7 +219,7 @@ export default function PoolPage() {
                 animate="visible"
               >
                 {sessions.map((session, index) => {
-                  const remaining = session.availability?.remaining ?? session.maxCapacity;
+                  const remaining = session.availability?.remaining ?? session.maxCapacity ?? 50;
                   const isSoldOut = remaining === 0;
                   const isSelected = selectedSession?.id === session.id;
 
@@ -255,7 +281,7 @@ export default function PoolPage() {
                               'bg-gradient-to-r from-green-500 to-emerald-400'
                             }`}
                             initial={{ width: 0 }}
-                            animate={{ width: `${(remaining / session.maxCapacity) * 100}%` }}
+                            animate={{ width: `${(remaining / (session.maxCapacity ?? 50)) * 100}%` }}
                             transition={{ duration: 0.8, delay: index * 0.1 }}
                           />
                         </div>
@@ -356,13 +382,13 @@ export default function PoolPage() {
                           {guestCount} × {formatCurrency(selectedSession.price, currency)}
                         </span>
                         <span className="font-medium text-slate-900 dark:text-white">
-                          {formatCurrency(selectedSession.price * guestCount, currency)}
+                          {formatCurrency(Number(selectedSession.price) * guestCount, currency)}
                         </span>
                       </div>
                       <div className="flex justify-between text-lg font-bold">
                         <span className="text-slate-900 dark:text-white">{tCommon('total')}</span>
                         <span className="text-blue-600 dark:text-blue-400">
-                          {formatCurrency(selectedSession.price * guestCount, currency)}
+                          {formatCurrency(Number(selectedSession.price) * guestCount, currency)}
                         </span>
                       </div>
                     </div>
@@ -394,6 +420,67 @@ export default function PoolPage() {
             </motion.div>
           </div>
         </div>
+
+        {/* Your Tickets Section - Only show if user is logged in and has tickets */}
+        {user && myTickets.length > 0 && (
+          <motion.div 
+            className="mt-12 bg-white dark:bg-slate-800 rounded-xl p-6 border dark:border-slate-700 shadow-lg"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center">
+              <Ticket className="w-6 h-6 mr-2 text-blue-500" />
+              {t('yourTickets')}
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {myTickets.slice(0, 6).map((ticket: any) => (
+                <Link 
+                  key={ticket.id} 
+                  href={`/pool/confirmation?id=${ticket.id}`}
+                  className="block p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg border border-blue-100 dark:border-blue-800 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-mono text-sm text-blue-600 dark:text-blue-400">
+                      #{ticket.ticket_number}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      ticket.status === 'valid' 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : ticket.status === 'used'
+                        ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    }`}>
+                      {ticket.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <p className="font-medium text-slate-900 dark:text-white mb-1">
+                    {formatDate(ticket.ticket_date)}
+                  </p>
+                  <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
+                    <span className="flex items-center">
+                      <Users className="w-4 h-4 mr-1" />
+                      {ticket.number_of_guests} {ticket.number_of_guests > 1 ? 'guests' : 'guest'}
+                    </span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">
+                      {formatCurrency(ticket.total_amount, currency)}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center text-xs text-blue-600 dark:text-blue-400">
+                    <span>View ticket</span>
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {myTickets.length > 6 && (
+              <div className="mt-4 text-center">
+                <Link href="/profile" className="text-blue-600 dark:text-blue-400 hover:underline">
+                  {t('viewAllTickets')} ({myTickets.length})
+                </Link>
+              </div>
+            )}
+          </motion.div>
+        )}
 
         {/* Info Section */}
         <div className="mt-12 bg-white dark:bg-slate-800 rounded-lg p-8 border dark:border-slate-700">

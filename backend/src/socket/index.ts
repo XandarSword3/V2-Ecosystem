@@ -6,13 +6,45 @@ import { verifyToken } from "../modules/auth/auth.utils";
 
 let io: Server;
 
+// Function to check if origin is allowed for socket.io (same as Express CORS)
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001', 
+    'http://localhost:3002',
+    'http://localhost:3003',
+    config.frontendUrl,
+    'https://v2-ecosystem.vercel.app',
+  ].filter(Boolean);
+  
+  // Check exact match
+  if (allowedOrigins.includes(origin)) return true;
+  
+  // Allow all Vercel preview URLs for this project
+  if (origin.includes('vercel.app')) return true;
+  
+  return false;
+}
+
 export function initializeSocketServer(httpServer: HttpServer) {
   io = new Server(httpServer, {
     cors: {
-      origin: config.frontendUrl,
+      origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) {
+          callback(null, true);
+        } else {
+          logger.warn(`Socket.io CORS blocked origin: ${origin}`);
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },
+    // Improve connection stability
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   // Authentication middleware

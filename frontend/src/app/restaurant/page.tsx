@@ -21,21 +21,44 @@ interface MenuItem {
   description?: string;
   description_ar?: string;
   description_fr?: string;
-  price: number;
+  price: number | string;
   category: {
     id: string;
     name: string;
     name_ar?: string;
     name_fr?: string;
   };
+  // Support both snake_case (from API) and camelCase
+  preparation_time_minutes?: number;
   preparationTimeMinutes?: number;
+  is_vegetarian?: boolean;
   isVegetarian?: boolean;
+  is_vegan?: boolean;
   isVegan?: boolean;
+  is_gluten_free?: boolean;
   isGlutenFree?: boolean;
   allergens?: string[];
+  image_url?: string;
   imageUrl?: string;
-  isAvailable: boolean;
-  isFeatured: boolean;
+  is_available?: boolean;
+  isAvailable?: boolean;
+  is_featured?: boolean;
+  isFeatured?: boolean;
+}
+
+// Helper to normalize menu item data from API
+function normalizeMenuItem(item: any): MenuItem {
+  return {
+    ...item,
+    price: Number(item.price) || 0,
+    preparationTimeMinutes: item.preparationTimeMinutes || item.preparation_time_minutes,
+    isVegetarian: item.isVegetarian ?? item.is_vegetarian ?? false,
+    isVegan: item.isVegan ?? item.is_vegan ?? false,
+    isGlutenFree: item.isGlutenFree ?? item.is_gluten_free ?? false,
+    imageUrl: item.imageUrl || item.image_url,
+    isAvailable: item.isAvailable ?? item.is_available ?? true,
+    isFeatured: item.isFeatured ?? item.is_featured ?? false,
+  };
 }
 
 // Animation variants
@@ -95,7 +118,9 @@ export default function RestaurantMenuPage() {
     queryFn: () => restaurantApi.getMenu(),
   });
 
-  const menuItems: MenuItem[] = data?.data?.data?.items || [];
+  // Normalize menu items from API (snake_case → camelCase)
+  const rawItems = data?.data?.data?.items || [];
+  const menuItems: MenuItem[] = rawItems.map(normalizeMenuItem);
   const categories = data?.data?.data?.categories || [];
 
   // Filter items
@@ -114,7 +139,7 @@ export default function RestaurantMenuPage() {
     addToRestaurant({
       id: item.id,
       name: translatedName,
-      price: item.price,
+      price: Number(item.price),
       category: translateContent(item.category, 'name'),
       imageUrl: item.imageUrl,
     });

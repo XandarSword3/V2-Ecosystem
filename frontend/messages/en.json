@@ -372,6 +372,8 @@
     "viewMyTickets": "View My Tickets",
     "importantNote": "Important",
     "showQrAtEntrance": "Please show this QR code at the pool entrance for validation.",
+    "yourTickets": "Your Tickets",
+    "viewAllTickets": "View all tickets",
     "poolInfo": {
       "title": "Pool Information",
       "hoursTitle": "Pool Hours",
