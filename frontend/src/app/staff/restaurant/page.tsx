@@ -7,6 +7,7 @@ import { useRestaurantOrders } from '@/lib/socket';
 import { formatCurrency, formatTime, getOrderStatusColor } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/Button';
 import {
   UtensilsCrossed,
   Clock,
