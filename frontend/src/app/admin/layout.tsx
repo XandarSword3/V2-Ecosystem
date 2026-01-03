@@ -157,9 +157,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       setAuthChecked(true);
       if (!isAuthenticated) {
         router.push('/login?redirect=/admin');
+      } else if (user && !user.roles.includes('admin')) {
+        toast.error(t('errors.accessDenied') || 'Access denied. Admin privileges required.');
+        router.push('/');
       }
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, router, user, t]);
 
   const toggleExpanded = (name: string) => {
     setExpandedItems((prev) =>
