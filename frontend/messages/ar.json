@@ -504,6 +504,9 @@
     "inventory": "المخزون",
     "reports": "التقارير",
     "settings": "الإعدادات",
+    "errors": {
+      "accessDenied": "تم رفض الوصول. ليس لديك إذن لعرض هذه الصفحة."
+    },
     "appearance": "المظهر",
     "menuItems": "أصناف القائمة",
     "categories": "التصنيفات",
