@@ -16,6 +16,8 @@ import {
   RefreshCw,
   User,
   LogOut,
+  XCircle,
+  Timer,
 } from 'lucide-react';
 
 interface Order {
@@ -42,6 +44,7 @@ export default function RestaurantKitchenPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Load initial orders
   useEffect(() => {
@@ -168,7 +171,8 @@ export default function RestaurantKitchenPage() {
                 {ordersByStatus[status as keyof typeof ordersByStatus].map((order) => (
                   <div
                     key={order.id}
-                    className="border border-slate-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+                    className="border border-slate-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => setSelectedOrder(order)}
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div>
@@ -212,7 +216,10 @@ export default function RestaurantKitchenPage() {
                       </span>
                       {getNextStatus(order.status) && (
                         <button
-                          onClick={() => updateOrderStatus(order.id, getNextStatus(order.status)!)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateOrderStatus(order.id, getNextStatus(order.status)!);
+                          }}
                           className="btn btn-primary btn-sm text-xs"
                         >
                           Mark {getNextStatus(order.status)}
@@ -231,6 +238,108 @@ export default function RestaurantKitchenPage() {
             </div>
           ))}
         </div>
+
+        {/* Order Details Modal */}
+        {selectedOrder && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setSelectedOrder(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                    Order #{selectedOrder.orderNumber}
+                  </h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {formatTime(selectedOrder.createdAt)}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedOrder(null)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+                >
+                  <XCircle className="w-6 h-6 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                {/* Customer Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Customer</h3>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {selectedOrder.customerName}
+                    </p>
+                    {selectedOrder.tableNumber && (
+                      <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+                        Table {selectedOrder.tableNumber}
+                      </p>
+                    )}
+                  </div>
+                  <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Status</h3>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-medium ${
+                        selectedOrder.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        selectedOrder.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                        selectedOrder.status === 'preparing' ? 'bg-orange-100 text-orange-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Items */}
+                <div>
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Order Items</h3>
+                  <div className="space-y-3">
+                    {selectedOrder.items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-start p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 dark:text-white">{item.quantity}x</span>
+                            <span className="font-medium text-slate-900 dark:text-white">{item.name}</span>
+                          </div>
+                          {item.specialInstructions && (
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 italic">
+                              Note: {item.specialInstructions}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-lg font-semibold text-slate-900 dark:text-white">Total Amount</span>
+                  <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                    {formatCurrency(selectedOrder.totalAmount)}
+                  </span>
+                </div>
+                
+                <div className="flex justify-end gap-3">
+                  {getNextStatus(selectedOrder.status) && (
+                    <Button onClick={() => {
+                      updateOrderStatus(selectedOrder.id, getNextStatus(selectedOrder.status)!);
+                      setSelectedOrder(null);
+                    }}>
+                      Mark {getNextStatus(selectedOrder.status)}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
