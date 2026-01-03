@@ -504,6 +504,9 @@
     "inventory": "Inventaire",
     "reports": "Rapports",
     "settings": "Paramètres",
+    "errors": {
+      "accessDenied": "Accès refusé. Vous n'avez pas la permission de voir cette page."
+    },
     "appearance": "Apparence",
     "menuItems": "Articles du Menu",
     "categories": "Catégories",
