@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { getSupabase } from "../../database/connection.js";
 import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
+import { createPaymentIntentSchema, recordCashPaymentSchema, validateBody } from "../../validation/schemas.js";
 
 const stripe = new Stripe(config.stripe.secretKey, {
   apiVersion: '2023-10-16',
@@ -10,11 +11,13 @@ const stripe = new Stripe(config.stripe.secretKey, {
 
 export async function createPaymentIntent(req: Request, res: Response, next: NextFunction) {
   try {
-    const { amount, currency = 'usd', referenceType, referenceId } = req.body;
+    // Validate input
+    const validatedData = validateBody(createPaymentIntentSchema, req.body);
+    const { amount, currency = 'usd', referenceType, referenceId } = validatedData;
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // Convert to cents
-      currency,
+      currency: currency as string,
       metadata: {
         referenceType,
         referenceId,
@@ -149,8 +152,11 @@ async function updateReferencePaymentStatus(
 
 export async function recordCashPayment(req: Request, res: Response, next: NextFunction) {
   try {
+    // Validate input
+    const validatedData = validateBody(recordCashPaymentSchema, req.body);
+    const { referenceType, referenceId, amount, notes } = validatedData;
+    
     const supabase = getSupabase();
-    const { referenceType, referenceId, amount, notes } = req.body;
 
     const { data: payment, error } = await supabase
       .from('payments')

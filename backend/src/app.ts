@@ -20,6 +20,7 @@ import paymentRoutes from './modules/payments/payment.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import reviewsRoutes from './modules/reviews/reviews.routes.js';
 import * as modulesController from './modules/admin/modules.controller.js';
+import { requireModule, clearModuleCache } from './middleware/moduleGuard.middleware.js';
 
 const app = express();
 
@@ -90,6 +91,8 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/refresh', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
 
 // Parsing & compression
 app.use(express.json({ limit: '10mb' }));
@@ -153,16 +156,19 @@ app.get('/api/settings', handleSettings);
 // Public modules endpoint
 app.get('/api/modules', modulesController.getModules);
 
-// API Routes
+// API Routes - Module-protected routes have guards that check if module is active
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/restaurant', restaurantRoutes);
-app.use('/api/snack', snackRoutes);
-app.use('/api/chalets', chaletRoutes);
-app.use('/api/pool', poolRoutes);
+app.use('/api/restaurant', requireModule('restaurant'), restaurantRoutes);
+app.use('/api/snack', requireModule('snack-bar'), snackRoutes);
+app.use('/api/chalets', requireModule('chalets'), chaletRoutes);
+app.use('/api/pool', requireModule('pool'), poolRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewsRoutes);
+
+// Export clearModuleCache for use when modules are updated
+export { clearModuleCache };
 
 // 404 handler
 app.use((_req: Request, res: Response) => {
