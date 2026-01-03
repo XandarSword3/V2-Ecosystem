@@ -9,6 +9,7 @@ interface CartItem {
   specialInstructions?: string;
   category?: string;
   imageUrl?: string;
+  moduleId?: string;
 }
 
 interface CartState {
