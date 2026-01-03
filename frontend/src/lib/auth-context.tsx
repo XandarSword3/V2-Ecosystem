@@ -31,22 +31,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Check for stored user on mount
-    const storedUser = localStorage.getItem('user');
-    const accessToken = localStorage.getItem('accessToken');
-    
-    if (storedUser && accessToken) {
+    // Validate stored credentials on mount by checking with the server
+    const validateSession = async () => {
+      const storedUser = localStorage.getItem('user');
+      const accessToken = localStorage.getItem('accessToken');
+      
+      if (!storedUser || !accessToken) {
+        setIsLoading(false);
+        return;
+      }
+      
       try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
+        // Validate token with backend - this prevents localStorage spoofing
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: { 
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data) {
+            // Use server-validated user data, not localStorage
+            const validatedUser: User = {
+              id: data.data.id,
+              email: data.data.email,
+              fullName: data.data.full_name || data.data.fullName,
+              phone: data.data.phone,
+              profileImageUrl: data.data.profile_image_url || data.data.profileImageUrl,
+              preferredLanguage: data.data.preferred_language || data.data.preferredLanguage || 'en',
+              roles: data.data.roles || []
+            };
+            setUser(validatedUser);
+            // Update localStorage with validated data
+            localStorage.setItem('user', JSON.stringify(validatedUser));
+          } else {
+            throw new Error('Invalid session');
+          }
+        } else {
+          // Token invalid - clear everything
+          throw new Error('Token validation failed');
+        }
       } catch (e) {
+        // Clear invalid session data
+        console.warn('Session validation failed, clearing credentials');
         localStorage.removeItem('user');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        setUser(null);
       }
-    }
+      
+      setIsLoading(false);
+    };
     
-    setIsLoading(false);
+    validateSession();
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
 import { emailService } from "../../services/email.service.js";
+import { purchasePoolTicketSchema, validateBody } from "../../validation/schemas.js";
 import QRCode from 'qrcode';
 import { config } from "../../config/index.js";
 import dayjs from 'dayjs';
@@ -131,6 +132,9 @@ export async function getAvailability(req: Request, res: Response, next: NextFun
 
 export async function purchaseTicket(req: Request, res: Response, next: NextFunction) {
   try {
+    // Validate input
+    const validatedData = validateBody(purchasePoolTicketSchema, req.body);
+    
     const supabase = getSupabase();
     const {
       sessionId,
@@ -140,7 +144,7 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
       customerPhone,
       numberOfGuests,
       paymentMethod,
-    } = req.body;
+    } = validatedData;
 
     // Get session
     const { data: session, error: sessionError } = await supabase
