@@ -21,6 +21,7 @@ import {
   Cookie,
   Hash,
 } from 'lucide-react';
+import { QRCode } from '@/components/ui/QRCode';
 
 interface SnackOrder {
   id: string;
@@ -35,12 +36,12 @@ interface SnackOrder {
   notes?: string;
   created_at: string;
   items?: {
-    snack_item: {
+    snack_items: {
       name: string;
     };
     quantity: number;
     unit_price: number;
-    total_price: number;
+    subtotal: number;
   }[];
 }
 
@@ -143,6 +144,14 @@ function SnackConfirmationContent() {
             </CardTitle>
           </CardHeader>
           <CardContent className="divide-y divide-slate-200 dark:divide-slate-700">
+            {/* QR Code */}
+            <div className="py-6 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800/50">
+              <QRCode value={order.id} size={160} />
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                {t('qrCode')}
+              </p>
+            </div>
+
             {/* Status */}
             <div className="py-4 flex items-center justify-between">
               <span className="text-slate-600 dark:text-slate-400">{tCommon('status')}</span>
@@ -192,9 +201,9 @@ function SnackConfirmationContent() {
                       <span className="w-6 h-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center text-xs font-medium">
                         {item.quantity}
                       </span>
-                      <span>{item.snack_item?.name}</span>
+                      <span>{item.snack_items?.name}</span>
                     </div>
-                    <span className="font-medium">{formatCurrency(item.total_price, currency)}</span>
+                    <span className="font-medium">{formatCurrency(item.subtotal, currency)}</span>
                   </div>
                 ))}
               </div>

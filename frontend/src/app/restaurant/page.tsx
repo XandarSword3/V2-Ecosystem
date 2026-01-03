@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { useCartStore } from '@/lib/stores/cartStore';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -98,6 +99,7 @@ const categoryIcons: Record<string, string> = {
 export default function RestaurantMenuPage() {
   const t = useTranslations('restaurant');
   const tCommon = useTranslations('common');
+  const { settings } = useSiteSettings();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
   const currency = useSettingsStore((s) => s.currency);
@@ -255,7 +257,7 @@ export default function RestaurantMenuPage() {
             </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
-              {t('menu')}
+              {settings.restaurantName || t('menu')}
             </h1>
             <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
               {t('menuSubtitle')}

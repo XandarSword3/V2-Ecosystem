@@ -88,9 +88,9 @@ export const authApi = {
 
 // Restaurant API
 export const restaurantApi = {
-  getMenu: () => api.get('/restaurant/menu'),
-  getMenuByCategory: (categoryId: string) => 
-    api.get(`/restaurant/menu/category/${categoryId}`),
+  getMenu: (moduleId?: string) => api.get('/restaurant/menu', { params: { moduleId } }),
+  getMenuByCategory: (categoryId: string, moduleId?: string) => 
+    api.get(`/restaurant/menu/category/${categoryId}`, { params: { moduleId } }),
   createOrder: (data: any) => api.post('/restaurant/orders', data),
   getMyOrders: () => api.get('/restaurant/my-orders'),
   getOrderStatus: (orderId: string) => api.get(`/restaurant/orders/${orderId}`),
@@ -106,7 +106,7 @@ export const snackApi = {
 
 // Chalets API
 export const chaletsApi = {
-  getChalets: () => api.get('/chalets'),
+  getChalets: (moduleId?: string) => api.get('/chalets', { params: { moduleId } }),
   getChalet: (id: string) => api.get(`/chalets/${id}`),
   getAvailability: (chaletId: string, checkIn: string, checkOut: string) =>
     api.get(`/chalets/${chaletId}/availability`, { params: { checkIn, checkOut } }),
@@ -118,13 +118,23 @@ export const chaletsApi = {
 
 // Pool API
 export const poolApi = {
-  getSessions: (date?: string) => 
-    api.get('/pool/sessions', { params: { date } }),
+  getSessions: (date?: string, moduleId?: string) => 
+    api.get('/pool/sessions', { params: { date, moduleId } }),
+  getSession: (id: string) => api.get(`/pool/sessions/${id}`),
   getSessionAvailability: (sessionId: string, date: string) =>
     api.get(`/pool/sessions/${sessionId}/availability`, { params: { date } }),
   purchaseTicket: (data: any) => api.post('/pool/tickets', data),
-  getTicket: (ticketId: string) => api.get(`/pool/tickets/${ticketId}`),
   getMyTickets: () => api.get('/pool/my-tickets'),
+  getTicket: (id: string) => api.get(`/pool/tickets/${id}`),
+};
+
+// Modules API
+export const modulesApi = {
+  getAll: (activeOnly = false) => api.get(`/modules${activeOnly ? '?activeOnly=true' : ''}`),
+  getById: (id: string) => api.get(`/modules/${id}`),
+  create: (data: any) => api.post('/modules', data),
+  update: (id: string, data: any) => api.put(`/modules/${id}`, data),
+  delete: (id: string) => api.delete(`/modules/${id}`),
 };
 
 // Payments API

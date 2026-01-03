@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
+import { emitToAll } from "../../socket/index";
 import dayjs from 'dayjs';
 
 // ============================================
@@ -662,6 +663,16 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
         }, { onConflict: 'key' });
     }
     
+    // Emit socket event for real-time updates
+    emitToAll('settings.updated', {
+      ...generalSettings,
+      ...contactSettings,
+      ...hoursSettings,
+      ...chaletSettings,
+      ...poolSettings,
+      ...legalSettings
+    });
+
     res.json({ success: true, message: 'Settings saved successfully' });
   } catch (error) {
     next(error);

@@ -19,6 +19,7 @@ import poolRoutes from './modules/pool/pool.routes.js';
 import paymentRoutes from './modules/payments/payment.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import reviewsRoutes from './modules/reviews/reviews.routes.js';
+import * as modulesController from './modules/admin/modules.controller.js';
 
 const app = express();
 
@@ -142,6 +143,9 @@ async function handleSettings(_req: Request, res: Response) {
 // Public site settings endpoint (no auth required) - both paths
 app.get('/settings', handleSettings);
 app.get('/api/settings', handleSettings);
+
+// Public modules endpoint
+app.get('/api/modules', modulesController.getModules);
 
 // API Routes
 app.use('/api/auth', authRoutes);
