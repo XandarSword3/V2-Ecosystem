@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { chaletApi } from '@/lib/api';
+import { chaletsApi as chaletApi } from '@/lib/api';
 import { Loader2, AlertCircle, Calendar, Users, Home } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useContentTranslation } from '@/lib/translate';
