@@ -63,6 +63,35 @@ export async function getMyOrders(req: Request, res: Response, next: NextFunctio
   }
 }
 
+// Helper function to transform order data for frontend
+function transformOrderForFrontend(order: any) {
+  return {
+    id: order.id,
+    orderNumber: order.order_number,
+    customerName: order.customer_name || order.customer?.full_name || 'Guest',
+    customerPhone: order.customer_phone,
+    orderType: order.order_type,
+    status: order.status,
+    tableNumber: order.table_number,
+    totalAmount: parseFloat(order.total_amount || '0'),
+    createdAt: order.created_at,
+    estimatedReadyTime: order.estimated_ready_time,
+    items: (order.order_items || []).map((item: any) => ({
+      id: item.id,
+      name: item.menu_items?.name || 'Unknown Item',
+      quantity: item.quantity,
+      unitPrice: parseFloat(item.unit_price || '0'),
+      specialInstructions: item.special_instructions,
+    })),
+    // Also include snake_case for compatibility
+    order_number: order.order_number,
+    customer_name: order.customer_name,
+    order_type: order.order_type,
+    total_amount: order.total_amount,
+    created_at: order.created_at,
+  };
+}
+
 export async function getStaffOrders(req: Request, res: Response, next: NextFunction) {
   try {
     const { status, date } = req.query;
@@ -70,7 +99,9 @@ export async function getStaffOrders(req: Request, res: Response, next: NextFunc
       status: status as string,
       date: date as string,
     });
-    res.json({ success: true, data: orders });
+    // Transform to camelCase format for frontend
+    const transformedOrders = orders.map(transformOrderForFrontend);
+    res.json({ success: true, data: transformedOrders });
   } catch (error) {
     next(error);
   }
@@ -79,7 +110,9 @@ export async function getStaffOrders(req: Request, res: Response, next: NextFunc
 export async function getLiveOrders(req: Request, res: Response, next: NextFunction) {
   try {
     const orders = await orderService.getLiveOrders();
-    res.json({ success: true, data: orders });
+    // Transform to camelCase format for frontend
+    const transformedOrders = orders.map(transformOrderForFrontend);
+    res.json({ success: true, data: transformedOrders });
   } catch (error) {
     next(error);
   }

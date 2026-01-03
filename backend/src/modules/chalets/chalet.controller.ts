@@ -377,7 +377,7 @@ export async function getStaffBookings(req: Request, res: Response, next: NextFu
 
     let query = supabase
       .from('chalet_bookings')
-      .select('*, chalet:chalets(name), users:customer_id(full_name, email, phone)')
+      .select('*, chalets:chalet_id(id, name, capacity), users:customer_id(full_name, email, phone)')
       .is('deleted_at', null)
       .order('check_in_date', { ascending: true });
 
@@ -402,14 +402,14 @@ export async function getTodayBookings(req: Request, res: Response, next: NextFu
 
     const { data: checkIns } = await supabase
       .from('chalet_bookings')
-      .select('*, chalet:chalets(name), users:customer_id(full_name, email, phone)')
+      .select('*, chalets:chalet_id(id, name, capacity), users:customer_id(full_name, email, phone)')
       .gte('check_in_date', `${today}T00:00:00`)
       .lt('check_in_date', `${today}T23:59:59`)
       .is('deleted_at', null);
 
     const { data: checkOuts } = await supabase
       .from('chalet_bookings')
-      .select('*, chalet:chalets(name), users:customer_id(full_name, email, phone)')
+      .select('*, chalets:chalet_id(id, name, capacity), users:customer_id(full_name, email, phone)')
       .gte('check_out_date', `${today}T00:00:00`)
       .lt('check_out_date', `${today}T23:59:59`)
       .is('deleted_at', null);
