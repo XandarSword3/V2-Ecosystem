@@ -449,7 +449,7 @@ export async function getTodayTickets(req: Request, res: Response, next: NextFun
 
     const { data: tickets, error } = await supabase
       .from('pool_tickets')
-      .select('*')
+      .select('*, users:customer_id(full_name, email)')
       .gte('ticket_date', today)
       .lte('ticket_date', endOfDay)
       .order('created_at', { ascending: false });
