@@ -157,7 +157,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       setAuthChecked(true);
       if (!isAuthenticated) {
         router.push('/login?redirect=/admin');
-      } else if (user && !user.roles.includes('admin')) {
+      } else if (user && !user.roles.some(role => ['admin', 'super_admin'].includes(role))) {
         toast.error(t('errors.accessDenied') || 'Access denied. Admin privileges required.');
         router.push('/');
       }
