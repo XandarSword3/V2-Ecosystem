@@ -81,7 +81,7 @@ export default function ModulesPage() {
 
       {isCreating && (
         <ModuleForm
-          onSubmit={(data) => createMutation.mutate(data)}
+          onSubmit={(data: any) => createMutation.mutate(data)}
           onCancel={() => setIsCreating(false)}
           isLoading={createMutation.isPending}
         />
@@ -90,7 +90,7 @@ export default function ModulesPage() {
       {editingModule && (
         <ModuleForm
           initialData={editingModule}
-          onSubmit={(data) => updateMutation.mutate({ id: editingModule.id, data })}
+          onSubmit={(data: any) => updateMutation.mutate({ id: editingModule.id, data })}
           onCancel={() => setEditingModule(null)}
           isLoading={updateMutation.isPending}
         />
