@@ -28,7 +28,9 @@ import {
   Sandwich,
   Pizza,
   ChevronDown,
+  List,
 } from 'lucide-react';
+import Link from 'next/link';
 
 interface SnackItem {
   id: string;
@@ -38,28 +40,30 @@ interface SnackItem {
   description_ar?: string;
   price: number;
   category: string;
+  category_id?: string;
   image_url?: string;
   is_available: boolean;
 }
 
-const categories = [
-  { id: 'drink', label: 'Drinks', icon: Coffee },
-  { id: 'ice_cream', label: 'Ice Cream', icon: IceCream },
-  { id: 'sandwich', label: 'Sandwiches', icon: Sandwich },
-  { id: 'snack', label: 'Snacks', icon: Pizza },
-  { id: 'other', label: 'Other', icon: Cookie },
-];
+interface Category {
+  id: string;
+  name: string;
+  display_order: number;
+}
 
-const getCategoryIcon = (category: string) => {
-  // Handle both singular and plural forms just in case
-  const normalizedCategory = category.endsWith('s') && category !== 'snacks' ? category.slice(0, -1) : category;
-  const found = categories.find(c => c.id === category || c.id === normalizedCategory);
-  return found ? found.icon : Cookie;
+const getCategoryIcon = (categoryName: string) => {
+  const lower = categoryName.toLowerCase();
+  if (lower.includes('drink')) return Coffee;
+  if (lower.includes('ice cream')) return IceCream;
+  if (lower.includes('sandwich')) return Sandwich;
+  if (lower.includes('pizza')) return Pizza;
+  return Cookie;
 };
 
 export default function SnackMenuManagementPage() {
   const t = useTranslations('admin');
   const [items, setItems] = useState<SnackItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -70,7 +74,17 @@ export default function SnackMenuManagementPage() {
 
   useEffect(() => {
     fetchItems();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get('/snack/categories');
+      setCategories(response.data.data || []);
+    } catch (error) {
+      console.error('Failed to fetch categories', error);
+    }
+  };
 
   const fetchItems = async () => {
     try {
@@ -93,7 +107,7 @@ export default function SnackMenuManagementPage() {
       description: '',
       description_ar: '',
       price: 0,
-      category: 'snacks',
+      category_id: categories[0]?.id,
       is_available: true,
     });
     setShowModal(true);
@@ -155,12 +169,18 @@ export default function SnackMenuManagementPage() {
 
   const filteredItems = items.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || 
+      item.category_id === selectedCategory || 
+      (categories.find(c => c.id === selectedCategory)?.name.toLowerCase() === item.category);
     return matchesSearch && matchesCategory;
   });
 
   const groupedItems = categories.reduce((acc, cat) => {
-    acc[cat.id] = filteredItems.filter(item => item.category === cat.id);
+    acc[cat.id] = filteredItems.filter(item => 
+      item.category_id === cat.id || 
+      (!item.category_id && item.category === cat.name.toLowerCase()) ||
+      (!item.category_id && item.category === 'snack' && cat.name.toLowerCase() === 'snacks') // Handle singular/plural mismatch
+    );
     return acc;
   }, {} as Record<string, SnackItem[]>);
 
@@ -222,7 +242,7 @@ export default function SnackMenuManagementPage() {
                 >
                   <option value="all">All Categories</option>
                   {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.label}</option>
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -239,15 +259,15 @@ export default function SnackMenuManagementPage() {
           <p className="text-2xl font-bold text-slate-900 dark:text-white">{items.length}</p>
         </div>
         {categories.slice(0, 4).map(cat => {
-          const Icon = cat.icon;
+          const Icon = getCategoryIcon(cat.name);
           return (
             <div key={cat.id} className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                 <Icon className="w-4 h-4" />
-                {cat.label}
+                {cat.name}
               </div>
               <p className="text-2xl font-bold text-amber-600">
-                {items.filter(i => i.category === cat.id).length}
+                {items.filter(i => i.category_id === cat.id || (!i.category_id && i.category === cat.name.toLowerCase())).length}
               </p>
             </div>
           );
@@ -275,13 +295,13 @@ export default function SnackMenuManagementPage() {
             const categoryItems = groupedItems[category.id];
             if (!categoryItems || categoryItems.length === 0) return null;
 
-            const Icon = category.icon;
+            const Icon = getCategoryIcon(category.name);
             return (
               <Card key={category.id}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Icon className="w-5 h-5 text-amber-600" />
-                    {category.label}
+                    {category.name}
                     <span className="text-sm font-normal text-slate-500">
                       ({categoryItems.length} items)
                     </span>
@@ -481,12 +501,19 @@ export default function SnackMenuManagementPage() {
                       Category *
                     </label>
                     <select
-                      value={formData.category || 'snacks'}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      value={formData.category_id || ''}
+                      onChange={(e) => {
+                        const cat = categories.find(c => c.id === e.target.value);
+                        setFormData({ 
+                          ...formData, 
+                          category_id: e.target.value,
+                          category: cat?.name.toLowerCase() || 'other'
+                        });
+                      }}
                       className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-amber-500"
                     >
                       {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.label}</option>
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
                       ))}
                     </select>
                   </div>
