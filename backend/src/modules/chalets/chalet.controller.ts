@@ -15,11 +15,19 @@ function generateBookingNumber(): string {
 export async function getChalets(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const { moduleId } = req.query;
+    
+    let query = supabase
       .from('chalets')
       .select('*')
       .eq('is_active', true)
       .is('deleted_at', null);
+
+    if (moduleId) {
+      query = query.eq('module_id', moduleId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     res.json({ success: true, data: data || [] });

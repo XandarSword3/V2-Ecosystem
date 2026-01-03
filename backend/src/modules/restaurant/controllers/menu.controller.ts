@@ -5,9 +5,10 @@ import { translateText } from '../../../services/translation.service.js';
 // Get full menu with categories and items
 export async function getFullMenu(req: Request, res: Response, next: NextFunction) {
   try {
+    const { moduleId } = req.query;
     const [categories, items] = await Promise.all([
-      menuService.getAllCategories(),
-      menuService.getMenuItems({ availableOnly: true }),
+      menuService.getAllCategories(moduleId as string),
+      menuService.getMenuItems({ availableOnly: true, moduleId: moduleId as string }),
     ]);
     
     // Group items by category
@@ -31,7 +32,8 @@ export async function getFullMenu(req: Request, res: Response, next: NextFunctio
 
 export async function getCategories(req: Request, res: Response, next: NextFunction) {
   try {
-    const categories = await menuService.getAllCategories();
+    const { moduleId } = req.query;
+    const categories = await menuService.getAllCategories(moduleId as string);
     res.json({ success: true, data: categories });
   } catch (error) {
     next(error);
@@ -40,10 +42,11 @@ export async function getCategories(req: Request, res: Response, next: NextFunct
 
 export async function getMenuItems(req: Request, res: Response, next: NextFunction) {
   try {
-    const { categoryId, available } = req.query;
+    const { categoryId, available, moduleId } = req.query;
     const items = await menuService.getMenuItems({
       categoryId: categoryId as string,
       availableOnly: available === 'true',
+      moduleId: moduleId as string,
     });
     res.json({ success: true, data: items });
   } catch (error) {
@@ -74,10 +77,10 @@ export async function getFeaturedItems(req: Request, res: Response, next: NextFu
 
 export async function createCategory(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, description, ...rest } = req.body;
+    const { name, description, moduleId, ...rest } = req.body;
     
     // Auto-translate name and description if not provided
-    let translatedData = { ...rest, name };
+    let translatedData = { ...rest, name, moduleId };
     
     if (name && !req.body.name_ar) {
       try {

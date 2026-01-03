@@ -22,6 +22,7 @@ import {
   Hash,
   User,
 } from 'lucide-react';
+import { QRCode } from '@/components/ui/QRCode';
 
 interface RestaurantOrder {
   id: string;
@@ -150,6 +151,14 @@ function RestaurantConfirmationContent() {
             </CardTitle>
           </CardHeader>
           <CardContent className="divide-y divide-slate-200 dark:divide-slate-700">
+            {/* QR Code */}
+            <div className="py-6 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800/50">
+              <QRCode value={order.id} size={160} />
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                {t('qrCode') || 'Show this QR code to staff'}
+              </p>
+            </div>
+
             {/* Status */}
             <div className="py-4 flex items-center justify-between">
               <span className="text-slate-600 dark:text-slate-400">{tCommon('status')}</span>

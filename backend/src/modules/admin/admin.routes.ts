@@ -1,12 +1,19 @@
 import { Router } from 'express';
 import { authenticate, authorize } from "../../middleware/auth.middleware";
 import * as adminController from "./admin.controller";
+import * as modulesController from "./modules.controller";
 
 const router = Router();
 
 // All admin routes require super_admin role
 router.use(authenticate);
 router.use(authorize('super_admin'));
+
+// Modules
+router.get('/modules', modulesController.getModules);
+router.post('/modules', modulesController.createModule);
+router.put('/modules/:id', modulesController.updateModule);
+router.delete('/modules/:id', modulesController.deleteModule);
 
 // Dashboard
 router.get('/dashboard', adminController.getDashboard);

@@ -31,7 +31,7 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
-  const { settings } = useSiteSettings();
+  const { settings, modules } = useSiteSettings();
   const restaurantCount = useCartStore((s) => s.getRestaurantCount());
   const snackCount = useCartStore((s) => s.getSnackCount());
   const totalCartCount = restaurantCount + snackCount;
@@ -48,13 +48,40 @@ export default function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const getIconForModule = (module: any) => {
+    // Specific icons for default modules
+    if (module.slug === 'restaurant') return UtensilsCrossed;
+    if (module.slug === 'snack-bar') return Cookie;
+    if (module.slug === 'pool') return Waves;
+    if (module.slug === 'chalets') return Home;
+
+    // Generic icons based on type
+    switch (module.template_type) {
+      case 'menu_service': return UtensilsCrossed;
+      case 'multi_day_booking': return Home;
+      case 'session_access': return Waves;
+      default: return Home;
+    }
+  };
+
   const navigation = [
     { name: t('home'), href: '/', icon: Home },
-    { name: t('restaurant'), href: '/restaurant', icon: UtensilsCrossed },
-    { name: t('chalets'), href: '/chalets', icon: Home },
-    { name: t('pool'), href: '/pool', icon: Waves },
-    { name: t('snackBar'), href: '/snack-bar', icon: Cookie },
+    ...modules.map(m => ({
+      name: m.name,
+      href: `/${m.slug}`,
+      icon: getIconForModule(m)
+    }))
   ];
+
+  // Fallback if modules not loaded yet (optional, but good for UX)
+  if (modules.length === 0) {
+    navigation.push(
+      { name: t('restaurant'), href: '/restaurant', icon: UtensilsCrossed },
+      { name: t('chalets'), href: '/chalets', icon: Home },
+      { name: t('pool'), href: '/pool', icon: Waves },
+      { name: t('snackBar'), href: '/snack-bar', icon: Cookie }
+    );
+  }
 
   // Don't show header on admin or staff pages
   if (pathname?.startsWith('/admin') || pathname?.startsWith('/staff')) {
@@ -120,7 +147,7 @@ export default function Header() {
           <div className="flex items-center gap-2">
             {/* Cart Button */}
             {totalCartCount > 0 && (
-              <Link href="/restaurant/cart">
+              <Link href="/cart">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}

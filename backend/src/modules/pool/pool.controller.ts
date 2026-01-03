@@ -17,10 +17,18 @@ function generateTicketNumber(): string {
 export async function getSessions(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const { data: sessions, error } = await supabase
+    const { moduleId } = req.query;
+    
+    let query = supabase
       .from('pool_sessions')
       .select('*')
       .eq('is_active', true);
+
+    if (moduleId) {
+      query = query.eq('module_id', moduleId);
+    }
+
+    const { data: sessions, error } = await query;
 
     if (error) throw error;
 
@@ -54,7 +62,7 @@ export async function getSession(req: Request, res: Response, next: NextFunction
 export async function getAvailability(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const { date, sessionId } = req.query;
+    const { date, sessionId, moduleId } = req.query;
 
     if (!date) {
       return res.status(400).json({ success: false, error: 'date required' });
@@ -64,10 +72,16 @@ export async function getAvailability(req: Request, res: Response, next: NextFun
     const endOfDay = dayjs(date as string).endOf('day').toISOString();
 
     // Get all sessions
-    const { data: sessions, error: sessionsError } = await supabase
+    let sessionsQuery = supabase
       .from('pool_sessions')
       .select('*')
       .eq('is_active', true);
+
+    if (moduleId) {
+      sessionsQuery = sessionsQuery.eq('module_id', moduleId);
+    }
+
+    const { data: sessions, error: sessionsError } = await sessionsQuery;
 
     if (sessionsError) throw sessionsError;
 
