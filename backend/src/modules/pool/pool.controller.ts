@@ -238,8 +238,9 @@ export async function getTicket(req: Request, res: Response, next: NextFunction)
     const userRoles = req.user?.roles || [];
     const isOwner = ticket.customer_id === userId;
     const isAdminOrStaff = userRoles.includes('admin') || userRoles.includes('staff');
+    const isGuestTicket = !ticket.customer_id; // Allow guest tickets (no owner)
     
-    if (!isOwner && !isAdminOrStaff) {
+    if (!isOwner && !isAdminOrStaff && !isGuestTicket) {
       // For non-owners, only return limited info (validation status)
       return res.json({ 
         success: true, 
