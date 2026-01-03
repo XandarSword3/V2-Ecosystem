@@ -732,7 +732,10 @@
     "myBookings": "My Bookings",
     "noBookings": "You have no bookings yet",
     "myTickets": "My Pool Tickets",
-    "noTickets": "You have no pool tickets yet"
+    "noTickets": "You have no pool tickets yet",
+    "bookingDetails": "Booking Details",
+    "specialRequests": "Special Requests",
+    "addOns": "Add-ons"
   },
   "legal": {
     "privacy": {

@@ -732,7 +732,10 @@
     "myBookings": "Mes Réservations",
     "noBookings": "Vous n'avez pas encore de réservations",
     "myTickets": "Mes Billets Piscine",
-    "noTickets": "Vous n'avez pas encore de billets piscine"
+    "noTickets": "Vous n'avez pas encore de billets piscine",
+    "bookingDetails": "Détails de la réservation",
+    "specialRequests": "Demandes spéciales",
+    "addOns": "Suppléments"
   },
   "legal": {
     "privacy": {

@@ -732,7 +732,10 @@
     "myBookings": "حجوزاتي",
     "noBookings": "لا توجد لديك حجوزات بعد",
     "myTickets": "تذاكر المسبح",
-    "noTickets": "لا توجد لديك تذاكر مسبح بعد"
+    "noTickets": "لا توجد لديك تذاكر مسبح بعد",
+    "bookingDetails": "تفاصيل الحجز",
+    "specialRequests": "طلبات خاصة",
+    "addOns": "الإضافات"
   },
   "legal": {
     "privacy": {

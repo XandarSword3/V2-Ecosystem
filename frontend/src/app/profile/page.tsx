@@ -33,6 +33,7 @@ import {
   ChevronRight,
   Loader2,
   Package,
+  X,
 } from 'lucide-react';
 
 type TabType = 'profile' | 'orders' | 'snacks' | 'bookings' | 'tickets';
@@ -57,6 +58,7 @@ export default function ProfilePage() {
   const currency = useSettingsStore((s) => s.currency);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [saving, setSaving] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -473,7 +475,8 @@ export default function ProfilePage() {
                       {bookings.map((booking: any) => (
                         <div
                           key={booking.id}
-                          className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                          onClick={() => setSelectedBooking(booking)}
+                          className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
                         >
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium">{booking.chalet?.name || 'Chalet'}</span>
