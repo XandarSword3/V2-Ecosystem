@@ -1,0 +1,2 @@
+
+ALTER TABLE pool_tickets ADD COLUMN IF NOT EXISTS qr_code TEXT;
