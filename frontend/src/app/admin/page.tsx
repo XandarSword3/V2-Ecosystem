@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatCardSkeleton, CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
+import { useSocket } from '@/lib/socket';
 import {
   Users,
   UtensilsCrossed,
@@ -182,6 +183,8 @@ function OrderStatus({ status }: { status: string }) {
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const { socket } = useSocket();
+  const [onlineUsers, setOnlineUsers] = useState(0);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -189,6 +192,17 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadStats();
   }, []);
+
+  useEffect(() => {
+    if (socket) {
+      socket.on('stats:online_users', (data: { count: number }) => {
+        setOnlineUsers(data.count);
+      });
+    }
+    return () => {
+      socket?.off('stats:online_users');
+    };
+  }, [socket]);
 
   const loadStats = async (isRefresh = false) => {
     if (isRefresh) setIsRefreshing(true);
@@ -278,6 +292,15 @@ export default function AdminDashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Online Users"
+          value={onlineUsers}
+          icon={Users}
+          trend="neutral"
+          trendValue="Live Count"
+          gradient="bg-gradient-to-br from-blue-400 to-indigo-500"
+          delay={0}
+        />
         <StatCard
           title="Today's Orders"
           value={stats?.todayOrders || 0}

@@ -78,6 +78,10 @@ export function initializeSocketServer(httpServer: HttpServer) {
       socket.join(`user:${socket.data.userId}`);
     }
 
+    // Broadcast online count to admins
+    const onlineCount = io.engine.clientsCount;
+    io.to('role:admin').to('role:super_admin').emit('stats:online_users', { count: onlineCount });
+
     // Staff can join business unit rooms
     socket.on('join:unit', (unit: string) => {
       if (['restaurant', 'snack_bar', 'chalets', 'pool'].includes(unit)) {
@@ -88,6 +92,12 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
     socket.on('disconnect', () => {
       logger.debug(`Socket disconnected: ${socket.id}`);
+      
+      // Broadcast online count to admins (after a small delay to ensure count is updated)
+      setTimeout(() => {
+        const count = io.engine.clientsCount;
+        io.to('role:admin').to('role:super_admin').emit('stats:online_users', { count });
+      }, 100);
     });
   });
 

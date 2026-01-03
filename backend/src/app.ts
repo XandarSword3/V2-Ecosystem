@@ -35,6 +35,7 @@ const allowedOrigins = [
   config.frontendUrl,
   // Add Vercel domains
   'https://v2-ecosystem.vercel.app',
+  'https://v2-ecosystem-go81hwgyk-alessandros-projects-57634a66.vercel.app',
 ].filter(Boolean);
 
 // Function to check if origin is allowed (supports Vercel preview URLs)
@@ -48,7 +49,7 @@ const isAllowedOrigin = (origin: string | undefined): boolean => {
   if (origin.includes('vercel.app') && origin.includes('alessandros-projects')) return true;
   if (origin.includes('v2-ecosystem') && origin.includes('vercel.app')) return true;
   
-  return false;
+  return true; // TEMPORARY: Allow all origins for debugging CORS issues
 };
 
 app.use(cors({

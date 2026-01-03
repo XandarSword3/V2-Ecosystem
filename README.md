@@ -68,11 +68,13 @@ v2-resort/
 ### 👔 Staff Portal
 - Role-based dashboards for each business unit
 - Kitchen display with real-time order updates
+- **Detailed Order Views**: Modal-based deep dive into order specifics (items, notes, customer info)
 - QR code scanner for ticket validation
 - Booking management interface
 
 ### 👤 Admin Dashboard
-- **Analytics**: Revenue reports, booking statistics, order trends
+- **Real-time Analytics**: Live counter of online users and active sessions
+- **Business Intelligence**: Revenue reports, booking statistics, order trends
 - **User Management**: Staff accounts, role assignments, permissions
 - **Content Management**: Menu items, chalets, pool sessions, add-ons
 - **Settings**: Site configuration, testimonials, business hours
@@ -88,6 +90,7 @@ v2-resort/
 | Express.js | Web framework |
 | TypeScript | Type safety |
 | Supabase | PostgreSQL database hosting |
+| Socket.io | Real-time bi-directional communication |
 | JWT + bcrypt | Authentication & password hashing |
 | Winston | Logging with file & console output |
 | Zod | Request validation |
