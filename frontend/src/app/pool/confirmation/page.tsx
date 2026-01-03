@@ -155,7 +155,7 @@ function PoolConfirmationContent() {
                 <Waves className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">{t('session')}</p>
+                <p className="text-sm text-slate-500">{t('sessionLabel')}</p>
                 <p className="font-semibold">{ticket.session?.name || 'Pool Session'}</p>
               </div>
             </div>
