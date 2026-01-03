@@ -258,14 +258,39 @@ export async function getStaffOrders(req: Request, res: Response, next: NextFunc
     const supabase = getSupabase();
     const { data: orders, error } = await supabase
       .from('snack_orders')
-      .select('*')
+      .select(`
+        *,
+        items:snack_order_items (
+          id,
+          quantity,
+          unit_price,
+          subtotal,
+          snack_items (
+            id,
+            name,
+            image_url
+          )
+        )
+      `)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(100);
 
     if (error) throw error;
 
-    res.json({ success: true, data: orders || [] });
+    // Transform items to have name at top level for frontend
+    const transformedOrders = (orders || []).map((order: any) => ({
+      ...order,
+      items: (order.items || []).map((item: any) => ({
+        id: item.id,
+        name: item.snack_items?.name || 'Unknown Item',
+        quantity: item.quantity,
+        unit_price: parseFloat(item.unit_price),
+        notes: item.notes,
+      })),
+    }));
+
+    res.json({ success: true, data: transformedOrders });
   } catch (error) {
     next(error);
   }
@@ -278,13 +303,38 @@ export async function getLiveOrders(req: Request, res: Response, next: NextFunct
     
     const { data: orders, error } = await supabase
       .from('snack_orders')
-      .select('*')
+      .select(`
+        *,
+        items:snack_order_items (
+          id,
+          quantity,
+          unit_price,
+          subtotal,
+          snack_items (
+            id,
+            name,
+            image_url
+          )
+        )
+      `)
       .in('status', activeStatuses)
       .order('created_at', { ascending: true });
 
     if (error) throw error;
 
-    res.json({ success: true, data: orders || [] });
+    // Transform items to have name at top level for frontend
+    const transformedOrders = (orders || []).map((order: any) => ({
+      ...order,
+      items: (order.items || []).map((item: any) => ({
+        id: item.id,
+        name: item.snack_items?.name || 'Unknown Item',
+        quantity: item.quantity,
+        unit_price: parseFloat(item.unit_price),
+        notes: item.notes,
+      })),
+    }));
+
+    res.json({ success: true, data: transformedOrders });
   } catch (error) {
     next(error);
   }

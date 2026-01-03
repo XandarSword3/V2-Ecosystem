@@ -228,7 +228,7 @@ export async function getOrders(filters: { status?: string; date?: string }) {
           name
         )
       ),
-      users (
+      customer:users!customer_id (
         full_name
       )
     `)
@@ -274,7 +274,7 @@ export async function getLiveOrders() {
           name
         )
       ),
-      users (
+      customer:users!customer_id (
         full_name
       )
     `)
