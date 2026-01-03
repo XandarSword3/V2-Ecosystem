@@ -123,7 +123,7 @@ export default function TestimonialsCarousel() {
           }
         }
       } catch (error) {
-        console.log('Using fallback testimonials');
+        // Using fallback testimonials if API fails
       } finally {
         setIsLoading(false);
       }

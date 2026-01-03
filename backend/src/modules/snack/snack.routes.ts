@@ -10,6 +10,7 @@ router.get('/items/:id', snackController.getItem);
 
 // Customer routes
 router.post('/orders', optionalAuth, snackController.createOrder);
+router.get('/orders/my', authenticate, snackController.getMyOrders);
 router.get('/orders/:id', snackController.getOrder);
 router.get('/orders/:id/status', snackController.getOrderStatus);
 
