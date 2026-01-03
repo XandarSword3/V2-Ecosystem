@@ -21,8 +21,8 @@ export async function getModules(req: Request, res: Response, next: NextFunction
     if (error) throw error;
 
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message, stack: error.stack });
   }
 }
 

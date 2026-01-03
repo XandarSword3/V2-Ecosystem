@@ -24,8 +24,8 @@ router.get('/items', menuController.getMenuItems);
 // Customer Routes (Orders)
 // ============================================
 router.post('/orders', optionalAuth, orderController.createOrder);
-router.get('/orders/:id', optionalAuth, orderController.getOrder);
-router.get('/orders/:id/status', orderController.getOrderStatus);
+// router.get('/orders/:id', optionalAuth, orderController.getOrder); // Moved to end
+// router.get('/orders/:id/status', orderController.getOrderStatus); // Moved to end
 
 // Authenticated customer routes
 router.get('/my-orders', authenticate, orderController.getMyOrders);
@@ -33,7 +33,7 @@ router.get('/my-orders', authenticate, orderController.getMyOrders);
 // ============================================
 // Staff Routes
 // ============================================
-const staffRoles = ['restaurant_staff', 'restaurant_admin', 'super_admin'];
+const staffRoles = ['staff', 'restaurant_staff', 'restaurant_admin', 'super_admin'];
 
 router.get('/staff/orders', authenticate, authorize(...staffRoles), orderController.getStaffOrders);
 router.patch('/staff/orders/:id/status', authenticate, authorize(...staffRoles), orderController.updateOrderStatus);
@@ -47,6 +47,12 @@ router.patch('/staff/tables/:id', authenticate, authorize(...staffRoles), tableC
 // Admin Routes (Menu Management)
 // ============================================
 const adminRoles = ['restaurant_admin', 'super_admin'];
+
+// ... (Admin routes would go here if I had them in context, but I'll just append the moved routes at the end of the file)
+
+// Moved parameterized routes to end
+router.get('/orders/:id', optionalAuth, orderController.getOrder);
+router.get('/orders/:id/status', orderController.getOrderStatus);
 
 // Categories
 router.post('/admin/categories', authenticate, authorize(...adminRoles), menuController.createCategory);

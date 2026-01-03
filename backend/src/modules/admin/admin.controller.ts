@@ -249,6 +249,7 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
     let query = supabase
       .from('users')
       .select('id, email, full_name, phone, is_active, email_verified, last_login_at, created_at')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(offset, offset + Number(limit) - 1);
 
