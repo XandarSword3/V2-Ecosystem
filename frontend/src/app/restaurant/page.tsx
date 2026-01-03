@@ -612,7 +612,7 @@ export default function RestaurantMenuPage() {
                     <p className="text-xl font-bold">{formatCurrency(cartTotal, currency)}</p>
                   </div>
                 </div>
-                <Link href="/restaurant/checkout">
+                <Link href="/restaurant/cart">
                   <motion.button 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}

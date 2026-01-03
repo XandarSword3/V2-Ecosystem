@@ -99,7 +99,7 @@ export default function StaffSnackPage() {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      await api.put(`/snack/staff/orders/${orderId}/status`, { status: newStatus });
+      await api.patch(`/snack/staff/orders/${orderId}/status`, { status: newStatus });
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus as SnackOrder['status'] } : o))
       );

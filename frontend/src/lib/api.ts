@@ -92,7 +92,7 @@ export const restaurantApi = {
   getMenuByCategory: (categoryId: string) => 
     api.get(`/restaurant/menu/category/${categoryId}`),
   createOrder: (data: any) => api.post('/restaurant/orders', data),
-  getMyOrders: () => api.get('/restaurant/orders/my'),
+  getMyOrders: () => api.get('/restaurant/my-orders'),
   getOrderStatus: (orderId: string) => api.get(`/restaurant/orders/${orderId}`),
 };
 
@@ -100,6 +100,8 @@ export const restaurantApi = {
 export const snackApi = {
   getItems: () => api.get('/snack/items'),
   createOrder: (data: any) => api.post('/snack/orders', data),
+  getMyOrders: () => api.get('/snack/orders/my'),
+  getOrder: (orderId: string) => api.get(`/snack/orders/${orderId}`),
 };
 
 // Chalets API
@@ -110,7 +112,7 @@ export const chaletsApi = {
     api.get(`/chalets/${chaletId}/availability`, { params: { checkIn, checkOut } }),
   getAddOns: () => api.get('/chalets/add-ons'),
   createBooking: (data: any) => api.post('/chalets/bookings', data),
-  getMyBookings: () => api.get('/chalets/bookings/my'),
+  getMyBookings: () => api.get('/chalets/my-bookings'),
   getBookingDetails: (bookingId: string) => api.get(`/chalets/bookings/${bookingId}`),
 };
 
@@ -121,7 +123,8 @@ export const poolApi = {
   getSessionAvailability: (sessionId: string, date: string) =>
     api.get(`/pool/sessions/${sessionId}/availability`, { params: { date } }),
   purchaseTicket: (data: any) => api.post('/pool/tickets', data),
-  getMyTickets: () => api.get('/pool/tickets/my'),
+  getTicket: (ticketId: string) => api.get(`/pool/tickets/${ticketId}`),
+  getMyTickets: () => api.get('/pool/my-tickets'),
 };
 
 // Payments API

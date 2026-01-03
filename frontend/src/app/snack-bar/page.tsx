@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -64,6 +65,7 @@ const categoryIcons: Record<string, string> = {
 export default function SnackBarPage() {
   const t = useTranslations('snackBar');
   const tCommon = useTranslations('common');
+  const router = useRouter();
   const { translateContent } = useContentTranslation();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const currency = useSettingsStore((s) => s.currency);
@@ -450,6 +452,7 @@ export default function SnackBarPage() {
                 <motion.button 
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  onClick={() => router.push('/snack-bar/cart')}
                   className="bg-white text-amber-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300"
                 >
                   {t('placeOrder')}

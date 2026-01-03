@@ -65,7 +65,7 @@ export default function StaffScannerPage() {
     setLastResult(null);
 
     try {
-      const response = await api.post('/pool/tickets/validate', { code: code.trim() });
+      const response = await api.post('/pool/staff/validate', { ticketNumber: code.trim() });
       const result: ValidationResult = {
         success: true,
         message: response.data.message || 'Ticket validated successfully',
@@ -80,7 +80,7 @@ export default function StaffScannerPage() {
     } catch (error: any) {
       const result: ValidationResult = {
         success: false,
-        message: error.response?.data?.message || 'Invalid or expired ticket',
+        message: error.response?.data?.error || 'Invalid or expired ticket',
       };
       setLastResult(result);
       setScanHistory((prev) => [

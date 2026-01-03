@@ -1,13 +1,15 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { poolApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { useContentTranslation } from '@/lib/translate';
+import { useAuth } from '@/lib/auth-context';
 import { Loader2, Waves, Users, Clock, Calendar, AlertCircle, Ticket, Droplets, Sun, Umbrella } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -45,25 +47,54 @@ const cardVariants = {
 export default function PoolPage() {
   const t = useTranslations('pool');
   const tCommon = useTranslations('common');
+  const router = useRouter();
+  const { user } = useAuth();
   const currency = useSettingsStore((s) => s.currency);
   const { translateContent } = useContentTranslation();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedSession, setSelectedSession] = useState<PoolSession | null>(null);
   const [guestCount, setGuestCount] = useState(1);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [showBookingForm, setShowBookingForm] = useState(false);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['pool-sessions', selectedDate],
     queryFn: () => poolApi.getSessions(selectedDate),
+  });
+
+  const purchaseMutation = useMutation({
+    mutationFn: (data: any) => poolApi.purchaseTicket(data),
+    onSuccess: (response) => {
+      toast.success(t('ticketPurchased'));
+      const ticket = response.data.data;
+      router.push(`/pool/confirmation?id=${ticket.id}`);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || t('purchaseFailed'));
+    },
   });
 
   const sessions: PoolSession[] = data?.data?.data || [];
 
   const handlePurchase = async () => {
     if (!selectedSession) {
-      toast.error('Please select a session');
+      toast.error(t('selectSession'));
       return;
     }
-    toast.info('Redirecting to checkout...');
+    if (!customerName.trim() || !customerPhone.trim()) {
+      toast.error(t('fillContactInfo'));
+      return;
+    }
+    
+    purchaseMutation.mutate({
+      sessionId: selectedSession.id,
+      ticketDate: selectedDate,
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      numberOfGuests: guestCount,
+      paymentMethod: 'cash',
+    });
   };
 
   if (isLoading) {
@@ -295,6 +326,30 @@ export default function PoolPage() {
                       </div>
                     </div>
 
+                    {/* Contact Info */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="label text-slate-900 dark:text-white">{t('yourName')}</label>
+                        <input
+                          type="text"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          placeholder={t('enterYourName')}
+                          className="input w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="label text-slate-900 dark:text-white">{t('phoneNumber')}</label>
+                        <input
+                          type="tel"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(e.target.value)}
+                          placeholder={t('enterPhoneNumber')}
+                          className="input w-full"
+                        />
+                      </div>
+                    </div>
+
                     <div className="border-t dark:border-slate-700 pt-4">
                       <div className="flex justify-between mb-2">
                         <span className="text-slate-600 dark:text-slate-400">
@@ -305,7 +360,7 @@ export default function PoolPage() {
                         </span>
                       </div>
                       <div className="flex justify-between text-lg font-bold">
-                        <span className="text-slate-900 dark:text-white">Total</span>
+                        <span className="text-slate-900 dark:text-white">{tCommon('total')}</span>
                         <span className="text-blue-600 dark:text-blue-400">
                           {formatCurrency(selectedSession.price * guestCount, currency)}
                         </span>
@@ -314,14 +369,19 @@ export default function PoolPage() {
 
                     <button
                       onClick={handlePurchase}
+                      disabled={purchaseMutation.isPending}
                       className="btn btn-primary w-full"
                     >
-                      {t('purchaseTickets')}
+                      {purchaseMutation.isPending ? (
+                        <><Loader2 className="w-4 h-4 animate-spin mr-2" />{tCommon('processing')}</>
+                      ) : (
+                        t('purchaseTickets')
+                      )}
                     </button>
                   </>
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-slate-500 dark:text-slate-400">Select a session to continue</p>
+                    <p className="text-slate-500 dark:text-slate-400">{t('selectSessionToContinue')}</p>
                   </div>
                 )}
               </div>

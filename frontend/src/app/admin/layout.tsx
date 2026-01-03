@@ -125,8 +125,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           setNotifications(response.data.data);
         }
       } catch (error) {
-        // If endpoint doesn't exist yet, use empty array - no fake data
-        console.log('Notifications endpoint not available');
+        // If endpoint doesn't exist yet, use empty array
         setNotifications([]);
       } finally {
         setLoadingNotifications(false);

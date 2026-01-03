@@ -35,18 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem('user');
     const accessToken = localStorage.getItem('accessToken');
     
-    console.log('[AUTH CONTEXT] Checking stored auth...');
-    console.log('[AUTH CONTEXT] Has stored user:', !!storedUser);
-    console.log('[AUTH CONTEXT] Has access token:', !!accessToken);
-    
     if (storedUser && accessToken) {
       try {
         const parsedUser = JSON.parse(storedUser);
-        console.log('[AUTH CONTEXT] Restored user:', parsedUser.email);
-        console.log('[AUTH CONTEXT] User roles:', parsedUser.roles);
         setUser(parsedUser);
       } catch (e) {
-        console.error('[AUTH CONTEXT] Failed to parse stored user');
         localStorage.removeItem('user');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
@@ -57,8 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
-    console.log('[AUTH CONTEXT] Login called for:', email);
-    
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -66,7 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const data = await response.json();
-    console.log('[AUTH CONTEXT] Login response:', data);
 
     if (!response.ok || !data.success) {
       throw new Error(data.error || 'Login failed');
@@ -79,13 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(userData));
     
     setUser(userData);
-    console.log('[AUTH CONTEXT] User set:', userData);
     
     return userData;
   };
 
   const logout = () => {
-    console.log('[AUTH CONTEXT] Logout called');
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');

@@ -114,32 +114,15 @@ export default function StaffPoolPage() {
     if (!code.trim()) return;
     
     try {
-      const response = await api.post('/pool/tickets/validate', { code });
+      const response = await api.post('/pool/staff/validate', { ticketNumber: code });
       const ticket = response.data.data;
-
-      if (ticket.status === 'pending') {
-        // First entry
-        await recordEntry(ticket.id);
-      } else if (ticket.status === 'active' && ticket.entry_time && !ticket.exit_time) {
-        // Second scan = exit
-        await recordExit(ticket.id);
-      } else {
-        toast.error('Ticket cannot be used');
-      }
+      
+      // The backend handles validation and marks as used
+      toast.success(response.data.message || 'Ticket validated!', { icon: '🏊' });
+      fetchTickets(); // Refresh the tickets list
     } catch (error: any) {
-      // Mock validation for demo
-      const mockTicket = tickets.find((t) => t.ticket_number === code.toUpperCase());
-      if (mockTicket) {
-        if (mockTicket.status === 'pending') {
-          await recordEntry(mockTicket.id);
-        } else if (mockTicket.status === 'active' && mockTicket.entry_time && !mockTicket.exit_time) {
-          await recordExit(mockTicket.id);
-        } else {
-          toast.error('Ticket already used or expired');
-        }
-      } else {
-        toast.error('Invalid ticket code');
-      }
+      const errorMessage = error.response?.data?.error || 'Invalid ticket code';
+      toast.error(errorMessage);
     }
     
     setManualCode('');

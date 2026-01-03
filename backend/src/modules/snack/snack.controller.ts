@@ -214,6 +214,50 @@ export async function getOrderStatus(req: Request, res: Response, next: NextFunc
   }
 }
 
+export async function getMyOrders(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
+    const { data: orders, error } = await supabase
+      .from('snack_orders')
+      .select(`
+        id,
+        order_number,
+        status,
+        total_amount,
+        payment_status,
+        payment_method,
+        estimated_ready_time,
+        created_at,
+        snack_order_items (
+          id,
+          quantity,
+          unit_price,
+          subtotal,
+          snack_items (
+            id,
+            name,
+            image_url
+          )
+        )
+      `)
+      .eq('customer_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    res.json({ success: true, data: orders || [] });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getStaffOrders(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();

@@ -80,7 +80,7 @@ export default function PoolSessionsManagementPage() {
     try {
       setLoading(true);
       const response = await api.get('/pool/sessions');
-      setSessions(response.data.sessions || []);
+      setSessions(response.data.data || response.data.sessions || []);
     } catch (error: any) {
       toast.error('Failed to fetch pool sessions');
       console.error(error);
