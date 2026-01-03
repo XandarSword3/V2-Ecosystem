@@ -346,8 +346,8 @@ export async function createItem(req: Request, res: Response, next: NextFunction
         description: body.description || null,
         description_ar: body.descriptionAr || body.description_ar || null,
         price: String(body.price),
-        category: body.category || 'other',
-        category_id: body.categoryId || body.category_id || null,
+        category: body.category || 'snack',
+        // category_id removed as it doesn't exist in DB
         image_url: body.imageUrl || body.image_url || null,
         display_order: body.displayOrder || body.display_order || 0,
         is_available: body.isAvailable !== undefined ? body.isAvailable : (body.is_available !== undefined ? body.is_available : true),
@@ -379,7 +379,7 @@ export async function updateItem(req: Request, res: Response, next: NextFunction
     if (body.descriptionAr !== undefined || body.description_ar !== undefined) updateData.description_ar = body.descriptionAr || body.description_ar;
     if (body.price !== undefined) updateData.price = String(body.price);
     if (body.category !== undefined) updateData.category = body.category;
-    if (body.categoryId !== undefined || body.category_id !== undefined) updateData.category_id = body.categoryId || body.category_id;
+    // category_id removed
     if (body.imageUrl !== undefined || body.image_url !== undefined) updateData.image_url = body.imageUrl || body.image_url;
     if (body.displayOrder !== undefined || body.display_order !== undefined) updateData.display_order = body.displayOrder || body.display_order;
     if (body.isAvailable !== undefined || body.is_available !== undefined) updateData.is_available = body.isAvailable !== undefined ? body.isAvailable : body.is_available;
@@ -442,98 +442,32 @@ export async function toggleAvailability(req: Request, res: Response, next: Next
 // Categories
 // ============================================
 
+const STATIC_CATEGORIES = [
+  { id: 'sandwich', name: 'Sandwich', display_order: 1 },
+  { id: 'drink', name: 'Drink', display_order: 2 },
+  { id: 'snack', name: 'Snack', display_order: 3 },
+  { id: 'ice_cream', name: 'Ice Cream', display_order: 4 },
+];
+
 export async function getCategories(req: Request, res: Response, next: NextFunction) {
   try {
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from('snack_categories')
-      .select('*')
-      .is('deleted_at', null)
-      .order('display_order', { ascending: true });
-
-    if (error) throw error;
-
-    res.json({ success: true, data: data || [] });
+    // Return static categories that match the database ENUM
+    res.json({ success: true, data: STATIC_CATEGORIES });
   } catch (error) {
     next(error);
   }
 }
 
 export async function createCategory(req: Request, res: Response, next: NextFunction) {
-  try {
-    const supabase = getSupabase();
-    const body = req.body;
-
-    if (!body.name) {
-      return res.status(400).json({ success: false, message: 'Name is required' });
-    }
-
-    const { data: category, error } = await supabase
-      .from('snack_categories')
-      .insert({
-        name: body.name,
-        name_ar: body.nameAr || body.name_ar || null,
-        name_fr: body.nameFr || body.name_fr || null,
-        description: body.description || null,
-        display_order: body.displayOrder || body.display_order || 0,
-        is_active: body.isActive !== undefined ? body.isActive : true,
-        image_url: body.imageUrl || body.image_url || null,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    res.status(201).json({ success: true, data: category });
-  } catch (error) {
-    next(error);
-  }
+  // Categories are static for now due to ENUM constraint
+  res.status(405).json({ success: false, message: 'Category creation not supported' });
 }
 
 export async function updateCategory(req: Request, res: Response, next: NextFunction) {
-  try {
-    const supabase = getSupabase();
-    const body = req.body;
-    const updateData: Record<string, unknown> = { 
-      updated_at: new Date().toISOString() 
-    };
-
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.nameAr !== undefined) updateData.name_ar = body.nameAr;
-    if (body.nameFr !== undefined) updateData.name_fr = body.nameFr;
-    if (body.description !== undefined) updateData.description = body.description;
-    if (body.displayOrder !== undefined) updateData.display_order = body.displayOrder;
-    if (body.isActive !== undefined) updateData.is_active = body.isActive;
-    if (body.imageUrl !== undefined) updateData.image_url = body.imageUrl;
-
-    const { data: category, error } = await supabase
-      .from('snack_categories')
-      .update(updateData)
-      .eq('id', req.params.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    res.json({ success: true, data: category });
-  } catch (error) {
-    next(error);
-  }
+  res.status(405).json({ success: false, message: 'Category update not supported' });
 }
 
 export async function deleteCategory(req: Request, res: Response, next: NextFunction) {
-  try {
-    const supabase = getSupabase();
-    const { error } = await supabase
-      .from('snack_categories')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', req.params.id);
-
-    if (error) throw error;
-
-    res.json({ success: true, message: 'Category deleted' });
-  } catch (error) {
-    next(error);
-  }
+  res.status(405).json({ success: false, message: 'Category deletion not supported' });
 }
 

@@ -50,11 +50,10 @@ const isAllowedOrigin = (origin: string | undefined): boolean => {
   // Check exact match
   if (allowedOrigins.includes(origin)) return true;
   
-  // Allow all Vercel preview URLs for this project
-  if (origin.includes('vercel.app') && origin.includes('alessandros-projects')) return true;
-  if (origin.includes('v2-ecosystem') && origin.includes('vercel.app')) return true;
+  // Check Vercel preview URLs
+  if (origin.endsWith('.vercel.app')) return true;
   
-  return true; // TEMPORARY: Allow all origins for debugging CORS issues
+  return false;
 };
 
 app.use(cors({
@@ -125,6 +124,7 @@ async function handleSettings(_req: Request, res: Response) {
     const { config } = await import('./config/index.js');
     const supabase = createClient(config.supabase.url, config.supabase.anonKey);
     
+    // Existing site_settings table uses 'key' and 'value' (JSONB) columns
     const { data: settings, error } = await supabase
       .from('site_settings')
       .select('key, value');
@@ -132,11 +132,11 @@ async function handleSettings(_req: Request, res: Response) {
     if (error) throw error;
     
     // Combine all settings into a flat object
+    // Each row has a key (like 'general', 'contact') and value (JSONB object)
     const combinedSettings: Record<string, any> = {};
     (settings || []).forEach((s: any) => {
-      if (typeof s.value === 'object') {
-        Object.assign(combinedSettings, s.value);
-      }
+      // The value is already a JSONB object, no parsing needed
+      combinedSettings[s.key] = s.value;
     });
     
     res.json({ success: true, data: combinedSettings });

@@ -161,13 +161,11 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
     
     if (name && !req.body.name_ar) {
       try {
-        console.log('[MENU] Auto-translating item name:', name);
         const nameTranslations = await translateText(name, 'en');
         translatedData.name_ar = nameTranslations.ar;
         translatedData.name_fr = nameTranslations.fr;
-        console.log('[MENU] Translations:', nameTranslations);
       } catch (e) {
-        console.warn('[MENU] Auto-translation failed for item name');
+        // Auto-translation failed, continue without translations
       }
     }
     

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
+import { emailService } from "../../services/email.service.js";
 import dayjs from 'dayjs';
 
 function generateBookingNumber(): string {
@@ -231,6 +232,36 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
           unit_price: item.unit_price,
           subtotal: item.subtotal,
         })));
+    }
+
+    // Send booking confirmation email
+    if (customerEmail) {
+      const { data: addOnsList } = await supabase
+        .from('chalet_add_ons')
+        .select('id, name, price')
+        .in('id', addOnItems.map((a) => a.add_on_id));
+
+      const addOnMap = new Map((addOnsList || []).map((a) => [a.id, a]));
+      const formattedAddOns = addOnItems.map((item) => ({
+        name: addOnMap.get(item.add_on_id)?.name || 'Add-on',
+        price: item.subtotal,
+      }));
+
+      emailService.sendBookingConfirmation({
+        customerEmail,
+        customerName,
+        bookingNumber: booking.booking_number,
+        chaletName: chalet.name,
+        checkInDate: dayjs(booking.check_in_date).format('MMMM D, YYYY'),
+        checkOutDate: dayjs(booking.check_out_date).format('MMMM D, YYYY'),
+        numberOfGuests,
+        numberOfNights,
+        addOns: formattedAddOns,
+        totalAmount: parseFloat(booking.total_amount),
+        paymentStatus: booking.payment_status,
+      }).catch((err) => {
+        console.warn('Failed to send booking confirmation email:', err);
+      });
     }
 
     res.status(201).json({
@@ -492,8 +523,6 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
       image_url: req.body.image_url || null,
     };
     
-    console.log('[CHALETS] Creating chalet with data:', chaletData);
-    
     const { data, error } = await supabase
       .from('chalets')
       .insert(chaletData)
@@ -501,14 +530,11 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
       .single();
 
     if (error) {
-      console.error('[CHALETS] Database error:', error);
       throw error;
     }
     
-    console.log('[CHALETS] Chalet created successfully:', data?.id);
     res.status(201).json({ success: true, data });
   } catch (error: any) {
-    console.error('[CHALETS] Error creating chalet:', error);
     // Return more specific error message
     if (error.code === '23502') {
       return res.status(400).json({ 

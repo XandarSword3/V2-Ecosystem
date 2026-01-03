@@ -4,6 +4,7 @@ import { getSupabase } from "../../database/connection.js";
 import { generateTokens, verifyRefreshToken } from "./auth.utils.js";
 import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
+import { emailService } from "../../services/email.service.js";
 
 interface RegisterData {
   email: string;
@@ -336,12 +337,101 @@ export async function changePassword(userId: string, currentPassword: string, ne
 }
 
 export async function sendPasswordResetEmail(email: string) {
-  // TODO: Implement email sending
-  // Generate reset token, store it, send email
-  throw new Error('Not implemented');
+  const supabase = getSupabase();
+  
+  // Find user
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('id, name, email')
+    .eq('email', email.toLowerCase())
+    .single();
+  
+  if (userError || !user) {
+    // Don't reveal if email exists
+    logger.info(`Password reset requested for non-existent email: ${email}`);
+    return;
+  }
+  
+  // Generate reset token
+  const resetToken = uuidv4();
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  
+  // Store token (you may need to create a password_reset_tokens table)
+  // For now, we'll use the sessions table with a special session type
+  await supabase
+    .from('sessions')
+    .insert({
+      user_id: user.id,
+      refresh_token: resetToken,
+      expires_at: expiresAt.toISOString(),
+      is_active: true,
+    });
+  
+  // Send email with reset link
+  const resetUrl = `${config.frontendUrl}/reset-password?token=${resetToken}`;
+  
+  await emailService.sendEmail({
+    to: user.email,
+    subject: 'Reset Your Password - V2 Resort',
+    html: `
+      <h1>Password Reset Request</h1>
+      <p>Hi ${user.name},</p>
+      <p>You requested to reset your password. Click the link below to set a new password:</p>
+      <p><a href="${resetUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Reset Password</a></p>
+      <p>This link will expire in 1 hour.</p>
+      <p>If you didn't request this, you can safely ignore this email.</p>
+      <p>Thanks,<br>V2 Resort Team</p>
+    `,
+  });
+  
+  logger.info(`Password reset email sent to: ${email}`);
 }
 
 export async function resetPassword(token: string, newPassword: string) {
-  // TODO: Implement password reset
-  throw new Error('Not implemented');
+  const supabase = getSupabase();
+  
+  // Find valid reset token
+  const { data: session, error: sessionError } = await supabase
+    .from('sessions')
+    .select('id, user_id, expires_at')
+    .eq('refresh_token', token)
+    .eq('is_active', true)
+    .single();
+  
+  if (sessionError || !session) {
+    throw new Error('Invalid or expired reset token');
+  }
+  
+  // Check expiration
+  if (new Date(session.expires_at) < new Date()) {
+    await supabase.from('sessions').delete().eq('id', session.id);
+    throw new Error('Reset token has expired');
+  }
+  
+  // Hash new password
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  
+  // Update user password
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ 
+      password_hash: hashedPassword,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', session.user_id);
+  
+  if (updateError) {
+    throw new Error('Failed to update password');
+  }
+  
+  // Invalidate reset token
+  await supabase.from('sessions').delete().eq('id', session.id);
+  
+  // Invalidate all other sessions for security
+  await supabase
+    .from('sessions')
+    .update({ is_active: false })
+    .eq('user_id', session.user_id);
+  
+  logger.info(`Password reset completed for user: ${session.user_id}`);
 }

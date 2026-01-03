@@ -17,8 +17,6 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
     const lastWeekStart = dayjs().subtract(7, 'day').startOf('day').toISOString();
     const lastWeekEnd = dayjs().subtract(7, 'day').endOf('day').toISOString();
 
-    console.log('[ADMIN] Loading dashboard data...');
-
     // Today's stats - run queries in parallel
     const [
       restaurantOrdersResult,
@@ -147,14 +145,6 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
     const revenueTrend = calcTrend(totalRevenue, yesterdayRevenue);
     const bookingsTrend = calcTrend(chaletBookingsResult.count || 0, lastWeekBookings);
     const ticketsTrend = calcTrend(poolTicketsResult.count || 0, yesterdayTickets);
-
-    console.log('[ADMIN] Dashboard loaded:', {
-      todayOrders: totalOrders,
-      todayRevenue: totalRevenue,
-      todayBookings: chaletBookingsResult.count,
-      todayTickets: poolTicketsResult.count,
-      totalUsers: usersResult.count
-    });
 
     res.json({
       success: true,
@@ -547,7 +537,7 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
   try {
     const supabase = getSupabase();
     
-    // Get all settings from database
+    // Get all settings from database (existing schema uses 'key' and 'value' columns)
     const { data: settings, error } = await supabase
       .from('site_settings')
       .select('key, value');
@@ -556,7 +546,7 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
     
     // Combine all settings into a flat object
     const combinedSettings: Record<string, any> = {};
-    (settings || []).forEach(s => {
+    (settings || []).forEach((s: any) => {
       if (typeof s.value === 'object') {
         Object.assign(combinedSettings, s.value);
       }
@@ -604,7 +594,7 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
     const settings = req.body;
     const userId = req.user?.userId;
     
-    // Group settings by category for database update
+    // Group settings by category for database update (existing schema uses 'key' and 'value' JSONB columns)
     const generalSettings = {
       resortName: settings.resortName,
       tagline: settings.tagline,
@@ -800,8 +790,173 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
 
 export async function exportReport(req: Request, res: Response, next: NextFunction) {
   try {
-    // TODO: Implement CSV/Excel export
-    res.json({ success: false, error: 'Export not implemented yet' });
+    const supabase = getSupabase();
+    const { type, format = 'csv', range = 'month' } = req.query;
+    
+    if (!type) {
+      return res.status(400).json({ success: false, error: 'Report type is required' });
+    }
+    
+    // Calculate date range
+    let start: string;
+    const end: string = dayjs().endOf('day').toISOString();
+    
+    if (range === 'week') {
+      start = dayjs().subtract(7, 'day').startOf('day').toISOString();
+    } else if (range === 'year') {
+      start = dayjs().subtract(1, 'year').startOf('day').toISOString();
+    } else {
+      start = dayjs().subtract(1, 'month').startOf('day').toISOString();
+    }
+    
+    let data: any[] = [];
+    let filename = '';
+    
+    switch (type) {
+      case 'restaurant': {
+        const { data: orders, error } = await supabase
+          .from('restaurant_orders')
+          .select('order_number, customer_name, order_type, status, subtotal, tax_amount, total_amount, payment_status, payment_method, created_at')
+          .gte('created_at', start)
+          .lte('created_at', end)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        data = (orders || []).map(o => ({
+          'Order Number': o.order_number,
+          'Customer': o.customer_name,
+          'Type': o.order_type,
+          'Status': o.status,
+          'Subtotal': o.subtotal,
+          'Tax': o.tax_amount,
+          'Total': o.total_amount,
+          'Payment Status': o.payment_status,
+          'Payment Method': o.payment_method,
+          'Date': dayjs(o.created_at).format('YYYY-MM-DD HH:mm'),
+        }));
+        filename = `restaurant-orders-${dayjs().format('YYYY-MM-DD')}`;
+        break;
+      }
+      
+      case 'chalets': {
+        const { data: bookings, error } = await supabase
+          .from('chalet_bookings')
+          .select('booking_number, customer_name, customer_email, check_in_date, check_out_date, number_of_guests, number_of_nights, base_amount, total_amount, status, payment_status, created_at')
+          .gte('created_at', start)
+          .lte('created_at', end)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        data = (bookings || []).map(b => ({
+          'Booking Number': b.booking_number,
+          'Customer': b.customer_name,
+          'Email': b.customer_email,
+          'Check-in': dayjs(b.check_in_date).format('YYYY-MM-DD'),
+          'Check-out': dayjs(b.check_out_date).format('YYYY-MM-DD'),
+          'Guests': b.number_of_guests,
+          'Nights': b.number_of_nights,
+          'Base Amount': b.base_amount,
+          'Total': b.total_amount,
+          'Status': b.status,
+          'Payment': b.payment_status,
+          'Booked On': dayjs(b.created_at).format('YYYY-MM-DD HH:mm'),
+        }));
+        filename = `chalet-bookings-${dayjs().format('YYYY-MM-DD')}`;
+        break;
+      }
+      
+      case 'pool': {
+        const { data: tickets, error } = await supabase
+          .from('pool_tickets')
+          .select('ticket_number, customer_name, ticket_date, number_of_guests, total_amount, status, payment_status, created_at')
+          .gte('created_at', start)
+          .lte('created_at', end)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        data = (tickets || []).map(t => ({
+          'Ticket Number': t.ticket_number,
+          'Customer': t.customer_name,
+          'Date': dayjs(t.ticket_date).format('YYYY-MM-DD'),
+          'Guests': t.number_of_guests,
+          'Total': t.total_amount,
+          'Status': t.status,
+          'Payment': t.payment_status,
+          'Purchased': dayjs(t.created_at).format('YYYY-MM-DD HH:mm'),
+        }));
+        filename = `pool-tickets-${dayjs().format('YYYY-MM-DD')}`;
+        break;
+      }
+      
+      case 'snack': {
+        const { data: orders, error } = await supabase
+          .from('snack_orders')
+          .select('order_number, customer_name, status, subtotal, total_amount, payment_status, created_at')
+          .gte('created_at', start)
+          .lte('created_at', end)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        data = (orders || []).map(o => ({
+          'Order Number': o.order_number,
+          'Customer': o.customer_name,
+          'Status': o.status,
+          'Subtotal': o.subtotal,
+          'Total': o.total_amount,
+          'Payment': o.payment_status,
+          'Date': dayjs(o.created_at).format('YYYY-MM-DD HH:mm'),
+        }));
+        filename = `snack-orders-${dayjs().format('YYYY-MM-DD')}`;
+        break;
+      }
+      
+      case 'users': {
+        const { data: users, error } = await supabase
+          .from('users')
+          .select('name, email, phone, created_at, last_login, is_active')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        data = (users || []).map(u => ({
+          'Name': u.name,
+          'Email': u.email,
+          'Phone': u.phone || '',
+          'Registered': dayjs(u.created_at).format('YYYY-MM-DD'),
+          'Last Login': u.last_login ? dayjs(u.last_login).format('YYYY-MM-DD HH:mm') : 'Never',
+          'Active': u.is_active ? 'Yes' : 'No',
+        }));
+        filename = `users-${dayjs().format('YYYY-MM-DD')}`;
+        break;
+      }
+      
+      default:
+        return res.status(400).json({ success: false, error: 'Invalid report type' });
+    }
+    
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
+      return res.json(data);
+    }
+    
+    // CSV format
+    if (data.length === 0) {
+      return res.status(200).json({ success: true, data: [], message: 'No data for the selected period' });
+    }
+    
+    const headers = Object.keys(data[0]);
+    const csvRows = [
+      headers.join(','),
+      ...data.map(row => headers.map(h => {
+        const val = String(row[h] || '').replace(/"/g, '""');
+        return `"${val}"`;
+      }).join(',')),
+    ];
+    const csv = csvRows.join('\n');
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
+    return res.send(csv);
   } catch (error) {
     next(error);
   }

@@ -1,5 +1,6 @@
 import { getSupabase } from "../../../database/connection.js";
 import { emitToUnit } from "../../../socket/index.js";
+import { emailService } from "../../../services/email.service.js";
 import dayjs from 'dayjs';
 
 const TAX_RATE = 0.11; // 11% VAT in Lebanon
@@ -13,6 +14,7 @@ function generateOrderNumber(): string {
 export async function createOrder(data: {
   customerId?: string;
   customerName: string;
+  customerEmail?: string;
   customerPhone?: string;
   tableId?: string;
   orderType: 'dine_in' | 'takeaway' | 'delivery';
@@ -118,6 +120,32 @@ export async function createOrder(data: {
     orderType: order.order_type,
     totalAmount: order.total_amount,
   });
+
+  // Send order confirmation email if customer email is available
+  if (data.customerEmail) {
+    const formattedItems = orderItems.map((item) => {
+      const menuItem = itemMap.get(item.menu_item_id);
+      return {
+        name: menuItem?.name || 'Unknown Item',
+        quantity: item.quantity,
+        price: item.unit_price,
+        subtotal: item.subtotal,
+      };
+    });
+
+    emailService.sendOrderConfirmation({
+      customerEmail: data.customerEmail,
+      customerName: data.customerName,
+      orderNumber: order.order_number,
+      orderDate: dayjs(order.created_at).format('MMMM D, YYYY h:mm A'),
+      estimatedTime: dayjs(order.estimated_ready_time).format('h:mm A'),
+      items: formattedItems,
+      totalAmount: parseFloat(order.total_amount),
+    }).catch((err) => {
+      // Don't fail the order if email fails
+      console.warn('Failed to send order confirmation email:', err);
+    });
+  }
 
   return order;
 }

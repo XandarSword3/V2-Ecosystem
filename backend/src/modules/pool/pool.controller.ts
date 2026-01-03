@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
+import { emailService } from "../../services/email.service.js";
 import QRCode from 'qrcode';
 import { config } from "../../config/index.js";
 import dayjs from 'dayjs';
@@ -135,6 +136,7 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
       sessionId,
       ticketDate,
       customerName,
+      customerEmail,
       customerPhone,
       numberOfGuests,
       paymentMethod,
@@ -210,6 +212,22 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
       .single();
 
     if (ticketError) throw ticketError;
+
+    // Send ticket email with QR code
+    if (customerEmail) {
+      emailService.sendTicketWithQR({
+        customerEmail,
+        customerName,
+        ticketNumber: ticket.ticket_number,
+        sessionName: session.name,
+        ticketDate: dayjs(ticketDate).format('MMMM D, YYYY'),
+        sessionTime: `${session.start_time} - ${session.end_time}`,
+        numberOfGuests,
+        qrCodeDataUrl: qrCode,
+      }).catch((err) => {
+        console.warn('Failed to send ticket email:', err);
+      });
+    }
 
     res.status(201).json({ success: true, data: ticket });
   } catch (error) {
