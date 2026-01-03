@@ -27,11 +27,19 @@ import {
 interface PoolTicket {
   id: string;
   ticket_number: string;
-  status: 'pending' | 'active' | 'used' | 'expired' | 'cancelled';
-  ticket_type: 'adult' | 'child' | 'family' | 'vip';
-  valid_date: string;
+  status: 'pending' | 'active' | 'used' | 'expired' | 'cancelled' | 'valid';
+  ticket_type?: 'adult' | 'child' | 'family' | 'vip';
+  valid_date?: string;
+  ticket_date?: string;
   entry_time?: string;
   exit_time?: string;
+  number_of_guests?: number;
+  customer_name?: string;
+  customer_phone?: string;
+  total_amount?: number | string;
+  payment_status?: string;
+  payment_method?: string;
+  qr_code?: string;
   users?: {
     full_name: string;
     email: string;
@@ -41,6 +49,7 @@ interface PoolTicket {
 const statusConfig: Record<string, { color: string; icon: React.ElementType }> = {
   pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock },
   active: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
+  valid: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
   used: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: CheckCircle2 },
   expired: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle },
   cancelled: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: XCircle },
@@ -425,7 +434,7 @@ export default function StaffPoolPage() {
         <AnimatePresence mode="popLayout">
           {tickets.map((ticket, index) => {
             const config = statusConfig[ticket.status];
-            const typeConfig = ticketTypeConfig[ticket.ticket_type];
+            const typeConfig = ticket.ticket_type ? ticketTypeConfig[ticket.ticket_type] : undefined;
             const StatusIcon = config?.icon || Ticket;
             const isInPool = ticket.status === 'active' && ticket.entry_time && !ticket.exit_time;
 

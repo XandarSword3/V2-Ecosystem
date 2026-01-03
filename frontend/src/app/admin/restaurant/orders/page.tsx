@@ -24,10 +24,14 @@ import {
 
 interface OrderItem {
   id: string;
-  menu_item_id: string;
+  menu_item_id?: string;
   quantity: number;
-  unit_price: number;
+  unit_price?: number;
+  unitPrice?: number;
   notes?: string;
+  special_instructions?: string;
+  specialInstructions?: string;
+  name?: string;
   menu_items?: {
     name: string;
   };
@@ -36,15 +40,24 @@ interface OrderItem {
 interface Order {
   id: string;
   order_number: string;
+  orderNumber?: string;
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
   total_amount: number;
+  totalAmount?: number;
   table_number?: number;
+  tableNumber?: number;
   notes?: string;
   created_at: string;
+  createdAt?: string;
   order_items?: OrderItem[];
+  items?: OrderItem[];
   users?: {
     full_name: string;
   };
+  customer?: {
+    full_name: string;
+  };
+  customerName?: string;
 }
 
 const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
@@ -268,15 +281,15 @@ export default function AdminRestaurantOrdersPage() {
                           </div>
 
                           <div className="text-sm text-slate-600 dark:text-slate-300 space-y-1">
-                            {order.order_items?.slice(0, 3).map((item) => (
+                            {(order.items || order.order_items)?.slice(0, 3).map((item) => (
                               <p key={item.id}>
-                                {item.quantity}x {item.menu_items?.name || 'Item'}
-                                {item.notes && <span className="text-slate-400"> - {item.notes}</span>}
+                                {item.quantity}x {item.name || item.menu_items?.name || 'Item'}
+                                {(item.notes || item.specialInstructions || item.special_instructions) && <span className="text-slate-400"> - {item.notes || item.specialInstructions || item.special_instructions}</span>}
                               </p>
                             ))}
-                            {(order.order_items?.length || 0) > 3 && (
+                            {((order.items || order.order_items)?.length || 0) > 3 && (
                               <p className="text-xs text-slate-400 italic">
-                                + {(order.order_items?.length || 0) - 3} more items...
+                                + {((order.items || order.order_items)?.length || 0) - 3} more items...
                               </p>
                             )}
                           </div>
@@ -284,12 +297,12 @@ export default function AdminRestaurantOrdersPage() {
                           <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
                             <span className="flex items-center gap-1">
                               <Timer className="w-3 h-3" />
-                              {formatDate(order.created_at)}
+                              {formatDate(order.created_at || order.createdAt || new Date().toISOString())}
                             </span>
-                            {order.users && (
+                            {(order.users || order.customer || order.customerName) && (
                               <span className="flex items-center gap-1">
                                 <User className="w-3 h-3" />
-                                {order.users.full_name}
+                                {order.customerName || order.customer?.full_name || order.users?.full_name}
                               </span>
                             )}
                           </div>
@@ -369,11 +382,11 @@ export default function AdminRestaurantOrdersPage() {
                   <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                     <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Customer</h3>
                     <p className="font-medium text-slate-900 dark:text-white">
-                      {selectedOrder.users?.full_name || 'Guest'}
+                      {selectedOrder.customerName || selectedOrder.customer?.full_name || selectedOrder.users?.full_name || 'Guest'}
                     </p>
-                    {selectedOrder.table_number && (
+                    {(selectedOrder.table_number || selectedOrder.tableNumber) && (
                       <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
-                        Table {selectedOrder.table_number}
+                        Table {selectedOrder.table_number || selectedOrder.tableNumber}
                       </p>
                     )}
                   </div>
@@ -398,24 +411,28 @@ export default function AdminRestaurantOrdersPage() {
                 <div>
                   <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Order Items</h3>
                   <div className="space-y-3">
-                    {selectedOrder.order_items?.map((item) => (
-                      <div key={item.id} className="flex justify-between items-start p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 dark:text-white">{item.quantity}x</span>
-                            <span className="font-medium text-slate-900 dark:text-white">{item.menu_items?.name}</span>
+                    {(selectedOrder.items || selectedOrder.order_items)?.length === 0 ? (
+                      <p className="text-slate-500 dark:text-slate-400 italic">No items found</p>
+                    ) : (
+                      (selectedOrder.items || selectedOrder.order_items)?.map((item) => (
+                        <div key={item.id} className="flex justify-between items-start p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 dark:text-white">{item.quantity}x</span>
+                              <span className="font-medium text-slate-900 dark:text-white">{item.name || item.menu_items?.name || 'Unknown Item'}</span>
+                            </div>
+                            {(item.notes || item.specialInstructions || item.special_instructions) && (
+                              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 italic">
+                                Note: {item.notes || item.specialInstructions || item.special_instructions}
+                              </p>
+                            )}
                           </div>
-                          {item.notes && (
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 italic">
-                              Note: {item.notes}
-                            </p>
-                          )}
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            {formatCurrency((item.unitPrice || item.unit_price || 0) * item.quantity)}
+                          </p>
                         </div>
-                        <p className="font-medium text-slate-900 dark:text-white">
-                          {formatCurrency(item.unit_price * item.quantity)}
-                        </p>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
 

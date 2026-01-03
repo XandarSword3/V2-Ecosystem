@@ -33,9 +33,22 @@ interface ChaletBooking {
   check_in_date: string;
   check_out_date: string;
   total_amount: number;
-  guests: number;
+  guests?: number;
+  number_of_guests?: number;
+  number_of_nights?: number;
+  base_amount?: number;
+  add_ons_amount?: number;
+  discount_amount?: number;
+  deposit_amount?: number;
+  special_requests?: string;
   notes?: string;
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  payment_status?: string;
+  payment_method?: string;
   chalets?: {
+    id?: string;
     name: string;
     capacity: number;
   };
@@ -312,36 +325,36 @@ export default function StaffChaletsPage() {
                             </div>
                             <div>
                               <span className="text-slate-500 dark:text-slate-400">Check-in</span>
-                              <p className="font-medium text-slate-900 dark:text-white">{booking.check_in_date}</p>
+                              <p className="font-medium text-slate-900 dark:text-white">{new Date(booking.check_in_date).toLocaleDateString()}</p>
                             </div>
                             <div>
                               <span className="text-slate-500 dark:text-slate-400">Check-out</span>
-                              <p className="font-medium text-slate-900 dark:text-white">{booking.check_out_date}</p>
+                              <p className="font-medium text-slate-900 dark:text-white">{new Date(booking.check_out_date).toLocaleDateString()}</p>
                             </div>
                             <div>
                               <span className="text-slate-500 dark:text-slate-400">Guests</span>
                               <p className="font-medium text-slate-900 dark:text-white flex items-center gap-1">
                                 <Users className="w-4 h-4" />
-                                {booking.guests}
+                                {booking.number_of_guests || booking.guests || 1}
                               </p>
                             </div>
                           </div>
 
                           {/* Guest Info */}
-                          {booking.users && (
+                          {(booking.users || booking.customer_name) && (
                             <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
                               <p className="font-medium text-slate-900 dark:text-white">
-                                {booking.users.full_name}
+                                {booking.customer_name || booking.users?.full_name}
                               </p>
                               <div className="flex flex-wrap gap-4 mt-1 text-sm text-slate-500 dark:text-slate-400">
                                 <span className="flex items-center gap-1">
                                   <Mail className="w-4 h-4" />
-                                  {booking.users.email}
+                                  {booking.customer_email || booking.users?.email}
                                 </span>
-                                {booking.users.phone && (
+                                {(booking.customer_phone || booking.users?.phone) && (
                                   <span className="flex items-center gap-1">
                                     <Phone className="w-4 h-4" />
-                                    {booking.users.phone}
+                                    {booking.customer_phone || booking.users?.phone}
                                   </span>
                                 )}
                               </div>

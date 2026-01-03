@@ -26,14 +26,20 @@ import {
 interface PoolTicket {
   id: string;
   ticket_number: string;
-  ticket_type: 'adult' | 'child' | 'family' | 'vip';
-  price: number;
-  status: 'pending' | 'active' | 'used' | 'expired' | 'cancelled';
-  valid_date: string;
+  ticket_type?: 'adult' | 'child' | 'family' | 'vip';
+  price?: number;
+  total_amount?: number | string;
+  status: 'pending' | 'active' | 'used' | 'expired' | 'cancelled' | 'valid';
+  valid_date?: string;
+  ticket_date?: string;
   created_at: string;
   payment_status?: string;
   payment_method?: string;
   number_of_guests?: number;
+  customer_name?: string;
+  customer_phone?: string;
+  session_id?: string;
+  qr_code?: string;
   users?: {
     full_name: string;
     email: string;
@@ -44,6 +50,7 @@ interface PoolTicket {
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
   active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  valid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   used: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300',
   expired: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
   cancelled: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
@@ -96,13 +103,18 @@ export default function AdminPoolTicketsPage() {
     return true;
   });
 
+  // Helper to get ticket price
+  const getTicketPrice = (t: PoolTicket): number => {
+    if (t.price) return typeof t.price === 'number' ? t.price : parseFloat(String(t.price));
+    if (t.total_amount) return typeof t.total_amount === 'number' ? t.total_amount : parseFloat(String(t.total_amount));
+    return 0;
+  };
+
   const stats = {
     total: tickets.length,
-    active: tickets.filter((t) => t.status === 'active').length,
+    active: tickets.filter((t) => t.status === 'active' || t.status === 'valid').length,
     pending: tickets.filter((t) => t.status === 'pending').length,
-    todayRevenue: tickets
-      .filter((t) => t.valid_date === new Date().toISOString().split('T')[0])
-      .reduce((sum, t) => sum + t.price, 0),
+    todayRevenue: tickets.reduce((sum, t) => sum + getTicketPrice(t), 0),
   };
 
   if (loading) {
@@ -253,27 +265,33 @@ export default function AdminPoolTicketsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium text-white ${ticketTypeColors[ticket.ticket_type] || 'bg-slate-500'}`}>
-                          {(ticket.ticket_type || 'unknown').charAt(0).toUpperCase() + (ticket.ticket_type || 'unknown').slice(1)}
-                        </span>
+                        {ticket.ticket_type ? (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium text-white ${ticketTypeColors[ticket.ticket_type] || 'bg-slate-500'}`}>
+                            {ticket.ticket_type.charAt(0).toUpperCase() + ticket.ticket_type.slice(1)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 text-sm">
+                            {ticket.number_of_guests || 1} guest(s)
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div>
                           <p className="font-medium text-slate-900 dark:text-white">
-                            {ticket.users?.full_name || 'Guest'}
+                            {ticket.customer_name || ticket.users?.full_name || 'Guest'}
                           </p>
-                          <p className="text-sm text-slate-500">{ticket.users?.email}</p>
+                          <p className="text-sm text-slate-500">{ticket.customer_phone || ticket.users?.email}</p>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                        {ticket.valid_date}
+                        {ticket.ticket_date ? new Date(ticket.ticket_date).toLocaleDateString() : ticket.valid_date || 'N/A'}
                       </td>
                       <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                        {formatCurrency(ticket.price)}
+                        {formatCurrency(getTicketPrice(ticket))}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[ticket.status] || 'bg-slate-100 text-slate-800'}`}>
-                          {(ticket.status || 'unknown').charAt(0).toUpperCase() + (ticket.status || 'unknown').slice(1)}
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[ticket.status] || 'bg-green-100 text-green-800'}`}>
+                          {(ticket.status || 'valid').toUpperCase()}
                         </span>
                       </td>
                       <td className="px-6 py-4 flex items-center gap-2">
@@ -319,21 +337,21 @@ export default function AdminPoolTicketsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Status</p>
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[selectedTicket.status]}`}>
-                      {selectedTicket.status.toUpperCase()}
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[selectedTicket.status] || 'bg-green-100 text-green-800'}`}>
+                      {(selectedTicket.status || 'valid').toUpperCase()}
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500">Type</p>
-                    <p className="font-medium capitalize">{selectedTicket.ticket_type}</p>
+                    <p className="text-sm text-slate-500">Number of Guests</p>
+                    <p className="font-medium">{selectedTicket.number_of_guests || 1} guest(s)</p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Price</p>
-                    <p className="font-medium">{formatCurrency(selectedTicket.price)}</p>
+                    <p className="font-medium text-lg text-green-600">{formatCurrency(getTicketPrice(selectedTicket))}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500">Valid Date</p>
-                    <p className="font-medium">{selectedTicket.valid_date}</p>
+                    <p className="text-sm text-slate-500">Ticket Date</p>
+                    <p className="font-medium">{selectedTicket.ticket_date ? new Date(selectedTicket.ticket_date).toLocaleDateString() : selectedTicket.valid_date || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Created At</p>
@@ -341,11 +359,11 @@ export default function AdminPoolTicketsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Payment Status</p>
-                    <p className="font-medium capitalize">{selectedTicket.payment_status || 'N/A'}</p>
+                    <p className="font-medium capitalize">{selectedTicket.payment_status || 'pending'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Payment Method</p>
-                    <p className="font-medium capitalize">{selectedTicket.payment_method || 'N/A'}</p>
+                    <p className="font-medium capitalize">{selectedTicket.payment_method || 'cash'}</p>
                   </div>
                 </div>
                 
@@ -354,14 +372,24 @@ export default function AdminPoolTicketsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-slate-500">Name</p>
-                      <p className="font-medium">{selectedTicket.users?.full_name || 'Guest'}</p>
+                      <p className="font-medium">{selectedTicket.customer_name || selectedTicket.users?.full_name || 'Guest'}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">Email</p>
-                      <p className="font-medium">{selectedTicket.users?.email || 'N/A'}</p>
+                      <p className="text-sm text-slate-500">Phone / Email</p>
+                      <p className="font-medium">{selectedTicket.customer_phone || selectedTicket.users?.email || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
+
+                {/* QR Code if available */}
+                {selectedTicket.qr_code && (
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <h3 className="font-medium mb-2">QR Code</h3>
+                    <div className="flex justify-center">
+                      <img src={selectedTicket.qr_code} alt="Ticket QR Code" className="w-32 h-32" />
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
                 <Button onClick={() => setSelectedTicket(null)}>Close</Button>
