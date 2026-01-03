@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { modulesApi } from '@/lib/api';
 import { Loader2, Plus, Edit, Trash2, Check, X, AlertCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { Module } from '@/lib/settings-context';
 
 export default function ModulesPage() {
