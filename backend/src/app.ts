@@ -26,6 +26,11 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // CORS configuration - allow Vercel preview URLs and production domains
 const allowedOrigins = [
   'http://localhost:3000',
