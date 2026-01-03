@@ -226,13 +226,23 @@ async function seed() {
     // 10. Create pool sessions
     console.log('Creating pool sessions...');
     const sessions = [
-      { name: 'Morning Session', name_ar: 'جلسة صباحية', name_fr: 'Session Matinale', start_time: '09:00', end_time: '12:00', max_capacity: 50, price: 15.00 },
-      { name: 'Afternoon Session', name_ar: 'جلسة بعد الظهر', name_fr: 'Session Après-midi', start_time: '13:00', end_time: '17:00', max_capacity: 50, price: 20.00 },
-      { name: 'Evening Session', name_ar: 'جلسة مسائية', name_fr: 'Session du Soir', start_time: '18:00', end_time: '21:00', max_capacity: 40, price: 15.00 },
+      { name: 'Morning Session', start_time: '09:00', end_time: '12:00', max_capacity: 50, price: 15.00, is_active: true },
+      { name: 'Afternoon Session', start_time: '13:00', end_time: '17:00', max_capacity: 50, price: 20.00, is_active: true },
+      { name: 'Evening Session', start_time: '18:00', end_time: '21:00', max_capacity: 40, price: 15.00, is_active: true },
     ];
 
     for (const session of sessions) {
-      await supabase.from('pool_sessions').upsert(session, { onConflict: 'name' });
+      // Check if session already exists
+      const { data: existing } = await supabase
+        .from('pool_sessions')
+        .select('id')
+        .eq('name', session.name)
+        .single();
+      
+      if (!existing) {
+        const { error } = await supabase.from('pool_sessions').insert(session);
+        if (error) console.error(`  Error creating session ${session.name}:`, error.message);
+      }
     }
     console.log('  ✓ Pool sessions created\n');
 

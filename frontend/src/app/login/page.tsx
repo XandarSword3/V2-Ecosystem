@@ -20,12 +20,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [logs, setLogs] = useState<string[]>([]);
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      console.log('[LOGIN PAGE] Already authenticated, redirecting...');
       const roles = user.roles || [];
       if (roles.includes('super_admin') || roles.includes('admin')) {
         router.replace('/admin');
@@ -37,43 +35,27 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, user, router]);
 
-  const addLog = (message: string) => {
-    console.log('[LOGIN PAGE]', message);
-    setLogs(prev => [...prev, `${new Date().toISOString().split('T')[1].split('.')[0]} - ${message}`]);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLogs([]);
     setIsLoading(true);
-
-    addLog(`Starting login for: ${email}`);
 
     try {
       // Use auth context login which updates state immediately
       const userData = await login(email, password);
-      
-      addLog(`Login successful for user: ${userData.email}`);
-      addLog(`User roles: ${JSON.stringify(userData.roles)}`);
 
       // Determine redirect based on roles
       const roles = userData.roles || [];
-      addLog(`Determining redirect for roles: ${JSON.stringify(roles)}`);
 
       // Use replace instead of push for cleaner navigation
       if (roles.includes('super_admin') || roles.includes('admin')) {
-        addLog('Redirecting to /admin...');
         window.location.href = '/admin'; // Force full page navigation
       } else if (roles.some((r: string) => r.includes('staff') || r.includes('manager'))) {
-        addLog('Redirecting to /staff...');
         window.location.href = '/staff';
       } else {
-        addLog('Redirecting to /...');
         window.location.href = '/';
       }
     } catch (err: any) {
-      addLog(`ERROR: ${err.message}`);
       setError(err.message || 'Login failed. Please try again.');
       setIsLoading(false);
     }
@@ -192,16 +174,6 @@ export default function LoginPage() {
               <p><strong>Staff:</strong> restaurant.staff@v2resort.com / staff123</p>
             </div>
           </div>
-
-          {/* Debug Logs */}
-          {logs.length > 0 && (
-            <div className="mt-4 p-3 bg-slate-900 rounded-lg max-h-48 overflow-y-auto">
-              <p className="text-xs text-green-400 font-mono mb-2">Debug Logs:</p>
-              {logs.map((log, i) => (
-                <p key={i} className="text-xs text-slate-300 font-mono">{log}</p>
-              ))}
-            </div>
-          )}
 
           {/* Links */}
           <div className="mt-6 text-center">

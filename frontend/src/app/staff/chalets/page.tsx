@@ -98,7 +98,7 @@ export default function StaffChaletsPage() {
 
   const updateBookingStatus = async (bookingId: string, newStatus: string) => {
     try {
-      await api.put(`/chalets/bookings/${bookingId}/status`, { status: newStatus });
+      await api.patch(`/chalets/staff/bookings/${bookingId}/status`, { status: newStatus });
       setBookings((prev) =>
         prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus as ChaletBooking['status'] } : b))
       );
