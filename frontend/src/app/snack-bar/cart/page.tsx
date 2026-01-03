@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -33,6 +33,12 @@ export default function SnackCartPage() {
   const tCommon = useTranslations('common');
   const router = useRouter();
   const currency = useSettingsStore((s) => s.currency);
+
+  // Handle hydration - cart is empty on server, populated on client
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const snackItems = useCartStore((s) => s.snackItems);
   const addToSnack = useCartStore((s) => s.addToSnack);
@@ -86,6 +92,15 @@ export default function SnackCartPage() {
       })),
     });
   };
+
+  // Show loading state during hydration to prevent hydration mismatch
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+      </div>
+    );
+  }
 
   if (snackItems.length === 0) {
     return (
