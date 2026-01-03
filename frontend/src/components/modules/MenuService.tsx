@@ -28,8 +28,12 @@ export function MenuService({ module }: MenuServiceProps) {
   const restaurantItems = useCartStore((s) => s.restaurantItems);
   const addToRestaurant = useCartStore((s) => s.addToRestaurant);
   const removeFromRestaurant = useCartStore((s) => s.removeFromRestaurant);
-  const getRestaurantTotal = useCartStore((s) => s.getRestaurantTotal);
-  const getRestaurantCount = useCartStore((s) => s.getRestaurantCount());
+  
+  const snackItems = useCartStore((s) => s.snackItems);
+  const addToSnack = useCartStore((s) => s.addToSnack);
+  const removeFromSnack = useCartStore((s) => s.removeFromSnack);
+
+  const isSnackBar = module.slug === 'snack-bar';
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['menu', module.id],
@@ -44,21 +48,32 @@ export function MenuService({ module }: MenuServiceProps) {
     : items;
 
   const addToCart = (item: any) => {
-    addToRestaurant({
+    const cartItem = {
       id: item.id,
       name: item.name,
       price: item.price,
       moduleId: module.id, // Add module ID to cart item if needed for separation
-    });
+    };
+
+    if (isSnackBar) {
+      addToSnack(cartItem);
+    } else {
+      addToRestaurant(cartItem);
+    }
     toast.success(t('addedToCart', { name: translateContent(item, 'name') }));
   };
 
   const removeFromCart = (itemId: string) => {
-    removeFromRestaurant(itemId);
+    if (isSnackBar) {
+      removeFromSnack(itemId);
+    } else {
+      removeFromRestaurant(itemId);
+    }
   };
 
   const getItemQuantity = (itemId: string) => {
-    const item = restaurantItems.find((i) => i.id === itemId);
+    const items = isSnackBar ? snackItems : restaurantItems;
+    const item = items.find((i) => i.id === itemId);
     return item?.quantity || 0;
   };
 
