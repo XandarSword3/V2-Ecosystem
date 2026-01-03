@@ -23,6 +23,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useCartStore } from '@/lib/stores/cartStore';
 import { cn } from '@/lib/cn';
+import { useSiteSettings } from '@/lib/settings-context';
 
 export default function Header() {
   const pathname = usePathname();
@@ -30,6 +31,7 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
+  const { settings } = useSiteSettings();
   const restaurantCount = useCartStore((s) => s.getRestaurantCount());
   const snackCount = useCartStore((s) => s.getSnackCount());
   const totalCartCount = restaurantCount + snackCount;
@@ -81,10 +83,10 @@ export default function Header() {
               whileTap={{ scale: 0.95 }}
               className="bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-500 text-white font-bold text-xl px-3 py-1.5 rounded-xl shadow-lg shadow-blue-500/30"
             >
-              V2
+              {settings.resortName ? settings.resortName.substring(0, 2) : 'V2'}
             </motion.div>
             <span className="font-bold text-xl text-gray-900 dark:text-white hidden sm:inline group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-              Resort
+              {settings.resortName ? settings.resortName.substring(2) : 'Resort'}
             </span>
           </Link>
 
