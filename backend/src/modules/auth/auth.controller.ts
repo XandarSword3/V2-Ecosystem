@@ -18,11 +18,10 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     res.status(201).json({ success: true, data: result });
   } catch (error: any) {
     logger.error('Registration failed:', error.message);
-    // Return error details for debugging
+    // Only expose error details in development
     res.status(500).json({ 
       success: false, 
-      error: error.message,
-      stack: error.stack 
+      error: isProduction ? 'Registration failed. Please try again.' : error.message
     });
   }
 }

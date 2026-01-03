@@ -6,6 +6,8 @@ import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
 import { emailService } from "../../services/email.service.js";
 
+const isProduction = config.env === 'production';
+
 interface RegisterData {
   email: string;
   password: string;
@@ -118,18 +120,20 @@ export async function login(email: string, password: string, meta: SessionMeta) 
   }
 
   // Verify password
-  logger.info('[AUTH SERVICE] Step 2: Verifying password...');
-  logger.info('[AUTH SERVICE] Password hash from DB (first 20 chars):', user.password_hash?.substring(0, 20));
+  if (!isProduction) {
+    logger.info('[AUTH SERVICE] Step 2: Verifying password...');
+  }
   const isValid = await bcrypt.compare(password, user.password_hash);
-  logger.info('[AUTH SERVICE] Password valid:', isValid);
   
   if (!isValid) {
-    logger.error('[AUTH SERVICE] Invalid password for:', email);
+    logger.warn('[AUTH SERVICE] Invalid password attempt for:', email);
     throw new Error('Invalid credentials');
   }
 
   // Get user roles
-  logger.info('[AUTH SERVICE] Step 3: Getting user roles...');
+  if (!isProduction) {
+    logger.info('[AUTH SERVICE] Step 3: Getting user roles...');
+  }
   const { data: userRolesList, error: rolesError } = await supabase
     .from('user_roles')
     .select(`
@@ -143,19 +147,17 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     throw rolesError;
   }
 
-  logger.info('[AUTH SERVICE] Raw roles data:', JSON.stringify(userRolesList, null, 2));
-  
   const roleNames = (userRolesList || []).map((r: any) => r.roles?.name).filter(Boolean);
-  logger.info('[AUTH SERVICE] Extracted role names:', JSON.stringify(roleNames));
 
   // Generate tokens
-  logger.info('[AUTH SERVICE] Step 4: Generating tokens...');
+  if (!isProduction) {
+    logger.info('[AUTH SERVICE] Step 4: Generating tokens...');
+  }
   const tokens = generateTokens({
     userId: user.id,
     email: user.email,
     roles: roleNames,
   });
-  logger.info('[AUTH SERVICE] Tokens generated successfully');
 
   // Create session
   logger.info('[AUTH SERVICE] Step 5: Creating session...');

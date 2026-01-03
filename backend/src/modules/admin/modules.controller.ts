@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection";
 import { emitToAll } from "../../socket";
+import { clearModuleCache } from "../../middleware/moduleGuard.middleware";
+import { createModuleSchema, updateModuleSchema, validateBody } from "../../validation/schemas";
 
 export async function getModules(req: Request, res: Response, next: NextFunction) {
   try {
@@ -22,7 +24,7 @@ export async function getModules(req: Request, res: Response, next: NextFunction
 
     res.json({ success: true, data });
   } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message, stack: error.stack });
+    res.status(500).json({ success: false, error: 'Failed to fetch modules' });
   }
 }
 
@@ -59,19 +61,24 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
 
 export async function updateModule(req: Request, res: Response, next: NextFunction) {
   try {
+    // Validate input
+    const validatedData = validateBody(updateModuleSchema, req.body);
+    
     const supabase = getSupabase();
     const { id } = req.params;
-    const updates = req.body;
 
     const { data, error } = await supabase
       .from('modules')
-      .update(updates)
+      .update(validatedData)
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
 
+    // Clear module cache so changes take effect immediately
+    clearModuleCache(data.slug);
+    
     emitToAll('modules.updated', data);
 
     res.json({ success: true, data });

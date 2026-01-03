@@ -12,7 +12,7 @@ router.get('/add-ons', chaletController.getAddOns);
 
 // Customer booking routes
 router.post('/bookings', optionalAuth, chaletController.createBooking);
-router.get('/bookings/:id', chaletController.getBooking);
+router.get('/bookings/:id', optionalAuth, chaletController.getBooking);
 router.post('/bookings/:id/cancel', optionalAuth, chaletController.cancelBooking);
 
 // Authenticated customer routes

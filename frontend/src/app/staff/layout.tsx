@@ -92,12 +92,28 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Check authentication
+  // Check authentication AND staff roles
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login?redirect=/staff');
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push('/login?redirect=/staff');
+      } else if (user) {
+        // Verify user has at least one staff role
+        const staffRoles = [
+          'super_admin', 'admin',
+          'restaurant_staff', 'restaurant_admin',
+          'chalet_staff', 'chalet_admin',
+          'pool_staff', 'pool_admin',
+          'snack_bar_staff', 'snack_bar_admin'
+        ];
+        const hasStaffRole = user.roles?.some(role => staffRoles.includes(role));
+        if (!hasStaffRole) {
+          toast.error('Access denied. Staff privileges required.');
+          router.push('/');
+        }
+      }
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, router, user]);
 
   const handleLogout = async () => {
     await logout();

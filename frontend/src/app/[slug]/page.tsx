@@ -6,13 +6,31 @@ import { useSiteSettings } from '@/lib/settings-context';
 import { MenuService } from '@/components/modules/MenuService';
 import { BookingService } from '@/components/modules/BookingService';
 import { SessionService } from '@/components/modules/SessionService';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle, Home } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function ModulePage() {
   const params = useParams();
   const router = useRouter();
   const { modules, loading: isLoading } = useSiteSettings();
   const [slug, setSlug] = useState<string>('');
+  const [allModules, setAllModules] = useState<any[]>([]);
+
+  // Fetch all modules (including inactive) to check if module exists but is disabled
+  useEffect(() => {
+    const fetchAllModules = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/modules`);
+        if (response.ok) {
+          const data = await response.json();
+          setAllModules(data.data || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch all modules:', error);
+      }
+    };
+    fetchAllModules();
+  }, []);
 
   useEffect(() => {
     if (params?.slug) {
@@ -28,20 +46,65 @@ export default function ModulePage() {
     );
   }
 
+  // Check if module is active
   const currentModule = modules.find((m) => m.slug === slug);
+  
+  // Check if module exists but is disabled
+  const disabledModule = !currentModule && allModules.find((m) => m.slug === slug && !m.is_active);
+
+  if (disabledModule) {
+    // Module exists but is disabled - show friendly message
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center max-w-md"
+        >
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+            <AlertCircle className="w-10 h-10 text-amber-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-3">
+            Feature Currently Unavailable
+          </h1>
+          <p className="text-slate-400 mb-6">
+            The {disabledModule.name} service is temporarily unavailable. 
+            Please check back later or contact us for more information.
+          </p>
+          <button 
+            onClick={() => router.push('/')}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Home className="w-5 h-5" />
+            Return Home
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (!currentModule) {
-    // If module not found, it might be a 404 or we are still syncing
-    // For now, let's show a simple not found or redirect
+    // Module not found at all - 404
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <h1 className="text-2xl font-bold mb-4">Page Not Found</h1>
-        <button 
-          onClick={() => router.push('/')}
-          className="text-primary-600 hover:underline"
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center max-w-md"
         >
-          Return Home
-        </button>
+          <h1 className="text-6xl font-bold text-white mb-4">404</h1>
+          <h2 className="text-2xl font-semibold text-slate-300 mb-3">Page Not Found</h2>
+          <p className="text-slate-400 mb-6">
+            The page you&apos;re looking for doesn&apos;t exist or has been moved.
+          </p>
+          <button 
+            onClick={() => router.push('/')}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Home className="w-5 h-5" />
+            Return Home
+          </button>
+        </motion.div>
       </div>
     );
   }

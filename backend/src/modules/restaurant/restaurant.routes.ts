@@ -52,7 +52,7 @@ const adminRoles = ['restaurant_admin', 'super_admin'];
 
 // Moved parameterized routes to end
 router.get('/orders/:id', optionalAuth, orderController.getOrder);
-router.get('/orders/:id/status', orderController.getOrderStatus);
+router.get('/orders/:id/status', optionalAuth, orderController.getOrderStatus);
 
 // Categories
 router.post('/admin/categories', authenticate, authorize(...adminRoles), menuController.createCategory);

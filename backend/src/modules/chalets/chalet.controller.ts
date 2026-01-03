@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
 import { emailService } from "../../services/email.service.js";
+import { createChaletBookingSchema, validateBody, uuidSchema } from "../../validation/schemas.js";
 import dayjs from 'dayjs';
 
 function generateBookingNumber(): string {
@@ -118,6 +119,9 @@ export async function getAddOns(req: Request, res: Response, next: NextFunction)
 
 export async function createBooking(req: Request, res: Response, next: NextFunction) {
   try {
+    // Validate input
+    const validatedData = validateBody(createChaletBookingSchema, req.body);
+    
     const supabase = getSupabase();
     const {
       chaletId,
@@ -130,7 +134,7 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
       addOns: selectedAddOns,
       specialRequests,
       paymentMethod,
-    } = req.body;
+    } = validatedData;
 
     // Get chalet
     const { data: chalet, error: chaletError } = await supabase

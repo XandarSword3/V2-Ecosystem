@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
 import { emitToAll } from "../../socket/index";
+import { createUserSchema, validateBody, validatePagination } from "../../validation/schemas.js";
 import dayjs from 'dayjs';
 
 // ============================================
@@ -279,12 +280,11 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
 
 export async function createUser(req: Request, res: Response, next: NextFunction) {
   try {
-    const supabase = getSupabase();
-    const { email, password, full_name, phone, roles = ['customer'] } = req.body;
+    // Validate input with strong password requirements
+    const validatedData = validateBody(createUserSchema, req.body);
+    const { email, password, full_name, phone, roles } = validatedData;
     
-    if (!email || !password || !full_name) {
-      return res.status(400).json({ success: false, error: 'Email, password, and full name are required' });
-    }
+    const supabase = getSupabase();
     
     // Check if email already exists
     const { data: existing } = await supabase
@@ -317,12 +317,13 @@ export async function createUser(req: Request, res: Response, next: NextFunction
     
     if (userError) throw userError;
     
-    // Assign roles
-    if (roles.length > 0) {
+    // Assign roles - roles has default value from schema so is guaranteed to exist
+    const rolesToAssign = roles || ['customer'];
+    if (rolesToAssign.length > 0) {
       const { data: roleRecords } = await supabase
         .from('roles')
         .select('id, name')
-        .in('name', roles);
+        .in('name', rolesToAssign);
       
       if (roleRecords && roleRecords.length > 0) {
         const roleInserts = roleRecords.map(role => ({
