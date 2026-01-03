@@ -130,11 +130,11 @@ export const poolApi = {
 
 // Modules API
 export const modulesApi = {
-  getAll: (activeOnly = false) => api.get(`/modules${activeOnly ? '?activeOnly=true' : ''}`),
-  getById: (id: string) => api.get(`/modules/${id}`),
-  create: (data: any) => api.post('/modules', data),
-  update: (id: string, data: any) => api.put(`/modules/${id}`, data),
-  delete: (id: string) => api.delete(`/modules/${id}`),
+  getAll: (activeOnly = false) => api.get(`/admin/modules${activeOnly ? '?activeOnly=true' : ''}`),
+  getById: (id: string) => api.get(`/admin/modules/${id}`),
+  create: (data: any) => api.post('/admin/modules', data),
+  update: (id: string, data: any) => api.put(`/admin/modules/${id}`, data),
+  delete: (id: string) => api.delete(`/admin/modules/${id}`),
 };
 
 // Payments API
