@@ -4,9 +4,11 @@ import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { XCircle, Home, UtensilsCrossed, Waves, RefreshCw, AlertTriangle, Clock, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useSiteSettings } from '@/lib/settings-context';
 
 export default function CancellationPage() {
   const t = useTranslations('legal.cancellation');
+  const { settings } = useSiteSettings();
 
   const sections = [
     { key: 'general', icon: AlertTriangle },
@@ -55,32 +57,44 @@ export default function CancellationPage() {
       {/* Content */}
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto space-y-8">
-          {sections.map((section, index) => {
-            const Icon = section.icon;
-            return (
-              <motion.div
-                key={section.key}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-white/10 hover:border-amber-500/30 transition-colors"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-amber-500/10 rounded-xl shrink-0">
-                    <Icon className="w-6 h-6 text-amber-500" />
+          {settings.refundPolicy ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-white/10"
+            >
+              <div className="prose prose-invert max-w-none whitespace-pre-wrap text-gray-300">
+                {settings.refundPolicy}
+              </div>
+            </motion.div>
+          ) : (
+            sections.map((section, index) => {
+              const Icon = section.icon;
+              return (
+                <motion.div
+                  key={section.key}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-white/10 hover:border-amber-500/30 transition-colors"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-amber-500/10 rounded-xl shrink-0">
+                      <Icon className="w-6 h-6 text-amber-500" />
+                    </div>
+                    <div className="space-y-3">
+                      <h2 className="text-2xl font-semibold text-white">
+                        {t(`${section.key}.title`)}
+                      </h2>
+                      <p className="text-gray-300 leading-relaxed whitespace-pre-line">
+                        {t(`${section.key}.content`)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-3">
-                    <h2 className="text-2xl font-semibold text-white">
-                      {t(`${section.key}.title`)}
-                    </h2>
-                    <p className="text-gray-300 leading-relaxed whitespace-pre-line">
-                      {t(`${section.key}.content`)}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+                </motion.div>
+              );
+            })
+          )}
 
           {/* Contact Section */}
           <motion.div

@@ -500,12 +500,12 @@ export default function HomePage() {
                   transition={{ duration: 0.5 }}
                   className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center"
                 >
-                  <span className="text-white font-bold text-xl">V2</span>
+                  <span className="text-white font-bold text-xl">{settings.resortName ? settings.resortName.substring(0, 2) : 'V2'}</span>
                 </motion.div>
-                <span className="text-xl font-semibold">{tNav('home').replace('Home', 'Resort')}</span>
+                <span className="text-xl font-semibold">{settings.resortName ? settings.resortName.substring(2) : 'Resort'}</span>
               </div>
               <p className="text-slate-400">
-                {tFooter('description')}
+                {settings.description || tFooter('description')}
               </p>
             </motion.div>
 
