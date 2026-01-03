@@ -10,6 +10,7 @@ import { snackApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { useCartStore } from '@/lib/stores/cartStore';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { Loader2, Cookie, ShoppingCart, AlertCircle, Plus, Minus, Sparkles, UtensilsCrossed } from 'lucide-react';
 import { toast } from 'sonner';
@@ -67,6 +68,7 @@ export default function SnackBarPage() {
   const tCommon = useTranslations('common');
   const router = useRouter();
   const { translateContent } = useContentTranslation();
+  const { settings } = useSiteSettings();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const currency = useSettingsStore((s) => s.currency);
 
@@ -216,7 +218,7 @@ export default function SnackBarPage() {
             </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
-              {t('title')}
+              {settings.snackBarName || t('title')}
             </h1>
             <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
               {t('subtitle')}

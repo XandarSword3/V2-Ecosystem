@@ -94,6 +94,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: t('nav.users'), href: '/admin/users', icon: Users },
     { name: t('nav.reviews') || 'Reviews', href: '/admin/reviews', icon: Star },
     { name: t('nav.reports'), href: '/admin/reports', icon: BarChart3 },
+    { name: 'Modules', href: '/admin/modules', icon: Cloud },
     { 
       name: t('nav.settings'), 
       href: '/admin/settings', 

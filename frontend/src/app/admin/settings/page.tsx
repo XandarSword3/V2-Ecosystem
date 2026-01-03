@@ -24,6 +24,9 @@ import { Button } from '@/components/ui/Button';
 interface SiteSettings {
   // Resort Info
   resortName: string;
+  restaurantName: string;
+  snackBarName: string;
+  poolName: string;
   tagline: string;
   description: string;
   
@@ -57,6 +60,9 @@ interface SiteSettings {
 
 const defaultSettings: SiteSettings = {
   resortName: 'V2 Resort',
+  restaurantName: 'V2 Restaurant',
+  snackBarName: 'V2 Snack Bar',
+  poolName: 'V2 Pool',
   tagline: "Lebanon's Premier Resort Experience",
   description: 'Your premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences in the heart of Lebanon.',
   phone: '+961 XX XXX XXX',
@@ -143,6 +149,32 @@ export default function AdminSettingsPage() {
                 onChange={(e) => setSettings({ ...settings, resortName: e.target.value })}
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Restaurant Name
+                </label>
+                <input
+                  type="text"
+                  value={settings.restaurantName}
+                  onChange={(e) => setSettings({ ...settings, restaurantName: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Snack Bar Name
+                </label>
+                <input
+                  type="text"
+                  value={settings.snackBarName}
+                  onChange={(e) => setSettings({ ...settings, snackBarName: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
             </div>
             
             <div>
@@ -318,6 +350,18 @@ export default function AdminSettingsPage() {
       case 'pool':
         return (
           <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Pool Name
+              </label>
+              <input
+                type="text"
+                value={settings.poolName}
+                onChange={(e) => setSettings({ ...settings, poolName: e.target.value })}
+                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">

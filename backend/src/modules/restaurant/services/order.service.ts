@@ -188,7 +188,22 @@ export async function getOrders(filters: { status?: string; date?: string }) {
   
   let query = supabase
     .from('restaurant_orders')
-    .select('*')
+    .select(`
+      *,
+      order_items:restaurant_order_items (
+        id,
+        quantity,
+        unit_price,
+        special_instructions,
+        menu_items (
+          id,
+          name
+        )
+      ),
+      users (
+        full_name
+      )
+    `)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
@@ -219,7 +234,22 @@ export async function getLiveOrders() {
   
   const { data, error } = await supabase
     .from('restaurant_orders')
-    .select('*')
+    .select(`
+      *,
+      order_items:restaurant_order_items (
+        id,
+        quantity,
+        unit_price,
+        special_instructions,
+        menu_items (
+          id,
+          name
+        )
+      ),
+      users (
+        full_name
+      )
+    `)
     .in('status', activeStatuses)
     .order('created_at', { ascending: true });
 

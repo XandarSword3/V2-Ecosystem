@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { poolApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { useAuth } from '@/lib/auth-context';
 import { Loader2, Waves, Users, Clock, Calendar, AlertCircle, Ticket, Droplets, Sun, Umbrella, QrCode, ChevronRight } from 'lucide-react';
@@ -66,6 +67,7 @@ export default function PoolPage() {
   const tCommon = useTranslations('common');
   const router = useRouter();
   const { user } = useAuth();
+  const { settings } = useSiteSettings();
   const currency = useSettingsStore((s) => s.currency);
   const { translateContent } = useContentTranslation();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -177,7 +179,7 @@ export default function PoolPage() {
             <div className="flex items-center justify-center mb-4">
               <Waves className="w-12 h-12 mr-3" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">{t('title')}</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">{settings.poolName || t('title')}</h1>
             <p className="text-lg md:text-xl opacity-90 max-w-2xl mx-auto">{t('subtitle')}</p>
           </motion.div>
         </div>

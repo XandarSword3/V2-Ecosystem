@@ -1,19 +1,25 @@
 import { getSupabase } from "../../../database/connection.js";
 
-export async function getAllCategories() {
+export async function getAllCategories(moduleId?: string) {
   const supabase = getSupabase();
-  const { data, error } = await supabase
+  let query = supabase
     .from('menu_categories')
     .select('*')
     .eq('is_active', true)
     .is('deleted_at', null)
     .order('display_order', { ascending: true });
 
+  if (moduleId) {
+    query = query.eq('module_id', moduleId);
+  }
+
+  const { data, error } = await query;
+
   if (error) throw error;
   return data || [];
 }
 
-export async function getMenuItems(filters: { categoryId?: string; availableOnly?: boolean }) {
+export async function getMenuItems(filters: { categoryId?: string; availableOnly?: boolean; moduleId?: string }) {
   const supabase = getSupabase();
   
   let query = supabase
@@ -30,6 +36,9 @@ export async function getMenuItems(filters: { categoryId?: string; availableOnly
   }
   if (filters.availableOnly) {
     query = query.eq('is_available', true);
+  }
+  if (filters.moduleId) {
+    query = query.eq('module_id', filters.moduleId);
   }
 
   const { data, error } = await query;
@@ -70,6 +79,7 @@ export async function createCategory(data: {
   description?: string;
   displayOrder?: number;
   imageUrl?: string;
+  moduleId?: string;
 }) {
   const supabase = getSupabase();
   const { data: category, error } = await supabase
@@ -81,6 +91,7 @@ export async function createCategory(data: {
       description: data.description,
       display_order: data.displayOrder || 0,
       image_url: data.imageUrl,
+      module_id: data.moduleId,
     })
     .select()
     .single();
