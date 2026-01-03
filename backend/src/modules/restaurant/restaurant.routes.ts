@@ -65,6 +65,11 @@ router.put('/admin/items/:id', authenticate, authorize(...adminRoles), menuContr
 router.delete('/admin/items/:id', authenticate, authorize(...adminRoles), menuController.deleteMenuItem);
 router.patch('/admin/items/:id/availability', authenticate, authorize(...adminRoles), menuController.toggleAvailability);
 
+// Admin Orders (for admin dashboard)
+router.get('/admin/orders', authenticate, authorize(...adminRoles), orderController.getStaffOrders);
+router.put('/admin/orders/:id/status', authenticate, authorize(...adminRoles), orderController.updateOrderStatus);
+router.patch('/admin/orders/:id/status', authenticate, authorize(...adminRoles), orderController.updateOrderStatus);
+
 // Tables
 router.post('/admin/tables', authenticate, authorize(...adminRoles), tableController.createTable);
 router.delete('/admin/tables/:id', authenticate, authorize(...adminRoles), tableController.deleteTable);
