@@ -8,8 +8,8 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       customerId: req.user?.userId,
     });
     res.status(201).json({ success: true, data: order });
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message, stack: error.stack });
   }
 }
 

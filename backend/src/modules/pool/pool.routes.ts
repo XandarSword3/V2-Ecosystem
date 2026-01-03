@@ -17,7 +17,7 @@ router.get('/tickets/:id', poolController.getTicket);
 router.get('/my-tickets', authenticate, poolController.getMyTickets);
 
 // Staff routes
-const staffRoles = ['pool_staff', 'pool_admin', 'super_admin'];
+const staffRoles = ['staff', 'pool_staff', 'pool_admin', 'super_admin'];
 router.post('/staff/validate', authenticate, authorize(...staffRoles), poolController.validateTicket);
 router.get('/staff/capacity', authenticate, authorize(...staffRoles), poolController.getCurrentCapacity);
 router.get('/staff/tickets/today', authenticate, authorize(...staffRoles), poolController.getTodayTickets);
