@@ -6,7 +6,7 @@ import { forwardRef, ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
-type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
+type ButtonSize = 'sm' | 'md' | 'lg' | 'xl' | 'icon';
 
 interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
   children: ReactNode;
@@ -61,6 +61,7 @@ const sizeStyles: Record<ButtonSize, string> = {
   md: 'px-4 py-2 text-sm gap-2 rounded-lg',
   lg: 'px-6 py-3 text-base gap-2.5 rounded-xl',
   xl: 'px-8 py-4 text-lg gap-3 rounded-xl',
+  icon: 'h-10 w-10 p-2 rounded-lg flex items-center justify-center',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(

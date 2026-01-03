@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import api from '@/lib/api';
+import { toast } from 'sonner';
 import { 
   Settings,
   Save,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 interface SiteSettings {
   // Resort Info
@@ -90,7 +92,6 @@ export default function AdminSettingsPage() {
   
   const [settings, setSettings] = useState<SiteSettings>(defaultSettings);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'hours' | 'chalets' | 'pool' | 'legal'>('general');
 
   useEffect(() => {
@@ -106,22 +107,20 @@ export default function AdminSettingsPage() {
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
-      // Use default settings if API fails
+      toast.error('Failed to load settings');
     }
   };
 
   const handleSave = async () => {
     setIsSaving(true);
-    setSaveMessage(null);
     
     try {
       await api.put('/admin/settings', settings);
-      setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
+      toast.success('Settings saved successfully!');
     } catch (error) {
-      setSaveMessage({ type: 'error', text: 'Failed to save settings. Please try again.' });
+      toast.error('Failed to save settings. Please try again.');
     } finally {
       setIsSaving(false);
-      setTimeout(() => setSaveMessage(null), 3000);
     }
   };
 
@@ -143,11 +142,9 @@ export default function AdminSettingsPage() {
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Resort Name
               </label>
-              <input
-                type="text"
+              <Input
                 value={settings.resortName}
                 onChange={(e) => setSettings({ ...settings, resortName: e.target.value })}
-                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
 
@@ -156,11 +153,9 @@ export default function AdminSettingsPage() {
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Restaurant Name
                 </label>
-                <input
-                  type="text"
+                <Input
                   value={settings.restaurantName}
                   onChange={(e) => setSettings({ ...settings, restaurantName: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
               
@@ -168,11 +163,9 @@ export default function AdminSettingsPage() {
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Snack Bar Name
                 </label>
-                <input
-                  type="text"
+                <Input
                   value={settings.snackBarName}
                   onChange={(e) => setSettings({ ...settings, snackBarName: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -181,11 +174,9 @@ export default function AdminSettingsPage() {
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Tagline
               </label>
-              <input
-                type="text"
+              <Input
                 value={settings.tagline}
                 onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
-                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
             
@@ -487,25 +478,6 @@ export default function AdminSettingsPage() {
             {isSaving ? 'Saving...' : tCommon('save')}
           </Button>
         </div>
-        
-        {saveMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`mt-4 p-4 rounded-xl flex items-center gap-2 ${
-              saveMessage.type === 'success' 
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' 
-                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-            }`}
-          >
-            {saveMessage.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5" />
-            ) : (
-              <AlertCircle className="w-5 h-5" />
-            )}
-            {saveMessage.text}
-          </motion.div>
-        )}
       </motion.div>
 
       {/* Tabs */}
