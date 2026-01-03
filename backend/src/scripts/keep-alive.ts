@@ -16,5 +16,5 @@ async function ping() {
 // Run immediately
 ping();
 
-// Run every 14 minutes (Render spins down after 15 mins of inactivity)
-setInterval(ping, 14 * 60 * 1000);
+// Run every 30 seconds as requested
+setInterval(ping, 30 * 1000);
