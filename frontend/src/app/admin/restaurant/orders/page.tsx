@@ -61,6 +61,7 @@ export default function AdminRestaurantOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { socket } = useSocket();
 
   const fetchOrders = useCallback(async () => {
@@ -244,7 +245,10 @@ export default function AdminRestaurantOrdersPage() {
                   transition={{ delay: index * 0.03 }}
                   layout
                 >
-                  <Card>
+                  <Card 
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => setSelectedOrder(order)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                         <div className="flex-1">
@@ -264,12 +268,17 @@ export default function AdminRestaurantOrdersPage() {
                           </div>
 
                           <div className="text-sm text-slate-600 dark:text-slate-300 space-y-1">
-                            {order.order_items?.map((item) => (
+                            {order.order_items?.slice(0, 3).map((item) => (
                               <p key={item.id}>
                                 {item.quantity}x {item.menu_items?.name || 'Item'}
                                 {item.notes && <span className="text-slate-400"> - {item.notes}</span>}
                               </p>
                             ))}
+                            {(order.order_items?.length || 0) > 3 && (
+                              <p className="text-xs text-slate-400 italic">
+                                + {(order.order_items?.length || 0) - 3} more items...
+                              </p>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
@@ -290,7 +299,7 @@ export default function AdminRestaurantOrdersPage() {
                           <p className="text-xl font-bold text-slate-900 dark:text-white">
                             {formatCurrency(order.total_amount)}
                           </p>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                             {order.status === 'pending' && (
                               <Button size="sm" onClick={() => updateOrderStatus(order.id, 'confirmed')}>
                                 Confirm
@@ -322,6 +331,140 @@ export default function AdminRestaurantOrdersPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Order Details Modal */}
+      <AnimatePresence>
+        {selectedOrder && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setSelectedOrder(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                    Order #{selectedOrder.order_number}
+                  </h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {formatDate(selectedOrder.created_at)}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedOrder(null)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+                >
+                  <XCircle className="w-6 h-6 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                {/* Customer Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Customer</h3>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {selectedOrder.users?.full_name || 'Guest'}
+                    </p>
+                    {selectedOrder.table_number && (
+                      <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+                        Table {selectedOrder.table_number}
+                      </p>
+                    )}
+                  </div>
+                  <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Status</h3>
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const config = statusConfig[selectedOrder.status];
+                        const StatusIcon = config?.icon || Clock;
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-medium ${config?.color}`}>
+                            <StatusIcon className="w-4 h-4" />
+                            {config?.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Items */}
+                <div>
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Order Items</h3>
+                  <div className="space-y-3">
+                    {selectedOrder.order_items?.map((item) => (
+                      <div key={item.id} className="flex justify-between items-start p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 dark:text-white">{item.quantity}x</span>
+                            <span className="font-medium text-slate-900 dark:text-white">{item.menu_items?.name}</span>
+                          </div>
+                          {item.notes && (
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 italic">
+                              Note: {item.notes}
+                            </p>
+                          )}
+                        </div>
+                        <p className="font-medium text-slate-900 dark:text-white">
+                          {formatCurrency(item.unit_price * item.quantity)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {selectedOrder.notes && (
+                  <div>
+                    <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Order Notes</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border border-yellow-100 dark:border-yellow-900/30">
+                      {selectedOrder.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-lg font-semibold text-slate-900 dark:text-white">Total Amount</span>
+                  <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                    {formatCurrency(selectedOrder.total_amount)}
+                  </span>
+                </div>
+                
+                <div className="flex justify-end gap-3">
+                  {selectedOrder.status === 'pending' && (
+                    <Button onClick={() => { updateOrderStatus(selectedOrder.id, 'confirmed'); setSelectedOrder(null); }}>
+                      Confirm Order
+                    </Button>
+                  )}
+                  {selectedOrder.status === 'confirmed' && (
+                    <Button onClick={() => { updateOrderStatus(selectedOrder.id, 'preparing'); setSelectedOrder(null); }}>
+                      Start Preparing
+                    </Button>
+                  )}
+                  {selectedOrder.status === 'preparing' && (
+                    <Button onClick={() => { updateOrderStatus(selectedOrder.id, 'ready'); setSelectedOrder(null); }}>
+                      Mark Ready
+                    </Button>
+                  )}
+                  {selectedOrder.status === 'ready' && (
+                    <Button onClick={() => { updateOrderStatus(selectedOrder.id, 'delivered'); setSelectedOrder(null); }}>
+                      Mark Delivered
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

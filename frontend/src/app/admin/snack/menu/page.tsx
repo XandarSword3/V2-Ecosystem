@@ -43,15 +43,17 @@ interface SnackItem {
 }
 
 const categories = [
-  { id: 'drinks', label: 'Drinks', icon: Coffee },
+  { id: 'drink', label: 'Drinks', icon: Coffee },
   { id: 'ice_cream', label: 'Ice Cream', icon: IceCream },
-  { id: 'sandwiches', label: 'Sandwiches', icon: Sandwich },
-  { id: 'snacks', label: 'Snacks', icon: Pizza },
+  { id: 'sandwich', label: 'Sandwiches', icon: Sandwich },
+  { id: 'snack', label: 'Snacks', icon: Pizza },
   { id: 'other', label: 'Other', icon: Cookie },
 ];
 
 const getCategoryIcon = (category: string) => {
-  const found = categories.find(c => c.id === category);
+  // Handle both singular and plural forms just in case
+  const normalizedCategory = category.endsWith('s') && category !== 'snacks' ? category.slice(0, -1) : category;
+  const found = categories.find(c => c.id === category || c.id === normalizedCategory);
   return found ? found.icon : Cookie;
 };
 
