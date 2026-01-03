@@ -87,8 +87,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${apiUrl}/settings`);
+      // Ensure we have the correct API URL with /api prefix
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiUrl = baseUrl.replace(/\/api\/?$/, ''); // Remove trailing /api if present
+      const response = await fetch(`${apiUrl}/api/settings`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch settings');
