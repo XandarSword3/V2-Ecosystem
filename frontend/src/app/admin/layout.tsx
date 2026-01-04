@@ -113,7 +113,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   // Inject dynamic modules
   if (modules && modules.length > 0) {
-    const dynamicModules = modules.filter(m => m.is_active).map(module => {
+    const dynamicModules = modules
+      .filter(m => m.is_active)
+      // Filter out core modules that are already hardcoded in the navigation
+      .filter(m => !['restaurant', 'chalets', 'pool', 'snack-bar', 'snack'].includes(m.slug))
+      .map(module => {
       let children: { name: string; href: string }[] = [];
       let icon = Cloud;
 
