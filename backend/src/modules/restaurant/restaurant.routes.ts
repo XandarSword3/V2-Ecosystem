@@ -33,7 +33,14 @@ router.get('/my-orders', authenticate, orderController.getMyOrders);
 // ============================================
 // Staff Routes
 // ============================================
-const staffRoles = ['staff', 'restaurant_staff', 'restaurant_admin', 'super_admin'];
+const staffRoles = [
+  'staff', 
+  'restaurant_staff', 'restaurant_admin', 
+  'snack_bar_staff', 'snack_bar_admin',
+  'chalet_staff', 'chalet_admin',
+  'pool_staff', 'pool_admin',
+  'super_admin'
+];
 
 router.get('/staff/orders', authenticate, authorize(...staffRoles), orderController.getStaffOrders);
 router.patch('/staff/orders/:id/status', authenticate, authorize(...staffRoles), orderController.updateOrderStatus);
@@ -46,7 +53,14 @@ router.patch('/staff/tables/:id', authenticate, authorize(...staffRoles), tableC
 // ============================================
 // Admin Routes (Menu Management)
 // ============================================
-const adminRoles = ['restaurant_admin', 'super_admin'];
+const adminRoles = [
+  'restaurant_admin', 
+  'snack_bar_admin',
+  'chalet_admin',
+  'pool_admin',
+  'admin',
+  'super_admin'
+];
 
 // ... (Admin routes would go here if I had them in context, but I'll just append the moved routes at the end of the file)
 

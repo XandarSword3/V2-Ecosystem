@@ -211,7 +211,7 @@ export async function getOrdersByCustomer(customerId: string) {
   return data || [];
 }
 
-export async function getOrders(filters: { status?: string; date?: string }) {
+export async function getOrders(filters: { status?: string; date?: string; moduleId?: string }) {
   const supabase = getSupabase();
   
   let query = supabase
@@ -225,7 +225,8 @@ export async function getOrders(filters: { status?: string; date?: string }) {
         special_instructions,
         menu_items (
           id,
-          name
+          name,
+          module_id
         )
       ),
       customer:users!customer_id (
@@ -253,7 +254,20 @@ export async function getOrders(filters: { status?: string; date?: string }) {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data || [];
+
+  let orders = data || [];
+
+  // Filter by moduleId if provided
+  if (filters.moduleId) {
+    orders = orders.filter(order => {
+      // Check if any item in the order belongs to the module
+      // Note: This assumes an order only contains items from one module.
+      // If mixed, this will include the order if AT LEAST ONE item is from the module.
+      return order.order_items?.some((item: any) => item.menu_items?.module_id === filters.moduleId);
+    });
+  }
+
+  return orders;
 }
 
 export async function getLiveOrders() {

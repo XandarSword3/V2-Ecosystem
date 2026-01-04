@@ -25,6 +25,7 @@ import {
   CheckCircle,
   AlertCircle,
 } from 'lucide-react';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface StaffLayoutProps {
@@ -43,6 +44,21 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
   const router = useRouter();
   const t = useTranslations('staff');
   const tAdmin = useTranslations('admin');
+  const [modules, setModules] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchModules = async () => {
+      try {
+        const response = await api.get('/admin/modules');
+        if (response.data.success) {
+          setModules(response.data.data.filter((m: any) => m.isActive));
+        }
+      } catch (error) {
+        console.error('Failed to fetch modules:', error);
+      }
+    };
+    fetchModules();
+  }, []);
 
   const navigation: NavItem[] = [
     { 
@@ -50,6 +66,18 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
       href: '/staff/restaurant', 
       icon: ChefHat,
       roles: ['restaurant_staff', 'restaurant_admin', 'super_admin']
+    },
+    ...modules.map(module => ({
+      name: module.name,
+      href: `/staff/modules/${module.slug}`,
+      icon: ChefHat,
+      roles: ['restaurant_staff', 'restaurant_admin', 'super_admin']
+    })),
+    { 
+      name: t('nav.snackBar'), 
+      href: '/staff/snack', 
+      icon: Cookie,
+      roles: ['snack_bar_staff', 'snack_bar_admin', 'super_admin']
     },
     { 
       name: t('nav.snackBar'), 

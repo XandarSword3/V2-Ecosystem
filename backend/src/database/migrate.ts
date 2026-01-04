@@ -1,5 +1,5 @@
-import { getPool, initializeDatabase, closeDatabase } from './connection.js';
-import { logger } from '../utils/logger.js';
+import { getPool, initializeDatabase, closeDatabase } from './connection';
+import { logger } from '../utils/logger';
 
 async function migrate() {
   try {
@@ -480,6 +480,21 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_pool_tickets_session_id ON pool_tickets(session_id);
       CREATE INDEX IF NOT EXISTS idx_pool_tickets_ticket_date ON pool_tickets(ticket_date);
       CREATE INDEX IF NOT EXISTS idx_payments_reference ON payments(reference_type, reference_id);
+    `);
+
+    // Add module_id to restaurant_orders
+    await pool.query(`
+      ALTER TABLE restaurant_orders ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);
+      
+      DO $$
+      DECLARE
+        restaurant_id UUID;
+      BEGIN
+        SELECT id INTO restaurant_id FROM modules WHERE slug = 'restaurant';
+        IF restaurant_id IS NOT NULL THEN
+          UPDATE restaurant_orders SET module_id = restaurant_id WHERE module_id IS NULL;
+        END IF;
+      END $$;
     `);
 
     logger.info('Migrations completed successfully');
