@@ -26,9 +26,7 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   notes?: string;
-  snack_menu_items?: {
-    name: string;
-  };
+  name: string; // Backend returns 'name' directly
 }
 
 interface Order {
@@ -38,7 +36,7 @@ interface Order {
   total_amount: number;
   notes?: string;
   created_at: string;
-  order_items?: OrderItem[];
+  items?: OrderItem[]; // Backend returns 'items'
   users?: {
     full_name: string;
   };
@@ -255,9 +253,9 @@ export default function AdminSnackOrdersPage() {
                           </div>
 
                           <div className="text-sm text-slate-600 dark:text-slate-300 space-y-1">
-                            {order.order_items?.map((item) => (
+                            {order.items?.map((item) => (
                               <p key={item.id}>
-                                {item.quantity}x {item.snack_menu_items?.name || 'Item'}
+                                {item.quantity}x {item.name}
                               </p>
                             ))}
                           </div>
