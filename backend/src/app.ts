@@ -179,12 +179,22 @@ app.use((_req: Request, res: Response) => {
 app.use(errorLogger);
 
 // Global error handler
-app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const requestId = (req as any).requestId || 'unknown';
-  logger.error(`[${requestId}] Unhandled error:`, err);
-  res.status(500).json({
-    error: config.env === 'production' ? 'Internal Server Error' : err.message,
-    requestId: requestId, // Include request ID for tracking
+  
+  // Log error (skip logging for 404s and validation errors in production to reduce noise)
+  if (err.statusCode !== 404 && err.statusCode !== 400) {
+    logger.error(`[${requestId}] Unhandled error:`, err);
+  }
+
+  const statusCode = err.statusCode || 500;
+  const message = err.statusCode ? err.message : (config.env === 'production' ? 'Internal Server Error' : err.message);
+
+  res.status(statusCode).json({
+    success: false,
+    error: message,
+    errors: err.errors, // Include validation errors if present
+    requestId: requestId,
   });
 });
 
