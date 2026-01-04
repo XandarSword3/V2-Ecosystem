@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { useSiteSettings } from '@/lib/settings-context';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
@@ -47,6 +48,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations('admin');
+  const { modules } = useSiteSettings();
 
   const navigation: NavItem[] = [
     { name: t('nav.dashboard'), href: '/admin', icon: LayoutDashboard },
@@ -108,6 +110,53 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     },
     { name: t('nav.auditLogs'), href: '/admin/audit', icon: Shield },
   ];
+
+  // Inject dynamic modules
+  if (modules && modules.length > 0) {
+    const dynamicModules = modules.filter(m => m.is_active).map(module => {
+      let children: { name: string; href: string }[] = [];
+      let icon = Cloud;
+
+      if (module.template_type === 'menu_service') {
+        icon = UtensilsCrossed;
+        children = [
+          { name: t('nav.menuItems'), href: `/admin/modules/${module.slug}/menu` },
+          { name: t('nav.categories'), href: `/admin/modules/${module.slug}/categories` },
+          { name: t('nav.orders'), href: `/admin/modules/${module.slug}/orders` },
+          { name: t('nav.tables'), href: `/admin/modules/${module.slug}/tables` },
+        ];
+      } else if (module.template_type === 'multi_day_booking') {
+        icon = Home;
+        children = [
+          { name: t('nav.allChalets'), href: `/admin/modules/${module.slug}` },
+          { name: t('nav.bookings'), href: `/admin/modules/${module.slug}/bookings` },
+          { name: t('nav.pricingRules'), href: `/admin/modules/${module.slug}/pricing` },
+          { name: t('nav.addons'), href: `/admin/modules/${module.slug}/addons` },
+        ];
+      } else if (module.template_type === 'session_access') {
+        icon = Waves;
+        children = [
+          { name: t('nav.sessions'), href: `/admin/modules/${module.slug}/sessions` },
+          { name: t('nav.tickets'), href: `/admin/modules/${module.slug}/tickets` },
+          { name: t('nav.capacity'), href: `/admin/modules/${module.slug}/capacity` },
+        ];
+      }
+
+      return {
+        name: module.name,
+        href: `/admin/modules/${module.slug}`,
+        icon,
+        children
+      };
+    });
+
+    // Insert before 'Modules' link
+    const modulesIndex = navigation.findIndex(n => n.name === 'Modules');
+    if (modulesIndex !== -1) {
+      navigation.splice(modulesIndex, 0, ...dynamicModules);
+    }
+  }
+
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

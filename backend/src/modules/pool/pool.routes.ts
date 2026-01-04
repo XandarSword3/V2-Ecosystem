@@ -11,7 +11,7 @@ router.get('/availability', poolController.getAvailability);
 
 // Customer routes
 router.post('/tickets', optionalAuth, poolController.purchaseTicket);
-router.get('/tickets/:id', poolController.getTicket);
+router.get('/tickets/:id', optionalAuth, poolController.getTicket);
 
 // Authenticated customer routes
 router.get('/my-tickets', authenticate, poolController.getMyTickets);

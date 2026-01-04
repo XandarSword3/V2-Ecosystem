@@ -1,9 +1,9 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { config } from '../config/index.js';
-import * as schema from './schema/index.js';
-import { getSupabaseAdmin } from './supabase.js';
-import { logger } from '../utils/logger.js';
+import { config } from '../config/index';
+import * as schema from './schema/index';
+import { getSupabaseAdmin } from './supabase';
+import { logger } from '../utils/logger';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 let pool: Pool | null = null;

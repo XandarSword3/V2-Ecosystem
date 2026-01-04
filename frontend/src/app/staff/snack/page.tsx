@@ -282,12 +282,14 @@ export default function StaffSnackPage() {
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ delay: index * 0.05 }}
                   layout
+                  onClick={() => setSelectedOrder(order)}
+                  className="cursor-pointer"
                 >
                   <Card 
-                    className={`hover:shadow-lg transition-all cursor-pointer ${
+                    className={`hover:shadow-lg transition-all ${
                       order.status === 'pending' ? 'ring-2 ring-yellow-400 animate-pulse' : ''
                     }`}
-                    onClick={() => setSelectedOrder(order)}
+                    hover={true}
                   >
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
