@@ -303,7 +303,7 @@ export async function getUserById(userId: string) {
 
   return {
     ...user,
-    roles: (userRolesList || []).map((r: any) => r.roles),
+    roles: (userRolesList || []).map((r: any) => r.roles?.name).filter(Boolean),
   };
 }
 
