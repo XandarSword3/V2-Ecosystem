@@ -94,10 +94,11 @@ function transformOrderForFrontend(order: any) {
 
 export async function getStaffOrders(req: Request, res: Response, next: NextFunction) {
   try {
-    const { status, date } = req.query;
+    const { status, date, moduleId } = req.query;
     const orders = await orderService.getOrders({
       status: status as string,
       date: date as string,
+      moduleId: moduleId as string,
     });
     // Transform to camelCase format for frontend
     const transformedOrders = orders.map(transformOrderForFrontend);
