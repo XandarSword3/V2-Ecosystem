@@ -12,6 +12,7 @@ async function main() {
 
     // Start server immediately so Render health check passes
     server.listen(config.port, '0.0.0.0', () => {
+      console.log(`Server running on ${config.port}`); // Explicit log for Render/User check
       logger.info(`🚀 Server running on port ${config.port}`);
       logger.info(`📍 Environment: ${config.env}`);
       logger.info(`🔗 API URL: ${config.apiUrl}`);
