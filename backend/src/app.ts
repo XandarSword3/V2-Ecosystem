@@ -24,6 +24,9 @@ import { requireModule, clearModuleCache } from './middleware/moduleGuard.middle
 
 const app = express();
 
+// Trust proxy - required for correct IP detection behind load balancers (Render, Vercel, etc.)
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 
@@ -31,6 +34,9 @@ app.use(helmet());
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Simple health check for Render
+app.get('/healthz', (req, res) => res.send('ok'));
 
 // CORS configuration - allow Vercel preview URLs and production domains
 const allowedOrigins = [

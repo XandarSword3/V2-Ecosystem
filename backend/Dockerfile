@@ -15,39 +15,34 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
-# Remove devDependencies after build
-RUN npm prune --production
-
 # Production stage
 FROM node:20-alpine AS runner
 
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 expressjs
+# Use built-in node user
+USER node
+
+# Copy package files for production install
+COPY --chown=node:node package*.json ./
+
+# Install only production dependencies
+# This replaces npm prune and ensures a clean slate
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy built application
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
+COPY --from=builder --chown=node:node /app/dist ./dist
 
-# Set ownership
-RUN chown -R expressjs:nodejs /app
+# Set default port
+ENV PORT=3000
 
-# Switch to non-root user
-USER expressjs
-
-# Set default port (can be overridden by environment variable)
-ENV PORT=3001
-
-# Expose port (Render uses PORT env var)
+# Expose port
 EXPOSE ${PORT}
 
-# Health check - use environment variable for port
-# Note: Render ignores Docker HEALTHCHECK and uses its own
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/healthz || exit 1
 
 # Start application
 CMD ["node", "dist/index.js"]

@@ -33,7 +33,8 @@ export async function initializeDatabase() {
     return db;
   } catch (error: any) {
     logger.warn(`Direct PostgreSQL connection failed: ${error.message}`);
-    logger.info('Falling back to Supabase client...');
+    logger.warn('This is expected if using Supabase Transaction Pooler on port 6543 without prepared statements, or if the connection string is invalid.');
+    logger.info('Falling back to Supabase client (HTTP API)...');
     
     // Use Supabase client
     supabase = getSupabaseAdmin();

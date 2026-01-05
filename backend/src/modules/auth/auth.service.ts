@@ -5,6 +5,7 @@ import { generateTokens, verifyRefreshToken } from "./auth.utils.js";
 import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
 import { emailService } from "../../services/email.service.js";
+import { AppError } from "../../utils/AppError.js";
 
 const isProduction = config.env === 'production';
 
@@ -104,19 +105,19 @@ export async function login(email: string, password: string, meta: SessionMeta) 
 
   if (userError) {
     logger.error('[AUTH SERVICE] Database error finding user:', JSON.stringify(userError));
-    throw new Error('Invalid credentials');
+    throw new AppError('Invalid credentials', 401);
   }
   
   if (!user) {
     logger.error('[AUTH SERVICE] User not found for email:', email);
-    throw new Error('Invalid credentials');
+    throw new AppError('Invalid credentials', 401);
   }
   
   logger.info('[AUTH SERVICE] User found:', { id: user.id, email: user.email, is_active: user.is_active });
 
   if (!user.is_active) {
     logger.error('[AUTH SERVICE] Account is disabled for:', email);
-    throw new Error('Account is disabled');
+    throw new AppError('Account is disabled', 403);
   }
 
   // Verify password
@@ -127,7 +128,7 @@ export async function login(email: string, password: string, meta: SessionMeta) 
   
   if (!isValid) {
     logger.warn('[AUTH SERVICE] Invalid password attempt for:', email);
-    throw new Error('Invalid credentials');
+    throw new AppError('Invalid credentials', 401);
   }
 
   // Get user roles
