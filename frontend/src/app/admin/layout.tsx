@@ -125,31 +125,31 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       if (module.template_type === 'menu_service') {
         icon = UtensilsCrossed;
         children = [
-          { name: t('nav.menuItems'), href: `/admin/modules/${module.slug}/menu` },
-          { name: t('nav.categories'), href: `/admin/modules/${module.slug}/categories` },
-          { name: t('nav.orders'), href: `/admin/modules/${module.slug}/orders` },
-          { name: t('nav.tables'), href: `/admin/modules/${module.slug}/tables` },
+          { name: t('nav.menuItems'), href: `/admin/${module.slug}/menu` },
+          { name: t('nav.categories'), href: `/admin/${module.slug}/categories` },
+          { name: t('nav.orders'), href: `/admin/${module.slug}/orders` },
+          { name: t('nav.tables'), href: `/admin/${module.slug}/tables` },
         ];
       } else if (module.template_type === 'multi_day_booking') {
         icon = Home;
         children = [
-          { name: t('nav.allChalets'), href: `/admin/modules/${module.slug}` },
-          { name: t('nav.bookings'), href: `/admin/modules/${module.slug}/bookings` },
-          { name: t('nav.pricingRules'), href: `/admin/modules/${module.slug}/pricing` },
-          { name: t('nav.addons'), href: `/admin/modules/${module.slug}/addons` },
+          { name: t('nav.allChalets'), href: `/admin/${module.slug}` },
+          { name: t('nav.bookings'), href: `/admin/${module.slug}/bookings` },
+          { name: t('nav.pricingRules'), href: `/admin/${module.slug}/pricing` },
+          { name: t('nav.addons'), href: `/admin/${module.slug}/addons` },
         ];
       } else if (module.template_type === 'session_access') {
         icon = Waves;
         children = [
-          { name: t('nav.sessions'), href: `/admin/modules/${module.slug}/sessions` },
-          { name: t('nav.tickets'), href: `/admin/modules/${module.slug}/tickets` },
-          { name: t('nav.capacity'), href: `/admin/modules/${module.slug}/capacity` },
+          { name: t('nav.sessions'), href: `/admin/${module.slug}/sessions` },
+          { name: t('nav.tickets'), href: `/admin/${module.slug}/tickets` },
+          { name: t('nav.capacity'), href: `/admin/${module.slug}/capacity` },
         ];
       }
 
       return {
         name: module.name,
-        href: `/admin/modules/${module.slug}`,
+        href: `/admin/${module.slug}`,
         icon,
         children
       };
@@ -158,7 +158,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     // Insert before 'Modules' link
     const modulesIndex = navigation.findIndex(n => n.name === 'Modules');
     if (modulesIndex !== -1) {
-      navigation.splice(modulesIndex, 0, ...dynamicModules);
+      // Remove the Modules link and insert the dynamic modules
+      navigation.splice(modulesIndex, 1, ...dynamicModules);
     }
   }
 
