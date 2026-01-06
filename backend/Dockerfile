@@ -21,15 +21,14 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Use built-in node user
-USER node
-
 # Copy package files for production install
-COPY --chown=node:node package*.json ./
+COPY package*.json ./
 
-# Install only production dependencies
-# This replaces npm prune and ensures a clean slate
+# Install only production dependencies as root first
 RUN npm ci --omit=dev && npm cache clean --force
+
+# Then switch to node user for security
+USER node
 
 # Copy built application
 COPY --from=builder --chown=node:node /app/dist ./dist
