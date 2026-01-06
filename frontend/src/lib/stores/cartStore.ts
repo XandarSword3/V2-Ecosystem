@@ -10,9 +10,21 @@ interface CartItem {
   category?: string;
   imageUrl?: string;
   moduleId?: string;
+  type?: string;
+  moduleName?: string;
 }
 
 interface CartState {
+  // Unified Cart
+  items: CartItem[];
+  addItem: (item: CartItem) => void;
+  removeItem: (itemId: string) => void;
+  updateQuantity: (itemId: string, quantity: number) => void;
+  updateInstructions: (itemId: string, instructions: string) => void;
+  clearCart: () => void;
+  getTotal: () => number;
+  getCount: () => number;
+
   // Restaurant cart
   restaurantItems: CartItem[];
   // Snack bar cart  

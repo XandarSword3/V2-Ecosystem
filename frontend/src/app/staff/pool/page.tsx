@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
+import { formatCurrency } from '@/lib/utils';
 import { useSocket } from '@/lib/socket';
 import {
   Waves,
