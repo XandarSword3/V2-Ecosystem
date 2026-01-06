@@ -65,14 +65,6 @@ export function MenuService({ module }: MenuServiceProps) {
   };
 
   const removeFromCart = (itemId: string) => {
-    // We need to implement removal logic here or update cart store
-    // For now assuming we just want to decrement or remove
-    // But since `MenuService` local usage of `removeFromCart` implies decrementing...
-    // We need to find the item in cart first to check quantity?
-    // Let's use `updateQuantity` instead if we have access to it.
-  };
-
-  const removeFromCart = (itemId: string) => {
     if (isSnackBar) {
       removeFromSnack(itemId);
     } else {

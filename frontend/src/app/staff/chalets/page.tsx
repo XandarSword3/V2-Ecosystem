@@ -292,7 +292,7 @@ export default function StaffChaletsPage() {
                   onClick={() => setSelectedBooking(booking)}
                   className="cursor-pointer"
                 >
-                  <Card className="hover:shadow-lg transition-all">
+                  <Card className={`hover:shadow-lg transition-all ${
                     isCheckInDay && booking.status === 'confirmed' ? 'ring-2 ring-blue-400' :
                     isCheckOutDay && booking.status === 'checked_in' ? 'ring-2 ring-orange-400' : ''
                   }`}>
