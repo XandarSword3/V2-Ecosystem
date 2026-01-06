@@ -8,6 +8,7 @@ import { formatCurrency, formatTime, getOrderStatusColor } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import {
   UtensilsCrossed,
   Clock,
@@ -19,6 +20,10 @@ import {
   LogOut,
   XCircle,
   Timer,
+  LayoutDashboard,
+  Calendar,
+  Ticket,
+  Users,
 } from 'lucide-react';
 
 interface Order {
@@ -40,51 +45,104 @@ interface Order {
 
 const statusFlow = ['pending', 'confirmed', 'preparing', 'ready', 'completed'];
 
-export default function ModuleKitchenPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
-  const { user, logout } = useAuth();
+function SessionAccessDashboard({ slug, moduleName }: { slug: string, moduleName: string }) {
+  return (
+    <div className="space-y-6 p-6">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+          <Ticket className="h-8 w-8 text-primary" />
+          {moduleName} Management
+        </h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">
+          Manage sessions, tickets, and capacity.
+        </p>
+      </header>
+      
+      <div className="grid gap-6 md:grid-cols-3">
+        <Link href={`/staff/modules/${slug}/sessions`} className="block group">
+          <Card className="h-full transition-all group-hover:shadow-lg group-hover:border-primary">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-500" />
+                Sessions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500">Manage daily sessions and time slots.</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href={`/staff/modules/${slug}/tickets`} className="block group">
+          <Card className="h-full transition-all group-hover:shadow-lg group-hover:border-primary">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Ticket className="w-5 h-5 text-green-500" />
+                Tickets
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500">Scan and validate tickets.</p>
+            </CardContent>
+          </Card>
+        </Link>
+        
+        <Link href={`/staff/modules/${slug}/capacity`} className="block group">
+          <Card className="h-full transition-all group-hover:shadow-lg group-hover:border-primary">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-purple-500" />
+                Capacity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500">View real-time occupancy and stats.</p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function MultiDayBookingDashboard({ slug, moduleName }: { slug: string, moduleName: string }) {
+    return (
+        <div className="space-y-6 p-6">
+            <header className="mb-8">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                    <LayoutDashboard className="h-8 w-8 text-primary" />
+                    {moduleName} Management
+                </h1>
+                <p className="text-gray-500 dark:text-gray-400 mt-1">
+                    Manage bookings and accommodations. (Placeholder)
+                </p>
+            </header>
+            <Card>
+                <CardContent className="p-8 text-center text-gray-500">
+                    <LayoutDashboard className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Booking Dashboard Not Implemented Yet</p>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName: string, moduleId: string }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [moduleId, setModuleId] = useState<string | null>(null);
-  const [moduleName, setModuleName] = useState<string>('');
-
   const { socket } = useSocket();
 
-  // Fetch module details
+  // Load initial orders
   useEffect(() => {
-    const fetchModule = async () => {
-      try {
-        const response = await api.get(`/admin/modules/${slug}`);
-        if (response.data.success) {
-          setModuleId(response.data.data.id);
-          setModuleName(response.data.data.name);
-        }
-      } catch (error) {
-        console.error('Failed to fetch module:', error);
-        toast.error('Failed to load module details');
-      }
-    };
-
-    fetchModule();
-  }, [slug]);
-
-  // Load initial orders once moduleId is available
-  useEffect(() => {
-    if (moduleId) {
-      loadOrders();
-    }
+    loadOrders();
   }, [moduleId]);
 
   // Real-time updates
   useEffect(() => {
     if (socket && moduleId) {
-      // Join the module-specific room
-      // Note: Backend needs to support joining arbitrary unit rooms or we need to update backend
       socket.emit('join:unit', moduleId); 
-      
-      // Also join the slug as unit for backward compatibility or easier debugging
       socket.emit('join:unit', slug);
 
       const handleNewOrder = (newOrder: any) => {
@@ -92,7 +150,6 @@ export default function ModuleKitchenPage({ params }: { params: Promise<{ slug: 
         toast.info(`New order #${newOrder.orderNumber}`, {
           description: newOrder.customerName,
         });
-        // Play notification sound
         const audio = new Audio('/notification.mp3');
         audio.play().catch(() => {});
       };
@@ -109,7 +166,6 @@ export default function ModuleKitchenPage({ params }: { params: Promise<{ slug: 
 
       socket.on('order:new', handleNewOrder);
       socket.on('order:status', handleStatusUpdate);
-      // Legacy events
       socket.on('new-order', handleNewOrder);
       socket.on('order-status-updated', handleStatusUpdate);
 
@@ -123,8 +179,6 @@ export default function ModuleKitchenPage({ params }: { params: Promise<{ slug: 
   }, [socket, moduleId, slug]);
 
   const loadOrders = async () => {
-    if (!moduleId) return;
-    
     try {
       const response = await api.get('/restaurant/staff/orders', {
         params: { 
@@ -161,10 +215,10 @@ export default function ModuleKitchenPage({ params }: { params: Promise<{ slug: 
     ? orders.filter((order) => order.status === selectedStatus)
     : orders;
 
-  if (isLoading && !moduleId) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center p-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -441,6 +495,68 @@ export default function ModuleKitchenPage({ params }: { params: Promise<{ slug: 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+export default function ModulePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params);
+  const [moduleId, setModuleId] = useState<string | null>(null);
+  const [moduleName, setModuleName] = useState<string>('');
+  const [templateType, setTemplateType] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchModule = async () => {
+      try {
+        const response = await api.get(`/admin/modules/${slug}`);
+        if (response.data.success) {
+            setModuleId(response.data.data.id);
+            setModuleName(response.data.data.name);
+            setTemplateType(response.data.data.template_type);
+        }
+      } catch (error) {
+        console.error('Failed to fetch module:', error);
+        toast.error('Failed to load module details');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchModule();
+  }, [slug]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!moduleId) {
+      return (
+          <div className="min-h-screen flex items-center justify-center">
+              <p className="text-gray-500">Module not found.</p>
+          </div>
+      );
+  }
+
+  if (templateType === 'menu_service') {
+      return <KitchenView slug={slug} moduleName={moduleName} moduleId={moduleId} />;
+  }
+
+  if (templateType === 'session_access') {
+      return <SessionAccessDashboard slug={slug} moduleName={moduleName} />;
+  }
+  
+  if (templateType === 'multi_day_booking') {
+       return <MultiDayBookingDashboard slug={slug} moduleName={moduleName} />;
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-500">Unsupported Module Type: {templateType}</p>
     </div>
   );
 }
