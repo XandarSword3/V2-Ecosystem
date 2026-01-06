@@ -633,6 +633,14 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       termsOfService: settings.termsOfService,
       refundPolicy: settings.refundPolicy,
     };
+
+    const appearanceSettings = {
+      theme: settings.theme,
+      weatherEffect: settings.weatherEffect,
+      animationsEnabled: settings.animationsEnabled,
+      reducedMotion: settings.reducedMotion,
+      soundEnabled: settings.soundEnabled,
+    };
     
     // Upsert each settings category
     const updates = [
@@ -642,6 +650,7 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       { key: 'chalets', value: chaletSettings },
       { key: 'pool', value: poolSettings },
       { key: 'legal', value: legalSettings },
+      { key: 'appearance', value: appearanceSettings },
     ];
     
     for (const update of updates) {
@@ -662,7 +671,8 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       ...hoursSettings,
       ...chaletSettings,
       ...poolSettings,
-      ...legalSettings
+      ...legalSettings,
+      ...appearanceSettings
     });
 
     res.json({ success: true, message: 'Settings saved successfully' });

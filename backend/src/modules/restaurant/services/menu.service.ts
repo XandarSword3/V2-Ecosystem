@@ -160,6 +160,7 @@ export async function createMenuItem(data: {
   imageUrl?: string;
   isFeatured?: boolean;
   displayOrder?: number;
+  moduleId?: string;
 }) {
   const supabase = getSupabase();
   
@@ -187,6 +188,7 @@ export async function createMenuItem(data: {
       image_url: data.imageUrl,
       is_featured: data.isFeatured || false,
       display_order: data.displayOrder || 0,
+      module_id: data.moduleId,
     })
     .select()
     .single();

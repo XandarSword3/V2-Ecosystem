@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useSocket } from './socket';
+import { ResortTheme, WeatherEffect } from './theme-config';
 
 export interface SiteSettings {
   // General
@@ -41,6 +42,13 @@ export interface SiteSettings {
   privacyPolicy: string;
   termsOfService: string;
   refundPolicy: string;
+
+  // Appearance
+  theme: ResortTheme;
+  weatherEffect: WeatherEffect;
+  animationsEnabled: boolean;
+  reducedMotion: boolean;
+  soundEnabled: boolean;
 }
 
 const defaultSettings: SiteSettings = {
@@ -70,6 +78,13 @@ const defaultSettings: SiteSettings = {
   privacyPolicy: '',
   termsOfService: '',
   refundPolicy: '',
+  
+  // Appearance defaults
+  theme: 'beach',
+  weatherEffect: 'sunny',
+  animationsEnabled: true,
+  reducedMotion: false,
+  soundEnabled: true,
 };
 
 export interface Module {
