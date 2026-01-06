@@ -28,6 +28,39 @@ export async function getModules(req: Request, res: Response, next: NextFunction
   }
 }
 
+export async function getModule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { id } = req.params;
+
+    // Try to fetch by id first
+    let { data, error } = await supabase
+      .from('modules')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    // If not found by id, try slug
+    if ((error || !data) && id) {
+      const { data: bySlug, error: slugErr } = await supabase
+        .from('modules')
+        .select('*')
+        .eq('slug', id)
+        .single();
+
+      if (slugErr) throw slugErr;
+      if (!bySlug) return res.status(404).json({ success: false, error: 'Module not found' });
+
+      data = bySlug;
+    }
+
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+
 export async function createModule(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
