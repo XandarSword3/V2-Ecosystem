@@ -10,6 +10,7 @@ import { useSiteSettings } from '@/lib/settings-context';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { CurrencySwitcher } from '@/components/CurrencySwitcher';
 import { api } from '@/lib/api';
 import {
   LayoutDashboard,
@@ -258,6 +259,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <span className="font-semibold text-slate-900 dark:text-white">Admin</span>
         </div>
         <div className="flex items-center gap-2">
+          <CurrencySwitcher />
           <ThemeToggle />
           <LanguageSwitcher />
         </div>

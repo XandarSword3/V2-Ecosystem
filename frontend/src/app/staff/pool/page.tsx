@@ -68,6 +68,7 @@ export default function StaffPoolPage() {
   const [scanMode, setScanMode] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [currentlyInPool, setCurrentlyInPool] = useState(0);
+  const [selectedTicket, setSelectedTicket] = useState<PoolTicket | null>(null);
   const poolCapacity = 100; // This should come from settings
   const { socket } = useSocket();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -446,8 +447,10 @@ export default function StaffPoolPage() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ delay: index * 0.05 }}
                 layout
+                onClick={() => setSelectedTicket(ticket)}
+                className="cursor-pointer"
               >
-                <Card className={`${isInPool ? 'ring-2 ring-green-400 bg-green-50/50 dark:bg-green-900/10' : ''}`}>
+                <Card className={`hover:shadow-lg transition-all ${isInPool ? 'ring-2 ring-green-400 bg-green-50/50 dark:bg-green-900/10' : ''}`}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -527,6 +530,116 @@ export default function StaffPoolPage() {
           <p className="text-slate-500 dark:text-slate-400">No tickets for today</p>
         </div>
       )}
+
+       {/* Pool Ticket Details Modal */}
+       <AnimatePresence>
+        {selectedTicket && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setSelectedTicket(null)}
+          >
+             <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                    Ticket Details
+                  </h2>
+                   <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Ticket Number: {selectedTicket.ticket_number}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedTicket(null)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+                >
+                  <XCircle className="w-6 h-6 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                 {/* QR Code Placeholder/Area */}
+                 <div className="flex justify-center p-4 bg-white rounded-lg border border-slate-200">
+                      <QrCode className="w-32 h-32 text-slate-900" />
+                 </div>
+
+                {/* Status & Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Status</h3>
+                     <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-medium ${statusConfig[selectedTicket.status]?.color}`}>
+                            {selectedTicket.status}
+                        </span>
+                     </div>
+                  </div>
+                   <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Guests</h3>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Users className="w-5 h-5 text-slate-400" />
+                        {selectedTicket.number_of_guests || 1}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Customer Info */}
+                 <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Guest Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <span className="text-xs text-slate-400">Name</span>
+                            <p className="font-medium">{selectedTicket.customer_name || selectedTicket.users?.full_name}</p>
+                        </div>
+                         <div>
+                            <span className="text-xs text-slate-400">Phone / Email</span>
+                            <p className="font-medium">{selectedTicket.customer_phone || selectedTicket.users?.email}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                 {/* Timing & Price */}
+                 <div className="space-y-2">
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Details</h3>
+                    <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Ticket Date</span>
+                        <span>{new Date(selectedTicket.ticket_date || Date.now()).toLocaleDateString()}</span>
+                    </div>
+                     <div className="flex justify-between text-sm">
+                         <span className="text-slate-500">Created At</span>
+                         <span>{new Date().toLocaleDateString()}</span>
+                     </div>
+                     <div className="flex justify-between font-bold text-lg pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <span>Price</span>
+                        {/* Use simple number formatting since formatCurrency might not be imported or available in this scope, wait it is imported in page.tsx */}
+                         {/* Checking imports... yes formatCurrency is imported */}
+                        <span>{formatCurrency(Number(selectedTicket.total_amount) || 0)}</span>
+                     </div>
+                      <div className="flex justify-between text-sm text-slate-500">
+                         <span>Payment Status</span>
+                         <span className="capitalize">{selectedTicket.payment_status || 'Pending'}</span>
+                     </div>
+                     <div className="flex justify-between text-sm text-slate-500">
+                         <span>Payment Method</span>
+                         <span className="capitalize">{selectedTicket.payment_method || 'cash'}</span>
+                     </div>
+                 </div>
+
+              </div>
+               
+              <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setSelectedTicket(null)}>
+                        Close
+                    </Button>
+              </div>
+            </motion.div>    
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -56,6 +56,7 @@ export default function AdminSnackOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { socket } = useSocket();
 
   const fetchOrders = useCallback(async () => {
@@ -237,8 +238,10 @@ export default function AdminSnackOrdersPage() {
                   exit={{ opacity: 0, x: -100 }}
                   transition={{ delay: index * 0.03 }}
                   layout
+                  onClick={() => setSelectedOrder(order)}
+                  className="cursor-pointer"
                 >
-                  <Card>
+                  <Card className="hover:shadow-lg transition-all">
                     <CardContent className="p-4">
                       <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                         <div className="flex-1">
@@ -305,6 +308,115 @@ export default function AdminSnackOrdersPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Order Details Modal */}
+      <AnimatePresence>
+        {selectedOrder && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setSelectedOrder(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                    Order #{selectedOrder.order_number}
+                  </h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {formatDate(selectedOrder.created_at)}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedOrder(null)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+                >
+                  <XCircle className="w-6 h-6 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                {/* Customer Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Customer</h3>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {selectedOrder.users?.full_name || 'Guest'}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Status</h3>
+                    <div className="flex items-center gap-2">
+                       {/* Status logic inline to reuse component scope */}
+                       <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-medium ${statusConfig[selectedOrder.status]?.color}`}>
+                         {statusConfig[selectedOrder.status]?.label}
+                       </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Items */}
+                <div>
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Order Items</h3>
+                  <div className="space-y-3">
+                    {selectedOrder.items?.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-start p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 dark:text-white">{item.quantity}x</span>
+                            <span className="font-medium text-slate-900 dark:text-white">{item.name}</span>
+                          </div>
+                          {item.notes && (
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 italic">
+                              Note: {item.notes}
+                            </p>
+                          )}
+                        </div>
+                        <p className="font-medium text-slate-900 dark:text-white">
+                          {formatCurrency(item.unit_price * item.quantity)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-lg font-semibold text-slate-900 dark:text-white">Total Amount</span>
+                  <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                    {formatCurrency(selectedOrder.total_amount)}
+                  </span>
+                </div>
+                
+                <div className="flex justify-end gap-3">
+                   {/* Action Buttons */}
+                    {selectedOrder.status === 'pending' && (
+                        <Button onClick={() => { updateOrderStatus(selectedOrder.id, 'preparing'); setSelectedOrder(null); }}>
+                        Start Preparing
+                        </Button>
+                    )}
+                    {selectedOrder.status === 'preparing' && (
+                        <Button onClick={() => { updateOrderStatus(selectedOrder.id, 'ready'); setSelectedOrder(null); }}>
+                        Mark Ready
+                        </Button>
+                    )}
+                    {selectedOrder.status === 'ready' && (
+                        <Button onClick={() => { updateOrderStatus(selectedOrder.id, 'delivered'); setSelectedOrder(null); }}>
+                        Mark Delivered
+                        </Button>
+                    )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

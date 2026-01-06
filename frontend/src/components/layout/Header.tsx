@@ -32,9 +32,7 @@ export default function Header() {
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const { settings, modules } = useSiteSettings();
-  const restaurantCount = useCartStore((s) => s.getRestaurantCount());
-  const snackCount = useCartStore((s) => s.getSnackCount());
-  const totalCartCount = restaurantCount + snackCount;
+  const cartCount = useCartStore((s) => s.getCount());
   
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');

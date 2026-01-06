@@ -8,6 +8,7 @@ import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { CurrencySwitcher } from '@/components/CurrencySwitcher';
 import {
   ChefHat,
   UtensilsCrossed,
@@ -73,12 +74,6 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
       icon: ChefHat,
       roles: ['restaurant_staff', 'restaurant_admin', 'super_admin']
     })),
-    { 
-      name: t('nav.snackBar'), 
-      href: '/staff/snack', 
-      icon: Cookie,
-      roles: ['snack_bar_staff', 'snack_bar_admin', 'super_admin']
-    },
     { 
       name: t('nav.snackBar'), 
       href: '/staff/snack', 
@@ -207,6 +202,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
             <Bell className="h-5 w-5 text-slate-400" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
           </button>
+          <CurrencySwitcher />
           <ThemeToggle />
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-700 rounded-lg">
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-medium">

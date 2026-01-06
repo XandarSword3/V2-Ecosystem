@@ -82,6 +82,7 @@ const limiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.maxRequests,
   message: { error: 'Too many requests, please try again later.' },
+  validate: { trustProxy: false },
 });
 app.use('/api/', limiter);
 
@@ -93,6 +94,7 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Don't count successful logins
+  validate: { trustProxy: false },
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);

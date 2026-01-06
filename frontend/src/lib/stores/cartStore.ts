@@ -41,125 +41,84 @@ interface CartState {
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
-      restaurantItems: [],
-      snackItems: [],
-      
-      // Restaurant actions
-      addToRestaurant: (item) => set((state) => {
-        const existing = state.restaurantItems.find((i) => i.id === item.id);
+      items: [],
+      restaurantItems: [], 
+      snackItems: [], 
+
+      addItem: (item) => set((state) => {
+        const existing = state.items.find((i) => 
+            i.id === item.id && i.moduleId === item.moduleId && i.specialInstructions === item.specialInstructions
+        );
+        
         if (existing) {
           return {
-            restaurantItems: state.restaurantItems.map((i) =>
-              i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+            items: state.items.map((i) =>
+              (i.id === item.id && i.moduleId === item.moduleId && i.specialInstructions === item.specialInstructions) 
+              ? { ...i, quantity: i.quantity + (item.quantity || 1) } 
+              : i
             ),
           };
         }
         return {
-          restaurantItems: [...state.restaurantItems, { ...item, quantity: 1 }],
+          items: [...state.items, { ...item, quantity: item.quantity || 1 }],
         };
       }),
-      
-      removeFromRestaurant: (itemId) => set((state) => {
-        const existing = state.restaurantItems.find((i) => i.id === itemId);
-        if (existing && existing.quantity > 1) {
-          return {
-            restaurantItems: state.restaurantItems.map((i) =>
-              i.id === itemId ? { ...i, quantity: i.quantity - 1 } : i
-            ),
-          };
-        }
-        return {
-          restaurantItems: state.restaurantItems.filter((i) => i.id !== itemId),
-        };
-      }),
-      
-      updateRestaurantQuantity: (itemId, quantity) => set((state) => {
+
+      removeItem: (itemId) => set((state) => ({
+        items: state.items.filter((i) => i.id !== itemId),
+      })),
+
+      updateQuantity: (itemId, quantity) => set((state) => {
         if (quantity <= 0) {
           return {
-            restaurantItems: state.restaurantItems.filter((i) => i.id !== itemId),
+            items: state.items.filter((i) => i.id !== itemId),
           };
         }
         return {
-          restaurantItems: state.restaurantItems.map((i) =>
+          items: state.items.map((i) =>
             i.id === itemId ? { ...i, quantity } : i
           ),
         };
       }),
-      
-      updateRestaurantInstructions: (itemId, instructions) => set((state) => ({
-        restaurantItems: state.restaurantItems.map((i) =>
+
+      updateInstructions: (itemId, instructions) => set((state) => ({
+        items: state.items.map((i) =>
           i.id === itemId ? { ...i, specialInstructions: instructions } : i
         ),
       })),
-      
-      clearRestaurantCart: () => set({ restaurantItems: [] }),
-      
-      // Snack actions
-      addToSnack: (item) => set((state) => {
-        const existing = state.snackItems.find((i) => i.id === item.id);
-        if (existing) {
-          return {
-            snackItems: state.snackItems.map((i) =>
-              i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-            ),
-          };
-        }
-        return {
-          snackItems: [...state.snackItems, { ...item, quantity: 1 }],
-        };
-      }),
-      
-      removeFromSnack: (itemId) => set((state) => {
-        const existing = state.snackItems.find((i) => i.id === itemId);
-        if (existing && existing.quantity > 1) {
-          return {
-            snackItems: state.snackItems.map((i) =>
-              i.id === itemId ? { ...i, quantity: i.quantity - 1 } : i
-            ),
-          };
-        }
-        return {
-          snackItems: state.snackItems.filter((i) => i.id !== itemId),
-        };
-      }),
-      
-      updateSnackQuantity: (itemId, quantity) => set((state) => {
-        if (quantity <= 0) {
-          return {
-            snackItems: state.snackItems.filter((i) => i.id !== itemId),
-          };
-        }
-        return {
-          snackItems: state.snackItems.map((i) =>
-            i.id === itemId ? { ...i, quantity } : i
-          ),
-        };
-      }),
-      
-      clearSnackCart: () => set({ snackItems: [] }),
-      
-      // Computed
-      getRestaurantTotal: () => {
-        return get().restaurantItems.reduce(
+
+      clearCart: () => set({ items: [] }),
+
+      getTotal: () => {
+        return get().items.reduce(
           (sum, item) => sum + item.price * item.quantity,
           0
         );
       },
-      
-      getRestaurantCount: () => {
-        return get().restaurantItems.reduce((sum, item) => sum + item.quantity, 0);
+
+      getCount: () => {
+        return get().items.reduce((sum, item) => sum + item.quantity, 0);
       },
+
+      // Legacy Compatibility 
+      addToRestaurant: (item) => get().addItem({ ...item, quantity: 1, type: 'restaurant', moduleId: 'restaurant', moduleName: 'Restaurant' }),
+      removeFromRestaurant: (itemId) => get().removeItem(itemId),
       
-      getSnackTotal: () => {
-        return get().snackItems.reduce(
-          (sum, item) => sum + item.price * item.quantity,
-          0
-        );
-      },
+      addToSnack: (item) => get().addItem({ ...item, quantity: 1, type: 'snack', moduleId: 'snack-bar', moduleName: 'Snack Bar' }),
+      removeFromSnack: (itemId) => get().removeItem(itemId),
+
+      getRestaurantCount: () => get().items.filter(i => i.moduleId === 'restaurant').reduce((sum, i) => sum + i.quantity, 0),
+      getSnackCount: () => get().items.filter(i => i.moduleId === 'snack-bar').reduce((sum, i) => sum + i.quantity, 0),
       
-      getSnackCount: () => {
-        return get().snackItems.reduce((sum, item) => sum + item.quantity, 0);
-      },
+      getRestaurantTotal: () => get().items.filter(i => i.moduleId === 'restaurant').reduce((sum, i) => sum + i.price * i.quantity, 0),
+      getSnackTotal: () => get().items.filter(i => i.moduleId === 'snack-bar').reduce((sum, i) => sum + i.price * i.quantity, 0),
+      
+      updateRestaurantQuantity: (id, q) => get().updateQuantity(id, q),
+      updateRestaurantInstructions: (id, i) => get().updateInstructions(id, i),
+      clearRestaurantCart: () => set((state) => ({ items: state.items.filter(i => i.moduleId !== 'restaurant') })),
+      
+      updateSnackQuantity: (id, q) => get().updateQuantity(id, q),
+      clearSnackCart: () => set((state) => ({ items: state.items.filter(i => i.moduleId !== 'snack-bar') })),
     }),
     {
       name: 'v2-resort-cart',
