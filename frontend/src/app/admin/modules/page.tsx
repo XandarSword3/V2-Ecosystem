@@ -179,11 +179,24 @@ function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: any) {
     description: initialData?.description || '',
     template_type: initialData?.template_type || 'menu_service',
     is_active: initialData?.is_active ?? true,
+    settings: initialData?.settings || {
+      header_color: '#0ea5e9',
+      accent_color: '#6366f1',
+      show_in_nav: true,
+      icon: 'default',
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
+  };
+
+  const updateSettings = (key: string, value: any) => {
+    setFormData({
+      ...formData,
+      settings: { ...formData.settings, [key]: value },
+    });
   };
 
   return (
@@ -257,6 +270,87 @@ function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: any) {
               />
               <span className="ml-2 text-sm text-slate-700 dark:text-slate-300">
                 Active (Visible to users)
+              </span>
+            </label>
+          </div>
+        </div>
+
+        {/* Module Appearance Settings */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
+            Appearance Settings
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Header Color
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="color"
+                  value={formData.settings.header_color || '#0ea5e9'}
+                  onChange={(e) => updateSettings('header_color', e.target.value)}
+                  className="w-12 h-10 rounded cursor-pointer border border-slate-300"
+                />
+                <input
+                  type="text"
+                  value={formData.settings.header_color || '#0ea5e9'}
+                  onChange={(e) => updateSettings('header_color', e.target.value)}
+                  className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+                  placeholder="#0ea5e9"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Accent Color
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="color"
+                  value={formData.settings.accent_color || '#6366f1'}
+                  onChange={(e) => updateSettings('accent_color', e.target.value)}
+                  className="w-12 h-10 rounded cursor-pointer border border-slate-300"
+                />
+                <input
+                  type="text"
+                  value={formData.settings.accent_color || '#6366f1'}
+                  onChange={(e) => updateSettings('accent_color', e.target.value)}
+                  className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+                  placeholder="#6366f1"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Icon Style
+              </label>
+              <select
+                value={formData.settings.icon || 'default'}
+                onChange={(e) => updateSettings('icon', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="default">Default</option>
+                <option value="utensils">Utensils (Restaurant)</option>
+                <option value="home">Home (Accommodation)</option>
+                <option value="waves">Waves (Pool/Beach)</option>
+                <option value="dumbbell">Dumbbell (Gym)</option>
+                <option value="spa">Spa</option>
+                <option value="coffee">Coffee</option>
+                <option value="shopping">Shopping</option>
+              </select>
+            </div>
+          </div>
+          <div className="mt-3">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.settings.show_in_nav ?? true}
+                onChange={(e) => updateSettings('show_in_nav', e.target.checked)}
+                className="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
+              />
+              <span className="ml-2 text-sm text-slate-700 dark:text-slate-300">
+                Show in main navigation
               </span>
             </label>
           </div>

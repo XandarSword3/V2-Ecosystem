@@ -98,10 +98,17 @@ export function MenuService({ module }: MenuServiceProps) {
     );
   }
 
+  // Get module-specific colors or use defaults
+  const headerColor = module.settings?.header_color || '#0ea5e9';
+  const accentColor = module.settings?.accent_color || '#6366f1';
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-primary-600 to-primary-800 pt-24 pb-20">
+      <div 
+        className="relative overflow-hidden pt-24 pb-20"
+        style={{ background: `linear-gradient(to right, ${headerColor}, ${accentColor})` }}
+      >
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: -30 }}
@@ -127,9 +134,10 @@ export function MenuService({ module }: MenuServiceProps) {
             onClick={() => setSelectedCategory(null)}
             className={`px-6 py-3 rounded-full font-semibold transition-all ${
               !selectedCategory 
-                ? 'bg-primary-600 text-white shadow-lg' 
+                ? 'text-white shadow-lg' 
                 : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'
             }`}
+            style={!selectedCategory ? { backgroundColor: headerColor } : {}}
           >
             All
           </button>
@@ -139,9 +147,10 @@ export function MenuService({ module }: MenuServiceProps) {
               onClick={() => setSelectedCategory(cat.id)}
               className={`px-6 py-3 rounded-full font-semibold transition-all ${
                 selectedCategory === cat.id
-                  ? 'bg-primary-600 text-white shadow-lg' 
+                  ? 'text-white shadow-lg' 
                   : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'
               }`}
+              style={selectedCategory === cat.id ? { backgroundColor: headerColor } : {}}
             >
               {translateContent(cat, 'name')}
             </button>

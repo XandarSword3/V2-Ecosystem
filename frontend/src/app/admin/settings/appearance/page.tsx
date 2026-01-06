@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSiteSettings } from '@/lib/settings-context';
 import { resortThemes, type ResortTheme, type WeatherEffect } from '@/lib/theme-config';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 import {
   Palette,
   Cloud,
@@ -152,18 +153,13 @@ function ToggleSwitch({
 }
 
 export default function AppearanceSettingsPage() {
-  const {
-    resortTheme,
-    weatherEffect,
-    animationsEnabled,
-    reducedMotion,
-    soundEnabled,
-    setResortTheme,
-    setWeatherEffect,
-    setAnimationsEnabled,
-    setReducedMotion,
-    setSoundEnabled,
-  } = useSettingsStore();
+  const { settings, refetch } = useSiteSettings();
+
+  const [resortTheme, setResortTheme] = useState<ResortTheme>(settings.theme || 'beach');
+  const [weatherEffect, setWeatherEffect] = useState<WeatherEffect>(settings.weatherEffect || 'sunny');
+  const [animationsEnabled, setAnimationsEnabled] = useState(settings.animationsEnabled ?? true);
+  const [reducedMotion, setReducedMotion] = useState(settings.reducedMotion ?? false);
+  const [soundEnabled, setSoundEnabled] = useState(settings.soundEnabled ?? true);
 
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -179,12 +175,29 @@ export default function AppearanceSettingsPage() {
   };
 
   const handleSave = async () => {
-    setIsSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    setHasChanges(false);
-    toast.success('Appearance settings saved!');
+    try {
+      setIsSaving(true);
+      
+      const newSettings = {
+        ...settings,
+        theme: resortTheme,
+        weatherEffect,
+        animationsEnabled,
+        reducedMotion,
+        soundEnabled
+      };
+      
+      await api.put('/admin/settings', newSettings);
+      await refetch();
+      
+      setHasChanges(false);
+      toast.success('Appearance settings saved!');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      toast.error('Failed to save settings');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {

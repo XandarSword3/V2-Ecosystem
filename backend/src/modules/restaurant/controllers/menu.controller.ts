@@ -131,10 +131,12 @@ export async function deleteCategory(req: Request, res: Response, next: NextFunc
 export async function createMenuItem(req: Request, res: Response, next: NextFunction) {
   try {
     // Accept both camelCase and snake_case field names for flexibility
-    const { name, description, categoryId, category_id, price, ...rest } = req.body;
+    const { name, description, categoryId, category_id, price, module_id, moduleId, ...rest } = req.body;
     
     // Use categoryId or category_id (frontend may send either)
     const resolvedCategoryId = categoryId || category_id;
+    // Use moduleId or module_id (frontend may send either)
+    const resolvedModuleId = moduleId || module_id;
     
     // Validate required fields
     if (!resolvedCategoryId) {
@@ -157,7 +159,7 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
     }
     
     // Auto-translate name and description if not provided
-    let translatedData = { ...rest, name, categoryId: resolvedCategoryId, price: Number(price) };
+    let translatedData = { ...rest, name, categoryId: resolvedCategoryId, price: Number(price), moduleId: resolvedModuleId };
     
     if (name && !req.body.name_ar) {
       try {

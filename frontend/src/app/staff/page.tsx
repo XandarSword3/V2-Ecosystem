@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
+import { useSiteSettings } from '@/lib/settings-context';
 import { api } from '@/lib/api';
 import { useSocket } from '@/lib/socket';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -40,6 +41,7 @@ interface RecentActivity {
 export default function StaffDashboard() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
+  const { modules } = useSiteSettings();
   const t = useTranslations('staff');
   const { socket } = useSocket();
   
@@ -180,6 +182,36 @@ export default function StaffDashboard() {
     );
   }
 
+  const moduleActions = (modules || [])
+    .filter(m => m.is_active && !['restaurant', 'chalets', 'pool', 'snack-bar'].includes(m.slug))
+    .map(m => {
+      let icon = Home;
+      let color = 'from-blue-400 to-indigo-500';
+      let bgColor = 'bg-blue-50 dark:bg-blue-950/30';
+      let description = 'Manage module';
+
+      if (m.template_type === 'menu_service') {
+        icon = ChefHat;
+        color = 'from-orange-400 to-rose-500';
+        bgColor = 'bg-orange-50 dark:bg-orange-950/30';
+        description = 'Kitchen view';
+      } else if (m.template_type === 'session_access') {
+        icon = Waves;
+        color = 'from-cyan-400 to-blue-500';
+        bgColor = 'bg-cyan-50 dark:bg-cyan-950/30';
+        description = 'Sessions & Capacity';
+      }
+
+      return {
+        title: m.name,
+        description,
+        href: `/staff/${m.slug}`,
+        icon,
+        color,
+        bgColor
+      };
+    });
+
   const quickActions = [
     {
       title: 'Kitchen Orders',
@@ -189,6 +221,7 @@ export default function StaffDashboard() {
       color: 'from-orange-400 to-rose-500',
       bgColor: 'bg-orange-50 dark:bg-orange-950/30',
     },
+    ...moduleActions,
     {
       title: 'Snack Bar',
       description: 'Handle snack bar orders',

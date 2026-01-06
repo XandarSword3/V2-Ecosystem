@@ -46,9 +46,16 @@ export function BookingService({ module }: BookingServiceProps) {
     );
   }
 
+  // Get module-specific colors or use defaults
+  const headerColor = module.settings?.header_color || '#059669';
+  const accentColor = module.settings?.accent_color || '#0d9488';
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <div className="relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-800 pt-24 pb-20">
+      <div 
+        className="relative overflow-hidden pt-24 pb-20"
+        style={{ background: `linear-gradient(to right, ${headerColor}, ${accentColor})` }}
+      >
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: -30 }}
