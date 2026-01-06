@@ -29,7 +29,7 @@ export default function DynamicModuleDashboard() {
 
   const renderMenuServiceDashboard = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Link href={`/admin/modules/${slug}/menu`}>
+      <Link href={`/admin/${slug}/menu`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Menu Items</CardTitle>
@@ -42,7 +42,7 @@ export default function DynamicModuleDashboard() {
         </Card>
       </Link>
       
-      <Link href={`/admin/modules/${slug}/categories`}>
+      <Link href={`/admin/${slug}/categories`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Categories</CardTitle>
@@ -55,7 +55,7 @@ export default function DynamicModuleDashboard() {
         </Card>
       </Link>
 
-      <Link href={`/admin/modules/${slug}/orders`}>
+      <Link href={`/admin/${slug}/orders`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Orders</CardTitle>
@@ -72,7 +72,7 @@ export default function DynamicModuleDashboard() {
 
   const renderBookingDashboard = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Link href={`/admin/modules/${slug}/bookings`}>
+      <Link href={`/admin/${slug}/bookings`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Bookings</CardTitle>
@@ -85,7 +85,7 @@ export default function DynamicModuleDashboard() {
         </Card>
       </Link>
       
-      <Link href={`/admin/modules/${slug}/pricing`}>
+      <Link href={`/admin/${slug}/pricing`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pricing</CardTitle>
@@ -102,7 +102,7 @@ export default function DynamicModuleDashboard() {
 
   const renderSessionDashboard = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Link href={`/admin/modules/${slug}/sessions`}>
+      <Link href={`/admin/${slug}/sessions`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Sessions</CardTitle>
@@ -115,7 +115,7 @@ export default function DynamicModuleDashboard() {
         </Card>
       </Link>
 
-      <Link href={`/admin/modules/${slug}/tickets`}>
+      <Link href={`/admin/${slug}/tickets`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tickets</CardTitle>

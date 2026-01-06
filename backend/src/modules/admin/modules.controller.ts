@@ -91,22 +91,39 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
   try {
     const supabase = getSupabase();
     const { id } = req.params;
+    const force = req.query.force === 'true';
 
-    // Soft delete or hard delete? Let's do soft delete by setting is_active to false for now
-    // or actually delete if no data is associated.
-    // For simplicity, let's just delete from the modules table. 
-    // Foreign key constraints might prevent this if there are items.
-    
-    const { error } = await supabase
+    if (force) {
+      // Attempt hard delete
+      const { error: delErr } = await supabase
+        .from('modules')
+        .delete()
+        .eq('id', id);
+
+      if (delErr) {
+        // If deletion fails due to FK constraints, return informative error
+        return res.status(400).json({ success: false, error: 'Failed to hard-delete module. Remove dependent data or use soft-delete.' });
+      }
+
+      emitToAll('modules.updated', { id, deleted: true });
+      return res.json({ success: true, message: 'Module hard-deleted' });
+    }
+
+    // Soft delete: mark as inactive
+    const { data, error } = await supabase
       .from('modules')
-      .delete()
-      .eq('id', id);
+      .update({ is_active: false })
+      .eq('id', id)
+      .select()
+      .single();
 
     if (error) throw error;
 
-    emitToAll('modules.updated', { id, deleted: true });
+    // Clear cache and notify clients
+    clearModuleCache(data.slug);
+    emitToAll('modules.updated', data);
 
-    res.json({ success: true, message: 'Module deleted successfully' });
+    res.json({ success: true, message: 'Module deactivated (soft-deleted)', data });
   } catch (error) {
     next(error);
   }

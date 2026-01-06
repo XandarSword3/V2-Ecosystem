@@ -158,8 +158,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     // Insert before 'Modules' link
     const modulesIndex = navigation.findIndex(n => n.name === 'Modules');
     if (modulesIndex !== -1) {
-      // Remove the Modules link and insert the dynamic modules
-      navigation.splice(modulesIndex, 1, ...dynamicModules);
+      // Insert dynamic modules before the 'Modules' management link so the management page stays available
+      navigation.splice(modulesIndex, 0, ...dynamicModules);
     }
   }
 
