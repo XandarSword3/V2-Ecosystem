@@ -11,6 +11,7 @@ router.use(authorize('super_admin'));
 
 // Modules
 router.get('/modules', modulesController.getModules);
+router.get('/modules/:id', modulesController.getModule);
 router.post('/modules', modulesController.createModule);
 router.put('/modules/:id', modulesController.updateModule);
 router.delete('/modules/:id', modulesController.deleteModule);
