@@ -73,6 +73,7 @@ export default function StaffChaletsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'today' | 'all'>('today');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBooking, setSelectedBooking] = useState<ChaletBooking | null>(null);
   const { socket } = useSocket();
 
   const fetchBookings = useCallback(async () => {
@@ -288,8 +289,10 @@ export default function StaffChaletsPage() {
                   exit={{ opacity: 0, x: -100 }}
                   transition={{ delay: index * 0.05 }}
                   layout
+                  onClick={() => setSelectedBooking(booking)}
+                  className="cursor-pointer"
                 >
-                  <Card className={`${
+                  <Card className="hover:shadow-lg transition-all">
                     isCheckInDay && booking.status === 'confirmed' ? 'ring-2 ring-blue-400' :
                     isCheckOutDay && booking.status === 'checked_in' ? 'ring-2 ring-orange-400' : ''
                   }`}>
@@ -408,6 +411,145 @@ export default function StaffChaletsPage() {
           )}
         </AnimatePresence>
       </div>
+
+       {/* Chalet Booking Details Modal */}
+       <AnimatePresence>
+        {selectedBooking && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setSelectedBooking(null)}
+          >
+             <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                    Booking #{selectedBooking.booking_number}
+                  </h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {selectedBooking.chalets?.name}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedBooking(null)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+                >
+                  <XCircle className="w-6 h-6 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                
+                {/* Status & Dates */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Status</h3>
+                     <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-medium ${statusConfig[selectedBooking.status]?.color}`}>
+                            {statusConfig[selectedBooking.status]?.label}
+                        </span>
+                     </div>
+                  </div>
+                   <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Dates</h3>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                        {new Date(selectedBooking.check_in_date).toLocaleDateString()} - {new Date(selectedBooking.check_out_date).toLocaleDateString()}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                        {selectedBooking.number_of_nights || 1} Nights
+                    </p>
+                  </div>
+                </div>
+
+                {/* Customer Info */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Customer Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <span className="text-xs text-slate-400">Name</span>
+                            <p className="font-medium">{selectedBooking.customer_name || selectedBooking.users?.full_name}</p>
+                        </div>
+                         <div>
+                            <span className="text-xs text-slate-400">Email</span>
+                            <p className="font-medium">{selectedBooking.customer_email || selectedBooking.users?.email}</p>
+                        </div>
+                         <div>
+                            <span className="text-xs text-slate-400">Phone</span>
+                            <p className="font-medium">{selectedBooking.customer_phone || selectedBooking.users?.phone || '-'}</p>
+                        </div>
+                        <div>
+                            <span className="text-xs text-slate-400">Guests</span>
+                            <p className="font-medium">{selectedBooking.number_of_guests || selectedBooking.guests || 1}</p>
+                        </div>
+                    </div>
+                </div>
+
+                 {/* Financials */}
+                 <div className="space-y-2">
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Billing</h3>
+                    <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Base Amount</span>
+                        <span>{formatCurrency(selectedBooking.base_amount || selectedBooking.total_amount)}</span>
+                    </div>
+                     {selectedBooking.add_ons_amount ? (
+                        <div className="flex justify-between text-sm">
+                            <span className="text-slate-500">Add-ons</span>
+                            <span>{formatCurrency(selectedBooking.add_ons_amount)}</span>
+                        </div>
+                     ) : null}
+                     <div className="flex justify-between font-bold text-lg pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <span>Total</span>
+                        <span>{formatCurrency(selectedBooking.total_amount)}</span>
+                     </div>
+                     <div className="flex justify-between text-sm text-slate-500">
+                         <span>Payment Status</span>
+                         <span className="capitalize">{selectedBooking.payment_status || 'Pending'}</span>
+                     </div>
+                 </div>
+
+                 {selectedBooking.special_requests && (
+                    <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                        <h3 className="text-sm font-bold text-yellow-800 dark:text-yellow-200 mb-1">Special Requests</h3>
+                         <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            {selectedBooking.special_requests}
+                        </p>
+                    </div>
+                 )}
+
+              </div>
+
+              <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
+                    {/* Action Buttons within Modal */}
+                    {selectedBooking.status === 'confirmed' && (
+                        <Button onClick={() => {updateBookingStatus(selectedBooking.id, 'checked_in'); setSelectedBooking(null);}}>
+                            <LogIn className="w-4 h-4 mr-2" /> Check In
+                        </Button>
+                    )}
+                     {selectedBooking.status === 'checked_in' && (
+                        <Button onClick={() => {updateBookingStatus(selectedBooking.id, 'checked_out'); setSelectedBooking(null);}}>
+                            <LogOut className="w-4 h-4 mr-2" /> Check Out
+                        </Button>
+                    )}
+                    {selectedBooking.status === 'pending' && (
+                        <>
+                             <Button onClick={() => {updateBookingStatus(selectedBooking.id, 'confirmed'); setSelectedBooking(null);}}>
+                                Confirm
+                            </Button>
+                            <Button variant="danger" onClick={() => {updateBookingStatus(selectedBooking.id, 'cancelled'); setSelectedBooking(null);}}>
+                                Cancel
+                            </Button>
+                        </>
+                    )}
+              </div>
+            </motion.div>    
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

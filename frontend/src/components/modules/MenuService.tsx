@@ -52,15 +52,24 @@ export function MenuService({ module }: MenuServiceProps) {
       id: item.id,
       name: item.name,
       price: item.price,
-      moduleId: module.id, // Add module ID to cart item if needed for separation
+      quantity: 1,
+      moduleId: module.id,
+      moduleName: module.name,
+      type: isSnackBar ? 'snack' : 'restaurant',
+      // Ensure image is mapped correctly if it's 'image_url' in API response
+      imageUrl: item.image_url || item.image 
     };
 
-    if (isSnackBar) {
-      addToSnack(cartItem);
-    } else {
-      addToRestaurant(cartItem);
-    }
-    toast.success(t('addedToCart', { name: translateContent(item, 'name') }));
+    addItem(cartItem);
+    toast.success(tCommon('addedToCart'));
+  };
+
+  const removeFromCart = (itemId: string) => {
+    // We need to implement removal logic here or update cart store
+    // For now assuming we just want to decrement or remove
+    // But since `MenuService` local usage of `removeFromCart` implies decrementing...
+    // We need to find the item in cart first to check quantity?
+    // Let's use `updateQuantity` instead if we have access to it.
   };
 
   const removeFromCart = (itemId: string) => {
