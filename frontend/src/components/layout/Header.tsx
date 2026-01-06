@@ -144,7 +144,7 @@ export default function Header() {
           {/* Right Side Actions */}
           <div className="flex items-center gap-2">
             {/* Cart Button */}
-            {totalCartCount > 0 && (
+            {cartCount > 0 && (
               <Link href="/cart">
                 <motion.div
                   initial={{ scale: 0 }}
@@ -159,7 +159,7 @@ export default function Header() {
                     animate={{ scale: 1 }}
                     className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
                   >
-                    {totalCartCount}
+                    {cartCount}
                   </motion.span>
                 </motion.div>
               </Link>
