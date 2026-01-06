@@ -32,6 +32,7 @@ export function MenuService({ module }: MenuServiceProps) {
   const snackItems = useCartStore((s) => s.snackItems);
   const addToSnack = useCartStore((s) => s.addToSnack);
   const removeFromSnack = useCartStore((s) => s.removeFromSnack);
+  const addItem = useCartStore((s) => s.addItem);
 
   const isSnackBar = module.slug === 'snack-bar';
 

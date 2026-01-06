@@ -24,6 +24,7 @@ import {
   Search,
   AlertCircle,
   Sparkles,
+  XCircle,
 } from 'lucide-react';
 
 interface ChaletBooking {
@@ -184,7 +185,7 @@ export default function StaffChaletsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 text-sm">Today's Check-ins</p>
+                  <p className="text-blue-100 text-sm">Today&apos;s Check-ins</p>
                   <p className="text-3xl font-bold">{todayCheckIns}</p>
                 </div>
                 <LogIn className="w-10 h-10 text-blue-200" />
@@ -198,7 +199,7 @@ export default function StaffChaletsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-orange-100 text-sm">Today's Check-outs</p>
+                  <p className="text-orange-100 text-sm">Today&apos;s Check-outs</p>
                   <p className="text-3xl font-bold">{todayCheckOuts}</p>
                 </div>
                 <LogOut className="w-10 h-10 text-orange-200" />
