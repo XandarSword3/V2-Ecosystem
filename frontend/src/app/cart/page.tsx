@@ -5,14 +5,16 @@ import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { formatCurrency } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { toast } from 'sonner';
-import { Trash2, Plus, Minus, ArrowRight, ShoppingCart, Store } from 'lucide-react';
+import { Trash2, Plus, Minus, ArrowRight, ShoppingCart, Store, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
+import { toast } from 'sonner';
 
 export default function CartPage() {
   const t = useTranslations('common');
+  const router = useRouter();
   const currency = useSettingsStore((s) => s.currency);
 
   const items = useCartStore((s) => s.items);
@@ -33,6 +35,34 @@ export default function CartPage() {
     acc[key].push(item);
     return acc;
   }, {} as Record<string, typeof items>);
+
+  const hasMultipleModules = Object.keys(groupedItems).length > 1;
+
+  const handleCheckout = (moduleId?: string) => {
+    let targetModuleId = moduleId;
+
+    // If no specific module ID passed, try to detect single module context
+    if (!targetModuleId) {
+      const uniqueModules = Array.from(new Set(items.map(i => i.moduleId).filter(Boolean)));
+      
+      if (uniqueModules.length === 1) {
+        targetModuleId = uniqueModules[0];
+      } else if (uniqueModules.length > 1) {
+        toast.info("Please checkout each module separately using the buttons in each section.");
+        return;
+      } else {
+        targetModuleId = items[0]?.moduleId;
+        if (!targetModuleId) {
+            toast.error("Unable to determine checkout destination.");
+            return;
+        }
+      }
+    }
+
+    if (targetModuleId) {
+      router.push(`/${targetModuleId}/cart`);
+    }
+  };
 
   if (isEmpty) {
     return (
@@ -69,70 +99,86 @@ export default function CartPage() {
         </div>
 
         <div className="grid gap-8">
-          {Object.entries(groupedItems).map(([moduleName, moduleItems]) => (
-            <section key={moduleName}>
-              <div className="flex items-center gap-2 mb-4">
-                <Store className="w-5 h-5 text-primary-600" />
-                <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-                  {moduleName}
-                </h2>
-              </div>
-              <Card>
-                <CardContent className="p-0 divide-y divide-slate-100 dark:divide-slate-800">
-                  {moduleItems.map((item) => (
-                    <div key={item.id} className="p-4 flex items-center gap-4">
-                      {item.imageUrl && (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="w-16 h-16 object-cover rounded-lg"
-                        />
-                      )}
-                      <div className="flex-1">
-                        <h3 className="font-medium text-slate-900 dark:text-white">
-                          {item.name}
-                        </h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          {formatCurrency(item.price, currency)}
-                        </p>
-                        {item.specialInstructions && (
-                          <p className="text-xs text-slate-500 mt-1 italic">
-                            "{item.specialInstructions}"
-                          </p>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-3">
-                         <div className="flex items-center border rounded-lg dark:border-slate-700">
-                          <button
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </button>
-                          <span className="w-8 text-center text-sm font-medium">
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+          {Object.entries(groupedItems).map(([moduleName, moduleItems]) => {
+             const sectionModuleId = moduleItems[0]?.moduleId;
+             return (
+                <section key={moduleName}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Store className="w-5 h-5 text-primary-600" />
+                      <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                        {moduleName}
+                      </h2>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </section>
-          ))}
+                    {hasMultipleModules && sectionModuleId && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleCheckout(sectionModuleId)}
+                          className="gap-2"
+                        >
+                          Checkout {moduleName}
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                    )}
+                  </div>
+                  <Card>
+                    <CardContent className="p-0 divide-y divide-slate-100 dark:divide-slate-800">
+                      {moduleItems.map((item) => (
+                        <div key={item.id} className="p-4 flex items-center gap-4">
+                          {item.imageUrl && (
+                            <img
+                              src={item.imageUrl}
+                              alt={item.name}
+                              className="w-16 h-16 object-cover rounded-lg"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h3 className="font-medium text-slate-900 dark:text-white">
+                              {item.name}
+                            </h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                              {formatCurrency(item.price, currency)}
+                            </p>
+                            {item.specialInstructions && (
+                              <p className="text-xs text-slate-500 mt-1 italic">
+                                "{item.specialInstructions}"
+                              </p>
+                            )}
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                             <div className="flex items-center border rounded-lg dark:border-slate-700">
+                              <button
+                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              >
+                                <Minus className="w-4 h-4" />
+                              </button>
+                              <span className="w-8 text-center text-sm font-medium">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => removeItem(item.id)}
+                              className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </section>
+             );
+          })}
 
           {/* Checkout Section */}
           <div className="mt-8 flex justify-end">
@@ -143,37 +189,18 @@ export default function CartPage() {
                   {formatCurrency(total, currency)}
                 </span>
               </div>
-              <Button onClick={() => {
-                const moduleIds = Array.from(new Set(items.map(i => i.moduleId || '')));
-                if (moduleIds.length === 0) return;
-
-                const target = moduleIds[0];
-                if (moduleIds.length > 1) {
-                  toast.info('Multiple modules in cart — redirecting to first module cart. Consider checking out per module.');
-                }
-
-                if (target === 'restaurant') {
-                  window.location.href = '/restaurant/cart';
-                  return;
-                }
-
-                if (target === 'snack-bar') {
-                  window.location.href = '/snack-bar/cart';
-                  return;
-                }
-
-                // If we don't have a dedicated cart route, send them to the module page and instruct them
-                const knownCarts = ['restaurant', 'snack-bar'];
-                if (knownCarts.includes(target)) {
-                  window.location.href = `/${target}/cart`;
-                } else {
-                  toast.info('This module does not have a consolidated cart; please proceed to the module page to complete purchase.');
-                  window.location.href = `/${target}`;
-                }
-              }} className="w-full h-12 text-lg gap-2">
+              <Button 
+                className="w-full h-12 text-lg gap-2"
+                onClick={() => handleCheckout()}
+              >
                 Checkout
                 <ArrowRight className="w-5 h-5" />
               </Button>
+              {hasMultipleModules && (
+                <p className="text-xs text-center mt-2 text-slate-500">
+                  Please checkout each module separately using the buttons above
+                </p>
+              )}
             </div>
           </div>
         </div>
