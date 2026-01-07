@@ -60,7 +60,7 @@ export default function AdminPoolCapacityPage() {
   const saveSettings = async () => {
     try {
       setSaving(true);
-      await api.put('/pool/settings', settings);
+      await api.put('/pool/admin/settings', settings);
       toast.success('Pool settings saved');
     } catch (error) {
       toast.error('Failed to save settings');
@@ -73,7 +73,7 @@ export default function AdminPoolCapacityPage() {
     if (!confirm('Are you sure you want to reset the current occupancy to 0?')) return;
     
     try {
-      await api.post('/pool/reset-occupancy');
+      await api.post('/pool/admin/reset-occupancy');
       setSettings((prev) => ({ ...prev, current_occupancy: 0 }));
       toast.success('Occupancy reset');
     } catch (error) {

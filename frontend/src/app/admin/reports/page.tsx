@@ -52,10 +52,22 @@ interface ReportData {
   }>;
 }
 
+type ExportType = 'restaurant' | 'chalets' | 'pool' | 'snack' | 'users';
+
+const EXPORT_OPTIONS: { value: ExportType; label: string }[] = [
+  { value: 'restaurant', label: 'Restaurant Orders' },
+  { value: 'chalets', label: 'Chalet Bookings' },
+  { value: 'pool', label: 'Pool Tickets' },
+  { value: 'snack', label: 'Snack Orders' },
+  { value: 'users', label: 'Users' },
+];
+
 export default function AdminReportsPage() {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'year'>('month');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fetchReports = useCallback(async () => {
     try {
@@ -77,17 +89,19 @@ export default function AdminReportsPage() {
     fetchReports();
   }, [fetchReports]);
 
-  const exportReport = async () => {
+  const exportReport = async (type: ExportType) => {
+    setExporting(true);
+    setShowExportMenu(false);
     try {
       const response = await api.get('/admin/reports/export', {
-        params: { range: dateRange, format: 'csv' },
+        params: { range: dateRange, format: 'csv', type },
         responseType: 'blob',
       });
       
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `report-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `${type}-report-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -95,6 +109,8 @@ export default function AdminReportsPage() {
       toast.success('Report exported successfully');
     } catch (error) {
       toast.error('Failed to export report');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -186,10 +202,25 @@ export default function AdminReportsPage() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={exportReport}>
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
+          <div className="relative">
+            <Button onClick={() => setShowExportMenu(!showExportMenu)} disabled={exporting}>
+              <Download className="w-4 h-4 mr-2" />
+              {exporting ? 'Exporting...' : 'Export'}
+            </Button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-10">
+                {EXPORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => exportReport(opt.value)}
+                    className="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 first:rounded-t-lg last:rounded-b-lg text-sm"
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
