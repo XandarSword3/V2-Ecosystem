@@ -142,7 +142,30 @@ export default function CartPage() {
                   {formatCurrency(total, currency)}
                 </span>
               </div>
-              <Button className="w-full h-12 text-lg gap-2">
+              <Button onClick={() => {
+                const moduleIds = Array.from(new Set(items.map(i => i.moduleId || '')));
+                if (moduleIds.length === 0) return;
+
+                const target = moduleIds[0];
+                if (moduleIds.length > 1) {
+                  // If multiple modules are present, guide user to checkout per module
+                  // Redirect to the first module cart but inform the user
+                  // You could replace this with a multi-module checkout flow later
+                }
+
+                if (target === 'restaurant') {
+                  window.location.href = '/restaurant/cart';
+                  return;
+                }
+
+                if (target === 'snack-bar') {
+                  window.location.href = '/snack-bar/cart';
+                  return;
+                }
+
+                // Attempt a generic module-specific cart route
+                window.location.href = `/${target}/cart`;
+              }} className="w-full h-12 text-lg gap-2">
                 Checkout
                 <ArrowRight className="w-5 h-5" />
               </Button>
