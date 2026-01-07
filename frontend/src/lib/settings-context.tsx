@@ -45,6 +45,15 @@ export interface SiteSettings {
 
   // Appearance
   theme: ResortTheme;
+  themeColors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    surface: string;
+    text: string;
+    textMuted: string;
+  };
   weatherEffect: WeatherEffect;
   animationsEnabled: boolean;
   reducedMotion: boolean;

@@ -62,43 +62,25 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
     fetchModules();
   }, []);
 
+// Dynamic modules only to avoid duplicates
   const navigation: NavItem[] = [
-    { 
-      name: t('nav.kitchen'), 
-      href: '/staff/restaurant', 
-      icon: ChefHat,
-      roles: ['restaurant_staff', 'restaurant_admin', 'super_admin']
-    },
     ...modules.map(module => ({
       name: module.name,
       href: `/staff/modules/${module.slug}`,
-      icon: ChefHat,
-      roles: ['restaurant_staff', 'restaurant_admin', 'super_admin']
+      icon: ChefHat, // Default icon
+      roles: ['super_admin', 'admin', `${module.slug}_staff`, `${module.slug}_admin`,
+             // Explicitly map legacy roles to specific slugs for backward compatibility
+             module.slug === 'restaurant' ? 'restaurant_staff' : '',
+             module.slug === 'restaurant' ? 'restaurant_admin' : '',
+             module.slug === 'pool' ? 'pool_staff' : '',
+             module.slug === 'pool' ? 'pool_admin' : '',
+             module.slug === 'chalets' ? 'chalet_staff' : '',
+             module.slug === 'chalets' ? 'chalet_admin' : '',
+             module.slug === 'snack-bar' ? 'snack_bar_staff' : '',
+             module.slug === 'snack-bar' ? 'snack_bar_admin' : ''
+             ].filter(Boolean)
     })),
-    { 
-      name: t('nav.snackBar'), 
-      href: '/staff/snack', 
-      icon: Cookie,
-      roles: ['snack_bar_staff', 'snack_bar_admin', 'super_admin']
-    },
-    { 
-      name: t('nav.chalets'), 
-      href: '/staff/chalets', 
-      icon: Home,
-      roles: ['chalet_staff', 'chalet_admin', 'super_admin']
-    },
-    { 
-      name: t('nav.pool'), 
-      href: '/staff/pool', 
-      icon: Waves,
-      roles: ['pool_staff', 'pool_admin', 'super_admin']
-    },
-    { 
-      name: t('nav.bookings'), 
-      href: '/staff/bookings', 
-      icon: Calendar,
-      roles: ['chalet_staff', 'chalet_admin', 'super_admin']
-    },
+    // Static utilities
     { 
       name: t('nav.ticketScanner'), 
       href: '/staff/scanner', 
