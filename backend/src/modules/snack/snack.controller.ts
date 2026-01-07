@@ -12,7 +12,7 @@ function generateOrderNumber(): string {
 export async function getItems(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const { category, available } = req.query;
+    const { category, available, moduleId } = req.query;
     
     let query = supabase
       .from('snack_items')
@@ -20,6 +20,10 @@ export async function getItems(req: Request, res: Response, next: NextFunction) 
       .is('deleted_at', null)
       .order('display_order', { ascending: true });
 
+    // Filter by module_id for proper data isolation
+    if (moduleId) {
+      query = query.eq('module_id', moduleId);
+    }
     if (category) {
       query = query.eq('category', category);
     }
@@ -397,7 +401,7 @@ export async function createItem(req: Request, res: Response, next: NextFunction
         description_ar: body.descriptionAr || body.description_ar || null,
         price: String(body.price),
         category: body.category || 'snack',
-        // category_id removed as it doesn't exist in DB
+        module_id: body.moduleId || body.module_id || null, // Module isolation
         image_url: body.imageUrl || body.image_url || null,
         display_order: body.displayOrder || body.display_order || 0,
         is_available: body.isAvailable !== undefined ? body.isAvailable : (body.is_available !== undefined ? body.is_available : true),
