@@ -73,6 +73,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { name: t('nav.bookings'), href: '/admin/chalets/bookings' },
         { name: t('nav.pricingRules'), href: '/admin/chalets/pricing' },
         { name: t('nav.addons'), href: '/admin/chalets/addons' },
+        { name: t('nav.settings'), href: '/admin/chalets/settings' },
       ]
     },
     { 
