@@ -38,6 +38,9 @@ export default function CartPage() {
 
   const hasMultipleModules = Object.keys(groupedItems).length > 1;
 
+  // Map module IDs to their slug before routing to avoid landing on 404s when the ID is used
+  const { modules } = useSiteSettings();
+
   const handleCheckout = (moduleId?: string) => {
     let targetModuleId = moduleId;
 
@@ -60,7 +63,10 @@ export default function CartPage() {
     }
 
     if (targetModuleId) {
-      router.push(`/${targetModuleId}/cart`);
+      // Prefer routing by slug when we can find the module
+      const mod = modules.find((m) => m.id === targetModuleId) || modules.find((m) => m.slug === targetModuleId);
+      const slug = mod ? mod.slug : targetModuleId;
+      router.push(`/${slug}/cart`);
     }
   };
 
