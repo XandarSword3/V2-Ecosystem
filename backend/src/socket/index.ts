@@ -28,6 +28,20 @@ function isAllowedOrigin(origin: string | undefined): boolean {
   return false;
 }
 
+export function getOnlineUsers(): string[] {
+  if (!io) return [];
+  const userIds = new Set<string>();
+  
+  // Iterate through all connected sockets
+  io.sockets.sockets.forEach((socket) => {
+    if (socket.data.userId) {
+      userIds.add(socket.data.userId);
+    }
+  });
+
+  return Array.from(userIds);
+}
+
 export function initializeSocketServer(httpServer: HttpServer) {
   io = new Server(httpServer, {
     cors: {
