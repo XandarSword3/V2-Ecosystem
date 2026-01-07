@@ -35,7 +35,9 @@ export default function RestaurantCartPage() {
   const router = useRouter();
   const currency = useSettingsStore((s) => s.currency);
 
-  const restaurantItems = useCartStore((s) => s.restaurantItems);
+  // Fix: derive restaurantItems from main items array
+  const restaurantItems = useCartStore((s) => s.items.filter(i => i.moduleId === 'restaurant'));
+  
   const addToRestaurant = useCartStore((s) => s.addToRestaurant);
   const removeFromRestaurant = useCartStore((s) => s.removeFromRestaurant);
   const updateRestaurantInstructions = useCartStore((s) => s.updateRestaurantInstructions);

@@ -25,14 +25,9 @@ export function MenuService({ module }: MenuServiceProps) {
   const currency = useSettingsStore((s) => s.currency);
 
   // Use the cart store
-  const restaurantItems = useCartStore((s) => s.restaurantItems);
-  const addToRestaurant = useCartStore((s) => s.addToRestaurant);
-  const removeFromRestaurant = useCartStore((s) => s.removeFromRestaurant);
-  
-  const snackItems = useCartStore((s) => s.snackItems);
-  const addToSnack = useCartStore((s) => s.addToSnack);
-  const removeFromSnack = useCartStore((s) => s.removeFromSnack);
   const addItem = useCartStore((s) => s.addItem);
+  const removeItem = useCartStore((s) => s.removeItem);
+  const allItems = useCartStore((s) => s.items);
 
   const isSnackBar = module.slug === 'snack-bar';
 
@@ -54,7 +49,7 @@ export function MenuService({ module }: MenuServiceProps) {
       name: item.name,
       price: item.price,
       quantity: 1,
-      moduleId: module.slug, // use slug so routing and grouping are predictable
+      moduleId: module.id,
       moduleName: module.name,
       type: isSnackBar ? 'snack' : 'restaurant',
       // Ensure image is mapped correctly if it's 'image_url' in API response
@@ -66,16 +61,12 @@ export function MenuService({ module }: MenuServiceProps) {
   };
 
   const removeFromCart = (itemId: string) => {
-    if (isSnackBar) {
-      removeFromSnack(itemId);
-    } else {
-      removeFromRestaurant(itemId);
-    }
+    removeItem(itemId);
   };
 
   const getItemQuantity = (itemId: string) => {
-    const items = isSnackBar ? snackItems : restaurantItems;
-    const item = items.find((i) => i.id === itemId);
+    // Find item with same ID and Module ID
+    const item = allItems.find((i) => i.id === itemId && i.moduleId === module.id);
     return item?.quantity || 0;
   };
 
