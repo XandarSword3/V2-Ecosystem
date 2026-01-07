@@ -675,3 +675,26 @@ export async function updatePoolSettings(req: Request, res: Response, next: Next
     next(error);
   }
 }
+
+export async function resetOccupancy(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    
+    // Reset current occupancy to 0
+    await supabase
+      .from('site_settings')
+      .upsert(
+        { 
+          key: 'current_occupancy', 
+          value: '0', 
+          category: 'pool',
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'key,category' }
+      );
+    
+    res.json({ success: true, message: 'Occupancy reset to 0' });
+  } catch (error) {
+    next(error);
+  }
+}
