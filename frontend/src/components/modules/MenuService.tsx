@@ -50,6 +50,7 @@ export function MenuService({ module }: MenuServiceProps) {
       price: item.price,
       quantity: 1,
       moduleId: module.id,
+      moduleSlug: module.slug,
       moduleName: module.name,
       type: isSnackBar ? 'snack' : 'restaurant',
       // Ensure image is mapped correctly if it's 'image_url' in API response
@@ -57,7 +58,8 @@ export function MenuService({ module }: MenuServiceProps) {
     };
 
     addItem(cartItem);
-    toast.success(tCommon('addedToCart'));
+    // Pass item name for the translation string
+    toast.success(tCommon('addedToCart', { name: translateContent(item, 'name') }));
   };
 
   const removeFromCart = (itemId: string) => {
