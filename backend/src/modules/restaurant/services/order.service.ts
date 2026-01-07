@@ -35,6 +35,11 @@ export async function createOrder(data: {
 
   const itemMap = new Map((menuItemsList || []).map(i => [i.id, i]));
 
+  // Infer module_id from the first item (assuming all items are from the same module)
+  // If mixed modules is possible in backend but not frontend, this might be risky, 
+  // but frontend now enforces single module per checkout.
+  const moduleId = menuItemsList?.[0]?.module_id;
+
   // Calculate totals
   let subtotal = 0;
   const orderItems = data.items.map(item => {
@@ -73,6 +78,7 @@ export async function createOrder(data: {
       customer_name: data.customerName,
       customer_phone: data.customerPhone,
       table_id: data.tableId,
+      module_id: moduleId,
       order_type: data.orderType,
       status: 'pending',
       subtotal: subtotal.toFixed(2),
