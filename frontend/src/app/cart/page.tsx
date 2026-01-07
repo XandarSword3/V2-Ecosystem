@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { Trash2, Plus, Minus, ArrowRight, ShoppingCart, Store } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -148,9 +149,7 @@ export default function CartPage() {
 
                 const target = moduleIds[0];
                 if (moduleIds.length > 1) {
-                  // If multiple modules are present, guide user to checkout per module
-                  // Redirect to the first module cart but inform the user
-                  // You could replace this with a multi-module checkout flow later
+                  toast.info('Multiple modules in cart — redirecting to first module cart. Consider checking out per module.');
                 }
 
                 if (target === 'restaurant') {
