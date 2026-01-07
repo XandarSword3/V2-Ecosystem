@@ -636,6 +636,7 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
 
     const appearanceSettings = {
       theme: settings.theme,
+      themeColors: settings.themeColors,
       weatherEffect: settings.weatherEffect,
       animationsEnabled: settings.animationsEnabled,
       reducedMotion: settings.reducedMotion,

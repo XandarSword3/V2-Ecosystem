@@ -11,12 +11,15 @@ function hexToRgb(hex: string) {
 
 export function ThemeInjector() {
   const { settings } = useSiteSettings();
-  const theme = resortThemes[settings.theme] || resortThemes.beach;
+  const themePreset = resortThemes[settings.theme] || resortThemes.beach;
+  
+  // Use CMS-defined colors if available, otherwise use theme preset
+  const colors = (settings as any).themeColors || themePreset.colors;
 
   useEffect(() => {
     const root = document.documentElement;
-    const colors = theme.colors;
-
+    // colors is already derived in render scope, but let's use it inside effect
+    
     // Helper to set color variable
     const set = (name: string, hex: string) => {
       const rgb = hexToRgb(hex);
@@ -47,7 +50,7 @@ export function ThemeInjector() {
       set('resort-background', colors.background); // For custom usage
     }
 
-  }, [theme]);
+  }, [colors]);
 
   return null;
 }
