@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection";
 import { emitToAll } from "../../socket";
+import bcrypt from 'bcryptjs';
 import { clearModuleCache } from "../../middleware/moduleGuard.middleware";
 import { createModuleSchema, updateModuleSchema, validateBody } from "../../validation/schemas";
 
@@ -83,6 +84,48 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
       .single();
 
     if (error) throw error;
+
+    // --- Auto-create Roles & Staff User ---
+    try {
+      // 1. Create Roles
+      const roleNames = [`${finalSlug}_admin`, `${finalSlug}_staff`];
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('roles')
+        .insert(roleNames.map(r => ({ name: r, description: `Role for ${name}` })))
+        .select();
+
+      if (!rolesError && rolesData) {
+        // 2. Create Default Staff User
+        const staffEmail = `staff.${finalSlug}@v2resort.com`;
+        const staffPassword = await bcrypt.hash(`Staff${finalSlug.charAt(0).toUpperCase() + finalSlug.slice(1)}123!`, 10);
+        
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .insert({
+            email: staffEmail,
+            password: staffPassword,
+            full_name: `${name} Staff`,
+            phone: '',
+            is_active: true,
+            email_verified: true,
+            roles: roleNames // Store simply for reference or if using array column
+          })
+          .select()
+          .single();
+
+        if (!userError && userData) {
+             // 3. Link User to Roles (using user_roles junction table)
+             const userRolesInserts = rolesData.map((role: any) => ({
+                 user_id: userData.id,
+                 role_id: role.id
+             }));
+             await supabase.from('user_roles').insert(userRolesInserts);
+        }
+      }
+    } catch (innerError) {
+      console.error('Failed to auto-create staff/roles for module:', innerError);
+      // We don't fail the module creation itself, just log
+    }
 
     emitToAll('modules.updated', data);
 
