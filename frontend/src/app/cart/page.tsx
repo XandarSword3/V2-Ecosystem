@@ -162,8 +162,14 @@ export default function CartPage() {
                   return;
                 }
 
-                // Attempt a generic module-specific cart route
-                window.location.href = `/${target}/cart`;
+                // If we don't have a dedicated cart route, send them to the module page and instruct them
+                const knownCarts = ['restaurant', 'snack-bar'];
+                if (knownCarts.includes(target)) {
+                  window.location.href = `/${target}/cart`;
+                } else {
+                  toast.info('This module does not have a consolidated cart; please proceed to the module page to complete purchase.');
+                  window.location.href = `/${target}`;
+                }
               }} className="w-full h-12 text-lg gap-2">
                 Checkout
                 <ArrowRight className="w-5 h-5" />
