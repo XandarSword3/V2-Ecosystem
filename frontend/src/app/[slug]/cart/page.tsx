@@ -37,8 +37,10 @@ export default function ModuleCartPage() {
   
   const router = useRouter();
   const params = useParams();
-  const slug = params?.slug as string;
-  const { modules } = useSiteSettings();
+  const rawSlug = params?.slug;
+  const slug = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
+
+  const { modules, loading: modulesLoading } = useSiteSettings();
   
   const currentModule = modules.find((m) => m.slug === slug);
   const moduleId = currentModule?.id;
@@ -51,8 +53,11 @@ export default function ModuleCartPage() {
   }, []);
 
   // Filter items for THIS module
+  // Only access useCartStore if hydrated to avoid mismatches, or use the store's hook which handles it?
+  // Zustand's hook returns the client state usually.
   const items = useCartStore((s) => s.items);
-  const moduleItems = items.filter(i => i.moduleId === moduleId);
+  // We need to be careful: if we filter items based on moduleId which might be undefined initially...
+  const moduleItems = moduleId ? items.filter(i => i.moduleId === moduleId) : [];
   
   const addItem = useCartStore((s) => s.addItem);
   const removeItem = useCartStore((s) => s.removeItem);
@@ -125,8 +130,24 @@ export default function ModuleCartPage() {
     });
   };
 
-  if (!isHydrated || !currentModule) {
-      return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  if (!isHydrated) {
+      return null;
+  }
+
+  if (modulesLoading) {
+      return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin w-8 h-8 text-primary-500" /></div>;
+  }
+
+  if (!currentModule) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center">
+            <h2 className="text-xl font-bold mb-2">Module Not Found</h2>
+            <p className="text-slate-500 mb-4">Could not find module for slug: {slug}</p>
+            <Link href="/">
+                <Button>Return Home</Button>
+            </Link>
+        </div>
+      );
   }
 
   if (moduleItems.length === 0) {
