@@ -205,7 +205,7 @@ export default function StaffDashboard() {
       return {
         title: m.name,
         description,
-        href: `/staff/${m.slug}`,
+        href: `/staff/modules/${m.slug}`,
         icon,
         color,
         bgColor

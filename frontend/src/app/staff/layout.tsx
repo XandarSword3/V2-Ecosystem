@@ -52,7 +52,8 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
       try {
         const response = await api.get('/admin/modules');
         if (response.data.success) {
-          setModules(response.data.data.filter((m: any) => m.isActive));
+          // Normalise backend flag names: some APIs return `is_active`, others `isActive`
+          setModules(response.data.data.filter((m: any) => (m.is_active ?? m.isActive)));
         }
       } catch (error) {
         console.error('Failed to fetch modules:', error);
