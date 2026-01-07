@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useSocket } from '@/lib/socket';
@@ -714,8 +714,8 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
   );
 }
 
-export default function ModulePage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
+export default function ModulePage({ params }: { params: { slug: string } }) {
+  const slug = params.slug;
   const [moduleId, setModuleId] = useState<string | null>(null);
   const [moduleName, setModuleName] = useState<string>('');
   const [templateType, setTemplateType] = useState<string>('');
