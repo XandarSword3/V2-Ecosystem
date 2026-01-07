@@ -40,7 +40,9 @@ export default function SnackCartPage() {
     setIsHydrated(true);
   }, []);
 
-  const snackItems = useCartStore((s) => s.snackItems);
+  // Fix: derive snackItems from main items array
+  const snackItems = useCartStore((s) => s.items.filter(i => i.moduleId === 'snack-bar'));
+  
   const addToSnack = useCartStore((s) => s.addToSnack);
   const removeFromSnack = useCartStore((s) => s.removeFromSnack);
   const clearSnackCart = useCartStore((s) => s.clearSnackCart);
