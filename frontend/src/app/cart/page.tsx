@@ -2,6 +2,7 @@
 
 import { useCartStore } from '@/lib/stores/cartStore';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSiteSettings } from '@/lib/settings-context';
 import { formatCurrency } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
