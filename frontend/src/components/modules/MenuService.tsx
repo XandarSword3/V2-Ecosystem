@@ -58,8 +58,15 @@ export function MenuService({ module }: MenuServiceProps) {
     };
 
     addItem(cartItem);
-    // Pass item name for the translation string
-    toast.success(tCommon('addedToCart', { name: translateContent(item, 'name') }));
+
+    // Pass item name for the translation string; fallback to a simple English string
+    const translatedName = translateContent(item, 'name');
+    const msg = tCommon('addedToCart', { name: translatedName });
+    if (typeof msg === 'string' && msg.includes('MISSING_MESSAGE')) {
+      toast.success(`${translatedName} added to cart`);
+    } else {
+      toast.success(msg);
+    }
   };
 
   const removeFromCart = (itemId: string) => {
