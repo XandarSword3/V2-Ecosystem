@@ -54,7 +54,7 @@ export function MenuService({ module }: MenuServiceProps) {
       name: item.name,
       price: item.price,
       quantity: 1,
-      moduleId: module.id,
+      moduleId: module.slug, // use slug so routing and grouping are predictable
       moduleName: module.name,
       type: isSnackBar ? 'snack' : 'restaurant',
       // Ensure image is mapped correctly if it's 'image_url' in API response
