@@ -192,9 +192,15 @@ export default function RolesPage() {
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Users className="h-4 w-4" />
-                  {role.users_count || 0} users
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span>{role.users_count || 0} users</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    <span>{role.permissions_count || 0} perms</span>
+                  </div>
                 </div>
                 <Button 
                   variant="outline" 

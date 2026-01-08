@@ -505,7 +505,45 @@ export async function getRoles(req: Request, res: Response, next: NextFunction) 
 
     if (error) throw error;
 
-    res.json({ success: true, data: rolesList || [] });
+    const roles = rolesList || [];
+
+    if (roles.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const roleIds = roles.map((r: any) => r.id).filter(Boolean);
+
+    // Fetch user_roles for counts
+    const { data: userRolesData } = await supabase
+      .from('user_roles')
+      .select('role_id')
+      .in('role_id', roleIds);
+
+    const userCountMap: Record<string, number> = {};
+    (userRolesData || []).forEach((ur: any) => {
+      if (!ur.role_id) return;
+      userCountMap[ur.role_id] = (userCountMap[ur.role_id] || 0) + 1;
+    });
+
+    // Fetch role_permissions for permission counts
+    const { data: rolePermsData } = await supabase
+      .from('role_permissions')
+      .select('role_id,permission_id')
+      .in('role_id', roleIds);
+
+    const permCountMap: Record<string, number> = {};
+    (rolePermsData || []).forEach((rp: any) => {
+      if (!rp.role_id) return;
+      permCountMap[rp.role_id] = (permCountMap[rp.role_id] || 0) + 1;
+    });
+
+    const enriched = roles.map((r: any) => ({
+      ...r,
+      users_count: userCountMap[r.id] || 0,
+      permissions_count: permCountMap[r.id] || 0,
+    }));
+
+    res.json({ success: true, data: enriched });
   } catch (error) {
     next(error);
   }
