@@ -23,7 +23,7 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
 
     // Execute query with fallback in case embedding fails due to ambiguous relationships
     let users: any[] = [];
-    let count: number | undefined = undefined;
+    let count: number | null | undefined = undefined;
 
     try {
       const result = await query;
