@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection";
+import { logActivity } from "../../utils/activityLogger";
 
 // -- Permissions --
 
@@ -79,7 +80,14 @@ export async function updateRolePermissions(req: Request, res: Response, next: N
       
       if (insError) throw insError;
     }
-
+    // Log Activity
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'UPDATE_ROLE_PERMISSIONS',
+      resource: 'roles',
+      resource_id: id,
+      new_value: { permission_ids }
+    });
     res.json({ success: true, message: 'Role permissions updated' });
   } catch (error) {
     next(error);

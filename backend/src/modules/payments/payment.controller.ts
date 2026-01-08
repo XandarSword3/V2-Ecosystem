@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { getSupabase } from "../../database/connection.js";
 import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
-import { createPaymentIntentSchema, recordCashPaymentSchema, validateBody } from "../../validation/schemas.js";
+import { createPaymentIntentSchema, recordCashPaymentSchema, recordManualPaymentSchema, validateBody } from "../../validation/schemas.js";
 
 const stripe = new Stripe(config.stripe.secretKey, {
   apiVersion: '2023-10-16',
@@ -185,6 +185,39 @@ export async function recordCashPayment(req: Request, res: Response, next: NextF
   }
 }
 
+export async function recordManualPayment(req: Request, res: Response, next: NextFunction) {
+  try {
+    const validatedData = validateBody(recordManualPaymentSchema, req.body);
+    const { referenceType, referenceId, amount, method, notes } = validatedData;
+    
+    const supabase = getSupabase();
+
+    const { data: payment, error } = await supabase
+      .from('payments')
+      .insert({
+        reference_type: referenceType,
+        reference_id: referenceId,
+        amount: amount.toFixed(2),
+        currency: 'USD',
+        method: method,
+        status: 'completed',
+        processed_by: req.user!.userId,
+        processed_at: new Date().toISOString(),
+        notes,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
+
+    res.status(201).json({ success: true, data: payment });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getPaymentMethods(req: Request, res: Response, next: NextFunction) {
   try {
     // For now, return supported methods
@@ -193,7 +226,8 @@ export async function getPaymentMethods(req: Request, res: Response, next: NextF
       data: [
         { id: 'cash', name: 'Cash', enabled: true },
         { id: 'card', name: 'Credit/Debit Card', enabled: !!config.stripe.secretKey },
-        { id: 'whish', name: 'Whish', enabled: false }, // TODO: Implement
+        { id: 'whish', name: 'Whish Money Transfer', enabled: true },
+        { id: 'omt', name: 'OMT Money Transfer', enabled: true },
       ],
     });
   } catch (error) {

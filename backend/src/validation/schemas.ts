@@ -185,6 +185,14 @@ export const recordCashPaymentSchema = z.object({
   notes: sanitizedString(500).optional(),
 });
 
+export const recordManualPaymentSchema = z.object({
+  referenceType: z.enum(['restaurant_order', 'snack_order', 'chalet_booking', 'pool_ticket']),
+  referenceId: uuidSchema,
+  amount: z.number().positive().max(100000),
+  method: z.enum(['cash', 'whish', 'omt', 'other_transfer']),
+  notes: sanitizedString(500).optional(),
+});
+
 // ============ ADMIN SCHEMAS ============
 
 export const createUserSchema = z.object({

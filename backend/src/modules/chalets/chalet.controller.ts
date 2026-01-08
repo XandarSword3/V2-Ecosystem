@@ -194,7 +194,16 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
       }
     }
 
-    const depositAmount = baseAmount * 0.3;
+    // Get deposit percentage from settings
+    const { data: depositSetting } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('category', 'chalet')
+      .eq('key', 'deposit_percentage')
+      .single();
+    
+    const depositPercentage = depositSetting ? parseFloat(depositSetting.value) / 100 : 0.3; // Default 30%
+    const depositAmount = baseAmount * depositPercentage;
     const totalAmount = baseAmount + addOnsAmount;
 
     // Create booking
@@ -688,6 +697,61 @@ export async function deletePriceRule(req: Request, res: Response, next: NextFun
 
     if (error) throw error;
     res.json({ success: true, message: 'Price rule deleted' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ============================================
+// Settings
+// ============================================
+
+export async function getChaletSettings(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { data: settings, error } = await supabase
+      .from('site_settings')
+      .select('*')
+      .eq('category', 'chalet');
+    
+    if (error) throw error;
+    
+    const settingsObj: Record<string, any> = {
+      deposit_percentage: 30, // Default
+      check_in_time: '14:00',
+      check_out_time: '11:00',
+    };
+    
+    (settings || []).forEach(s => {
+      settingsObj[s.key] = s.value;
+    });
+    
+    res.json({ success: true, data: settingsObj });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateChaletSettings(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const settings = req.body;
+    
+    for (const [key, value] of Object.entries(settings)) {
+      await supabase
+        .from('site_settings')
+        .upsert(
+          { 
+            key, 
+            value: String(value), 
+            category: 'chalet',
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'key,category' }
+        );
+    }
+    
+    res.json({ success: true, message: 'Settings updated' });
   } catch (error) {
     next(error);
   }

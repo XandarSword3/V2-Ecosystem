@@ -41,6 +41,10 @@ router.post('/admin/price-rules', authenticate, authorize(...adminRoles), chalet
 router.put('/admin/price-rules/:id', authenticate, authorize(...adminRoles), chaletController.updatePriceRule);
 router.delete('/admin/price-rules/:id', authenticate, authorize(...adminRoles), chaletController.deletePriceRule);
 
+// Settings
+router.get('/admin/settings', authenticate, authorize(...adminRoles), chaletController.getChaletSettings);
+router.put('/admin/settings', authenticate, authorize(...adminRoles), chaletController.updateChaletSettings);
+
 // Public routes (Moved to end to avoid conflict with specific routes)
 router.get('/', chaletController.getChalets);
 router.get('/:id', chaletController.getChalet);
