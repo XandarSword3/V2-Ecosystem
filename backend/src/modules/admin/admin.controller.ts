@@ -823,7 +823,33 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
     const settings = req.body;
     const userId = req.user?.userId;
 
-    // Group settings by category for database update (existing schema uses 'key' and 'value' JSONB columns)
+    // Support single key update if format is { key: '...', value: {...} }
+    if (settings.key && settings.value !== undefined) {
+      const { error } = await supabase
+        .from('site_settings')
+        .upsert({
+          key: settings.key,
+          value: settings.value,
+          updated_at: new Date().toISOString(),
+          updated_by: userId,
+        }, { onConflict: 'key' });
+
+      if (error) throw error;
+
+      // Emit specific update
+      emitToAll('settings.updated', { [settings.key]: settings.value });
+
+      await logActivity({
+        user_id: userId!,
+        action: 'UPDATE_SETTINGS',
+        resource: `settings:${settings.key}`,
+        new_value: settings.value
+      });
+
+      return res.json({ success: true, message: `Settings for ${settings.key} saved successfully` });
+    }
+
+    // Legacy bulk update logic
     const generalSettings = {
       resortName: settings.resortName,
       tagline: settings.tagline,
@@ -1372,6 +1398,163 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
     });
 
     res.json({ success: true, data: notifications.slice(0, 10) });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getOccupancyReport(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { range = 'month' } = req.query;
+
+    let start: dayjs.Dayjs;
+    const end = dayjs().endOf('day');
+
+    if (range === 'week') {
+      start = dayjs().subtract(7, 'day').startOf('day');
+    } else if (range === 'year') {
+      start = dayjs().subtract(1, 'year').startOf('day');
+    } else {
+      start = dayjs().subtract(1, 'month').startOf('day');
+    }
+
+    const daysInRange = end.diff(start, 'day') + 1;
+
+    // 1. Chalet Occupancy
+    const [chaletsResult, bookingsResult] = await Promise.all([
+      supabase.from('chalets').select('id', { count: 'exact', head: true }).eq('is_active', true).is('deleted_at', null),
+      supabase.from('chalet_bookings')
+        .select('number_of_nights, check_in_date')
+        .gte('check_in_date', start.toISOString())
+        .lte('check_in_date', end.toISOString())
+        .not('status', 'in', '("cancelled", "no_show")')
+    ]);
+
+    const totalChalets = chaletsResult.count || 0;
+    const totalChaletCapacity = totalChalets * daysInRange;
+    const bookedNights = (bookingsResult.data || []).reduce((sum, b) => sum + (b.number_of_nights || 0), 0);
+    const chaletOccupancyRate = totalChaletCapacity > 0 ? (bookedNights / totalChaletCapacity) * 100 : 0;
+
+    // 2. Pool Occupancy
+    const [sessionsResult, ticketsResult] = await Promise.all([
+      supabase.from('pool_sessions').select('max_capacity').eq('is_active', true),
+      supabase.from('pool_tickets')
+        .select('number_of_guests')
+        .gte('ticket_date', start.toISOString())
+        .lte('ticket_date', end.toISOString())
+        .not('status', 'in', '("cancelled", "no_show")')
+    ]);
+
+    const dailyPoolCapacity = (sessionsResult.data || []).reduce((sum, s) => sum + (s.max_capacity || 0), 0);
+    const totalPoolCapacity = dailyPoolCapacity * daysInRange;
+    const ticketsSold = (ticketsResult.data || []).reduce((sum, t) => sum + (t.number_of_guests || 0), 0);
+    const poolOccupancyRate = totalPoolCapacity > 0 ? (ticketsSold / totalPoolCapacity) * 100 : 0;
+
+    res.json({
+      success: true,
+      data: {
+        chalets: {
+          occupancyRate: Math.round(chaletOccupancyRate * 10) / 10,
+          bookedNights,
+          totalCapacity: totalChaletCapacity,
+          activeUnits: totalChalets
+        },
+        pool: {
+          occupancyRate: Math.round(poolOccupancyRate * 10) / 10,
+          ticketsSold,
+          totalCapacity: totalPoolCapacity,
+          dailyCapacity: dailyPoolCapacity
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getCustomerAnalytics(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { range = 'month' } = req.query;
+
+    let start: dayjs.Dayjs;
+    const end = dayjs().endOf('day');
+
+    if (range === 'week') {
+      start = dayjs().subtract(7, 'day').startOf('day');
+    } else if (range === 'year') {
+      start = dayjs().subtract(1, 'year').startOf('day');
+    } else {
+      start = dayjs().subtract(1, 'month').startOf('day');
+    }
+
+    // Fetch transactions from all units to identify top customers
+    // Since we don't have a single transactions table, we'll fetch from main tables
+    const [restOrders, snackOrders, chaletBookings, poolTickets] = await Promise.all([
+      supabase.from('restaurant_orders').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('status', 'completed'),
+      supabase.from('snack_orders').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('status', 'completed'),
+      supabase.from('chalet_bookings').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('payment_status', 'paid'),
+      supabase.from('pool_tickets').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('payment_status', 'paid')
+    ]);
+
+    const allTransactions = [
+      ...(restOrders.data || []),
+      ...(snackOrders.data || []),
+      ...(chaletBookings.data || []),
+      ...(poolTickets.data || [])
+    ];
+
+    // Group by customer
+    const customerStats = new Map<string, { name: string, revenue: number, count: number, firstDate: string }>();
+
+    allTransactions.forEach(t => {
+      const stats = customerStats.get(t.customer_id) || { name: t.customer_name, revenue: 0, count: 0, firstDate: t.created_at };
+      stats.revenue += parseFloat(t.total_amount);
+      stats.count += 1;
+      if (dayjs(t.created_at).isBefore(dayjs(stats.firstDate))) {
+        stats.firstDate = t.created_at;
+      }
+      customerStats.set(t.customer_id, stats);
+    });
+
+    const customersInRange = Array.from(customerStats.entries()).map(([id, stats]) => ({ id, ...stats }));
+
+    // Top Customers
+    const topCustomers = [...customersInRange]
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+
+    // New vs Returning logic for the selected range
+    const rangeStart = start.toISOString();
+    let newCustomers = 0;
+    let returningCustomers = 0;
+
+    customersInRange.forEach(c => {
+      // Check if they had ANY transaction in the selected range
+      const hasTransactionInRange = allTransactions.some(t => t.customer_id === c.id && dayjs(t.created_at).isAfter(start) && dayjs(t.created_at).isBefore(end));
+
+      if (hasTransactionInRange) {
+        if (dayjs(c.firstDate).isBefore(start)) {
+          returningCustomers++;
+        } else {
+          newCustomers++;
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        topCustomers,
+        customerRetention: {
+          new: newCustomers,
+          returning: returningCustomers,
+          total: newCustomers + returningCustomers,
+          newRatio: returningCustomers + newCustomers > 0 ? Math.round((newCustomers / (newCustomers + returningCustomers)) * 100) : 0
+        }
+      }
+    });
   } catch (error) {
     next(error);
   }

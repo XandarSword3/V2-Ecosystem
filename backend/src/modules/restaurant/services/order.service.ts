@@ -329,6 +329,9 @@ export async function updateOrderStatus(
   if (status === 'ready') {
     updateData.actual_ready_time = new Date().toISOString();
   }
+  if (status === 'served') {
+    updateData.served_at = new Date().toISOString();
+  }
   if (status === 'completed') {
     updateData.completed_at = new Date().toISOString();
   }

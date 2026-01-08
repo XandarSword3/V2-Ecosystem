@@ -104,6 +104,10 @@ class EmailService {
           settings.contact_address = s.value.address || 'V2 Resort, Lebanon';
           settings.companyAddress = s.value.address || 'V2 Resort, Lebanon';
         }
+        if (s.key === 'chalets' && s.value) {
+          settings.chalet_check_in = s.value.checkIn || s.value.check_in_time || '3:00 PM';
+          settings.chalet_check_out = s.value.checkOut || s.value.check_out_time || '12:00 PM';
+        }
       });
       return { ...this.getDefaultSettings(), ...settings };
     } catch {
@@ -313,6 +317,31 @@ class EmailService {
     return this.sendEmail({
       to: data.customerEmail,
       subject: `Booking Confirmation - ${data.bookingNumber}`,
+      html,
+    });
+  }
+
+  async sendBookingCancellation(data: {
+    customerEmail: string;
+    customerName: string;
+    bookingNumber: string;
+    chaletName: string;
+    reason?: string;
+  }): Promise<boolean> {
+    const settings = await this.getSiteSettings();
+    const html = `
+      <h1>${settings.company_name}</h1>
+      <h2>Booking Cancellation</h2>
+      <p>Dear ${data.customerName},</p>
+      <p>Your booking <strong>${data.bookingNumber}</strong> for <strong>${data.chaletName}</strong> has been cancelled.</p>
+      ${data.reason ? `<p><strong>Reason:</strong> ${data.reason}</p>` : ''}
+      <p>If you have any questions, please contact us.</p>
+      <p>Thank you,<br>${settings.company_name}</p>
+    `;
+
+    return this.sendEmail({
+      to: data.customerEmail,
+      subject: `Booking Cancellation - ${data.bookingNumber}`,
       html,
     });
   }

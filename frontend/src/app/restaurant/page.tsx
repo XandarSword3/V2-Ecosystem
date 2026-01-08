@@ -38,6 +38,10 @@ interface MenuItem {
   isVegan?: boolean;
   is_gluten_free?: boolean;
   isGlutenFree?: boolean;
+  is_spicy?: boolean;
+  isSpicy?: boolean;
+  discount_price?: number;
+  discountPrice?: number;
   allergens?: string[];
   image_url?: string;
   imageUrl?: string;
@@ -56,6 +60,8 @@ function normalizeMenuItem(item: any): MenuItem {
     isVegetarian: item.isVegetarian ?? item.is_vegetarian ?? false,
     isVegan: item.isVegan ?? item.is_vegan ?? false,
     isGlutenFree: item.isGlutenFree ?? item.is_gluten_free ?? false,
+    isSpicy: item.isSpicy ?? item.is_spicy ?? false,
+    discountPrice: item.discountPrice !== undefined ? item.discountPrice : (item.discount_price !== undefined ? Number(item.discount_price) : undefined),
     imageUrl: item.imageUrl || item.image_url,
     isAvailable: item.isAvailable ?? item.is_available ?? true,
     isFeatured: item.isFeatured ?? item.is_featured ?? false,
@@ -129,7 +135,7 @@ export default function RestaurantMenuPage() {
   let filteredItems = selectedCategory
     ? menuItems.filter((item) => item.category.id === selectedCategory)
     : menuItems;
-  
+
   if (showFeaturedOnly) {
     filteredItems = filteredItems.filter((item) => item.isFeatured);
   }
@@ -141,7 +147,7 @@ export default function RestaurantMenuPage() {
     addToRestaurant({
       id: item.id,
       name: translatedName,
-      price: Number(item.price),
+      price: Number(item.discountPrice || item.price),
       category: translateContent(item.category, 'name'),
       imageUrl: item.imageUrl,
     });
@@ -161,14 +167,14 @@ export default function RestaurantMenuPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="text-center"
         >
           <div className="relative">
             <Loader2 className="w-12 h-12 animate-spin text-orange-600 mx-auto mb-4" />
-            <motion.div 
+            <motion.div
               className="absolute inset-0 flex items-center justify-center"
               animate={{ rotate: 360 }}
               transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
@@ -185,7 +191,7 @@ export default function RestaurantMenuPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl"
@@ -216,12 +222,12 @@ export default function RestaurantMenuPage() {
               key={i}
               className="absolute text-5xl opacity-10"
               style={{ left: `${item.x}%`, top: `${item.y}%` }}
-              animate={{ 
+              animate={{
                 y: [0, -30, 0, 30, 0],
                 x: [0, 15, 0, -15, 0],
                 rotate: [0, 180, 360],
               }}
-              transition={{ 
+              transition={{
                 duration: item.duration,
                 repeat: Infinity,
                 ease: 'easeInOut',
@@ -255,7 +261,7 @@ export default function RestaurantMenuPage() {
               <Sparkles className="w-4 h-4 text-white" />
               <span className="text-white/90 text-sm font-medium">{t('authenticLebanese')}</span>
             </div>
-            
+
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
               {settings.restaurantName || t('menu')}
             </h1>
@@ -264,7 +270,7 @@ export default function RestaurantMenuPage() {
             </p>
 
             {/* Quick Stats */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
@@ -293,7 +299,7 @@ export default function RestaurantMenuPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-6 relative z-10">
         {/* Featured Dishes Section */}
         {featuredItems.length > 0 && !selectedCategory && (
-          <motion.section 
+          <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-12"
@@ -305,16 +311,15 @@ export default function RestaurantMenuPage() {
               </h2>
               <button
                 onClick={() => setShowFeaturedOnly(!showFeaturedOnly)}
-                className={`text-sm font-medium px-4 py-2 rounded-full transition-all ${
-                  showFeaturedOnly 
-                    ? 'bg-orange-500 text-white' 
-                    : 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 hover:bg-orange-200'
-                }`}
+                className={`text-sm font-medium px-4 py-2 rounded-full transition-all ${showFeaturedOnly
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 hover:bg-orange-200'
+                  }`}
               >
                 {showFeaturedOnly ? t('showAll') : t('viewFeatured')}
               </button>
             </div>
-            
+
             <div className="grid md:grid-cols-3 gap-6">
               {featuredItems.map((item, index) => (
                 <motion.div
@@ -336,7 +341,7 @@ export default function RestaurantMenuPage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <motion.span 
+                          <motion.span
                             className="text-6xl"
                             animate={{ rotate: [0, 10, -10, 0] }}
                             transition={{ duration: 2, repeat: Infinity }}
@@ -350,10 +355,21 @@ export default function RestaurantMenuPage() {
                           <Star className="w-3 h-3 fill-current" /> {t('featured')}
                         </span>
                       </div>
-                      <div className="absolute top-3 right-3">
-                        <span className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-3 py-1.5 rounded-full font-bold text-orange-600 dark:text-orange-400">
-                          {formatCurrency(item.price, currency)}
-                        </span>
+                      <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+                        {item.discountPrice ? (
+                          <>
+                            <div className="bg-emerald-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg">
+                              {formatCurrency(item.discountPrice, currency)}
+                            </div>
+                            <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-[10px] font-bold text-slate-400 line-through">
+                              {formatCurrency(item.price, currency)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg">
+                            {formatCurrency(item.price, currency)}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="p-5">
@@ -384,7 +400,7 @@ export default function RestaurantMenuPage() {
         )}
 
         {/* Category Pills */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -397,8 +413,8 @@ export default function RestaurantMenuPage() {
               whileTap={{ scale: 0.95 }}
               className={`
                 px-6 py-3 rounded-full font-semibold transition-all duration-300 shadow-md
-                ${!selectedCategory 
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-orange-500/30' 
+                ${!selectedCategory
+                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-orange-500/30'
                   : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600'
                 }
               `}
@@ -416,8 +432,8 @@ export default function RestaurantMenuPage() {
                 whileTap={{ scale: 0.95 }}
                 className={`
                   px-6 py-3 rounded-full font-semibold transition-all duration-300 shadow-md
-                  ${selectedCategory === category.id 
-                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-orange-500/30' 
+                  ${selectedCategory === category.id
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-orange-500/30'
                     : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600'
                   }
                 `}
@@ -433,7 +449,7 @@ export default function RestaurantMenuPage() {
 
         {/* Menu Grid */}
         <AnimatePresence mode="wait">
-          <motion.div 
+          <motion.div
             key={selectedCategory || 'all'}
             variants={containerVariants}
             initial="hidden"
@@ -442,8 +458,8 @@ export default function RestaurantMenuPage() {
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
             {filteredItems.map((item) => (
-              <motion.div 
-                key={item.id} 
+              <motion.div
+                key={item.id}
                 variants={cardVariants}
                 whileHover={{ y: -8, transition: { duration: 0.3 } }}
                 className="group"
@@ -459,7 +475,7 @@ export default function RestaurantMenuPage() {
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-orange-100 via-amber-100 to-red-100 dark:from-orange-900/30 dark:via-amber-900/30 dark:to-red-900/30 flex items-center justify-center">
-                        <motion.span 
+                        <motion.span
                           className="text-6xl"
                           animate={{ rotate: [0, 5, -5, 0] }}
                           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
@@ -468,12 +484,23 @@ export default function RestaurantMenuPage() {
                         </motion.span>
                       </div>
                     )}
-                    
+
                     {/* Price Badge */}
-                    <div className="absolute top-3 right-3">
-                      <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg">
-                        {formatCurrency(item.price, currency)}
-                      </div>
+                    <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+                      {item.discountPrice ? (
+                        <>
+                          <div className="bg-emerald-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg">
+                            {formatCurrency(item.discountPrice, currency)}
+                          </div>
+                          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-xs font-bold text-slate-400 line-through">
+                            {formatCurrency(item.price, currency)}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg">
+                          {formatCurrency(item.price, currency)}
+                        </div>
+                      )}
                     </div>
 
                     {/* Featured Badge */}
@@ -503,7 +530,7 @@ export default function RestaurantMenuPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Content Section */}
                   <div className="p-5 flex-1 flex flex-col">
                     <div className="flex-1">
@@ -512,26 +539,30 @@ export default function RestaurantMenuPage() {
                           {translateContent(item, 'name')}
                         </h3>
                       </div>
-                      
+
                       <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
                         {translateContent(item, 'description')}
                       </p>
 
-                      {/* Dietary Tags */}
                       <div className="flex flex-wrap gap-2 mb-4">
                         {item.isVegetarian && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                            <Leaf className="w-3 h-3" /> {t('vegetarian')}
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" title={t('vegetarian')}>
+                            <Leaf className="w-3 h-3" />
                           </span>
                         )}
                         {item.isVegan && (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                            {t('vegan')}
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" title={t('vegan')}>
+                            <Sparkles className="w-3 h-3" />
                           </span>
                         )}
                         {item.isGlutenFree && (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
-                            {t('glutenFree')}
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" title={t('glutenFree')}>
+                            GF
+                          </span>
+                        )}
+                        {item.isSpicy && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" title={t('spicy')}>
+                            <Flame className="w-3 h-3" />
                           </span>
                         )}
                       </div>
@@ -540,7 +571,7 @@ export default function RestaurantMenuPage() {
                     {/* Quantity Controls */}
                     <div className="mt-auto">
                       {getItemQuantity(item.id) > 0 ? (
-                        <motion.div 
+                        <motion.div
                           initial={{ scale: 0.8 }}
                           animate={{ scale: 1 }}
                           className="flex items-center justify-center gap-4 bg-orange-50 dark:bg-slate-700 rounded-xl px-4 py-3"
@@ -588,7 +619,7 @@ export default function RestaurantMenuPage() {
 
         {/* Empty State */}
         {filteredItems.length === 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-20"
@@ -614,7 +645,7 @@ export default function RestaurantMenuPage() {
       {/* Floating Cart Bar */}
       <AnimatePresence>
         {cartCount > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
@@ -626,7 +657,7 @@ export default function RestaurantMenuPage() {
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     <ShoppingCart className="w-8 h-8 text-white" />
-                    <motion.div 
+                    <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       className="absolute -top-2 -right-2 w-6 h-6 bg-white text-orange-600 rounded-full flex items-center justify-center text-xs font-bold"
@@ -640,7 +671,7 @@ export default function RestaurantMenuPage() {
                   </div>
                 </div>
                 <Link href="/restaurant/cart">
-                  <motion.button 
+                  <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className="bg-white text-orange-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300"

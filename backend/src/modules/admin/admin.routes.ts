@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate, authorize } from "../../middleware/auth.middleware";
 import * as adminController from "./admin.controller";
 import * as modulesController from "./modules.controller";
+import * as backupsController from "./backups.controller";
 
 import * as usersController from "./users.controller";
 import * as permissionsController from "./permissions.controller";
@@ -47,8 +48,16 @@ router.put('/settings', adminController.updateSettings);
 // Audit logs
 router.get('/audit-logs', adminController.getAuditLogs);
 
+// Backups
+router.get('/backups', backupsController.getBackups);
+router.post('/backups', backupsController.createBackup);
+router.get('/backups/:id/download', backupsController.getDownloadUrl);
+router.delete('/backups/:id', backupsController.deleteBackup);
+
 // Reports
 router.get('/reports/overview', adminController.getOverviewReport);
+router.get('/reports/occupancy', adminController.getOccupancyReport);
+router.get('/reports/customers', adminController.getCustomerAnalytics);
 router.get('/reports/export', adminController.exportReport);
 
 // Notifications
