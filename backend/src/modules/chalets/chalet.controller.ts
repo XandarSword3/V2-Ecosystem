@@ -195,14 +195,33 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
     }
 
     // Get deposit percentage from settings
-    const { data: depositSetting } = await supabase
-      .from('site_settings')
-      .select('value')
-      .eq('category', 'chalet')
-      .eq('key', 'deposit_percentage')
-      .single();
+    let depositPercentage = 0.3; // Default 30%
     
-    const depositPercentage = depositSetting ? parseFloat(depositSetting.value) / 100 : 0.3; // Default 30%
+    try {
+      const { data: depositSetting, error: settingError } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('category', 'chalet')
+        .eq('key', 'deposit_percentage')
+        .single();
+      
+      if (!settingError && depositSetting) {
+        depositPercentage = parseFloat(depositSetting.value) / 100;
+      } else if (settingError && settingError.message?.includes('column')) {
+        // Fallback for missing category column
+        const { data: oldSetting } = await supabase
+          .from('site_settings')
+          .select('value')
+          .eq('key', 'chalets')
+          .single();
+        if (oldSetting?.value?.depositPercent) {
+          depositPercentage = parseFloat(oldSetting.value.depositPercent) / 100;
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching deposit settings, using default', e);
+    }
+
     const depositAmount = baseAmount * depositPercentage;
     const totalAmount = baseAmount + addOnsAmount;
 
@@ -709,22 +728,39 @@ export async function deletePriceRule(req: Request, res: Response, next: NextFun
 export async function getChaletSettings(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
+    let settingsObj: Record<string, any> = {
+      deposit_percentage: 30, // Default
+      check_in_time: '14:00',
+      check_out_time: '11:00',
+    };
+
     const { data: settings, error } = await supabase
       .from('site_settings')
       .select('*')
       .eq('category', 'chalet');
     
-    if (error) throw error;
-    
-    const settingsObj: Record<string, any> = {
-      deposit_percentage: 30, // Default
-      check_in_time: '14:00',
-      check_out_time: '11:00',
-    };
-    
-    (settings || []).forEach(s => {
-      settingsObj[s.key] = s.value;
-    });
+    if (error) {
+      // Handle schema mismatch (missing category column)
+      if (error.code === '42703' || error.message?.includes('column')) {
+         const { data: oldData } = await supabase
+           .from('site_settings')
+           .select('value')
+           .eq('key', 'chalets')
+           .single();
+         
+         if (oldData?.value) {
+           settingsObj.deposit_percentage = oldData.value.depositPercent || 30;
+           settingsObj.check_in_time = oldData.value.checkIn || '14:00';
+           settingsObj.check_out_time = oldData.value.checkOut || '11:00';
+         }
+      } else {
+        throw error;
+      }
+    } else {
+      (settings || []).forEach(s => {
+        settingsObj[s.key] = s.value;
+      });
+    }
     
     res.json({ success: true, data: settingsObj });
   } catch (error) {

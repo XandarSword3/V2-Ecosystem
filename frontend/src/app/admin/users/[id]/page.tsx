@@ -36,16 +36,18 @@ export default function UserDetailsPage() {
             api.get(`/admin/users/${id}`),
             api.get('/admin/permissions')
         ]).then(([userRes, permRes]) => {
-            if (userRes.data) {
-                setUser(userRes.data);
+            const userPayload = userRes.data?.data ?? userRes.data ?? null;
+            if (userPayload) {
+                setUser(userPayload);
                 // Initialize overrides from user data
                 const initialOverrides: Record<string, boolean> = {};
-                userRes.data.user_permissions_overrides?.forEach((p: any) => {
+                (userPayload.user_permissions_overrides || []).forEach((p: any) => {
                     initialOverrides[p.permission_id] = p.is_granted;
                 });
                 setOverrides(initialOverrides);
             }
-            if (permRes.data) setAllPermissions(permRes.data);
+            const permsPayload = permRes.data?.data ?? permRes.data ?? [];
+            setAllPermissions(Array.isArray(permsPayload) ? permsPayload : []);
             setLoading(false);
         }).catch(err => {
             toast.error('Failed to load user data');
