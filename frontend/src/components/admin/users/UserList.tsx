@@ -43,9 +43,9 @@ export default function UserList({ type, title }: UserListProps) {
     try {
       // Assuming GET /admin/users supports ?type=... and ?search=...
       const res = await api.get(`/admin/users?type=${type}&search=${search}`);
-      if (res.data) {
-        setUsers(res.data);
-      }
+      // Backend returns { success: true, data: [...] }
+      const payload = res.data?.data ?? res.data ?? [];
+      setUsers(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error('Failed to fetch users', error);
       // Don't toast on polling error to avoid spam
