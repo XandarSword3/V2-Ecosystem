@@ -69,7 +69,11 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
   cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle, label: 'Cancelled' },
 };
 
+import { useSiteSettings } from '@/lib/settings-context';
+
 export default function AdminRestaurantOrdersPage() {
+  const { modules } = useSiteSettings();
+  const restaurantModule = modules.find(m => m.slug === 'restaurant');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -78,29 +82,41 @@ export default function AdminRestaurantOrdersPage() {
   const { socket } = useSocket();
 
   const fetchOrders = useCallback(async () => {
+    if (!restaurantModule) return;
     try {
-      const response = await api.get('/restaurant/staff/orders');
+      const response = await api.get('/restaurant/staff/orders', {
+        params: { moduleId: restaurantModule.id }
+      });
       setOrders(response.data.data || []);
     } catch (error) {
       toast.error('Failed to fetch orders');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [restaurantModule]);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    if (restaurantModule) {
+      fetchOrders();
+    }
+  }, [fetchOrders, restaurantModule]);
 
   useEffect(() => {
-    if (socket) {
-      socket.on('order:new', (order: Order) => {
-        setOrders((prev) => [order, ...prev]);
-        toast.success(`New order #${order.order_number}`);
+    if (socket && restaurantModule) {
+      socket.on('order:new', (order: any) => {
+        if (order.moduleId === restaurantModule.id || order.module_id === restaurantModule.id) {
+          // Fetch specific order details or append if full order provided
+          // Since socket payload is partial, we might want to refetch or just add brief info
+          // For now, let's refetch to be safe, or just toast
+          fetchOrders();
+          toast.success(`New order #${order.orderNumber || order.order_number}`);
+        }
       });
 
-      socket.on('order:updated', (order: Order) => {
-        setOrders((prev) => prev.map((o) => (o.id === order.id ? order : o)));
+      socket.on('order:updated', (order: any) => {
+        if (order.moduleId === restaurantModule.id || order.module_id === restaurantModule.id) {
+          setOrders((prev) => prev.map((o) => (o.id === order.orderId || o.id === order.id ? { ...o, status: order.status } : o)));
+        }
       });
 
       return () => {
@@ -108,7 +124,7 @@ export default function AdminRestaurantOrdersPage() {
         socket.off('order:updated');
       };
     }
-  }, [socket]);
+  }, [socket, restaurantModule, fetchOrders]);
 
   const updateOrderStatus = async (orderId: string, status: string) => {
     try {
@@ -258,7 +274,7 @@ export default function AdminRestaurantOrdersPage() {
                   transition={{ delay: index * 0.03 }}
                   layout
                 >
-                  <Card 
+                  <Card
                     className="cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => setSelectedOrder(order)}
                   >
@@ -348,7 +364,7 @@ export default function AdminRestaurantOrdersPage() {
       {/* Order Details Modal */}
       <AnimatePresence>
         {selectedOrder && (
-          <div 
+          <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
             onClick={() => setSelectedOrder(null)}
           >
@@ -368,7 +384,7 @@ export default function AdminRestaurantOrdersPage() {
                     {formatDate(selectedOrder.created_at)}
                   </p>
                 </div>
-                <button 
+                <button
                   onClick={() => setSelectedOrder(null)}
                   className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
                 >
@@ -454,7 +470,7 @@ export default function AdminRestaurantOrdersPage() {
                     {formatCurrency(selectedOrder.total_amount)}
                   </span>
                 </div>
-                
+
                 <div className="flex justify-end gap-3">
                   {selectedOrder.status === 'pending' && (
                     <Button onClick={() => { updateOrderStatus(selectedOrder.id, 'confirmed'); setSelectedOrder(null); }}>

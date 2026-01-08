@@ -18,7 +18,7 @@ export async function getChalets(req: Request, res: Response, next: NextFunction
   try {
     const supabase = getSupabase();
     const { moduleId } = req.query;
-    
+
     let query = supabase
       .from('chalets')
       .select('*')
@@ -121,7 +121,7 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
   try {
     // Validate input
     const validatedData = validateBody(createChaletBookingSchema, req.body);
-    
+
     const supabase = getSupabase();
     const {
       chaletId,
@@ -194,35 +194,40 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
       }
     }
 
-    // Get deposit percentage from settings
-    let depositPercentage = 0.3; // Default 30%
-    
+    // Get deposit configuration from settings
+    let depositAmount = 0;
+    let depositType: 'percentage' | 'fixed' = 'percentage';
+    let depositPercentage = 30; // Default 30%
+    let depositFixed = 100; // Default $100
+
     try {
-      const { data: depositSetting, error: settingError } = await supabase
+      // Try to get deposit settings from site_settings
+      const { data: settingsData } = await supabase
         .from('site_settings')
-        .select('value')
-        .eq('category', 'chalet')
-        .eq('key', 'deposit_percentage')
+        .select('key, value')
+        .eq('key', 'chalets')
         .single();
-      
-      if (!settingError && depositSetting) {
-        depositPercentage = parseFloat(depositSetting.value) / 100;
-      } else if (settingError && settingError.message?.includes('column')) {
-        // Fallback for missing category column
-        const { data: oldSetting } = await supabase
-          .from('site_settings')
-          .select('value')
-          .eq('key', 'chalets')
-          .single();
-        if (oldSetting?.value?.depositPercent) {
-          depositPercentage = parseFloat(oldSetting.value.depositPercent) / 100;
-        }
+
+      if (settingsData?.value) {
+        const chaletSettings = typeof settingsData.value === 'string'
+          ? JSON.parse(settingsData.value)
+          : settingsData.value;
+
+        depositType = chaletSettings.chaletDepositType || 'percentage';
+        depositPercentage = chaletSettings.chaletDeposit || 30;
+        depositFixed = chaletSettings.chaletDepositFixed || 100;
       }
     } catch (e) {
       console.warn('Error fetching deposit settings, using default', e);
     }
 
-    const depositAmount = baseAmount * depositPercentage;
+    // Calculate deposit based on type
+    if (depositType === 'fixed') {
+      depositAmount = depositFixed;
+    } else {
+      depositAmount = (baseAmount * depositPercentage) / 100;
+    }
+
     const totalAmount = baseAmount + addOnsAmount;
 
     // Create booking
@@ -335,27 +340,27 @@ export async function cancelBooking(req: Request, res: Response, next: NextFunct
     const supabase = getSupabase();
     const { reason } = req.body;
     const userId = req.user?.userId;
-    
+
     // First, get the booking to verify ownership
     const { data: booking, error: fetchError } = await supabase
       .from('chalet_bookings')
       .select('id, customer_id, status')
       .eq('id', req.params.id)
       .single();
-      
+
     if (fetchError || !booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
-    
+
     // Only the booking owner or admin/staff can cancel
     const isOwner = booking.customer_id === userId;
     const userRoles = req.user?.roles || [];
     const isAdminOrStaff = userRoles.includes('admin') || userRoles.includes('staff');
-    
+
     if (!isOwner && !isAdminOrStaff) {
       return res.status(403).json({ success: false, message: 'Not authorized to cancel this booking' });
     }
-    
+
     // Check if already cancelled
     if (booking.status === 'cancelled') {
       return res.status(400).json({ success: false, message: 'Booking is already cancelled' });
@@ -526,7 +531,7 @@ export async function updateBookingStatus(req: Request, res: Response, next: Nex
 export async function createChalet(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    
+
     // Validate required fields
     if (!req.body.name) {
       return res.status(400).json({ success: false, message: 'Chalet name is required' });
@@ -534,7 +539,7 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
     if (!req.body.base_price && req.body.base_price !== 0) {
       return res.status(400).json({ success: false, message: 'Base price is required' });
     }
-    
+
     // Ensure all required fields have proper values
     const chaletData = {
       name: req.body.name,
@@ -554,7 +559,7 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
       images: req.body.images || [],
       image_url: req.body.image_url || null,
     };
-    
+
     const { data, error } = await supabase
       .from('chalets')
       .insert(chaletData)
@@ -564,14 +569,14 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
     if (error) {
       throw error;
     }
-    
+
     res.status(201).json({ success: true, data });
   } catch (error: any) {
     // Return more specific error message
     if (error.code === '23502') {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Missing required field: ${error.column || 'unknown'}` 
+      return res.status(400).json({
+        success: false,
+        message: `Missing required field: ${error.column || 'unknown'}`
       });
     }
     next(error);
@@ -738,21 +743,21 @@ export async function getChaletSettings(req: Request, res: Response, next: NextF
       .from('site_settings')
       .select('*')
       .eq('category', 'chalet');
-    
+
     if (error) {
       // Handle schema mismatch (missing category column)
       if (error.code === '42703' || error.message?.includes('column')) {
-         const { data: oldData } = await supabase
-           .from('site_settings')
-           .select('value')
-           .eq('key', 'chalets')
-           .single();
-         
-         if (oldData?.value) {
-           settingsObj.deposit_percentage = oldData.value.depositPercent || 30;
-           settingsObj.check_in_time = oldData.value.checkIn || '14:00';
-           settingsObj.check_out_time = oldData.value.checkOut || '11:00';
-         }
+        const { data: oldData } = await supabase
+          .from('site_settings')
+          .select('value')
+          .eq('key', 'chalets')
+          .single();
+
+        if (oldData?.value) {
+          settingsObj.deposit_percentage = oldData.value.depositPercent || 30;
+          settingsObj.check_in_time = oldData.value.checkIn || '14:00';
+          settingsObj.check_out_time = oldData.value.checkOut || '11:00';
+        }
       } else {
         throw error;
       }
@@ -761,7 +766,7 @@ export async function getChaletSettings(req: Request, res: Response, next: NextF
         settingsObj[s.key] = s.value;
       });
     }
-    
+
     res.json({ success: true, data: settingsObj });
   } catch (error) {
     next(error);
@@ -772,21 +777,21 @@ export async function updateChaletSettings(req: Request, res: Response, next: Ne
   try {
     const supabase = getSupabase();
     const settings = req.body;
-    
+
     for (const [key, value] of Object.entries(settings)) {
       await supabase
         .from('site_settings')
         .upsert(
-          { 
-            key, 
-            value: String(value), 
+          {
+            key,
+            value: String(value),
             category: 'chalet',
             updated_at: new Date().toISOString()
           },
           { onConflict: 'key,category' }
         );
     }
-    
+
     res.json({ success: true, message: 'Settings updated' });
   } catch (error) {
     next(error);

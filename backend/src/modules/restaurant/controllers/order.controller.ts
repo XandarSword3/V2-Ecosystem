@@ -19,26 +19,26 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     if (!order) {
       return res.status(404).json({ success: false, error: 'Order not found' });
     }
-    
+
     // Security: Only order owner or admin/staff can view full order details
     const userId = req.user?.userId;
     const userRoles = req.user?.roles || [];
     const isOwner = order.customer_id === userId;
     const isAdminOrStaff = userRoles.includes('admin') || userRoles.includes('staff');
-    
+
     if (!isOwner && !isAdminOrStaff) {
       // For non-owners, only return limited info (status tracking)
-      return res.json({ 
-        success: true, 
-        data: { 
-          id: order.id, 
-          status: order.status, 
+      return res.json({
+        success: true,
+        data: {
+          id: order.id,
+          status: order.status,
           created_at: order.created_at,
           estimated_ready_time: order.estimated_ready_time
-        } 
+        }
       });
     }
-    
+
     res.json({ success: true, data: order });
   } catch (error) {
     next(error);
@@ -110,7 +110,8 @@ export async function getStaffOrders(req: Request, res: Response, next: NextFunc
 
 export async function getLiveOrders(req: Request, res: Response, next: NextFunction) {
   try {
-    const orders = await orderService.getLiveOrders();
+    const { moduleId } = req.query;
+    const orders = await orderService.getLiveOrders(moduleId as string);
     // Transform to camelCase format for frontend
     const transformedOrders = orders.map(transformOrderForFrontend);
     res.json({ success: true, data: transformedOrders });
@@ -136,8 +137,8 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
 
 export async function getDailyReport(req: Request, res: Response, next: NextFunction) {
   try {
-    const { date } = req.query;
-    const report = await orderService.getDailyReport(date as string);
+    const { date, moduleId } = req.query;
+    const report = await orderService.getDailyReport(date as string, moduleId as string);
     res.json({ success: true, data: report });
   } catch (error) {
     next(error);
@@ -146,10 +147,11 @@ export async function getDailyReport(req: Request, res: Response, next: NextFunc
 
 export async function getSalesReport(req: Request, res: Response, next: NextFunction) {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, moduleId } = req.query;
     const report = await orderService.getSalesReport(
       startDate as string,
-      endDate as string
+      endDate as string,
+      moduleId as string
     );
     res.json({ success: true, data: report });
   } catch (error) {

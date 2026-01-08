@@ -10,15 +10,15 @@ export async function getFullMenu(req: Request, res: Response, next: NextFunctio
       menuService.getAllCategories(moduleId as string),
       menuService.getMenuItems({ availableOnly: true, moduleId: moduleId as string }),
     ]);
-    
+
     // Group items by category
     const menuByCategory = categories.map((category: any) => ({
       ...category,
       items: items.filter((item: any) => item.category_id === category.id),
     }));
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       data: {
         categories,
         items,
@@ -68,7 +68,8 @@ export async function getMenuItem(req: Request, res: Response, next: NextFunctio
 
 export async function getFeaturedItems(req: Request, res: Response, next: NextFunction) {
   try {
-    const items = await menuService.getFeaturedItems();
+    const { moduleId } = req.query;
+    const items = await menuService.getFeaturedItems(moduleId as string);
     res.json({ success: true, data: items });
   } catch (error) {
     next(error);
@@ -78,10 +79,10 @@ export async function getFeaturedItems(req: Request, res: Response, next: NextFu
 export async function createCategory(req: Request, res: Response, next: NextFunction) {
   try {
     const { name, description, moduleId, ...rest } = req.body;
-    
+
     // Auto-translate name and description if not provided
     let translatedData = { ...rest, name, moduleId };
-    
+
     if (name && !req.body.name_ar) {
       try {
         const nameTranslations = await translateText(name, 'en');
@@ -91,7 +92,7 @@ export async function createCategory(req: Request, res: Response, next: NextFunc
         console.warn('[MENU] Auto-translation failed for category name');
       }
     }
-    
+
     if (description && !req.body.description_ar) {
       try {
         const descTranslations = await translateText(description, 'en');
@@ -102,7 +103,7 @@ export async function createCategory(req: Request, res: Response, next: NextFunc
         console.warn('[MENU] Auto-translation failed for category description');
       }
     }
-    
+
     const category = await menuService.createCategory(translatedData);
     res.status(201).json({ success: true, data: category });
   } catch (error) {
@@ -132,35 +133,35 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
   try {
     // Accept both camelCase and snake_case field names for flexibility
     const { name, description, categoryId, category_id, price, module_id, moduleId, ...rest } = req.body;
-    
+
     // Use categoryId or category_id (frontend may send either)
     const resolvedCategoryId = categoryId || category_id;
     // Use moduleId or module_id (frontend may send either)
     const resolvedModuleId = moduleId || module_id;
-    
+
     // Validate required fields
     if (!resolvedCategoryId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'categoryId is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'categoryId is required'
       });
     }
     if (!name) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'name is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'name is required'
       });
     }
     if (price === undefined || price === null) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'price is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'price is required'
       });
     }
-    
+
     // Auto-translate name and description if not provided
     let translatedData = { ...rest, name, categoryId: resolvedCategoryId, price: Number(price), moduleId: resolvedModuleId };
-    
+
     if (name && !req.body.name_ar) {
       try {
         const nameTranslations = await translateText(name, 'en');
@@ -170,7 +171,7 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
         // Auto-translation failed, continue without translations
       }
     }
-    
+
     if (description && !req.body.description_ar) {
       try {
         const descTranslations = await translateText(description, 'en');
@@ -181,15 +182,15 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
         console.warn('[MENU] Auto-translation failed for item description');
       }
     }
-    
+
     const item = await menuService.createMenuItem(translatedData);
     res.status(201).json({ success: true, data: item, autoTranslated: true });
   } catch (error: any) {
     console.error('[MENU] Error creating menu item:', error);
     if (error.code === '23503') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid category - category does not exist' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid category - category does not exist'
       });
     }
     next(error);
@@ -201,7 +202,7 @@ export async function updateMenuItem(req: Request, res: Response, next: NextFunc
     // Convert snake_case to camelCase for service compatibility
     const body = req.body;
     const normalizedData: Record<string, any> = {};
-    
+
     // Map snake_case fields to camelCase
     if (body.category_id !== undefined) normalizedData.categoryId = body.category_id;
     if (body.categoryId !== undefined) normalizedData.categoryId = body.categoryId;
@@ -222,7 +223,7 @@ export async function updateMenuItem(req: Request, res: Response, next: NextFunc
     if (body.is_available !== undefined) normalizedData.isAvailable = body.is_available;
     if (body.is_featured !== undefined) normalizedData.isFeatured = body.is_featured;
     if (body.display_order !== undefined) normalizedData.displayOrder = body.display_order;
-    
+
     const item = await menuService.updateMenuItem(req.params.id, normalizedData);
     res.json({ success: true, data: item });
   } catch (error) {
