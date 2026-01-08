@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { 
+import {
   Settings,
   Save,
   Building2,
@@ -31,29 +31,33 @@ interface SiteSettings {
   poolName: string;
   tagline: string;
   description: string;
-  
+
   // Contact Info
   phone: string;
   email: string;
   address: string;
-  
+
   // Business Hours
   poolHours: string;
   restaurantHours: string;
   receptionHours: string;
-  
+
   // Chalet Settings
   chaletCheckIn: string;
   chaletCheckOut: string;
   chaletDeposit: number;
+  chaletDepositType: 'percentage' | 'fixed';
+  chaletDepositFixed: number;
+  chaletMinNights: number;
+  chaletMaxNights: number;
   cancellationPolicy: string;
-  
+
   // Pool Settings
   poolAdultPrice: number;
   poolChildPrice: number;
   poolInfantPrice: number;
   poolCapacity: number;
-  
+
   // Legal
   privacyPolicy: string;
   termsOfService: string;
@@ -75,7 +79,11 @@ const defaultSettings: SiteSettings = {
   receptionHours: '24/7',
   chaletCheckIn: '3:00 PM',
   chaletCheckOut: '12:00 PM',
-  chaletDeposit: 50,
+  chaletDeposit: 30,
+  chaletDepositType: 'percentage',
+  chaletDepositFixed: 100,
+  chaletMinNights: 1,
+  chaletMaxNights: 30,
   cancellationPolicy: 'Free cancellation up to 48 hours before check-in. 50% charge for late cancellations.',
   poolAdultPrice: 15,
   poolChildPrice: 10,
@@ -89,7 +97,7 @@ const defaultSettings: SiteSettings = {
 export default function AdminSettingsPage() {
   const t = useTranslations('admin');
   const tCommon = useTranslations('common');
-  
+
   const [settings, setSettings] = useState<SiteSettings>(defaultSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'contact' | 'hours' | 'chalets' | 'pool' | 'legal'>('general');
@@ -113,7 +121,7 @@ export default function AdminSettingsPage() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    
+
     try {
       await api.put('/admin/settings', settings);
       toast.success('Settings saved successfully!');
@@ -158,7 +166,7 @@ export default function AdminSettingsPage() {
                   onChange={(e) => setSettings({ ...settings, restaurantName: e.target.value })}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Snack Bar Name
@@ -169,7 +177,7 @@ export default function AdminSettingsPage() {
                 />
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Tagline
@@ -179,7 +187,7 @@ export default function AdminSettingsPage() {
                 onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Description
@@ -210,7 +218,7 @@ export default function AdminSettingsPage() {
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   <Mail className="w-4 h-4 inline mr-2" />
@@ -224,7 +232,7 @@ export default function AdminSettingsPage() {
                 />
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 <MapPin className="w-4 h-4 inline mr-2" />
@@ -255,7 +263,7 @@ export default function AdminSettingsPage() {
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Restaurant Hours
@@ -267,7 +275,7 @@ export default function AdminSettingsPage() {
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Reception Hours
@@ -285,55 +293,181 @@ export default function AdminSettingsPage() {
 
       case 'chalets':
         return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Check-in Time
-                </label>
-                <input
-                  type="text"
-                  value={settings.chaletCheckIn}
-                  onChange={(e) => setSettings({ ...settings, chaletCheckIn: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Check-out Time
-                </label>
-                <input
-                  type="text"
-                  value={settings.chaletCheckOut}
-                  onChange={(e) => setSettings({ ...settings, chaletCheckOut: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Deposit (%)
-                </label>
-                <input
-                  type="number"
-                  value={settings.chaletDeposit}
-                  onChange={(e) => setSettings({ ...settings, chaletDeposit: parseInt(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
+          <div className="space-y-8">
+            {/* Check-in/Check-out Times */}
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Check-in & Check-out</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Check-in Time
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.chaletCheckIn}
+                    onChange={(e) => setSettings({ ...settings, chaletCheckIn: e.target.value })}
+                    placeholder="e.g., 3:00 PM"
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Check-out Time
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.chaletCheckOut}
+                    onChange={(e) => setSettings({ ...settings, chaletCheckOut: e.target.value })}
+                    placeholder="e.g., 12:00 PM"
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
               </div>
             </div>
-            
+
+            {/* Deposit Configuration */}
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl p-6 border border-emerald-100 dark:border-emerald-800">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-emerald-600" />
+                Deposit Configuration
+              </h3>
+
+              {/* Deposit Type Toggle */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                  Deposit Type
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSettings({ ...settings, chaletDepositType: 'percentage' })}
+                    className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all ${settings.chaletDepositType === 'percentage'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                  >
+                    <div className="font-medium">Percentage</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">e.g., 30% of booking total</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettings({ ...settings, chaletDepositType: 'fixed' })}
+                    className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all ${settings.chaletDepositType === 'fixed'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                  >
+                    <div className="font-medium">Fixed Amount</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">e.g., $100 flat deposit</div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {settings.chaletDepositType === 'percentage' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Deposit Percentage
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={settings.chaletDeposit}
+                        onChange={(e) => {
+                          const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                          setSettings({ ...settings, chaletDeposit: val });
+                        }}
+                        className="w-full px-4 py-2 pr-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">%</span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Enter a value between 0-100%</p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Fixed Deposit Amount
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={settings.chaletDepositFixed}
+                        onChange={(e) => setSettings({ ...settings, chaletDepositFixed: Math.max(0, parseFloat(e.target.value) || 0) })}
+                        className="w-full px-4 py-2 pl-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Fixed amount charged at booking</p>
+                  </div>
+                )}
+
+                {/* Deposit Preview Calculator */}
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">📊 Deposit Preview</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                    Example: $500 booking total
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600 dark:text-slate-400">Deposit required:</span>
+                    <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                      ${settings.chaletDepositType === 'percentage'
+                        ? ((500 * settings.chaletDeposit) / 100).toFixed(2)
+                        : settings.chaletDepositFixed.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Booking Constraints */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Cancellation Policy
-              </label>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Booking Constraints</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Minimum Nights
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={settings.chaletMinNights}
+                    onChange={(e) => setSettings({ ...settings, chaletMinNights: Math.max(1, parseInt(e.target.value) || 1) })}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Maximum Nights
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={settings.chaletMaxNights}
+                    onChange={(e) => setSettings({ ...settings, chaletMaxNights: Math.max(1, parseInt(e.target.value) || 1) })}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Cancellation Policy */}
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Cancellation Policy</h3>
               <textarea
-                rows={3}
+                rows={4}
                 value={settings.cancellationPolicy}
                 onChange={(e) => setSettings({ ...settings, cancellationPolicy: e.target.value })}
-                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="Describe your cancellation policy..."
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                This will be displayed to customers during the booking process.
+              </p>
             </div>
           </div>
         );
@@ -365,7 +499,7 @@ export default function AdminSettingsPage() {
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Child Price ($)
@@ -377,7 +511,7 @@ export default function AdminSettingsPage() {
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Infant Price ($)
@@ -389,7 +523,7 @@ export default function AdminSettingsPage() {
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Max Capacity
@@ -420,7 +554,7 @@ export default function AdminSettingsPage() {
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Terms of Service
@@ -433,7 +567,7 @@ export default function AdminSettingsPage() {
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Refund Policy
@@ -468,7 +602,7 @@ export default function AdminSettingsPage() {
               Manage your resort settings, contact information, pricing, and policies
             </p>
           </div>
-          
+
           <Button
             onClick={handleSave}
             disabled={isSaving}
@@ -486,11 +620,10 @@ export default function AdminSettingsPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-              activeTab === tab.id
-                ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-medium'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${activeTab === tab.id
+              ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-medium'
+              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+              }`}
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}

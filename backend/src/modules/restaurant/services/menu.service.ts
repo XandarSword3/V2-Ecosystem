@@ -21,7 +21,7 @@ export async function getAllCategories(moduleId?: string) {
 
 export async function getMenuItems(filters: { categoryId?: string; availableOnly?: boolean; moduleId?: string }) {
   const supabase = getSupabase();
-  
+
   let query = supabase
     .from('menu_items')
     .select(`
@@ -58,15 +58,22 @@ export async function getMenuItemById(id: string) {
   return data;
 }
 
-export async function getFeaturedItems() {
+export async function getFeaturedItems(moduleId?: string) {
   const supabase = getSupabase();
-  const { data, error } = await supabase
+  let query = supabase
     .from('menu_items')
     .select('*')
     .eq('is_featured', true)
     .eq('is_available', true)
     .is('deleted_at', null)
     .order('display_order', { ascending: true });
+
+  // Filter by module_id for proper data isolation
+  if (moduleId) {
+    query = query.eq('module_id', moduleId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return data || [];
@@ -111,7 +118,7 @@ export async function updateCategory(id: string, data: Partial<{
 }>) {
   const supabase = getSupabase();
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  
+
   if (data.name !== undefined) updateData.name = data.name;
   if (data.nameAr !== undefined) updateData.name_ar = data.nameAr;
   if (data.nameFr !== undefined) updateData.name_fr = data.nameFr;
@@ -163,10 +170,10 @@ export async function createMenuItem(data: {
   moduleId?: string;
 }) {
   const supabase = getSupabase();
-  
+
   // Ensure price is a valid number
   const priceValue = typeof data.price === 'number' ? data.price : parseFloat(String(data.price)) || 0;
-  
+
   const { data: item, error } = await supabase
     .from('menu_items')
     .insert({
@@ -219,7 +226,7 @@ export async function updateMenuItem(id: string, data: Partial<{
 }>) {
   const supabase = getSupabase();
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  
+
   if (data.categoryId !== undefined) updateData.category_id = data.categoryId;
   if (data.name !== undefined) updateData.name = data.name;
   if (data.nameAr !== undefined) updateData.name_ar = data.nameAr;

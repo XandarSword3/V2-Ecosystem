@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
+import { useSiteSettings } from '@/lib/settings-context';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -45,6 +46,7 @@ interface MenuItem {
   is_spicy: boolean;
   preparation_time?: number;
   allergens?: string[];
+  module_id?: string;
 }
 
 interface Category {
@@ -56,6 +58,9 @@ interface Category {
 
 export default function MenuManagementPage() {
   const t = useTranslations('admin');
+  const { modules } = useSiteSettings();
+  const restaurantModule = modules.find(m => m.slug === 'restaurant');
+
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,15 +72,18 @@ export default function MenuManagementPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (restaurantModule) {
+      fetchData();
+    }
+  }, [restaurantModule]);
 
   const fetchData = async () => {
+    if (!restaurantModule) return;
     try {
       setLoading(true);
       const [menuRes, catRes] = await Promise.all([
-        api.get('/restaurant/items'),
-        api.get('/restaurant/categories'),
+        api.get('/restaurant/items', { params: { moduleId: restaurantModule.id } }),
+        api.get('/restaurant/categories', { params: { moduleId: restaurantModule.id } }),
       ]);
       setItems(menuRes.data.data || []);
       setCategories(catRes.data.data || []);
@@ -117,13 +125,20 @@ export default function MenuManagementPage() {
       return;
     }
 
+    if (!restaurantModule) {
+      toast.error('Restaurant module not found');
+      return;
+    }
+
     try {
       setSaving(true);
+      const payload = { ...formData, module_id: restaurantModule.id };
+
       if (editingItem) {
-        await api.put(`/restaurant/admin/items/${editingItem.id}`, formData);
+        await api.put(`/restaurant/admin/items/${editingItem.id}`, payload);
         toast.success('Menu item updated successfully');
       } else {
-        await api.post('/restaurant/admin/items', formData);
+        await api.post('/restaurant/admin/items', payload);
         toast.success('Menu item created successfully');
       }
       fetchData();
@@ -354,11 +369,10 @@ export default function MenuManagementPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => toggleAvailability(item)}
-                          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm transition-colors ${
-                            item.is_available
+                          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm transition-colors ${item.is_available
                               ? 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
                               : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30'
-                          }`}
+                            }`}
                         >
                           {item.is_available ? (
                             <>
