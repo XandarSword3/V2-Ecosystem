@@ -24,6 +24,8 @@ import {
   Download,
   DollarSign,
   TrendingUp,
+  Settings as SettingsIcon,
+  Save,
 } from 'lucide-react';
 
 interface Payment {
@@ -57,6 +59,15 @@ export default function AdminPaymentsPage() {
   const [methodFilter, setMethodFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [exporting, setExporting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'transactions' | 'settings'>('transactions');
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState({
+    stripePublicKey: '',
+    stripeSecretKey: '',
+    stripeWebhookSecret: '',
+    stripeMode: 'test' as 'test' | 'live',
+    currency: 'USD',
+  });
   const { socket } = useSocket();
 
   const exportPayments = async () => {
@@ -64,7 +75,7 @@ export default function AdminPaymentsPage() {
       setExporting(true);
       // Filter payments based on current filters
       const dataToExport = filteredPayments;
-      
+
       // Create CSV content
       const headers = ['Date', 'Amount', 'Method', 'Status', 'Reference Type', 'Customer'];
       const rows = dataToExport.map(p => [
@@ -75,12 +86,12 @@ export default function AdminPaymentsPage() {
         p.reference_type,
         p.users?.full_name || 'Guest'
       ]);
-      
+
       const csvContent = [
         headers.join(','),
         ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
       ].join('\n');
-      
+
       // Download file
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -91,7 +102,7 @@ export default function AdminPaymentsPage() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
+
       toast.success('Payments exported successfully');
     } catch (error) {
       toast.error('Failed to export payments');
@@ -104,13 +115,13 @@ export default function AdminPaymentsPage() {
     try {
       const response = await api.get('/payments/transactions');
       setPayments(response.data.data || []);
-      
+
       // Calculate stats
       const today = new Date().toISOString().split('T')[0];
       const todayPayments = (response.data.data || []).filter(
         (p: Payment) => p.created_at.startsWith(today)
       );
-      
+
       setStats({
         totalToday: todayPayments.reduce((sum: number, p: Payment) => sum + p.amount, 0),
         totalPending: (response.data.data || []).filter((p: Payment) => p.status === 'pending').length,
@@ -124,9 +135,49 @@ export default function AdminPaymentsPage() {
     }
   }, []);
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const response = await api.get('/admin/settings');
+      if (response.data.success && response.data.data.payments) {
+        setPaymentSettings(response.data.data.payments);
+      }
+    } catch (error) {
+      console.error('Failed to fetch payment settings:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPayments();
-  }, [fetchPayments]);
+    fetchSettings();
+  }, [fetchPayments, fetchSettings]);
+
+  const saveSettings = async () => {
+    try {
+      setSavingSettings(true);
+      await api.put('/admin/settings', {
+        key: 'payments',
+        value: paymentSettings
+      });
+      toast.success('Payment settings saved successfully');
+    } catch (error) {
+      toast.error('Failed to save payment settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleRefund = async (paymentId: string) => {
+    const reason = prompt('Please enter the reason for the refund:');
+    if (reason === null) return;
+
+    try {
+      await api.post(`/payments/transactions/${paymentId}/refund`, { reason });
+      toast.success('Refund processed successfully');
+      fetchPayments();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to process refund');
+    }
+  };
 
   // Real-time payment updates
   useEffect(() => {
@@ -239,230 +290,346 @@ export default function AdminPaymentsPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <motion.div variants={fadeInUp}>
-          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm">Today's Revenue</p>
-                  <p className="text-2xl font-bold mt-1">
-                    {formatCurrency(stats?.totalToday || 0)}
-                  </p>
-                </div>
-                <DollarSign className="w-10 h-10 text-green-200" />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={fadeInUp}>
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm">Total Transactions</p>
-                  <p className="text-2xl font-bold mt-1">
-                    {stats?.transactionCount || 0}
-                  </p>
-                </div>
-                <TrendingUp className="w-10 h-10 text-blue-200" />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={fadeInUp}>
-          <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-yellow-100 text-sm">Pending</p>
-                  <p className="text-2xl font-bold mt-1">
-                    {stats?.totalPending || 0}
-                  </p>
-                </div>
-                <Clock className="w-10 h-10 text-yellow-200" />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={fadeInUp}>
-          <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-emerald-100 text-sm">Completed</p>
-                  <p className="text-2xl font-bold mt-1">
-                    {stats?.totalCompleted || 0}
-                  </p>
-                </div>
-                <CheckCircle2 className="w-10 h-10 text-emerald-200" />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 dark:border-slate-700">
+        <button
+          onClick={() => setActiveTab('transactions')}
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'transactions'
+            ? 'border-blue-600 text-blue-600'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+        >
+          Transactions
+        </button>
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'settings'
+            ? 'border-blue-600 text-blue-600'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+        >
+          Provider Config
+        </button>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search by ID, customer, or reference..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-              />
+      <AnimatePresence mode="wait">
+        {activeTab === 'transactions' ? (
+          <motion.div
+            key="transactions"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="space-y-6"
+          >
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <motion.div variants={fadeInUp}>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                        <DollarSign className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Total Today</p>
+                        <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                          {formatCurrency(stats?.totalToday || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+              <motion.div variants={fadeInUp}>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                        <TrendingUp className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Total Completed</p>
+                        <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                          {stats?.totalCompleted || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+              <motion.div variants={fadeInUp}>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
+                        <Clock className="w-5 h-5 text-yellow-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Pending</p>
+                        <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                          {stats?.totalPending || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+              <motion.div variants={fadeInUp}>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800">
+                        <Search className="w-5 h-5 text-slate-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Total Transactions</p>
+                        <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                          {stats?.transactionCount || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
             </div>
 
-            {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-            >
-              <option value="all">All Status</option>
-              <option value="completed">Completed</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
-              <option value="refunded">Refunded</option>
-            </select>
+            {/* Filters */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search transactions..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="completed">Completed</option>
+                      <option value="failed">Failed</option>
+                      <option value="refunded">Refunded</option>
+                    </select>
+                    <select
+                      value={methodFilter}
+                      onChange={(e) => setMethodFilter(e.target.value)}
+                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                    >
+                      <option value="all">All Methods</option>
+                      <option value="cash">Cash</option>
+                      <option value="card">Card</option>
+                      <option value="stripe">Stripe</option>
+                    </select>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+                    >
+                      <ArrowUpDown className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* Method Filter */}
-            <select
-              value={methodFilter}
-              onChange={(e) => setMethodFilter(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-            >
-              <option value="all">All Methods</option>
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="stripe">Stripe</option>
-            </select>
-
-            {/* Sort Order */}
-            <Button
-              variant="outline"
-              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-            >
-              <ArrowUpDown className="w-4 h-4 mr-2" />
-              {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Payments Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-800">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Transaction
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Customer
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Method
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                <AnimatePresence mode="popLayout">
-                  {filteredPayments.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center">
-                        <p className="text-slate-500 dark:text-slate-400">
-                          No payments found
-                        </p>
-                      </td>
+            {/* Table */}
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Reference</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Method</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                     </tr>
-                  ) : (
-                    filteredPayments.map((payment, index) => (
-                      <motion.tr
-                        key={payment.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                      >
-                        <td className="px-6 py-4">
-                          <span className="font-mono text-sm text-slate-600 dark:text-slate-300">
-                            #{payment.id.slice(0, 8)}
-                          </span>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {filteredPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                          No transactions found
                         </td>
-                        <td className="px-6 py-4">
-                          <div>
-                            <p className="font-medium text-slate-900 dark:text-white">
+                      </tr>
+                    ) : (
+                      filteredPayments.map((payment) => (
+                        <tr key={payment.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            {formatDate(payment.created_at)}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-mono text-slate-500 whitespace-nowrap">
+                            {payment.id.slice(0, 8)}...
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-slate-900 dark:text-white">
                               {payment.users?.full_name || 'Guest'}
-                            </p>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                              {payment.users?.email || '-'}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="capitalize text-slate-600 dark:text-slate-300">
-                            {payment.reference_type?.replace('_', ' ') || '-'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            {getMethodIcon(payment.payment_method)}
-                            <span className="capitalize text-slate-600 dark:text-slate-300">
-                              {payment.payment_method}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {payment.users?.email || 'No email'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-xs font-medium px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                              {payment.reference_type}
                             </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-slate-900 dark:text-white">
+                          </td>
+                          <td className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-white whitespace-nowrap">
                             {formatCurrency(payment.amount)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                              payment.status
-                            )}`}
-                          >
-                            {payment.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
-                          {formatDate(payment.created_at)}
-                        </td>
-                      </motion.tr>
-                    ))
-                  )}
-                </AnimatePresence>
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 capitalize">
+                              {getMethodIcon(payment.payment_method)}
+                              {payment.payment_method}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(payment.status)}`}>
+                              {payment.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {payment.status === 'completed' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRefund(payment.id)}
+                              >
+                                Refund
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="settings"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-blue-600" />
+                  Stripe Configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Stripe Mode
+                  </label>
+                  <select
+                    value={paymentSettings.stripeMode}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, stripeMode: e.target.value as any })}
+                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  >
+                    <option value="test">Test Mode</option>
+                    <option value="live">Live Mode</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Public Key
+                  </label>
+                  <input
+                    type="password"
+                    value={paymentSettings.stripePublicKey}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, stripePublicKey: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    placeholder="pk_test_..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Secret Key
+                  </label>
+                  <input
+                    type="password"
+                    value={paymentSettings.stripeSecretKey}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, stripeSecretKey: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    placeholder="sk_test_..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Webhook Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={paymentSettings.stripeWebhookSecret}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, stripeWebhookSecret: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    placeholder="whsec_..."
+                  />
+                </div>
+                <div className="pt-4">
+                  <Button
+                    className="w-full"
+                    onClick={saveSettings}
+                    disabled={savingSettings}
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {savingSettings ? 'Saving...' : 'Save Configuration'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-green-600" />
+                  General Payment Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    Default Currency
+                  </label>
+                  <select
+                    value={paymentSettings.currency}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, currency: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="LBP">LBP (ل.ل)</option>
+                  </select>
+                </div>
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <strong>Note:</strong> Stripe settings will override environment variables if configured here. Ensure keys match the selected mode.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -26,6 +26,36 @@ import {
   ArrowDownRight,
 } from 'lucide-react';
 
+interface OccupancyData {
+  chalets: {
+    occupancyRate: number;
+    bookedNights: number;
+    totalCapacity: number;
+    activeUnits: number;
+  };
+  pool: {
+    occupancyRate: number;
+    ticketsSold: number;
+    totalCapacity: number;
+    dailyCapacity: number;
+  };
+}
+
+interface CustomerData {
+  topCustomers: Array<{
+    id: string;
+    name: string;
+    revenue: number;
+    count: number;
+  }>;
+  customerRetention: {
+    new: number;
+    returning: number;
+    total: number;
+    newRatio: number;
+  };
+}
+
 interface ReportData {
   overview: {
     totalRevenue: number;
@@ -64,6 +94,8 @@ const EXPORT_OPTIONS: { value: ExportType; label: string }[] = [
 
 export default function AdminReportsPage() {
   const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [occupancyData, setOccupancyData] = useState<OccupancyData | null>(null);
+  const [customerData, setCustomerData] = useState<CustomerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'year'>('month');
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -72,10 +104,15 @@ export default function AdminReportsPage() {
   const fetchReports = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/reports/overview', {
-        params: { range: dateRange },
-      });
-      setReportData(response.data.data || null);
+      const [overviewRes, occupancyRes, customerRes] = await Promise.all([
+        api.get('/admin/reports/overview', { params: { range: dateRange } }),
+        api.get('/admin/reports/occupancy', { params: { range: dateRange } }),
+        api.get('/admin/reports/customers', { params: { range: dateRange } }),
+      ]);
+
+      setReportData(overviewRes.data.data || null);
+      setOccupancyData(occupancyRes.data.data || null);
+      setCustomerData(customerRes.data.data || null);
     } catch (error) {
       console.error('Failed to fetch reports:', error);
       toast.error('Failed to fetch reports data');
@@ -97,7 +134,7 @@ export default function AdminReportsPage() {
         params: { range: dateRange, format: 'csv', type },
         responseType: 'blob',
       });
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -105,7 +142,7 @@ export default function AdminReportsPage() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      
+
       toast.success('Report exported successfully');
     } catch (error) {
       toast.error('Failed to export report');
@@ -188,11 +225,10 @@ export default function AdminReportsPage() {
               <button
                 key={range}
                 onClick={() => setDateRange(range)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  dateRange === range
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${dateRange === range
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
               >
                 {range.charAt(0).toUpperCase() + range.slice(1)}
               </button>
@@ -236,9 +272,8 @@ export default function AdminReportsPage() {
                   <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
                     {formatCurrency(data.overview.totalRevenue)}
                   </p>
-                  <div className={`flex items-center gap-1 mt-2 text-sm ${
-                    data.overview.revenueChange >= 0 ? 'text-green-500' : 'text-red-500'
-                  }`}>
+                  <div className={`flex items-center gap-1 mt-2 text-sm ${data.overview.revenueChange >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
                     {data.overview.revenueChange >= 0 ? (
                       <ArrowUpRight className="w-4 h-4" />
                     ) : (
@@ -265,9 +300,8 @@ export default function AdminReportsPage() {
                   <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
                     {data.overview.totalOrders}
                   </p>
-                  <div className={`flex items-center gap-1 mt-2 text-sm ${
-                    data.overview.ordersChange >= 0 ? 'text-green-500' : 'text-red-500'
-                  }`}>
+                  <div className={`flex items-center gap-1 mt-2 text-sm ${data.overview.ordersChange >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
                     {data.overview.ordersChange >= 0 ? (
                       <ArrowUpRight className="w-4 h-4" />
                     ) : (
@@ -320,6 +354,102 @@ export default function AdminReportsPage() {
                   <Users className="w-6 h-6 text-orange-600 dark:text-orange-400" />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+
+      {/* Occupancy & Retention */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Occupancy Card */}
+        <motion.div variants={fadeInUp}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Unit Occupancy Rate</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {occupancyData && (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Chalet Bookings</span>
+                        <span className="text-sm font-semibold text-slate-900 dark:text-white">{occupancyData.chalets.occupancyRate}%</span>
+                      </div>
+                      <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${occupancyData.chalets.occupancyRate}%` }}
+                          className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500">{occupancyData.chalets.bookedNights} nights / {occupancyData.chalets.totalCapacity} total</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Pool Sessions</span>
+                        <span className="text-sm font-semibold text-slate-900 dark:text-white">{occupancyData.pool.occupancyRate}%</span>
+                      </div>
+                      <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${occupancyData.pool.occupancyRate}%` }}
+                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500">{occupancyData.pool.ticketsSold} guests / {occupancyData.pool.totalCapacity} capacity</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Retention Card */}
+        <motion.div variants={fadeInUp}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Customer Retention</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {customerData && (
+                <div className="flex items-center gap-8 py-4">
+                  <div className="relative w-32 h-32">
+                    {/* Simplified donut chart using CSS */}
+                    <div className="absolute inset-0 rounded-full border-[12px] border-slate-100 dark:border-slate-800" />
+                    <div
+                      className="absolute inset-0 rounded-full border-[12px] border-indigo-500 border-t-transparent border-l-transparent"
+                      style={{ transform: `rotate(${45 + (customerData.customerRetention.newRatio * 3.6)}deg)` }}
+                    />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-bold">{customerData.customerRetention.newRatio}%</span>
+                      <span className="text-[10px] text-slate-500 uppercase">New</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-sm bg-indigo-500" />
+                        <span className="text-sm text-slate-600 dark:text-slate-400">New Customers</span>
+                      </div>
+                      <span className="font-semibold">{customerData.customerRetention.new}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-sm bg-slate-200 dark:bg-slate-700" />
+                        <span className="text-sm text-slate-600 dark:text-slate-400">Returning</span>
+                      </div>
+                      <span className="font-semibold">{customerData.customerRetention.returning}</span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-sm">
+                      <span className="text-slate-500 font-medium">Total Active Users</span>
+                      <span className="font-bold">{customerData.customerRetention.total}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -445,12 +575,11 @@ export default function AdminReportsPage() {
                       className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     >
                       <td className="py-3 px-4">
-                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-sm font-bold ${
-                          index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' :
                           index === 1 ? 'bg-slate-100 text-slate-700' :
-                          index === 2 ? 'bg-orange-100 text-orange-700' :
-                          'bg-slate-50 text-slate-500'
-                        }`}>
+                            index === 2 ? 'bg-orange-100 text-orange-700' :
+                              'bg-slate-50 text-slate-500'
+                          }`}>
                           {index + 1}
                         </span>
                       </td>
@@ -470,6 +599,64 @@ export default function AdminReportsPage() {
               {topItems.length === 0 && (
                 <div className="text-center py-8 text-slate-500 dark:text-slate-400">
                   No sales data available yet
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+      {/* Top Customers */}
+      <motion.div variants={fadeInUp}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Customers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                      Customer
+                    </th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                      Orders
+                    </th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                      Total Revenue
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customerData?.topCustomers.map((customer, index) => (
+                    <motion.tr
+                      key={customer.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                    >
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">
+                            {customer.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <span className="font-medium text-slate-900 dark:text-white">{customer.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-right text-slate-600 dark:text-slate-300">
+                        {customer.count}
+                      </td>
+                      <td className="py-3 px-4 text-right font-semibold text-slate-900 dark:text-white">
+                        {formatCurrency(customer.revenue)}
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+              {(!customerData || customerData.topCustomers.length === 0) && (
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                  No customer data available yet
                 </div>
               )}
             </div>

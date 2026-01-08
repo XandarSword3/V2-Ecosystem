@@ -53,9 +53,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const navigation: NavItem[] = [
     { name: t('nav.dashboard'), href: '/admin', icon: LayoutDashboard },
-    { 
-      name: t('nav.restaurant'), 
-      href: '/admin/restaurant', 
+    {
+      name: t('nav.restaurant'),
+      href: '/admin/restaurant',
       icon: UtensilsCrossed,
       children: [
         { name: t('nav.menuItems'), href: '/admin/restaurant/menu' },
@@ -64,9 +64,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { name: t('nav.tables'), href: '/admin/restaurant/tables' },
       ]
     },
-    { 
-      name: t('nav.chalets'), 
-      href: '/admin/chalets', 
+    {
+      name: t('nav.chalets'),
+      href: '/admin/chalets',
       icon: Home,
       children: [
         { name: t('nav.allChalets'), href: '/admin/chalets' },
@@ -76,9 +76,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { name: t('nav.settings'), href: '/admin/chalets/settings' },
       ]
     },
-    { 
-      name: t('nav.pool'), 
-      href: '/admin/pool', 
+    {
+      name: t('nav.pool'),
+      href: '/admin/pool',
       icon: Waves,
       children: [
         { name: t('nav.sessions'), href: '/admin/pool/sessions' },
@@ -86,18 +86,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { name: t('nav.capacity'), href: '/admin/pool/capacity' },
       ]
     },
-    { 
-      name: t('nav.snackBar'), 
-      href: '/admin/snack', 
+    {
+      name: t('nav.snackBar'),
+      href: '/admin/snack',
       icon: Cookie,
       children: [
         { name: t('nav.menu'), href: '/admin/snack/menu' },
         { name: t('nav.orders'), href: '/admin/snack/orders' },
       ]
     },
-    { 
-      name: t('nav.users'), 
-      href: '/admin/users', 
+    {
+      name: t('nav.users'),
+      href: '/admin/users',
       icon: Users,
       children: [
         { name: 'Customers', href: '/admin/users/customers' },
@@ -109,9 +109,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: t('nav.reviews') || 'Reviews', href: '/admin/reviews', icon: Star },
     { name: t('nav.reports'), href: '/admin/reports', icon: BarChart3 },
     { name: 'Modules', href: '/admin/modules', icon: Cloud },
-    { 
-      name: t('nav.settings'), 
-      href: '/admin/settings', 
+    {
+      name: t('nav.settings'),
+      href: '/admin/settings',
       icon: Settings,
       children: [
         { name: t('nav.general'), href: '/admin/settings' },
@@ -120,6 +120,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { name: 'Footer', href: '/admin/settings/footer' },
         { name: t('nav.payments'), href: '/admin/settings/payments' },
         { name: t('nav.notifications'), href: '/admin/settings/notifications' },
+        { name: 'Database Backups', href: '/admin/settings/backups' },
       ]
     },
     { name: t('nav.auditLogs'), href: '/admin/audit', icon: Shield },
@@ -132,41 +133,41 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       // Filter out core modules that are already hardcoded in the navigation
       .filter(m => !['restaurant', 'chalets', 'pool', 'snack-bar', 'snack'].includes(m.slug))
       .map(module => {
-      let children: { name: string; href: string }[] = [];
-      let icon = Cloud;
+        let children: { name: string; href: string }[] = [];
+        let icon = Cloud;
 
-      if (module.template_type === 'menu_service') {
-        icon = UtensilsCrossed;
-        children = [
-          { name: t('nav.menuItems'), href: `/admin/${module.slug}/menu` },
-          { name: t('nav.categories'), href: `/admin/${module.slug}/categories` },
-          { name: t('nav.orders'), href: `/admin/${module.slug}/orders` },
-          { name: t('nav.tables'), href: `/admin/${module.slug}/tables` },
-        ];
-      } else if (module.template_type === 'multi_day_booking') {
-        icon = Home;
-        children = [
-          { name: t('nav.allChalets'), href: `/admin/${module.slug}` },
-          { name: t('nav.bookings'), href: `/admin/${module.slug}/bookings` },
-          { name: t('nav.pricingRules'), href: `/admin/${module.slug}/pricing` },
-          { name: t('nav.addons'), href: `/admin/${module.slug}/addons` },
-        ];
-      } else if (module.template_type === 'session_access') {
-        icon = Waves;
-        children = [
-          { name: t('nav.sessions'), href: `/admin/${module.slug}/sessions` },
-          { name: t('nav.tickets'), href: `/admin/${module.slug}/tickets` },
-          { name: t('nav.capacity'), href: `/admin/${module.slug}/capacity` },
-        ];
-      }
+        if (module.template_type === 'menu_service') {
+          icon = UtensilsCrossed;
+          children = [
+            { name: t('nav.menuItems'), href: `/admin/${module.slug}/menu` },
+            { name: t('nav.categories'), href: `/admin/${module.slug}/categories` },
+            { name: t('nav.orders'), href: `/admin/${module.slug}/orders` },
+            { name: t('nav.tables'), href: `/admin/${module.slug}/tables` },
+          ];
+        } else if (module.template_type === 'multi_day_booking') {
+          icon = Home;
+          children = [
+            { name: t('nav.allChalets'), href: `/admin/${module.slug}` },
+            { name: t('nav.bookings'), href: `/admin/${module.slug}/bookings` },
+            { name: t('nav.pricingRules'), href: `/admin/${module.slug}/pricing` },
+            { name: t('nav.addons'), href: `/admin/${module.slug}/addons` },
+          ];
+        } else if (module.template_type === 'session_access') {
+          icon = Waves;
+          children = [
+            { name: t('nav.sessions'), href: `/admin/${module.slug}/sessions` },
+            { name: t('nav.tickets'), href: `/admin/${module.slug}/tickets` },
+            { name: t('nav.capacity'), href: `/admin/${module.slug}/capacity` },
+          ];
+        }
 
-      return {
-        name: module.name,
-        href: `/admin/${module.slug}`,
-        icon,
-        children
-      };
-    });
+        return {
+          name: module.name,
+          href: `/admin/${module.slug}`,
+          icon,
+          children
+        };
+      });
 
     // Insert before 'Modules' link
     const modulesIndex = navigation.findIndex(n => n.name === 'Modules');
@@ -182,7 +183,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [authChecked, setAuthChecked] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Array<{id: string; title: string; message: string; time: string; read: boolean}>>([]);
+  const [notifications, setNotifications] = useState<Array<{ id: string; title: string; message: string; time: string; read: boolean }>>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
 
   // Fetch real notifications from backend
@@ -200,7 +201,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         setLoadingNotifications(false);
       }
     };
-    
+
     if (isAuthenticated) {
       fetchNotifications();
       // Refresh notifications every 30 seconds
@@ -210,11 +211,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }, [isAuthenticated]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
-  
+
   const markAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   };
-  
+
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
@@ -429,7 +430,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
                 className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 relative"
               >
@@ -438,7 +439,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
                 )}
               </button>
-              
+
               {/* Notifications Dropdown */}
               <AnimatePresence>
                 {notificationsOpen && (
@@ -451,7 +452,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                       <h3 className="font-semibold text-slate-900 dark:text-white">Notifications</h3>
                       {unreadCount > 0 && (
-                        <button 
+                        <button
                           onClick={markAllAsRead}
                           className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
                         >
@@ -467,7 +468,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                         </div>
                       ) : (
                         notifications.map(notification => (
-                          <div 
+                          <div
                             key={notification.id}
                             onClick={() => markAsRead(notification.id)}
                             className={cn(
@@ -489,7 +490,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                         ))
                       )}
                     </div>
-                    <Link 
+                    <Link
                       href="/admin/settings/notifications"
                       onClick={() => setNotificationsOpen(false)}
                       className="block p-3 text-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"

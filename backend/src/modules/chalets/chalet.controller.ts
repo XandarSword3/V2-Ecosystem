@@ -155,12 +155,66 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
       return res.status(400).json({ success: false, error: 'Invalid date range' });
     }
 
-    // Calculate base amount
+    // 1. Check Availability (Overlap Check)
+    const { data: existingBookings, error: availError } = await supabase
+      .from('chalet_bookings')
+      .select('id, check_in_date, check_out_date')
+      .eq('chalet_id', chaletId)
+      .is('deleted_at', null)
+      .not('status', 'in', '("cancelled", "no_show")');
+
+    if (availError) throw availError;
+
+    const hasOverlap = (existingBookings || []).some(booking => {
+      const bIn = dayjs(booking.check_in_date);
+      const bOut = dayjs(booking.check_out_date);
+      // Overlap if (start1 < end2) AND (end1 > start2)
+      return checkIn.isBefore(bOut) && checkOut.isAfter(bIn);
+    });
+
+    if (hasOverlap) {
+      return res.status(400).json({
+        success: false,
+        error: 'Chalet is already booked for the selected dates'
+      });
+    }
+
+    // 2. Fetch Seasonal Price Rules
+    const { data: priceRules } = await supabase
+      .from('chalet_price_rules')
+      .select('*')
+      .eq('chalet_id', chaletId);
+
+    // 3. Calculate Base Amount (Night-by-night)
     let baseAmount = 0;
     let current = checkIn;
     while (current.isBefore(checkOut)) {
-      const isWeekend = current.day() === 5 || current.day() === 6;
-      const nightPrice = isWeekend ? parseFloat(chalet.weekend_price) : parseFloat(chalet.base_price);
+      // Find if any custom price rule applies to this specific night
+      const activeRule = (priceRules || []).find(rule => {
+        const start = dayjs(rule.start_date).startOf('day');
+        const end = dayjs(rule.end_date).endOf('day');
+        return (current.isSame(start) || current.isAfter(start)) &&
+          (current.isSame(end) || current.isBefore(end));
+      });
+
+      let nightPrice: number;
+      if (activeRule) {
+        if (activeRule.price) {
+          nightPrice = parseFloat(activeRule.price);
+        } else if (activeRule.price_multiplier) {
+          const base = current.day() === 5 || current.day() === 6
+            ? parseFloat(chalet.weekend_price)
+            : parseFloat(chalet.base_price);
+          nightPrice = base * parseFloat(activeRule.price_multiplier);
+        } else {
+          const isWeekend = current.day() === 5 || current.day() === 6;
+          nightPrice = isWeekend ? parseFloat(chalet.weekend_price) : parseFloat(chalet.base_price);
+        }
+      } else {
+        const isWeekend = current.day() === 5 || current.day() === 6;
+        nightPrice = isWeekend ? parseFloat(chalet.weekend_price) : parseFloat(chalet.base_price);
+      }
+
       baseAmount += nightPrice;
       current = current.add(1, 'day');
     }
@@ -344,7 +398,7 @@ export async function cancelBooking(req: Request, res: Response, next: NextFunct
     // First, get the booking to verify ownership
     const { data: booking, error: fetchError } = await supabase
       .from('chalet_bookings')
-      .select('id, customer_id, status')
+      .select('id, customer_id, status, customer_email, customer_name, booking_number, chalet:chalets(name)')
       .eq('id', req.params.id)
       .single();
 
@@ -378,6 +432,18 @@ export async function cancelBooking(req: Request, res: Response, next: NextFunct
       .single();
 
     if (error) throw error;
+
+    // Send cancellation email
+    if (booking.customer_email) {
+      emailService.sendBookingCancellation({
+        customerEmail: booking.customer_email,
+        customerName: booking.customer_name,
+        bookingNumber: booking.booking_number,
+        chaletName: (booking.chalet as any)?.name || 'Chalet',
+        reason,
+      }).catch(err => console.warn('Failed to send cancellation email:', err));
+    }
+
     res.json({ success: true, data, message: 'Booking cancelled' });
   } catch (error) {
     next(error);

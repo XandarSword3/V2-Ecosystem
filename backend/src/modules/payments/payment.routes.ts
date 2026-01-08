@@ -20,5 +20,6 @@ router.post('/record-manual', authenticate, authorize(...staffRoles), paymentCon
 const adminRoles = ['super_admin'];
 router.get('/transactions', authenticate, authorize(...adminRoles), paymentController.getTransactions);
 router.get('/transactions/:id', authenticate, authorize(...adminRoles), paymentController.getTransaction);
+router.post('/transactions/:id/refund', authenticate, authorize(...adminRoles), paymentController.refundPayment);
 
 export default router;

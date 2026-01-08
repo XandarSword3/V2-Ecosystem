@@ -32,10 +32,10 @@ interface AuditLog {
   id: string;
   user_id?: string;
   action: string;
-  entity_type: string;
-  entity_id?: string;
-  old_values?: Record<string, any>;
-  new_values?: Record<string, any>;
+  resource: string;
+  resource_id?: string;
+  old_value?: string;
+  new_value?: string;
   ip_address?: string;
   user_agent?: string;
   created_at: string;
@@ -57,6 +57,7 @@ const actionConfig: Record<string, { icon: React.ElementType; color: string; bgC
 
 const entityConfig: Record<string, { icon: React.ElementType; label: string }> = {
   user: { icon: User, label: 'User' },
+  users: { icon: User, label: 'User' },
   menu_item: { icon: Database, label: 'Menu Item' },
   category: { icon: Database, label: 'Category' },
   chalet: { icon: Database, label: 'Chalet' },
@@ -64,6 +65,8 @@ const entityConfig: Record<string, { icon: React.ElementType; label: string }> =
   order: { icon: Activity, label: 'Order' },
   settings: { icon: Settings, label: 'Settings' },
   session: { icon: Clock, label: 'Session' },
+  module: { icon: Settings, label: 'Module' },
+  backups: { icon: Database, label: 'Backup' },
 };
 
 export default function AdminAuditPage() {
@@ -94,12 +97,12 @@ export default function AdminAuditPage() {
 
   const filteredLogs = logs.filter((log) => {
     if (actionFilter !== 'all' && log.action !== actionFilter) return false;
-    if (entityFilter !== 'all' && log.entity_type !== entityFilter) return false;
+    if (entityFilter !== 'all' && log.resource !== entityFilter) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
         log.action.toLowerCase().includes(query) ||
-        log.entity_type.toLowerCase().includes(query) ||
+        log.resource.toLowerCase().includes(query) ||
         log.users?.full_name?.toLowerCase().includes(query) ||
         log.users?.email?.toLowerCase().includes(query)
       );
@@ -108,7 +111,7 @@ export default function AdminAuditPage() {
   });
 
   const uniqueActions = Array.from(new Set(logs.map((l: AuditLog) => l.action)));
-  const uniqueEntities = Array.from(new Set(logs.map((l: AuditLog) => l.entity_type)));
+  const uniqueEntities = Array.from(new Set(logs.map((l: AuditLog) => l.resource)));
 
   if (loading) {
     return (
@@ -118,6 +121,17 @@ export default function AdminAuditPage() {
       </div>
     );
   }
+
+  // Helper to parse JSON strings if needed
+  const parseValue = (val: any) => {
+    if (!val) return null;
+    if (typeof val === 'object') return val;
+    try {
+      return JSON.parse(val);
+    } catch (e) {
+      return val;
+    }
+  };
 
   return (
     <motion.div
@@ -170,9 +184,9 @@ export default function AdminAuditPage() {
                   <Plus className="w-5 h-5 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Creates</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Logins</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-white">
-                    {logs.filter((l) => l.action === 'create').length}
+                    {logs.filter((l) => l.action === 'LOGIN').length}
                   </p>
                 </div>
               </div>
@@ -190,7 +204,7 @@ export default function AdminAuditPage() {
                 <div>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Updates</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-white">
-                    {logs.filter((l) => l.action === 'update').length}
+                    {logs.filter((l) => l.action.includes('UPDATE')).length}
                   </p>
                 </div>
               </div>
@@ -208,7 +222,7 @@ export default function AdminAuditPage() {
                 <div>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Deletes</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-white">
-                    {logs.filter((l) => l.action === 'delete').length}
+                    {logs.filter((l) => l.action.includes('DELETE')).length}
                   </p>
                 </div>
               </div>
@@ -242,7 +256,7 @@ export default function AdminAuditPage() {
               <option value="all">All Actions</option>
               {uniqueActions.map((action) => (
                 <option key={action} value={action}>
-                  {action.charAt(0).toUpperCase() + action.slice(1)}
+                  {action.replace('_', ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase())}
                 </option>
               ))}
             </select>
@@ -253,7 +267,7 @@ export default function AdminAuditPage() {
               onChange={(e) => setEntityFilter(e.target.value)}
               className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
             >
-              <option value="all">All Entities</option>
+              <option value="all">All Resources</option>
               {uniqueEntities.map((entity) => (
                 <option key={entity} value={entity}>
                   {entity.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
@@ -280,10 +294,11 @@ export default function AdminAuditPage() {
                 </motion.div>
               ) : (
                 filteredLogs.map((log, index) => {
-                  const ActionIcon = actionConfig[log.action]?.icon || Activity;
-                  const actionColor = actionConfig[log.action]?.color || 'text-slate-500';
-                  const actionBg = actionConfig[log.action]?.bgColor || 'bg-slate-100';
-                  const EntityIcon = entityConfig[log.entity_type]?.icon || Database;
+                  const normalizedAction = log.action.toLowerCase();
+                  const ActionIcon = actionConfig[normalizedAction]?.icon || (normalizedAction.includes('create') ? Plus : normalizedAction.includes('update') ? Edit : normalizedAction.includes('delete') ? Trash2 : Activity);
+                  const actionColor = actionConfig[normalizedAction]?.color || (normalizedAction.includes('create') ? 'text-green-500' : normalizedAction.includes('update') ? 'text-blue-500' : normalizedAction.includes('delete') ? 'text-red-500' : 'text-slate-500');
+                  const actionBg = actionConfig[normalizedAction]?.bgColor || (normalizedAction.includes('create') ? 'bg-green-100' : normalizedAction.includes('update') ? 'bg-blue-100' : normalizedAction.includes('delete') ? 'bg-red-100' : 'bg-slate-100');
+                  const EntityIcon = entityConfig[log.resource]?.icon || Database;
 
                   return (
                     <motion.div
@@ -312,18 +327,18 @@ export default function AdminAuditPage() {
                       >
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <span className={`font-semibold capitalize ${actionColor}`}>
-                            {log.action}
+                            {log.action.replace('_', ' ').toLowerCase()}
                           </span>
                           <span className="text-slate-400">•</span>
                           <span className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
                             <EntityIcon className="w-4 h-4" />
-                            {entityConfig[log.entity_type]?.label || log.entity_type.replace('_', ' ')}
+                            {entityConfig[log.resource]?.label || log.resource.replace('_', ' ')}
                           </span>
-                          {log.entity_id && (
+                          {log.resource_id && (
                             <>
                               <span className="text-slate-400">•</span>
                               <span className="font-mono text-xs text-slate-500">
-                                {log.entity_id.slice(0, 8)}
+                                {log.resource_id.slice(0, 8)}
                               </span>
                             </>
                           )}
@@ -385,13 +400,13 @@ export default function AdminAuditPage() {
                   <div>
                     <span className="text-sm text-slate-500 dark:text-slate-400">Action</span>
                     <p className="font-medium text-slate-900 dark:text-white capitalize">
-                      {selectedLog.action}
+                      {selectedLog.action.replace('_', ' ').toLowerCase()}
                     </p>
                   </div>
                   <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">Entity Type</span>
-                    <p className="font-medium text-slate-900 dark:text-white">
-                      {selectedLog.entity_type.replace('_', ' ')}
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Resource</span>
+                    <p className="font-medium text-slate-900 dark:text-white capitalize">
+                      {selectedLog.resource.replace('_', ' ')}
                     </p>
                   </div>
                   <div>
@@ -418,20 +433,24 @@ export default function AdminAuditPage() {
                   </div>
                 )}
 
-                {selectedLog.old_values && (
+                {selectedLog.old_value && (
                   <div>
                     <span className="text-sm text-slate-500 dark:text-slate-400">Previous Values</span>
                     <pre className="mt-1 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm overflow-x-auto text-red-800 dark:text-red-200">
-                      {JSON.stringify(selectedLog.old_values, null, 2)}
+                      {typeof parseValue(selectedLog.old_value) === 'object'
+                        ? JSON.stringify(parseValue(selectedLog.old_value), null, 2)
+                        : selectedLog.old_value}
                     </pre>
                   </div>
                 )}
 
-                {selectedLog.new_values && (
+                {selectedLog.new_value && (
                   <div>
                     <span className="text-sm text-slate-500 dark:text-slate-400">New Values</span>
                     <pre className="mt-1 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm overflow-x-auto text-green-800 dark:text-green-200">
-                      {JSON.stringify(selectedLog.new_values, null, 2)}
+                      {typeof parseValue(selectedLog.new_value) === 'object'
+                        ? JSON.stringify(parseValue(selectedLog.new_value), null, 2)
+                        : selectedLog.new_value}
                     </pre>
                   </div>
                 )}

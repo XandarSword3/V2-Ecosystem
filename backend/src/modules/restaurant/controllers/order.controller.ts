@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as orderService from "../services/order.service.js";
 
-import { createRestaurantOrderSchema, validateBody } from "../../../validation/schemas.js";
+import { createRestaurantOrderSchema, updateOrderStatusSchema, validateBody } from "../../../validation/schemas.js";
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
@@ -141,7 +141,7 @@ export async function getLiveOrders(req: Request, res: Response, next: NextFunct
 
 export async function updateOrderStatus(req: Request, res: Response, next: NextFunction) {
   try {
-    const { status, notes } = req.body;
+    const { status, notes } = validateBody(updateOrderStatusSchema, req.body);
     const order = await orderService.updateOrderStatus(
       req.params.id,
       status,

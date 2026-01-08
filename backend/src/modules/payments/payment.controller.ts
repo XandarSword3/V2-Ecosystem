@@ -5,9 +5,35 @@ import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
 import { createPaymentIntentSchema, recordCashPaymentSchema, recordManualPaymentSchema, validateBody } from "../../validation/schemas.js";
 
-const stripe = new Stripe(config.stripe.secretKey, {
-  apiVersion: '2023-10-16',
-});
+const getStripeInstance = async () => {
+  const supabase = getSupabase();
+  const { data: settings } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'payments')
+    .single();
+
+  const secretKey = settings?.value?.stripeSecretKey || config.stripe.secretKey;
+
+  if (!secretKey) {
+    throw new Error('Stripe secret key not configured');
+  }
+
+  return new Stripe(secretKey, {
+    apiVersion: '2023-10-16',
+  });
+};
+
+const getStripeWebhookSecret = async () => {
+  const supabase = getSupabase();
+  const { data: settings } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'payments')
+    .single();
+
+  return settings?.value?.stripeWebhookSecret || config.stripe.webhookSecret;
+};
 
 export async function createPaymentIntent(req: Request, res: Response, next: NextFunction) {
   try {
@@ -15,9 +41,14 @@ export async function createPaymentIntent(req: Request, res: Response, next: Nex
     const validatedData = validateBody(createPaymentIntentSchema, req.body);
     const { amount, currency = 'usd', referenceType, referenceId } = validatedData;
 
+    const supabase = getSupabase();
+    const { data: settings } = await supabase.from('site_settings').select('value').eq('key', 'payments').single();
+    const defaultCurrency = settings?.value?.currency?.toLowerCase() || currency;
+
+    const stripe = await getStripeInstance();
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // Convert to cents
-      currency: currency as string,
+      currency: defaultCurrency,
       metadata: {
         referenceType,
         referenceId,
@@ -43,10 +74,12 @@ export async function handleStripeWebhook(req: Request, res: Response) {
   let event: Stripe.Event;
 
   try {
+    const stripe = await getStripeInstance();
+    const webhookSecret = await getStripeWebhookSecret();
     event = stripe.webhooks.constructEvent(
       req.body,
       sig,
-      config.stripe.webhookSecret
+      webhookSecret
     );
   } catch (err: any) {
     logger.error('Webhook signature verification failed:', err.message);
@@ -155,7 +188,7 @@ export async function recordCashPayment(req: Request, res: Response, next: NextF
     // Validate input
     const validatedData = validateBody(recordCashPaymentSchema, req.body);
     const { referenceType, referenceId, amount, notes } = validatedData;
-    
+
     const supabase = getSupabase();
 
     const { data: payment, error } = await supabase
@@ -189,7 +222,7 @@ export async function recordManualPayment(req: Request, res: Response, next: Nex
   try {
     const validatedData = validateBody(recordManualPaymentSchema, req.body);
     const { referenceType, referenceId, amount, method, notes } = validatedData;
-    
+
     const supabase = getSupabase();
 
     const { data: payment, error } = await supabase
@@ -271,6 +304,67 @@ export async function getTransaction(req: Request, res: Response, next: NextFunc
     }
 
     res.json({ success: true, data: payment });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function refundPayment(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { id } = req.params;
+    const { reason, amount } = req.body; // amount is optional, if not provided, full refund
+
+    // Get original payment
+    const { data: payment, error: fetchError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !payment) {
+      return res.status(404).json({ success: false, error: 'Payment record not found' });
+    }
+
+    if (payment.status === 'refunded') {
+      return res.status(400).json({ success: false, error: 'Payment is already refunded' });
+    }
+
+    let refundDetails: any = {
+      status: 'refunded',
+      notes: reason ? `${payment.notes || ''} [Refund Reason: ${reason}]` : payment.notes,
+      processed_at: new Date().toISOString(),
+      processed_by: req.user!.userId,
+    };
+
+    // If it's a Stripe payment, trigger Stripe refund
+    if (payment.method === 'card' && payment.stripe_payment_intent_id) {
+      try {
+        const stripe = await getStripeInstance();
+        const stripeRefund = await stripe.refunds.create({
+          payment_intent: payment.stripe_payment_intent_id,
+          amount: amount ? Math.round(amount * 100) : undefined,
+          reason: 'requested_by_customer', // Default reason
+        });
+        refundDetails.notes = `${refundDetails.notes || ''} [Stripe Refund ID: ${stripeRefund.id}]`;
+      } catch (stripeError: any) {
+        logger.error('Stripe refund failed:', stripeError);
+        return res.status(400).json({ success: false, error: `Stripe refund failed: ${stripeError.message}` });
+      }
+    }
+
+    // Update payment record
+    const { error: updateError } = await supabase
+      .from('payments')
+      .update(refundDetails)
+      .eq('id', id);
+
+    if (updateError) throw updateError;
+
+    // Update source reference (Order/Booking)
+    await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, 'refunded');
+
+    res.json({ success: true, message: 'Payment refunded successfully' });
   } catch (error) {
     next(error);
   }

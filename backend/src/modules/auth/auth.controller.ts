@@ -3,6 +3,7 @@ import * as authService from "./auth.service";
 import { loginSchema, registerSchema, changePasswordSchema } from "./auth.validation";
 import { logger } from "../../utils/logger";
 import { config } from "../../config";
+import { logActivity } from "../../utils/activityLogger";
 
 const isProduction = config.env === 'production';
 
@@ -15,12 +16,22 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     const data = registerSchema.parse(req.body);
     const result = await authService.register(data);
     logger.info(`Registration successful for: ${data.email}`);
+
+    await logActivity({
+      user_id: result.user.id,
+      action: 'REGISTER',
+      resource: 'auth',
+      ip_address: req.ip,
+      user_agent: req.get('user-agent'),
+      new_value: { email: data.email, fullName: data.fullName }
+    });
+
     res.status(201).json({ success: true, data: result });
   } catch (error: any) {
     logger.error('Registration failed:', error.message);
     // Only expose error details in development
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: isProduction ? 'Registration failed. Please try again.' : error.message
     });
   }
@@ -33,14 +44,22 @@ export async function login(req: Request, res: Response, next: NextFunction) {
   }
   try {
     const data = loginSchema.parse(req.body);
-    
+
     const result = await authService.login(data.email, data.password, {
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
     });
-    
+
     logger.info(`Login successful for user: ${result.user.id}`);
-    
+
+    await logActivity({
+      user_id: result.user.id,
+      action: 'LOGIN',
+      resource: 'auth',
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    });
+
     res.json({ success: true, data: result });
   } catch (error: any) {
     logger.warn(`Login failed for email: ${req.body.email}`);
@@ -75,6 +94,14 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (token) {
       await authService.logout(token);
+
+      await logActivity({
+        user_id: req.user!.userId,
+        action: 'LOGOUT',
+        resource: 'auth',
+        ip_address: req.ip,
+        user_agent: req.get('user-agent')
+      });
     }
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
@@ -86,6 +113,15 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
   try {
     const data = changePasswordSchema.parse(req.body);
     await authService.changePassword(req.user!.userId, data.currentPassword, data.newPassword);
+
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'CHANGE_PASSWORD',
+      resource: 'auth',
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    });
+
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (error) {
     next(error);
@@ -107,7 +143,16 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
 export async function resetPassword(req: Request, res: Response, next: NextFunction) {
   try {
     const { token, newPassword } = req.body;
-    await authService.resetPassword(token, newPassword);
+    const result = await authService.resetPassword(token, newPassword);
+
+    await logActivity({
+      user_id: (result as any).user_id || 'unknown', // Assuming resetPassword returns user_id
+      action: 'RESET_PASSWORD',
+      resource: 'auth',
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    });
+
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (error) {
     next(error);
