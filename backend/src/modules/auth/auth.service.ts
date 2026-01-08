@@ -107,12 +107,12 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     logger.error('[AUTH SERVICE] Database error finding user:', JSON.stringify(userError));
     throw new AppError('Invalid credentials', 401);
   }
-  
+
   if (!user) {
     logger.error('[AUTH SERVICE] User not found for email:', email);
     throw new AppError('Invalid credentials', 401);
   }
-  
+
   logger.info('[AUTH SERVICE] User found:', { id: user.id, email: user.email, is_active: user.is_active });
 
   if (!user.is_active) {
@@ -125,7 +125,7 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     logger.info('[AUTH SERVICE] Step 2: Verifying password...');
   }
   const isValid = await bcrypt.compare(password, user.password_hash);
-  
+
   if (!isValid) {
     logger.warn('[AUTH SERVICE] Invalid password attempt for:', email);
     throw new AppError('Invalid credentials', 401);
@@ -204,7 +204,7 @@ export async function login(email: string, password: string, meta: SessionMeta) 
 
   logger.info('[AUTH SERVICE] ========== LOGIN SUCCESS ==========');
   logger.info('[AUTH SERVICE] Returning user:', JSON.stringify(result.user, null, 2));
-  
+
   return result;
 }
 
@@ -341,24 +341,24 @@ export async function changePassword(userId: string, currentPassword: string, ne
 
 export async function sendPasswordResetEmail(email: string) {
   const supabase = getSupabase();
-  
+
   // Find user
   const { data: user, error: userError } = await supabase
     .from('users')
     .select('id, name, email')
     .eq('email', email.toLowerCase())
     .single();
-  
+
   if (userError || !user) {
     // Don't reveal if email exists
     logger.info(`Password reset requested for non-existent email: ${email}`);
     return;
   }
-  
+
   // Generate reset token
   const resetToken = uuidv4();
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-  
+
   // Store token (you may need to create a password_reset_tokens table)
   // For now, we'll use the sessions table with a special session type
   await supabase
@@ -369,10 +369,10 @@ export async function sendPasswordResetEmail(email: string) {
       expires_at: expiresAt.toISOString(),
       is_active: true,
     });
-  
+
   // Send email with reset link
   const resetUrl = `${config.frontendUrl}/reset-password?token=${resetToken}`;
-  
+
   await emailService.sendEmail({
     to: user.email,
     subject: 'Reset Your Password - V2 Resort',
@@ -386,13 +386,13 @@ export async function sendPasswordResetEmail(email: string) {
       <p>Thanks,<br>V2 Resort Team</p>
     `,
   });
-  
+
   logger.info(`Password reset email sent to: ${email}`);
 }
 
 export async function resetPassword(token: string, newPassword: string) {
   const supabase = getSupabase();
-  
+
   // Find valid reset token
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
@@ -400,41 +400,42 @@ export async function resetPassword(token: string, newPassword: string) {
     .eq('refresh_token', token)
     .eq('is_active', true)
     .single();
-  
+
   if (sessionError || !session) {
     throw new Error('Invalid or expired reset token');
   }
-  
+
   // Check expiration
   if (new Date(session.expires_at) < new Date()) {
     await supabase.from('sessions').delete().eq('id', session.id);
     throw new Error('Reset token has expired');
   }
-  
+
   // Hash new password
   const hashedPassword = await bcrypt.hash(newPassword, 12);
-  
+
   // Update user password
   const { error: updateError } = await supabase
     .from('users')
-    .update({ 
+    .update({
       password_hash: hashedPassword,
       updated_at: new Date().toISOString(),
     })
     .eq('id', session.user_id);
-  
+
   if (updateError) {
     throw new Error('Failed to update password');
   }
-  
+
   // Invalidate reset token
   await supabase.from('sessions').delete().eq('id', session.id);
-  
+
   // Invalidate all other sessions for security
   await supabase
     .from('sessions')
     .update({ is_active: false })
     .eq('user_id', session.user_id);
-  
+
   logger.info(`Password reset completed for user: ${session.user_id}`);
+  return { user_id: session.user_id };
 }

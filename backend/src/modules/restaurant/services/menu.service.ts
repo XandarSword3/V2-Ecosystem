@@ -166,6 +166,8 @@ export async function createMenuItem(data: {
   allergens?: string[];
   imageUrl?: string;
   isFeatured?: boolean;
+  isSpicy?: boolean;
+  discountPrice?: number;
   displayOrder?: number;
   moduleId?: string;
 }) {
@@ -194,6 +196,8 @@ export async function createMenuItem(data: {
       allergens: data.allergens || [],
       image_url: data.imageUrl,
       is_featured: data.isFeatured || false,
+      is_spicy: data.isSpicy || false,
+      discount_price: data.discountPrice,
       display_order: data.displayOrder || 0,
       module_id: data.moduleId,
     })
@@ -222,6 +226,8 @@ export async function updateMenuItem(id: string, data: Partial<{
   imageUrl: string;
   isAvailable: boolean;
   isFeatured: boolean;
+  isSpicy: boolean;
+  discountPrice: number;
   displayOrder: number;
 }>) {
   const supabase = getSupabase();
@@ -244,6 +250,8 @@ export async function updateMenuItem(id: string, data: Partial<{
   if (data.imageUrl !== undefined) updateData.image_url = data.imageUrl;
   if (data.isAvailable !== undefined) updateData.is_available = data.isAvailable;
   if (data.isFeatured !== undefined) updateData.is_featured = data.isFeatured;
+  if (data.isSpicy !== undefined) updateData.is_spicy = data.isSpicy;
+  if (data.discountPrice !== undefined) updateData.discount_price = data.discountPrice;
   if (data.displayOrder !== undefined) updateData.display_order = data.displayOrder;
 
   const { data: item, error } = await supabase

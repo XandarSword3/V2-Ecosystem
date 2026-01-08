@@ -149,7 +149,7 @@ export const createRestaurantOrderSchema = z.object({
 });
 
 export const updateOrderStatusSchema = z.object({
-  status: z.enum(['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed', 'cancelled']),
+  status: z.enum(['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivered', 'completed', 'cancelled']),
   notes: sanitizedString(500).optional(),
 });
 
