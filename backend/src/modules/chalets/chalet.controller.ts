@@ -733,7 +733,7 @@ export async function deletePriceRule(req: Request, res: Response, next: NextFun
 export async function getChaletSettings(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    let settingsObj: Record<string, any> = {
+    const settingsObj: Record<string, any> = {
       deposit_percentage: 30, // Default
       check_in_time: '14:00',
       check_out_time: '11:00',

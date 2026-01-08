@@ -5,6 +5,7 @@ import { purchasePoolTicketSchema, validateBody } from "../../validation/schemas
 import QRCode from 'qrcode';
 import { config } from "../../config/index.js";
 import dayjs from 'dayjs';
+import { emitToUnit } from "../../socket/index.js";
 
 function generateTicketNumber(): string {
   const date = dayjs().format('YYMMDD');
@@ -20,7 +21,7 @@ export async function getSessions(req: Request, res: Response, next: NextFunctio
   try {
     const supabase = getSupabase();
     const { moduleId } = req.query;
-    
+
     let query = supabase
       .from('pool_sessions')
       .select('*')
@@ -134,7 +135,7 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
   try {
     // Validate input
     const validatedData = validateBody(purchasePoolTicketSchema, req.body);
-    
+
     const supabase = getSupabase();
     const {
       sessionId,
@@ -166,20 +167,20 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
 
     const { data: existingTickets, error: ticketsError } = await supabase
       .from('pool_tickets')
-      .select('*')
+      .select('number_of_guests')
       .eq('session_id', sessionId)
       .gte('ticket_date', targetDate)
       .lte('ticket_date', endOfDay)
-      .eq('status', 'valid');
+      .in('status', ['valid', 'active', 'used']); // All booked spots count against total session capacity
 
     if (ticketsError) throw ticketsError;
 
     const soldGuests = (existingTickets || []).reduce((sum, t) => sum + t.number_of_guests, 0);
     if (soldGuests + numberOfGuests > session.max_capacity) {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: 'Not enough capacity available',
-        available: session.max_capacity - soldGuests,
+        available: Math.max(0, session.max_capacity - soldGuests),
       });
     }
 
@@ -201,10 +202,11 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
       .insert({
         ticket_number: ticketNumber,
         session_id: sessionId,
+        module_id: session.module_id,
         customer_id: req.user?.userId,
         customer_name: customerName,
         customer_phone: customerPhone,
-        ticket_date: dayjs(ticketDate).startOf('day').toISOString(),
+        ticket_date: targetDate,
         number_of_guests: numberOfGuests,
         total_amount: totalAmount.toFixed(2),
         status: 'valid',
@@ -216,6 +218,13 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
       .single();
 
     if (ticketError) throw ticketError;
+
+    // Emit socket event for real-time capacity updates
+    emitToUnit('pool', 'pool:ticket:new', {
+      ...ticket,
+      sessionId: ticket.session_id,
+      ticketDate: ticket.ticket_date,
+    });
 
     // Send ticket email with QR code
     if (customerEmail) {
@@ -261,17 +270,17 @@ export async function getTicket(req: Request, res: Response, next: NextFunction)
     const isOwner = ticket.customer_id === userId;
     const isAdminOrStaff = userRoles.includes('admin') || userRoles.includes('staff');
     const isGuestTicket = !ticket.customer_id; // Allow guest tickets (no owner)
-    
+
     if (!isOwner && !isAdminOrStaff && !isGuestTicket) {
       // For non-owners, only return limited info (validation status)
-      return res.json({ 
-        success: true, 
-        data: { 
-          id: ticket.id, 
+      return res.json({
+        success: true,
+        data: {
+          id: ticket.id,
           ticket_number: ticket.ticket_number,
-          status: ticket.status, 
+          status: ticket.status,
           ticket_date: ticket.ticket_date
-        } 
+        }
       });
     }
 
@@ -324,7 +333,7 @@ export async function validateTicket(req: Request, res: Response, next: NextFunc
         .select('id')
         .eq('ticket_number', ticketNumber)
         .single();
-      
+
       if (!error) ticketId = ticket?.id;
     } else if (qrData) {
       try {
@@ -334,7 +343,7 @@ export async function validateTicket(req: Request, res: Response, next: NextFunc
           .select('id')
           .eq('ticket_number', parsed.ticketNumber)
           .single();
-        
+
         if (!error) ticketId = ticket?.id;
       } catch {
         return res.status(400).json({ success: false, error: 'Invalid QR code' });
@@ -356,17 +365,17 @@ export async function validateTicket(req: Request, res: Response, next: NextFunc
     }
 
     // Validate ticket
-    if (ticket.status === 'used') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Ticket already used',
+    if (['used', 'active'].includes(ticket.status)) {
+      return res.status(400).json({
+        success: false,
+        error: ticket.status === 'active' ? 'Ticket already active (In Pool)' : 'Ticket already used',
         validatedAt: ticket.validated_at,
       });
     }
 
     if (ticket.status === 'expired' || ticket.status === 'cancelled') {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: `Ticket is ${ticket.status}`,
       });
     }
@@ -375,20 +384,21 @@ export async function validateTicket(req: Request, res: Response, next: NextFunc
     const today = dayjs().startOf('day');
     const ticketDay = dayjs(ticket.ticket_date).startOf('day');
     if (!ticketDay.isSame(today)) {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: 'Ticket is not valid for today',
         ticketDate: ticket.ticket_date,
       });
     }
 
-    // Mark as used
+    // Mark as active (Entered)
     const { data: updatedTicket, error: updateError } = await supabase
       .from('pool_tickets')
       .update({
-        status: 'used',
+        status: 'active',
         validated_at: new Date().toISOString(),
         validated_by: req.user!.userId,
+        entry_time: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', ticket.id)
@@ -397,11 +407,93 @@ export async function validateTicket(req: Request, res: Response, next: NextFunc
 
     if (updateError) throw updateError;
 
-    res.json({ 
-      success: true, 
+    // Emit entry event
+    emitToUnit('pool', 'pool:entry', { ticketId: ticket.id });
+    emitToUnit('pool', 'pool:ticket:updated', updatedTicket);
+
+    res.json({
+      success: true,
       data: updatedTicket,
       message: `Valid! ${ticket.number_of_guests} guest(s) admitted.`,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function recordEntry(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { id } = req.params;
+
+    const { data: ticket, error: ticketError } = await supabase
+      .from('pool_tickets')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (ticketError || !ticket) {
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    }
+
+    if (['used', 'active', 'cancelled'].includes(ticket.status)) {
+      return res.status(400).json({ success: false, error: `Ticket status is ${ticket.status}` });
+    }
+
+    const { data: updatedTicket, error: updateError } = await supabase
+      .from('pool_tickets')
+      .update({
+        status: 'active',
+        entry_time: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    emitToUnit('pool', 'pool:entry', { ticketId: id });
+    emitToUnit('pool', 'pool:ticket:updated', updatedTicket);
+
+    res.json({ success: true, data: updatedTicket });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function recordExit(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { id } = req.params;
+
+    const { data: ticket, error: ticketError } = await supabase
+      .from('pool_tickets')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (ticketError || !ticket) {
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    }
+
+    const { data: updatedTicket, error: updateError } = await supabase
+      .from('pool_tickets')
+      .update({
+        status: 'used',
+        exit_time: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    emitToUnit('pool', 'pool:exit', { ticketId: id });
+    emitToUnit('pool', 'pool:ticket:updated', updatedTicket);
+
+    res.json({ success: true, data: updatedTicket });
   } catch (error) {
     next(error);
   }
@@ -431,10 +523,14 @@ export async function getCurrentCapacity(req: Request, res: Response, next: Next
     const capacity = (sessions || []).map(session => {
       const sessionTickets = (tickets || []).filter(t => t.session_id === session.id);
       const validTickets = sessionTickets.filter(t => t.status === 'valid');
+      const activeTickets = sessionTickets.filter(t => t.status === 'active');
       const usedTickets = sessionTickets.filter(t => t.status === 'used');
 
       const pendingGuests = validTickets.reduce((sum, t) => sum + t.number_of_guests, 0);
-      const admittedGuests = usedTickets.reduce((sum, t) => sum + t.number_of_guests, 0);
+      const activeGuests = activeTickets.reduce((sum, t) => sum + t.number_of_guests, 0);
+      const usedGuests = usedTickets.reduce((sum, t) => sum + t.number_of_guests, 0);
+
+      const admittedGuests = activeGuests + usedGuests;
 
       return {
         sessionId: session.id,
@@ -451,9 +547,9 @@ export async function getCurrentCapacity(req: Request, res: Response, next: Next
 
     const totalAdmitted = capacity.reduce((sum, c) => sum + c.admitted, 0);
 
-    res.json({ 
-      success: true, 
-      data: { 
+    res.json({
+      success: true,
+      data: {
         sessions: capacity,
         totalAdmitted,
       },
@@ -490,21 +586,22 @@ export async function getTodayTickets(req: Request, res: Response, next: NextFun
 
 export async function createSession(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, startTime, endTime, maxCapacity, price } = req.body;
-    
+    const { name, startTime, endTime, maxCapacity, price, moduleId } = req.body;
+
     // Validate required fields
     if (!name || !startTime || !endTime || maxCapacity === undefined || price === undefined) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields: name, startTime, endTime, maxCapacity, price' 
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: name, startTime, endTime, maxCapacity, price'
       });
     }
-    
+
     const supabase = getSupabase();
     const { data: session, error } = await supabase
       .from('pool_sessions')
       .insert({
         name,
+        module_id: moduleId,
         start_time: startTime,
         end_time: endTime,
         max_capacity: Number(maxCapacity),
@@ -527,10 +624,10 @@ export async function createSession(req: Request, res: Response, next: NextFunct
 export async function updateSession(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const updateData: Record<string, unknown> = { 
-      updated_at: new Date().toISOString() 
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
     };
-    
+
     if (req.body.name !== undefined) updateData.name = req.body.name;
     if (req.body.startTime !== undefined) updateData.start_time = req.body.startTime;
     if (req.body.endTime !== undefined) updateData.end_time = req.body.endTime;
@@ -558,9 +655,9 @@ export async function deleteSession(req: Request, res: Response, next: NextFunct
     const supabase = getSupabase();
     const { error } = await supabase
       .from('pool_sessions')
-      .update({ 
-        is_active: false, 
-        updated_at: new Date().toISOString() 
+      .update({
+        is_active: false,
+        updated_at: new Date().toISOString()
       })
       .eq('id', req.params.id);
 
@@ -619,21 +716,21 @@ export async function getDailyReport(req: Request, res: Response, next: NextFunc
 export async function getPoolSettings(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    
+
     // Get settings from site_settings table with pool category
     const { data: settings, error } = await supabase
       .from('site_settings')
       .select('*')
       .eq('category', 'pool');
-    
+
     if (error) throw error;
-    
+
     // Convert to object format
     const settingsObj: Record<string, string> = {};
     (settings || []).forEach((s: { key: string; value: string }) => {
       settingsObj[s.key] = s.value;
     });
-    
+
     // Default settings if none exist
     const defaultSettings = {
       maxCapacity: '100',
@@ -643,7 +740,7 @@ export async function getPoolSettings(req: Request, res: Response, next: NextFun
       isOpen: 'true',
       ...settingsObj,
     };
-    
+
     res.json({ success: true, data: defaultSettings });
   } catch (error) {
     next(error);
@@ -654,22 +751,22 @@ export async function updatePoolSettings(req: Request, res: Response, next: Next
   try {
     const supabase = getSupabase();
     const settings = req.body;
-    
+
     // Upsert each setting
     for (const [key, value] of Object.entries(settings)) {
       await supabase
         .from('site_settings')
         .upsert(
-          { 
-            key, 
-            value: String(value), 
+          {
+            key,
+            value: String(value),
             category: 'pool',
             updated_at: new Date().toISOString()
           },
           { onConflict: 'key,category' }
         );
     }
-    
+
     res.json({ success: true, message: 'Pool settings updated' });
   } catch (error) {
     next(error);
@@ -679,22 +776,68 @@ export async function updatePoolSettings(req: Request, res: Response, next: Next
 export async function resetOccupancy(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    
+
     // Reset current occupancy to 0
     await supabase
       .from('site_settings')
       .upsert(
-        { 
-          key: 'current_occupancy', 
-          value: '0', 
+        {
+          key: 'current_occupancy',
+          value: '0',
           category: 'pool',
           updated_at: new Date().toISOString()
         },
         { onConflict: 'key,category' }
       );
-    
+
     res.json({ success: true, message: 'Occupancy reset to 0' });
   } catch (error) {
     next(error);
   }
+}
+
+// ============================================
+// Maintenance Logs
+// ============================================
+
+export async function getMaintenanceLogs(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { moduleId } = req.query;
+
+    let query = supabase
+      .from('pool_maintenance_logs')
+      .select('*, users:performed_by(full_name)')
+      .order('created_at', { ascending: false });
+
+    if (moduleId) {
+      query = query.eq('module_id', moduleId);
+    }
+
+    const { data: logs, error } = await query;
+    if (error) throw error;
+    res.json({ success: true, data: logs || [] });
+  } catch (error) { next(error); }
+}
+
+export async function createMaintenanceLog(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { type, readings, notes, moduleId } = req.body;
+
+    const { data: log, error } = await supabase
+      .from('pool_maintenance_logs')
+      .insert({
+        type,
+        readings,
+        notes,
+        module_id: moduleId,
+        performed_by: req.user!.userId
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(201).json({ success: true, data: log });
+  } catch (error) { next(error); }
 }

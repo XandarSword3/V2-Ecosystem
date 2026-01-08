@@ -4,13 +4,14 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { poolApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { useAuth } from '@/lib/auth-context';
+import { useSocket } from '@/lib/socket';
 import { Loader2, Waves, Users, Clock, Calendar, AlertCircle, Ticket, Droplets, Sun, Umbrella, QrCode, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -102,7 +103,30 @@ export default function PoolPage() {
     },
   });
 
+  const { socket } = useSocket();
+
+  useEffect(() => {
+    if (socket) {
+      const handleUpdate = (data: any) => {
+        // If the update is for the current business area and selected date, refetch
+        const updateDate = data.ticketDate || data.ticket_date;
+        if (updateDate && updateDate.split('T')[0] === selectedDate) {
+          refetch();
+        }
+      };
+
+      socket.on('pool:ticket:new', handleUpdate);
+      socket.on('pool:ticket:updated', handleUpdate);
+
+      return () => {
+        socket.off('pool:ticket:new', handleUpdate);
+        socket.off('pool:ticket:updated', handleUpdate);
+      };
+    }
+  }, [socket, selectedDate, refetch]);
+
   const rawSessions = data?.data?.data || [];
+
   const sessions: PoolSession[] = rawSessions.map(normalizeSession);
 
   const handlePurchase = async () => {
@@ -114,7 +138,7 @@ export default function PoolPage() {
       toast.error(t('fillContactInfo'));
       return;
     }
-    
+
     purchaseMutation.mutate({
       sessionId: selectedSession.id,
       ticketDate: selectedDate,
@@ -168,9 +192,9 @@ export default function PoolPage() {
             />
           </svg>
         </div>
-        
+
         <div className="absolute inset-0 flex items-center justify-center">
-          <motion.div 
+          <motion.div
             className="text-center text-white px-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -190,7 +214,7 @@ export default function PoolPage() {
           {/* Sessions */}
           <div className="lg:col-span-2 space-y-6">
             {/* Date Picker */}
-            <motion.div 
+            <motion.div
               className="card p-6 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-lg"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -214,7 +238,7 @@ export default function PoolPage() {
             </h2>
 
             {sessions.length > 0 ? (
-              <motion.div 
+              <motion.div
                 className="space-y-4"
                 variants={containerVariants}
                 initial="hidden"
@@ -229,13 +253,12 @@ export default function PoolPage() {
                     <motion.div
                       key={session.id}
                       variants={cardVariants}
-                      className={`card p-6 cursor-pointer transition-all duration-300 bg-white dark:bg-slate-800 border-2 rounded-xl ${
-                        isSelected
+                      className={`card p-6 cursor-pointer transition-all duration-300 bg-white dark:bg-slate-800 border-2 rounded-xl ${isSelected
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-lg shadow-blue-200 dark:shadow-blue-900/30'
                           : isSoldOut
-                          ? 'border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 hover:shadow-lg'
-                      }`}
+                            ? 'border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 hover:shadow-lg'
+                        }`}
                       onClick={() => !isSoldOut && setSelectedSession(session)}
                       whileHover={!isSoldOut ? { scale: 1.02 } : {}}
                       whileTap={!isSoldOut ? { scale: 0.98 } : {}}
@@ -251,11 +274,10 @@ export default function PoolPage() {
                               <Clock className="w-4 h-4 mr-1" />
                               {session.startTime} - {session.endTime}
                             </span>
-                            <span className={`flex items-center px-3 py-1 rounded-full text-sm ${
-                              remaining < 10 ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 
-                              remaining < 20 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' : 
-                              'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                            }`}>
+                            <span className={`flex items-center px-3 py-1 rounded-full text-sm ${remaining < 10 ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
+                                remaining < 20 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' :
+                                  'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                              }`}>
                               <Users className="w-4 h-4 mr-1" />
                               {remaining} {tCommon('spotsLeft', { count: remaining })}
                             </span>
@@ -277,11 +299,10 @@ export default function PoolPage() {
                         </div>
                         <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
                           <motion.div
-                            className={`h-3 rounded-full ${
-                              remaining < 10 ? 'bg-gradient-to-r from-red-500 to-red-400' : 
-                              remaining < 20 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' : 
-                              'bg-gradient-to-r from-green-500 to-emerald-400'
-                            }`}
+                            className={`h-3 rounded-full ${remaining < 10 ? 'bg-gradient-to-r from-red-500 to-red-400' :
+                                remaining < 20 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                                  'bg-gradient-to-r from-green-500 to-emerald-400'
+                              }`}
                             initial={{ width: 0 }}
                             animate={{ width: `${(remaining / (session.maxCapacity ?? 50)) * 100}%` }}
                             transition={{ duration: 0.8, delay: index * 0.1 }}
@@ -299,7 +320,7 @@ export default function PoolPage() {
                 })}
               </motion.div>
             ) : (
-              <motion.div 
+              <motion.div
                 className="card p-12 text-center bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -313,7 +334,7 @@ export default function PoolPage() {
 
           {/* Booking Summary */}
           <div className="lg:col-span-1">
-            <motion.div 
+            <motion.div
               className="card sticky top-24 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-xl overflow-hidden"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -425,7 +446,7 @@ export default function PoolPage() {
 
         {/* Your Tickets Section - Only show if user is logged in and has tickets */}
         {user && myTickets.length > 0 && (
-          <motion.div 
+          <motion.div
             className="mt-12 bg-white dark:bg-slate-800 rounded-xl p-6 border dark:border-slate-700 shadow-lg"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -436,8 +457,8 @@ export default function PoolPage() {
             </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {myTickets.slice(0, 6).map((ticket: any) => (
-                <Link 
-                  key={ticket.id} 
+                <Link
+                  key={ticket.id}
                   href={`/pool/confirmation?id=${ticket.id}`}
                   className="block p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg border border-blue-100 dark:border-blue-800 hover:shadow-md transition-shadow"
                 >
@@ -445,13 +466,12 @@ export default function PoolPage() {
                     <span className="font-mono text-sm text-blue-600 dark:text-blue-400">
                       #{ticket.ticket_number}
                     </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      ticket.status === 'valid' 
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${ticket.status === 'valid'
                         ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                         : ticket.status === 'used'
-                        ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                    }`}>
+                          ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      }`}>
                       {ticket.status.toUpperCase()}
                     </span>
                   </div>

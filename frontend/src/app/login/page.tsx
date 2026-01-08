@@ -14,7 +14,7 @@ export default function LoginPage() {
   const tCommon = useTranslations('common');
   const router = useRouter();
   const { user, isAuthenticated, login } = useAuth();
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -167,11 +167,13 @@ export default function LoginPage() {
           </form>
 
           {/* Quick Login Hints */}
-          <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">Test Credentials:</p>
-            <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1">
-              <p><strong>Admin:</strong> admin@v2resort.com / admin123</p>
-              <p><strong>Staff:</strong> restaurant.staff@v2resort.com / staff123</p>
+          <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold uppercase tracking-wider">Demo Credentials</p>
+            <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2">
+              <div className="flex justify-between items-center group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 p-1 rounded" onClick={() => { setEmail('admin@v2resort.com'); setPassword('admin123'); }}>
+                <span className="font-medium text-primary-600">Super Admin:</span>
+                <span className="font-mono">admin@v2resort.com / admin123</span>
+              </div>
             </div>
           </div>
 
@@ -180,8 +182,8 @@ export default function LoginPage() {
             <span className="text-slate-600 dark:text-slate-400 text-sm">
               {t('noAccount')}{' '}
             </span>
-            <Link 
-              href="/register" 
+            <Link
+              href="/register"
               className="text-primary-600 hover:text-primary-700 text-sm font-medium"
             >
               {t('signUp')}
