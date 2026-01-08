@@ -1,15 +1,34 @@
 import { Request, Response, NextFunction } from 'express';
-import * as orderService from "../services/order.service";
+import * as orderService from "../services/order.service.js";
+
+import { createRestaurantOrderSchema, validateBody } from "../../../validation/schemas.js";
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
+    const validatedData = validateBody(createRestaurantOrderSchema, req.body);
+
+    const formattedItems = validatedData.items.map(item => ({
+      menuItemId: item.menuItemId,
+      quantity: item.quantity,
+      specialInstructions: item.notes,
+    }));
+
     const order = await orderService.createOrder({
-      ...req.body,
-      customerId: req.user?.userId,
+      customerName: validatedData.customerName || 'Guest',
+      customerPhone: validatedData.customerPhone || undefined,
+      orderType: validatedData.orderType as any,
+      items: formattedItems,
+      paymentMethod: validatedData.paymentMethod as any,
+      specialInstructions: validatedData.specialInstructions,
+      customerId: (req as any).user?.userId,
     });
     res.status(201).json({ success: true, data: order });
   } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message, stack: error.stack });
+    if (error.statusCode) {
+      res.status(error.statusCode).json({ success: false, error: error.message, errors: error.errors });
+    } else {
+      res.status(500).json({ success: false, error: error.message, stack: error.stack });
+    }
   }
 }
 

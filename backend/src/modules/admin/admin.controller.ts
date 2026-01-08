@@ -962,7 +962,7 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
 
     // Calculate date range based on range parameter
     let start: string;
-    let end: string = dayjs().endOf('day').toISOString();
+    const end: string = dayjs().endOf('day').toISOString();
 
     if (range === 'week') {
       start = dayjs().subtract(7, 'day').startOf('day').toISOString();

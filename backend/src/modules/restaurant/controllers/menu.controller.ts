@@ -81,7 +81,7 @@ export async function createCategory(req: Request, res: Response, next: NextFunc
     const { name, description, moduleId, ...rest } = req.body;
 
     // Auto-translate name and description if not provided
-    let translatedData = { ...rest, name, moduleId };
+    const translatedData = { ...rest, name, moduleId };
 
     if (name && !req.body.name_ar) {
       try {
@@ -160,7 +160,7 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
     }
 
     // Auto-translate name and description if not provided
-    let translatedData = { ...rest, name, categoryId: resolvedCategoryId, price: Number(price), moduleId: resolvedModuleId };
+    const translatedData = { ...rest, name, categoryId: resolvedCategoryId, price: Number(price), moduleId: resolvedModuleId };
 
     if (name && !req.body.name_ar) {
       try {
