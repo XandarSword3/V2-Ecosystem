@@ -1016,7 +1016,7 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
     const restaurantOrdersList = restaurantResult.data || [];
     const snackOrdersList = snackResult.data || [];
     const chaletBookingsList = chaletResult.data || [];
-    const poolTicketsList = poolTicketsResult.data || [];
+    const poolTicketsList = poolResult.data || [];
     const totalUsers = usersResult.count || 0;
 
     // Calculate revenues

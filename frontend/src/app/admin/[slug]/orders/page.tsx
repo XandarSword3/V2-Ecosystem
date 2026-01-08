@@ -106,7 +106,7 @@ export default function DynamicOrdersPage() {
   }, [fetchOrders, currentModule]);
 
   useEffect(() => {
-    if (socket) {
+    if (socket && currentModule) {
       socket.on('order:new', (order: any) => {
         if (order.moduleId === currentModule.id || order.module_id === currentModule.id) {
           fetchOrders();
@@ -127,7 +127,7 @@ export default function DynamicOrdersPage() {
         socket.off('order:updated');
       }
     };
-  }, [socket, fetchOrders]);
+  }, [socket, fetchOrders, currentModule]);
 
   const updateStatus = async (orderId: string, status: string) => {
     try {
@@ -192,8 +192,8 @@ export default function DynamicOrdersPage() {
                   key={status}
                   onClick={() => setStatusFilter(status)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${statusFilter === status
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                 >
                   {status.charAt(0).toUpperCase() + status.slice(1)}
