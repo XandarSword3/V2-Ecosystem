@@ -466,6 +466,34 @@ async function migrate() {
         ('session_access', 'Pool', 'pool', 'Pool access and session management', 3, true),
         ('menu_service', 'Snack Bar', 'snack-bar', 'Quick service snack bar', 4, true)
       ON CONFLICT (slug) DO NOTHING;
+
+      -- Support inquiries table
+      CREATE TABLE IF NOT EXISTS support_inquiries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(100) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        phone VARCHAR(50),
+        subject VARCHAR(200) NOT NULL,
+        message TEXT NOT NULL,
+        status VARCHAR(20) DEFAULT 'new',
+        admin_notes TEXT,
+        responded_at TIMESTAMP WITH TIME ZONE,
+        responded_by UUID REFERENCES users(id),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- FAQs table
+      CREATE TABLE IF NOT EXISTS faqs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        question TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        category VARCHAR(50),
+        sort_order INTEGER DEFAULT 0,
+        is_published BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
     `);
 
     // Create indexes

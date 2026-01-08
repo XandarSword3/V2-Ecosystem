@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
 import { emitToAll } from "../../socket/index";
+import { logActivity } from "../../utils/activityLogger";
 import { createUserSchema, validateBody, validatePagination } from "../../validation/schemas.js";
 import dayjs from 'dayjs';
 
@@ -334,6 +335,12 @@ export async function createUser(req: Request, res: Response, next: NextFunction
         await supabase.from('user_roles').insert(roleInserts);
       }
     }
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'CREATE_USER',
+      resource: 'users',
+      resource_id: user.id
+    });
     
     res.status(201).json({ success: true, data: { ...user, roles } });
   } catch (error) {
@@ -402,6 +409,14 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
 
     if (error) throw error;
 
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'UPDATE_USER',
+      resource: 'users',
+      resource_id: req.params.id,
+      new_value: updateData
+    });
+
     res.json({ success: true, data: user });
   } catch (error) {
     next(error);
@@ -437,6 +452,14 @@ export async function updateUserRoles(req: Request, res: Response, next: NextFun
       if (insertError) throw insertError;
     }
 
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'UPDATE_ROLES',
+      resource: 'users',
+      resource_id: userId,
+      new_value: { roleIds }
+    });
+
     res.json({ success: true, message: 'Roles updated' });
   } catch (error) {
     next(error);
@@ -455,6 +478,13 @@ export async function deleteUser(req: Request, res: Response, next: NextFunction
       .eq('id', req.params.id);
 
     if (error) throw error;
+
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'DELETE_USER',
+      resource: 'users',
+      resource_id: req.params.id
+    });
 
     res.json({ success: true, message: 'User deleted' });
   } catch (error) {
@@ -497,6 +527,14 @@ export async function createRole(req: Request, res: Response, next: NextFunction
 
     if (error) throw error;
 
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'CREATE_ROLE',
+      resource: 'roles',
+      resource_id: role.id,
+      new_value: req.body
+    });
+
     res.status(201).json({ success: true, data: role });
   } catch (error) {
     next(error);
@@ -523,6 +561,14 @@ export async function updateRole(req: Request, res: Response, next: NextFunction
       .single();
 
     if (error) throw error;
+
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'UPDATE_ROLE',
+      resource: 'roles',
+      resource_id: role.id,
+      new_value: updateData
+    });
 
     res.json({ success: true, data: role });
   } catch (error) {
@@ -676,6 +722,13 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       ...appearanceSettings
     });
 
+    await logActivity({
+      user_id: userId!,
+      action: 'UPDATE_SETTINGS',
+      resource: 'settings',
+      new_value: settings
+    });
+
     res.json({ success: true, message: 'Settings saved successfully' });
   } catch (error) {
     next(error);
@@ -689,13 +742,28 @@ export async function getAuditLogs(req: Request, res: Response, next: NextFuncti
 
     const { data: logs, error } = await supabase
       .from('audit_logs')
-      .select('*')
+      .select(`
+        *,
+        users:user_id (
+          full_name,
+          email
+        )
+      `)
       .order('created_at', { ascending: false })
       .range(Number(offset), Number(offset) + Number(limit) - 1);
 
     if (error) throw error;
 
-    res.json({ success: true, data: logs || [] });
+    // Map to frontend expected format
+    const mappedLogs = (logs || []).map((log: any) => ({
+      ...log,
+      entity_type: log.resource,
+      entity_id: log.resource_id,
+      old_values: log.old_value ? (typeof log.old_value === 'string' ? JSON.parse(log.old_value) : log.old_value) : null,
+      new_values: log.new_value ? (typeof log.new_value === 'string' ? JSON.parse(log.new_value) : log.new_value) : null,
+    }));
+
+    res.json({ success: true, data: mappedLogs });
   } catch (error) {
     next(error);
   }

@@ -116,6 +116,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       children: [
         { name: t('nav.general'), href: '/admin/settings' },
         { name: t('nav.appearance'), href: '/admin/settings/appearance' },
+        { name: 'Homepage', href: '/admin/settings/homepage' },
+        { name: 'Footer', href: '/admin/settings/footer' },
         { name: t('nav.payments'), href: '/admin/settings/payments' },
         { name: t('nav.notifications'), href: '/admin/settings/notifications' },
       ]
