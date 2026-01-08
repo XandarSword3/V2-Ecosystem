@@ -10,7 +10,7 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
 
     let query = supabase
       .from('users')
-      .select('*, user_roles(roles(name))')
+      .select('*, user_roles!user_id(roles(name))')
       .order('created_at', { ascending: false });
 
     // Filter by search term
@@ -18,24 +18,57 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
       query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`);
     }
 
-    // Filter by type
-    if (type === 'staff') {
-       // Assuming staff have roles that contain 'staff'
-       // This is a bit tricky with Supabase basic filtering on joined tables. 
-       // Often better to filter in memory or use complex PostgREST syntax.
-       // For now, let's fetch more and filter in memory if the dataset isn't huge, 
-       // OR use a specific View in DB.
-       // Let's assume we filter by filtering the Joined roles? No, Supabase/PostREST filtering on inner joins is complex.
-       // Simplest approach: Fetch users, then filter. 
-    } 
-    // Actual implementation for type filtering:
-    // We can filter by checking if they HAVE roles (staff/admin) or NO roles (customer usually).
-    
     // Pagination
     query = query.range(Number(offset), Number(offset) + Number(limit) - 1);
 
-    const { data: users, error, count } = await query;
-    if (error) throw error;
+    // Execute query with fallback in case embedding fails due to ambiguous relationships
+    let users: any[] = [];
+    let count: number | undefined = undefined;
+
+    try {
+      const result = await query;
+      if (result.error) throw result.error;
+      users = result.data || [];
+      count = result.count;
+    } catch (err: any) {
+      // If Supabase returns an embedding error (multiple relationships), fall back to separate queries
+      const msg = err?.message || err?.error || String(err);
+      console.warn('Embedding failed for users query, falling back to safer fetch:', msg);
+
+      // Fetch users without embedding
+      const usersResult = await supabase
+        .from('users')
+        .select('*')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .range(Number(offset), Number(offset) + Number(limit) - 1);
+
+      users = usersResult.data || [];
+      count = usersResult.count;
+
+      // Fetch roles for these users in a separate query and attach them
+      const userIds = users.map(u => u.id).filter(Boolean);
+      if (userIds.length > 0) {
+        const { data: urData } = await supabase
+          .from('user_roles')
+          .select('user_id, roles(name)')
+          .in('user_id', userIds);
+
+        const roleMap: Record<string, string[]> = {};
+        (urData || []).forEach((ur: any) => {
+          if (ur.user_id) {
+            roleMap[ur.user_id] = roleMap[ur.user_id] || [];
+            if (ur.roles?.name) roleMap[ur.user_id].push(ur.roles.name);
+          }
+        });
+
+        // Normalize to same shape as embedded response
+        users = users.map(u => ({
+          ...u,
+          user_roles: (roleMap[u.id] || []).map(name => ({ roles: { name } }))
+        }));
+      }
+    }
 
     const onlineUserIds = getOnlineUsers();
 

@@ -32,6 +32,7 @@ export default function RolesPage() {
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [rolePermissions, setRolePermissions] = useState<string[]>([]); // permission IDs
+  const [authError, setAuthError] = useState<string | null>(null);
   
   // Create role form
   const [newRoleName, setNewRoleName] = useState('');
@@ -48,11 +49,23 @@ export default function RolesPage() {
         api.get('/admin/roles'),
         api.get('/admin/permissions')
       ]);
-      if (rolesRes.data) setRoles(rolesRes.data);
-      if (permsRes.data?.data) setPermissions(permsRes.data.data);
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to load roles');
+      const rolesPayload = rolesRes.data?.data ?? rolesRes.data ?? [];
+      setRoles(Array.isArray(rolesPayload) ? rolesPayload : []);
+      const permsPayload = permsRes.data?.data ?? permsRes.data ?? [];
+      setPermissions(Array.isArray(permsPayload) ? permsPayload : []);
+      // Clear any previous auth error on success
+      setAuthError(null);
+    } catch (error: any) {
+      console.error(error);
+
+      // Give clearer feedback for auth/permission issues
+      if (error.response?.status === 401) {
+        setAuthError('You must be logged in to view roles. Please login.');
+      } else if (error.response?.status === 403) {
+        setAuthError('Access denied. You need the super_admin role to view and manage roles.');
+      } else {
+        toast.error('Failed to load roles');
+      }
     } finally {
       setLoading(false);
     }
@@ -151,8 +164,19 @@ export default function RolesPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {loading ? (
           <p className="col-span-full text-center py-8 text-muted-foreground">Loading...</p>
+        ) : authError ? (
+          <div className="col-span-full text-center py-8 text-muted-foreground">
+            <p className="mb-2 text-sm">{authError}</p>
+            <div className="flex items-center justify-center gap-2">
+              <Button variant="outline" onClick={() => (window.location.href = '/login')}>Login</Button>
+              <Button variant="ghost" onClick={() => window.location.reload()}>Retry</Button>
+            </div>
+          </div>
         ) : roles.length === 0 ? (
-          <p className="col-span-full text-center py-8 text-muted-foreground">No roles found</p>
+          <div className="col-span-full text-center py-8 text-muted-foreground space-y-2">
+            <p>No roles found</p>
+            <p className="text-xs">If this is a fresh install, run the seed script to create default roles and an admin user.</p>
+          </div>
         ) : (
           roles.map(role => (
             <Card key={role.id} className="hover:border-primary/50 transition-colors">
