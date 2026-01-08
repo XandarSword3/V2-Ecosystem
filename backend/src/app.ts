@@ -31,18 +31,21 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(helmet());
 
-// Health check endpoint
+// Health check endpoint - placed before middleware for fast response
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Simple health check for Render
+// Alternative health check endpoints for flexibility
 app.get('/healthz', (req, res) => res.send('ok'));
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // CORS configuration - allow Vercel preview URLs and production domains
 const allowedOrigins = [
   'http://localhost:3000',
-  'http://localhost:3001', 
+  'http://localhost:3001',
   'http://localhost:3002',
   'http://localhost:3003',
   config.frontendUrl,
@@ -54,13 +57,13 @@ const allowedOrigins = [
 // Function to check if origin is allowed (supports Vercel preview URLs)
 const isAllowedOrigin = (origin: string | undefined): boolean => {
   if (!origin) return true; // Allow requests with no origin (mobile apps, Postman, etc.)
-  
+
   // Check exact match
   if (allowedOrigins.includes(origin)) return true;
-  
+
   // Check Vercel preview URLs
   if (origin.endsWith('.vercel.app')) return true;
-  
+
   return false;
 };
 
@@ -119,15 +122,8 @@ app.use(morgan('combined', {
 // Enhanced request logging - logs detailed request/response info for debugging
 app.use(requestLogger);
 
-// Health check - must respond quickly for Render
-app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Also support /api/health for consistency
-app.get('/api/health', (_req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// NOTE: Primary health check endpoints are defined at the top of the file (before middleware)
+// to ensure fast response times for Render health checks
 
 // Settings handler function
 async function handleSettings(_req: Request, res: Response) {
@@ -135,14 +131,14 @@ async function handleSettings(_req: Request, res: Response) {
     const { createClient } = await import('@supabase/supabase-js');
     const { config } = await import('./config/index.js');
     const supabase = createClient(config.supabase.url, config.supabase.anonKey);
-    
+
     // Existing site_settings table uses 'key' and 'value' (JSONB) columns
     const { data: settings, error } = await supabase
       .from('site_settings')
       .select('key, value');
-    
+
     if (error) throw error;
-    
+
     // Combine all settings into a flat object
     // Each row has a key (like 'general', 'contact') and value (JSONB object)
     const combinedSettings: Record<string, any> = {};
@@ -150,7 +146,7 @@ async function handleSettings(_req: Request, res: Response) {
       // The value is already a JSONB object, no parsing needed
       combinedSettings[s.key] = s.value;
     });
-    
+
     res.json({ success: true, data: combinedSettings });
   } catch (error) {
     console.error('Error fetching public settings:', error);
@@ -191,7 +187,7 @@ app.use(errorLogger);
 // Global error handler
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const requestId = (req as any).requestId || 'unknown';
-  
+
   // Log error (skip logging for 404s and validation errors in production to reduce noise)
   if (err.statusCode !== 404 && err.statusCode !== 400) {
     logger.error(`[${requestId}] Unhandled error:`, err);

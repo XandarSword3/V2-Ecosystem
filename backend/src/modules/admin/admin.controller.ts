@@ -128,7 +128,7 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
 
     const totalOrders = (restaurantOrdersResult.count || 0) + (snackOrdersResult.count || 0);
     const totalRevenue = restaurantRevenue + snackRevenue + chaletRevenue + poolRevenue;
-    
+
     // Yesterday's calculations
     const yesterdayOrders = yesterdayOrdersResult.count || 0;
     const yesterdayRevenue = (yesterdayRevenueResult.data || []).reduce(
@@ -136,13 +136,13 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
     );
     const lastWeekBookings = lastWeekBookingsResult.count || 0;
     const yesterdayTickets = yesterdayTicketsResult.count || 0;
-    
+
     // Calculate trends
     const calcTrend = (current: number, previous: number) => {
       if (previous === 0) return current > 0 ? 100 : 0;
       return Math.round(((current - previous) / previous) * 100);
     };
-    
+
     const ordersTrend = calcTrend(totalOrders, yesterdayOrders);
     const revenueTrend = calcTrend(totalRevenue, yesterdayRevenue);
     const bookingsTrend = calcTrend(chaletBookingsResult.count || 0, lastWeekBookings);
@@ -187,7 +187,7 @@ export async function getRevenueStats(req: Request, res: Response, next: NextFun
   try {
     const supabase = getSupabase();
     const { startDate, endDate } = req.query;
-    
+
     const start = startDate ? dayjs(startDate as string).toISOString() : dayjs().startOf('month').toISOString();
     const end = endDate ? dayjs(endDate as string).toISOString() : dayjs().endOf('month').toISOString();
 
@@ -265,7 +265,7 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
           .from('user_roles')
           .select('roles(name)')
           .eq('user_id', user.id);
-        
+
         return {
           ...user,
           roles: (userRoles || []).map((ur: any) => ur.roles?.name).filter(Boolean),
@@ -284,24 +284,24 @@ export async function createUser(req: Request, res: Response, next: NextFunction
     // Validate input with strong password requirements
     const validatedData = validateBody(createUserSchema, req.body);
     const { email, password, full_name, phone, roles } = validatedData;
-    
+
     const supabase = getSupabase();
-    
+
     // Check if email already exists
     const { data: existing } = await supabase
       .from('users')
       .select('id')
       .eq('email', email.toLowerCase())
       .single();
-    
+
     if (existing) {
       return res.status(400).json({ success: false, error: 'Email already exists' });
     }
-    
+
     // Hash password
     const bcrypt = await import('bcryptjs');
     const passwordHash = await bcrypt.hash(password, 10);
-    
+
     // Create user
     const { data: user, error: userError } = await supabase
       .from('users')
@@ -315,9 +315,9 @@ export async function createUser(req: Request, res: Response, next: NextFunction
       })
       .select('id, email, full_name, phone, is_active, created_at')
       .single();
-    
+
     if (userError) throw userError;
-    
+
     // Assign roles - roles has default value from schema so is guaranteed to exist
     const rolesToAssign = roles || ['customer'];
     if (rolesToAssign.length > 0) {
@@ -325,13 +325,13 @@ export async function createUser(req: Request, res: Response, next: NextFunction
         .from('roles')
         .select('id, name')
         .in('name', rolesToAssign);
-      
+
       if (roleRecords && roleRecords.length > 0) {
         const roleInserts = roleRecords.map(role => ({
           user_id: user.id,
           role_id: role.id,
         }));
-        
+
         await supabase.from('user_roles').insert(roleInserts);
       }
     }
@@ -341,7 +341,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
       resource: 'users',
       resource_id: user.id
     });
-    
+
     res.status(201).json({ success: true, data: { ...user, roles } });
   } catch (error) {
     next(error);
@@ -535,10 +535,10 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
 export async function updateUser(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const updateData: Record<string, unknown> = { 
-      updated_at: new Date().toISOString() 
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
     };
-    
+
     if (req.body.fullName !== undefined) updateData.full_name = req.body.fullName;
     if (req.body.phone !== undefined) updateData.phone = req.body.phone;
     if (req.body.isActive !== undefined) updateData.is_active = req.body.isActive;
@@ -615,9 +615,9 @@ export async function deleteUser(req: Request, res: Response, next: NextFunction
     const supabase = getSupabase();
     const { error } = await supabase
       .from('users')
-      .update({ 
-        deleted_at: new Date().toISOString(), 
-        is_active: false 
+      .update({
+        deleted_at: new Date().toISOString(),
+        is_active: false
       })
       .eq('id', req.params.id);
 
@@ -726,10 +726,10 @@ export async function createRole(req: Request, res: Response, next: NextFunction
 export async function updateRole(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const updateData: Record<string, unknown> = { 
-      updated_at: new Date().toISOString() 
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
     };
-    
+
     if (req.body.name !== undefined) updateData.name = req.body.name;
     if (req.body.displayName !== undefined) updateData.display_name = req.body.displayName;
     if (req.body.description !== undefined) updateData.description = req.body.description;
@@ -765,14 +765,14 @@ export async function updateRole(req: Request, res: Response, next: NextFunction
 export async function getSettings(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    
+
     // Get all settings from database (existing schema uses 'key' and 'value' columns)
     const { data: settings, error } = await supabase
       .from('site_settings')
       .select('key, value');
-    
+
     if (error) throw error;
-    
+
     // Combine all settings into a flat object
     const combinedSettings: Record<string, any> = {};
     (settings || []).forEach((s: any) => {
@@ -780,7 +780,7 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
         Object.assign(combinedSettings, s.value);
       }
     });
-    
+
     // If no settings in DB, return defaults
     if (Object.keys(combinedSettings).length === 0) {
       res.json({
@@ -810,7 +810,7 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
       });
       return;
     }
-    
+
     res.json({ success: true, data: combinedSettings });
   } catch (error) {
     next(error);
@@ -822,40 +822,40 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
     const supabase = getSupabase();
     const settings = req.body;
     const userId = req.user?.userId;
-    
+
     // Group settings by category for database update (existing schema uses 'key' and 'value' JSONB columns)
     const generalSettings = {
       resortName: settings.resortName,
       tagline: settings.tagline,
       description: settings.description,
     };
-    
+
     const contactSettings = {
       phone: settings.phone,
       email: settings.email,
       address: settings.address,
     };
-    
+
     const hoursSettings = {
       poolHours: settings.poolHours,
       restaurantHours: settings.restaurantHours,
       receptionHours: settings.receptionHours,
     };
-    
+
     const chaletSettings = {
       checkIn: settings.chaletCheckIn,
       checkOut: settings.chaletCheckOut,
       depositPercent: settings.chaletDeposit,
       cancellationPolicy: settings.cancellationPolicy,
     };
-    
+
     const poolSettings = {
       adultPrice: settings.poolAdultPrice,
       childPrice: settings.poolChildPrice,
       infantPrice: settings.poolInfantPrice,
       capacity: settings.poolCapacity,
     };
-    
+
     const legalSettings = {
       privacyPolicy: settings.privacyPolicy,
       termsOfService: settings.termsOfService,
@@ -870,7 +870,7 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       reducedMotion: settings.reducedMotion,
       soundEnabled: settings.soundEnabled,
     };
-    
+
     // Upsert each settings category
     const updates = [
       { key: 'general', value: generalSettings },
@@ -881,7 +881,7 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       { key: 'legal', value: legalSettings },
       { key: 'appearance', value: appearanceSettings },
     ];
-    
+
     for (const update of updates) {
       await supabase
         .from('site_settings')
@@ -892,7 +892,7 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
           updated_by: userId,
         }, { onConflict: 'key' });
     }
-    
+
     // Emit socket event for real-time updates
     emitToAll('settings.updated', {
       ...generalSettings,
@@ -959,11 +959,11 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
   try {
     const supabase = getSupabase();
     const { range = 'month' } = req.query;
-    
+
     // Calculate date range based on range parameter
     let start: string;
     let end: string = dayjs().endOf('day').toISOString();
-    
+
     if (range === 'week') {
       start = dayjs().subtract(7, 'day').startOf('day').toISOString();
     } else if (range === 'year') {
@@ -978,7 +978,9 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
       snackResult,
       chaletResult,
       poolResult,
-      usersResult
+      usersResult,
+      restItemsResult,
+      snackItemsResult
     ] = await Promise.all([
       supabase.from('restaurant_orders')
         .select('*')
@@ -997,13 +999,24 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
         .gte('created_at', start)
         .lte('created_at', end),
       supabase.from('users')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true }),
+      // Fetch details for Top Items
+      supabase.from('restaurant_order_items')
+        .select('quantity, unit_price, menu_items(name), restaurant_orders!inner(created_at, status)')
+        .gte('restaurant_orders.created_at', start)
+        .lte('restaurant_orders.created_at', end)
+        .eq('restaurant_orders.status', 'completed'),
+      supabase.from('snack_order_items')
+        .select('quantity, unit_price, snack_items(name), snack_orders!inner(created_at, status)')
+        .gte('snack_orders.created_at', start)
+        .lte('snack_orders.created_at', end)
+        .eq('snack_orders.status', 'completed')
     ]);
 
     const restaurantOrdersList = restaurantResult.data || [];
     const snackOrdersList = snackResult.data || [];
     const chaletBookingsList = chaletResult.data || [];
-    const poolTicketsList = poolResult.data || [];
+    const poolTicketsList = poolTicketsResult.data || [];
     const totalUsers = usersResult.count || 0;
 
     // Calculate revenues
@@ -1024,6 +1037,49 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
     const totalOrders = restaurantOrdersList.length + snackOrdersList.length;
     const totalBookings = chaletBookingsList.length + poolTicketsList.length;
 
+    // Process Top Items
+    const topItemsMap = new Map<string, { name: string, quantity: number, revenue: number }>();
+
+    const processItems = (items: any[]) => {
+      items.forEach(item => {
+        const name = item.menu_items?.name || item.snack_items?.name || 'Unknown Item';
+        const current = topItemsMap.get(name) || { name, quantity: 0, revenue: 0 };
+        current.quantity += (item.quantity || 0);
+        current.revenue += (item.quantity || 0) * (item.unit_price || 0);
+        topItemsMap.set(name, current);
+      });
+    };
+
+    processItems(restItemsResult.data || []);
+    processItems(snackItemsResult.data || []);
+
+    const topItems = Array.from(topItemsMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    // Revenue By Month (or Period)
+    const monthlyRevenueMap = new Map<string, number>();
+    const addToMonth = (date: string, amount: number) => {
+      // Use simpler format if range is week/month to show trend more granuarly? 
+      // User requested "Revenue Trend" in UI, often implies monthly or daily.
+      // If range is year, 'MMM YYYY' is good.
+      // If range is month, 'DD MMM' might be better?
+      // But frontend expects "month" field. Let's stick to consistent buckets.
+      // Actually, if we use 'MMM YYYY', and range is 'month', we get 1 or 2 bars.
+      // Let's use 'MMM YYYY' for consistency with "revenueByMonth" name.
+      const month = dayjs(date).format('MMM YYYY');
+      monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + parseFloat(String(amount)));
+    };
+
+    restaurantOrdersList.filter(o => o.status === 'completed').forEach(o => addToMonth(o.created_at, o.total_amount));
+    snackOrdersList.filter(o => o.status === 'completed').forEach(o => addToMonth(o.created_at, o.total_amount));
+    chaletBookingsList.filter(b => b.payment_status === 'paid').forEach(b => addToMonth(b.created_at, b.total_amount));
+    poolTicketsList.filter(t => t.payment_status === 'paid').forEach(t => addToMonth(t.created_at, t.total_amount));
+
+    const revenueByMonth = Array.from(monthlyRevenueMap.entries())
+      .map(([month, revenue]) => ({ month, revenue }))
+      .sort((a, b) => dayjs(a.month, 'MMM YYYY').valueOf() - dayjs(b.month, 'MMM YYYY').valueOf());
+
     res.json({
       success: true,
       data: {
@@ -1032,7 +1088,7 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
           totalOrders,
           totalBookings,
           totalUsers,
-          revenueChange: 0, // Would need previous period data
+          revenueChange: 0,
           ordersChange: 0,
         },
         revenueByService: {
@@ -1041,8 +1097,8 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
           chalets: chaletRevenue,
           pool: poolRevenue,
         },
-        revenueByMonth: [], // Would need to aggregate by month
-        topItems: [], // Would need to join with order items
+        revenueByMonth,
+        topItems,
       },
     });
   } catch (error) {
@@ -1054,15 +1110,15 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
   try {
     const supabase = getSupabase();
     const { type, format = 'csv', range = 'month' } = req.query;
-    
+
     if (!type) {
       return res.status(400).json({ success: false, error: 'Report type is required' });
     }
-    
+
     // Calculate date range
     let start: string;
     const end: string = dayjs().endOf('day').toISOString();
-    
+
     if (range === 'week') {
       start = dayjs().subtract(7, 'day').startOf('day').toISOString();
     } else if (range === 'year') {
@@ -1070,10 +1126,10 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
     } else {
       start = dayjs().subtract(1, 'month').startOf('day').toISOString();
     }
-    
+
     let data: any[] = [];
     let filename = '';
-    
+
     switch (type) {
       case 'restaurant': {
         const { data: orders, error } = await supabase
@@ -1082,7 +1138,7 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
           .gte('created_at', start)
           .lte('created_at', end)
           .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
         data = (orders || []).map(o => ({
           'Order Number': o.order_number,
@@ -1099,7 +1155,7 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
         filename = `restaurant-orders-${dayjs().format('YYYY-MM-DD')}`;
         break;
       }
-      
+
       case 'chalets': {
         const { data: bookings, error } = await supabase
           .from('chalet_bookings')
@@ -1107,7 +1163,7 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
           .gte('created_at', start)
           .lte('created_at', end)
           .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
         data = (bookings || []).map(b => ({
           'Booking Number': b.booking_number,
@@ -1126,7 +1182,7 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
         filename = `chalet-bookings-${dayjs().format('YYYY-MM-DD')}`;
         break;
       }
-      
+
       case 'pool': {
         const { data: tickets, error } = await supabase
           .from('pool_tickets')
@@ -1134,7 +1190,7 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
           .gte('created_at', start)
           .lte('created_at', end)
           .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
         data = (tickets || []).map(t => ({
           'Ticket Number': t.ticket_number,
@@ -1149,7 +1205,7 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
         filename = `pool-tickets-${dayjs().format('YYYY-MM-DD')}`;
         break;
       }
-      
+
       case 'snack': {
         const { data: orders, error } = await supabase
           .from('snack_orders')
@@ -1157,7 +1213,7 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
           .gte('created_at', start)
           .lte('created_at', end)
           .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
         data = (orders || []).map(o => ({
           'Order Number': o.order_number,
@@ -1171,13 +1227,13 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
         filename = `snack-orders-${dayjs().format('YYYY-MM-DD')}`;
         break;
       }
-      
+
       case 'users': {
         const { data: users, error } = await supabase
           .from('users')
           .select('name, email, phone, created_at, last_login, is_active')
           .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
         data = (users || []).map(u => ({
           'Name': u.name,
@@ -1190,22 +1246,22 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
         filename = `users-${dayjs().format('YYYY-MM-DD')}`;
         break;
       }
-      
+
       default:
         return res.status(400).json({ success: false, error: 'Invalid report type' });
     }
-    
+
     if (format === 'json') {
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
       return res.json(data);
     }
-    
+
     // CSV format
     if (data.length === 0) {
       return res.status(200).json({ success: true, data: [], message: 'No data for the selected period' });
     }
-    
+
     const headers = Object.keys(data[0]);
     const csvRows = [
       headers.join(','),
@@ -1215,7 +1271,7 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
       }).join(',')),
     ];
     const csv = csvRows.join('\n');
-    
+
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
     return res.send(csv);
@@ -1232,13 +1288,13 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
   try {
     const supabase = getSupabase();
     const userId = req.user?.userId;
-    
+
     // Get recent orders, bookings, and system events as notifications
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
-    const notifications: Array<{id: string; title: string; message: string; time: string; read: boolean}> = [];
-    
+
+    const notifications: Array<{ id: string; title: string; message: string; time: string; read: boolean }> = [];
+
     // Get recent restaurant orders
     const { data: recentOrders } = await supabase
       .from('restaurant_orders')
@@ -1246,13 +1302,13 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
       .gte('created_at', oneDayAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(5);
-    
+
     (recentOrders || []).forEach(order => {
       const createdAt = new Date(order.created_at);
       const diffMs = now.getTime() - createdAt.getTime();
       const diffMins = Math.floor(diffMs / 60000);
       const timeAgo = diffMins < 60 ? `${diffMins} min ago` : `${Math.floor(diffMins / 60)} hours ago`;
-      
+
       notifications.push({
         id: `order-${order.id}`,
         title: 'New Order',
@@ -1261,7 +1317,7 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
         read: order.status !== 'pending',
       });
     });
-    
+
     // Get recent chalet bookings
     const { data: recentBookings } = await supabase
       .from('chalet_bookings')
@@ -1269,13 +1325,13 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
       .gte('created_at', oneDayAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(5);
-    
+
     (recentBookings || []).forEach(booking => {
       const createdAt = new Date(booking.created_at);
       const diffMs = now.getTime() - createdAt.getTime();
       const diffMins = Math.floor(diffMs / 60000);
       const timeAgo = diffMins < 60 ? `${diffMins} min ago` : `${Math.floor(diffMins / 60)} hours ago`;
-      
+
       notifications.push({
         id: `booking-${booking.id}`,
         title: 'Chalet Booking',
@@ -1284,7 +1340,7 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
         read: booking.status !== 'pending',
       });
     });
-    
+
     // Get pending reviews
     const { data: pendingReviews } = await supabase
       .from('reviews')
@@ -1292,13 +1348,13 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
       .limit(5);
-    
+
     (pendingReviews || []).forEach(review => {
       const createdAt = new Date(review.created_at);
       const diffMs = now.getTime() - createdAt.getTime();
       const diffMins = Math.floor(diffMs / 60000);
       const timeAgo = diffMins < 60 ? `${diffMins} min ago` : `${Math.floor(diffMins / 60)} hours ago`;
-      
+
       notifications.push({
         id: `review-${review.id}`,
         title: 'Review Pending',
@@ -1307,14 +1363,14 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
         read: false,
       });
     });
-    
+
     // Sort by time (most recent first) and limit
     notifications.sort((a, b) => {
       const aTime = parseInt(a.time) || 0;
       const bTime = parseInt(b.time) || 0;
       return aTime - bTime;
     });
-    
+
     res.json({ success: true, data: notifications.slice(0, 10) });
   } catch (error) {
     next(error);

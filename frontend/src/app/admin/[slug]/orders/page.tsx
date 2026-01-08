@@ -107,17 +107,17 @@ export default function DynamicOrdersPage() {
 
   useEffect(() => {
     if (socket) {
-      socket.on('order:new', (order: Order) => {
-        // Ideally we should check if the order belongs to this currentModule
-        // But for now we just refresh or append
-        // Since we don't have module_id in order object easily available without fetching details
-        // We can just refetch
-        fetchOrders();
-        toast.success(`New order #${order.order_number}`);
+      socket.on('order:new', (order: any) => {
+        if (order.moduleId === currentModule.id || order.module_id === currentModule.id) {
+          fetchOrders();
+          toast.success(`New order #${order.orderNumber || order.order_number}`);
+        }
       });
 
-      socket.on('order:updated', (order: Order) => {
-        setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...order } : o)));
+      socket.on('order:updated', (order: any) => {
+        if (order.moduleId === currentModule.id || order.module_id === currentModule.id) {
+          setOrders((prev) => prev.map((o) => (o.id === order.orderId || o.id === order.id ? { ...o, ...order } : o)));
+        }
       });
     }
 
@@ -144,7 +144,7 @@ export default function DynamicOrdersPage() {
 
   const filteredOrders = orders.filter((order) => {
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    const matchesSearch = 
+    const matchesSearch =
       (order.order_number || order.orderNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (order.customer?.full_name || order.customerName || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesStatus && matchesSearch;
@@ -191,11 +191,10 @@ export default function DynamicOrdersPage() {
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                    statusFilter === status
+                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${statusFilter === status
                       ? 'bg-blue-600 text-white'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
+                    }`}
                 >
                   {status.charAt(0).toUpperCase() + status.slice(1)}
                 </button>
@@ -230,7 +229,7 @@ export default function DynamicOrdersPage() {
             filteredOrders.map((order) => {
               const StatusIcon = statusConfig[order.status]?.icon || Clock;
               const items = order.items || order.order_items || [];
-              
+
               return (
                 <motion.div
                   key={order.id}
@@ -298,14 +297,14 @@ export default function DynamicOrdersPage() {
                       <div className="grid grid-cols-2 gap-2 pt-2">
                         {order.status === 'pending' && (
                           <>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               onClick={() => updateStatus(order.id, 'cancelled')}
                             >
                               Reject
                             </Button>
-                            <Button 
+                            <Button
                               className="bg-blue-600 hover:bg-blue-700 text-white"
                               onClick={() => updateStatus(order.id, 'confirmed')}
                             >
@@ -314,7 +313,7 @@ export default function DynamicOrdersPage() {
                           </>
                         )}
                         {order.status === 'confirmed' && (
-                          <Button 
+                          <Button
                             className="col-span-2 bg-orange-500 hover:bg-orange-600 text-white"
                             onClick={() => updateStatus(order.id, 'preparing')}
                           >
@@ -322,7 +321,7 @@ export default function DynamicOrdersPage() {
                           </Button>
                         )}
                         {order.status === 'preparing' && (
-                          <Button 
+                          <Button
                             className="col-span-2 bg-green-600 hover:bg-green-700 text-white"
                             onClick={() => updateStatus(order.id, 'ready')}
                           >
@@ -330,7 +329,7 @@ export default function DynamicOrdersPage() {
                           </Button>
                         )}
                         {order.status === 'ready' && (
-                          <Button 
+                          <Button
                             className="col-span-2 bg-slate-800 hover:bg-slate-900 text-white"
                             onClick={() => updateStatus(order.id, 'delivered')}
                           >

@@ -125,6 +125,7 @@ export async function createOrder(data: {
     orderNumber: order.order_number,
     orderType: order.order_type,
     totalAmount: order.total_amount,
+    moduleId: order.module_id,
   });
 
   // Send order confirmation email if customer email is available
@@ -158,7 +159,7 @@ export async function createOrder(data: {
 
 export async function getOrderById(id: string) {
   const supabase = getSupabase();
-  
+
   const { data: order, error: orderError } = await supabase
     .from('restaurant_orders')
     .select('*')
@@ -194,7 +195,7 @@ export async function getOrderById(id: string) {
 
 export async function getOrderStatus(id: string) {
   const supabase = getSupabase();
-  
+
   const { data: order, error } = await supabase
     .from('restaurant_orders')
     .select('id, order_number, status, estimated_ready_time, actual_ready_time')
@@ -219,7 +220,7 @@ export async function getOrdersByCustomer(customerId: string) {
 
 export async function getOrders(filters: { status?: string; date?: string; moduleId?: string }) {
   const supabase = getSupabase();
-  
+
   let query = supabase
     .from('restaurant_orders')
     .select(`
@@ -242,6 +243,10 @@ export async function getOrders(filters: { status?: string; date?: string; modul
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
+  if (filters.moduleId) {
+    query = query.eq('module_id', filters.moduleId);
+  }
+
   if (filters.status) {
     // Handle comma-separated status values
     const statuses = filters.status.split(',').map(s => s.trim());
@@ -261,26 +266,14 @@ export async function getOrders(filters: { status?: string; date?: string; modul
   const { data, error } = await query;
   if (error) throw error;
 
-  let orders = data || [];
-
-  // Filter by moduleId if provided
-  if (filters.moduleId) {
-    orders = orders.filter(order => {
-      // Check if any item in the order belongs to the module
-      // Note: This assumes an order only contains items from one module.
-      // If mixed, this will include the order if AT LEAST ONE item is from the module.
-      return order.order_items?.some((item: any) => item.menu_items?.module_id === filters.moduleId);
-    });
-  }
-
-  return orders;
+  return data || [];
 }
 
-export async function getLiveOrders() {
+export async function getLiveOrders(moduleId?: string) {
   const supabase = getSupabase();
   const activeStatuses = ['pending', 'confirmed', 'preparing', 'ready'];
-  
-  const { data, error } = await supabase
+
+  let query = supabase
     .from('restaurant_orders')
     .select(`
       *,
@@ -301,13 +294,19 @@ export async function getLiveOrders() {
     .in('status', activeStatuses)
     .order('created_at', { ascending: true });
 
+  if (moduleId) {
+    query = query.eq('module_id', moduleId);
+  }
+
+  const { data, error } = await query;
+
   if (error) throw error;
   return data || [];
 }
 
 export async function updateOrderStatus(
-  id: string, 
-  status: string, 
+  id: string,
+  status: string,
   changedBy: string,
   notes?: string
 ) {
@@ -363,23 +362,30 @@ export async function updateOrderStatus(
     orderId: order.id,
     orderNumber: order.order_number,
     status: order.status,
+    moduleId: order.module_id,
   });
 
   return order;
 }
 
-export async function getDailyReport(dateStr?: string) {
+export async function getDailyReport(dateStr?: string, moduleId?: string) {
   const supabase = getSupabase();
   const date = dateStr ? dayjs(dateStr) : dayjs();
   const startOfDay = date.startOf('day').toISOString();
   const endOfDay = date.endOf('day').toISOString();
 
-  const { data: orders, error } = await supabase
+  let query = supabase
     .from('restaurant_orders')
     .select('*')
     .gte('created_at', startOfDay)
     .lte('created_at', endOfDay)
     .is('deleted_at', null);
+
+  if (moduleId) {
+    query = query.eq('module_id', moduleId);
+  }
+
+  const { data: orders, error } = await query;
 
   if (error) throw error;
 
@@ -401,18 +407,24 @@ export async function getDailyReport(dateStr?: string) {
   };
 }
 
-export async function getSalesReport(startDate: string, endDate: string) {
+export async function getSalesReport(startDate: string, endDate: string, moduleId?: string) {
   const supabase = getSupabase();
   const start = dayjs(startDate).startOf('day').toISOString();
   const end = dayjs(endDate).endOf('day').toISOString();
 
-  const { data: orders, error } = await supabase
+  let query = supabase
     .from('restaurant_orders')
     .select('*')
     .gte('created_at', start)
     .lte('created_at', end)
     .eq('status', 'completed')
     .is('deleted_at', null);
+
+  if (moduleId) {
+    query = query.eq('module_id', moduleId);
+  }
+
+  const { data: orders, error } = await query;
 
   if (error) throw error;
 
