@@ -351,38 +351,182 @@ export async function createUser(req: Request, res: Response, next: NextFunction
 export async function getUser(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
+    const { id } = req.params;
 
-    if (userError) {
-      if (userError.code === 'PGRST116') {
-        return res.status(404).json({ success: false, error: 'User not found' });
+    // First attempt: try embedded query (works when schema relationships are clean)
+    try {
+      const { data: user, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          user_roles (
+            roles (
+              id,
+              name,
+              role_permissions (
+                permissions (
+                  id,
+                  slug,
+                  name,
+                  description,
+                  resource,
+                  action
+                )
+              )
+            )
+          ),
+          user_permissions (
+            is_granted,
+            permission_id,
+            permissions (
+              id,
+              slug,
+              name,
+              description,
+              resource,
+              action
+            )
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+      // Helper to derive canonical slug
+      function deriveSlugFromPerm(perm: any) {
+        if (!perm) return null;
+        if (perm.slug) return perm.slug;
+        if (perm.name && typeof perm.name === 'string' && perm.name.includes('.')) return perm.name;
+        if (perm.resource && perm.action) return `${perm.resource}.${perm.action}`;
+        if (perm.name && typeof perm.name === 'string') return perm.name.toLowerCase().replace(/\s+/g, '.');
+        return null;
       }
-      throw userError;
+
+      const rolePermissions = new Set<string>();
+      const effectivePermissions = new Set<string>();
+
+      user.user_roles?.forEach((ur: any) => {
+        ur.roles?.role_permissions?.forEach((rp: any) => {
+          const p = rp.permissions;
+          const pSlug = deriveSlugFromPerm(p);
+          if (pSlug) {
+            rolePermissions.add(pSlug);
+            effectivePermissions.add(pSlug);
+          }
+        });
+      });
+
+      user.user_permissions?.forEach((up: any) => {
+        const p = up.permissions;
+        const pSlug = deriveSlugFromPerm(p);
+        if (pSlug) {
+          if (up.is_granted) {
+            effectivePermissions.add(pSlug);
+          } else {
+            effectivePermissions.delete(pSlug);
+          }
+        }
+      });
+
+      const { password_hash, ...safeUser } = user;
+
+      const detailedUser = {
+        ...safeUser,
+        roles: user.user_roles?.map((ur: any) => ur.roles.name) || [],
+        role_permissions: Array.from(rolePermissions),
+        user_permissions_overrides: user.user_permissions || [],
+        effective_permissions: Array.from(effectivePermissions)
+      };
+
+      return res.json({ success: true, data: detailedUser });
+    } catch (embedError: any) {
+      // If embedding failed (e.g., ambiguous relationships), fallback to safer series of queries
+      const msg = embedError?.message || embedError?.error || String(embedError);
+      console.warn('Embedded user fetch failed, falling back. Reason:', msg);
+
+      // Basic user
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (userError) {
+        if (userError.code === 'PGRST116') return res.status(404).json({ success: false, error: 'User not found' });
+        throw userError;
+      }
+
+      // Roles assigned
+      const { data: userRolesList, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('roles(id,name)')
+        .eq('user_id', id);
+
+      if (rolesError) throw rolesError;
+
+      const roleIds = (userRolesList || []).map((r: any) => r.role_id).filter(Boolean);
+
+      // Role permissions
+      let rolePermRows: any[] = [];
+      if (roleIds.length > 0) {
+        const { data: rpData, error: rpErr } = await supabase
+          .from('role_permissions')
+          .select('role_id, permission_id, permissions(id,slug,name,resource,action)')
+          .in('role_id', roleIds);
+        if (rpErr) throw rpErr;
+        rolePermRows = rpData || [];
+      }
+
+      // User permission overrides
+      const { data: userPerms, error: userPermErr } = await supabase
+        .from('user_permissions')
+        .select('is_granted,permission_id,permissions(id,slug,name,resource,action)')
+        .eq('user_id', id);
+      if (userPermErr) throw userPermErr;
+
+      // Helper deriveSlug
+      function deriveSlugFromPerm(perm: any) {
+        if (!perm) return null;
+        if (perm.slug) return perm.slug;
+        if (perm.name && typeof perm.name === 'string' && perm.name.includes('.')) return perm.name;
+        if (perm.resource && perm.action) return `${perm.resource}.${perm.action}`;
+        if (perm.name && typeof perm.name === 'string') return perm.name.toLowerCase().replace(/\s+/g, '.');
+        return null;
+      }
+
+      const rolePermissions = new Set<string>();
+      const effectivePermissions = new Set<string>();
+
+      rolePermRows.forEach((rp: any) => {
+        const p = rp.permissions;
+        const slug = deriveSlugFromPerm(p);
+        if (slug) {
+          rolePermissions.add(slug);
+          effectivePermissions.add(slug);
+        }
+      });
+
+      (userPerms || []).forEach((up: any) => {
+        const p = up.permissions;
+        const slug = deriveSlugFromPerm(p);
+        if (slug) {
+          if (up.is_granted) effectivePermissions.add(slug);
+          else effectivePermissions.delete(slug);
+        }
+      });
+
+      const detailedUser = {
+        ...user,
+        roles: (userRolesList || []).map((r: any) => r.roles?.name).filter(Boolean),
+        role_permissions: Array.from(rolePermissions),
+        user_permissions_overrides: userPerms || [],
+        effective_permissions: Array.from(effectivePermissions)
+      };
+
+      return res.json({ success: true, data: detailedUser });
     }
-
-    // Get roles
-    const { data: userRolesList, error: rolesError } = await supabase
-      .from('user_roles')
-      .select(`
-        roles (*)
-      `)
-      .eq('user_id', user.id);
-
-    if (rolesError) throw rolesError;
-
-    const { password_hash, ...safeUser } = user;
-
-    res.json({ 
-      success: true, 
-      data: { 
-        ...safeUser, 
-        roles: (userRolesList || []).map(r => r.roles),
-      },
-    });
   } catch (error) {
     next(error);
   }
