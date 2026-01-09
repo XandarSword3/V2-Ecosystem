@@ -156,6 +156,8 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
       customerPhone,
       numberOfGuests,
       paymentMethod,
+      numberOfAdults,
+      numberOfChildren,
     } = validatedData;
 
     // Get session
@@ -196,10 +198,11 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
     }
 
     // Calculate total using adult/child prices if provided
-    const { numberOfAdults = 0, numberOfChildren = 0 } = validatedData;
+    const safeNumberOfAdults = typeof numberOfAdults === 'number' ? numberOfAdults : 0;
+    const safeNumberOfChildren = typeof numberOfChildren === 'number' ? numberOfChildren : 0;
     let totalAmount = 0;
     if (session.adult_price !== undefined && session.child_price !== undefined) {
-      totalAmount = (parseFloat(session.adult_price) * numberOfAdults) + (parseFloat(session.child_price) * numberOfChildren);
+      totalAmount = (parseFloat(session.adult_price) * safeNumberOfAdults) + (parseFloat(session.child_price) * safeNumberOfChildren);
     } else {
       totalAmount = parseFloat(session.price) * numberOfGuests;
     }
@@ -604,13 +607,21 @@ export async function getTodayTickets(req: Request, res: Response, next: NextFun
 
 export async function createSession(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, startTime, endTime, maxCapacity, price, moduleId } = req.body;
+    const { name, startTime, endTime, maxCapacity, moduleId, adult_price, child_price } = req.body as {
+      name: string;
+      startTime: string;
+      endTime: string;
+      maxCapacity: number;
+      moduleId: string;
+      adult_price: string | number;
+      child_price: string | number;
+    };
 
     // Validate required fields
     if (!name || !startTime || !endTime || maxCapacity === undefined || adult_price === undefined || child_price === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: name, startTime, endTime, maxCapacity, price'
+        message: 'Missing required fields: name, startTime, endTime, maxCapacity, adult_price, child_price'
       });
     }
 
