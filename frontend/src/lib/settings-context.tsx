@@ -15,29 +15,29 @@ export interface SiteSettings {
   currency: string;
   taxRate: number;
   timezone: string;
-  
+
   // Contact
   phone: string;
   email: string;
   address: string;
-  
+
   // Hours
   poolHours: string;
   restaurantHours: string;
   receptionHours: string;
-  
+
   // Chalets
   checkIn: string;
   checkOut: string;
   depositPercent: number;
   cancellationPolicy: string;
-  
+
   // Pool
   adultPrice: number;
   childPrice: number;
   infantPrice: number;
   capacity: number;
-  
+
   // Legal
   privacyPolicy: string;
   termsOfService: string;
@@ -58,6 +58,10 @@ export interface SiteSettings {
   animationsEnabled: boolean;
   reducedMotion: boolean;
   soundEnabled: boolean;
+
+  // CMS
+  footer?: any;
+  navbar?: any;
 }
 
 const defaultSettings: SiteSettings = {
@@ -87,13 +91,15 @@ const defaultSettings: SiteSettings = {
   privacyPolicy: '',
   termsOfService: '',
   refundPolicy: '',
-  
+
   // Appearance defaults
   theme: 'beach',
   weatherEffect: 'sunny',
   animationsEnabled: true,
   reducedMotion: false,
   soundEnabled: true,
+  footer: null,
+  navbar: null,
 };
 
 export interface Module {
@@ -120,7 +126,7 @@ const SettingsContext = createContext<SettingsContextValue>({
   modules: [],
   loading: true,
   error: null,
-  refetch: async () => {},
+  refetch: async () => { },
 });
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
@@ -136,18 +142,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       // Ensure we have the correct API URL with /api prefix
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const apiUrl = baseUrl.replace(/\/api\/?$/, ''); // Remove trailing /api if present
-      
+
       const [settingsRes, modulesRes] = await Promise.all([
         fetch(`${apiUrl}/api/settings`),
         fetch(`${apiUrl}/api/modules?activeOnly=true`)
       ]);
-      
+
       if (!settingsRes.ok) {
         throw new Error('Failed to fetch settings');
       }
-      
+
       const settingsData = await settingsRes.json();
-      
+
       if (settingsData.success && settingsData.data) {
         setSettings({ ...defaultSettings, ...settingsData.data });
       }

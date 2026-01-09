@@ -5,10 +5,11 @@ import { Providers } from './providers';
 import { Toaster } from 'sonner';
 import { defaultLocale, getLocaleFromCookie, type Locale } from '@/i18n';
 import Header from '@/components/layout/Header';
+import Footer from '@/components/Footer';
 import { WeatherEffects } from '@/components/effects/WeatherEffects';
 import { PageTransition } from '@/components/effects/PageTransition';
 
-const inter = Inter({ 
+const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
 });
@@ -44,9 +45,9 @@ export default function RootLayout({
   const isRtl = locale === 'ar';
 
   return (
-    <html 
-      lang={locale} 
-      dir={isRtl ? 'rtl' : 'ltr'} 
+    <html
+      lang={locale}
+      dir={isRtl ? 'rtl' : 'ltr'}
       suppressHydrationWarning
     >
       <body className={`${inter.variable} ${notoArabic.variable} ${isRtl ? 'font-arabic' : 'font-sans'}`}>
@@ -58,6 +59,7 @@ export default function RootLayout({
               {children}
             </PageTransition>
           </main>
+          <Footer />
           <Toaster position={isRtl ? 'top-left' : 'top-right'} richColors />
         </Providers>
       </body>
