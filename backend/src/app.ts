@@ -148,6 +148,11 @@ async function handleSettings(_req: Request, res: Response) {
       combinedSettings[s.key] = s.value;
     });
 
+    // Remove navbar property if present
+    if (combinedSettings.navbar) {
+      delete combinedSettings.navbar;
+    }
+
     res.json({ success: true, data: combinedSettings });
   } catch (error) {
     console.error('Error fetching public settings:', error);

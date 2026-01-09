@@ -260,16 +260,16 @@ export default function PoolPage() {
                               'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
                             }`}>
                               <Users className="w-4 h-4 mr-1" />
-                              {remaining} {tCommon('spotsLeft', { count: remaining })}
+                              {tCommon('spotsLeft', { count: remaining })}
                             </span>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                            {t('adult')}: {formatCurrency(session.adult_price, currency)}
+                            {t('pricing.adult')}: {formatCurrency(session.adult_price, currency)}
                           </p>
                           <p className="text-lg font-bold text-cyan-600 dark:text-cyan-400">
-                            {t('child')}: {formatCurrency(session.child_price, currency)}
+                            {t('pricing.child')}: {formatCurrency(session.child_price, currency)}
                           </p>
                           <p className="text-sm text-slate-500 dark:text-slate-400">{tCommon('perPerson')}</p>
                         </div>
