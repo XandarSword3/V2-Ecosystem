@@ -34,31 +34,8 @@ interface PoolSession {
   child_price: number | string;
   isActive?: boolean;
   availability?: {
-    ticketsSold: number;
-    remaining: number;
+    remaining?: number;
   };
-}
-
-// Helper to normalize session data from API
-function normalizeSession(session: any): PoolSession {
-  return {
-    ...session,
-    startTime: session.startTime || session.start_time,
-    endTime: session.endTime || session.end_time,
-    maxCapacity: session.maxCapacity || session.max_capacity || 50,
-    isActive: session.isActive ?? session.is_active ?? true,
-    adult_price: Number(session.adult_price) || 0,
-    child_price: Number(session.child_price) || 0,
-  };
-}
-
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
 };
 
 const cardVariants = {
@@ -67,90 +44,100 @@ const cardVariants = {
 };
 
 export default function PoolPage() {
-  const t = useTranslations('pool');
-  const tCommon = useTranslations('common');
-  const router = useRouter();
-  const { user } = useAuth();
-  const { settings } = useSiteSettings();
-  const currency = useSettingsStore((s) => s.currency);
-  const { translateContent } = useContentTranslation();
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedSession, setSelectedSession] = useState<PoolSession | null>(null);
-  const [guestCount, setGuestCount] = useState(1);
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [showBookingForm, setShowBookingForm] = useState(false);
+          // ...existing code...
+        // Booking handler
+        const handleBooking = async () => {
+          if (!selectedSession) {
+            toast.error(t('selectSession'));
+            return;
+          }
+          if (!customerName.trim() || !customerPhone.trim()) {
+            toast.error(t('fillContactInfo'));
+            return;
+          }
+          purchaseMutation.mutate({
+            sessionId: selectedSession.id,
+            ticketDate: selectedDate,
+            customerName: customerName.trim(),
+            customerPhone: customerPhone.trim(),
+            numberOfAdults: adultCount,
+            numberOfChildren: childCount,
+            numberOfGuests: adultCount + childCount,
+            paymentMethod: 'cash',
+          });
+        };
+    // State declarations
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedSession, setSelectedSession] = useState<PoolSession | null>(null);
+    const [adultCount, setAdultCount] = useState(1);
+    const [childCount, setChildCount] = useState(0);
+    const { user } = useAuth();
+    const t = useTranslations('pool');
+    const tCommon = useTranslations('common');
+    const router = useRouter();
+    const { settings } = useSiteSettings();
+    const currency = useSettingsStore((s) => s.currency);
+    const { translateContent } = useContentTranslation();
+    const [customerName, setCustomerName] = useState('');
+    const [customerPhone, setCustomerPhone] = useState('');
+    useEffect(() => {
+      setAdultCount(1);
+      setChildCount(0);
+    }, [selectedSession]);
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['pool-sessions', selectedDate],
-    queryFn: () => poolApi.getSessions(selectedDate),
-  });
+    // Animation variants
+    const containerVariants = {
+      hidden: { opacity: 0 },
+      visible: {
+        opacity: 1,
+        transition: { staggerChildren: 0.1 }
+      }
+    };
+    const cardVariants = {
+      hidden: { opacity: 0, y: 20 },
+      visible: { opacity: 1, y: 0 }
+    };
 
-  // Fetch user's tickets if logged in
-  const { data: myTicketsData } = useQuery({
-    queryKey: ['my-pool-tickets'],
-    queryFn: () => poolApi.getMyTickets(),
-    enabled: !!user,
-  });
-  const myTickets = myTicketsData?.data?.data || [];
-
-  const purchaseMutation = useMutation({
-    mutationFn: (data: any) => poolApi.purchaseTicket(data),
-    onSuccess: (response) => {
-      toast.success(t('ticketPurchased'));
-      const ticket = response.data.data;
-      router.push(`/pool/confirmation?id=${ticket.id}`);
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error || t('purchaseFailed'));
-    },
-  });
-
-  const { socket } = useSocket();
-
-  useEffect(() => {
-    if (socket) {
-      const handleUpdate = (data: any) => {
-        // If the update is for the current business area and selected date, refetch
-        const updateDate = data.ticketDate || data.ticket_date;
-        if (updateDate && updateDate.split('T')[0] === selectedDate) {
-          refetch();
-        }
-      };
-
-      socket.on('pool:ticket:new', handleUpdate);
-      socket.on('pool:ticket:updated', handleUpdate);
-
-      return () => {
-        socket.off('pool:ticket:new', handleUpdate);
-        socket.off('pool:ticket:updated', handleUpdate);
-      };
-    }
-  }, [socket, selectedDate, refetch]);
-
-  const rawSessions = data?.data?.data || [];
-
-  const sessions: PoolSession[] = rawSessions.map(normalizeSession);
-
-  const handlePurchase = async () => {
-    if (!selectedSession) {
-      toast.error(t('selectSession'));
-      return;
-    }
-    if (!customerName.trim() || !customerPhone.trim()) {
-      toast.error(t('fillContactInfo'));
-      return;
-    }
-
-    purchaseMutation.mutate({
-      sessionId: selectedSession.id,
-      ticketDate: selectedDate,
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      numberOfGuests: guestCount,
-      paymentMethod: 'cash',
+    const { data, isLoading, error, refetch } = useQuery({
+      queryKey: ['pool-sessions', selectedDate],
+      queryFn: () => poolApi.getSessions(selectedDate),
     });
-  };
+      const sessions = data?.data?.data || [];
+  
+    // Fetch user's tickets if logged in
+    const { data: myTicketsData } = useQuery({
+      queryKey: ['my-pool-tickets'],
+      queryFn: () => poolApi.getMyTickets(),
+      enabled: !!user,
+    });
+  
+    const myTickets = myTicketsData?.data?.data || [];
+    const purchaseMutation = useMutation({
+      mutationFn: (data: any) => poolApi.purchaseTicket(data),
+      onSuccess: (response) => {
+        toast.success(t('ticketPurchased'));
+        const ticket = response.data.data;
+        router.push(`/pool/confirmation?id=${ticket.id}`);
+      },
+      onError: (err: any) => {
+        toast.error(err.response?.data?.error || t('purchaseFailed'));
+      },
+    });
+  
+    const { socket } = useSocket();
+  
+    if (isLoading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-blue-50 to-cyan-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-slate-600 dark:text-slate-400">{tCommon('loading')}</p>
+          </div>
+        </div>
+      );
+    }
+
+
 
   if (isLoading) {
     return (
@@ -163,17 +150,7 @@ export default function PoolPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-cyan-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{tCommon('error')}</h2>
-          <p className="text-slate-600 dark:text-slate-400">{tCommon('tryAgainLater')}</p>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-cyan-50 to-white dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
@@ -247,7 +224,7 @@ export default function PoolPage() {
                 initial="hidden"
                 animate="visible"
               >
-                {sessions.map((session, index) => {
+                {sessions.map((session: PoolSession, index: number) => {
                   const remaining = session.availability?.remaining ?? session.maxCapacity ?? 50;
                   const isSoldOut = remaining === 0;
                   const isSelected = selectedSession?.id === session.id;
@@ -256,31 +233,32 @@ export default function PoolPage() {
                     <motion.div
                       key={session.id}
                       variants={cardVariants}
-                      className={`card p-6 cursor-pointer transition-all duration-300 bg-white dark:bg-slate-800 border-2 rounded-xl ${isSelected
+                      className={`card p-6 cursor-pointer transition-all duration-300 bg-white dark:bg-slate-800 border-2 rounded-xl ${
+                        isSelected
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-lg shadow-blue-200 dark:shadow-blue-900/30'
                           : isSoldOut
                             ? 'border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed'
                             : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 hover:shadow-lg'
-                        }`}
+                      }`}
                       onClick={() => !isSoldOut && setSelectedSession(session)}
                       whileHover={!isSoldOut ? { scale: 1.02 } : {}}
                       whileTap={!isSoldOut ? { scale: 0.98 } : {}}
                     >
                       <div className="flex justify-between items-center">
                         <div>
-                          <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center">
-                            <Droplets className="w-5 h-5 mr-2 text-blue-500" />
-                            {translateContent(session, 'name')}
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                            {session.name}
                           </h3>
                           <div className="flex items-center gap-4 text-slate-600 dark:text-slate-400 mt-2">
                             <span className="flex items-center bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full text-sm">
                               <Clock className="w-4 h-4 mr-1" />
                               {session.startTime} - {session.endTime}
                             </span>
-                            <span className={`flex items-center px-3 py-1 rounded-full text-sm ${remaining < 10 ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
-                                remaining < 20 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' :
-                                  'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                              }`}>
+                            <span className={`flex items-center px-3 py-1 rounded-full text-sm ${
+                              remaining < 10 ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
+                              remaining < 20 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' :
+                              'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                            }`}>
                               <Users className="w-4 h-4 mr-1" />
                               {remaining} {tCommon('spotsLeft', { count: remaining })}
                             </span>
@@ -297,7 +275,6 @@ export default function PoolPage() {
                         </div>
                       </div>
 
-                      {/* Capacity Bar */}
                       <div className="mt-4">
                         <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
                           <span>{t('capacity')}</span>
@@ -305,10 +282,11 @@ export default function PoolPage() {
                         </div>
                         <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
                           <motion.div
-                            className={`h-3 rounded-full ${remaining < 10 ? 'bg-gradient-to-r from-red-500 to-red-400' :
-                                remaining < 20 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
-                                  'bg-gradient-to-r from-green-500 to-emerald-400'
-                              }`}
+                            className={`h-3 rounded-full ${
+                              remaining < 10 ? 'bg-gradient-to-r from-red-500 to-red-400' :
+                              remaining < 20 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                              'bg-gradient-to-r from-green-500 to-emerald-400'
+                            }`}
                             initial={{ width: 0 }}
                             animate={{ width: `${(remaining / (session.maxCapacity ?? 50)) * 100}%` }}
                             transition={{ duration: 0.8, delay: index * 0.1 }}
@@ -362,24 +340,7 @@ export default function PoolPage() {
                       </p>
                     </div>
 
-                    <div>
-                      <label className="label text-slate-900 dark:text-white">{t('numberOfGuests')}</label>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
-                          className="btn btn-outline px-3"
-                        >
-                          -
-                        </button>
-                        <span className="text-xl font-semibold w-12 text-center text-slate-900 dark:text-white">{guestCount}</span>
-                        <button
-                          onClick={() => setGuestCount(Math.min(10, guestCount + 1))}
-                          className="btn btn-outline px-3"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
+
 
                     {/* Contact Info */}
                     <div className="space-y-3">
@@ -406,66 +367,52 @@ export default function PoolPage() {
                     </div>
 
                     <div className="border-t dark:border-slate-700 pt-4">
+                      <div className="flex gap-4 items-center mb-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1 text-slate-900 dark:text-white">{t('adults')}</label>
+                          <input 
+                            type="number" 
+                            min={1} 
+                            value={adultCount} 
+                            onChange={e => setAdultCount(Math.max(1, Number(e.target.value)))} 
+                            className="w-16 px-2 py-1 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1 text-slate-900 dark:text-white">{t('children')}</label>
+                          <input 
+                            type="number" 
+                            min={0} 
+                            value={childCount} 
+                            onChange={e => setChildCount(Math.max(0, Number(e.target.value)))} 
+                            className="w-16 px-2 py-1 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" 
+                          />
+                        </div>
+                      </div>
                       <div className="flex justify-between mb-2">
                         <span className="text-slate-600 dark:text-slate-400">
-                          {guestCount} × {formatCurrency(selectedSession.price, currency)}
-                                                  {adultCount} × {formatCurrency(selectedSession.adult_price, currency)} {t('adult')}
-                                                  {childCount > 0 && (
-                                                    <>
-                                                      {' + '}
-                                                      {childCount} × {formatCurrency(selectedSession.child_price, currency)} {t('child')}
-                                                    </>
-                                                  )}
+                          {adultCount} × {formatCurrency(selectedSession.adult_price, currency)} {t('adult')}
+                          {childCount > 0 && (
+                            <>
+                              {' + '}
+                              {childCount} × {formatCurrency(selectedSession.child_price, currency)} {t('child')}
+                            </>
+                          )}
                         </span>
                         <span className="font-medium text-slate-900 dark:text-white">
-                          {formatCurrency(Number(selectedSession.price) * guestCount, currency)}
-                                                  {formatCurrency((Number(selectedSession.adult_price) * adultCount + Number(selectedSession.child_price) * childCount), currency)}
-                                                  {formatCurrency((Number(selectedSession.adult_price) * adultCount + Number(selectedSession.child_price) * childCount), currency)}
-                          const [adultCount, setAdultCount] = useState(1);
-                          const [childCount, setChildCount] = useState(0);
-                          // Reset counts when session changes
-                          useEffect(() => {
-                            setAdultCount(1);
-                            setChildCount(0);
-                          }, [selectedSession]);
-                          // Booking form UI
-                          // ...existing code...
-                          {/* Adult/Child count selectors */}
-                          <div className="flex gap-4 items-center mb-4">
-                            <div>
-                              <label className="block text-sm font-medium mb-1">{t('adults')}</label>
-                              <input type="number" min={1} value={adultCount} onChange={e => setAdultCount(Math.max(1, Number(e.target.value)))} className="w-16 px-2 py-1 border rounded" />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">{t('children')}</label>
-                              <input type="number" min={0} value={childCount} onChange={e => setChildCount(Math.max(0, Number(e.target.value)))} className="w-16 px-2 py-1 border rounded" />
-                            </div>
-                          </div>
-                          // Submit booking logic (use adultCount and childCount)
-                          // ...existing code...
-                          // When submitting, send numberOfAdults and numberOfChildren to backend
-                          const handleBooking = async () => {
-                            // ...existing code...
-                            const bookingData = {
-                              // ...existing booking fields...
-                              numberOfAdults: adultCount,
-                              numberOfChildren: childCount,
-                              numberOfGuests: adultCount + childCount,
-                            };
-                            // ...existing code...
-                          };
+                          {formatCurrency((Number(selectedSession.adult_price) * adultCount + Number(selectedSession.child_price) * childCount), currency)}
                         </span>
                       </div>
                       <div className="flex justify-between text-lg font-bold">
                         <span className="text-slate-900 dark:text-white">{tCommon('total')}</span>
                         <span className="text-blue-600 dark:text-blue-400">
-                          {formatCurrency(Number(selectedSession.price) * guestCount, currency)}
+                          {formatCurrency((Number(selectedSession.adult_price) * adultCount + Number(selectedSession.child_price) * childCount), currency)}
                         </span>
                       </div>
                     </div>
 
                     <button
-                      onClick={handlePurchase}
+                      onClick={handleBooking}
                       disabled={purchaseMutation.isPending}
                       className="btn btn-primary w-full"
                     >
