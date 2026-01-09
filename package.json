@@ -23,7 +23,8 @@
     "lint:frontend": "cd frontend && npm run lint"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "supertest": "^7.2.2"
   },
   "engines": {
     "node": ">=18.0.0"

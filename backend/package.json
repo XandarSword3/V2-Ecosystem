@@ -10,8 +10,8 @@
     "migrate": "ts-node src/database/migrate.ts",
     "seed": "ts-node src/database/seed.ts",
     "db:reset": "tsx src/database/reset.ts",
-    "test": "vitest",
-    "test:coverage": "vitest --coverage",
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix"
   },
@@ -50,6 +50,7 @@
     "@types/nodemailer": "^6.4.14",
     "@types/pg": "^8.16.0",
     "@types/qrcode": "^1.5.5",
+    "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
     "@typescript-eslint/parser": "^6.17.0",

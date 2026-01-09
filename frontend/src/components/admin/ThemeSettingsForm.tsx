@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { FontSelector } from './FontSelector';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -39,7 +40,7 @@ const updateThemeSettings = async (settings: ThemeSettings): Promise<ThemeSettin
 
 export function ThemeSettingsForm() {
   const queryClient = useQueryClient();
-  const { data: initialSettings, isLoading, isError } = useQuery<ThemeSettings, Error>({
+  const { data: initialSettings, isLoading, isError, error } = useQuery<ThemeSettings, Error>({
     queryKey: ['themeSettings'],
     queryFn: fetchThemeSettings,
   });
@@ -68,8 +69,7 @@ export function ThemeSettingsForm() {
   };
 
   if (isLoading) return <p>Loading theme settings...</p>;
-  // The error object from useQuery contains 'message', not errors from react-hook-form
-  if (isError && 'message' in isError) return <p>Error loading theme settings: {isError.message}</p>;
+  if (isError && error) return <p>Error loading theme settings: {error.message}</p>;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
