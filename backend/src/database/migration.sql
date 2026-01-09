@@ -355,7 +355,8 @@ CREATE TABLE IF NOT EXISTS pool_sessions (
   start_time VARCHAR(5) NOT NULL,
   end_time VARCHAR(5) NOT NULL,
   max_capacity INTEGER NOT NULL,
-  price DECIMAL(10,2) NOT NULL,
+  adult_price DECIMAL(10,2) NOT NULL,
+  child_price DECIMAL(10,2) NOT NULL,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMP DEFAULT NOW() NOT NULL
