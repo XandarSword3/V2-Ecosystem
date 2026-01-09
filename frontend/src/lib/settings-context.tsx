@@ -109,6 +109,7 @@ export interface Module {
   slug: string;
   description?: string;
   is_active: boolean;
+  show_in_main?: boolean;
   settings?: any;
   sort_order: number;
 }

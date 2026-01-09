@@ -27,15 +27,26 @@ import { cn } from '@/lib/cn';
 import { useSiteSettings } from '@/lib/settings-context';
 
 export default function Header() {
-  const pathname = usePathname();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const { user, isAuthenticated } = useAuth();
-  const { settings, modules } = useSiteSettings();
-  const cartCount = useCartStore((s) => s.getCount());
+    const { settings, modules } = useSiteSettings();
+    // DEBUG: Log modules and navbar settings to help diagnose navigation issues
+    if (typeof window !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG] modules (detailed):', modules);
+      // eslint-disable-next-line no-console
+      modules.forEach((m, i) => {
+        console.log(`[DEBUG] module[${i}]:`, m.name, '| slug:', m.slug, '| show_in_main:', m.show_in_main, '| is_active:', m.is_active);
+      });
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG] settings.navbar:', settings.navbar);
+    }
+    const pathname = usePathname();
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [scrolled, setScrolled] = useState(false);
+    const [preferencesOpen, setPreferencesOpen] = useState(false);
+    const { user, isAuthenticated } = useAuth();
+    const cartCount = useCartStore((s) => s.getCount());
 
-  const t = useTranslations('nav');
+    const t = useTranslations('nav');
   const tCommon = useTranslations('common');
 
   // Handle scroll effect
@@ -99,21 +110,19 @@ export default function Header() {
     };
   }) || [
       { name: t('home'), href: '/', icon: Home },
-      ...modules.map(m => ({
-        name: m.name,
-        href: `/${m.slug}`,
-        icon: getIconForModule(m)
-      }))
+      ...modules
+        .filter(m => m.show_in_main)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map(m => ({
+          name: m.name,
+          href: `/${m.slug}`,
+          icon: getIconForModule(m)
+        }))
     ];
 
-  // Fallback if modules not loaded yet and no CMS
-  if (!settings.navbar && modules.length === 0) {
-    navigation.push(
-      { name: t('restaurant'), href: '/restaurant', icon: UtensilsCrossed },
-      { name: t('chalets'), href: '/chalets', icon: Home },
-      { name: t('pool'), href: '/pool', icon: Waves },
-      { name: t('snackBar'), href: '/snack-bar', icon: Cookie }
-    );
+  if (typeof window !== 'undefined') {
+    // eslint-disable-next-line no-console
+    console.log('[DEBUG] navigation array:', navigation);
   }
 
   // Don't show header on admin or staff pages
