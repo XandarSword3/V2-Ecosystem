@@ -22,20 +22,24 @@ export async function getSessions(req: Request, res: Response, next: NextFunctio
     const supabase = getSupabase();
     const { moduleId } = req.query;
 
-    let query = supabase
-      .from('pool_sessions')
-      .select('*')
-      .eq('is_active', true);
+        let query = supabase
+          .from('pool_sessions')
+          .select('*')
+          .eq('is_active', true);
 
     if (moduleId) {
       query = query.eq('module_id', moduleId);
     }
 
-    const { data: sessions, error } = await query;
-
-    if (error) throw error;
-
-    res.json({ success: true, data: sessions || [] });
+        const { data: sessions, error } = await query;
+        if (error) throw error;
+        // Normalize price fields for frontend compatibility
+        const sessionsWithPrices = (sessions || []).map((s: any) => ({
+          ...s,
+          adult_price: s.adult_price ?? s.price ?? 0,
+          child_price: s.child_price ?? s.price ?? 0,
+        }));
+        res.json({ success: true, data: sessionsWithPrices });
   } catch (error) {
     next(error);
   }
@@ -56,7 +60,13 @@ export async function getSession(req: Request, res: Response, next: NextFunction
       }
       throw error;
     }
-    res.json({ success: true, data: session });
+    // Normalize price fields for frontend compatibility
+    const sessionWithPrices = session ? {
+      ...session,
+      adult_price: session.adult_price ?? session.price ?? 0,
+      child_price: session.child_price ?? session.price ?? 0,
+    } : null;
+    res.json({ success: true, data: sessionWithPrices });
   } catch (error) {
     next(error);
   }
@@ -112,7 +122,8 @@ export async function getAvailability(req: Request, res: Response, next: NextFun
         maxCapacity: session.max_capacity,
         sold: soldGuests,
         available: Math.max(0, available),
-        price: session.price,
+        adult_price: session.adult_price ?? session.price ?? 0,
+        child_price: session.child_price ?? session.price ?? 0,
       };
     });
 
@@ -171,7 +182,7 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
       .eq('session_id', sessionId)
       .gte('ticket_date', targetDate)
       .lte('ticket_date', endOfDay)
-      .in('status', ['valid', 'active', 'used']); // All booked spots count against total session capacity
+      .in('status', ['valid', 'used']); // All booked spots count against total session capacity
 
     if (ticketsError) throw ticketsError;
 
@@ -184,7 +195,14 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
       });
     }
 
-    const totalAmount = parseFloat(session.price) * numberOfGuests;
+    // Calculate total using adult/child prices if provided
+    const { numberOfAdults = 0, numberOfChildren = 0 } = validatedData;
+    let totalAmount = 0;
+    if (session.adult_price !== undefined && session.child_price !== undefined) {
+      totalAmount = (parseFloat(session.adult_price) * numberOfAdults) + (parseFloat(session.child_price) * numberOfChildren);
+    } else {
+      totalAmount = parseFloat(session.price) * numberOfGuests;
+    }
     const ticketNumber = generateTicketNumber();
 
     // Generate QR code
@@ -589,7 +607,7 @@ export async function createSession(req: Request, res: Response, next: NextFunct
     const { name, startTime, endTime, maxCapacity, price, moduleId } = req.body;
 
     // Validate required fields
-    if (!name || !startTime || !endTime || maxCapacity === undefined || price === undefined) {
+    if (!name || !startTime || !endTime || maxCapacity === undefined || adult_price === undefined || child_price === undefined) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: name, startTime, endTime, maxCapacity, price'
@@ -605,7 +623,8 @@ export async function createSession(req: Request, res: Response, next: NextFunct
         start_time: startTime,
         end_time: endTime,
         max_capacity: Number(maxCapacity),
-        price: String(price),
+        adult_price: String(adult_price),
+        child_price: String(child_price),
       })
       .select()
       .single();
@@ -632,7 +651,8 @@ export async function updateSession(req: Request, res: Response, next: NextFunct
     if (req.body.startTime !== undefined) updateData.start_time = req.body.startTime;
     if (req.body.endTime !== undefined) updateData.end_time = req.body.endTime;
     if (req.body.maxCapacity !== undefined) updateData.max_capacity = req.body.maxCapacity;
-    if (req.body.price !== undefined) updateData.price = req.body.price.toString();
+    if (req.body.adult_price !== undefined) updateData.adult_price = req.body.adult_price.toString();
+    if (req.body.child_price !== undefined) updateData.child_price = req.body.child_price.toString();
     if (req.body.isActive !== undefined) updateData.is_active = req.body.isActive;
 
     const { data: session, error } = await supabase

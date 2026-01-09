@@ -124,7 +124,7 @@ export const purchasePoolTicketSchema = z.object({
 });
 
 export const updatePoolTicketSchema = z.object({
-  status: z.enum(['pending', 'valid', 'active', 'used', 'expired', 'cancelled']).optional(),
+  status: z.enum(['pending', 'valid', 'used', 'expired', 'cancelled']).optional(),
   numberOfGuests: z.number().int().min(1).max(20).optional(),
 });
 
