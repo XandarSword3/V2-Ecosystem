@@ -30,6 +30,8 @@ interface PoolSession {
   endTime?: string;
   maxCapacity?: number;
   price: number | string; // API may return as string
+  adult_price: number | string;
+  child_price: number | string;
   isActive?: boolean;
   availability?: {
     ticketsSold: number;
@@ -45,7 +47,8 @@ function normalizeSession(session: any): PoolSession {
     endTime: session.endTime || session.end_time,
     maxCapacity: session.maxCapacity || session.max_capacity || 50,
     isActive: session.isActive ?? session.is_active ?? true,
-    price: Number(session.price) || 0,
+    adult_price: Number(session.adult_price) || 0,
+    child_price: Number(session.child_price) || 0,
   };
 }
 
@@ -284,8 +287,11 @@ export default function PoolPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                            {formatCurrency(session.price, currency)}
+                          <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                            {t('adult')}: {formatCurrency(session.adult_price, currency)}
+                          </p>
+                          <p className="text-lg font-bold text-cyan-600 dark:text-cyan-400">
+                            {t('child')}: {formatCurrency(session.child_price, currency)}
                           </p>
                           <p className="text-sm text-slate-500 dark:text-slate-400">{tCommon('perPerson')}</p>
                         </div>
@@ -403,9 +409,51 @@ export default function PoolPage() {
                       <div className="flex justify-between mb-2">
                         <span className="text-slate-600 dark:text-slate-400">
                           {guestCount} × {formatCurrency(selectedSession.price, currency)}
+                                                  {adultCount} × {formatCurrency(selectedSession.adult_price, currency)} {t('adult')}
+                                                  {childCount > 0 && (
+                                                    <>
+                                                      {' + '}
+                                                      {childCount} × {formatCurrency(selectedSession.child_price, currency)} {t('child')}
+                                                    </>
+                                                  )}
                         </span>
                         <span className="font-medium text-slate-900 dark:text-white">
                           {formatCurrency(Number(selectedSession.price) * guestCount, currency)}
+                                                  {formatCurrency((Number(selectedSession.adult_price) * adultCount + Number(selectedSession.child_price) * childCount), currency)}
+                                                  {formatCurrency((Number(selectedSession.adult_price) * adultCount + Number(selectedSession.child_price) * childCount), currency)}
+                          const [adultCount, setAdultCount] = useState(1);
+                          const [childCount, setChildCount] = useState(0);
+                          // Reset counts when session changes
+                          useEffect(() => {
+                            setAdultCount(1);
+                            setChildCount(0);
+                          }, [selectedSession]);
+                          // Booking form UI
+                          // ...existing code...
+                          {/* Adult/Child count selectors */}
+                          <div className="flex gap-4 items-center mb-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">{t('adults')}</label>
+                              <input type="number" min={1} value={adultCount} onChange={e => setAdultCount(Math.max(1, Number(e.target.value)))} className="w-16 px-2 py-1 border rounded" />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">{t('children')}</label>
+                              <input type="number" min={0} value={childCount} onChange={e => setChildCount(Math.max(0, Number(e.target.value)))} className="w-16 px-2 py-1 border rounded" />
+                            </div>
+                          </div>
+                          // Submit booking logic (use adultCount and childCount)
+                          // ...existing code...
+                          // When submitting, send numberOfAdults and numberOfChildren to backend
+                          const handleBooking = async () => {
+                            // ...existing code...
+                            const bookingData = {
+                              // ...existing booking fields...
+                              numberOfAdults: adultCount,
+                              numberOfChildren: childCount,
+                              numberOfGuests: adultCount + childCount,
+                            };
+                            // ...existing code...
+                          };
                         </span>
                       </div>
                       <div className="flex justify-between text-lg font-bold">
