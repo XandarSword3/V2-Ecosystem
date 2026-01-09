@@ -310,7 +310,13 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
       .select()
       .single();
 
-    if (bookingError) throw bookingError;
+    if (bookingError) {
+      console.error('[createBooking] Supabase insert error', { error: bookingError, payload: {
+        chaletId, customerName, customerEmail, customerPhone, checkInDate, checkOutDate, numberOfGuests, paymentMethod
+      }});
+      // Return helpful error to client and also throw to be captured by global handler
+      return res.status(500).json({ success: false, error: 'Failed to create booking (DB error)' });
+    }
 
     // Insert add-ons
     if (addOnItems.length > 0) {
