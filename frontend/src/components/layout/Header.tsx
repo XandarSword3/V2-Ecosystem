@@ -28,17 +28,7 @@ import { useSiteSettings } from '@/lib/settings-context';
 
 export default function Header() {
     const { settings, modules } = useSiteSettings();
-    // DEBUG: Log modules and navbar settings to help diagnose navigation issues
-    if (typeof window !== 'undefined') {
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] modules (detailed):', modules);
-      // eslint-disable-next-line no-console
-      modules.forEach((m, i) => {
-        console.log(`[DEBUG] module[${i}]:`, m.name, '| slug:', m.slug, '| show_in_main:', m.show_in_main, '| is_active:', m.is_active);
-      });
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] settings.navbar:', settings.navbar);
-    }
+    // ...existing code...
     const pathname = usePathname();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
@@ -120,10 +110,7 @@ export default function Header() {
         }))
     ];
 
-  if (typeof window !== 'undefined') {
-    // eslint-disable-next-line no-console
-    console.log('[DEBUG] navigation array:', navigation);
-  }
+  // ...existing code...
 
   // Don't show header on admin or staff pages
   if (pathname?.startsWith('/admin') || pathname?.startsWith('/staff')) {

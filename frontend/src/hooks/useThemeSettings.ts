@@ -4,8 +4,6 @@ interface ThemeSettings {
   primary_color: string;
   secondary_color: string;
   font_family: string;
-  weather_widget_enabled: boolean;
-  weather_widget_location: string;
 }
 
 const fetchThemeSettings = async (): Promise<ThemeSettings> => {

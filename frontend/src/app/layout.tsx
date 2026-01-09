@@ -4,10 +4,12 @@ import '../styles/globals.css';
 import { Providers } from './providers';
 import { Toaster } from 'sonner';
 import { defaultLocale, getLocaleFromCookie, type Locale } from '@/i18n';
+
 import Header from '@/components/layout/Header';
 import Footer from '@/components/Footer';
-import { WeatherEffects } from '@/components/effects/WeatherEffects';
 import { PageTransition } from '@/components/effects/PageTransition';
+import { useSiteSettings } from '@/lib/settings-context';
+import { resortThemes } from '@/lib/theme-config';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -44,15 +46,26 @@ export default function RootLayout({
   const locale = defaultLocale;
   const isRtl = locale === 'ar';
 
+  // Get theme from settings context (client only)
+  let themeClass = '';
+  if (typeof window !== 'undefined') {
+    try {
+      // Dynamically import hook to avoid SSR issues
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { settings } = require('@/lib/settings-context').useSiteSettings();
+      const theme = (settings?.theme || 'beach') as import('@/lib/theme-config').ResortTheme;
+      themeClass = resortThemes[theme]?.background || '';
+    } catch {}
+  }
+
   return (
     <html
       lang={locale}
       dir={isRtl ? 'rtl' : 'ltr'}
       suppressHydrationWarning
     >
-      <body className={`${inter.variable} ${notoArabic.variable} ${isRtl ? 'font-arabic' : 'font-sans'}`}>
+      <body className={`${inter.variable} ${notoArabic.variable} ${isRtl ? 'font-arabic' : 'font-sans'} ${themeClass}`}>
         <Providers>
-          <WeatherEffects />
           <Header />
           <main>
             <PageTransition>

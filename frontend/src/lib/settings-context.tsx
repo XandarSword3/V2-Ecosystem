@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useSocket } from './socket';
-import { ResortTheme, WeatherEffect } from './theme-config';
+import { ResortTheme } from './theme-config';
 
 export interface SiteSettings {
   // General
@@ -54,7 +54,6 @@ export interface SiteSettings {
     text: string;
     textMuted: string;
   };
-  weatherEffect: WeatherEffect;
   animationsEnabled: boolean;
   reducedMotion: boolean;
   soundEnabled: boolean;
@@ -94,7 +93,6 @@ const defaultSettings: SiteSettings = {
 
   // Appearance defaults
   theme: 'beach',
-  weatherEffect: 'sunny',
   animationsEnabled: true,
   reducedMotion: false,
   soundEnabled: true,
@@ -137,40 +135,43 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const { socket } = useSocket();
 
+  // Broadcast settings update to all tabs using localStorage
+  const broadcastSettingsUpdate = () => {
+    try {
+      localStorage.setItem('v2-settings-updated', Date.now().toString());
+    } catch {}
+  };
+
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      // Ensure we have the correct API URL with /api prefix
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const apiUrl = baseUrl.replace(/\/api\/?$/, ''); // Remove trailing /api if present
-
+      const apiUrl = baseUrl.replace(/\/api\/?$/, '');
+      console.log('[SettingsProvider] Fetching settings from', `${apiUrl}/api/settings`);
       const [settingsRes, modulesRes] = await Promise.all([
         fetch(`${apiUrl}/api/settings`),
         fetch(`${apiUrl}/api/modules?activeOnly=true`)
       ]);
-
       if (!settingsRes.ok) {
         throw new Error('Failed to fetch settings');
       }
-
       const settingsData = await settingsRes.json();
-
+      console.log('[SettingsProvider] Received settings data:', settingsData);
       if (settingsData.success && settingsData.data) {
         setSettings({ ...defaultSettings, ...settingsData.data });
+        console.log('[SettingsProvider] Updated settings state:', { ...defaultSettings, ...settingsData.data });
       }
-
       if (modulesRes.ok) {
         const modulesData = await modulesRes.json();
         if (modulesData.success && modulesData.data) {
           setModules(modulesData.data);
+          console.log('[SettingsProvider] Updated modules state:', modulesData.data);
         }
       }
-
       setError(null);
     } catch (err) {
-      console.error('Failed to load site settings:', err);
+      console.error('[SettingsProvider] Failed to load site settings:', err);
       setError('Failed to load settings');
-      // Keep default settings on error
     } finally {
       setLoading(false);
     }
@@ -178,19 +179,31 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchSettings();
+
+    // Listen for cross-tab settings update
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'v2-settings-updated') {
+        fetchSettings();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   useEffect(() => {
     if (!socket) return;
 
-    const handleSettingsUpdate = (newSettings: Partial<SiteSettings>) => {
-      console.log('Received settings update:', newSettings);
-      setSettings(prev => ({ ...prev, ...newSettings }));
+    const handleSettingsUpdate = async (newSettings: Partial<SiteSettings>) => {
+      console.log('[SettingsProvider] Socket event: settings.updated', newSettings);
+      broadcastSettingsUpdate();
+      await fetchSettings();
     };
 
     const handleModulesUpdate = () => {
-      console.log('Received modules update, refetching...');
-      fetchSettings(); // Refetch everything to be safe
+      console.log('[SettingsProvider] Socket event: modules.updated');
+      fetchSettings();
     };
 
     socket.on('settings.updated', handleSettingsUpdate);

@@ -18,15 +18,15 @@ export const getThemeSettings = async (req: Request, res: Response) => {
 };
 
 export const updateThemeSettings = async (req: Request, res: Response) => {
-  const { primary_color, secondary_color, font_family, weather_widget_enabled, weather_widget_location } = req.body;
+  const { primary_color, secondary_color, font_family } = req.body;
   try {
     const pool = getPool();
     const result = await pool.query(
       `UPDATE theme_settings
-       SET primary_color = $1, secondary_color = $2, font_family = $3, weather_widget_enabled = $4, weather_widget_location = $5, updated_at = CURRENT_TIMESTAMP
+       SET primary_color = $1, secondary_color = $2, font_family = $3, updated_at = CURRENT_TIMESTAMP
        WHERE id = (SELECT id FROM theme_settings LIMIT 1)
        RETURNING *`,
-      [primary_color, secondary_color, font_family, weather_widget_enabled, weather_widget_location]
+      [primary_color, secondary_color, font_family]
     );
 
     if (result.rows.length > 0) {
