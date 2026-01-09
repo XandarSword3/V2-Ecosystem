@@ -120,6 +120,8 @@ export const purchasePoolTicketSchema = z.object({
   customerEmail: emailSchema.optional(),
   customerPhone: phoneSchema,
   numberOfGuests: z.number().int().min(1).max(20, 'Maximum 20 guests per ticket'),
+  numberOfAdults: z.number().int().min(0).max(20).default(0),
+  numberOfChildren: z.number().int().min(0).max(20).default(0),
   paymentMethod: z.enum(['cash', 'card', 'online']),
 });
 
