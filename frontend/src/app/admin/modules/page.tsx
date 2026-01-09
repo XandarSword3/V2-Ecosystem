@@ -46,7 +46,7 @@ export default function ModulesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => modulesApi.delete(id),
+    mutationFn: ({ id, force }: { id: string; force?: boolean }) => modulesApi.delete(id, force),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-modules'] });
       toast.success('Module deleted successfully');
@@ -154,8 +154,11 @@ export default function ModulesPage() {
                   </button>
                   <button
                     onClick={() => {
-                      if (confirm('Are you sure you want to delete this module?')) {
-                        deleteMutation.mutate(module.id);
+                      const input = prompt('Type "Delete" to confirm hard deletion of this module. This action is irreversible.');
+                      if (input === 'Delete') {
+                        deleteMutation.mutate({ id: module.id, force: true });
+                      } else if (input !== null) {
+                        toast.error('You must type "Delete" exactly to confirm.');
                       }
                     }}
                     className="text-red-600 hover:text-red-900 dark:hover:text-red-400"
