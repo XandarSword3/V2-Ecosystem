@@ -92,6 +92,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: Cookie,
       children: [
         { name: t('nav.menu'), href: '/admin/snack/menu' },
+        { name: t('nav.categories'), href: '/admin/snack/categories' },
         { name: t('nav.orders'), href: '/admin/snack/orders' },
       ]
     },
