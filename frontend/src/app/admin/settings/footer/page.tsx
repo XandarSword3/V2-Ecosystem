@@ -226,7 +226,7 @@ export default function FooterSettingsPage() {
                     placeholder="V2 Resort"
                   />
                   <Button
-                    variant={config.logo.showIcon ? 'default' : 'outline'}
+                    variant={config.logo.showIcon ? 'primary' : 'outline'}
                     size="icon"
                     onClick={() => setConfig({ ...config, logo: { ...config.logo, showIcon: !config.logo.showIcon } })}
                     title="Toggle Icon"

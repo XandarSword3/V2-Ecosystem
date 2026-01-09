@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
-import { ColorPicker } from './ColorPicker';
+// import { Switch } from '@/components/ui/Switch'; // Assuming a Switch component is available in ui
 import { FontSelector } from './FontSelector';
-import { Switch } from '@/components/ui/Switch'; // Assuming a Switch component is available in ui/
+import { ColorPicker } from './ColorPicker';
 
 interface WeatherWidgetConfigProps {
   weatherWidgetEnabledName: string;
@@ -37,7 +37,7 @@ export const WeatherWidgetConfig: React.FC<WeatherWidgetConfigProps> = ({
         <label htmlFor={weatherWidgetEnabledName} className="block text-sm font-medium text-gray-700">
           Enable Weather Widget
         </label>
-        <Switch id={weatherWidgetEnabledName} {...{ [weatherWidgetEnabledName]: true }} />
+        <input type="checkbox" id={weatherWidgetEnabledName} name={weatherWidgetEnabledName} />
       </div>
 
       {isWeatherWidgetEnabled && (
