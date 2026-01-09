@@ -206,8 +206,24 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
         .eq('id', id);
 
       if (delErr) {
-        // If deletion fails due to FK constraints, return informative error
-        return res.status(400).json({ success: false, error: 'Failed to hard-delete module. Remove dependent data or use soft-delete.' });
+        // If deletion fails due to FK constraints, try to list dependent rows to help the user
+        const candidateTables = [
+          'menu_categories', 'menu_items', 'snack_items', 'chalets', 'pool_sessions', 'pool_tickets', 'restaurant_orders', 'reviews', 'pages', 'modules', 'users'
+        ];
+        const deps: Record<string, number> = {};
+        for (const table of candidateTables) {
+          try {
+            const { count } = await supabase
+              .from(table)
+              .select('id', { count: 'exact', head: true })
+              .eq('module_id', id);
+            deps[table] = typeof count === 'number' ? count : 0;
+          } catch (e) {
+            // ignore tables that don't exist or cannot be queried
+            deps[table] = -1;
+          }
+        }
+        return res.status(400).json({ success: false, error: 'Failed to hard-delete module. Remove dependent data or use soft-delete.', dependencies: deps });
       }
 
       emitToAll('modules.updated', { id, deleted: true });
