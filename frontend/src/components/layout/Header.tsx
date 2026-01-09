@@ -8,16 +8,17 @@ import { ThemeToggle } from '../ThemeToggle';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { CurrencySwitcher } from '../CurrencySwitcher';
 import { UserPreferencesModal } from '../settings/UserPreferencesModal';
-import { 
-  UtensilsCrossed, 
-  Home, 
-  Waves, 
-  Cookie, 
-  Menu, 
-  X, 
+import {
+  UtensilsCrossed,
+  Home,
+  Waves,
+  Cookie,
+  Menu,
+  X,
   User,
   ShoppingCart,
-  Settings
+  Settings,
+  Link as LinkIcon
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
@@ -33,18 +34,23 @@ export default function Header() {
   const { user, isAuthenticated } = useAuth();
   const { settings, modules } = useSiteSettings();
   const cartCount = useCartStore((s) => s.getCount());
-  
+
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');
 
   // Handle scroll effect
   useEffect(() => {
+    const isSticky = settings.navbar?.config?.sticky !== false;
+    if (!isSticky) {
+      setScrolled(false);
+      return;
+    }
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [settings.navbar?.config?.sticky]);
 
   const getIconForModule = (module: any) => {
     // Specific icons for default modules
@@ -62,17 +68,46 @@ export default function Header() {
     }
   };
 
-  const navigation = [
-    { name: t('home'), href: '/', icon: Home },
-    ...modules.map(m => ({
-      name: m.name,
-      href: `/${m.slug}`,
-      icon: getIconForModule(m)
-    }))
-  ];
+  const getIconByName = (name: string) => {
+    const icons: Record<string, any> = {
+      Home,
+      UtensilsCrossed,
+      Waves,
+      Cookie,
+      Link: LinkIcon,
+      User,
+      ShoppingCart,
+      Settings
+    };
+    return icons[name] || Home;
+  };
 
-  // Fallback if modules not loaded yet (optional, but good for UX)
-  if (modules.length === 0) {
+  // Build navigation from CMS or Fallback
+  const navigation = settings.navbar?.links?.map((link: any) => {
+    if (link.type === 'module') {
+      const module = modules.find(m => m.slug === link.moduleSlug);
+      return {
+        name: module?.name || link.label,
+        href: module ? `/${module.slug}` : link.href,
+        icon: module ? getIconForModule(module) : getIconByName(link.icon)
+      };
+    }
+    return {
+      name: link.label,
+      href: link.href,
+      icon: getIconByName(link.icon)
+    };
+  }) || [
+      { name: t('home'), href: '/', icon: Home },
+      ...modules.map(m => ({
+        name: m.name,
+        href: `/${m.slug}`,
+        icon: getIconForModule(m)
+      }))
+    ];
+
+  // Fallback if modules not loaded yet and no CMS
+  if (!settings.navbar && modules.length === 0) {
     navigation.push(
       { name: t('restaurant'), href: '/restaurant', icon: UtensilsCrossed },
       { name: t('chalets'), href: '/chalets', icon: Home },
@@ -86,13 +121,23 @@ export default function Header() {
     return null;
   }
 
+  const navConfig = settings.navbar?.config || {
+    showLanguageSwitcher: true,
+    showThemeToggle: true,
+    showCurrencySwitcher: true,
+    showUserPreferences: true,
+    showCart: true,
+    sticky: true
+  };
+
   return (
     <motion.header
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       className={cn(
-        'sticky top-0 z-50 transition-all duration-300',
+        navConfig.sticky ? 'sticky top-0 z-50' : 'relative z-50',
+        'transition-all duration-300',
         scrolled
           ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg shadow-lg shadow-black/5'
           : 'bg-white dark:bg-gray-900',
@@ -117,10 +162,10 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-1">
-            {navigation.map((item) => {
+            {navigation.map((item: any) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
-              
+
               return (
                 <Link key={item.href} href={item.href}>
                   <motion.div
@@ -144,7 +189,7 @@ export default function Header() {
           {/* Right Side Actions */}
           <div className="flex items-center gap-2">
             {/* Cart Button */}
-            {cartCount > 0 && (
+            {navConfig.showCart && cartCount > 0 && (
               <Link href="/cart">
                 <motion.div
                   initial={{ scale: 0 }}
@@ -165,21 +210,23 @@ export default function Header() {
               </Link>
             )}
 
-            <CurrencySwitcher />
-            <LanguageSwitcher />
-            <ThemeToggle />
-            
+            {navConfig.showCurrencySwitcher && <CurrencySwitcher />}
+            {navConfig.showLanguageSwitcher && <LanguageSwitcher />}
+            {navConfig.showThemeToggle && <ThemeToggle />}
+
             {/* Settings Button */}
-            <motion.button
-              whileHover={{ scale: 1.05, rotate: 15 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setPreferencesOpen(true)}
-              className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              aria-label={t('settings')}
-            >
-              <Settings className="h-5 w-5" />
-            </motion.button>
-            
+            {navConfig.showUserPreferences && (
+              <motion.button
+                whileHover={{ scale: 1.05, rotate: 15 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setPreferencesOpen(true)}
+                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                aria-label={t('settings')}
+              >
+                <Settings className="h-5 w-5" />
+              </motion.button>
+            )}
+
             {/* Auth Buttons - Desktop */}
             <div className="hidden md:flex items-center gap-2 ml-2">
               {isAuthenticated ? (
@@ -216,7 +263,7 @@ export default function Header() {
                 </>
               )}
             </div>
-            
+
             {/* Mobile Menu Button */}
             <motion.button
               whileTap={{ scale: 0.9 }}
@@ -272,10 +319,10 @@ export default function Header() {
                 }}
                 className="py-4 space-y-1"
               >
-                {navigation.map((item) => {
+                {navigation.map((item: any) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
-                  
+
                   return (
                     <motion.div
                       key={item.href}
@@ -342,11 +389,11 @@ export default function Header() {
           )}
         </AnimatePresence>
       </div>
-      
+
       {/* User Preferences Modal */}
-      <UserPreferencesModal 
-        isOpen={preferencesOpen} 
-        onClose={() => setPreferencesOpen(false)} 
+      <UserPreferencesModal
+        isOpen={preferencesOpen}
+        onClose={() => setPreferencesOpen(false)}
       />
     </motion.header>
   );

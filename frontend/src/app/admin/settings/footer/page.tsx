@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
@@ -14,346 +14,422 @@ import {
   Trash2,
   Save,
   GripVertical,
-  ExternalLink,
   Facebook,
   Instagram,
   Twitter,
   Youtube,
+  Globe,
+  Layout,
+  Info,
+  Layers,
+  CheckCircle2,
+  Type
 } from 'lucide-react';
 
 interface FooterLink {
-  id: string;
   label: string;
   href: string;
-  isExternal: boolean;
 }
 
-interface SocialLink {
-  platform: 'facebook' | 'instagram' | 'twitter' | 'youtube';
+interface FooterColumn {
+  title: string;
+  links: FooterLink[];
+}
+
+interface FooterSocial {
+  platform: string;
   url: string;
-  enabled: boolean;
 }
 
-interface FooterSettings {
-  quickLinks: FooterLink[];
-  legalLinks: FooterLink[];
-  socialLinks: SocialLink[];
-  copyrightText: string;
-  showNewsletter: boolean;
+interface FooterConfig {
+  logo: {
+    text: string;
+    showIcon: boolean;
+  };
+  description: string;
+  columns: FooterColumn[];
+  socials: FooterSocial[];
+  contact: {
+    showAddress: boolean;
+    showPhone: boolean;
+    showEmail: boolean;
+  };
+  copyright: string;
 }
 
-const defaultSettings: FooterSettings = {
-  quickLinks: [
-    { id: '1', label: 'Restaurant', href: '/restaurant', isExternal: false },
-    { id: '2', label: 'Chalets', href: '/chalets', isExternal: false },
-    { id: '3', label: 'Pool', href: '/pool', isExternal: false },
-    { id: '4', label: 'Snack Bar', href: '/snack', isExternal: false },
+const DEFAULT_CONFIG: FooterConfig = {
+  logo: { text: 'V2 Resort', showIcon: true },
+  description: 'Premium resort experience in the heart of Lebanon.',
+  columns: [
+    {
+      title: 'Quick Links',
+      links: [
+        { label: 'Restaurant', href: '/restaurant' },
+        { label: 'Chalets', href: '/chalets' },
+        { label: 'Pool', href: '/pool' }
+      ]
+    }
   ],
-  legalLinks: [
-    { id: '1', label: 'Privacy Policy', href: '/privacy', isExternal: false },
-    { id: '2', label: 'Terms of Service', href: '/terms', isExternal: false },
-    { id: '3', label: 'Cancellation Policy', href: '/cancellation', isExternal: false },
+  socials: [
+    { platform: 'facebook', url: '' },
+    { platform: 'instagram', url: '' }
   ],
-  socialLinks: [
-    { platform: 'facebook', url: '', enabled: false },
-    { platform: 'instagram', url: '', enabled: false },
-    { platform: 'twitter', url: '', enabled: false },
-    { platform: 'youtube', url: '', enabled: false },
-  ],
-  copyrightText: '© {year} V2 Resort. All rights reserved.',
-  showNewsletter: false,
-};
-
-const socialIcons: Record<string, React.ElementType> = {
-  facebook: Facebook,
-  instagram: Instagram,
-  twitter: Twitter,
-  youtube: Youtube,
+  contact: {
+    showAddress: true,
+    showPhone: true,
+    showEmail: true
+  },
+  copyright: '© {year} V2 Resort. All rights reserved.'
 };
 
 export default function FooterSettingsPage() {
-  const [settings, setSettings] = useState<FooterSettings>(defaultSettings);
-  const [isSaving, setIsSaving] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [config, setConfig] = useState<FooterConfig>(DEFAULT_CONFIG);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadSettings();
+    fetchSettings();
   }, []);
 
-  const loadSettings = async () => {
+  const fetchSettings = async () => {
     try {
-      const response = await api.get('/admin/settings');
-      if (response.data?.data?.footer) {
-        setSettings({ ...defaultSettings, ...response.data.data.footer });
+      const { data } = await api.get('/admin/settings');
+      if (data?.data?.footer) {
+        setConfig(data.data.footer);
       }
     } catch (error) {
-      console.error('Failed to load footer settings:', error);
+      console.error('Failed to fetch footer settings:', error);
+      toast.error('Failed to load settings');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    setIsSaving(true);
+    setSaving(true);
     try {
-      await api.put('/admin/settings', { footer: settings });
-      toast.success('Footer settings saved!');
-      setHasChanges(false);
-    } catch (error) {
-      toast.error('Failed to save footer settings');
+      await api.put('/admin/settings', { key: 'footer', value: config });
+      toast.success('Footer configuration saved successfully');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to save settings');
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
-  const addQuickLink = () => {
-    setSettings({
-      ...settings,
-      quickLinks: [...settings.quickLinks, { id: Date.now().toString(), label: 'New Link', href: '/', isExternal: false }],
+  // --- Column Management ---
+  const addColumn = () => {
+    setConfig({
+      ...config,
+      columns: [...config.columns, { title: 'New Column', links: [] }]
     });
-    setHasChanges(true);
   };
 
-  const removeQuickLink = (id: string) => {
-    setSettings({
-      ...settings,
-      quickLinks: settings.quickLinks.filter((link) => link.id !== id),
-    });
-    setHasChanges(true);
+  const removeColumn = (index: number) => {
+    const newColumns = [...config.columns];
+    newColumns.splice(index, 1);
+    setConfig({ ...config, columns: newColumns });
   };
 
-  const updateQuickLink = (id: string, field: keyof FooterLink, value: string | boolean) => {
-    setSettings({
-      ...settings,
-      quickLinks: settings.quickLinks.map((link) =>
-        link.id === id ? { ...link, [field]: value } : link
-      ),
-    });
-    setHasChanges(true);
+  const updateColumnTitle = (index: number, title: string) => {
+    const newColumns = [...config.columns];
+    newColumns[index].title = title;
+    setConfig({ ...config, columns: newColumns });
   };
 
-  const addLegalLink = () => {
-    setSettings({
-      ...settings,
-      legalLinks: [...settings.legalLinks, { id: Date.now().toString(), label: 'New Link', href: '/', isExternal: false }],
-    });
-    setHasChanges(true);
+  const addLink = (columnIndex: number) => {
+    const newColumns = [...config.columns];
+    newColumns[columnIndex].links.push({ label: 'New Link', href: '#' });
+    setConfig({ ...config, columns: newColumns });
   };
 
-  const removeLegalLink = (id: string) => {
-    setSettings({
-      ...settings,
-      legalLinks: settings.legalLinks.filter((link) => link.id !== id),
-    });
-    setHasChanges(true);
+  const removeLink = (columnIndex: number, linkIndex: number) => {
+    const newColumns = [...config.columns];
+    newColumns[columnIndex].links.splice(linkIndex, 1);
+    setConfig({ ...config, columns: newColumns });
   };
 
-  const updateLegalLink = (id: string, field: keyof FooterLink, value: string | boolean) => {
-    setSettings({
-      ...settings,
-      legalLinks: settings.legalLinks.map((link) =>
-        link.id === id ? { ...link, [field]: value } : link
-      ),
-    });
-    setHasChanges(true);
+  const updateLink = (columnIndex: number, linkIndex: number, field: keyof FooterLink, value: string) => {
+    const newColumns = [...config.columns];
+    newColumns[columnIndex].links[linkIndex][field] = value;
+    setConfig({ ...config, columns: newColumns });
   };
 
-  const updateSocialLink = (platform: string, field: 'url' | 'enabled', value: string | boolean) => {
-    setSettings({
-      ...settings,
-      socialLinks: settings.socialLinks.map((link) =>
-        link.platform === platform ? { ...link, [field]: value } : link
-      ),
+  // --- Socials Management ---
+  const addSocial = () => {
+    setConfig({
+      ...config,
+      socials: [...config.socials, { platform: 'facebook', url: '' }]
     });
-    setHasChanges(true);
   };
+
+  const removeSocial = (index: number) => {
+    const newSocials = [...config.socials];
+    newSocials.splice(index, 1);
+    setConfig({ ...config, socials: newSocials });
+  };
+
+  const updateSocial = (index: number, field: keyof FooterSocial, value: string) => {
+    const newSocials = [...config.socials];
+    newSocials[index][field] = value;
+    setConfig({ ...config, socials: newSocials });
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+    </div>
+  );
 
   return (
     <motion.div
       initial="hidden"
       animate="visible"
       variants={staggerContainer}
-      className="space-y-8"
+      className="space-y-8 pb-20"
     >
       {/* Header */}
-      <motion.div variants={fadeInUp} className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            <LinkIcon className="w-8 h-8 text-primary-600" />
-            Footer Settings
+            <Layout className="w-8 h-8 text-primary-600" />
+            Footer CMS
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Manage footer links and social media connections
+          <p className="text-slate-500 dark:text-slate-400">
+            Customize your website''s footer layout, links, and information.
           </p>
         </div>
-        <Button onClick={handleSave} isLoading={isSaving} disabled={!hasChanges}>
+        <Button onClick={handleSave} disabled={saving} className="shadow-lg shadow-primary-500/20">
           <Save className="w-4 h-4 mr-2" />
-          Save Changes
+          {saving ? 'Saving...' : 'Save Changes'}
         </Button>
-      </motion.div>
+      </div>
 
-      {/* Quick Links */}
-      <motion.div variants={fadeInUp}>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column - General & Brand */}
+        <div className="lg:col-span-1 space-y-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-blue-500" />
+                Branding & Info
+              </CardTitle>
+              <CardDescription>Resort name and description</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
-                <CardTitle>Quick Links</CardTitle>
-                <CardDescription>Navigation links shown in the footer</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={addQuickLink}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Link
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {settings.quickLinks.map((link) => (
-                <div
-                  key={link.id}
-                  className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
-                >
-                  <GripVertical className="w-4 h-4 text-slate-400 cursor-grab" />
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Resort Name (Logo Text)</label>
+                <div className="flex gap-2">
                   <Input
-                    placeholder="Label"
-                    value={link.label}
-                    onChange={(e) => updateQuickLink(link.id, 'label', e.target.value)}
-                    className="flex-1"
+                    value={config.logo.text}
+                    onChange={(e) => setConfig({ ...config, logo: { ...config.logo, text: e.target.value } })}
+                    placeholder="V2 Resort"
                   />
-                  <Input
-                    placeholder="URL"
-                    value={link.href}
-                    onChange={(e) => updateQuickLink(link.id, 'href', e.target.value)}
-                    className="flex-1"
-                  />
-                  <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                    <input
-                      type="checkbox"
-                      checked={link.isExternal}
-                      onChange={(e) => updateQuickLink(link.id, 'isExternal', e.target.checked)}
-                      className="rounded"
-                    />
-                    <ExternalLink className="w-4 h-4" />
-                  </label>
-                  <Button variant="ghost" size="sm" onClick={() => removeQuickLink(link.id)}>
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Legal Links */}
-      <motion.div variants={fadeInUp}>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Legal Links</CardTitle>
-                <CardDescription>Legal and policy pages</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={addLegalLink}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Link
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {settings.legalLinks.map((link) => (
-                <div
-                  key={link.id}
-                  className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
-                >
-                  <GripVertical className="w-4 h-4 text-slate-400 cursor-grab" />
-                  <Input
-                    placeholder="Label"
-                    value={link.label}
-                    onChange={(e) => updateLegalLink(link.id, 'label', e.target.value)}
-                    className="flex-1"
-                  />
-                  <Input
-                    placeholder="URL"
-                    value={link.href}
-                    onChange={(e) => updateLegalLink(link.id, 'href', e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button variant="ghost" size="sm" onClick={() => removeLegalLink(link.id)}>
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Social Links */}
-      <motion.div variants={fadeInUp}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Social Media</CardTitle>
-            <CardDescription>Connect your social media profiles</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {settings.socialLinks.map((social) => {
-                const Icon = socialIcons[social.platform];
-                return (
-                  <div
-                    key={social.platform}
-                    className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-colors ${
-                      social.enabled
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                        : 'border-slate-200 dark:border-slate-700'
-                    }`}
+                  <Button
+                    variant={config.logo.showIcon ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setConfig({ ...config, logo: { ...config.logo, showIcon: !config.logo.showIcon } })}
+                    title="Toggle Icon"
                   >
-                    <Icon className={`w-6 h-6 ${social.enabled ? 'text-primary-600' : 'text-slate-400'}`} />
-                    <div className="flex-1">
-                      <p className="font-medium capitalize text-slate-900 dark:text-white">{social.platform}</p>
-                      <Input
-                        placeholder={`https://${social.platform}.com/...`}
-                        value={social.url}
-                        onChange={(e) => updateSocialLink(social.platform, 'url', e.target.value)}
-                        className="mt-2"
-                      />
+                    <CheckCircle2 className={`w-4 h-4 ${config.logo.showIcon ? 'text-white' : 'text-slate-400'}`} />
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Footer Description</label>
+                <textarea
+                  className="w-full min-h-[100px] p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  value={config.description}
+                  onChange={(e) => setConfig({ ...config, description: e.target.value })}
+                  placeholder="A short description of your resort..."
+                />
+              </div>
+              <div className="space-y-3 pt-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase">Contact Display</p>
+                {[
+                  { key: 'showAddress', label: 'Show Address' },
+                  { key: 'showPhone', label: 'Show Phone' },
+                  { key: 'showEmail', label: 'Show Email' }
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center gap-3 cursor-pointer group">
+                    <div
+                      className={`w-10 h-6 rounded-full p-1 transition-colors duration-200 ${config.contact[item.key as keyof typeof config.contact] ? 'bg-primary-600' : 'bg-slate-200 dark:bg-slate-700'}`}
+                      onClick={() => setConfig({
+                        ...config,
+                        contact: { ...config.contact, [item.key]: !config.contact[item.key as keyof typeof config.contact] }
+                      })}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${config.contact[item.key as keyof typeof config.contact] ? 'translate-x-4' : 'translate-x-0'}`} />
                     </div>
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={social.enabled}
-                        onChange={(e) => updateSocialLink(social.platform, 'enabled', e.target.checked)}
-                        className="w-5 h-5 rounded"
-                      />
-                    </label>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+                    <span className="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-900 transition-colors">{item.label}</span>
+                  </label>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Copyright */}
-      <motion.div variants={fadeInUp}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Copyright Text</CardTitle>
-            <CardDescription>Use {'{year}'} to insert the current year automatically</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Input
-              value={settings.copyrightText}
-              onChange={(e) => {
-                setSettings({ ...settings, copyrightText: e.target.value });
-                setHasChanges(true);
-              }}
-              placeholder="© {year} Your Company. All rights reserved."
-            />
-          </CardContent>
-        </Card>
-      </motion.div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Facebook className="w-5 h-5 text-blue-600" />
+                Social Media
+              </CardTitle>
+              <CardDescription>Links to your social profiles</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <AnimatePresence>
+                {config.socials.map((social, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="flex gap-2"
+                  >
+                    <select
+                      className="w-1/3 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                      value={social.platform}
+                      onChange={(e) => updateSocial(idx, 'platform', e.target.value)}
+                    >
+                      <option value="facebook">Facebook</option>
+                      <option value="instagram">Instagram</option>
+                      <option value="twitter">Twitter</option>
+                      <option value="youtube">Youtube</option>
+                      <option value="tiktok">TikTok</option>
+                    </select>
+                    <Input
+                      className="flex-1"
+                      placeholder="URL"
+                      value={social.url}
+                      onChange={(e) => updateSocial(idx, 'url', e.target.value)}
+                    />
+                    <Button variant="ghost" size="icon" onClick={() => removeSocial(idx)} className="text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              <Button variant="outline" className="w-full text-xs" onClick={addSocial}>
+                <Plus className="w-3 h-3 mr-1" /> Add Social Profile
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Type className="w-5 h-5 text-slate-600" />
+                Copyright
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Input
+                value={config.copyright}
+                onChange={(e) => setConfig({ ...config, copyright: e.target.value })}
+                placeholder="© {year} V2 Resort. All rights reserved."
+              />
+              <p className="text-xs text-slate-500 mt-2">Use {'{year}'} to insert the current year.</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Links Columns Builder */}
+        <div className="lg:col-span-2 space-y-8">
+          <Card className="min-h-full">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-purple-500" />
+                  Footer Navigation
+                </CardTitle>
+                <CardDescription>Manage your footer columns and links</CardDescription>
+              </div>
+              <Button onClick={addColumn} size="sm" variant="outline" className="text-primary-600 border-primary-100 bg-primary-50">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Column
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {config.columns.map((column, colIdx) => (
+                  <motion.div
+                    key={colIdx}
+                    variants={fadeInUp}
+                    className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20 relative group"
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <GripVertical className="w-4 h-4 text-slate-300 cursor-grab" />
+                      <Input
+                        value={column.title}
+                        onChange={(e) => updateColumnTitle(colIdx, e.target.value)}
+                        className="font-bold border-none bg-transparent focus:ring-0 px-0 h-auto text-lg"
+                        placeholder="Column Title"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeColumn(colIdx)}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <AnimatePresence>
+                        {column.links.map((link, linkIdx) => (
+                          <motion.div
+                            key={linkIdx}
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-lg shadow-sm"
+                          >
+                            <Input
+                              value={link.label}
+                              onChange={(e) => updateLink(colIdx, linkIdx, 'label', e.target.value)}
+                              placeholder="Label"
+                              className="text-xs h-8 flex-1"
+                            />
+                            <Input
+                              value={link.href}
+                              onChange={(e) => updateLink(colIdx, linkIdx, 'href', e.target.value)}
+                              placeholder="URL"
+                              className="text-xs h-8 flex-1"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-400 hover:text-red-500"
+                              onClick={() => removeLink(colIdx, linkIdx)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                      <Button
+                        variant="ghost"
+                        className="w-full text-xs h-8 border border-dashed border-slate-300 dark:border-slate-700 hover:border-primary-300 hover:text-primary-600"
+                        onClick={() => addLink(colIdx)}
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Add Link
+                      </Button>
+                    </div>
+                  </motion.div>
+                ))}
+
+                {config.columns.length === 0 && (
+                  <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                    <Layers className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                    <p className="text-slate-500">No columns added yet. Use the button above to start.</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </motion.div>
   );
 }

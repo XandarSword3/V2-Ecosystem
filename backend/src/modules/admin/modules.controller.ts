@@ -36,11 +36,14 @@ export async function getModule(req: Request, res: Response, next: NextFunction)
     const { id } = req.params;
 
     // Try to fetch by id first
-    let { data, error } = await supabase
+    const { data: initialData, error: initialError } = await supabase
       .from('modules')
       .select('*')
       .eq('id', id)
       .single();
+
+    let data = initialData;
+    const error = initialError;
 
     // If not found by id, try slug
     if ((error || !data) && id) {

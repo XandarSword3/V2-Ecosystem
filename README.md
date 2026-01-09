@@ -1,63 +1,216 @@
-# V2 Resort Management Platform
-## Own Your Hospitality Software. One Payment. Forever.
 
-**Break free from monthly subscription fees.** This is a complete, white-label resort management system you purchase once and own permanently. Deploy it under your brand, modify it without restrictions, and eliminate recurring software costs that compound into six figures over five years. While competitors charge $300–$800 monthly plus transaction fees, you pay once and the software is yours.
+# V2 Resort Management Platform – Technical Overview
 
-> **Live Demo**: [https://v2-ecosystem.vercel.app](https://v2-ecosystem.vercel.app)  
-> **Backend API**: [https://v2-resort-backend.onrender.com](https://v2-resort-backend.onrender.com)
+## Overview
+V2 Resort is a modular, full-stack hospitality management platform designed for independent deployment, extensibility, and security. It provides a unified solution for restaurant, accommodation, pool, and activity management, with a focus on maintainability, scalability, and operational autonomy.
 
 ---
 
-## The Problem with Current Hospitality Software
+## Architecture
 
-Independent resorts, hotels, and hospitality businesses face a fragmented technology landscape. You're likely managing reservations in one system, restaurant orders in another, and point-of-sale through a third provider. Each system charges monthly fees. Each system locks you into their upgrade cycle, their feature roadmap, and their pricing changes. When you want to add a new revenue stream—a spa, an activity booking system, a retail shop—you either pay for another subscription or hire developers to build custom integrations.
+### Frontend
+- **Framework:** Next.js 14 (App Router), React, TypeScript
+- **Styling:** Tailwind CSS, Framer Motion
+- **State/Async:** React Query, Zustand
+- **i18n:** next-intl (English, Arabic RTL, French)
+- **Real-time:** Socket.io client
+- **Validation:** Zod
+- **Payments:** Stripe integration
+- **Other:** Lucide React icons, QR code generation/scanning
 
-**The math is brutal.** A typical resort using separate SaaS platforms for reservations ($400/month), restaurant management ($350/month), and property management ($450/month) pays $14,400 annually. Over five years, that's $72,000 in software fees alone—before counting transaction fees, which add 2-3% to every booking and order. On $500,000 in annual revenue, transaction fees cost another $10,000–$15,000 per year.
+### Backend
+- **Framework:** Node.js, Express, TypeScript
+- **Database:** PostgreSQL (via Supabase)
+- **Real-time:** Socket.io
+- **Security:** JWT (access/refresh), Bcrypt, Helmet, CORS, rate limiting, Zod validation
+- **Logging:** Winston, morgan
+- **Email:** Nodemailer (SMTP)
+- **Payments:** Stripe
+- **Containerization:** Docker Compose (frontend, backend, PostgreSQL, Redis, nginx)
 
-This system solves that problem permanently.
-
----
-
-## Value Proposition: What You Actually Get
-
-### One-Time Purchase, Perpetual Ownership
-Pay once. Receive complete source code with unlimited modification rights. Deploy to your own infrastructure under your own branding. No monthly fees. No transaction percentages. No vendor dependency. The software runs on your servers, connects to your database, and processes your customer transactions without sending data to third parties or requiring ongoing payments.
-
-### Five-Year Cost Comparison
-
-| Solution | Year 1 | Year 2 | Year 3 | Year 4 | Year 5 | **Total** |
-|----------|--------|--------|--------|--------|--------|-----------|
-| **Multi-SaaS Stack** | $14,400 + $12,500* | $14,400 + $12,500* | $14,400 + $12,500* | $14,400 + $12,500* | $14,400 + $12,500* | **$134,500** |
-| **Enterprise SaaS** | $18,000 + $15,000* | $18,000 + $15,000* | $18,000 + $15,000* | $18,000 + $15,000* | $18,000 + $15,000* | **$165,000** |
-| **V2 Resort Platform** | Purchase** + $1,200*** | $1,200 | $1,200 | $1,200 | $1,200 | **~$6,000–$8,000** |
-
-*Transaction fees at 2.5% on $500K annual revenue  
-**One-time purchase (contact for pricing)  
-***Hosting costs only ($50–$150/month depending on scale)
-
-**Break-even point: 18-24 months.** After that, every year represents pure cost savings compared to subscription alternatives.
-
-### White-Label Flexibility That Scales
-The entire platform operates under your branding. Your logo. Your colors. Your domain. Your email templates. Your policies. When you expand to a second property, you deploy the same system with different branding at zero additional software cost. When you franchise or manage multiple properties, each location runs its own isolated instance without per-location licensing fees.
-
-For operators planning to grow from one property to three or five, this architectural advantage compounds. Three properties on SaaS subscriptions cost three times as much. Three properties on V2 Resort Platform cost the same software price plus minimal incremental hosting—roughly $2,400 annually in infrastructure versus $43,200 in subscriptions and transaction fees.
-
-### Real-Time Operational Control Without Friction
-Every menu item, price, photo, description, booking rule, and capacity limit lives in your database under your control. Staff with proper permissions modify these elements through the admin interface without contacting support or waiting for vendor approval. When your chef creates a seasonal menu, they upload it immediately. When you adjust chalet pricing for holiday periods, you set the rates directly. When you want to change your homepage hero image, you replace it through the settings panel.
-
-This operational autonomy eliminates the productivity drag of waiting for vendor support while maintaining security through role-based access control. Your staff move as fast as your business requires.
+### Database
+- **Engine:** PostgreSQL (ACID, row-level locking, foreign keys, indexes)
+- **Schema:** Modular (users, roles, permissions, modules, menu, orders, bookings, tickets, settings, audit logs, etc.)
+- **Migrations:** SQL scripts and TypeScript migration utilities
 
 ---
 
-## Complete Operational Capabilities
+## Core Features
 
-### Guest Experience: Seamless From Browse to Checkout
+### Modular Business Units
+- **Module system**: Enable/disable business units (restaurant, chalets, pool, snack bar, etc.) via admin UI
+- **Templates:**
+	- Menu Service (restaurant, retail, spa)
+	- Multi-Day Booking (chalets, rooms, rentals)
+	- Session Access (pool, events, classes)
+- **Dynamic configuration:** Add new modules without code changes using templates
 
-#### 🍽️ Restaurant & Dining Operations
-Guests browse your full menu in their preferred language—**English, Arabic, or French**—with automatic translation of item names, descriptions, and allergen information. They filter by dietary requirements (vegetarian, gluten-free, vegan) and search for specific dishes. The menu displays real-time availability; if the kitchen runs out of an item, it's marked unavailable immediately. Guests select dine-in, takeaway, or delivery, add items to cart with special instructions, and complete checkout with integrated payment processing. Confirmation arrives via email with an order reference number and estimated preparation time.
+### Guest-Facing
+- **Multi-language UI:** English, Arabic (RTL), French
+- **Menu browsing:** Dietary filters, real-time availability, search, photos, allergen tags
+- **Booking:** Real-time calendar, dynamic pricing, add-ons, conflict prevention, QR code confirmations
+- **Pool/Activity:** Session-based ticketing, capacity enforcement, QR validation
+- **Payments:** Stripe integration, secure checkout
 
-#### 🏡 Chalet & Accommodation Bookings
-The booking interface shows available chalets with photo galleries, amenity lists, capacity limits, and dynamic pricing that adjusts for weekends and holidays. Guests check availability for specific date ranges using an interactive calendar that displays real-time availability. They add optional services—BBQ equipment, jacuzzi access, early check-in, late checkout—with pricing calculated automatically. The system prevents double-bookings through database-level locking. After payment, guests receive booking confirmation with QR codes, check-in instructions, and cancellation policy details.
+### Staff/Admin
+- **Kitchen display:** Real-time order queue, status workflow, timestamps
+- **Check-in dashboard:** Daily arrivals, payment status, special requests
+- **Order tracking:** Socket.io push updates, notifications
+- **Menu/inventory:** CRUD for categories/items, allergen/availability, photo upload
+- **Booking management:** Pricing rules, add-ons, calendar, block dates, occupancy view
+- **User/role management:** RBAC, audit logs, per-module access
+- **Branding:** White-label settings (logo, colors, email templates, policies)
+- **Reports:** Revenue, occupancy, order volume, CSV/JSON export, time-series charts
+
+---
+
+## Security
+
+### Authentication & Authorization
+- JWT (access: 15min, refresh: 7d)
+- RBAC (admin, staff, manager, per-module roles)
+- Password reset via email (tokenized)
+- Device/session tracking
+- Rate limiting (auth endpoints, general API)
+
+### Input & Data Validation
+- Zod schemas for all API input
+- TypeScript types throughout
+- Sanitization against XSS
+- Parameterized queries (SQL injection prevention)
+- Module guards for business unit isolation
+
+### Infrastructure
+- Helmet.js (CSP, HSTS, XSS headers)
+- CORS (configurable, origin whitelisting)
+- Bcrypt password hashing (salted)
+- Environment variable management for all secrets
+- Dockerized deployment (isolation, reproducibility)
+
+### Auditing & Logging
+- Winston structured logs
+- Audit logs (user actions, data changes)
+- Request/response logging (morgan)
+
+---
+
+## API Overview
+
+### Auth
+- POST /api/auth/register, /login, /logout, /refresh, /forgot-password, /reset-password, /me
+
+### Restaurant
+- GET /api/restaurant/menu, /categories
+- POST /api/restaurant/orders
+- GET /api/restaurant/orders
+- PATCH /api/restaurant/orders/:id/status
+
+### Chalets
+- GET /api/chalets, /:id, /:id/availability
+- POST /api/chalets/bookings
+- GET /api/chalets/bookings
+
+### Pool
+- GET /api/pool/sessions
+- POST /api/pool/tickets
+- GET /api/pool/tickets/:id
+- POST /api/pool/tickets/validate
+
+### Admin
+- GET /api/admin/dashboard, /users, /modules, /settings
+- POST /api/admin/users
+- PATCH /api/admin/modules/:id, /settings
+
+---
+
+## Database Schema (Summary)
+
+- **users, roles, user_roles, permissions**: Auth, RBAC
+- **modules**: Business unit config
+- **menu_categories, menu_items, restaurant_orders, restaurant_order_items**: Restaurant
+- **chalets, chalet_bookings, chalet_add_ons, chalet_price_rules**: Accommodation
+- **pool_sessions, pool_tickets**: Pool/activity
+- **payments, notifications, audit_logs, site_settings, email_templates**: Cross-cutting
+
+See `backend/src/database/migration.sql` for full schema.
+
+---
+
+## Environment Variables
+
+### Backend
+```
+PORT=3001
+NODE_ENV=production
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_KEY=...
+JWT_SECRET=...
+JWT_REFRESH_SECRET=...
+SMTP_HOST=...
+SMTP_PORT=587
+SMTP_USER=...
+SMTP_PASS=...
+SMTP_FROM=...
+SMTP_FROM_NAME=...
+FRONTEND_URL=...
+STRIPE_SECRET_KEY=...
+STRIPE_WEBHOOK_SECRET=...
+```
+
+### Frontend
+```
+NEXT_PUBLIC_API_URL=...
+NEXT_PUBLIC_SOCKET_URL=...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=...
+```
+
+---
+
+## Deployment
+
+### Development
+1. Clone repo, install dependencies in `backend/` and `frontend/`
+2. Configure `.env` files (see above)
+3. Run migrations: `npm run migrate` (backend)
+4. Start servers: `npm run dev` (both)
+
+### Production
+- Use Docker Compose for full stack (frontend, backend, db, redis, nginx)
+- Or deploy frontend (Vercel/Netlify) and backend (VPS/cloud)
+- Configure environment variables for each service
+
+---
+
+## Performance
+
+- Redis caching (backend)
+- DB indexing, connection pooling
+- Static generation (frontend)
+- React Query caching
+- Image optimization (Next.js)
+
+---
+
+## Troubleshooting
+
+- **DB connection:** Check Supabase credentials, network, permissions
+- **Frontend/backend:** Verify API URLs, CORS, server status
+- **Email:** Validate SMTP config, test with email client
+- **Modules:** Ensure enabled in DB, check route slugs
+- **WebSocket:** Confirm Socket.io URL, firewall, CORS
+
+---
+
+## License
+
+Proprietary. See LICENSE for terms.
+
+---
+
+## Credits
+
+Built by the V2 Resort development team. Key dependencies: Next.js, React, PostgreSQL, Supabase, Stripe.
 
 #### 🏊 Pool & Activity Access
 Guests purchase day passes for pool access with session-based pricing. The system displays current capacity and blocks sales when the session reaches maximum occupancy, preventing overcrowding and compliance issues. Tickets generate with unique QR codes that staff scan at entry for validation. The same framework extends to any session-based activity—spa appointments, guided tours, equipment rentals—without custom development.

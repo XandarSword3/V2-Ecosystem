@@ -5,6 +5,16 @@ import { logActivity } from "../../utils/activityLogger";
 import { createUserSchema, validateBody, validatePagination } from "../../validation/schemas.js";
 import dayjs from 'dayjs';
 
+// Helper to derive canonical slug from permission object
+function deriveSlugFromPerm(perm: any): string | null {
+  if (!perm) return null;
+  if (perm.slug) return perm.slug;
+  if (perm.name && typeof perm.name === 'string' && perm.name.includes('.')) return perm.name;
+  if (perm.resource && perm.action) return `${perm.resource}.${perm.action}`;
+  if (perm.name && typeof perm.name === 'string') return perm.name.toLowerCase().replace(/\s+/g, '.');
+  return null;
+}
+
 // ============================================
 // Dashboard
 // ============================================
@@ -394,16 +404,6 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
       if (error) throw error;
       if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-      // Helper to derive canonical slug
-      function deriveSlugFromPerm(perm: any) {
-        if (!perm) return null;
-        if (perm.slug) return perm.slug;
-        if (perm.name && typeof perm.name === 'string' && perm.name.includes('.')) return perm.name;
-        if (perm.resource && perm.action) return `${perm.resource}.${perm.action}`;
-        if (perm.name && typeof perm.name === 'string') return perm.name.toLowerCase().replace(/\s+/g, '.');
-        return null;
-      }
-
       const rolePermissions = new Set<string>();
       const effectivePermissions = new Set<string>();
 
@@ -485,16 +485,6 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
         .select('is_granted,permission_id,permissions(id,slug,name,resource,action)')
         .eq('user_id', id);
       if (userPermErr) throw userPermErr;
-
-      // Helper deriveSlug
-      function deriveSlugFromPerm(perm: any) {
-        if (!perm) return null;
-        if (perm.slug) return perm.slug;
-        if (perm.name && typeof perm.name === 'string' && perm.name.includes('.')) return perm.name;
-        if (perm.resource && perm.action) return `${perm.resource}.${perm.action}`;
-        if (perm.name && typeof perm.name === 'string') return perm.name.toLowerCase().replace(/\s+/g, '.');
-        return null;
-      }
 
       const rolePermissions = new Set<string>();
       const effectivePermissions = new Set<string>();
@@ -776,7 +766,11 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
     // Combine all settings into a flat object
     const combinedSettings: Record<string, any> = {};
     (settings || []).forEach((s: any) => {
-      if (typeof s.value === 'object') {
+      // Store keyed setting for specific CMS access
+      combinedSettings[s.key] = s.value;
+
+      // Also flatten for legacy support
+      if (typeof s.value === 'object' && s.value !== null) {
         Object.assign(combinedSettings, s.value);
       }
     });

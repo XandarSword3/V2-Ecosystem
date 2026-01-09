@@ -15,7 +15,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
 
     const order = await orderService.createOrder({
       customerName: validatedData.customerName || 'Guest',
-      customerPhone: validatedData.customerPhone || undefined,
+      customerPhone: validatedData.customerPhone ?? undefined,
       orderType: validatedData.orderType as any,
       items: formattedItems,
       paymentMethod: validatedData.paymentMethod as any,

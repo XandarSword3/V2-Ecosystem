@@ -2,6 +2,16 @@ import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection";
 import { getOnlineUsers } from "../../socket";
 
+// Helper to derive a canonical slug from legacy fields
+function deriveSlugFromPerm(perm: any): string | null {
+  if (!perm) return null;
+  if (perm.slug) return perm.slug;
+  if (perm.name && typeof perm.name === 'string' && perm.name.includes('.')) return perm.name;
+  if (perm.resource && perm.action) return `${perm.resource}.${perm.action}`;
+  if (perm.name && typeof perm.name === 'string') return perm.name.toLowerCase().replace(/\s+/g, '.');
+  return null;
+}
+
 // Get users with advanced filtering and online status
 export async function getUsers(req: Request, res: Response, next: NextFunction) {
   try {
@@ -155,16 +165,6 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
 
     if (error) throw error;
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-
-    // Helper to derive a canonical slug from legacy fields
-    function deriveSlugFromPerm(perm: any) {
-      if (!perm) return null;
-      if (perm.slug) return perm.slug;
-      if (perm.name && typeof perm.name === 'string' && perm.name.includes('.')) return perm.name;
-      if (perm.resource && perm.action) return `${perm.resource}.${perm.action}`;
-      if (perm.name && typeof perm.name === 'string') return perm.name.toLowerCase().replace(/\s+/g, '.');
-      return null;
-    }
 
     // Flatten permissions structure
     const rolePermissions = new Set<string>();
