@@ -20,6 +20,7 @@ import paymentRoutes from './modules/payments/payment.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import reviewsRoutes from './modules/reviews/reviews.routes.js';
 import supportRoutes from './modules/support/support.routes.js';
+import themeRoutes from './modules/theme/theme.routes.js';
 import * as modulesController from './modules/admin/modules.controller.js';
 import { requireModule, clearModuleCache } from './middleware/moduleGuard.middleware.js';
 
@@ -172,6 +173,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/theme', themeRoutes);
 
 // Export clearModuleCache for use when modules are updated
 export { clearModuleCache };

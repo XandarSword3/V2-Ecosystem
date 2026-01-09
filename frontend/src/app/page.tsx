@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
-import { 
-  UtensilsCrossed, 
-  Home, 
-  Waves, 
+import {
+  UtensilsCrossed,
+  Home,
+  Waves,
   Cookie,
   ChevronRight,
   MapPin,
@@ -227,7 +227,7 @@ export default function HomePage() {
         {/* Wave bottom border */}
         <div className="absolute bottom-0 left-0 right-0">
           <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
-            <path d="M0 120L60 105C120 90 240 60 360 45C480 30 600 30 720 37.5C840 45 960 60 1080 67.5C1200 75 1320 75 1380 75L1440 75V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" className="fill-resort-sand dark:fill-slate-900"/>
+            <path d="M0 120L60 105C120 90 240 60 360 45C480 30 600 30 720 37.5C840 45 960 60 1080 67.5C1200 75 1320 75 1380 75L1440 75V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" className="fill-resort-sand dark:fill-slate-900" />
           </svg>
         </div>
       </section>
@@ -286,7 +286,7 @@ export default function HomePage() {
                     <p className="text-slate-600 dark:text-slate-400 mb-4">
                       {service.description}
                     </p>
-                    
+
                     <div className="flex items-center text-primary-600 dark:text-primary-400 font-medium">
                       <span>{tCommon('learnMore')}</span>
                       <motion.div
@@ -314,7 +314,7 @@ export default function HomePage() {
       <section className="py-24 bg-white dark:bg-slate-800 relative overflow-hidden">
         {/* Background decoration */}
         <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary-50 dark:from-primary-900/20 to-transparent" />
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <motion.div
@@ -485,104 +485,6 @@ export default function HomePage() {
       {/* Live Chat Widget */}
       <LiveChatWidget />
 
-      {/* Footer */}
-      <footer className="bg-slate-900 dark:bg-slate-950 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 mb-12">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-            >
-              <div className="flex items-center space-x-2 mb-4">
-                <motion.div 
-                  whileHover={{ rotate: 360 }}
-                  transition={{ duration: 0.5 }}
-                  className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center"
-                >
-                  <span className="text-white font-bold text-xl">{settings.resortName ? settings.resortName.substring(0, 2) : 'V2'}</span>
-                </motion.div>
-                <span className="text-xl font-semibold">{settings.resortName ? settings.resortName.substring(2) : 'Resort'}</span>
-              </div>
-              <p className="text-slate-400">
-                {settings.description || tFooter('description')}
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-            >
-              <h4 className="font-semibold mb-4">{tFooter('quickLinks')}</h4>
-              <ul className="space-y-2 text-slate-400">
-                {[
-                  { name: tNav('restaurant'), href: '/restaurant' },
-                  { name: tNav('snackBar'), href: '/snack-bar' },
-                  { name: tNav('chalets'), href: '/chalets' },
-                  { name: tNav('pool'), href: '/pool' },
-                ].map((link) => (
-                  <li key={link.name}>
-                    <Link href={link.href} className="hover:text-white transition-colors">
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-            >
-              <h4 className="font-semibold mb-4">{tFooter('legal')}</h4>
-              <ul className="space-y-2 text-slate-400">
-                {[
-                  { name: tFooter('privacyPolicy'), href: '/privacy' },
-                  { name: tFooter('termsOfService'), href: '/terms' },
-                  { name: tFooter('cancellationPolicy'), href: '/cancellation' },
-                ].map((link) => (
-                  <li key={link.name}>
-                    <Link href={link.href} className="hover:text-white transition-colors">
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3 }}
-            >
-              <h4 className="font-semibold mb-4">{tFooter('contact')}</h4>
-              <ul className="space-y-3 text-slate-400">
-                <li className="flex items-center gap-3">
-                  <MapPin className="w-5 h-5 text-primary-400" />
-                  <span>{settings.address || tFooter('address')}</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-primary-400" />
-                  <span>{settings.phone || tFooter('phone')}</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Mail className="w-5 h-5 text-primary-400" />
-                  <span>{settings.email || tFooter('email')}</span>
-                </li>
-              </ul>
-            </motion.div>
-          </div>
-
-          <div className="border-t border-slate-800 dark:border-slate-700 pt-8 text-center text-slate-400 dark:text-slate-500">
-            <p>{tFooter('copyright', { year: new Date().getFullYear() })}</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

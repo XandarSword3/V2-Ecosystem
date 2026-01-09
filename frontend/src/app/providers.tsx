@@ -8,7 +8,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getLocaleFromCookie, defaultLocale, type Locale } from '@/i18n';
 import { LoadingScreen } from '@/components/effects/LoadingScreen';
 import { SettingsProvider } from '@/lib/settings-context';
-import { ThemeInjector } from '@/components/ThemeInjector';
+import { ThemeStyling } from '@/components/ThemeStyling';
 
 // Import all messages statically to avoid async loading issues
 import enMessages from '../../messages/en.json';
@@ -69,7 +69,7 @@ export function Providers({ children }: ProvidersProps) {
         <ThemeProvider>
           <AuthProvider>
             <SettingsProvider>
-              <ThemeInjector />
+              <ThemeStyling />
               <LoadingScreen />
               {children}
             </SettingsProvider>
