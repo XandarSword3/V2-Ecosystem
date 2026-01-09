@@ -20,6 +20,11 @@ export async function getModules(req: Request, res: Response, next: NextFunction
       query = query.eq('is_active', true);
     }
 
+    // Optionally filter by show_in_main if requested
+    if (req.query.showInMain === 'true') {
+      query = query.eq('show_in_main', true);
+    }
+
     const { data, error } = await query;
 
     if (error) throw error;
