@@ -120,7 +120,11 @@ async function callTranslateAPI(text: string, source: string, target: string): P
   });
 
   if (!response.ok) {
-    throw new Error(`Translation API error: ${response.status}`);
+    let bodyText = '';
+    try {
+      bodyText = await response.text();
+    } catch (e) {}
+    throw new Error(`Translation API error: ${response.status} ${bodyText}`);
   }
 
   const data = await response.json() as { translatedText?: string };
