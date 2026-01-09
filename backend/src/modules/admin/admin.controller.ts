@@ -763,17 +763,17 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
 
     if (error) throw error;
 
-    // Combine all settings into a flat object
+    // Combine all settings into a flat object, but flatten 'appearance' key into root
     const combinedSettings: Record<string, any> = {};
     (settings || []).forEach((s: any) => {
       // Store keyed setting for specific CMS access
       combinedSettings[s.key] = s.value;
-
-      // Also flatten for legacy support
-      if (typeof s.value === 'object' && s.value !== null) {
-        Object.assign(combinedSettings, s.value);
-      }
     });
+
+    // Flatten 'appearance' key into root if present
+    if (combinedSettings.appearance && typeof combinedSettings.appearance === 'object') {
+      Object.assign(combinedSettings, combinedSettings.appearance);
+    }
 
     // If no settings in DB, return defaults
     if (Object.keys(combinedSettings).length === 0) {
@@ -817,31 +817,36 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
     const settings = req.body;
     const userId = req.user?.userId;
 
-    // Support single key update if format is { key: '...', value: {...} }
-    if (settings.key && settings.value !== undefined) {
-      const { error } = await supabase
-        .from('site_settings')
-        .upsert({
-          key: settings.key,
-          value: settings.value,
-          updated_at: new Date().toISOString(),
-          updated_by: userId,
-        }, { onConflict: 'key' });
+    // Always upsert the 'appearance' key with the latest theme and related settings
+    const appearanceSettings = {
+      theme: settings.theme,
+      themeColors: settings.themeColors,
+      animationsEnabled: settings.animationsEnabled,
+      reducedMotion: settings.reducedMotion,
+      soundEnabled: settings.soundEnabled,
+    };
 
-      if (error) throw error;
+    const { error: appearanceError } = await supabase
+      .from('site_settings')
+      .upsert({
+        key: 'appearance',
+        value: appearanceSettings,
+        updated_at: new Date().toISOString(),
+        updated_by: userId,
+      }, { onConflict: 'key' });
 
-      // Emit specific update
-      emitToAll('settings.updated', { [settings.key]: settings.value });
+    if (appearanceError) throw appearanceError;
 
-      await logActivity({
-        user_id: userId!,
-        action: 'UPDATE_SETTINGS',
-        resource: `settings:${settings.key}`,
-        new_value: settings.value
-      });
+    emitToAll('settings.updated', { appearance: appearanceSettings });
 
-      return res.json({ success: true, message: `Settings for ${settings.key} saved successfully` });
-    }
+    await logActivity({
+      user_id: userId!,
+      action: 'UPDATE_SETTINGS',
+      resource: 'settings:appearance',
+      new_value: appearanceSettings
+    });
+
+    // Optionally, upsert other settings categories as before
 
     // Legacy bulk update logic
     const generalSettings = {
@@ -882,10 +887,9 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       refundPolicy: settings.refundPolicy,
     };
 
-    const appearanceSettings = {
+    const appearanceSettingsAlt = {
       theme: settings.theme,
       themeColors: settings.themeColors,
-      weatherEffect: settings.weatherEffect,
       animationsEnabled: settings.animationsEnabled,
       reducedMotion: settings.reducedMotion,
       soundEnabled: settings.soundEnabled,

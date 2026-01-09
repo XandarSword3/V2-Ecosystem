@@ -134,7 +134,7 @@ export const modulesApi = {
   getById: (id: string) => api.get(`/admin/modules/${id}`),
   create: (data: any) => api.post('/admin/modules', data),
   update: (id: string, data: any) => api.put(`/admin/modules/${id}`, data),
-  delete: (id: string) => api.delete(`/admin/modules/${id}`),
+  delete: (id: string, force = false) => api.delete(`/admin/modules/${id}${force ? '?force=true' : ''}`),
 };
 
 // Payments API

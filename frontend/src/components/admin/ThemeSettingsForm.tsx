@@ -10,8 +10,6 @@ interface ThemeSettings {
   primary_color: string;
   secondary_color: string;
   font_family: string;
-  weather_widget_enabled: boolean;
-  weather_widget_location: string;
 }
 
 const fetchThemeSettings = async (): Promise<ThemeSettings> => {
@@ -115,32 +113,6 @@ export function ThemeSettingsForm() {
         />
       </div>
 
-      <div className="flex items-center">
-        <input
-          id="weather_widget_enabled"
-          type="checkbox"
-          {...register('weather_widget_enabled')}
-          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-        />
-        <label htmlFor="weather_widget_enabled" className="ml-2 block text-sm text-gray-700">
-          Enable Weather Widget
-        </label>
-      </div>
-
-      {/* Conditionally render location input if weather widget is enabled */}
-      {true && ( // This condition will be replaced by the actual state of weather_widget_enabled
-        <div>
-          <label htmlFor="weather_widget_location" className="block text-sm font-medium text-gray-700">
-            Weather Widget Location
-          </label>
-          <input
-            type="text"
-            id="weather_widget_location"
-            {...register('weather_widget_location')}
-            className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
-      )}
 
       <button
         type="submit"

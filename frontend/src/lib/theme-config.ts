@@ -2,7 +2,6 @@
 // Supports multiple resort themes configurable by admins
 
 export type ResortTheme = 'beach' | 'mountain' | 'sunset' | 'forest' | 'midnight';
-export type WeatherEffect = 'none' | 'sunny' | 'rain' | 'snow' | 'clouds';
 
 export interface ThemeConfig {
   id: ResortTheme;
@@ -183,13 +182,4 @@ export const resortThemes: Record<ResortTheme, ThemeConfig> = {
   },
 };
 
-export const weatherEffects: Record<WeatherEffect, { name: string; icon: string }> = {
-  none: { name: 'No Effect', icon: '🌤️' },
-  sunny: { name: 'Sunny Day', icon: '☀️' },
-  rain: { name: 'Gentle Rain', icon: '🌧️' },
-  snow: { name: 'Snowfall', icon: '❄️' },
-  clouds: { name: 'Floating Clouds', icon: '☁️' },
-};
-
 export const defaultTheme: ResortTheme = 'beach';
-export const defaultWeather: WeatherEffect = 'none';
