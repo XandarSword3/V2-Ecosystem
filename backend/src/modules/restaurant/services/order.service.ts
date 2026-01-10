@@ -194,16 +194,8 @@ export async function getOrderById(id: string) {
 }
 
 export async function getOrderStatus(id: string) {
-  const supabase = getSupabase();
-
-  const { data: order, error } = await supabase
-    .from('restaurant_orders')
-    .select('id, order_number, status, estimated_ready_time, actual_ready_time')
-    .eq('id', id)
-    .single();
-
-  if (error) throw error;
-  return order;
+  // Return full order details for confirmation page
+  return getOrderById(id);
 }
 
 export async function getOrdersByCustomer(customerId: string) {
