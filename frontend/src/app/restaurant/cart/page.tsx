@@ -47,7 +47,7 @@ export default function RestaurantCartPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [tableNumber, setTableNumber] = useState('');
-  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway'>('dine_in');
+  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
   const [notes, setNotes] = useState('');
 
@@ -80,6 +80,7 @@ export default function RestaurantCartPage() {
       toast.error(t('enterTableNumber'));
       return;
     }
+    // Delivery orders don't require table number
     if (restaurantItems.length === 0) {
       toast.error(t('cartEmpty'));
       return;
@@ -233,7 +234,7 @@ export default function RestaurantCartPage() {
                   <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
                     {t('orderType')}
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => setOrderType('dine_in')}
                       className={`p-3 rounded-lg border-2 text-center transition-all ${
@@ -253,6 +254,16 @@ export default function RestaurantCartPage() {
                       }`}
                     >
                       <span className="text-sm font-medium">{t('takeaway')}</span>
+                    </button>
+                    <button
+                      onClick={() => setOrderType('delivery')}
+                      className={`p-3 rounded-lg border-2 text-center transition-all ${
+                        orderType === 'delivery'
+                          ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                          : 'border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-sm font-medium">{t('delivery') || 'Delivery'}</span>
                     </button>
                   </div>
                 </div>
