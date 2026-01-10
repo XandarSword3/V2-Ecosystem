@@ -198,16 +198,40 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
 
 export async function getOrderStatus(req: Request, res: Response, next: NextFunction) {
   try {
+    // Return full order details for confirmation page
     const supabase = getSupabase();
-    const { data: order, error } = await supabase
+    const { data: order, error: orderError } = await supabase
       .from('snack_orders')
-      .select('id, order_number, status, estimated_ready_time')
+      .select('*')
       .eq('id', req.params.id)
       .single();
 
-    if (error) throw error;
+    if (orderError) {
+      if (orderError.code === 'PGRST116') {
+        return res.status(404).json({ success: false, error: 'Order not found' });
+      }
+      throw orderError;
+    }
 
-    res.json({ success: true, data: order });
+    // Get order items with snack item details
+    const { data: items, error: itemsError } = await supabase
+      .from('snack_order_items')
+      .select(`
+        id,
+        quantity,
+        unit_price,
+        subtotal,
+        snack_items (
+          id,
+          name,
+          image_url
+        )
+      `)
+      .eq('order_id', req.params.id);
+
+    if (itemsError) throw itemsError;
+
+    res.json({ success: true, data: { ...order, items: items || [] } });
   } catch (error) {
     next(error);
   }
