@@ -9,7 +9,44 @@ interface BackupResult {
     tables: string[];
 }
 
+const BACKUP_BUCKET_NAME = 'backups';
+
 export class BackupService {
+    /**
+     * Ensures the backups bucket exists in Supabase Storage
+     */
+    private static async ensureBucketExists(): Promise<void> {
+        const supabase = getSupabase();
+        
+        // Check if bucket exists
+        const { data: buckets, error: listError } = await supabase
+            .storage
+            .listBuckets();
+        
+        if (listError) {
+            logger.warn('Could not list buckets:', listError.message);
+        }
+        
+        const bucketExists = buckets?.some(b => b.name === BACKUP_BUCKET_NAME);
+        
+        if (!bucketExists) {
+            logger.info('Creating backups bucket...');
+            const { error: createError } = await supabase
+                .storage
+                .createBucket(BACKUP_BUCKET_NAME, {
+                    public: false,
+                    fileSizeLimit: 100 * 1024 * 1024, // 100MB limit
+                });
+            
+            if (createError && !createError.message.includes('already exists')) {
+                logger.error('Failed to create backups bucket:', createError.message);
+                // Don't throw - we'll try the upload anyway and let it fail naturally
+            } else {
+                logger.info('Backups bucket created successfully');
+            }
+        }
+    }
+
     /**
      * Performs a full backup of the public schema data
      */
@@ -20,6 +57,9 @@ export class BackupService {
         const storagePath = `backups/${filename}`;
 
         try {
+            // Ensure bucket exists before proceeding
+            await this.ensureBucketExists();
+
             // 1. Get all public tables
             const { data: tables, error: tablesError } = await supabase
                 .rpc('get_public_tables'); // We'll need to create this RPC or use a query
