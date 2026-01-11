@@ -91,7 +91,7 @@ function ColorPicker({
 }
 
 export default function AppearanceSettingsPage() {
-  const { settings, refetch } = useSiteSettings();
+  const { settings, refetch, loading } = useSiteSettings();
   
   // Theme state
   const [selectedTheme, setSelectedTheme] = useState<ResortTheme>(settings.theme || 'beach');
@@ -118,6 +118,33 @@ export default function AppearanceSettingsPage() {
   
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  // Sync state when settings load from API (fixes settings not showing after page load)
+  useEffect(() => {
+    if (!loading && !initialized) {
+      setSelectedTheme(settings.theme || 'beach');
+      setUseCustomColors(!!settings.themeColors);
+      if (settings.themeColors) {
+        setCustomColors({
+          primary: settings.themeColors.primary || '#0891b2',
+          secondary: settings.themeColors.secondary || '#06b6d4',
+          accent: settings.themeColors.accent || '#f59e0b',
+          background: settings.themeColors.background || '#f0fdfa',
+          surface: settings.themeColors.surface || '#ffffff',
+          text: settings.themeColors.text || '#164e63',
+          textMuted: settings.themeColors.textMuted || '#0e7490',
+        });
+      }
+      setShowWeatherWidget(settings.showWeatherWidget ?? true);
+      setWeatherLocation(settings.weatherLocation || 'Beirut, Lebanon');
+      setWeatherEffect(settings.weatherEffect || 'auto');
+      setAnimationsEnabled(settings.animationsEnabled ?? true);
+      setReducedMotion(settings.reducedMotion ?? false);
+      setSoundEnabled(settings.soundEnabled ?? true);
+      setInitialized(true);
+    }
+  }, [loading, settings, initialized]);
 
   // Update custom colors when theme changes
   useEffect(() => {
