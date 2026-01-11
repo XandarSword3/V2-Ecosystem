@@ -817,115 +817,124 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
     const settings = req.body;
     const userId = req.user?.userId;
 
-    // Always upsert the 'appearance' key with the latest theme and related settings
-    const appearanceSettings = {
+    // Helper to check if an object has any non-undefined values
+    const hasValidData = (obj: Record<string, any>) => 
+      Object.values(obj).some(v => v !== undefined);
+
+    // Helper to filter out undefined values from an object
+    const filterUndefined = (obj: Record<string, any>) => 
+      Object.fromEntries(Object.entries(obj).filter(([_, v]) => v !== undefined));
+
+    const updates: { key: string; value: any }[] = [];
+
+    // Appearance settings (theme, weather, animations)
+    const appearanceData = {
       theme: settings.theme,
       themeColors: settings.themeColors,
       animationsEnabled: settings.animationsEnabled,
       reducedMotion: settings.reducedMotion,
       soundEnabled: settings.soundEnabled,
-      // Weather settings
       showWeatherWidget: settings.showWeatherWidget,
       weatherLocation: settings.weatherLocation,
       weatherEffect: settings.weatherEffect,
     };
+    if (hasValidData(appearanceData)) {
+      // Merge with existing appearance settings to preserve unchanged values
+      const { data: existingAppearance } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'appearance')
+        .single();
+      
+      const mergedAppearance = {
+        ...(existingAppearance?.value || {}),
+        ...filterUndefined(appearanceData)
+      };
+      updates.push({ key: 'appearance', value: mergedAppearance });
+    }
 
-    const { error: appearanceError } = await supabase
-      .from('site_settings')
-      .upsert({
-        key: 'appearance',
-        value: appearanceSettings,
-        updated_at: new Date().toISOString(),
-        updated_by: userId,
-      }, { onConflict: 'key' });
-
-    if (appearanceError) throw appearanceError;
-
-    emitToAll('settings.updated', { appearance: appearanceSettings });
-
-    await logActivity({
-      user_id: userId!,
-      action: 'UPDATE_SETTINGS',
-      resource: 'settings:appearance',
-      new_value: appearanceSettings
-    });
-
-    // Optionally, upsert other settings categories as before
-
-    // Legacy bulk update logic
-    const generalSettings = {
+    // General settings
+    const generalData = {
       resortName: settings.resortName,
       tagline: settings.tagline,
       description: settings.description,
     };
+    if (hasValidData(generalData)) {
+      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'general').single();
+      updates.push({ key: 'general', value: { ...(existing?.value || {}), ...filterUndefined(generalData) } });
+    }
 
-    const contactSettings = {
+    // Contact settings
+    const contactData = {
       phone: settings.phone,
       email: settings.email,
       address: settings.address,
     };
+    if (hasValidData(contactData)) {
+      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'contact').single();
+      updates.push({ key: 'contact', value: { ...(existing?.value || {}), ...filterUndefined(contactData) } });
+    }
 
-    const hoursSettings = {
+    // Hours settings
+    const hoursData = {
       poolHours: settings.poolHours,
       restaurantHours: settings.restaurantHours,
       receptionHours: settings.receptionHours,
     };
+    if (hasValidData(hoursData)) {
+      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'hours').single();
+      updates.push({ key: 'hours', value: { ...(existing?.value || {}), ...filterUndefined(hoursData) } });
+    }
 
-    const chaletSettings = {
+    // Chalet settings
+    const chaletData = {
       checkIn: settings.chaletCheckIn,
       checkOut: settings.chaletCheckOut,
       depositPercent: settings.chaletDeposit,
       cancellationPolicy: settings.cancellationPolicy,
     };
+    if (hasValidData(chaletData)) {
+      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'chalets').single();
+      updates.push({ key: 'chalets', value: { ...(existing?.value || {}), ...filterUndefined(chaletData) } });
+    }
 
-    const poolSettings = {
+    // Pool settings
+    const poolData = {
       adultPrice: settings.poolAdultPrice,
       childPrice: settings.poolChildPrice,
       infantPrice: settings.poolInfantPrice,
       capacity: settings.poolCapacity,
     };
+    if (hasValidData(poolData)) {
+      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'pool').single();
+      updates.push({ key: 'pool', value: { ...(existing?.value || {}), ...filterUndefined(poolData) } });
+    }
 
-    const legalSettings = {
+    // Legal settings
+    const legalData = {
       privacyPolicy: settings.privacyPolicy,
       termsOfService: settings.termsOfService,
       refundPolicy: settings.refundPolicy,
     };
+    if (hasValidData(legalData)) {
+      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'legal').single();
+      updates.push({ key: 'legal', value: { ...(existing?.value || {}), ...filterUndefined(legalData) } });
+    }
 
-    const appearanceSettingsAlt = {
-      theme: settings.theme,
-      themeColors: settings.themeColors,
-      animationsEnabled: settings.animationsEnabled,
-      reducedMotion: settings.reducedMotion,
-      soundEnabled: settings.soundEnabled,
-      // Weather settings
-      showWeatherWidget: settings.showWeatherWidget,
-      weatherLocation: settings.weatherLocation,
-      weatherEffect: settings.weatherEffect,
-    };
+    // CMS settings - homepage, footer, navbar (these come as complete objects)
+    if (settings.homepage) {
+      updates.push({ key: 'homepage', value: settings.homepage });
+    }
+    if (settings.footer) {
+      updates.push({ key: 'footer', value: settings.footer });
+    }
+    if (settings.navbar) {
+      updates.push({ key: 'navbar', value: settings.navbar });
+    }
 
-    // Homepage, Footer, Navbar settings (CMS)
-    const homepageSettings = settings.homepage || null;
-    const footerSettings = settings.footer || null;
-    const navbarSettings = settings.navbar || null;
-
-    // Upsert each settings category
-    const updates = [
-      { key: 'general', value: generalSettings },
-      { key: 'contact', value: contactSettings },
-      { key: 'hours', value: hoursSettings },
-      { key: 'chalets', value: chaletSettings },
-      { key: 'pool', value: poolSettings },
-      { key: 'legal', value: legalSettings },
-      { key: 'appearance', value: appearanceSettings },
-    ];
-
-    // Add CMS settings only if provided
-    if (homepageSettings) updates.push({ key: 'homepage', value: homepageSettings });
-    if (footerSettings) updates.push({ key: 'footer', value: footerSettings });
-    if (navbarSettings) updates.push({ key: 'navbar', value: navbarSettings });
-
+    // Perform all updates
     for (const update of updates) {
-      await supabase
+      const { error } = await supabase
         .from('site_settings')
         .upsert({
           key: update.key,
@@ -933,23 +942,27 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
           updated_at: new Date().toISOString(),
           updated_by: userId,
         }, { onConflict: 'key' });
+      
+      if (error) {
+        console.error(`Failed to update ${update.key}:`, error);
+        throw error;
+      }
     }
 
     // Emit socket event for real-time updates
-    emitToAll('settings.updated', {
-      ...generalSettings,
-      ...contactSettings,
-      ...hoursSettings,
-      ...chaletSettings,
-      ...poolSettings,
-      ...legalSettings,
-      ...appearanceSettings
-    });
+    const updatedCategories = updates.map(u => u.key);
+    const flattenedSettings: Record<string, any> = {};
+    for (const update of updates) {
+      if (typeof update.value === 'object' && !Array.isArray(update.value)) {
+        Object.assign(flattenedSettings, update.value);
+      }
+    }
+    emitToAll('settings.updated', flattenedSettings);
 
     await logActivity({
       user_id: userId!,
       action: 'UPDATE_SETTINGS',
-      resource: 'settings',
+      resource: `settings:${updatedCategories.join(',')}`,
       new_value: settings
     });
 
