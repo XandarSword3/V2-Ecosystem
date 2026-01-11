@@ -193,7 +193,7 @@ export default function DynamicSessionsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <motion.div variants={fadeInUp}>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center shadow-lg">
               <Waves className="w-6 h-6 text-white" />
             </div>
             {currentModule.name} Sessions
@@ -208,7 +208,7 @@ export default function DynamicSessionsPage() {
             <RefreshCw className="w-4 h-4" />
             Refresh
           </Button>
-          <Button onClick={openCreateModal} className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
+          <Button onClick={openCreateModal} className="flex items-center gap-2 bg-gradient-to-r from-primary-500 to-secondary-600 text-white">
             <Plus className="w-4 h-4" />
             Add Session
           </Button>
@@ -244,7 +244,7 @@ export default function DynamicSessionsPage() {
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <p className="text-sm text-slate-500 dark:text-slate-400">Total Capacity</p>
-          <p className="text-2xl font-bold text-cyan-600">{sessions.reduce((acc, s) => acc + (s.max_capacity || 0), 0)}</p>
+          <p className="text-2xl font-bold text-primary-600">{sessions.reduce((acc, s) => acc + (s.max_capacity || 0), 0)}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <p className="text-sm text-slate-500 dark:text-slate-400">Avg Price</p>
@@ -282,12 +282,12 @@ export default function DynamicSessionsPage() {
                     transition={{ delay: index * 0.05 }}
                   >
                     <Card className={`overflow-hidden ${!session.is_active ? 'opacity-60' : ''}`}>
-                      <div className="h-3 bg-gradient-to-r from-cyan-500 to-blue-600" />
+                      <div className="h-3 bg-gradient-to-r from-primary-500 to-secondary-600" />
                       <CardContent className="p-5">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
-                              <TimeIcon className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
+                            <div className="w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                              <TimeIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
                             </div>
                             <div>
                               <h3 className="font-semibold text-slate-900 dark:text-white">{session.name}</h3>
@@ -305,11 +305,11 @@ export default function DynamicSessionsPage() {
                         <div className="grid grid-cols-2 gap-3 mb-4">
                           <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
                             <p className="text-xs text-slate-500 dark:text-slate-400">Adult</p>
-                            <p className="text-lg font-bold text-cyan-600">{formatCurrency(session.adult_price)}</p>
+                            <p className="text-lg font-bold text-primary-600">{formatCurrency(session.adult_price)}</p>
                           </div>
                           <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
                             <p className="text-xs text-slate-500 dark:text-slate-400">Child</p>
-                            <p className="text-lg font-bold text-blue-600">{formatCurrency(session.child_price)}</p>
+                            <p className="text-lg font-bold text-secondary-600">{formatCurrency(session.child_price)}</p>
                           </div>
                         </div>
 
@@ -322,7 +322,7 @@ export default function DynamicSessionsPage() {
 
                         <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-4">
                           <div
-                            className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full transition-all"
+                            className="h-full bg-gradient-to-r from-primary-500 to-secondary-600 rounded-full transition-all"
                             style={{ width: `${((session.current_capacity || 0) / session.max_capacity) * 100}%` }}
                           />
                         </div>
@@ -340,7 +340,7 @@ export default function DynamicSessionsPage() {
                           </button>
                           <button
                             onClick={() => openEditModal(session)}
-                            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm bg-cyan-100 text-cyan-600 hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm bg-primary-100 text-primary-600 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-400 transition-colors"
                           >
                             <Edit2 className="w-4 h-4" />Edit
                           </button>
@@ -442,7 +442,7 @@ export default function DynamicSessionsPage() {
                           type="button"
                           onClick={() => toggleDayOfWeek(day.id)}
                           className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            isSelected ? 'bg-cyan-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                            isSelected ? 'bg-primary-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
                           }`}
                         >
                           {day.label.slice(0, 3)}
@@ -457,7 +457,7 @@ export default function DynamicSessionsPage() {
                     type="checkbox"
                     checked={formData.is_active ?? true}
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                    className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                   />
                   <span className="text-sm text-slate-700 dark:text-slate-300">Session is active</span>
                 </label>
@@ -465,7 +465,7 @@ export default function DynamicSessionsPage() {
 
               <div className="sticky bottom-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-6 flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
-                <Button onClick={handleSave} disabled={saving} className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
+                <Button onClick={handleSave} disabled={saving} className="flex-1 bg-gradient-to-r from-primary-500 to-secondary-600 text-white">
                   {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" />{editingSession ? 'Update Session' : 'Create Session'}</>}
                 </Button>
               </div>

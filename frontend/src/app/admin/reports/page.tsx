@@ -395,7 +395,7 @@ export default function AdminReportsPage() {
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${occupancyData.pool.occupancyRate}%` }}
-                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                          className="h-full bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full"
                         />
                       </div>
                       <p className="text-xs text-slate-500">{occupancyData.pool.ticketsSold} guests / {occupancyData.pool.totalCapacity} capacity</p>
@@ -469,7 +469,7 @@ export default function AdminReportsPage() {
                   { key: 'restaurant', label: 'Restaurant', icon: UtensilsCrossed, color: 'bg-blue-500' },
                   { key: 'snackBar', label: 'Snack Bar', icon: Cookie, color: 'bg-orange-500' },
                   { key: 'chalets', label: 'Chalets', icon: Home, color: 'bg-green-500' },
-                  { key: 'pool', label: 'Pool', icon: Waves, color: 'bg-cyan-500' },
+                  { key: 'pool', label: 'Pool', icon: Waves, color: 'bg-primary-500' },
                 ].map((service) => {
                   const value = data.revenueByService[service.key as keyof typeof data.revenueByService];
                   const percentage = totalServiceRevenue > 0 ? (value / totalServiceRevenue) * 100 : 0;

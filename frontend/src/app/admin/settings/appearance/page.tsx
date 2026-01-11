@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useSiteSettings } from '@/lib/settings-context';
-import { useEffect, useRef } from 'react';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { resortThemes, ResortTheme } from '@/lib/theme-config';
 import {
   Palette,
   Volume2,
@@ -18,10 +18,12 @@ import {
   Save,
   RotateCcw,
   Zap,
+  Sun,
+  Cloud,
+  CloudRain,
+  Snowflake,
+  Check,
 } from 'lucide-react';
-
-// Theme selection UI removed
-
 
 // Toggle switch component
 function ToggleSwitch({
@@ -57,19 +59,84 @@ function ToggleSwitch({
   );
 }
 
+// Color picker component
+function ColorPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between py-3">
+      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-10 h-10 rounded-lg cursor-pointer border-2 border-slate-200 dark:border-slate-700"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-24 px-2 py-1 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function AppearanceSettingsPage() {
   const { settings, refetch } = useSiteSettings();
+  
+  // Theme state
+  const [selectedTheme, setSelectedTheme] = useState<ResortTheme>(settings.theme || 'beach');
+  const [useCustomColors, setUseCustomColors] = useState(!!settings.themeColors);
+  const [customColors, setCustomColors] = useState({
+    primary: settings.themeColors?.primary || '#0891b2',
+    secondary: settings.themeColors?.secondary || '#06b6d4',
+    accent: settings.themeColors?.accent || '#f59e0b',
+    background: settings.themeColors?.background || '#f0fdfa',
+    surface: settings.themeColors?.surface || '#ffffff',
+    text: settings.themeColors?.text || '#164e63',
+    textMuted: settings.themeColors?.textMuted || '#0e7490',
+  });
+  
+  // Weather widget state
+  const [showWeatherWidget, setShowWeatherWidget] = useState(settings.showWeatherWidget ?? true);
+  const [weatherLocation, setWeatherLocation] = useState(settings.weatherLocation || 'Beirut, Lebanon');
+  const [weatherEffect, setWeatherEffect] = useState<string>(settings.weatherEffect || 'auto');
+  
+  // Animation state
   const [animationsEnabled, setAnimationsEnabled] = useState(settings.animationsEnabled ?? true);
   const [reducedMotion, setReducedMotion] = useState(settings.reducedMotion ?? false);
   const [soundEnabled, setSoundEnabled] = useState(settings.soundEnabled ?? true);
+  
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Update custom colors when theme changes
+  useEffect(() => {
+    if (!useCustomColors && selectedTheme) {
+      const themeColors = resortThemes[selectedTheme].colors;
+      setCustomColors(themeColors);
+    }
+  }, [selectedTheme, useCustomColors]);
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
       const newSettings = {
         ...settings,
+        theme: selectedTheme,
+        themeColors: useCustomColors ? customColors : null,
+        showWeatherWidget,
+        weatherLocation,
+        weatherEffect,
         animationsEnabled,
         reducedMotion,
         soundEnabled
@@ -77,7 +144,7 @@ export default function AppearanceSettingsPage() {
       await api.put('/admin/settings', newSettings);
       await refetch();
       setHasChanges(false);
-      toast.success('Appearance settings saved!');
+      toast.success('Appearance settings saved! Theme applied across the site.');
     } catch (error) {
       console.error('Failed to save settings:', error);
       toast.error('Failed to save settings');
@@ -87,12 +154,20 @@ export default function AppearanceSettingsPage() {
   };
 
   const handleReset = () => {
+    setSelectedTheme('beach');
+    setUseCustomColors(false);
+    setCustomColors(resortThemes.beach.colors);
+    setShowWeatherWidget(true);
+    setWeatherLocation('Beirut, Lebanon');
+    setWeatherEffect('auto');
     setAnimationsEnabled(true);
     setReducedMotion(false);
     setSoundEnabled(true);
     setHasChanges(true);
     toast.info('Settings reset to defaults');
   };
+
+  const markChanged = () => setHasChanges(true);
 
   return (
     <motion.div
@@ -123,6 +198,192 @@ export default function AppearanceSettingsPage() {
         </div>
       </motion.div>
 
+      {/* Theme Selection */}
+      <motion.div variants={fadeInUp}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="w-5 h-5 text-primary-600" />
+              Resort Theme
+            </CardTitle>
+            <CardDescription>
+              Choose a preset theme or customize colors for your resort
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+              {Object.values(resortThemes).map((theme) => (
+                <motion.button
+                  key={theme.id}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    setSelectedTheme(theme.id);
+                    markChanged();
+                  }}
+                  className={`relative p-4 rounded-xl border-2 transition-all ${
+                    selectedTheme === theme.id
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  {selectedTheme === theme.id && (
+                    <div className="absolute top-2 right-2 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                  <div className={`w-full h-12 rounded-lg mb-3 ${theme.gradient}`} />
+                  <span className="text-2xl mb-1 block">{theme.icon}</span>
+                  <p className="font-medium text-sm text-slate-900 dark:text-white">{theme.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{theme.description}</p>
+                </motion.button>
+              ))}
+            </div>
+            
+            {/* Custom Colors Toggle */}
+            <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+              <ToggleSwitch
+                enabled={useCustomColors}
+                onChange={(value) => {
+                  setUseCustomColors(value);
+                  markChanged();
+                }}
+                label="Use Custom Colors"
+                description="Override theme colors with your own custom palette"
+              />
+              
+              {useCustomColors && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
+                >
+                  <ColorPicker
+                    label="Primary Color"
+                    value={customColors.primary}
+                    onChange={(v) => { setCustomColors({...customColors, primary: v}); markChanged(); }}
+                  />
+                  <ColorPicker
+                    label="Secondary Color"
+                    value={customColors.secondary}
+                    onChange={(v) => { setCustomColors({...customColors, secondary: v}); markChanged(); }}
+                  />
+                  <ColorPicker
+                    label="Accent Color"
+                    value={customColors.accent}
+                    onChange={(v) => { setCustomColors({...customColors, accent: v}); markChanged(); }}
+                  />
+                  <ColorPicker
+                    label="Background"
+                    value={customColors.background}
+                    onChange={(v) => { setCustomColors({...customColors, background: v}); markChanged(); }}
+                  />
+                  <ColorPicker
+                    label="Surface Color"
+                    value={customColors.surface}
+                    onChange={(v) => { setCustomColors({...customColors, surface: v}); markChanged(); }}
+                  />
+                  <ColorPicker
+                    label="Text Color"
+                    value={customColors.text}
+                    onChange={(v) => { setCustomColors({...customColors, text: v}); markChanged(); }}
+                  />
+                  <ColorPicker
+                    label="Muted Text"
+                    value={customColors.textMuted}
+                    onChange={(v) => { setCustomColors({...customColors, textMuted: v}); markChanged(); }}
+                  />
+                </motion.div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Weather Widget Settings */}
+      <motion.div variants={fadeInUp}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sun className="w-5 h-5 text-primary-600" />
+              Weather Widget
+            </CardTitle>
+            <CardDescription>
+              Display real-time weather information for guests
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ToggleSwitch
+              enabled={showWeatherWidget}
+              onChange={(value) => {
+                setShowWeatherWidget(value);
+                markChanged();
+              }}
+              label="Show Weather Widget"
+              description="Display current weather conditions on the homepage"
+            />
+            
+            {showWeatherWidget && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Weather Location
+                  </label>
+                  <input
+                    type="text"
+                    value={weatherLocation}
+                    onChange={(e) => { setWeatherLocation(e.target.value); markChanged(); }}
+                    placeholder="e.g., Beirut, Lebanon"
+                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Enter the city and country for weather data
+                  </p>
+                </div>
+                
+                {/* Weather Animation Effect Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Weather Animation Effect
+                  </label>
+                  <select
+                    value={weatherEffect}
+                    onChange={(e) => { setWeatherEffect(e.target.value); markChanged(); }}
+                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  >
+                    <option value="auto">🎨 Auto (Based on theme)</option>
+                    <option value="waves">🌊 Waves (Animated ocean waves)</option>
+                    <option value="snow">❄️ Snow (Falling snowflakes)</option>
+                    <option value="rain">🌧️ Rain (Rain drops)</option>
+                    <option value="leaves">🍂 Leaves (Falling autumn leaves)</option>
+                    <option value="stars">✨ Stars (Twinkling night sky)</option>
+                    <option value="fireflies">🌟 Fireflies (Glowing particles)</option>
+                    <option value="none">🚫 None (Disable animations)</option>
+                  </select>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Choose the ambient animation effect displayed on the site. "Auto" uses the theme's default effect.
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {/* Weather Preview */}
+            <div className="mt-6 p-4 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-80">{weatherLocation}</p>
+                  <p className="text-4xl font-bold">24°C</p>
+                  <p className="text-sm opacity-80">Partly Cloudy</p>
+                </div>
+                <div className="text-6xl">
+                  <Cloud className="w-16 h-16" />
+                </div>
+              </div>
+              <p className="text-xs mt-2 opacity-60">Preview - Actual weather will be fetched from API</p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Animation & Performance */}
       <motion.div variants={fadeInUp}>
