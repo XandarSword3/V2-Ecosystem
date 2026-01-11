@@ -148,6 +148,20 @@ async function handleSettings(_req: Request, res: Response) {
       combinedSettings[s.key] = s.value;
     });
 
+    // Flatten 'appearance' settings into root for frontend compatibility
+    // This ensures theme, weatherEffect, showWeatherWidget etc are directly accessible
+    if (combinedSettings.appearance && typeof combinedSettings.appearance === 'object') {
+      Object.assign(combinedSettings, combinedSettings.appearance);
+    }
+
+    // Flatten other nested settings categories into root for frontend compatibility
+    const categoriesToFlatten = ['general', 'contact', 'hours', 'chalets', 'pool', 'legal'];
+    for (const key of categoriesToFlatten) {
+      if (combinedSettings[key] && typeof combinedSettings[key] === 'object') {
+        Object.assign(combinedSettings, combinedSettings[key]);
+      }
+    }
+
     // Remove navbar property if present
     if (combinedSettings.navbar) {
       delete combinedSettings.navbar;
