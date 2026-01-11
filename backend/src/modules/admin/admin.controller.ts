@@ -824,6 +824,10 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       animationsEnabled: settings.animationsEnabled,
       reducedMotion: settings.reducedMotion,
       soundEnabled: settings.soundEnabled,
+      // Weather settings
+      showWeatherWidget: settings.showWeatherWidget,
+      weatherLocation: settings.weatherLocation,
+      weatherEffect: settings.weatherEffect,
     };
 
     const { error: appearanceError } = await supabase
@@ -893,7 +897,16 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       animationsEnabled: settings.animationsEnabled,
       reducedMotion: settings.reducedMotion,
       soundEnabled: settings.soundEnabled,
+      // Weather settings
+      showWeatherWidget: settings.showWeatherWidget,
+      weatherLocation: settings.weatherLocation,
+      weatherEffect: settings.weatherEffect,
     };
+
+    // Homepage, Footer, Navbar settings (CMS)
+    const homepageSettings = settings.homepage || null;
+    const footerSettings = settings.footer || null;
+    const navbarSettings = settings.navbar || null;
 
     // Upsert each settings category
     const updates = [
@@ -905,6 +918,11 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       { key: 'legal', value: legalSettings },
       { key: 'appearance', value: appearanceSettings },
     ];
+
+    // Add CMS settings only if provided
+    if (homepageSettings) updates.push({ key: 'homepage', value: homepageSettings });
+    if (footerSettings) updates.push({ key: 'footer', value: footerSettings });
+    if (navbarSettings) updates.push({ key: 'navbar', value: navbarSettings });
 
     for (const update of updates) {
       await supabase
