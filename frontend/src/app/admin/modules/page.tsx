@@ -3,12 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { modulesApi } from '@/lib/api';
-import { Loader2, Plus, Edit, Trash2, Check, X, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Check, X, AlertCircle, LayoutTemplate } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Module } from '@/lib/settings-context';
 
+import { isSameDay } from 'date-fns';
+import { useRouter } from 'next/navigation';
+
 export default function ModulesPage() {
+  const router = useRouter();
   const t = useTranslations('admin');
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
@@ -146,6 +150,13 @@ export default function ModulesPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button
+                    onClick={() => router.push(`/admin/modules/builder/${module.id}`)}
+                    className="text-indigo-600 hover:text-indigo-900 dark:hover:text-indigo-400 mr-4"
+                    title="Edit User Interface"
+                  >
+                    <LayoutTemplate className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => setEditingModule(module)}
                     className="text-primary-600 hover:text-primary-900 dark:hover:text-primary-400 mr-4"

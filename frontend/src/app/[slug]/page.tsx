@@ -9,8 +9,11 @@ import { SessionService } from '@/components/modules/SessionService';
 import { Loader2, AlertCircle, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
+
 export default function ModulePage() {
   const params = useParams();
+
   const router = useRouter();
   const { modules, loading: isLoading } = useSiteSettings();
   const [slug, setSlug] = useState<string>('');
@@ -109,7 +112,12 @@ export default function ModulePage() {
     );
   }
 
-  // Render the appropriate component based on template type
+  // Check if module has a custom layout defined
+  if (currentModule.settings?.layout && Array.isArray(currentModule.settings.layout) && currentModule.settings.layout.length > 0) {
+    return <DynamicModuleRenderer layout={currentModule.settings.layout} module={currentModule} />;
+  }
+
+  // Fallback to legacy hardcoded templates
   switch (currentModule.template_type) {
     case 'menu_service':
       return <MenuService module={currentModule} />;

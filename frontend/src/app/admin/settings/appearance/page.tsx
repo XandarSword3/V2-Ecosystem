@@ -23,7 +23,39 @@ import {
   CloudRain,
   Snowflake,
   Check,
+  CloudSun,
 } from 'lucide-react';
+
+// Weather effect selector
+function WeatherOption({
+  effect,
+  icon: Icon,
+  label,
+  isSelected,
+  onSelect,
+}: {
+  effect: string;
+  icon: React.ElementType;
+  label: string;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={onSelect}
+      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+        isSelected
+          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-600 dark:text-slate-400'
+      }`}
+    >
+      <Icon className={`w-8 h-8 ${isSelected ? 'text-primary-500' : 'text-slate-400'}`} />
+      <span className="text-sm font-medium">{label}</span>
+    </motion.button>
+  );
+}
 
 // Toggle switch component
 function ToggleSwitch({
@@ -368,27 +400,66 @@ export default function AppearanceSettingsPage() {
                   </p>
                 </div>
                 
-                {/* Weather Animation Effect Selector */}
+                {/* Weather Animation Effect Selector - Visual Grid */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Weather Animation Effect
                   </label>
-                  <select
-                    value={weatherEffect}
-                    onChange={(e) => { setWeatherEffect(e.target.value); markChanged(); }}
-                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  >
-                    <option value="auto">🎨 Auto (Based on theme)</option>
-                    <option value="waves">🌊 Waves (Animated ocean waves)</option>
-                    <option value="snow">❄️ Snow (Falling snowflakes)</option>
-                    <option value="rain">🌧️ Rain (Rain drops)</option>
-                    <option value="leaves">🍂 Leaves (Falling autumn leaves)</option>
-                    <option value="stars">✨ Stars (Twinkling night sky)</option>
-                    <option value="fireflies">🌟 Fireflies (Glowing particles)</option>
-                    <option value="none">🚫 None (Disable animations)</option>
-                  </select>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Choose the ambient animation effect displayed on the site. "Auto" uses the theme's default effect.
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-2">
+                    <WeatherOption
+                      effect="sunny"
+                      icon={Sun}
+                      label="Sunny"
+                      isSelected={weatherEffect === 'sunny'}
+                      onSelect={() => { setWeatherEffect('sunny'); markChanged(); }}
+                    />
+                    <WeatherOption
+                      effect="clouds"
+                      icon={CloudSun}
+                      label="Cloudy"
+                      isSelected={weatherEffect === 'clouds'}
+                      onSelect={() => { setWeatherEffect('clouds'); markChanged(); }}
+                    />
+                    <WeatherOption
+                      effect="rain"
+                      icon={CloudRain}
+                      label="Rainy"
+                      isSelected={weatherEffect === 'rain'}
+                      onSelect={() => { setWeatherEffect('rain'); markChanged(); }}
+                    />
+                    <WeatherOption
+                      effect="snow"
+                      icon={Snowflake}
+                      label="Snowy"
+                      isSelected={weatherEffect === 'snow'}
+                      onSelect={() => { setWeatherEffect('snow'); markChanged(); }}
+                    />
+                    {/* Add more options as needed or keep simple */}
+                  </div>
+                  
+                  {/* Additional detailed selector for more obscure effects if needed */}
+                  <div className="mt-2">
+                     <label className="text-xs text-slate-500 mb-1 block">More Effects:</label>
+                     <select
+                        value={weatherEffect}
+                        onChange={(e) => { setWeatherEffect(e.target.value); markChanged(); }}
+                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                      >
+                        <option value="auto">🎨 Auto (Based on theme)</option>
+                        <option value="sunny">☀️ Sunny (Clear)</option>
+                        <option value="clouds">☁️ Cloudy</option>
+                        <option value="waves">🌊 Waves (Animated ocean waves)</option>
+                        <option value="snow">❄️ Snow (Falling snowflakes)</option>
+                        <option value="rain">🌧️ Rain (Rain drops)</option>
+                        <option value="leaves">🍂 Leaves (Falling autumn leaves)</option>
+                        <option value="stars">✨ Stars (Twinkling night sky)</option>
+                        <option value="fireflies">🌟 Fireflies (Glowing particles)</option>
+                        <option value="none">🚫 None (Disable animations)</option>
+                      </select>
+                  </div>
+
+                  <p className="text-xs text-slate-500 mt-2">
+                    Choose the ambient animation effect displayed on the site.
                   </p>
                 </div>
               </div>
