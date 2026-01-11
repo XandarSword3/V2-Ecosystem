@@ -6,6 +6,9 @@ import { verifyToken } from "../modules/auth/auth.utils";
 
 let io: Server;
 
+// Track active connections
+const activeConnections = new Map<string, { userId?: string; connectedAt: Date }>();
+
 // Function to check if origin is allowed for socket.io (same as Express CORS)
 function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return true;
@@ -56,9 +59,21 @@ export function initializeSocketServer(httpServer: HttpServer) {
       methods: ['GET', 'POST'],
       credentials: true,
     },
-    // Improve connection stability
-    pingTimeout: 60000,
-    pingInterval: 25000,
+    // Connection state recovery - handles brief disconnections gracefully
+    connectionStateRecovery: {
+      maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+      skipMiddlewares: true,
+    },
+    // CRITICAL: Improved connection stability settings
+    pingTimeout: 120000,       // 2 minutes before considering connection dead
+    pingInterval: 25000,       // Ping every 25 seconds (keep-alive)
+    connectTimeout: 60000,     // 60 seconds to establish connection
+    allowUpgrades: true,
+    transports: ['websocket', 'polling'],
+    // Upgrade timeout for switching from polling to websocket
+    upgradeTimeout: 30000,
+    // Allow request buffering during connection
+    maxHttpBufferSize: 1e6,    // 1MB
   });
 
   // Authentication middleware
@@ -78,7 +93,13 @@ export function initializeSocketServer(httpServer: HttpServer) {
   });
 
   io.on('connection', (socket: Socket) => {
-    logger.debug(`Socket connected: ${socket.id}`);
+    // Track connection
+    activeConnections.set(socket.id, {
+      userId: socket.data.userId,
+      connectedAt: new Date(),
+    });
+    
+    logger.info(`Socket connected: ${socket.id} (Total: ${activeConnections.size})`);
 
     // Join rooms based on user role
     if (socket.data.roles) {
@@ -96,6 +117,11 @@ export function initializeSocketServer(httpServer: HttpServer) {
     const onlineCount = io.engine.clientsCount;
     io.to('role:admin').to('role:super_admin').emit('stats:online_users', { count: onlineCount });
 
+    // Handle heartbeat to keep connection alive
+    socket.on('heartbeat', () => {
+      socket.emit('heartbeat:ack', { timestamp: Date.now() });
+    });
+
     // Staff can join business unit rooms
     socket.on('join:unit', (unit: string) => {
       if (['restaurant', 'snack_bar', 'chalets', 'pool'].includes(unit)) {
@@ -104,8 +130,27 @@ export function initializeSocketServer(httpServer: HttpServer) {
       }
     });
 
-    socket.on('disconnect', () => {
-      logger.debug(`Socket disconnected: ${socket.id}`);
+    // Handle room joining with acknowledgment
+    socket.on('join-room', (room: string, callback?: (success: boolean) => void) => {
+      socket.join(room);
+      logger.debug(`Socket ${socket.id} joined room: ${room}`);
+      if (callback) callback(true);
+    });
+
+    // Handle room leaving
+    socket.on('leave-room', (room: string) => {
+      socket.leave(room);
+      logger.debug(`Socket ${socket.id} left room: ${room}`);
+    });
+
+    // Handle ping for connection testing
+    socket.on('ping', (callback?: () => void) => {
+      if (callback) callback();
+    });
+
+    socket.on('disconnect', (reason: string) => {
+      activeConnections.delete(socket.id);
+      logger.info(`Socket disconnected: ${socket.id} - Reason: ${reason} (Remaining: ${activeConnections.size})`);
       
       // Broadcast online count to admins (after a small delay to ensure count is updated)
       setTimeout(() => {
@@ -113,7 +158,23 @@ export function initializeSocketServer(httpServer: HttpServer) {
         io.to('role:admin').to('role:super_admin').emit('stats:online_users', { count });
       }, 100);
     });
+
+    // Handle errors gracefully
+    socket.on('error', (error: Error) => {
+      logger.error(`Socket error for ${socket.id}: ${error.message}`);
+    });
   });
+
+  // Log connection stats periodically
+  setInterval(() => {
+    const stats = {
+      totalConnections: activeConnections.size,
+      engineClients: io.engine.clientsCount,
+    };
+    if (stats.totalConnections > 0) {
+      logger.debug(`Socket stats: ${JSON.stringify(stats)}`);
+    }
+  }, 60000); // Every minute
 
   return io;
 }

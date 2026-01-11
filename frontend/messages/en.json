@@ -48,6 +48,9 @@
     "phone": "Phone",
     "confirmPassword": "Confirm Password",
     "tryAgainLater": "Please try again later",
+    "testimonials": "What Our Guests Say",
+    "location": "Find Us",
+    "exploreResort": "Explore Our Resort",
     "checkBackLater": "Check back later for updates",
     "andMore": "+{count} more",
     "items": "items",
@@ -67,7 +70,11 @@
     "feedback": "Feedback",
     "complaint": "Complaint",
     "processing": "Processing...",
-    "status": "Status"
+    "status": "Status",
+    "chalets": "Chalets",
+    "maxGuests": "Max Guests",
+    "starRating": "Star Rating",
+    "featured": "Featured"
   },
   "nav": {
     "home": "Home",
@@ -264,6 +271,7 @@
   "chalets": {
     "title": "Chalets",
     "subtitle": "Find your perfect getaway in our comfortable mountain chalets",
+    "luxuryStay": "Luxury Mountain Retreat",
     "available": "Available Chalets",
     "noChaletsAvailable": "No chalets available at the moment. Please check back later.",
     "book": "Book Now",
@@ -342,6 +350,9 @@
   "pool": {
     "title": "Pool Tickets",
     "subtitle": "Book your refreshing pool experience",
+    "refreshingExperience": "Refreshing Experience",
+    "sessionsToday": "Sessions Today",
+    "availableSpots": "Available Spots",
     "sessions": "Pool Sessions",
     "tickets": "Get Tickets",
     "currentCapacity": "Current Capacity",

@@ -47,7 +47,7 @@ const serviceConfig: Record<string, { icon: React.ElementType; color: string }> 
   general: { icon: HelpCircle, color: 'text-slate-500' },
   restaurant: { icon: UtensilsCrossed, color: 'text-blue-500' },
   chalets: { icon: Home, color: 'text-green-500' },
-  pool: { icon: Waves, color: 'text-cyan-500' },
+  pool: { icon: Waves, color: 'text-primary-500' },
   snack_bar: { icon: Cookie, color: 'text-orange-500' },
 };
 

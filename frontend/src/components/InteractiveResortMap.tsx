@@ -83,8 +83,8 @@ export default function InteractiveResortMap() {
       <div className="relative aspect-[16/10] bg-gradient-to-br from-emerald-100 via-teal-50 to-blue-100 dark:from-emerald-900/30 dark:via-slate-800 dark:to-blue-900/30">
         {/* Background Pattern - Mountain silhouette */}
         <svg className="absolute inset-0 w-full h-full opacity-20" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path d="M0,70 Q15,40 30,60 T50,50 T70,55 T85,45 T100,60 L100,100 L0,100 Z" fill="currentColor" className="text-emerald-500" />
-          <path d="M0,80 Q20,60 40,75 T60,65 T80,70 T100,55 L100,100 L0,100 Z" fill="currentColor" className="text-teal-500" />
+          <path d="M0,70 Q15,40 30,60 T50,50 T70,55 T85,45 T100,60 L100,100 L0,100 Z" fill="currentColor" className="text-primary-500" />
+          <path d="M0,80 Q20,60 40,75 T60,65 T80,70 T100,55 L100,100 L0,100 Z" fill="currentColor" className="text-secondary-500" />
         </svg>
 
         {/* Decorative elements */}
@@ -92,7 +92,7 @@ export default function InteractiveResortMap() {
           {[...Array(5)].map((_, i) => (
             <motion.div
               key={i}
-              className="absolute w-2 h-2 bg-emerald-400/40 rounded-full"
+              className="absolute w-2 h-2 bg-primary-400/40 rounded-full"
               style={{
                 left: `${20 + i * 15}%`,
                 top: `${30 + Math.sin(i) * 20}%`,
@@ -128,8 +128,8 @@ export default function InteractiveResortMap() {
             <motion.div
               className={`absolute inset-0 rounded-full ${
                 selectedLocation?.id === location.id
-                  ? 'bg-emerald-500'
-                  : 'bg-emerald-400'
+                  ? 'bg-primary-500'
+                  : 'bg-primary-400'
               }`}
               animate={{
                 scale: [1, 1.8, 1],
@@ -147,10 +147,10 @@ export default function InteractiveResortMap() {
             <div
               className={`relative w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all ${
                 selectedLocation?.id === location.id
-                  ? 'bg-emerald-600 text-white ring-4 ring-emerald-300'
+                  ? 'bg-primary-600 text-white ring-4 ring-primary-300'
                   : isHovered === location.id
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400'
               }`}
             >
               {location.icon}

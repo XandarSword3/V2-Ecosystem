@@ -48,6 +48,9 @@
     "phone": "Téléphone",
     "confirmPassword": "Confirmer le mot de passe",
     "tryAgainLater": "Veuillez réessayer plus tard",
+    "testimonials": "Ce que disent nos clients",
+    "location": "Nous trouver",
+    "exploreResort": "Explorez notre complexe",
     "checkBackLater": "Revenez plus tard pour les mises à jour",
     "andMore": "+{count} de plus",
     "items": "articles",
@@ -67,7 +70,11 @@
     "feedback": "Commentaires",
     "complaint": "Réclamation",
     "processing": "En cours...",
-    "status": "Statut"
+    "status": "Statut",
+    "chalets": "Chalets",
+    "maxGuests": "Nombre max d'invités",
+    "starRating": "Étoiles",
+    "featured": "En vedette"
   },
   "nav": {
     "home": "Accueil",
@@ -264,6 +271,7 @@
   "chalets": {
     "title": "Chalets",
     "subtitle": "Trouvez votre escapade parfaite dans nos chalets de montagne confortables",
+    "luxuryStay": "Retraite de Montagne de Luxe",
     "available": "Chalets Disponibles",
     "noChaletsAvailable": "Aucun chalet disponible pour le moment. Veuillez réessayer plus tard.",
     "book": "Réserver",
@@ -342,6 +350,9 @@
   "pool": {
     "title": "Billets Piscine",
     "subtitle": "Réservez votre expérience de piscine rafraîchissante",
+    "refreshingExperience": "Expérience Rafraîchissante",
+    "sessionsToday": "Sessions Aujourd'hui",
+    "availableSpots": "Places Disponibles",
     "sessions": "Sessions Piscine",
     "tickets": "Obtenir des Billets",
     "currentCapacity": "Capacité Actuelle",

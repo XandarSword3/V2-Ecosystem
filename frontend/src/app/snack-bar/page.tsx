@@ -14,6 +14,10 @@ import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { Loader2, Cookie, ShoppingCart, AlertCircle, Plus, Minus, Sparkles, UtensilsCrossed } from 'lucide-react';
 import { toast } from 'sonner';
+import { FloatingCard } from '@/components/effects/Card3D';
+import { SpotlightCard } from '@/components/effects/GlowingBorder';
+import { GradientText } from '@/components/effects/TextEffects';
+import { AnimatedCounter } from '@/components/effects/AnimatedCounter';
 
 interface SnackItem {
   id: string;
@@ -144,24 +148,45 @@ export default function SnackBarPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl"
-        >
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{tCommon('error')}</h2>
-          <p className="text-slate-600 dark:text-slate-400">{tCommon('tryAgainLater')}</p>
-        </motion.div>
+        <FloatingCard>
+          <div className="text-center bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-12 rounded-3xl shadow-2xl border border-white/30">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{tCommon('error')}</h2>
+            <p className="text-slate-600 dark:text-slate-400">{tCommon('tryAgainLater')}</p>
+          </div>
+        </FloatingCard>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {/* Animated Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 dark:from-amber-700 dark:via-orange-700 dark:to-yellow-600 pt-24 pb-16">
-        {/* Floating Food Decorations - Spread across header */}
+    <div className="min-h-screen bg-gradient-to-br from-amber-50/50 via-orange-50/50 to-yellow-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      {/* Animated Hero Section with Aurora */}
+      <div className="relative overflow-hidden pt-24 pb-20">
+        {/* Aurora Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-500 via-orange-500 to-yellow-500 dark:from-amber-700 dark:via-orange-700 dark:to-yellow-600">
+          {/* Animated Blobs */}
+          <motion.div
+            className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-40"
+            style={{ background: 'radial-gradient(circle, rgba(251, 191, 36, 0.6) 0%, transparent 70%)' }}
+            animate={{ x: [0, 50, 0], y: [0, 30, 0], scale: [1, 1.2, 1] }}
+            transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            className="absolute top-1/2 right-1/4 w-80 h-80 rounded-full opacity-40"
+            style={{ background: 'radial-gradient(circle, rgba(249, 115, 22, 0.6) 0%, transparent 70%)' }}
+            animate={{ x: [0, -40, 0], y: [0, -50, 0], scale: [1, 1.3, 1] }}
+            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+          />
+          <motion.div
+            className="absolute bottom-1/4 left-1/2 w-72 h-72 rounded-full opacity-30"
+            style={{ background: 'radial-gradient(circle, rgba(234, 179, 8, 0.6) 0%, transparent 70%)' }}
+            animate={{ x: [0, 60, 0], y: [0, 40, 0], scale: [1, 1.15, 1] }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+          />
+        </div>
+
+        {/* Floating Food Decorations */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {[
             { emoji: '🍕', x: 8, y: 20, duration: 18 },
@@ -195,13 +220,10 @@ export default function SnackBarPage() {
 
         {/* Wave Decoration */}
         <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 100" fill="none" className="w-full h-auto">
-            <motion.path
-              d="M0,50 C360,100 720,0 1080,50 C1260,75 1360,75 1440,50 L1440,100 L0,100 Z"
-              className="fill-amber-50 dark:fill-slate-900"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 1.5, ease: 'easeInOut' }}
+          <svg viewBox="0 0 1440 120" fill="none" className="w-full h-auto">
+            <path
+              d="M0,60 C360,120 720,0 1080,60 C1260,90 1360,90 1440,60 L1440,120 L0,120 Z"
+              className="fill-amber-50/50 dark:fill-slate-900"
             />
           </svg>
         </div>
@@ -212,42 +234,73 @@ export default function SnackBarPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
-              <Sparkles className="w-4 h-4 text-white" />
-              <span className="text-white/90 text-sm font-medium">{t('freshlyMade')}</span>
-            </div>
+            <motion.div 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.3, type: 'spring' }}
+              className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md rounded-full px-5 py-2.5 mb-6 border border-white/30"
+            >
+              <Sparkles className="w-5 h-5 text-yellow-200" />
+              <span className="text-white font-medium">{t('freshlyMade')}</span>
+            </motion.div>
             
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 drop-shadow-lg">
               {settings.snackBarName || t('title')}
             </h1>
-            <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
+            <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto mb-10">
               {t('subtitle')}
             </p>
+
+            {/* Stats */}
+            <div className="flex flex-wrap justify-center gap-4 md:gap-6">
+              {[
+                { value: items.length, label: t('menuItems'), icon: '🍽️' },
+                { value: categories.length, label: t('categoriesLabel'), icon: '📂' },
+              ].map((stat, index) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 + index * 0.1 }}
+                  whileHover={{ y: -4, scale: 1.05 }}
+                  className="bg-white/20 backdrop-blur-xl rounded-2xl px-8 py-4 border border-white/30 text-white"
+                >
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <span className="text-2xl">{stat.icon}</span>
+                    <span className="text-3xl font-bold">
+                      <AnimatedCounter value={stat.value} duration={2} />
+                    </span>
+                  </div>
+                  <div className="text-sm text-white/80">{stat.label}</div>
+                </motion.div>
+              ))}
+            </div>
           </motion.div>
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-6 relative z-10">
-        {/* Category Pills */}
+        {/* Category Pills - Glass Container */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="mb-10"
         >
-          <div className="flex flex-wrap gap-3 justify-center">
-            <motion.button
-              onClick={() => setSelectedCategory(null)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className={`
-                px-6 py-3 rounded-full font-semibold transition-all duration-300 shadow-md
-                ${!selectedCategory 
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-500/30' 
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600'
-                }
-              `}
-            >
+          <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl p-4 border border-white/30 dark:border-slate-700/50 shadow-lg">
+            <div className="flex flex-wrap gap-3 justify-center">
+              <motion.button
+                onClick={() => setSelectedCategory(null)}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className={`
+                  px-6 py-3 rounded-full font-semibold transition-all duration-300
+                  ${!selectedCategory 
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' 
+                    : 'bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-600 border border-slate-200/50 dark:border-slate-600/50 backdrop-blur-sm'
+                  }
+                `}
+              >
               <span className="flex items-center gap-2">
                 <UtensilsCrossed className="w-4 h-4" />
                 {t('allItems')}
@@ -257,13 +310,13 @@ export default function SnackBarPage() {
               <motion.button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
                 className={`
-                  px-6 py-3 rounded-full font-semibold transition-all duration-300 shadow-md
+                  px-6 py-3 rounded-full font-semibold transition-all duration-300
                   ${selectedCategory === category 
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-500/30' 
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' 
+                    : 'bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-600 border border-slate-200/50 dark:border-slate-600/50 backdrop-blur-sm'
                   }
                 `}
               >
@@ -273,6 +326,7 @@ export default function SnackBarPage() {
                 </span>
               </motion.button>
             ))}
+            </div>
           </div>
         </motion.div>
 
@@ -293,38 +347,42 @@ export default function SnackBarPage() {
                 whileHover={{ y: -8, transition: { duration: 0.3 } }}
                 className="group"
               >
-                <div className="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100 dark:border-slate-700">
-                  {/* Image Section */}
-                  <div className="relative h-40 overflow-hidden">
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={translateContent(item, 'name')}
-                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-amber-100 via-orange-100 to-yellow-100 dark:from-amber-900/30 dark:via-orange-900/30 dark:to-yellow-900/30 flex items-center justify-center">
-                        <motion.span 
-                          className="text-6xl"
-                          animate={{ rotate: [0, 10, -10, 0] }}
-                          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                        >
-                          {categoryIcons[item.category] || '🍽️'}
-                        </motion.span>
+                <SpotlightCard
+                  spotlightColor="rgba(245, 158, 11, 0.15)"
+                  className="h-full rounded-2xl overflow-hidden"
+                >
+                  <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl h-full rounded-2xl overflow-hidden border border-white/30 dark:border-slate-700/50 shadow-lg hover:shadow-2xl transition-all duration-500">
+                    {/* Image Section */}
+                    <div className="relative h-40 overflow-hidden">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={translateContent(item, 'name')}
+                          className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-amber-100 via-orange-100 to-yellow-100 dark:from-amber-900/30 dark:via-orange-900/30 dark:to-yellow-900/30 flex items-center justify-center">
+                          <motion.span 
+                            className="text-6xl"
+                            animate={{ rotate: [0, 10, -10, 0] }}
+                            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                          >
+                            {categoryIcons[item.category] || '🍽️'}
+                          </motion.span>
+                        </div>
+                      )}
+                      
+                      {/* Price Badge - Enhanced */}
+                      <div className="absolute top-3 right-3">
+                        <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg shadow-amber-500/30">
+                          {formatCurrency(item.price, currency)}
+                        </div>
                       </div>
-                    )}
-                    
-                    {/* Price Badge */}
-                    <div className="absolute top-3 right-3">
-                      <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg">
-                        {formatCurrency(item.price, currency)}
-                      </div>
-                    </div>
 
-                    {/* Category Badge */}
-                    <div className="absolute top-3 left-3">
-                      <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-2 py-1 rounded-full text-xl">
-                        {categoryIcons[item.category]}
+                      {/* Category Badge - Glass */}
+                      <div className="absolute top-3 left-3">
+                        <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xl border border-white/30">
+                          {categoryIcons[item.category]}
                       </div>
                     </div>
 
@@ -355,13 +413,13 @@ export default function SnackBarPage() {
                         <motion.div 
                           initial={{ scale: 0.8 }}
                           animate={{ scale: 1 }}
-                          className="flex items-center gap-4 bg-amber-50 dark:bg-slate-700 rounded-full px-3 py-2"
+                          className="flex items-center gap-4 bg-amber-50/80 dark:bg-slate-700/80 backdrop-blur-sm rounded-full px-3 py-2"
                         >
                           <motion.button
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => removeFromSnack(item.id)}
-                            className="w-8 h-8 rounded-full bg-white dark:bg-slate-600 shadow-md flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-slate-500 transition-colors"
+                            className="w-8 h-8 rounded-full bg-white/90 dark:bg-slate-600 shadow-md flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-slate-500 transition-colors"
                           >
                             <Minus className="w-4 h-4" />
                           </motion.button>
@@ -373,7 +431,7 @@ export default function SnackBarPage() {
                             whileTap={{ scale: 0.9 }}
                             onClick={() => addToCart(item)}
                             disabled={!(item.isAvailable ?? item.is_available ?? true)}
-                            className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 shadow-md flex items-center justify-center text-white disabled:opacity-50"
+                            className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-amber-500/30 flex items-center justify-center text-white disabled:opacity-50"
                           >
                             <Plus className="w-4 h-4" />
                           </motion.button>
@@ -384,7 +442,7 @@ export default function SnackBarPage() {
                           whileTap={{ scale: 0.95 }}
                           onClick={() => addToCart(item)}
                           disabled={!(item.isAvailable ?? item.is_available ?? true)}
-                          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-500/30 hover:shadow-xl flex items-center justify-center gap-2"
                         >
                           <Plus className="w-4 h-4" />
                           {t('order.addToCart')}
@@ -392,7 +450,8 @@ export default function SnackBarPage() {
                       )}
                     </div>
                   </div>
-                </div>
+                  </div>
+                </SpotlightCard>
               </motion.div>
             ))}
           </motion.div>
@@ -405,25 +464,29 @@ export default function SnackBarPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-20"
           >
-            <div className="bg-white dark:bg-slate-800 rounded-3xl p-12 max-w-md mx-auto shadow-xl">
-              <motion.div
-                animate={{ rotate: [0, 10, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <Cookie className="w-20 h-20 text-amber-400 mx-auto mb-6" />
-              </motion.div>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                {tCommon('noItemsFound')}
-              </h3>
-              <p className="text-slate-600 dark:text-slate-400">
-                {t('tryDifferentCategory')}
-              </p>
-            </div>
+            <FloatingCard className="max-w-md mx-auto">
+              <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-12 shadow-xl border border-white/30">
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <Cookie className="w-20 h-20 text-amber-400 mx-auto mb-6" />
+                </motion.div>
+                <h3 className="text-2xl font-bold mb-2">
+                  <GradientText from="from-amber-500" to="to-orange-500">
+                    {tCommon('noItemsFound')}
+                  </GradientText>
+                </h3>
+                <p className="text-slate-600 dark:text-slate-400">
+                  {t('tryDifferentCategory')}
+                </p>
+              </div>
+            </FloatingCard>
           </motion.div>
         )}
       </main>
 
-      {/* Floating Cart Bar */}
+      {/* Floating Cart Bar with Glow Effect */}
       <AnimatePresence>
         {cartCount > 0 && (
           <motion.div 
@@ -433,32 +496,40 @@ export default function SnackBarPage() {
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="fixed bottom-6 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-50"
           >
-            <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 rounded-2xl shadow-2xl shadow-orange-500/30 p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <ShoppingCart className="w-8 h-8 text-white" />
-                    <motion.div 
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-white text-amber-600 rounded-full flex items-center justify-center text-xs font-bold"
-                    >
-                      {cartCount}
-                    </motion.div>
+            {/* Glow Effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-400 via-orange-500 to-yellow-400 rounded-2xl blur-xl opacity-50 animate-pulse" />
+            
+            {/* Main Cart Bar */}
+            <div className="relative bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 rounded-2xl p-1 shadow-2xl shadow-orange-500/40">
+              <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 rounded-xl p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                        <ShoppingCart className="w-7 h-7 text-white" />
+                      </div>
+                      <motion.div 
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-white text-amber-600 rounded-full flex items-center justify-center text-xs font-bold shadow-lg"
+                      >
+                        {cartCount}
+                      </motion.div>
+                    </div>
+                    <div className="text-white">
+                      <p className="text-sm text-white/80">{cartCount} {tCommon('items')}</p>
+                      <p className="text-xl font-bold">{formatCurrency(cartTotal, currency)}</p>
+                    </div>
                   </div>
-                  <div className="text-white">
-                    <p className="text-sm opacity-90">{cartCount} {tCommon('items')}</p>
-                    <p className="text-xl font-bold">{formatCurrency(cartTotal, currency)}</p>
-                  </div>
+                  <motion.button 
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => router.push('/snack-bar/cart')}
+                    className="bg-white/95 backdrop-blur-sm text-amber-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl hover:bg-white transition-all duration-300"
+                  >
+                    {t('placeOrder')}
+                  </motion.button>
                 </div>
-                <motion.button 
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => router.push('/snack-bar/cart')}
-                  className="bg-white text-amber-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300"
-                >
-                  {t('placeOrder')}
-                </motion.button>
               </div>
             </div>
           </motion.div>

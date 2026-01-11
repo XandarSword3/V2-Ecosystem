@@ -14,6 +14,13 @@ import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Premium effects
+import { AuroraSection } from '@/components/effects/AuroraBackground';
+import { Card3D, TiltCard, FloatingCard } from '@/components/effects/Card3D';
+import { SpotlightCard } from '@/components/effects/GlowingBorder';
+import { GradientText, RevealHeading } from '@/components/effects/TextEffects';
+import { AnimatedCounter } from '@/components/effects/AnimatedCounter';
+
 interface MenuItem {
   id: string;
   name: string;
@@ -205,10 +212,34 @@ export default function RestaurantMenuPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-orange-600 via-red-500 to-amber-500 dark:from-orange-800 dark:via-red-700 dark:to-amber-600 pt-24 pb-20">
-        {/* Decorative Elements - Spread across header */}
+    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      {/* Hero Section with Aurora Effect */}
+      <div className="relative overflow-hidden pt-24 pb-32">
+        {/* Aurora gradient background */}
+        <div className="absolute inset-0">
+          <div 
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 50%, var(--color-accent) 100%)',
+              opacity: 0.9,
+            }}
+          />
+          {/* Animated blobs */}
+          <motion.div
+            className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%)' }}
+            animate={{ scale: [1, 1.2, 1], x: [0, 50, 0], y: [0, 30, 0] }}
+            transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            className="absolute -bottom-1/4 -right-1/4 w-[50%] h-[50%] rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)' }}
+            animate={{ scale: [1, 1.1, 1], x: [0, -30, 0], y: [0, -40, 0] }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </div>
+
+        {/* Floating food emojis */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {[
             { emoji: '🍽️', x: 5, y: 15, duration: 22 },
@@ -220,7 +251,7 @@ export default function RestaurantMenuPage() {
           ].map((item, i) => (
             <motion.div
               key={i}
-              className="absolute text-5xl opacity-10"
+              className="absolute text-5xl opacity-20"
               style={{ left: `${item.x}%`, top: `${item.y}%` }}
               animate={{
                 y: [0, -30, 0, 30, 0],
@@ -238,15 +269,12 @@ export default function RestaurantMenuPage() {
           ))}
         </div>
 
-        {/* Wave decoration */}
+        {/* Wave bottom border */}
         <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 100" fill="none" className="w-full h-auto">
-            <motion.path
-              d="M0,50 C360,100 720,0 1080,50 C1260,75 1360,75 1440,50 L1440,100 L0,100 Z"
-              className="fill-amber-50 dark:fill-slate-900"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 1.5, ease: 'easeInOut' }}
+          <svg viewBox="0 0 1440 120" fill="none" className="w-full h-auto">
+            <path 
+              d="M0 120L60 105C120 90 240 60 360 45C480 30 600 30 720 37.5C840 45 960 60 1080 67.5C1200 75 1320 75 1380 75L1440 75V120H0Z" 
+              className="fill-white dark:fill-slate-950"
             />
           </svg>
         </div>
@@ -257,41 +285,43 @@ export default function RestaurantMenuPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
-              <Sparkles className="w-4 h-4 text-white" />
-              <span className="text-white/90 text-sm font-medium">{t('authenticLebanese')}</span>
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-xl rounded-full px-6 py-3 mb-8 border border-white/30">
+              <Sparkles className="w-5 h-5 text-white" />
+              <span className="text-white font-medium">{t('authenticLebanese')}</span>
             </div>
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 drop-shadow-lg">
               {settings.restaurantName || t('menu')}
             </h1>
-            <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
+            <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto mb-12">
               {t('menuSubtitle')}
             </p>
 
-            {/* Quick Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="flex justify-center gap-8 mt-8"
-            >
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white">{menuItems.length}+</div>
-                <div className="text-white/80 text-sm">{t('dishes')}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white">{categories.length}</div>
-                <div className="text-white/80 text-sm">{t('categories')}</div>
-              </div>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 text-3xl font-bold text-white">
-                  <Star className="w-6 h-6 fill-yellow-400 text-yellow-400" />
-                  4.9
-                </div>
-                <div className="text-white/80 text-sm">{t('rating')}</div>
-              </div>
-            </motion.div>
+            {/* Stats Cards */}
+            <div className="flex flex-wrap justify-center gap-4 md:gap-6">
+              {[
+                { value: menuItems.length, suffix: '+', label: t('dishes'), icon: <UtensilsCrossed className="w-5 h-5" /> },
+                { value: categories.length, label: t('categories'), icon: <ChefHat className="w-5 h-5" /> },
+                { value: 4.9, label: t('rating'), icon: <Star className="w-5 h-5 fill-current" /> },
+              ].map((stat, index) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 + index * 0.1 }}
+                  whileHover={{ y: -4, scale: 1.05 }}
+                  className="bg-white/20 backdrop-blur-xl rounded-2xl px-8 py-4 border border-white/30 text-white"
+                >
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    {stat.icon}
+                    <span className="text-3xl font-bold">
+                      <AnimatedCounter value={stat.value} suffix={stat.suffix} duration={2} />
+                    </span>
+                  </div>
+                  <div className="text-sm text-white/80">{stat.label}</div>
+                </motion.div>
+              ))}
+            </div>
           </motion.div>
         </div>
       </div>
@@ -304,96 +334,128 @@ export default function RestaurantMenuPage() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-12"
           >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <div className="flex items-center justify-between mb-8">
+              <RevealHeading className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Flame className="w-6 h-6 text-orange-500" />
-                {t('featuredDishes')}
-              </h2>
-              <button
+                <GradientText from="from-orange-500" via="via-red-500" to="to-amber-500">
+                  {t('featuredDishes')}
+                </GradientText>
+              </RevealHeading>
+              <motion.button
                 onClick={() => setShowFeaturedOnly(!showFeaturedOnly)}
-                className={`text-sm font-medium px-4 py-2 rounded-full transition-all ${showFeaturedOnly
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 hover:bg-orange-200'
-                  }`}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`text-sm font-medium px-5 py-2.5 rounded-full transition-all backdrop-blur-md ${showFeaturedOnly
+                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30'
+                  : 'bg-white/80 dark:bg-slate-800/80 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-slate-700 border border-orange-200/50 dark:border-slate-600/50'
+                }`}
               >
                 {showFeaturedOnly ? t('showAll') : t('viewFeatured')}
-              </button>
+              </motion.button>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-3 gap-8">
               {featuredItems.map((item, index) => (
-                <motion.div
+                <TiltCard
                   key={item.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -8 }}
-                  className="relative group"
+                  intensity={8}
+                  className="h-full"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl blur-xl opacity-30 group-hover:opacity-50 transition-opacity" />
-                  <div className="relative bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-xl border border-orange-100 dark:border-slate-700">
-                    <div className="h-48 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30 relative overflow-hidden">
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={translateContent(item, 'name')}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <motion.span
-                            className="text-6xl"
-                            animate={{ rotate: [0, 10, -10, 0] }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                          >
-                            {getCategoryIcon(item.category.name)}
-                          </motion.span>
-                        </div>
-                      )}
-                      <div className="absolute top-3 left-3">
-                        <span className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-current" /> {t('featured')}
-                        </span>
-                      </div>
-                      <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
-                        {item.discountPrice ? (
-                          <>
-                            <div className="bg-emerald-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg">
-                              {formatCurrency(item.discountPrice, currency)}
-                            </div>
-                            <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-[10px] font-bold text-slate-400 line-through">
-                              {formatCurrency(item.price, currency)}
-                            </div>
-                          </>
+                  <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.15 }}
+                    className="relative group h-full"
+                  >
+                    {/* Glow Effect */}
+                    <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-60 transition-opacity duration-500" />
+                    
+                    <div className="relative bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-white/20 dark:border-slate-700/50 h-full flex flex-col">
+                      {/* Image Section */}
+                      <div className="h-52 relative overflow-hidden">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={translateContent(item, 'name')}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          />
                         ) : (
-                          <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg">
-                            {formatCurrency(item.price, currency)}
+                          <div className="w-full h-full bg-gradient-to-br from-orange-100 via-amber-100 to-red-100 dark:from-orange-900/30 dark:via-amber-900/30 dark:to-red-900/30 flex items-center justify-center">
+                            <motion.span
+                              className="text-7xl drop-shadow-lg"
+                              animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                              transition={{ duration: 3, repeat: Infinity }}
+                            >
+                              {getCategoryIcon(item.category.name)}
+                            </motion.span>
                           </div>
                         )}
+                        
+                        {/* Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                        
+                        {/* Featured Badge */}
+                        <div className="absolute top-4 left-4">
+                          <motion.span 
+                            initial={{ x: -20, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-orange-500/30"
+                          >
+                            <Star className="w-3.5 h-3.5 fill-current" /> {t('featured')}
+                          </motion.span>
+                        </div>
+                        
+                        {/* Price Badge */}
+                        <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
+                          {item.discountPrice ? (
+                            <>
+                              <motion.div 
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="bg-emerald-500 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg"
+                              >
+                                {formatCurrency(item.discountPrice, currency)}
+                              </motion.div>
+                              <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-bold text-slate-400 line-through">
+                                {formatCurrency(item.price, currency)}
+                              </div>
+                            </>
+                          ) : (
+                            <motion.div 
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg shadow-orange-500/30"
+                            >
+                              {formatCurrency(item.price, currency)}
+                            </motion.div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="p-6 flex-1 flex flex-col">
+                        <h3 className="font-bold text-xl text-slate-900 dark:text-white mb-2">
+                          {translateContent(item, 'name')}
+                        </h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-5 flex-1">
+                          {translateContent(item, 'description')}
+                        </p>
+                        <motion.button
+                          whileHover={{ scale: 1.02, y: -2 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => addToCart(item)}
+                          disabled={!item.isAvailable}
+                          className="w-full py-3 bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 text-white rounded-xl font-semibold shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40 transition-all disabled:opacity-50 group/btn"
+                        >
+                          <span className="flex items-center justify-center gap-2">
+                            <Plus className="w-5 h-5 group-hover/btn:rotate-90 transition-transform duration-300" />
+                            {t('addToCart')}
+                          </span>
+                        </motion.button>
                       </div>
                     </div>
-                    <div className="p-5">
-                      <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-2">
-                        {translateContent(item, 'name')}
-                      </h3>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4">
-                        {translateContent(item, 'description')}
-                      </p>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => addToCart(item)}
-                        disabled={!item.isAvailable}
-                        className="w-full py-2.5 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl font-semibold shadow-lg shadow-orange-500/30 hover:shadow-xl transition-all disabled:opacity-50"
-                      >
-                        <span className="flex items-center justify-center gap-2">
-                          <Plus className="w-4 h-4" />
-                          {t('addToCart')}
-                        </span>
-                      </motion.button>
-                    </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
+                </TiltCard>
               ))}
             </div>
           </motion.section>
@@ -406,44 +468,47 @@ export default function RestaurantMenuPage() {
           transition={{ delay: 0.2 }}
           className="mb-10"
         >
-          <div className="flex flex-wrap gap-3 justify-center">
-            <motion.button
-              onClick={() => setSelectedCategory(null)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className={`
-                px-6 py-3 rounded-full font-semibold transition-all duration-300 shadow-md
-                ${!selectedCategory
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-orange-500/30'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600'
-                }
-              `}
-            >
-              <span className="flex items-center gap-2">
-                <UtensilsCrossed className="w-4 h-4" />
-                {tCommon('all')}
-              </span>
-            </motion.button>
-            {categories.map((category: any) => (
+          {/* Glass container for pills */}
+          <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl p-4 border border-white/30 dark:border-slate-700/50 shadow-lg">
+            <div className="flex flex-wrap gap-3 justify-center">
               <motion.button
-                key={category.id}
-                onClick={() => setSelectedCategory(category.id)}
-                whileHover={{ scale: 1.05 }}
+                onClick={() => setSelectedCategory(null)}
+                whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
                 className={`
-                  px-6 py-3 rounded-full font-semibold transition-all duration-300 shadow-md
-                  ${selectedCategory === category.id
-                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-orange-500/30'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600'
+                  px-6 py-3 rounded-full font-semibold transition-all duration-300
+                  ${!selectedCategory
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30'
+                    : 'bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-slate-600 border border-slate-200/50 dark:border-slate-600/50'
                   }
                 `}
               >
                 <span className="flex items-center gap-2">
-                  <span className="text-lg">{getCategoryIcon(category.name)}</span>
-                  {translateContent(category, 'name')}
+                  <UtensilsCrossed className="w-4 h-4" />
+                  {tCommon('all')}
                 </span>
               </motion.button>
-            ))}
+              {categories.map((category: any) => (
+                <motion.button
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category.id)}
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`
+                    px-6 py-3 rounded-full font-semibold transition-all duration-300
+                    ${selectedCategory === category.id
+                      ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30'
+                      : 'bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-slate-600 border border-slate-200/50 dark:border-slate-600/50'
+                    }
+                  `}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-lg">{getCategoryIcon(category.name)}</span>
+                    {translateContent(category, 'name')}
+                  </span>
+                </motion.button>
+              ))}
+            </div>
           </div>
         </motion.div>
 
@@ -455,118 +520,130 @@ export default function RestaurantMenuPage() {
             initial="hidden"
             animate="visible"
             exit={{ opacity: 0, y: -20 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
           >
             {filteredItems.map((item) => (
-              <motion.div
+              <SpotlightCard
                 key={item.id}
-                variants={cardVariants}
-                whileHover={{ y: -8, transition: { duration: 0.3 } }}
-                className="group"
+                className="h-full"
+                spotlightColor="rgba(251, 146, 60, 0.15)"
               >
-                <div className="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100 dark:border-slate-700 h-full flex flex-col">
-                  {/* Image Section */}
-                  <div className="relative h-48 overflow-hidden">
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={translateContent(item, 'name')}
-                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-orange-100 via-amber-100 to-red-100 dark:from-orange-900/30 dark:via-amber-900/30 dark:to-red-900/30 flex items-center justify-center">
-                        <motion.span
-                          className="text-6xl"
-                          animate={{ rotate: [0, 5, -5, 0] }}
-                          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                        >
-                          {getCategoryIcon(item.category.name)}
-                        </motion.span>
-                      </div>
-                    )}
-
-                    {/* Price Badge */}
-                    <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
-                      {item.discountPrice ? (
-                        <>
-                          <div className="bg-emerald-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg">
-                            {formatCurrency(item.discountPrice, currency)}
-                          </div>
-                          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-xs font-bold text-slate-400 line-through">
-                            {formatCurrency(item.price, currency)}
-                          </div>
-                        </>
+                <motion.div
+                  variants={cardVariants}
+                  className="group h-full"
+                >
+                  <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl overflow-hidden border border-white/30 dark:border-slate-700/50 h-full flex flex-col transition-all duration-500 hover:shadow-2xl hover:shadow-orange-500/10">
+                    {/* Image Section */}
+                    <div className="relative h-48 overflow-hidden">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={translateContent(item, 'name')}
+                          className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+                        />
                       ) : (
-                        <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg">
-                          {formatCurrency(item.price, currency)}
+                        <div className="w-full h-full bg-gradient-to-br from-orange-100 via-amber-100 to-red-100 dark:from-orange-900/30 dark:via-amber-900/30 dark:to-red-900/30 flex items-center justify-center">
+                          <motion.span
+                            className="text-6xl drop-shadow-md"
+                            animate={{ rotate: [0, 5, -5, 0] }}
+                            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                          >
+                            {getCategoryIcon(item.category.name)}
+                          </motion.span>
+                        </div>
+                      )}
+                      
+                      {/* Gradient overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                      {/* Price Badge */}
+                      <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+                        {item.discountPrice ? (
+                          <>
+                            <motion.div 
+                              whileHover={{ scale: 1.1 }}
+                              className="bg-emerald-500 text-white px-3.5 py-1.5 rounded-full font-bold text-sm shadow-lg"
+                            >
+                              {formatCurrency(item.discountPrice, currency)}
+                            </motion.div>
+                            <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-xs font-bold text-slate-400 line-through">
+                              {formatCurrency(item.price, currency)}
+                            </div>
+                          </>
+                        ) : (
+                          <motion.div 
+                            whileHover={{ scale: 1.1 }}
+                            className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3.5 py-1.5 rounded-full font-bold text-sm shadow-lg shadow-orange-500/20"
+                          >
+                            {formatCurrency(item.price, currency)}
+                          </motion.div>
+                        )}
+                      </div>
+
+                      {/* Featured Badge */}
+                      {item.isFeatured && (
+                        <div className="absolute top-3 left-3">
+                          <span className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-md">
+                            <Star className="w-3 h-3 fill-current" /> {t('featured')}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Availability Overlay */}
+                      {!item.isAvailable && (
+                        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
+                          <span className="bg-red-500 text-white px-4 py-2 rounded-full font-semibold text-sm shadow-lg">
+                            {t('unavailable')}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Prep Time */}
+                      {item.preparationTimeMinutes && (
+                        <div className="absolute bottom-3 left-3">
+                          <span className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5 shadow-sm">
+                            <Clock className="w-3.5 h-3.5" /> {item.preparationTimeMinutes} {t('minutes')}
+                          </span>
                         </div>
                       )}
                     </div>
 
-                    {/* Featured Badge */}
-                    {item.isFeatured && (
-                      <div className="absolute top-3 left-3">
-                        <span className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-current" /> {t('featured')}
-                        </span>
-                      </div>
-                    )}
+                    {/* Content Section */}
+                    <div className="p-5 flex-1 flex flex-col">
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="font-bold text-lg text-slate-900 dark:text-white line-clamp-1 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
+                            {translateContent(item, 'name')}
+                          </h3>
+                        </div>
 
-                    {/* Availability Overlay */}
-                    {!item.isAvailable && (
-                      <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
-                        <span className="bg-red-500 text-white px-4 py-2 rounded-full font-semibold text-sm">
-                          {t('unavailable')}
-                        </span>
-                      </div>
-                    )}
+                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
+                          {translateContent(item, 'description')}
+                        </p>
 
-                    {/* Prep Time */}
-                    {item.preparationTimeMinutes && (
-                      <div className="absolute bottom-3 left-3">
-                        <span className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> {item.preparationTimeMinutes} {t('minutes')}
-                        </span>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {item.isVegetarian && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100/80 dark:bg-green-900/30 text-green-700 dark:text-green-400 backdrop-blur-sm" title={t('vegetarian')}>
+                              <Leaf className="w-3 h-3" />
+                            </span>
+                          )}
+                          {item.isVegan && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100/80 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 backdrop-blur-sm" title={t('vegan')}>
+                              <Sparkles className="w-3 h-3" />
+                            </span>
+                          )}
+                          {item.isGlutenFree && (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100/80 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 backdrop-blur-sm" title={t('glutenFree')}>
+                              GF
+                            </span>
+                          )}
+                          {item.isSpicy && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100/80 dark:bg-red-900/30 text-red-700 dark:text-red-400 backdrop-blur-sm" title={t('spicy')}>
+                              <Flame className="w-3 h-3" />
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Content Section */}
-                  <div className="p-5 flex-1 flex flex-col">
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-bold text-lg text-slate-900 dark:text-white line-clamp-1">
-                          {translateContent(item, 'name')}
-                        </h3>
-                      </div>
-
-                      <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
-                        {translateContent(item, 'description')}
-                      </p>
-
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {item.isVegetarian && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" title={t('vegetarian')}>
-                            <Leaf className="w-3 h-3" />
-                          </span>
-                        )}
-                        {item.isVegan && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" title={t('vegan')}>
-                            <Sparkles className="w-3 h-3" />
-                          </span>
-                        )}
-                        {item.isGlutenFree && (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" title={t('glutenFree')}>
-                            GF
-                          </span>
-                        )}
-                        {item.isSpicy && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" title={t('spicy')}>
-                            <Flame className="w-3 h-3" />
-                          </span>
-                        )}
-                      </div>
-                    </div>
 
                     {/* Quantity Controls */}
                     <div className="mt-auto">
@@ -574,10 +651,10 @@ export default function RestaurantMenuPage() {
                         <motion.div
                           initial={{ scale: 0.8 }}
                           animate={{ scale: 1 }}
-                          className="flex items-center justify-center gap-4 bg-orange-50 dark:bg-slate-700 rounded-xl px-4 py-3"
+                          className="flex items-center justify-center gap-4 bg-orange-50/80 dark:bg-slate-700/80 backdrop-blur-sm rounded-xl px-4 py-3"
                         >
                           <motion.button
-                            whileHover={{ scale: 1.1 }}
+                            whileHover={{ scale: 1.15 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => removeFromRestaurant(item.id)}
                             className="w-10 h-10 rounded-full bg-white dark:bg-slate-600 shadow-md flex items-center justify-center text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-slate-500 transition-colors"
@@ -588,24 +665,24 @@ export default function RestaurantMenuPage() {
                             {getItemQuantity(item.id)}
                           </span>
                           <motion.button
-                            whileHover={{ scale: 1.1 }}
+                            whileHover={{ scale: 1.15 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => addToCart(item)}
                             disabled={!item.isAvailable}
-                            className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-red-500 shadow-md flex items-center justify-center text-white disabled:opacity-50"
+                            className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-red-500 shadow-md shadow-orange-500/30 flex items-center justify-center text-white disabled:opacity-50"
                           >
                             <Plus className="w-5 h-5" />
                           </motion.button>
                         </motion.div>
                       ) : (
                         <motion.button
-                          whileHover={{ scale: 1.02 }}
+                          whileHover={{ scale: 1.02, y: -2 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => addToCart(item)}
                           disabled={!item.isAvailable}
-                          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 text-white font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:shadow-orange-500/30 flex items-center justify-center gap-2 group/btn"
                         >
-                          <Plus className="w-5 h-5" />
+                          <Plus className="w-5 h-5 group-hover/btn:rotate-90 transition-transform duration-300" />
                           {item.isAvailable ? t('addToCart') : t('unavailable')}
                         </motion.button>
                       )}
@@ -613,6 +690,7 @@ export default function RestaurantMenuPage() {
                   </div>
                 </div>
               </motion.div>
+            </SpotlightCard>
             ))}
           </motion.div>
         </AnimatePresence>
@@ -624,20 +702,27 @@ export default function RestaurantMenuPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-20"
           >
-            <div className="bg-white dark:bg-slate-800 rounded-3xl p-12 max-w-md mx-auto shadow-xl">
-              <motion.div
-                animate={{ rotate: [0, 10, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <UtensilsCrossed className="w-20 h-20 text-orange-400 mx-auto mb-6" />
-              </motion.div>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                {tCommon('noItemsFound')}
-              </h3>
-              <p className="text-slate-600 dark:text-slate-400">
-                {t('tryDifferentCategory')}
-              </p>
-            </div>
+            <FloatingCard className="max-w-md mx-auto">
+              <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-12 shadow-2xl border border-white/30 dark:border-slate-700/50">
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0], y: [0, -10, 0] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
+                  <UtensilsCrossed className="w-20 h-20 text-orange-400 mx-auto mb-6 drop-shadow-lg" />
+                </motion.div>
+                <GradientText 
+                  from="from-orange-500" 
+                  via="via-red-500" 
+                  to="to-amber-500"
+                  className="text-2xl font-bold mb-3 block"
+                >
+                  {tCommon('noItemsFound')}
+                </GradientText>
+                <p className="text-slate-600 dark:text-slate-400">
+                  {t('tryDifferentCategory')}
+                </p>
+              </div>
+            </FloatingCard>
           </motion.div>
         )}
       </main>
@@ -652,33 +737,41 @@ export default function RestaurantMenuPage() {
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="fixed bottom-6 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-50"
           >
-            <div className="bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 rounded-2xl shadow-2xl shadow-orange-500/30 p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <ShoppingCart className="w-8 h-8 text-white" />
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-white text-orange-600 rounded-full flex items-center justify-center text-xs font-bold"
+            {/* Glow effect */}
+            <div className="absolute -inset-2 bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 rounded-3xl blur-xl opacity-40 animate-pulse" />
+            
+            <div className="relative bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 rounded-2xl shadow-2xl shadow-orange-500/40 p-1">
+              <div className="bg-white/10 backdrop-blur-xl rounded-xl p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <motion.div 
+                      className="relative"
+                      whileHover={{ scale: 1.1 }}
                     >
-                      {cartCount}
+                      <ShoppingCart className="w-8 h-8 text-white drop-shadow-lg" />
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-white text-orange-600 rounded-full flex items-center justify-center text-xs font-bold shadow-lg"
+                      >
+                        {cartCount}
+                      </motion.div>
                     </motion.div>
+                    <div className="text-white">
+                      <p className="text-sm opacity-90">{t('itemsInCart', { count: cartCount })}</p>
+                      <p className="text-2xl font-bold drop-shadow-md">{formatCurrency(cartTotal, currency)}</p>
+                    </div>
                   </div>
-                  <div className="text-white">
-                    <p className="text-sm opacity-90">{t('itemsInCart', { count: cartCount })}</p>
-                    <p className="text-xl font-bold">{formatCurrency(cartTotal, currency)}</p>
-                  </div>
+                  <Link href="/restaurant/cart">
+                    <motion.button
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="bg-white text-orange-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300"
+                    >
+                      {t('proceedToCheckout')}
+                    </motion.button>
+                  </Link>
                 </div>
-                <Link href="/restaurant/cart">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="bg-white text-orange-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300"
-                  >
-                    {t('proceedToCheckout')}
-                  </motion.button>
-                </Link>
               </div>
             </div>
           </motion.div>
