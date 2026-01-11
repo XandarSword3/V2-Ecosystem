@@ -65,7 +65,7 @@ export function UserPreferencesModal({ isOpen, onClose }: UserPreferencesModalPr
             className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="relative bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 p-6 text-white">
+            <div className="relative bg-gradient-to-r from-primary-600 via-primary-500 to-secondary-500 p-6 text-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -200,7 +200,7 @@ export function UserPreferencesModal({ isOpen, onClose }: UserPreferencesModalPr
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={onClose}
-                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all"
+                className="w-full py-3 px-4 bg-gradient-to-r from-primary-600 to-secondary-500 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40 transition-all"
               >
                 {t('preferences.done')}
               </motion.button>
@@ -235,7 +235,7 @@ function ToggleSwitch({ label, description, enabled, onChange }: ToggleSwitchPro
         className={`
           relative w-14 h-8 rounded-full transition-colors duration-300
           ${enabled 
-            ? 'bg-gradient-to-r from-blue-500 to-cyan-500' 
+            ? 'bg-gradient-to-r from-primary-500 to-secondary-500' 
             : 'bg-slate-300 dark:bg-slate-600'
           }
         `}

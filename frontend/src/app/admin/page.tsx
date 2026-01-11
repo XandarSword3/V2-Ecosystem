@@ -334,7 +334,7 @@ export default function AdminDashboard() {
           icon={Waves}
           trend={stats?.trends?.tickets !== undefined ? (stats.trends.tickets >= 0 ? 'up' : 'down') : 'neutral'}
           trendValue={stats?.trends?.tickets !== undefined ? `${stats.trends.tickets >= 0 ? '+' : ''}${stats.trends.tickets}% from yesterday` : 'No data'}
-          gradient="bg-gradient-to-br from-cyan-400 to-blue-500"
+          gradient="bg-gradient-to-br from-primary-400 to-secondary-500"
           delay={0.3}
         />
       </div>
@@ -377,7 +377,7 @@ export default function AdminDashboard() {
                   name="🏊 Pool"
                   value={stats?.revenueByUnit?.pool || 0}
                   percentage={getPercentage(stats?.revenueByUnit?.pool || 0)}
-                  color="bg-gradient-to-r from-cyan-400 to-blue-500"
+                  color="bg-gradient-to-r from-primary-400 to-secondary-500"
                   delay={0.7}
                 />
               </div>
@@ -469,7 +469,7 @@ export default function AdminDashboard() {
               {[
                 { href: '/admin/restaurant/menu', icon: UtensilsCrossed, label: 'Manage Menu', color: 'from-orange-400 to-rose-500' },
                 { href: '/admin/chalets', icon: Home, label: 'Manage Chalets', color: 'from-emerald-400 to-teal-500' },
-                { href: '/admin/pool', icon: Waves, label: 'Pool Sessions', color: 'from-cyan-400 to-blue-500' },
+                { href: '/admin/pool', icon: Waves, label: 'Pool Sessions', color: 'from-primary-400 to-secondary-500' },
                 { href: '/admin/reports', icon: TrendingUp, label: 'View Reports', color: 'from-purple-400 to-indigo-500' },
               ].map((action, index) => (
                 <motion.div

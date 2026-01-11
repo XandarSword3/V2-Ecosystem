@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { ThemeToggle } from '../ThemeToggle';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { CurrencySwitcher } from '../CurrencySwitcher';
@@ -20,7 +20,7 @@ import {
   Settings,
   Link as LinkIcon
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useCartStore } from '@/lib/stores/cartStore';
 import { cn } from '@/lib/cn';
@@ -28,6 +28,7 @@ import { useSiteSettings } from '@/lib/settings-context';
 
 export default function Header() {
     const { settings, modules } = useSiteSettings();
+    const locale = useLocale(); // Track locale to force re-render on language change
     // ...existing code...
     const pathname = usePathname();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -83,32 +84,56 @@ export default function Header() {
     return icons[name] || Home;
   };
 
-  // Build navigation from CMS or Fallback
-  const navigation = settings.navbar?.links?.map((link: any) => {
-    if (link.type === 'module') {
-      const module = modules.find(m => m.slug === link.moduleSlug);
-      return {
-        name: module?.name || link.label,
-        href: module ? `/${module.slug}` : link.href,
-        icon: module ? getIconForModule(module) : getIconByName(link.icon)
-      };
-    }
-    return {
-      name: link.label,
-      href: link.href,
-      icon: getIconByName(link.icon)
+  // Get translated name for module
+  const getModuleTranslatedName = (slug: string, fallbackName: string) => {
+    // Map slug to translation key
+    const translationMap: Record<string, string> = {
+      'restaurant': 'restaurant',
+      'chalets': 'chalets', 
+      'pool': 'pool',
+      'snack-bar': 'snackBar',
+      'snackbar': 'snackBar',
+      'gym': 'gym',
     };
-  }) || [
-      { name: t('home'), href: '/', icon: Home },
-      ...modules
-        .filter(m => m.show_in_main)
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map(m => ({
-          name: m.name,
-          href: `/${m.slug}`,
-          icon: getIconForModule(m)
-        }))
-    ];
+    const key = translationMap[slug.toLowerCase()];
+    if (key) {
+      try {
+        return t(key);
+      } catch {
+        return fallbackName;
+      }
+    }
+    return fallbackName;
+  };
+
+  // Build navigation from CMS or Fallback - recalculate when locale changes
+  const navigation = useMemo(() => {
+    return settings.navbar?.links?.map((link: any) => {
+      if (link.type === 'module') {
+        const module = modules.find(m => m.slug === link.moduleSlug);
+        return {
+          name: module ? getModuleTranslatedName(module.slug, module.name) : link.label,
+          href: module ? `/${module.slug}` : link.href,
+          icon: module ? getIconForModule(module) : getIconByName(link.icon)
+        };
+      }
+      return {
+        name: link.label,
+        href: link.href,
+        icon: getIconByName(link.icon)
+      };
+    }) || [
+        { name: t('home'), href: '/', icon: Home },
+        ...modules
+          .filter(m => m.show_in_main)
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map(m => ({
+            name: getModuleTranslatedName(m.slug, m.name),
+            href: `/${m.slug}`,
+            icon: getIconForModule(m)
+          }))
+      ];
+  }, [settings.navbar?.links, modules, locale, t]);
 
   // ...existing code...
 
@@ -128,30 +153,30 @@ export default function Header() {
 
   return (
     <motion.header
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
+      initial={{ y: -100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       className={cn(
         navConfig.sticky ? 'sticky top-0 z-50' : 'relative z-50',
-        'transition-all duration-300',
+        'transition-all duration-500',
         scrolled
-          ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg shadow-lg shadow-black/5'
-          : 'bg-white dark:bg-gray-900',
-        'border-b border-gray-200/50 dark:border-gray-800/50'
+          ? 'bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl shadow-xl shadow-slate-900/5 dark:shadow-black/20'
+          : 'bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl',
+        'border-b border-white/30 dark:border-slate-800/30'
       )}
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
+          <Link href="/" className="flex items-center gap-2.5 group">
             <motion.div
               whileHover={{ scale: 1.05, rotate: -3 }}
               whileTap={{ scale: 0.95 }}
-              className="bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-500 text-white font-bold text-xl px-3 py-1.5 rounded-xl shadow-lg shadow-blue-500/30"
+              className="bg-gradient-to-br from-primary-500 via-primary-600 to-secondary-500 text-white font-bold text-xl px-3.5 py-2 rounded-xl shadow-lg shadow-primary-500/30 backdrop-blur-sm"
             >
               {settings.resortName ? settings.resortName.substring(0, 2) : 'V2'}
             </motion.div>
-            <span className="font-bold text-xl text-gray-900 dark:text-white hidden sm:inline group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+            <span className="font-bold text-xl text-slate-900 dark:text-white hidden sm:inline group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-300">
               {settings.resortName ? settings.resortName.substring(2) : 'Resort'}
             </span>
           </Link>
@@ -165,13 +190,13 @@ export default function Header() {
               return (
                 <Link key={item.href} href={item.href}>
                   <motion.div
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={{ scale: 1.02, y: -1 }}
                     whileTap={{ scale: 0.98 }}
                     className={cn(
-                      'flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200',
+                      'flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300',
                       isActive
-                        ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium'
-                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                        ? 'bg-primary-500/10 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 font-medium backdrop-blur-sm border border-primary-200/50 dark:border-primary-700/30'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60 hover:backdrop-blur-sm'
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -190,15 +215,15 @@ export default function Header() {
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  whileHover={{ scale: 1.05 }}
+                  whileHover={{ scale: 1.05, y: -1 }}
                   whileTap={{ scale: 0.95 }}
-                  className="relative p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"
+                  className="relative p-2.5 rounded-xl bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg border border-white/40 dark:border-slate-700/40 text-primary-600 dark:text-primary-400 shadow-lg shadow-slate-900/5"
                 >
                   <ShoppingCart className="h-5 w-5" />
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
+                    className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center shadow-lg shadow-red-500/30"
                   >
                     {cartCount}
                   </motion.span>
@@ -216,7 +241,7 @@ export default function Header() {
                 whileHover={{ scale: 1.05, rotate: 15 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setPreferencesOpen(true)}
-                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                className="p-2.5 rounded-xl bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg border border-white/40 dark:border-slate-700/40 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-sm transition-all duration-300"
                 aria-label={t('settings')}
               >
                 <Settings className="h-5 w-5" />
@@ -228,9 +253,9 @@ export default function Header() {
               {isAuthenticated ? (
                 <Link href="/profile">
                   <motion.div
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={{ scale: 1.02, y: -1 }}
                     whileTap={{ scale: 0.98 }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg border border-white/40 dark:border-slate-700/40 text-slate-700 dark:text-slate-300 shadow-sm"
                   >
                     <User className="h-4 w-4" />
                     <span className="text-sm font-medium">{user?.fullName?.split(' ')[0] || 'Profile'}</span>
@@ -242,16 +267,16 @@ export default function Header() {
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                      className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
                     >
                       {t('signIn')}
                     </motion.div>
                   </Link>
                   <Link href="/register">
                     <motion.div
-                      whileHover={{ scale: 1.02 }}
+                      whileHover={{ scale: 1.02, y: -1 }}
                       whileTap={{ scale: 0.98 }}
-                      className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl shadow-lg shadow-blue-500/25 transition-all"
+                      className="px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-primary-500 via-primary-600 to-primary-700 hover:from-primary-600 hover:via-primary-700 hover:to-primary-800 text-white rounded-xl shadow-lg shadow-primary-500/30 transition-all duration-300"
                     >
                       {tCommon('register')}
                     </motion.div>
@@ -264,7 +289,7 @@ export default function Header() {
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 rounded-xl text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="lg:hidden p-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg border border-white/40 dark:border-slate-700/40 shadow-sm"
             >
               <AnimatePresence mode="wait">
                 {mobileMenuOpen ? (
@@ -301,7 +326,7 @@ export default function Header() {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3, ease: 'easeInOut' }}
-              className="lg:hidden overflow-hidden border-t border-gray-200 dark:border-gray-800"
+              className="lg:hidden overflow-hidden border-t border-white/20 dark:border-slate-700/30 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl"
             >
               <motion.div
                 initial="hidden"
@@ -331,10 +356,10 @@ export default function Header() {
                         href={item.href}
                         onClick={() => setMobileMenuOpen(false)}
                         className={cn(
-                          'flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
+                          'flex items-center gap-3 px-4 py-3 mx-2 rounded-xl transition-all duration-300',
                           isActive
-                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium'
-                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            ? 'bg-primary-500/10 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 font-medium border border-primary-200/50 dark:border-primary-700/30'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'
                         )}
                       >
                         <Icon className="h-5 w-5" />
@@ -350,30 +375,30 @@ export default function Header() {
                     hidden: { opacity: 0, x: -20 },
                     visible: { opacity: 1, x: 0 },
                   }}
-                  className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-800"
+                  className="pt-4 mt-4 mx-2 border-t border-white/20 dark:border-slate-700/30"
                 >
                   {isAuthenticated ? (
                     <Link
                       href="/profile"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60 transition-all duration-300"
                     >
                       <User className="h-5 w-5" />
                       <span>{t('myProfile')}</span>
                     </Link>
                   ) : (
-                    <div className="flex gap-2 px-4">
+                    <div className="flex gap-2 px-2">
                       <Link
                         href="/login"
                         onClick={() => setMobileMenuOpen(false)}
-                        className="flex-1 py-2.5 text-center text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl"
+                        className="flex-1 py-2.5 text-center text-sm font-medium bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg border border-white/40 dark:border-slate-700/40 text-slate-700 dark:text-slate-300 rounded-xl transition-all duration-300 hover:bg-white/80 dark:hover:bg-slate-700/80"
                       >
                         {t('signIn')}
                       </Link>
                       <Link
                         href="/register"
                         onClick={() => setMobileMenuOpen(false)}
-                        className="flex-1 py-2.5 text-center text-sm font-medium bg-blue-600 text-white rounded-xl"
+                        className="flex-1 py-2.5 text-center text-sm font-semibold bg-gradient-to-r from-primary-500 via-primary-600 to-primary-700 text-white rounded-xl shadow-lg shadow-primary-500/30"
                       >
                         {tCommon('register')}
                       </Link>

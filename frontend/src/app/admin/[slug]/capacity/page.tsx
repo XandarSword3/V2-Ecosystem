@@ -216,7 +216,7 @@ export default function DynamicCapacityPage() {
                 </div>
 
                 <div className="mt-6">
-                  <Button onClick={handleSave} disabled={saving} className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
+                  <Button onClick={handleSave} disabled={saving} className="w-full bg-gradient-to-r from-primary-500 to-secondary-600 text-white">
                     {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                     Save Settings
                   </Button>

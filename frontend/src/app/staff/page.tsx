@@ -197,8 +197,8 @@ export default function StaffDashboard() {
         description = 'Kitchen view';
       } else if (m.template_type === 'session_access') {
         icon = Waves;
-        color = 'from-cyan-400 to-blue-500';
-        bgColor = 'bg-cyan-50 dark:bg-cyan-950/30';
+        color = 'from-primary-400 to-secondary-500';
+        bgColor = 'bg-primary-50 dark:bg-primary-950/30';
         description = 'Sessions & Capacity';
       }
 
@@ -243,8 +243,8 @@ export default function StaffDashboard() {
       description: 'Manage pool access',
       href: '/staff/pool',
       icon: Waves,
-      color: 'from-cyan-400 to-blue-500',
-      bgColor: 'bg-cyan-50 dark:bg-cyan-950/30',
+      color: 'from-primary-400 to-secondary-500',
+      bgColor: 'bg-primary-50 dark:bg-primary-950/30',
     },
   ];
 

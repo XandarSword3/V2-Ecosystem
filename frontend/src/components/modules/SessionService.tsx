@@ -103,13 +103,13 @@ export function SessionService({ module }: SessionServiceProps) {
 
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center text-slate-600 dark:text-slate-400">
-                    <Clock className="w-4 h-4 mr-3 text-cyan-600" />
+                    <Clock className="w-4 h-4 mr-3 text-primary-600" />
                     <span className="text-sm">
                       {session.start_time} - {session.end_time}
                     </span>
                   </div>
                   <div className="flex items-center text-slate-600 dark:text-slate-400">
-                    <Users className="w-4 h-4 mr-3 text-cyan-600" />
+                    <Users className="w-4 h-4 mr-3 text-primary-600" />
                     <span className="text-sm">
                       Max {session.capacity} {t('guests')}
                     </span>
@@ -117,10 +117,10 @@ export function SessionService({ module }: SessionServiceProps) {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-700">
-                  <span className="text-2xl font-bold text-cyan-600">
+                  <span className="text-2xl font-bold text-primary-600">
                     {formatCurrency(session.price, currency)}
                   </span>
-                  <button className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium transition-colors text-sm">
+                  <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors text-sm">
                     {t('bookNow')}
                   </button>
                 </div>

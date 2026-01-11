@@ -51,7 +51,7 @@ const actionConfig: Record<string, { icon: React.ElementType; color: string; bgC
   delete: { icon: Trash2, color: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-900/30' },
   login: { icon: LogIn, color: 'text-purple-500', bgColor: 'bg-purple-100 dark:bg-purple-900/30' },
   logout: { icon: LogOut, color: 'text-slate-500', bgColor: 'bg-slate-100 dark:bg-slate-700' },
-  view: { icon: Eye, color: 'text-cyan-500', bgColor: 'bg-cyan-100 dark:bg-cyan-900/30' },
+  view: { icon: Eye, color: 'text-primary-500', bgColor: 'bg-primary-100 dark:bg-primary-900/30' },
   settings: { icon: Settings, color: 'text-orange-500', bgColor: 'bg-orange-100 dark:bg-orange-900/30' },
 };
 

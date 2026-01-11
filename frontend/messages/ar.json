@@ -48,6 +48,9 @@
     "phone": "الهاتف",
     "confirmPassword": "تأكيد كلمة المرور",
     "tryAgainLater": "يرجى المحاولة مرة أخرى لاحقاً",
+    "testimonials": "ماذا يقول ضيوفنا",
+    "location": "موقعنا",
+    "exploreResort": "استكشف منتجعنا",
     "checkBackLater": "تحقق مرة أخرى لاحقاً للحصول على التحديثات",
     "andMore": "+{count} المزيد",
     "items": "عناصر",
@@ -67,7 +70,11 @@
     "feedback": "ملاحظات",
     "complaint": "شكوى",
     "processing": "جاري المعالجة...",
-    "status": "الحالة"
+    "status": "الحالة",
+    "chalets": "الشاليهات",
+    "maxGuests": "الحد الأقصى للضيوف",
+    "starRating": "تقييم النجوم",
+    "featured": "مميز"
   },
   "nav": {
     "home": "الرئيسية",
@@ -264,6 +271,7 @@
   "chalets": {
     "title": "الشاليهات",
     "subtitle": "اعثر على ملاذك المثالي في شاليهاتنا الجبلية المريحة",
+    "luxuryStay": "ملاذ جبلي فاخر",
     "available": "الشاليهات المتاحة",
     "noChaletsAvailable": "لا تتوفر شاليهات حالياً. يرجى المحاولة لاحقاً.",
     "book": "احجز الآن",
@@ -342,6 +350,9 @@
   "pool": {
     "title": "تذاكر المسبح",
     "subtitle": "احجز تجربة مسبح منعشة",
+    "refreshingExperience": "تجربة منعشة",
+    "sessionsToday": "جلسات اليوم",
+    "availableSpots": "الأماكن المتاحة",
     "sessions": "جلسات المسبح",
     "tickets": "احصل على تذاكر",
     "currentCapacity": "السعة الحالية",

@@ -162,8 +162,8 @@ function PoolConfirmationContent() {
 
             {/* Date & Time */}
             <div className="py-4 flex items-center gap-4">
-              <div className="w-12 h-12 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-cyan-600" />
+              <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-primary-600" />
               </div>
               <div className="flex-1">
                 <p className="text-sm text-slate-500">{t('date')}</p>

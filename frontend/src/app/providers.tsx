@@ -9,7 +9,9 @@ import { getLocaleFromCookie, defaultLocale, type Locale } from '@/i18n';
 import { LoadingScreen } from '@/components/effects/LoadingScreen';
 import { SettingsProvider } from '@/lib/settings-context';
 import { HydrateSettingsFromBackend } from '@/lib/hydrate-settings';
-// import { ThemeStyling } from '@/components/ThemeStyling';
+import { DirectionSync } from '@/components/DirectionSync';
+import { ThemeInjector } from '@/components/ThemeInjector';
+import { WeatherEffects } from '@/components/effects/WeatherEffects';
 
 // Import all messages statically to avoid async loading issues
 import enMessages from '../../messages/en.json';
@@ -71,6 +73,9 @@ export function Providers({ children }: ProvidersProps) {
           <AuthProvider>
             <SettingsProvider>
               <HydrateSettingsFromBackend />
+              <ThemeInjector />
+              <WeatherEffects />
+              <DirectionSync />
               <LoadingScreen />
               {children}
             </SettingsProvider>

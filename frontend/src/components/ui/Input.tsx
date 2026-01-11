@@ -6,24 +6,47 @@ import { cn } from '@/lib/cn';
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: boolean;
   helperText?: string;
+  variant?: 'default' | 'glass' | 'filled';
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, error, helperText, ...props }, ref) => {
+  ({ className, type, error, helperText, variant = 'default', ...props }, ref) => {
+    const variants = {
+      default: cn(
+        'bg-white/70 dark:bg-slate-800/70 backdrop-blur-lg',
+        'border-white/40 dark:border-slate-700/40',
+        'hover:bg-white/80 dark:hover:bg-slate-800/80',
+        'focus:bg-white dark:focus:bg-slate-800'
+      ),
+      glass: cn(
+        'bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl',
+        'border-white/30 dark:border-slate-700/30',
+        'hover:bg-white/60 dark:hover:bg-slate-800/60',
+        'focus:bg-white/70 dark:focus:bg-slate-800/70'
+      ),
+      filled: cn(
+        'bg-slate-100 dark:bg-slate-800',
+        'border-transparent',
+        'hover:bg-slate-200/80 dark:hover:bg-slate-700/80',
+        'focus:bg-white dark:focus:bg-slate-700'
+      ),
+    };
+
     return (
       <div className="w-full">
         <input
           type={type}
           className={cn(
-            'flex h-10 w-full rounded-lg border bg-white px-3 py-2 text-sm',
-            'border-slate-200 dark:border-slate-700',
-            'dark:bg-slate-900 dark:text-white',
-            'placeholder:text-slate-400 dark:placeholder:text-slate-500',
+            'flex h-11 w-full rounded-xl border px-4 py-2.5 text-sm',
+            'text-slate-900 dark:text-white',
+            'placeholder:text-slate-400/80 dark:placeholder:text-slate-500/80',
             'focus:outline-none focus:ring-2 focus:ring-offset-0',
-            'focus:ring-primary-500 focus:border-transparent',
+            'focus:ring-primary-500/50 focus:border-primary-400/50',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            'transition-colors duration-200',
-            error && 'border-red-500 focus:ring-red-500',
+            'shadow-sm shadow-slate-900/5',
+            'transition-all duration-300',
+            variants[variant],
+            error && 'border-red-400/50 focus:ring-red-500/50 focus:border-red-400/50',
             className
           )}
           ref={ref}
@@ -31,8 +54,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         />
         {helperText && (
           <p className={cn(
-            'mt-1 text-sm',
-            error ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'
+            'mt-1.5 text-sm',
+            error ? 'text-red-500' : 'text-slate-500/80 dark:text-slate-400/80'
           )}>
             {helperText}
           </p>

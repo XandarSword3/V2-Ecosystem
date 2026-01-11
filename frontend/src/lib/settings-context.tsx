@@ -53,10 +53,20 @@ export interface SiteSettings {
     surface: string;
     text: string;
     textMuted: string;
+    // Dark mode variants (optional)
+    backgroundDark?: string;
+    surfaceDark?: string;
+    textDark?: string;
+    textMutedDark?: string;
   };
   animationsEnabled: boolean;
   reducedMotion: boolean;
   soundEnabled: boolean;
+  
+  // Weather Widget
+  showWeatherWidget?: boolean;
+  weatherLocation?: string;
+  weatherEffect?: 'auto' | 'waves' | 'snow' | 'rain' | 'leaves' | 'stars' | 'fireflies' | 'none';
 
   // CMS
   footer?: any;
@@ -96,6 +106,8 @@ const defaultSettings: SiteSettings = {
   animationsEnabled: true,
   reducedMotion: false,
   soundEnabled: true,
+  showWeatherWidget: true,
+  weatherLocation: 'Beirut, Lebanon',
   footer: null,
   navbar: null,
 };
