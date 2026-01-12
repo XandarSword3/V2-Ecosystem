@@ -54,7 +54,11 @@ export default function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [settings.navbar?.config?.sticky]);
 
-  const getIconForModule = (module: any) => {
+  interface ModuleIcon {
+    slug: string;
+    template_type: string;
+  }
+  const getIconForModule = (module: ModuleIcon) => {
     // Specific icons for default modules
     if (module.slug === 'restaurant') return UtensilsCrossed;
     if (module.slug === 'snack-bar') return Cookie;
@@ -71,7 +75,8 @@ export default function Header() {
   };
 
   const getIconByName = (name: string) => {
-    const icons: Record<string, any> = {
+    type IconComponent = typeof Home | typeof UtensilsCrossed | typeof Waves | typeof Cookie | typeof LinkIcon | typeof User | typeof ShoppingCart | typeof Settings;
+    const icons: Record<string, IconComponent> = {
       Home,
       UtensilsCrossed,
       Waves,
@@ -84,43 +89,61 @@ export default function Header() {
     return icons[name] || Home;
   };
 
-  // Get translated name for module
+  // Get translated name for module - dynamic lookup with fallback
   const getModuleTranslatedName = (slug: string, fallbackName: string) => {
-    // Map slug to translation key
-    const translationMap: Record<string, string> = {
-      'restaurant': 'restaurant',
-      'chalets': 'chalets', 
-      'pool': 'pool',
-      'snack-bar': 'snackBar',
-      'snackbar': 'snackBar',
-      'gym': 'gym',
+    // Normalize slug to camelCase for translation key lookup
+    const normalizeSlug = (s: string) => {
+      return s.toLowerCase()
+        .split('-')
+        .map((part, i) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1))
+        .join('');
     };
-    const key = translationMap[slug.toLowerCase()];
-    if (key) {
+    
+    // Try multiple key formats
+    const keysToTry = [
+      normalizeSlug(slug),           // snack-bar -> snackBar
+      slug.toLowerCase(),             // restaurant -> restaurant
+      slug.replace(/-/g, '_'),        // snack-bar -> snack_bar
+    ];
+    
+    for (const key of keysToTry) {
       try {
-        return t(key);
+        const translated = t(key as any);
+        // next-intl returns the key if not found, so check if translation exists
+        if (translated && translated !== key) {
+          return translated;
+        }
       } catch {
-        return fallbackName;
+        // Key not found, try next
       }
     }
+    
+    // Final fallback: use the module name from database
     return fallbackName;
   };
 
+  interface NavLink {
+    type?: string;
+    moduleSlug?: string;
+    label: string;
+    href: string;
+    icon?: string;
+  }
   // Build navigation from CMS or Fallback - recalculate when locale changes
   const navigation = useMemo(() => {
-    return settings.navbar?.links?.map((link: any) => {
+    return settings.navbar?.links?.map((link: NavLink) => {
       if (link.type === 'module') {
         const module = modules.find(m => m.slug === link.moduleSlug);
         return {
           name: module ? getModuleTranslatedName(module.slug, module.name) : link.label,
           href: module ? `/${module.slug}` : link.href,
-          icon: module ? getIconForModule(module) : getIconByName(link.icon)
+          icon: module ? getIconForModule(module) : getIconByName(link.icon || 'Home')
         };
       }
       return {
         name: link.label,
         href: link.href,
-        icon: getIconByName(link.icon)
+        icon: getIconByName(link.icon || 'Home')
       };
     }) || [
         { name: t('home'), href: '/', icon: Home },

@@ -31,8 +31,9 @@ async function run() {
     console.log(" Permissions tables created and seeded!");
     
     client.release();
-  } catch (error: any) {
-    console.error(" Migration failed:", error.message);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error(" Migration failed:", err.message);
   } finally {
     await pool.end();
   }

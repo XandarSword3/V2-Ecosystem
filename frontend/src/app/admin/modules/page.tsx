@@ -11,6 +11,24 @@ import { Module } from '@/lib/settings-context';
 import { isSameDay } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
+interface ModuleFormData {
+  name: string;
+  slug: string;
+  description: string;
+  template_type: string;
+  is_active: boolean;
+  settings: {
+    header_color: string;
+    accent_color: string;
+    show_in_nav: boolean;
+    icon: string;
+  };
+}
+
+interface ApiError {
+  response?: { data?: { message?: string } };
+}
+
 export default function ModulesPage() {
   const router = useRouter();
   const t = useTranslations('admin');
@@ -26,25 +44,25 @@ export default function ModulesPage() {
   const modules = data?.data?.data || [];
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => modulesApi.create(data),
+    mutationFn: (data: ModuleFormData) => modulesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-modules'] });
       setIsCreating(false);
       toast.success('Module created successfully');
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'Failed to create module');
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => modulesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: ModuleFormData }) => modulesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-modules'] });
       setEditingModule(null);
       toast.success('Module updated successfully');
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'Failed to update module');
     },
   });
@@ -55,7 +73,7 @@ export default function ModulesPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-modules'] });
       toast.success('Module deleted successfully');
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.message || 'Failed to delete module');
     },
   });
@@ -85,7 +103,7 @@ export default function ModulesPage() {
 
       {isCreating && (
         <ModuleForm
-          onSubmit={(data: any) => createMutation.mutate(data)}
+          onSubmit={(data: ModuleFormData) => createMutation.mutate(data)}
           onCancel={() => setIsCreating(false)}
           isLoading={createMutation.isPending}
         />
@@ -94,7 +112,7 @@ export default function ModulesPage() {
       {editingModule && (
         <ModuleForm
           initialData={editingModule}
-          onSubmit={(data: any) => updateMutation.mutate({ id: editingModule.id, data })}
+          onSubmit={(data: ModuleFormData) => updateMutation.mutate({ id: editingModule.id, data })}
           onCancel={() => setEditingModule(null)}
           isLoading={updateMutation.isPending}
         />
@@ -186,7 +204,14 @@ export default function ModulesPage() {
   );
 }
 
-function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: any) {
+interface ModuleFormProps {
+  initialData?: Module | null;
+  onSubmit: (data: ModuleFormData) => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}
+
+function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: ModuleFormProps) {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     slug: initialData?.slug || '',
@@ -206,7 +231,7 @@ function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: any) {
     onSubmit(formData);
   };
 
-  const updateSettings = (key: string, value: any) => {
+  const updateSettings = (key: string, value: string | boolean) => {
     setFormData({
       ...formData,
       settings: { ...formData.settings, [key]: value },
@@ -265,7 +290,7 @@ function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: any) {
             </label>
             <select
               value={formData.template_type}
-              onChange={(e) => setFormData({ ...formData, template_type: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, template_type: e.target.value as 'menu_service' | 'multi_day_booking' | 'session_access' })}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500"
               disabled={!!initialData} // Prevent changing type after creation for now
             >

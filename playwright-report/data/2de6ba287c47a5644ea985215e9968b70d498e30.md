@@ -1,0 +1,175 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e4]:
+      - link "V2 Resort" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e6]: V2
+        - generic [ref=e7]: Resort
+      - navigation [ref=e8]:
+        - link "Home" [ref=e9] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e10]:
+            - img [ref=e11]
+            - generic [ref=e14]: Home
+        - link "Restaurant" [ref=e15] [cursor=pointer]:
+          - /url: /restaurant
+          - generic [ref=e16]:
+            - img [ref=e17]
+            - generic [ref=e22]: Restaurant
+        - link "Chalets" [ref=e23] [cursor=pointer]:
+          - /url: /chalets
+          - generic [ref=e24]:
+            - img [ref=e25]
+            - generic [ref=e28]: Chalets
+        - link "Pool" [ref=e29] [cursor=pointer]:
+          - /url: /pool
+          - generic [ref=e30]:
+            - img [ref=e31]
+            - generic [ref=e35]: Pool
+        - link "Snack Bar" [ref=e36] [cursor=pointer]:
+          - /url: /snack-bar
+          - generic [ref=e37]:
+            - img [ref=e38]
+            - generic [ref=e40]: Snack Bar
+        - link "nav.gym" [ref=e41] [cursor=pointer]:
+          - /url: /GYM
+          - generic [ref=e42]:
+            - img [ref=e43]
+            - generic [ref=e48]: nav.gym
+      - generic [ref=e49]:
+        - button "$" [ref=e51] [cursor=pointer]:
+          - img [ref=e52]
+          - generic [ref=e57]: $
+          - img [ref=e58]
+        - button "🇬🇧 English" [ref=e61] [cursor=pointer]:
+          - img [ref=e62]
+          - generic [ref=e65]: 🇬🇧 English
+        - 'button "Current theme: system. Click to change." [ref=e66] [cursor=pointer]':
+          - img [ref=e67]
+        - button "Settings" [ref=e73] [cursor=pointer]:
+          - img [ref=e74]
+        - generic [ref=e77]:
+          - link "Sign In" [ref=e78] [cursor=pointer]:
+            - /url: /login
+            - generic [ref=e79]: Sign In
+          - link "Register" [ref=e80] [cursor=pointer]:
+            - /url: /register
+            - generic [ref=e81]: Register
+  - main [ref=e82]:
+    - generic [ref=e85]:
+      - link "V2 Resort" [ref=e87] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e89]: V2
+        - generic [ref=e90]: Resort
+      - generic [ref=e91]:
+        - generic [ref=e92]:
+          - heading "Welcome Back" [level=1] [ref=e93]
+          - paragraph [ref=e94]: Sign in to your account
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - generic [ref=e97]: Email
+            - generic [ref=e98]:
+              - img [ref=e99]
+              - textbox "admin@v2resort.com" [ref=e102]
+          - generic [ref=e103]:
+            - generic [ref=e104]:
+              - generic [ref=e105]: Password
+              - link "Forgot Password?" [ref=e106] [cursor=pointer]:
+                - /url: "#"
+            - generic [ref=e107]:
+              - img [ref=e108]
+              - textbox "••••••••" [ref=e111]
+              - button [ref=e112] [cursor=pointer]:
+                - img [ref=e113]
+          - button "Login" [ref=e116] [cursor=pointer]
+        - generic [ref=e117]:
+          - paragraph [ref=e118]: Demo Credentials
+          - generic [ref=e120] [cursor=pointer]:
+            - generic [ref=e121]: "Super Admin:"
+            - generic [ref=e122]: admin@v2resort.com / admin123
+        - generic [ref=e123]:
+          - generic [ref=e124]: Don't have an account?
+          - link "Sign Up" [ref=e125] [cursor=pointer]:
+            - /url: /register
+      - link "← Back to Home" [ref=e127] [cursor=pointer]:
+        - /url: /
+  - contentinfo [ref=e128]:
+    - generic [ref=e129]:
+      - generic [ref=e130]:
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - generic [ref=e134]: V2
+            - generic [ref=e135]: Resort
+          - paragraph [ref=e136]: Premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences in the heart of Lebanon.
+          - generic [ref=e137]:
+            - link [ref=e138] [cursor=pointer]:
+              - /url: https://facebook.com/v2resort
+              - img [ref=e139]
+            - link [ref=e141] [cursor=pointer]:
+              - /url: https://instagram.com/v2resort
+              - img [ref=e142]
+            - link [ref=e145] [cursor=pointer]:
+              - /url: https://twitter.com/v2resort
+              - img [ref=e146]
+        - generic [ref=e148]:
+          - heading "Quick Links" [level=4] [ref=e149]
+          - list [ref=e150]:
+            - listitem [ref=e151]:
+              - link "Restaurant" [ref=e152] [cursor=pointer]:
+                - /url: /restaurant
+                - generic [ref=e153]: Restaurant
+                - img [ref=e154]
+            - listitem [ref=e157]:
+              - link "Snack Bar" [ref=e158] [cursor=pointer]:
+                - /url: /snack-bar
+                - generic [ref=e159]: Snack Bar
+                - img [ref=e160]
+            - listitem [ref=e163]:
+              - link "Chalets" [ref=e164] [cursor=pointer]:
+                - /url: /chalets
+                - generic [ref=e165]: Chalets
+                - img [ref=e166]
+            - listitem [ref=e169]:
+              - link "Pool" [ref=e170] [cursor=pointer]:
+                - /url: /pool
+                - generic [ref=e171]: Pool
+                - img [ref=e172]
+        - generic [ref=e175]:
+          - heading "Legal" [level=4] [ref=e176]
+          - list [ref=e177]:
+            - listitem [ref=e178]:
+              - link "Privacy Policy" [ref=e179] [cursor=pointer]:
+                - /url: /privacy
+                - generic [ref=e180]: Privacy Policy
+                - img [ref=e181]
+            - listitem [ref=e184]:
+              - link "Terms of Service" [ref=e185] [cursor=pointer]:
+                - /url: /terms
+                - generic [ref=e186]: Terms of Service
+                - img [ref=e187]
+            - listitem [ref=e190]:
+              - link "Cancellation Policy" [ref=e191] [cursor=pointer]:
+                - /url: /cancellation
+                - generic [ref=e192]: Cancellation Policy
+                - img [ref=e193]
+        - generic [ref=e196]:
+          - heading "Contact" [level=4] [ref=e197]
+          - list [ref=e198]:
+            - listitem [ref=e199]:
+              - img [ref=e201]
+              - generic [ref=e204]: 123 Lane
+            - listitem [ref=e205]:
+              - img [ref=e207]
+              - generic [ref=e209]: +961 XX XXX XXX
+            - listitem [ref=e210]:
+              - img [ref=e212]
+              - generic [ref=e215]: info@v2resort.com
+      - generic [ref=e216]:
+        - paragraph [ref=e217]: © 2026 V2 Resort. All rights reserved.
+        - generic [ref=e219]: V2 Ecosystem v2.0
+  - region "Notifications alt+T"
+  - alert [ref=e220]
+```

@@ -90,7 +90,7 @@ export default function MenuManagementPage() {
       ]);
       setItems(menuRes.data.data || []);
       setCategories(catRes.data.data || []);
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to fetch menu data');
       console.error(error);
     } finally {
@@ -146,8 +146,9 @@ export default function MenuManagementPage() {
       }
       fetchData();
       setShowModal(false);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save menu item');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || 'Failed to save menu item');
     } finally {
       setSaving(false);
     }
@@ -160,7 +161,7 @@ export default function MenuManagementPage() {
       await api.delete(`/restaurant/admin/items/${id}`);
       toast.success('Menu item deleted');
       fetchData();
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to delete menu item');
     }
   };

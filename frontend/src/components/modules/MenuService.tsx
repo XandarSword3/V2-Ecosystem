@@ -17,6 +17,25 @@ interface MenuServiceProps {
   module: Module;
 }
 
+interface MenuCategoryItem {
+  id: string;
+  name: string;
+  name_ar?: string;
+  name_fr?: string;
+}
+
+interface MenuItemData {
+  id: string;
+  name: string;
+  name_ar?: string;
+  name_fr?: string;
+  description?: string;
+  price: number;
+  category_id: string;
+  image_url?: string;
+  image?: string;
+}
+
 export function MenuService({ module }: MenuServiceProps) {
   const t = useTranslations('restaurant');
   const tCommon = useTranslations('common');
@@ -36,14 +55,14 @@ export function MenuService({ module }: MenuServiceProps) {
     queryFn: () => restaurantApi.getMenu(module.id),
   });
 
-  const categories = data?.data?.data?.categories || [];
-  const items = data?.data?.data?.items || [];
+  const categories: MenuCategoryItem[] = data?.data?.data?.categories || [];
+  const items: MenuItemData[] = data?.data?.data?.items || [];
 
   const filteredItems = selectedCategory
-    ? items.filter((item: any) => item.category_id === selectedCategory)
+    ? items.filter((item: MenuItemData) => item.category_id === selectedCategory)
     : items;
 
-  const addToCart = (item: any) => {
+  const addToCart = (item: MenuItemData) => {
     const cartItem = {
       id: item.id,
       name: item.name,
@@ -141,7 +160,7 @@ export function MenuService({ module }: MenuServiceProps) {
           >
             All
           </button>
-          {categories.map((cat: any) => (
+          {categories.map((cat: MenuCategoryItem) => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
@@ -159,7 +178,7 @@ export function MenuService({ module }: MenuServiceProps) {
 
         {/* Items Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredItems.map((item: any) => (
+          {filteredItems.map((item: MenuItemData) => (
             <motion.div
               key={item.id}
               initial={{ opacity: 0, y: 20 }}

@@ -24,9 +24,10 @@ export async function createTable(req: Request, res: Response, next: NextFunctio
     
     const table = await tableService.createTable(req.body);
     res.status(201).json({ success: true, data: table });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as Error & { code?: string };
     // Handle duplicate table number
-    if (error.code === '23505' || error.message?.includes('duplicate')) {
+    if (err.code === '23505' || err.message?.includes('duplicate')) {
       return res.status(400).json({ 
         success: false, 
         message: 'Table number already exists' 

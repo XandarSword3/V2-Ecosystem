@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { modulesApi } from '@/lib/api';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { UIBlock } from '@/types/module-builder';
 
 export default function ModuleBuilderPage() {
   const params = useParams();
@@ -35,7 +36,7 @@ export default function ModuleBuilderPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (newLayout: any) => {
+    mutationFn: (newLayout: UIBlock[]) => {
         // We save the layout inside the 'settings' JSONb column
         // Merging with existing settings to prevent data loss
         const currentSettings = data?.data?.settings || {};

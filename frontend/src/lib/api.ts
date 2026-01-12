@@ -1,5 +1,58 @@
 import axios from 'axios';
 
+// Types for API requests
+interface CreateOrderData {
+  customerName?: string;
+  customerPhone?: string;
+  items: Array<{ menuItemId: string; quantity: number; notes?: string }>;
+  orderType?: string;
+  paymentMethod?: string;
+  specialInstructions?: string;
+  tableNumber?: string;
+  chaletNumber?: string;
+}
+
+interface CreateSnackOrderData {
+  customerName?: string;
+  customerPhone?: string;
+  items: Array<{ itemId: string; quantity: number; notes?: string }>;
+  paymentMethod: 'cash' | 'card';
+  notes?: string;
+}
+
+interface CreateBookingData {
+  chaletId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  checkInDate: string;
+  checkOutDate: string;
+  numberOfGuests: number;
+  addOns?: Array<{ addOnId: string; quantity: number }>;
+  specialRequests?: string;
+  paymentMethod: 'cash' | 'card' | 'online';
+}
+
+interface PurchaseTicketData {
+  sessionId: string;
+  ticketDate: string;
+  customerName: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  numberOfGuests: number;
+  numberOfAdults?: number;
+  numberOfChildren?: number;
+  paymentMethod: 'cash' | 'card' | 'online';
+}
+
+interface CreateModuleData {
+  template_type: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  settings?: Record<string, unknown>;
+}
+
 // API_URL should NOT include /api - we add it in baseURL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -91,7 +144,7 @@ export const restaurantApi = {
   getMenu: (moduleId?: string) => api.get('/restaurant/menu', { params: { moduleId } }),
   getMenuByCategory: (categoryId: string, moduleId?: string) => 
     api.get(`/restaurant/menu/category/${categoryId}`, { params: { moduleId } }),
-  createOrder: (data: any) => api.post('/restaurant/orders', data),
+  createOrder: (data: CreateOrderData) => api.post('/restaurant/orders', data),
   getMyOrders: () => api.get('/restaurant/my-orders'),
   getOrderStatus: (orderId: string) => api.get(`/restaurant/orders/${orderId}`),
 };
@@ -99,7 +152,7 @@ export const restaurantApi = {
 // Snack Bar API
 export const snackApi = {
   getItems: () => api.get('/snack/items'),
-  createOrder: (data: any) => api.post('/snack/orders', data),
+  createOrder: (data: CreateSnackOrderData) => api.post('/snack/orders', data),
   getMyOrders: () => api.get('/snack/orders/my'),
   getOrder: (orderId: string) => api.get(`/snack/orders/${orderId}`),
 };
@@ -111,7 +164,7 @@ export const chaletsApi = {
   getAvailability: (chaletId: string, checkIn: string, checkOut: string) =>
     api.get(`/chalets/${chaletId}/availability`, { params: { checkIn, checkOut } }),
   getAddOns: () => api.get('/chalets/add-ons'),
-  createBooking: (data: any) => api.post('/chalets/bookings', data),
+  createBooking: (data: CreateBookingData) => api.post('/chalets/bookings', data),
   getMyBookings: () => api.get('/chalets/my-bookings'),
   getBookingDetails: (bookingId: string) => api.get(`/chalets/bookings/${bookingId}`),
 };
@@ -123,7 +176,7 @@ export const poolApi = {
   getSession: (id: string) => api.get(`/pool/sessions/${id}`),
   getSessionAvailability: (sessionId: string, date: string) =>
     api.get(`/pool/sessions/${sessionId}/availability`, { params: { date } }),
-  purchaseTicket: (data: any) => api.post('/pool/tickets', data),
+  purchaseTicket: (data: PurchaseTicketData) => api.post('/pool/tickets', data),
   getMyTickets: () => api.get('/pool/my-tickets'),
   getTicket: (id: string) => api.get(`/pool/tickets/${id}`),
 };
@@ -132,8 +185,8 @@ export const poolApi = {
 export const modulesApi = {
   getAll: (activeOnly = false) => api.get(`/admin/modules${activeOnly ? '?activeOnly=true' : ''}`),
   getById: (id: string) => api.get(`/admin/modules/${id}`),
-  create: (data: any) => api.post('/admin/modules', data),
-  update: (id: string, data: any) => api.put(`/admin/modules/${id}`, data),
+  create: (data: CreateModuleData) => api.post('/admin/modules', data),
+  update: (id: string, data: Partial<CreateModuleData>) => api.put(`/admin/modules/${id}`, data),
   delete: (id: string, force = false) => api.delete(`/admin/modules/${id}${force ? '?force=true' : ''}`),
 };
 

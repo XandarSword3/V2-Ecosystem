@@ -81,7 +81,7 @@ export default function ChaletsManagementPage() {
       setLoading(true);
       const response = await api.get('/chalets');
       setChalets(response.data.data || []);
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to fetch chalets');
       console.error(error);
     } finally {
@@ -130,8 +130,9 @@ export default function ChaletsManagementPage() {
       }
       fetchChalets();
       setShowModal(false);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save chalet');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || 'Failed to save chalet');
     } finally {
       setSaving(false);
     }
@@ -144,7 +145,7 @@ export default function ChaletsManagementPage() {
       await api.delete(`/chalets/admin/chalets/${id}`);
       toast.success('Chalet deleted');
       fetchChalets();
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to delete chalet');
     }
   };

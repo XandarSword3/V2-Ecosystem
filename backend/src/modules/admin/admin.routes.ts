@@ -1,11 +1,20 @@
 import { Router } from 'express';
 import { authenticate, authorize } from "../../middleware/auth.middleware";
+import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
 import * as adminController from "./admin.controller";
 import * as modulesController from "./modules.controller";
 import * as backupsController from "./backups.controller";
+import * as translationsController from "./translations.controller";
 
 import * as usersController from "./users.controller";
 import * as permissionsController from "./permissions.controller";
+
+// Import refactored controllers
+import * as rolesController from "./controllers/roles.controller";
+import * as settingsController from "./controllers/settings.controller";
+import * as auditController from "./controllers/audit.controller";
+import * as reportsController from "./controllers/reports.controller";
+import * as notificationsController from "./controllers/notifications.controller";
 
 const router = Router();
 
@@ -33,34 +42,44 @@ router.put('/users/:id/roles', adminController.updateUserRoles);
 router.delete('/users/:id', adminController.deleteUser);
 router.put('/users/:id/permissions', permissionsController.updateUserPermissions); // User Override
 
-// Roles & Permissions
-router.get('/roles', adminController.getRoles);
-router.post('/roles', adminController.createRole);
-router.put('/roles/:id', adminController.updateRole);
+// Roles & Permissions (using refactored controller)
+router.get('/roles', rolesController.getRoles);
+router.post('/roles', rolesController.createRole);
+router.put('/roles/:id', rolesController.updateRole);
+router.delete('/roles/:id', rolesController.deleteRole);
 router.get('/roles/:id/permissions', permissionsController.getRolePermissions);
 router.put('/roles/:id/permissions', permissionsController.updateRolePermissions);
 router.get('/permissions', permissionsController.getAllPermissions);
 
-// Settings
-router.get('/settings', adminController.getSettings);
-router.put('/settings', adminController.updateSettings);
+// Settings (using refactored controller)
+router.get('/settings', settingsController.getSettings);
+router.put('/settings', settingsController.updateSettings);
 
-// Audit logs
-router.get('/audit-logs', adminController.getAuditLogs);
+// Audit logs (using refactored controller)
+router.get('/audit-logs', auditController.getAuditLogs);
+router.get('/audit-logs/:resource', auditController.getAuditLogsByResource);
+router.get('/audit-logs/:resource/:resourceId', auditController.getAuditLogsByResource);
 
-// Backups
+// Backups (rate limited - expensive operations)
 router.get('/backups', backupsController.getBackups);
-router.post('/backups', backupsController.createBackup);
+router.post('/backups', rateLimits.expensive, backupsController.createBackup);
 router.get('/backups/:id/download', backupsController.getDownloadUrl);
+router.post('/backups/restore', rateLimits.expensive, backupsController.restoreBackup);
 router.delete('/backups/:id', backupsController.deleteBackup);
 
-// Reports
-router.get('/reports/overview', adminController.getOverviewReport);
-router.get('/reports/occupancy', adminController.getOccupancyReport);
-router.get('/reports/customers', adminController.getCustomerAnalytics);
-router.get('/reports/export', adminController.exportReport);
+// Reports (rate limited - expensive operations)
+router.get('/reports/overview', reportsController.getOverviewReport);
+router.get('/reports/occupancy', reportsController.getOccupancyReport);
+router.get('/reports/customers', reportsController.getCustomerAnalytics);
+router.get('/reports/export', rateLimits.expensive, reportsController.exportReport);
 
-// Notifications
-router.get('/notifications', adminController.getNotifications);
+// Notifications (using refactored controller)
+router.get('/notifications', notificationsController.getNotifications);
+router.put('/notifications/:id/read', notificationsController.markNotificationRead);
+router.put('/notifications/read-all', notificationsController.markAllNotificationsRead);
+
+// Frontend Translation Files Comparison
+router.get('/translations/frontend/compare', translationsController.compareFrontendTranslations);
+router.post('/translations/frontend/update', translationsController.updateFrontendTranslation);
 
 export default router;

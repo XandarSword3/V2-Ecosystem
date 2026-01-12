@@ -69,6 +69,16 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
   cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle, label: 'Cancelled' },
 };
 
+interface SocketOrderEvent {
+  id?: string;
+  orderId?: string;
+  orderNumber?: string;
+  order_number?: string;
+  moduleId?: string;
+  module_id?: string;
+  status?: Order['status'];
+}
+
 import { useSiteSettings } from '@/lib/settings-context';
 
 export default function AdminRestaurantOrdersPage() {
@@ -103,7 +113,7 @@ export default function AdminRestaurantOrdersPage() {
 
   useEffect(() => {
     if (socket && restaurantModule) {
-      socket.on('order:new', (order: any) => {
+      socket.on('order:new', (order: SocketOrderEvent) => {
         if (order.moduleId === restaurantModule.id || order.module_id === restaurantModule.id) {
           // Fetch specific order details or append if full order provided
           // Since socket payload is partial, we might want to refetch or just add brief info
@@ -113,9 +123,9 @@ export default function AdminRestaurantOrdersPage() {
         }
       });
 
-      socket.on('order:updated', (order: any) => {
+      socket.on('order:updated', (order: SocketOrderEvent) => {
         if (order.moduleId === restaurantModule.id || order.module_id === restaurantModule.id) {
-          setOrders((prev) => prev.map((o) => (o.id === order.orderId || o.id === order.id ? { ...o, status: order.status } : o)));
+          setOrders((prev) => prev.map((o) => (o.id === order.orderId || o.id === order.id ? { ...o, status: order.status as Order['status'] } : o)));
         }
       });
 

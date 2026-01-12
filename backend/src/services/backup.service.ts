@@ -25,6 +25,7 @@ export class BackupService {
         
         if (listError) {
             logger.warn('Could not list buckets:', listError.message);
+            // If we can't list buckets, try to create anyway
         }
         
         const bucketExists = buckets?.some(b => b.name === BACKUP_BUCKET_NAME);
@@ -40,7 +41,11 @@ export class BackupService {
             
             if (createError && !createError.message.includes('already exists')) {
                 logger.error('Failed to create backups bucket:', createError.message);
-                // Don't throw - we'll try the upload anyway and let it fail naturally
+                logger.error('Please create the "backups" bucket manually in your Supabase dashboard:');
+                logger.error('1. Go to Storage in your Supabase project');
+                logger.error('2. Create a new bucket named "backups"');
+                logger.error('3. Set it as private (not public)');
+                throw new Error('Backup storage bucket not configured. Please create "backups" bucket in Supabase Storage dashboard.');
             } else {
                 logger.info('Backups bucket created successfully');
             }
@@ -134,7 +139,8 @@ export class BackupService {
                 tables: tableNames
             };
 
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const err = error as Error;
             logger.error('Backup failed:', error);
 
             // Record failure if possible
@@ -146,7 +152,7 @@ export class BackupService {
                     type: 'manual',
                     status: 'failed',
                     created_by: userId,
-                    metadata: { error: error.message }
+                    metadata: { error: err.message }
                 });
 
             throw error;
@@ -177,6 +183,64 @@ export class BackupService {
         } catch (error) {
             return coreTables;
         }
+    }
+
+    /**
+     * Restore from a backup data object
+     */
+    static async restoreBackup(backupData: { tables?: Record<string, unknown[]> }, userId: string): Promise<{ success: boolean; details: string }> {
+        const supabase = getSupabase();
+        
+        // Validation
+        if (!backupData || !backupData.tables) {
+            throw new Error('Invalid backup format: missing tables');
+        }
+
+        // Order is important for integrity. 
+        // 1. Core Users & Roles
+        // 2. Settings & Content
+        // 3. Operational Data (Bookings, etc)
+        const priorityTables = ['users', 'roles', 'site_settings', 'modules', 'menu_categories'];
+        const tableNames = Object.keys(backupData.tables);
+        
+        // Sort tables: priority ones first, then alphabetical
+        tableNames.sort((a, b) => {
+            const idxA = priorityTables.indexOf(a);
+            const idxB = priorityTables.indexOf(b);
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+            return a.localeCompare(b);
+        });
+
+        logger.info(`Starting restore process for ${tableNames.length} tables`);
+
+        for (const table of tableNames) {
+            const rows = backupData.tables[table];
+            if (!Array.isArray(rows) || rows.length === 0) continue;
+
+            logger.info(`Restoring table: ${table} (${rows.length} rows)`);
+
+            // Determine conflict target based on table
+            let conflictTarget: string | undefined = 'id';
+            if (table === 'site_settings') conflictTarget = 'key';
+            
+            // Handle composite keys or tables usually without ID if known
+            if (table === 'user_roles') conflictTarget = undefined; // Let Supabase infer or handle duplicates
+            
+            const options: { onConflict?: string } = {};
+            if (conflictTarget) options.onConflict = conflictTarget;
+
+            const { error } = await supabase
+                .from(table)
+                .upsert(rows, options);
+
+            if (error) {
+                logger.warn(`Error storing ${table}: ${error.code} - ${error.message}.`);
+            }
+        }
+        
+        return { success: true, details: `Restored ${tableNames.length} tables` };
     }
 
     /**

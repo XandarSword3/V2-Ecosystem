@@ -57,8 +57,9 @@ export default function RegisterPage() {
 
       // Redirect to login
       router.push('/login');
-    } catch (err: any) {
-      setError(err.message || 'Registration failed');
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || 'Registration failed');
     } finally {
       setIsLoading(false);
     }

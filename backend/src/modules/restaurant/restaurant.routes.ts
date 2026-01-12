@@ -43,8 +43,8 @@ const staffRoles = [
 ];
 
 router.get('/staff/orders', authenticate, authorize(...staffRoles), orderController.getStaffOrders);
-router.patch('/staff/orders/:id/status', authenticate, authorize(...staffRoles), orderController.updateOrderStatus);
 router.get('/staff/orders/live', authenticate, authorize(...staffRoles), orderController.getLiveOrders);
+router.patch('/staff/orders/:id/status', authenticate, authorize(...staffRoles), orderController.updateOrderStatus);
 
 // Tables
 router.get('/staff/tables', authenticate, authorize(...staffRoles), tableController.getTables);

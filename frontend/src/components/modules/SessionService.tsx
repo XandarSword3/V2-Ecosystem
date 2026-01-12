@@ -14,6 +14,19 @@ interface SessionServiceProps {
   module: Module;
 }
 
+interface PoolSession {
+  id: string;
+  name: string;
+  name_ar?: string;
+  name_fr?: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  gender: 'mixed' | 'male' | 'female';
+  capacity: number;
+  price: number;
+}
+
 export function SessionService({ module }: SessionServiceProps) {
   const t = useTranslations('pool');
   const tCommon = useTranslations('common');
@@ -25,7 +38,7 @@ export function SessionService({ module }: SessionServiceProps) {
     queryFn: () => poolApi.getSessions(module.id),
   });
 
-  const sessions = data?.data?.data || [];
+  const sessions: PoolSession[] = data?.data?.data || [];
 
   if (isLoading) {
     return (
@@ -74,7 +87,7 @@ export function SessionService({ module }: SessionServiceProps) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sessions.map((session: any) => (
+          {sessions.map((session: PoolSession) => (
             <motion.div
               key={session.id}
               initial={{ opacity: 0, scale: 0.95 }}

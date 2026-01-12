@@ -38,8 +38,9 @@ async function run() {
     console.log('✅ Migration completed successfully!');
     
     client.release();
-  } catch (error: any) {
-    console.error('❌ Migration failed:', error.message);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('❌ Migration failed:', err.message);
     console.log('\n⚠️  Please run the following SQL manually in your Supabase SQL Editor:');
     console.log('=' .repeat(50));
     console.log(fs.readFileSync(path.join(__dirname, '../database/add_missing_tables.sql'), 'utf8'));

@@ -91,7 +91,7 @@ export default function SnackMenuManagementPage() {
       setLoading(true);
       const response = await api.get('/snack/items');
       setItems(response.data.data || response.data.items || []);
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to fetch snack menu');
       console.error(error);
     } finally {
@@ -136,8 +136,9 @@ export default function SnackMenuManagementPage() {
       }
       fetchItems();
       setShowModal(false);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save item');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || 'Failed to save item');
     } finally {
       setSaving(false);
     }
@@ -150,7 +151,7 @@ export default function SnackMenuManagementPage() {
       await api.delete(`/snack/admin/items/${id}`);
       toast.success('Item deleted');
       fetchItems();
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to delete item');
     }
   };

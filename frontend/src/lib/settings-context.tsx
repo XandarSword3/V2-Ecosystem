@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useSocket } from './socket';
 import { ResortTheme } from './theme-config';
+import { settingsLogger } from './logger';
 
 export interface SiteSettings {
   // General
@@ -159,7 +160,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const apiUrl = baseUrl.replace(/\/api\/?$/, '');
-      console.log('[SettingsProvider] Fetching settings from', `${apiUrl}/api/settings`);
+      settingsLogger.debug('Fetching settings from', `${apiUrl}/api/settings`);
       const [settingsRes, modulesRes] = await Promise.all([
         fetch(`${apiUrl}/api/settings`),
         fetch(`${apiUrl}/api/modules?activeOnly=true`)
@@ -168,21 +169,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         throw new Error('Failed to fetch settings');
       }
       const settingsData = await settingsRes.json();
-      console.log('[SettingsProvider] Received settings data:', settingsData);
+      settingsLogger.debug('Received settings data', settingsData);
       if (settingsData.success && settingsData.data) {
         setSettings({ ...defaultSettings, ...settingsData.data });
-        console.log('[SettingsProvider] Updated settings state:', { ...defaultSettings, ...settingsData.data });
+        settingsLogger.debug('Updated settings state');
       }
       if (modulesRes.ok) {
         const modulesData = await modulesRes.json();
         if (modulesData.success && modulesData.data) {
           setModules(modulesData.data);
-          console.log('[SettingsProvider] Updated modules state:', modulesData.data);
+          settingsLogger.debug('Updated modules state', modulesData.data);
         }
       }
       setError(null);
     } catch (err) {
-      console.error('[SettingsProvider] Failed to load site settings:', err);
+      settingsLogger.error('Failed to load site settings', err);
       setError('Failed to load settings');
     } finally {
       setLoading(false);
@@ -208,13 +209,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (!socket) return;
 
     const handleSettingsUpdate = async (newSettings: Partial<SiteSettings>) => {
-      console.log('[SettingsProvider] Socket event: settings.updated', newSettings);
+      settingsLogger.debug('Socket event: settings.updated', newSettings);
       broadcastSettingsUpdate();
       await fetchSettings();
     };
 
     const handleModulesUpdate = () => {
-      console.log('[SettingsProvider] Socket event: modules.updated');
+      settingsLogger.debug('Socket event: modules.updated');
       fetchSettings();
     };
 

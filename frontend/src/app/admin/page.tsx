@@ -29,12 +29,21 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+interface RecentOrder {
+  id: string;
+  orderNumber?: string;
+  customerName?: string;
+  itemCount?: number;
+  totalAmount?: number;
+  status?: string;
+}
+
 interface DashboardStats {
   todayOrders: number;
   todayRevenue: number;
   todayBookings: number;
   todayTickets: number;
-  recentOrders: any[];
+  recentOrders: RecentOrder[];
   revenueByUnit: {
     restaurant: number;
     snackBar: number;
@@ -411,7 +420,7 @@ export default function AdminDashboard() {
             <CardContent>
               <div className="space-y-3">
                 <AnimatePresence mode="popLayout">
-                  {(stats?.recentOrders || []).slice(0, 5).map((order: any, index: number) => (
+                  {(stats?.recentOrders || []).slice(0, 5).map((order: RecentOrder, index: number) => (
                     <motion.div
                       key={order.id}
                       initial={{ opacity: 0, x: 20 }}

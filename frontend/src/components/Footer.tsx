@@ -18,7 +18,8 @@ import { usePathname } from 'next/navigation';
 
 export default function Footer() {
     const pathname = usePathname();
-    const locale = useLocale(); // Track locale to force re-render on language change
+    // useLocale() call triggers re-render on language change
+    useLocale();
     const tNav = useTranslations('nav');
     const tFooter = useTranslations('footer');
     const { settings } = useSiteSettings();
@@ -76,15 +77,26 @@ export default function Footer() {
     };
 
     // If CMS footer exists, translate its content
+    interface FooterLink {
+        label?: string;
+        labelKey?: string;
+        href: string;
+        moduleSlug?: string;
+    }
+    interface FooterColumn {
+        title?: string;
+        titleKey?: string;
+        links?: FooterLink[];
+    }
     const footerConfig = settings.footer ? {
         ...settings.footer,
         logo: settings.footer.logo || defaultFooterConfig.logo,
         description: settings.footer.description || defaultFooterConfig.description,
-        columns: settings.footer.columns?.map((col: any) => ({
+        columns: settings.footer.columns?.map((col: FooterColumn) => ({
             ...col,
             // Translate column title if it matches known keys
             title: col.titleKey ? tFooter(col.titleKey) : col.title,
-            links: col.links?.map((link: any) => ({
+            links: col.links?.map((link: FooterLink) => ({
                 ...link,
                 // Translate link labels for module links
                 label: link.moduleSlug ? getNavTranslation(link.moduleSlug) : 
@@ -143,7 +155,7 @@ export default function Footer() {
 
                         {footerConfig.socials && footerConfig.socials.length > 0 && (
                             <div className="flex items-center gap-3">
-                                {footerConfig.socials.map((social: any) => (
+                                {footerConfig.socials.map((social: { platform: string; url: string }) => (
                                     <motion.a
                                         key={social.platform}
                                         href={social.url}
@@ -161,7 +173,7 @@ export default function Footer() {
                     </motion.div>
 
                     {/* Dynamic Columns */}
-                    {footerConfig.columns.map((column: any, idx: number) => (
+                    {footerConfig.columns.map((column: FooterColumn, idx: number) => (
                         <motion.div
                             key={column.title}
                             initial={{ opacity: 0, y: 20 }}
@@ -173,7 +185,7 @@ export default function Footer() {
                                 {column.title}
                             </h4>
                             <ul className="space-y-4">
-                                {column.links.map((link: any) => (
+                                {column.links?.map((link: FooterLink) => (
                                     <li key={link.label}>
                                         <Link
                                             href={link.href}

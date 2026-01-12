@@ -25,6 +25,16 @@ import {
   User,
 } from 'lucide-react';
 
+interface SocketOrderEvent {
+  id?: string;
+  orderId?: string;
+  orderNumber?: string;
+  order_number?: string;
+  moduleId?: string;
+  module_id?: string;
+  status?: Order['status'];
+}
+
 interface OrderItem {
   id: string;
   menu_item_id?: string;
@@ -107,16 +117,16 @@ export default function DynamicOrdersPage() {
 
   useEffect(() => {
     if (socket && currentModule) {
-      socket.on('order:new', (order: any) => {
+      socket.on('order:new', (order: SocketOrderEvent) => {
         if (order.moduleId === currentModule.id || order.module_id === currentModule.id) {
           fetchOrders();
           toast.success(`New order #${order.orderNumber || order.order_number}`);
         }
       });
 
-      socket.on('order:updated', (order: any) => {
+      socket.on('order:updated', (order: SocketOrderEvent) => {
         if (order.moduleId === currentModule.id || order.module_id === currentModule.id) {
-          setOrders((prev) => prev.map((o) => (o.id === order.orderId || o.id === order.id ? { ...o, ...order } : o)));
+          setOrders((prev) => prev.map((o) => (o.id === order.orderId || o.id === order.id ? { ...o, ...order } as Order : o)));
         }
       });
     }
@@ -135,7 +145,7 @@ export default function DynamicOrdersPage() {
       toast.success(`Order status updated to ${status}`);
       fetchOrders();
       if (selectedOrder?.id === orderId) {
-        setSelectedOrder(prev => prev ? { ...prev, status: status as any } : null);
+        setSelectedOrder(prev => prev ? { ...prev, status: status as Order['status'] } : null);
       }
     } catch (error) {
       toast.error('Failed to update order status');
