@@ -118,7 +118,7 @@ export class BackupService {
             if (uploadError) throw uploadError;
 
             // 4. Record in database
-            const { error: recordError } = await supabase
+            const { data: insertedRec, error: recordError } = await supabase
                 .from('backups')
                 .insert({
                     filename,
@@ -128,11 +128,14 @@ export class BackupService {
                     status: 'completed',
                     created_by: userId,
                     metadata: { tables: tableNames }
-                });
+                })
+                .select()
+                .single();
 
             if (recordError) throw recordError;
 
             return {
+                id: insertedRec.id,
                 filename,
                 storagePath,
                 sizeBytes,

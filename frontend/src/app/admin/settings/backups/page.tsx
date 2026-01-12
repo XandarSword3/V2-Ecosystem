@@ -102,17 +102,30 @@ export default function BackupsPage() {
             const response = await api.get(`/admin/backups/${id}/download`);
 
             if (response.data.success && response.data.data.downloadUrl) {
-                // Trigger download
+                // Fetch the file content and create a blob for proper download
+                // This is needed because the download attribute doesn't work for cross-origin URLs
+                const fileResponse = await fetch(response.data.data.downloadUrl);
+                if (!fileResponse.ok) {
+                    throw new Error('Failed to fetch backup file');
+                }
+                
+                const blob = await fileResponse.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                
                 const link = document.createElement('a');
-                link.href = response.data.data.downloadUrl;
+                link.href = blobUrl;
                 link.download = filename;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                
+                // Clean up the blob URL
+                window.URL.revokeObjectURL(blobUrl);
                 toast.success('Download started');
             }
         } catch (error) {
-            toast.error('Failed to generate download link');
+            console.error('Download failed:', error);
+            toast.error('Failed to download backup');
         } finally {
             setDownloading(null);
         }

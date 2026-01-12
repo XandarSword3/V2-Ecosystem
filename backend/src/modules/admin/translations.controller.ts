@@ -710,7 +710,23 @@ export async function compareFrontendTranslations(req: Request, res: Response, n
     const path = await import('path');
     
     // Path to frontend messages directory
-    const messagesDir = path.join(__dirname, '../../../../frontend/messages');
+    // In production (built), we are in dist/modules/admin/translations.controller.js
+    // We need to go up to root and then to frontend/messages
+    // Using process.cwd() is safer as it resolves relative to the backend root where the server is running
+    const messagesDir = path.resolve(process.cwd(), '../frontend/messages');
+    
+    try {
+      await fs.access(messagesDir);
+    } catch {
+       // If frontend/messages doesn't exist (e.g. Docker container), return empty
+       return res.json({ 
+         success: true, 
+         data: { 
+           en: { "note": "Frontend translations not available in this environment" },
+           keys: []
+         } 
+       });
+    }
     
     // Read all JSON files
     const files = await fs.readdir(messagesDir);

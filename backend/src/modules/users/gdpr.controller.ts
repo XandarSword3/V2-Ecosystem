@@ -96,8 +96,8 @@ export async function exportUserData(req: Request, res: Response, next: NextFunc
         .order('created_at', { ascending: false }),
       
       // Activity logs (last 1000)
-      supabase.from('activity_logs')
-        .select('id, action, entity_type, entity_id, details, ip_address, user_agent, created_at')
+      supabase.from('audit_logs')
+        .select('id, action, resource, resource_id, old_value, new_value, ip_address, user_agent, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(1000)
@@ -120,7 +120,12 @@ export async function exportUserData(req: Request, res: Response, next: NextFunc
       },
       reviews: reviewsResult.data || [],
       support_tickets: supportTicketsResult.data || [],
-      activity_logs: activityLogsResult.data || []
+      activity_logs: (activityLogsResult.data || []).map((log: any) => ({
+        ...log,
+        entity_type: log.resource,
+        entity_id: log.resource_id,
+        details: log.new_value || log.old_value
+      }))
     };
 
     // Log the data export
@@ -217,7 +222,7 @@ export async function deleteUserData(req: Request, res: Response, next: NextFunc
 
     // 1. Delete activity logs
     const { error: activityError, count: activityCount } = await supabase
-      .from('activity_logs')
+      .from('audit_logs')
       .delete({ count: 'exact' })
       .eq('user_id', userId);
     deletionResults.activity_logs = { deleted: activityCount || 0, error: activityError?.message };

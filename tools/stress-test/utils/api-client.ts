@@ -350,11 +350,11 @@ export class ApiClient {
   }
 
   async getAdminReviews(): Promise<ApiResponse> {
-    return this.request('/admin/reviews', 'GET');
+    return this.request('/reviews/admin', 'GET');
   }
 
   async approveReview(id: string): Promise<ApiResponse> {
-    return this.request(`/admin/reviews/${id}/approve`, 'PUT');
+    return this.request(`/reviews/${id}/status`, 'PATCH', { status: 'approved' });
   }
 
   async rejectReview(id: string): Promise<ApiResponse> {
@@ -362,58 +362,70 @@ export class ApiClient {
   }
 
   async getAuditLogs(): Promise<ApiResponse> {
-    return this.request('/admin/audit', 'GET');
+    return this.request('/admin/audit-logs', 'GET');
   }
 
   async createBackup(): Promise<ApiResponse> {
     return this.request('/admin/backups', 'POST');
   }
 
+  async getBackups(): Promise<ApiResponse> {
+    return this.request('/admin/backups', 'GET');
+  }
+
+  async deleteBackup(id: string): Promise<ApiResponse> {
+    return this.request(`/admin/backups/${id}`, 'DELETE');
+  }
+
+  async compareTranslations(lang: string = 'en'): Promise<ApiResponse> {
+    return this.request(`/admin/translations/frontend/compare?code=${lang}`, 'GET');
+  }
+
   async getReports(type: string): Promise<ApiResponse> {
     return this.request(`/admin/reports/${type}`, 'GET');
   }
 
-  // Menu Management
+  // Menu Management - CORRECT PATHS: /restaurant/admin/... and /snack/admin/...
   async createMenuCategory(module: 'restaurant' | 'snack', data: any): Promise<ApiResponse> {
-    return this.request(`/admin/${module}/categories`, 'POST', data);
+    return this.request(`/${module}/admin/categories`, 'POST', data);
   }
 
   async updateMenuCategory(module: 'restaurant' | 'snack', id: string, data: any): Promise<ApiResponse> {
-    return this.request(`/admin/${module}/categories/${id}`, 'PUT', data);
+    return this.request(`/${module}/admin/categories/${id}`, 'PUT', data);
   }
 
   async createMenuItem(module: 'restaurant' | 'snack', data: any): Promise<ApiResponse> {
-    return this.request(`/admin/${module}/items`, 'POST', data);
+    return this.request(`/${module}/admin/items`, 'POST', data);
   }
 
   async updateMenuItem(module: 'restaurant' | 'snack', id: string, data: any): Promise<ApiResponse> {
-    return this.request(`/admin/${module}/items/${id}`, 'PUT', data);
+    return this.request(`/${module}/admin/items/${id}`, 'PUT', data);
   }
 
   async toggleItemAvailability(module: 'restaurant' | 'snack', id: string): Promise<ApiResponse> {
-    return this.request(`/admin/${module}/items/${id}/availability`, 'PATCH');
+    return this.request(`/${module}/admin/items/${id}/availability`, 'PATCH');
   }
 
   // Chalet Management
   async createChalet(data: any): Promise<ApiResponse> {
-    return this.request('/admin/chalets', 'POST', data);
+    return this.request('/chalets/admin/chalets', 'POST', data);
   }
 
   async updateChalet(id: string, data: any): Promise<ApiResponse> {
-    return this.request(`/admin/chalets/${id}`, 'PUT', data);
+    return this.request(`/chalets/admin/chalets/${id}`, 'PUT', data);
   }
 
   // Pool Management
   async createPoolSession(data: any): Promise<ApiResponse> {
-    return this.request('/admin/pool/sessions', 'POST', data);
+    return this.request('/pool/admin/sessions', 'POST', data);
   }
 
   async updatePoolSession(id: string, data: any): Promise<ApiResponse> {
-    return this.request(`/admin/pool/sessions/${id}`, 'PUT', data);
+    return this.request(`/pool/admin/sessions/${id}`, 'PUT', data);
   }
 
   async updatePoolSettings(data: any): Promise<ApiResponse> {
-    return this.request('/admin/pool/settings', 'PUT', data);
+    return this.request('/pool/admin/settings', 'PUT', data);
   }
 
   // ===== DYNAMIC MODULES =====
@@ -485,5 +497,193 @@ export class ApiClient {
   // Admin - update menu item for a module
   async updateModuleMenuItem(moduleId: string, itemId: string, data: any): Promise<ApiResponse> {
     return this.request(`/admin/modules/${moduleId}/menu-items/${itemId}`, 'PUT', data);
+  }
+
+  // ============ ENHANCED ADMIN CRUD OPERATIONS ============
+
+  // User Management
+  async deleteUser(id: string): Promise<ApiResponse> {
+    return this.request(`/admin/users/${id}`, 'DELETE');
+  }
+
+  async getUserById(id: string): Promise<ApiResponse> {
+    return this.request(`/admin/users/${id}`, 'GET');
+  }
+
+  // Restaurant Categories CRUD
+  async getRestaurantAdminCategories(): Promise<ApiResponse> {
+    return this.request('/restaurant/categories', 'GET');
+  }
+
+  async deleteMenuCategory(module: 'restaurant' | 'snack', id: string): Promise<ApiResponse> {
+    return this.request(`/${module}/admin/categories/${id}`, 'DELETE');
+  }
+
+  // Restaurant Items CRUD
+  async getRestaurantAdminItems(): Promise<ApiResponse> {
+    return this.request('/restaurant/items', 'GET');
+  }
+
+  async deleteMenuItem(module: 'restaurant' | 'snack', id: string): Promise<ApiResponse> {
+    return this.request(`/${module}/admin/items/${id}`, 'DELETE');
+  }
+
+  // Restaurant Tables CRUD
+  async getRestaurantTables(): Promise<ApiResponse> {
+    return this.request('/restaurant/staff/tables', 'GET');
+  }
+
+  async createRestaurantTable(data: any): Promise<ApiResponse> {
+    return this.request('/restaurant/admin/tables', 'POST', data);
+  }
+
+  async updateRestaurantTable(id: string, data: any): Promise<ApiResponse> {
+    return this.request(`/restaurant/staff/tables/${id}`, 'PATCH', data);
+  }
+
+  async deleteRestaurantTable(id: string): Promise<ApiResponse> {
+    return this.request(`/restaurant/admin/tables/${id}`, 'DELETE');
+  }
+
+  // Chalet CRUD
+  async getAdminChalets(): Promise<ApiResponse> {
+    return this.request('/chalets', 'GET');
+  }
+
+  async deleteChalet(id: string): Promise<ApiResponse> {
+    return this.request(`/chalets/admin/chalets/${id}`, 'DELETE');
+  }
+
+  // Chalet Pricing Rules
+  async getChaletPriceRules(): Promise<ApiResponse> {
+    return this.request('/chalets/admin/price-rules', 'GET');
+  }
+
+  async createChaletPriceRule(data: any): Promise<ApiResponse> {
+    return this.request('/chalets/admin/price-rules', 'POST', data);
+  }
+
+  async updateChaletPriceRule(id: string, data: any): Promise<ApiResponse> {
+    return this.request(`/chalets/admin/price-rules/${id}`, 'PUT', data);
+  }
+
+  async deleteChaletPriceRule(id: string): Promise<ApiResponse> {
+    return this.request(`/chalets/admin/price-rules/${id}`, 'DELETE');
+  }
+
+  // Chalet Add-ons
+  async getChaletAddonsAdmin(): Promise<ApiResponse> {
+    return this.request('/chalets/add-ons', 'GET');
+  }
+
+  async createChaletAddon(data: any): Promise<ApiResponse> {
+    return this.request('/chalets/admin/add-ons', 'POST', data);
+  }
+
+  async updateChaletAddon(id: string, data: any): Promise<ApiResponse> {
+    return this.request(`/chalets/admin/add-ons/${id}`, 'PUT', data);
+  }
+
+  async deleteChaletAddon(id: string): Promise<ApiResponse> {
+    return this.request(`/chalets/admin/add-ons/${id}`, 'DELETE');
+  }
+
+  // Pool Sessions CRUD
+  async getPoolAdminSessions(): Promise<ApiResponse> {
+    return this.request('/pool/sessions', 'GET');
+  }
+
+  async deletePoolSession(id: string): Promise<ApiResponse> {
+    return this.request(`/pool/admin/sessions/${id}`, 'DELETE');
+  }
+
+  async resetPoolOccupancy(): Promise<ApiResponse> {
+    return this.request('/pool/admin/reset-occupancy', 'POST');
+  }
+
+  // Roles & Permissions
+  async getRoles(): Promise<ApiResponse> {
+    return this.request('/admin/roles', 'GET');
+  }
+
+  async createRole(data: { name: string; displayName?: string; description?: string; businessUnit?: string }): Promise<ApiResponse> {
+    return this.request('/admin/roles', 'POST', data);
+  }
+
+  async updateRole(id: string, data: any): Promise<ApiResponse> {
+    return this.request(`/admin/roles/${id}`, 'PUT', data);
+  }
+
+  async deleteRole(id: string): Promise<ApiResponse> {
+    return this.request(`/admin/roles/${id}`, 'DELETE');
+  }
+
+  async getPermissions(): Promise<ApiResponse> {
+    return this.request('/admin/permissions', 'GET');
+  }
+
+  // Booking Status Updates
+  async updateBookingStatus(id: string, status: string): Promise<ApiResponse> {
+    return this.request(`/chalets/admin/bookings/${id}/status`, 'PATCH', { status });
+  }
+
+  async getAdminBookings(): Promise<ApiResponse> {
+    return this.request('/chalets/admin/bookings', 'GET');
+  }
+
+  // Settings (Homepage, Footer, Appearance)
+  async getHomepageSettings(): Promise<ApiResponse> {
+    return this.request('/admin/settings/homepage', 'GET');
+  }
+
+  async updateHomepageSettings(data: any): Promise<ApiResponse> {
+    return this.request('/admin/settings/homepage', 'PUT', data);
+  }
+
+  async getFooterSettings(): Promise<ApiResponse> {
+    return this.request('/admin/settings/footer', 'GET');
+  }
+
+  async updateFooterSettings(data: any): Promise<ApiResponse> {
+    return this.request('/admin/settings/footer', 'PUT', data);
+  }
+
+  async getAppearanceSettings(): Promise<ApiResponse> {
+    return this.request('/admin/settings/appearance', 'GET');
+  }
+
+  async updateAppearanceSettings(data: any): Promise<ApiResponse> {
+    return this.request('/admin/settings/appearance', 'PUT', data);
+  }
+
+  // Notifications
+  async getAdminNotifications(): Promise<ApiResponse> {
+    return this.request('/admin/notifications', 'GET');
+  }
+
+  async sendNotification(data: { title: string; message: string; type: string; target_type: string }): Promise<ApiResponse> {
+    return this.request('/admin/notifications', 'POST', data);
+  }
+
+  async markNotificationRead(id: string): Promise<ApiResponse> {
+    return this.request(`/admin/notifications/${id}/read`, 'PUT');
+  }
+
+  // Translation Management
+  async getTranslationStats(): Promise<ApiResponse> {
+    return this.request('/admin/translations/stats', 'GET');
+  }
+
+  async getMissingTranslations(): Promise<ApiResponse> {
+    return this.request('/admin/translations/missing', 'GET');
+  }
+
+  async updateTranslation(data: { table: string; id: string; field: string; language: string; value: string }): Promise<ApiResponse> {
+    return this.request('/admin/translations/update', 'POST', data);
+  }
+
+  // Download URL for backup
+  async getBackupDownloadUrl(id: string): Promise<ApiResponse> {
+    return this.request(`/admin/backups/${id}/download`, 'GET');
   }
 }
