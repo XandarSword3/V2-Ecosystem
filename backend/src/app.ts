@@ -1,3 +1,49 @@
+/**
+ * @fileoverview V2 Resort Management System - Express Application
+ * 
+ * This is the main Express application configuration for the V2 Resort backend.
+ * It provides a comprehensive REST API for managing resort operations including:
+ * 
+ * ## API Endpoints
+ * 
+ * ### Public Endpoints (No Authentication)
+ * - `GET /health` - Health check for load balancers
+ * - `GET /api/settings` - Public site settings (theme, contact info, etc.)
+ * - `GET /api/modules` - List of active modules
+ * 
+ * ### Authentication (`/api/auth`)
+ * - `POST /api/auth/register` - User registration
+ * - `POST /api/auth/login` - User login (JWT tokens)
+ * - `POST /api/auth/refresh` - Refresh access token
+ * - `POST /api/auth/forgot-password` - Password reset request
+ * - `POST /api/auth/reset-password` - Reset password with token
+ * 
+ * ### Restaurant Module (`/api/restaurant`) - Requires 'restaurant' module active
+ * - Menu management, categories, orders, tables
+ * 
+ * ### Chalets Module (`/api/chalets`) - Requires 'chalets' module active  
+ * - Chalet listings, bookings, availability, pricing
+ * 
+ * ### Pool Module (`/api/pool`) - Requires 'pool' module active
+ * - Pool tickets, sessions, capacity management
+ * 
+ * ### Snack Bar Module (`/api/snack`) - Requires 'snack-bar' module active
+ * - Snack menu, orders
+ * 
+ * ### Admin (`/api/admin`) - Requires admin role
+ * - Dashboard, user management, settings, reports
+ * 
+ * ## Security Features
+ * - Helmet.js for HTTP headers
+ * - CORS with whitelist
+ * - Rate limiting (general + auth-specific)
+ * - JWT authentication
+ * - Request ID correlation
+ * 
+ * @module app
+ * @version 1.0.0
+ */
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -8,6 +54,7 @@ import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { requestLogger, errorLogger } from './middleware/requestLogger.middleware.js';
 import { normalizeBody } from './middleware/normalizeBody.middleware.js';
+import { requestIdMiddleware } from './middleware/requestId.middleware.js';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes.js';
@@ -38,8 +85,55 @@ app.get('/health', (req, res) => {
 
 // Alternative health check endpoints for flexibility
 app.get('/healthz', (req, res) => res.send('ok'));
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+
+// Detailed health check with database and dependencies status
+app.get('/api/health', async (req, res) => {
+  const startTime = Date.now();
+  const health: {
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    version: string;
+    timestamp: string;
+    uptime: number;
+    checks: {
+      database: { status: string; latency?: number; error?: string };
+      memory: { used: number; total: number; percentage: number };
+    };
+  } = {
+    status: 'healthy',
+    version: process.env.npm_package_version || '1.0.0',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    checks: {
+      database: { status: 'unknown' },
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+        percentage: Math.round((process.memoryUsage().heapUsed / process.memoryUsage().heapTotal) * 100),
+      },
+    },
+  };
+
+  // Check database connectivity
+  try {
+    const { getSupabase } = await import('./database/connection.js');
+    const supabase = getSupabase();
+    const dbStart = Date.now();
+    const { error } = await supabase.from('users').select('id').limit(1);
+    const dbLatency = Date.now() - dbStart;
+    
+    if (error) {
+      health.checks.database = { status: 'error', error: error.message, latency: dbLatency };
+      health.status = 'degraded';
+    } else {
+      health.checks.database = { status: 'connected', latency: dbLatency };
+    }
+  } catch (err) {
+    health.checks.database = { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' };
+    health.status = 'unhealthy';
+  }
+
+  const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // CORS configuration - allow Vercel preview URLs and production domains
@@ -78,8 +172,12 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID'],
+  exposedHeaders: ['X-Request-ID'],
 }));
+
+// Request ID middleware - must be early to track all requests
+app.use(requestIdMiddleware);
 
 // General rate limiting
 const limiter = rateLimit({
@@ -141,8 +239,9 @@ async function handleSettings(_req: Request, res: Response) {
 
     // Combine all settings into a flat object
     // Each row has a key (like 'general', 'contact') and value (JSONB object)
-    const combinedSettings: Record<string, any> = {};
-    (settings || []).forEach((s: any) => {
+    interface SettingRow { key: string; value: unknown }
+    const combinedSettings: Record<string, unknown> = {};
+    (settings || []).forEach((s: SettingRow) => {
       // The value is already a JSONB object, no parsing needed
       combinedSettings[s.key] = s.value;
     });
@@ -168,7 +267,7 @@ async function handleSettings(_req: Request, res: Response) {
 
     res.json({ success: true, data: combinedSettings });
   } catch (error) {
-    console.error('Error fetching public settings:', error);
+    logger.error('Error fetching public settings:', error);
     res.status(500).json({ success: false, error: 'Failed to load settings' });
   }
 }
@@ -179,6 +278,42 @@ app.get('/api/settings', handleSettings);
 
 // Public modules endpoint
 app.get('/api/modules', modulesController.getModules);
+
+// API Documentation (OpenAPI/Swagger)
+app.get('/api/docs', async (_req: Request, res: Response) => {
+  try {
+    const { openApiSpec } = await import('./docs/openapi.js');
+    res.json(openApiSpec);
+  } catch (error) {
+    res.status(500).json({ error: 'Documentation not available' });
+  }
+});
+
+// Swagger UI redirect (provides a link to use with external Swagger UI)
+app.get('/api/docs/ui', (_req: Request, res: Response) => {
+  const docsUrl = `${config.apiUrl}/api/docs`;
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>V2 Resort API Documentation</title>
+      <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+    </head>
+    <body>
+      <div id="swagger-ui"></div>
+      <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+      <script>
+        SwaggerUIBundle({
+          url: '${docsUrl}',
+          dom_id: '#swagger-ui',
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+          layout: 'StandaloneLayout'
+        });
+      </script>
+    </body>
+    </html>
+  `);
+});
 
 // API Routes - Module-protected routes have guards that check if module is active
 app.use('/api/auth', authRoutes);
@@ -204,8 +339,13 @@ app.use((_req: Request, res: Response) => {
 app.use(errorLogger);
 
 // Global error handler
-app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-  const requestId = (req as any).requestId || 'unknown';
+interface ErrorWithStatus extends Error {
+  statusCode?: number;
+  errors?: unknown[];
+}
+
+app.use((err: ErrorWithStatus, req: Request, res: Response, _next: NextFunction) => {
+  const requestId = req.requestId || 'unknown';
 
   // Log error (skip logging for 404s and validation errors in production to reduce noise)
   if (err.statusCode !== 404 && err.statusCode !== 400) {

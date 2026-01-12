@@ -186,6 +186,33 @@ export function getIO() {
   return io;
 }
 
+/**
+ * Close the Socket.io server gracefully
+ * Disconnects all clients and cleans up resources
+ */
+export async function closeSocketServer(): Promise<void> {
+  if (!io) return;
+  
+  return new Promise((resolve) => {
+    // Notify all connected clients
+    io.emit('server:shutdown', { message: 'Server is shutting down' });
+    
+    // Disconnect all sockets
+    io.sockets.sockets.forEach((socket) => {
+      socket.disconnect(true);
+    });
+    
+    // Clear active connections
+    activeConnections.clear();
+    
+    // Close the server
+    io.close(() => {
+      logger.info('Socket.io server closed');
+      resolve();
+    });
+  });
+}
+
 // Emit helpers
 export function emitToUser(userId: string, event: string, data: unknown) {
   getIO().to(`user:${userId}`).emit(event, data);

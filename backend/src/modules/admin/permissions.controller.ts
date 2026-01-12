@@ -1,8 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection";
 import { logActivity } from "../../utils/activityLogger";
+import type { PermissionRow } from './types.js';
 
 // -- Permissions --
+
+interface NormalizedPermission extends Omit<PermissionRow, 'slug' | 'module_slug'> {
+  slug: string | null;
+  module_slug: string | null;
+}
 
 export async function getAllPermissions(req: Request, res: Response, next: NextFunction) {
   try {
@@ -14,11 +20,11 @@ export async function getAllPermissions(req: Request, res: Response, next: NextF
 
     if (error) throw error;
 
-    const normalized = (data || []).map((p: any) => {
+    const normalized = (data || []).map((p: PermissionRow): NormalizedPermission => {
       const slug = p.slug ?? p.name ?? (p.resource && p.action ? `${p.resource}.${p.action}` : null);
       const module_slug = p.module_slug ?? p.resource ?? (slug ? String(slug).split('.')[0] : null);
       return { ...p, slug, module_slug };
-    }).sort((a: any, b: any) => {
+    }).sort((a: NormalizedPermission, b: NormalizedPermission) => {
       const ma = a.module_slug || '';
       const mb = b.module_slug || '';
       if (ma === mb) return String(a.slug || '').localeCompare(String(b.slug || ''));
@@ -113,7 +119,11 @@ export async function updateUserPermissions(req: Request, res: Response, next: N
 
     // 2. Insert new
     if (permissions && permissions.length > 0) {
-        const inserts = permissions.map((p: any) => ({
+        interface PermissionOverride {
+          permission_id: string;
+          is_granted: boolean;
+        }
+        const inserts = permissions.map((p: PermissionOverride) => ({
             user_id: id,
             permission_id: p.permission_id,
             is_granted: p.is_granted

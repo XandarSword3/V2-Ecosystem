@@ -55,14 +55,28 @@ export default function RestaurantCartPage() {
   const tax = subtotal * 0.11; // 11% VAT
   const total = subtotal + tax;
 
+  interface CreateOrderData {
+    customerName: string;
+    customerPhone: string;
+    tableNumber?: string;
+    orderType: 'dine_in' | 'takeaway' | 'delivery';
+    paymentMethod: 'cash' | 'card';
+    notes?: string;
+    items: Array<{ menuItemId: string; quantity: number; notes?: string }>;
+  }
+
+  interface ApiError {
+    response?: { data?: { error?: string } };
+  }
+
   const orderMutation = useMutation({
-    mutationFn: (data: any) => restaurantApi.createOrder(data),
+    mutationFn: (data: CreateOrderData) => restaurantApi.createOrder(data),
     onSuccess: (response) => {
       clearRestaurantCart();
       toast.success(t('orderPlaced'));
       router.push(`/restaurant/confirmation?id=${response.data.data.id}`);
     },
-    onError: (err: any) => {
+    onError: (err: ApiError) => {
       toast.error(err.response?.data?.error || t('orderFailed'));
     },
   });
@@ -89,14 +103,14 @@ export default function RestaurantCartPage() {
     orderMutation.mutate({
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
-      tableNumber: orderType === 'dine_in' ? tableNumber.trim() : null,
+      tableNumber: orderType === 'dine_in' ? tableNumber.trim() : undefined,
       orderType,
       paymentMethod,
-      specialRequests: notes.trim(),
+      notes: notes.trim(),
       items: restaurantItems.map((item) => ({
         menuItemId: item.id,
         quantity: item.quantity,
-        specialInstructions: item.specialInstructions,
+        notes: item.specialInstructions,
       })),
     });
   };

@@ -81,7 +81,7 @@ export default function PoolSessionsManagementPage() {
       setLoading(true);
       const response = await api.get('/pool/sessions');
       setSessions(response.data.data || response.data.sessions || []);
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to fetch pool sessions');
       console.error(error);
     } finally {
@@ -128,8 +128,9 @@ export default function PoolSessionsManagementPage() {
       }
       fetchSessions();
       setShowModal(false);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save session');
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(errorMessage || 'Failed to save session');
     } finally {
       setSaving(false);
     }
@@ -142,7 +143,7 @@ export default function PoolSessionsManagementPage() {
       await api.delete(`/pool/admin/sessions/${id}`);
       toast.success('Session deleted');
       fetchSessions();
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to delete session');
     }
   };

@@ -55,8 +55,9 @@ export default function LoginPage() {
       } else {
         window.location.href = '/';
       }
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || 'Login failed. Please try again.');
       setIsLoading(false);
     }
   };

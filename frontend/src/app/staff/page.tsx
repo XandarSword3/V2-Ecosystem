@@ -54,6 +54,14 @@ export default function StaffDashboard() {
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
+  interface OrderRecord {
+    id: string;
+    order_number?: string;
+    status: string;
+    updated_at?: string;
+    created_at?: string;
+  }
+
   const fetchDashboardData = useCallback(async () => {
     try {
       // Fetch orders for stats
@@ -62,34 +70,34 @@ export default function StaffDashboard() {
         api.get('/snack/staff/orders/live').catch(() => ({ data: { data: [] } })),
       ]);
 
-      const allOrders = [
+      const allOrders: OrderRecord[] = [
         ...(restaurantRes.data.data || []),
         ...(snackRes.data.data || []),
       ];
 
-      const pending = allOrders.filter((o: any) => 
+      const pending = allOrders.filter((o: OrderRecord) => 
         ['pending', 'confirmed', 'preparing'].includes(o.status)
       ).length;
 
-      const completed = allOrders.filter((o: any) => 
+      const completed = allOrders.filter((o: OrderRecord) => 
         o.status === 'completed' && 
-        new Date(o.updated_at).toDateString() === new Date().toDateString()
+        new Date(o.updated_at || '').toDateString() === new Date().toDateString()
       ).length;
 
       setStats({
         pendingOrders: pending,
         completedToday: completed,
-        issues: allOrders.filter((o: any) => o.status === 'cancelled').length,
+        issues: allOrders.filter((o: OrderRecord) => o.status === 'cancelled').length,
         avgResponseTime: pending > 0 ? `${Math.round(5 + Math.random() * 10)}m` : '-',
       });
 
       // Generate recent activity from orders
       const activities: RecentActivity[] = allOrders
         .slice(0, 5)
-        .map((order: any, index: number) => ({
+        .map((order: OrderRecord, index: number) => ({
           id: order.id,
           action: `Order #${order.order_number || order.id.slice(0, 8)} - ${order.status}`,
-          time: getRelativeTime(order.updated_at || order.created_at),
+          time: getRelativeTime(order.updated_at || order.created_at || ''),
           type: order.status === 'completed' ? 'success' : order.status === 'cancelled' ? 'warning' : 'info',
         }));
 
@@ -115,7 +123,7 @@ export default function StaffDashboard() {
   // Real-time updates via WebSocket
   useEffect(() => {
     if (socket) {
-      socket.on('order:new', (order: any) => {
+      socket.on('order:new', (order: OrderRecord) => {
         setStats((prev) => ({
           ...prev,
           pendingOrders: prev.pendingOrders + 1,

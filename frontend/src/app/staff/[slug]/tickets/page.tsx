@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { toast } from 'sonner';
 import { 
     Ticket, QrCode, Search, CheckCircle2, XCircle, Clock, 
-    RefreshCw, Users, CreditCard 
+    RefreshCw, Users, CreditCard, LucideIcon 
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 
@@ -23,7 +23,7 @@ interface ModuleTicket {
   session_name?: string;
 }
 
-const statusConfig: Record<string, { color: string; icon: any }> = {
+const statusConfig: Record<string, { color: string; icon: LucideIcon }> = {
   pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
   active: { color: 'bg-green-100 text-green-800', icon: CheckCircle2 },
   valid: { color: 'bg-green-100 text-green-800', icon: CheckCircle2 },
@@ -77,8 +77,9 @@ export default function ModuleTicketsPage({ params }: { params: Promise<{ slug: 
       toast.success(response.data.message || 'Ticket validated!', { icon: '🎟️' });
       setManualCode('');
       fetchTickets(); // Refresh list to show status change
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'Invalid ticket code';
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      const errorMessage = axiosError.response?.data?.error || 'Invalid ticket code';
       toast.error(errorMessage);
     } finally {
       setValidating(false);

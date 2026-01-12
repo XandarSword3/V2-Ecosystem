@@ -79,13 +79,13 @@ export default function AdminOrdersPage() {
         api.get('/snack/staff/orders').catch(() => ({ data: { data: [] } })),
       ]);
 
-      const restaurantOrders = (restaurantRes.data.data || []).map((o: any) => ({
+      const restaurantOrders = (restaurantRes.data.data || []).map((o: Omit<Order, 'source'>) => ({
         ...o,
-        source: 'restaurant',
+        source: 'restaurant' as const,
       }));
-      const snackOrders = (snackRes.data.data || []).map((o: any) => ({
+      const snackOrders = (snackRes.data.data || []).map((o: Omit<Order, 'source'>) => ({
         ...o,
-        source: 'snack_bar',
+        source: 'snack_bar' as const,
       }));
 
       // Combine and sort by date
@@ -108,12 +108,12 @@ export default function AdminOrdersPage() {
   // Real-time order updates
   useEffect(() => {
     if (socket) {
-      socket.on('order:new', (order: any) => {
+      socket.on('order:new', (order: Order) => {
         setOrders((prev) => [order, ...prev]);
         toast.success(`New order received: #${order.order_number || order.id.slice(0, 8)}`);
       });
 
-      socket.on('order:updated', (order: any) => {
+      socket.on('order:updated', (order: Partial<Order> & { id: string }) => {
         setOrders((prev) =>
           prev.map((o) => (o.id === order.id ? { ...o, ...order } : o))
         );

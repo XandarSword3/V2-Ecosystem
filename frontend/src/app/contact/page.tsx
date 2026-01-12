@@ -53,8 +53,9 @@ export default function ContactPage() {
       setSubmitted(true);
       setForm(initialForm);
       toast.success('Message sent successfully! We\'ll get back to you soon.');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send message. Please try again.');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      setError(axiosError.response?.data?.error || 'Failed to send message. Please try again.');
       toast.error('Failed to send message');
     } finally {
       setIsSubmitting(false);

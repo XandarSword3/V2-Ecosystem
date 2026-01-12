@@ -45,7 +45,15 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
   const router = useRouter();
   const t = useTranslations('staff');
   const tAdmin = useTranslations('admin');
-  const [modules, setModules] = useState<any[]>([]);
+  interface ModuleData {
+    id: string;
+    name: string;
+    slug: string;
+    is_active?: boolean;
+    isActive?: boolean;
+    template_type?: string;
+  }
+  const [modules, setModules] = useState<ModuleData[]>([]);
 
   useEffect(() => {
     const fetchModules = async () => {
@@ -53,7 +61,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
         const response = await api.get('/admin/modules');
         if (response.data.success) {
           // Normalise backend flag names: some APIs return `is_active`, others `isActive`
-          setModules(response.data.data.filter((m: any) => (m.is_active ?? m.isActive)));
+          setModules(response.data.data.filter((m: ModuleData) => (m.is_active ?? m.isActive)));
         }
       } catch (error) {
         console.error('Failed to fetch modules:', error);

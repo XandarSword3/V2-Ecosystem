@@ -123,14 +123,17 @@ export default function AdminAuditPage() {
   }
 
   // Helper to parse JSON strings if needed
-  const parseValue = (val: any) => {
+  const parseValue = (val: unknown): unknown => {
     if (!val) return null;
     if (typeof val === 'object') return val;
-    try {
-      return JSON.parse(val);
-    } catch (e) {
-      return val;
+    if (typeof val === 'string') {
+      try {
+        return JSON.parse(val);
+      } catch (e) {
+        return val;
+      }
     }
+    return val;
   };
 
   return (

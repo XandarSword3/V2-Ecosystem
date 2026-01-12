@@ -56,14 +56,28 @@ export default function SnackCartPage() {
 
   const cartTotal = getSnackTotal();
 
+  interface SnackOrderData {
+    customerName: string;
+    customerPhone: string;
+    pickupLocation?: string;
+    paymentMethod: 'cash' | 'card';
+    notes?: string;
+    items: Array<{ itemId: string; quantity: number; notes?: string }>;
+  }
+
+  interface MutationError {
+    response?: { data?: { error?: string } };
+    message?: string;
+  }
+
   const orderMutation = useMutation({
-    mutationFn: (data: any) => snackApi.createOrder(data),
+    mutationFn: (data: SnackOrderData) => snackApi.createOrder(data),
     onSuccess: (response) => {
       clearSnackCart();
       toast.success(t('orderPlaced'));
       router.push(`/snack-bar/confirmation?id=${response.data.data.id}`);
     },
-    onError: (err: any) => {
+    onError: (err: MutationError) => {
       toast.error(err.response?.data?.error || t('orderFailed'));
     },
   });
@@ -89,7 +103,7 @@ export default function SnackCartPage() {
       paymentMethod,
       notes: notes.trim(),
       items: snackItems.map((item) => ({
-        snackItemId: item.id,
+        itemId: item.id,
         quantity: item.quantity,
       })),
     });

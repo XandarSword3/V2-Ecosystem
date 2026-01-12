@@ -2,15 +2,24 @@ import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
 import { emailService } from "../../services/email.service.js";
 import { purchasePoolTicketSchema, validateBody } from "../../validation/schemas.js";
+import { logger } from "../../utils/logger.js";
+import { logActivity } from "../../utils/activityLogger.js";
 import QRCode from 'qrcode';
 import { config } from "../../config/index.js";
 import dayjs from 'dayjs';
 import { emitToUnit } from "../../socket/index.js";
+import { PoolSessionRow } from "../../types/index.js";
 
 function generateTicketNumber(): string {
   const date = dayjs().format('YYMMDD');
   const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
   return `P-${date}-${random}`;
+}
+
+// Extended session type with optional price fields
+interface PoolSessionWithPrices extends PoolSessionRow {
+  adult_price?: string | number | null;
+  child_price?: string | number | null;
 }
 
 // ============================================
@@ -34,7 +43,7 @@ export async function getSessions(req: Request, res: Response, next: NextFunctio
         const { data: sessions, error } = await query;
         if (error) throw error;
         // Normalize price fields for frontend compatibility
-        const sessionsWithPrices = (sessions || []).map((s: any) => ({
+        const sessionsWithPrices = (sessions || []).map((s: PoolSessionWithPrices) => ({
           ...s,
           adult_price: s.adult_price ?? s.price ?? 0,
           child_price: s.child_price ?? s.price ?? 0,
@@ -247,6 +256,21 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
       ticketDate: ticket.ticket_date,
     });
 
+    // Audit log for ticket purchase
+    logActivity({
+      user_id: req.user?.userId || 'guest',
+      action: 'ticket_purchased',
+      resource: 'pool_ticket',
+      resource_id: ticket.id,
+      new_value: { 
+        ticket_number: ticketNumber, 
+        session_id: sessionId, 
+        guests: numberOfGuests,
+        total: totalAmount 
+      },
+      ip_address: req.ip,
+    });
+
     // Send ticket email with QR code
     if (customerEmail) {
       emailService.sendTicketWithQR({
@@ -259,7 +283,7 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
         numberOfGuests,
         qrCodeDataUrl: qrCode,
       }).catch((err) => {
-        console.warn('Failed to send ticket email:', err);
+        logger.warn('Failed to send ticket email:', err);
       });
     }
 
@@ -641,7 +665,7 @@ export async function createSession(req: Request, res: Response, next: NextFunct
       .single();
 
     if (error) {
-      console.error('Pool session creation error:', error);
+      logger.error('Pool session creation error:', error);
       throw error;
     }
 

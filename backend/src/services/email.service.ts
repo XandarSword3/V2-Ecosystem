@@ -49,8 +49,9 @@ class EmailService {
       });
       this.isConfigured = true;
       logger.info('Email service initialized successfully');
-    } catch (error: any) {
-      logger.error('Failed to initialize email service:', error.message);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error('Failed to initialize email service:', err.message);
       this.isConfigured = false;
     }
   }
@@ -70,8 +71,9 @@ class EmailService {
         return null;
       }
       return data;
-    } catch (error: any) {
-      logger.error(`Error fetching template '${templateName}':`, error.message);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error(`Error fetching template '${templateName}':`, err.message);
       return null;
     }
   }
@@ -91,22 +93,22 @@ class EmailService {
 
       // Extract relevant fields from JSONB values
       const settings: Record<string, string> = {};
-      (data || []).forEach((s: any) => {
+      (data || []).forEach((s: { key: string; value: Record<string, unknown> | null }) => {
         if (s.key === 'general' && s.value) {
-          settings.company_name = s.value.resortName || 'V2 Resort';
-          settings.companyName = s.value.resortName || 'V2 Resort';
+          settings.company_name = String(s.value.resortName || 'V2 Resort');
+          settings.companyName = String(s.value.resortName || 'V2 Resort');
         }
         if (s.key === 'contact' && s.value) {
-          settings.contact_email = s.value.email || 'info@v2resort.com';
-          settings.contactEmail = s.value.email || 'info@v2resort.com';
-          settings.contact_phone = s.value.phone || '+961 XX XXX XXX';
-          settings.contactPhone = s.value.phone || '+961 XX XXX XXX';
-          settings.contact_address = s.value.address || 'V2 Resort, Lebanon';
-          settings.companyAddress = s.value.address || 'V2 Resort, Lebanon';
+          settings.contact_email = String(s.value.email || 'info@v2resort.com');
+          settings.contactEmail = String(s.value.email || 'info@v2resort.com');
+          settings.contact_phone = String(s.value.phone || '+961 XX XXX XXX');
+          settings.contactPhone = String(s.value.phone || '+961 XX XXX XXX');
+          settings.contact_address = String(s.value.address || 'V2 Resort, Lebanon');
+          settings.companyAddress = String(s.value.address || 'V2 Resort, Lebanon');
         }
         if (s.key === 'chalets' && s.value) {
-          settings.chalet_check_in = s.value.checkIn || s.value.check_in_time || '3:00 PM';
-          settings.chalet_check_out = s.value.checkOut || s.value.check_out_time || '12:00 PM';
+          settings.chalet_check_in = String(s.value.checkIn || s.value.check_in_time || '3:00 PM');
+          settings.chalet_check_out = String(s.value.checkOut || s.value.check_out_time || '12:00 PM');
         }
       });
       return { ...this.getDefaultSettings(), ...settings };
@@ -160,8 +162,9 @@ class EmailService {
 
       logger.info(`Email sent successfully: ${info.messageId}`);
       return true;
-    } catch (error: any) {
-      logger.error('Failed to send email:', error.message);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error('Failed to send email:', err.message);
       return false;
     }
   }

@@ -1,17 +1,32 @@
+/**
+ * Critical Flows Integration Tests
+ * 
+ * These tests require a running database with seeded data.
+ * They are skipped by default in CI environments.
+ * To run these tests locally, ensure:
+ * 1. Database is running with test data
+ * 2. Admin user exists (admin@v2resort.com / Admin123!)
+ * 3. Set RUN_INTEGRATION_TESTS=true in environment
+ */
+
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import app from '../src/app';
 
-describe('Order Creation', () => {
+// Skip integration tests unless explicitly enabled
+const runIntegration = process.env.RUN_INTEGRATION_TESTS === 'true';
+const describeIntegration = runIntegration ? describe : describe.skip;
+
+describeIntegration('Order Creation (Integration)', () => {
   it('should create a restaurant order successfully', async () => {
     const res = await request(app)
       .post('/api/restaurant/orders')
       .send({
         customerName: 'Test User',
-        customerPhone: '1234567890',
+        customerPhone: '+1234567890',
         orderType: 'dine_in',
         items: [
-          { menuItemId: 'test-id', quantity: 2 }
+          { menuItemId: '550e8400-e29b-41d4-a716-446655440000', quantity: 2 }
         ]
       });
     expect(res.status).toBe(200);
@@ -20,7 +35,7 @@ describe('Order Creation', () => {
   });
 });
 
-describe('Authentication', () => {
+describeIntegration('Authentication (Integration)', () => {
   it('should login and return JWT', async () => {
     const res = await request(app)
       .post('/api/auth/login')
@@ -31,16 +46,17 @@ describe('Authentication', () => {
   });
 });
 
-describe('Double Booking Prevention', () => {
+describeIntegration('Double Booking Prevention (Integration)', () => {
   it('should prevent double booking for the same chalet and dates', async () => {
     const bookingPayload = {
-      chaletId: 'test-chalet-id',
+      chaletId: '550e8400-e29b-41d4-a716-446655440001',
       checkInDate: '2026-01-10',
       checkOutDate: '2026-01-12',
       customerName: 'Test User',
       customerEmail: 'test@example.com',
-      customerPhone: '1234567890',
-      numberOfGuests: 2
+      customerPhone: '+1234567890',
+      numberOfGuests: 2,
+      paymentMethod: 'cash'
     };
     // First booking should succeed
     const res1 = await request(app)
@@ -57,13 +73,13 @@ describe('Double Booking Prevention', () => {
   });
 });
 
-describe('Payment Processing', () => {
+describeIntegration('Payment Processing (Integration)', () => {
   it('should process payment and not fail', async () => {
     const res = await request(app)
       .post('/api/payments')
       .send({
         referenceType: 'order',
-        referenceId: 'test-order-id',
+        referenceId: '550e8400-e29b-41d4-a716-446655440002',
         amount: 100,
         currency: 'USD',
         method: 'card'

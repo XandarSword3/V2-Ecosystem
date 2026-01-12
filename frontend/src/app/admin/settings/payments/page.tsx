@@ -174,8 +174,9 @@ export default function AdminPaymentsPage() {
       await api.post(`/payments/transactions/${paymentId}/refund`, { reason });
       toast.success('Refund processed successfully');
       fetchPayments();
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to process refund');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      toast.error(axiosError.response?.data?.error || 'Failed to process refund');
     }
   };
 

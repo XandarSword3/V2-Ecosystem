@@ -136,8 +136,9 @@ export default function DynamicSessionsPage() {
       }
       fetchSessions();
       setShowModal(false);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save session');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(errorMessage || 'Failed to save session');
     } finally {
       setSaving(false);
     }

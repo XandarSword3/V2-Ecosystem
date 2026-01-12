@@ -75,8 +75,9 @@ export default function CreateUserPage() {
       
       toast.success('User created successfully');
       router.push(`/admin/users/${formData.role === 'customer' ? 'customers' : formData.role === 'staff' ? 'staff' : 'admins'}`);
-    } catch (error: any) {
-      const message = error.response?.data?.message || error.response?.data?.error || 'Failed to create user';
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string; error?: string } } };
+      const message = axiosError.response?.data?.message || axiosError.response?.data?.error || 'Failed to create user';
       toast.error(message);
     } finally {
       setLoading(false);
