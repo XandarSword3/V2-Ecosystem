@@ -677,10 +677,8 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
       base_price: parseFloat(req.body.base_price) || 0,
       weekend_price: req.body.weekend_price ? parseFloat(req.body.weekend_price) : (parseFloat(req.body.base_price) || 0),
       is_active: req.body.is_active !== undefined ? req.body.is_active : true,
-      is_featured: req.body.is_featured || false,
       amenities: req.body.amenities || [],
       images: req.body.images || [],
-      image_url: req.body.image_url || null,
     };
 
     const { data, error } = await supabase
@@ -710,9 +708,24 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
 export async function updateChalet(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
+    
+    // Extract only valid snake_case fields for the chalets table
+    const validFields = [
+      'name', 'name_ar', 'name_fr', 'description', 'description_ar', 'description_fr',
+      'capacity', 'bedroom_count', 'bathroom_count', 'amenities', 'images',
+      'base_price', 'weekend_price', 'size', 'status', 'is_active'
+    ];
+    
+    const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
+    for (const field of validFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+    
     const { data, error } = await supabase
       .from('chalets')
-      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', req.params.id)
       .select()
       .single();
@@ -742,9 +755,22 @@ export async function deleteChalet(req: Request, res: Response, next: NextFuncti
 export async function createAddOn(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
+    
+    // Extract only valid snake_case fields for the chalet_add_ons table
+    const validFields = [
+      'name', 'name_ar', 'name_fr', 'description', 'price', 'price_type', 'is_active'
+    ];
+    
+    const insertData: Record<string, any> = {};
+    for (const field of validFields) {
+      if (req.body[field] !== undefined) {
+        insertData[field] = req.body[field];
+      }
+    }
+    
     const { data, error } = await supabase
       .from('chalet_add_ons')
-      .insert(req.body)
+      .insert(insertData)
       .select()
       .single();
 
@@ -758,9 +784,22 @@ export async function createAddOn(req: Request, res: Response, next: NextFunctio
 export async function updateAddOn(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
+    
+    // Extract only valid snake_case fields for the chalet_add_ons table
+    const validFields = [
+      'name', 'name_ar', 'name_fr', 'description', 'price', 'price_type', 'is_active'
+    ];
+    
+    const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
+    for (const field of validFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+    
     const { data, error } = await supabase
       .from('chalet_add_ons')
-      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', req.params.id)
       .select()
       .single();
@@ -805,9 +844,23 @@ export async function getPriceRules(req: Request, res: Response, next: NextFunct
 export async function createPriceRule(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
+    
+    // Extract only valid snake_case fields for the chalet_price_rules table
+    const validFields = [
+      'chalet_id', 'name', 'start_date', 'end_date', 'price_multiplier',
+      'price', 'priority', 'is_active'
+    ];
+    
+    const insertData: Record<string, any> = {};
+    for (const field of validFields) {
+      if (req.body[field] !== undefined) {
+        insertData[field] = req.body[field];
+      }
+    }
+    
     const { data, error } = await supabase
       .from('chalet_price_rules')
-      .insert(req.body)
+      .insert(insertData)
       .select()
       .single();
 
@@ -821,9 +874,23 @@ export async function createPriceRule(req: Request, res: Response, next: NextFun
 export async function updatePriceRule(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
+    
+    // Extract only valid snake_case fields for the chalet_price_rules table
+    const validFields = [
+      'chalet_id', 'name', 'start_date', 'end_date', 'price_multiplier',
+      'price', 'priority', 'is_active'
+    ];
+    
+    const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
+    for (const field of validFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+    
     const { data, error } = await supabase
       .from('chalet_price_rules')
-      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', req.params.id)
       .select()
       .single();

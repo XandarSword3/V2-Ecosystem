@@ -1,0 +1,592 @@
+{
+  "timestamp": "2026-01-12T17:06:25.850Z",
+  "duration": 43763,
+  "summary": {
+    "passed": 62,
+    "failed": 0,
+    "total": 62,
+    "passRate": 100
+  },
+  "results": [
+    {
+      "feature": "Dashboard",
+      "operation": "LOAD",
+      "success": true,
+      "message": "Loaded: {\"todayOrders\":175,\"todayRevenue\":5607.900000000001,\"todayBookings\":0,\"todayTickets\":1,\"totalUsers\":...",
+      "duration": 282
+    },
+    {
+      "feature": "Reports",
+      "operation": "GET_OVERVIEW",
+      "success": true,
+      "message": "overview report loaded",
+      "duration": 680
+    },
+    {
+      "feature": "Reports",
+      "operation": "GET_OCCUPANCY",
+      "success": true,
+      "message": "occupancy report loaded",
+      "duration": 329
+    },
+    {
+      "feature": "Reports",
+      "operation": "GET_CUSTOMERS",
+      "success": true,
+      "message": "customers report loaded",
+      "duration": 225
+    },
+    {
+      "feature": "Restaurant Categories",
+      "operation": "CREATE",
+      "success": {
+        "id": "a751338f-8e5d-4ba7-aa53-e2ad62e5a6e2",
+        "name": "Test Category 1768237544547",
+        "name_ar": null,
+        "name_fr": null,
+        "description": "Created by comprehensive test",
+        "display_order": 24,
+        "is_active": true,
+        "image_url": null,
+        "created_at": "2026-01-12T17:05:46.594637",
+        "updated_at": "2026-01-12T17:05:46.594637",
+        "deleted_at": null,
+        "module_id": null
+      },
+      "message": "Created: a751338f-8e5d-4ba7-aa53-e2ad62e5a6e2",
+      "duration": 998
+    },
+    {
+      "feature": "Restaurant Categories",
+      "operation": "READ_VERIFY",
+      "success": true,
+      "message": "Category found in list",
+      "duration": 140
+    },
+    {
+      "feature": "Restaurant Categories",
+      "operation": "UPDATE",
+      "success": true,
+      "message": "Category updated",
+      "duration": 290
+    },
+    {
+      "feature": "Restaurant Categories",
+      "operation": "DELETE",
+      "success": true,
+      "message": "Category deleted",
+      "duration": 838
+    },
+    {
+      "feature": "Restaurant Categories",
+      "operation": "DELETE_VERIFY",
+      "success": true,
+      "message": "Category confirmed deleted",
+      "duration": 436
+    },
+    {
+      "feature": "Restaurant Items",
+      "operation": "CREATE",
+      "success": {
+        "id": "59776861-15e2-45bc-8fa5-7fa07e9dce23",
+        "category_id": "1b09abc3-5e71-4efe-882c-953308ac65af",
+        "name": "Bot Burger 1768237548040",
+        "name_ar": null,
+        "name_fr": null,
+        "description": "Delicious test burger created by bot",
+        "description_ar": null,
+        "description_fr": null,
+        "price": 15000,
+        "preparation_time_minutes": null,
+        "calories": null,
+        "is_vegetarian": false,
+        "is_vegan": false,
+        "is_gluten_free": false,
+        "allergens": [],
+        "image_url": null,
+        "is_available": true,
+        "is_featured": true,
+        "display_order": 0,
+        "created_at": "2026-01-12T17:05:49.713653",
+        "updated_at": "2026-01-12T17:05:49.713653",
+        "deleted_at": null,
+        "module_id": null,
+        "discount_price": null,
+        "is_spicy": true
+      },
+      "message": "Created item: 59776861-15e2-45bc-8fa5-7fa07e9dce23",
+      "duration": 348
+    },
+    {
+      "feature": "Restaurant Items",
+      "operation": "READ_VERIFY",
+      "success": true,
+      "message": "Item found with price 15000",
+      "duration": 108
+    },
+    {
+      "feature": "Restaurant Items",
+      "operation": "UPDATE",
+      "success": true,
+      "message": "Item updated (price→18000, available→false)",
+      "duration": 161
+    },
+    {
+      "feature": "Restaurant Items",
+      "operation": "TOGGLE_AVAILABILITY",
+      "success": true,
+      "message": "Availability toggled",
+      "duration": 203
+    },
+    {
+      "feature": "Restaurant Items",
+      "operation": "DELETE",
+      "success": true,
+      "message": "Item deleted",
+      "duration": 205
+    },
+    {
+      "feature": "Restaurant Tables",
+      "operation": "CREATE",
+      "success": {
+        "id": "0c5885eb-bea4-4937-9d58-875ce2c835a8",
+        "table_number": "T9755",
+        "capacity": 6,
+        "location": "Test Area",
+        "qr_code": "data:image/png;base64,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",
+        "is_active": true,
+        "created_at": "2026-01-12T17:05:51.099571",
+        "updated_at": "2026-01-12T17:05:51.099571"
+      },
+      "message": "Created table: T9755",
+      "duration": 132
+    },
+    {
+      "feature": "Restaurant Tables",
+      "operation": "READ_VERIFY",
+      "success": true,
+      "message": "Table found: capacity 6",
+      "duration": 201
+    },
+    {
+      "feature": "Restaurant Tables",
+      "operation": "UPDATE",
+      "success": true,
+      "message": "Table updated (capacity→8)",
+      "duration": 204
+    },
+    {
+      "feature": "Restaurant Tables",
+      "operation": "DELETE",
+      "success": true,
+      "message": "Table deleted",
+      "duration": 204
+    },
+    {
+      "feature": "Order Workflow",
+      "operation": "GET_LIVE_ORDERS",
+      "success": true,
+      "message": "Found 21 live orders",
+      "duration": 207
+    },
+    {
+      "feature": "Order Workflow",
+      "operation": "STATUS_TO_CONFIRMED",
+      "success": true,
+      "message": "Order a7594017-2fc4-404b-9f04-d88fc702fd52 → confirmed",
+      "duration": 1303
+    },
+    {
+      "feature": "Order Workflow",
+      "operation": "STATUS_TO_PREPARING",
+      "success": true,
+      "message": "Order a7594017-2fc4-404b-9f04-d88fc702fd52 → preparing",
+      "duration": 357
+    },
+    {
+      "feature": "Order Workflow",
+      "operation": "STATUS_TO_READY",
+      "success": true,
+      "message": "Order a7594017-2fc4-404b-9f04-d88fc702fd52 → ready",
+      "duration": 543
+    },
+    {
+      "feature": "Chalets",
+      "operation": "CREATE",
+      "success": {
+        "id": "dc38a855-89f3-48c7-801e-2e7539a1c28e",
+        "name": "Bot Chalet 1768237555901",
+        "name_ar": null,
+        "name_fr": null,
+        "description": "Test chalet created by comprehensive bot",
+        "description_ar": null,
+        "description_fr": null,
+        "capacity": 8,
+        "bedroom_count": 3,
+        "bathroom_count": 2,
+        "amenities": [
+          "wifi",
+          "pool_access",
+          "parking",
+          "bbq"
+        ],
+        "images": [],
+        "base_price": 500,
+        "weekend_price": 650,
+        "is_active": true,
+        "created_at": "2026-01-12T17:05:57.458501",
+        "updated_at": "2026-01-12T17:05:57.458501",
+        "deleted_at": null,
+        "module_id": null
+      },
+      "message": "Created chalet: dc38a855-89f3-48c7-801e-2e7539a1c28e",
+      "duration": 441
+    },
+    {
+      "feature": "Chalets",
+      "operation": "READ_VERIFY",
+      "success": true,
+      "message": "Chalet found: Bot Chalet 1768237555901",
+      "duration": 197
+    },
+    {
+      "feature": "Chalets",
+      "operation": "UPDATE",
+      "success": true,
+      "message": "Chalet updated (price→600000, featured→true)",
+      "duration": 201
+    },
+    {
+      "feature": "Chalets",
+      "operation": "DELETE",
+      "success": true,
+      "message": "Chalet deleted",
+      "duration": 102
+    },
+    {
+      "feature": "Chalet Pricing",
+      "operation": "CREATE",
+      "success": {
+        "id": "d8c04dad-272f-4521-8743-f3fa14ea66f4",
+        "chalet_id": "83361f1f-452e-4fcb-ad62-217e741f495c",
+        "name": "Summer Peak 1768237557738",
+        "start_date": "2026-01-13T17:05:57.871",
+        "end_date": "2026-02-11T17:05:57.871",
+        "priority": 10,
+        "is_active": true,
+        "created_at": "2026-01-12T17:05:59.195086",
+        "updated_at": "2026-01-12T17:05:59.195086",
+        "module_id": null,
+        "base_price": null,
+        "weekend_price": null,
+        "holiday_price": null,
+        "per_guest_price": null,
+        "min_guests": null,
+        "max_guests": null,
+        "price": 750000
+      },
+      "message": "Created rule: d8c04dad-272f-4521-8743-f3fa14ea66f4",
+      "duration": 116
+    },
+    {
+      "feature": "Chalet Pricing",
+      "operation": "READ_VERIFY",
+      "success": true,
+      "message": "Rule found: Summer Peak 1768237557738",
+      "duration": 191
+    },
+    {
+      "feature": "Chalet Pricing",
+      "operation": "UPDATE",
+      "success": true,
+      "message": "Rule updated (price→900000, active→false)",
+      "duration": 202
+    },
+    {
+      "feature": "Chalet Pricing",
+      "operation": "DELETE",
+      "success": true,
+      "message": "Rule deleted",
+      "duration": 214
+    },
+    {
+      "feature": "Chalet Add-ons",
+      "operation": "CREATE",
+      "success": {
+        "id": "aebb450d-bd09-44ef-a62e-a8086143bef5",
+        "name": "Kayak Rental 1768237559422",
+        "name_ar": null,
+        "name_fr": null,
+        "description": "Test addon by bot",
+        "price": 50,
+        "price_type": "per_night",
+        "is_active": true,
+        "created_at": "2026-01-12T17:06:00.756813",
+        "updated_at": "2026-01-12T17:06:00.756813",
+        "module_id": null
+      },
+      "message": "Created addon: aebb450d-bd09-44ef-a62e-a8086143bef5",
+      "duration": 188
+    },
+    {
+      "feature": "Chalet Add-ons",
+      "operation": "READ_VERIFY",
+      "success": true,
+      "message": "Addon found: Kayak Rental 1768237559422",
+      "duration": 208
+    },
+    {
+      "feature": "Chalet Add-ons",
+      "operation": "UPDATE",
+      "success": true,
+      "message": "Addon updated (price→60000)",
+      "duration": 203
+    },
+    {
+      "feature": "Chalet Add-ons",
+      "operation": "DELETE",
+      "success": true,
+      "message": "Addon deleted",
+      "duration": 203
+    },
+    {
+      "feature": "Pool Sessions",
+      "operation": "CREATE",
+      "success": {
+        "id": "efc06763-6da1-48ac-8755-bd73095ae642",
+        "name": "Night Swim 1768237560967",
+        "start_time": "20:00",
+        "end_time": "23:00",
+        "max_capacity": 30,
+        "price": 20,
+        "is_active": true,
+        "created_at": "2026-01-12T17:06:02.685211",
+        "updated_at": "2026-01-12T17:06:02.685211",
+        "module_id": null,
+        "adult_price": 20,
+        "child_price": 12
+      },
+      "message": "Created session: efc06763-6da1-48ac-8755-bd73095ae642",
+      "duration": 496
+    },
+    {
+      "feature": "Pool Sessions",
+      "operation": "READ_VERIFY",
+      "success": true,
+      "message": "Session found: Night Swim 1768237560967",
+      "duration": 115
+    },
+    {
+      "feature": "Pool Sessions",
+      "operation": "UPDATE",
+      "success": true,
+      "message": "Session updated (capacity→40, price→25)",
+      "duration": 181
+    },
+    {
+      "feature": "Pool Sessions",
+      "operation": "DELETE",
+      "success": true,
+      "message": "Session deleted",
+      "duration": 203
+    },
+    {
+      "feature": "Users",
+      "operation": "CREATE",
+      "success": {
+        "id": "d7e05af2-ec3f-4f54-886d-6dd751b5e54b",
+        "email": "testuser1768237562903@test.local",
+        "full_name": "Test Bot User",
+        "phone": "+1234567890",
+        "is_active": true,
+        "created_at": "2026-01-12T17:06:04.496491",
+        "roles": [
+          "restaurant_staff"
+        ]
+      },
+      "message": "Created user: testuser1768237562903@test.local",
+      "duration": 905
+    },
+    {
+      "feature": "Users",
+      "operation": "READ_VERIFY",
+      "success": true,
+      "message": "User found: testuser1768237562903@test.local",
+      "duration": 410
+    },
+    {
+      "feature": "Users",
+      "operation": "UPDATE",
+      "success": true,
+      "message": "User name updated",
+      "duration": 305
+    },
+    {
+      "feature": "Users",
+      "operation": "UPDATE_ROLES",
+      "success": true,
+      "message": "User roles updated (added pool_staff)",
+      "duration": 409
+    },
+    {
+      "feature": "Users",
+      "operation": "DELETE",
+      "success": true,
+      "message": "User deleted",
+      "duration": 407
+    },
+    {
+      "feature": "Roles",
+      "operation": "CREATE",
+      "success": {
+        "id": "533489a6-9e8e-489e-9d84-a525b9864459",
+        "name": "test_bot_role_1768237566182",
+        "display_name": "Test Bot Role 1768237566182",
+        "description": "Test role created by comprehensive bot",
+        "business_unit": "restaurant",
+        "created_at": "2026-01-12T17:06:07.525128",
+        "updated_at": "2026-01-12T17:06:07.525128"
+      },
+      "message": "Created role: test_bot_role_1768237566182",
+      "duration": 699
+    },
+    {
+      "feature": "Roles",
+      "operation": "READ_VERIFY",
+      "success": true,
+      "message": "Role found: test_bot_role_1768237566182",
+      "duration": 410
+    },
+    {
+      "feature": "Roles",
+      "operation": "UPDATE",
+      "success": true,
+      "message": "Role updated (added permission)",
+      "duration": 409
+    },
+    {
+      "feature": "Roles",
+      "operation": "DELETE",
+      "success": true,
+      "message": "Role deleted",
+      "duration": 647
+    },
+    {
+      "feature": "Modules",
+      "operation": "CREATE",
+      "success": {
+        "id": "89ed3ca6-35a2-4b62-a5d8-6328b1be9832",
+        "template_type": "menu_service",
+        "name": "Bot Cafe 1768237568927",
+        "slug": "bot-cafe-1768237568927",
+        "description": "Test module by comprehensive bot",
+        "settings": {},
+        "is_active": true,
+        "sort_order": 0,
+        "created_at": "2026-01-12T17:06:10.263058+00:00",
+        "updated_at": "2026-01-12T17:06:10.263058+00:00",
+        "show_in_main": true
+      },
+      "message": "Created module: bot-cafe-1768237568927",
+      "duration": 442
+    },
+    {
+      "feature": "Modules",
+      "operation": "READ_VERIFY",
+      "success": true,
+      "message": "Module found: Bot Cafe 1768237568927",
+      "duration": 103
+    },
+    {
+      "feature": "Modules",
+      "operation": "UPDATE",
+      "success": true,
+      "message": "Module updated (deactivated)",
+      "duration": 198
+    },
+    {
+      "feature": "Modules",
+      "operation": "DELETE",
+      "success": true,
+      "message": "Module deleted",
+      "duration": 200
+    },
+    {
+      "feature": "Settings",
+      "operation": "GET_GENERAL",
+      "success": true,
+      "message": "General settings loaded",
+      "duration": 99
+    },
+    {
+      "feature": "Settings",
+      "operation": "UPDATE_GENERAL",
+      "success": true,
+      "message": "General settings updated",
+      "duration": 3143
+    },
+    {
+      "feature": "Backups",
+      "operation": "CREATE",
+      "success": true,
+      "message": "Backup created: d0b096c3-0525-4e26-bc66-86734fd56872",
+      "duration": 5219
+    },
+    {
+      "feature": "Backups",
+      "operation": "LIST",
+      "success": true,
+      "message": "Found 28 backups",
+      "duration": 108
+    },
+    {
+      "feature": "Backups",
+      "operation": "DELETE",
+      "success": true,
+      "message": "Backup deleted",
+      "duration": 608
+    },
+    {
+      "feature": "Translations",
+      "operation": "COMPARE_FRONTEND",
+      "success": true,
+      "message": "Frontend comparison complete",
+      "duration": 19
+    },
+    {
+      "feature": "Notifications",
+      "operation": "LIST",
+      "success": true,
+      "message": "Found 10 notifications",
+      "duration": 331
+    },
+    {
+      "feature": "Reviews",
+      "operation": "LIST",
+      "success": true,
+      "message": "Found 5 reviews (0 pending)",
+      "duration": 188
+    },
+    {
+      "feature": "Reviews",
+      "operation": "APPROVE",
+      "success": true,
+      "message": "No pending reviews to approve (skipped)",
+      "duration": 0
+    },
+    {
+      "feature": "Audit Logs",
+      "operation": "LIST",
+      "success": true,
+      "message": "Found 50 audit log entries",
+      "duration": 114
+    },
+    {
+      "feature": "Audit Logs",
+      "operation": "VERIFY_RECENT",
+      "success": true,
+      "message": "Most recent: DELETE_BACKUP at 2026-01-12T17:06:22.102688",
+      "duration": 0
+    }
+  ]
+}

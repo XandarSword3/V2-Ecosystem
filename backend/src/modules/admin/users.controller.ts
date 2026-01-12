@@ -161,48 +161,82 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
       user_permissions?: UserPermissionNested[];
     }
 
-    // Fetch User + Roles + Permissions (Overrides)
-    // Avoid requesting columns that might not exist (module_slug/slug in older schemas).
-    const { data: user, error } = await supabase
-      .from('users')
-      .select(`
-        *,
-        user_roles (
-          roles (
-            id,
-            name,
-            role_permissions (
-              permissions (
-                id,
-                slug,
-                name,
-                description,
-                resource,
-                action
+    // First try the full query with user_permissions
+    let user: any = null;
+    let typedUser: UserDetailsQuery;
+    
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          user_roles!user_roles_user_id_fkey (
+            roles (
+              id,
+              name,
+              role_permissions (
+                permissions (
+                  id,
+                  slug,
+                  name,
+                  description,
+                  resource,
+                  action
+                )
+              )
+            )
+          ),
+          user_permissions (
+            is_granted,
+            permission_id,
+            permissions (
+              id,
+              slug,
+              name,
+              description,
+              resource,
+              action
+            )
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      user = data;
+    } catch (embedError) {
+      // Fallback: query without user_permissions if the table/relationship doesn't exist
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          user_roles!user_roles_user_id_fkey (
+            roles (
+              id,
+              name,
+              role_permissions (
+                permissions (
+                  id,
+                  slug,
+                  name,
+                  description,
+                  resource,
+                  action
+                )
               )
             )
           )
-        ),
-        user_permissions (
-          is_granted,
-          permission_id,
-          permissions (
-            id,
-            slug,
-            name,
-            description,
-            resource,
-            action
-          )
-        )
-      `)
-      .eq('id', id)
-      .single();
+        `)
+        .eq('id', id)
+        .single();
 
-    if (error) throw error;
+      if (error) throw error;
+      user = data;
+    }
+    
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    const typedUser = user as unknown as UserDetailsQuery;
+    typedUser = user as unknown as UserDetailsQuery;
 
     // Flatten permissions structure
     const rolePermissions = new Set<string>();
@@ -219,7 +253,7 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
       });
     });
 
-    // 2. Apply User Overrides
+    // 2. Apply User Overrides (if user_permissions exists)
     typedUser.user_permissions?.forEach((up) => {
       const pSlug = deriveSlugFromPermission(up.permissions);
       if (pSlug) {
