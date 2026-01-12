@@ -51,7 +51,7 @@ interface NavbarConfig {
     };
 }
 
-const ICONS: Record<string, any> = {
+const ICONS: Record<string, React.ElementType> = {
     Home,
     UtensilsCrossed,
     Waves,
@@ -107,8 +107,9 @@ export default function NavbarSettingsPage() {
         try {
             await api.put('/admin/settings', { key: 'navbar', value: navbar });
             toast.success('Navbar configuration saved successfully');
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Failed to save settings');
+        } catch (error: unknown) {
+            const axiosError = error as { response?: { data?: { error?: string } } };
+            toast.error(axiosError.response?.data?.error || 'Failed to save settings');
         } finally {
             setSaving(false);
         }
@@ -127,7 +128,7 @@ export default function NavbarSettingsPage() {
         setNavbar({ ...navbar, links: newLinks });
     };
 
-    const updateLink = (index: number, field: keyof NavLink, value: any) => {
+    const updateLink = (index: number, field: keyof NavLink, value: string | boolean) => {
         const newLinks = [...navbar.links];
         newLinks[index] = { ...newLinks[index], [field]: value };
 

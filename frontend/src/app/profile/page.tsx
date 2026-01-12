@@ -38,6 +38,35 @@ import {
 
 type TabType = 'profile' | 'orders' | 'snacks' | 'bookings' | 'tickets';
 
+interface OrderRecord {
+  id: string;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  created_at: string;
+}
+
+interface BookingRecord {
+  id: string;
+  status: string;
+  check_in_date: string;
+  check_out_date: string;
+  number_of_guests: number;
+  total_amount: number;
+  chalet?: { name: string };
+}
+
+interface TicketRecord {
+  id: string;
+  ticket_number: string;
+  status: string;
+  ticket_date: string;
+  session?: { name: string };
+  quantity: number;
+  number_of_guests?: number;
+  total_amount: number;
+}
+
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
   confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -58,7 +87,7 @@ export default function ProfilePage() {
   const currency = useSettingsStore((s) => s.currency);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [saving, setSaving] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [selectedBooking, setSelectedBooking] = useState<BookingRecord | null>(null);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -120,8 +149,9 @@ export default function ProfilePage() {
       });
       refreshUser();
       toast.success(t('profileUpdated'));
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('updateFailed'));
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || t('updateFailed'));
     } finally {
       setSaving(false);
     }
@@ -362,7 +392,7 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {orders.map((order: any) => (
+                      {orders.map((order: OrderRecord) => (
                         <div
                           key={order.id}
                           className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
@@ -417,7 +447,7 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {snackOrders.map((order: any) => (
+                      {snackOrders.map((order: OrderRecord) => (
                         <div
                           key={order.id}
                           className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
@@ -472,7 +502,7 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {bookings.map((booking: any) => (
+                      {bookings.map((booking: BookingRecord) => (
                         <div
                           key={booking.id}
                           onClick={() => setSelectedBooking(booking)}
@@ -531,7 +561,7 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {tickets.map((ticket: any) => (
+                      {tickets.map((ticket: TicketRecord) => (
                         <div
                           key={ticket.id}
                           className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"

@@ -75,3 +75,28 @@ export async function getDownloadUrl(req: Request, res: Response, next: NextFunc
         next(error);
     }
 }
+
+export async function restoreBackup(req: Request, res: Response, next: NextFunction) {
+    try {
+        const userId = req.user!.userId;
+        const backupData = req.body;
+        
+        // Basic validation that it looks like a backup
+        if (!backupData || !backupData.tables) {
+             return res.status(400).json({ success: false, error: "Invalid backup file format" });
+        }
+
+        const result = await BackupService.restoreBackup(backupData, userId);
+
+        await logActivity({
+            user_id: userId,
+            action: 'RESTORE_BACKUP',
+            resource: 'backups',
+            new_value: { timestamp: new Date().toISOString() }
+        });
+
+        res.json({ success: true, data: result });
+    } catch (error) {
+        next(error);
+    }
+}

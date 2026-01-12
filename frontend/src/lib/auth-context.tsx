@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { API_BASE_URL } from './api';
+import { authLogger } from './logger';
 
 interface User {
   id: string;
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (e) {
         // Clear invalid session data
-        console.warn('Session validation failed, clearing credentials');
+        authLogger.warn('Session validation failed, clearing credentials');
         localStorage.removeItem('user');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');

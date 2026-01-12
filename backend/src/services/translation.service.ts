@@ -1,6 +1,8 @@
 // Auto-translation service using LibreTranslate API (free and self-hosted)
 // Falls back to basic translation mappings if API is unavailable
 
+import { logger } from '../utils/logger.js';
+
 const LIBRE_TRANSLATE_URL = process.env.LIBRE_TRANSLATE_URL || 'https://libretranslate.com/translate';
 const LIBRE_TRANSLATE_KEY = process.env.LIBRE_TRANSLATE_KEY || '';
 
@@ -84,7 +86,7 @@ export async function translateText(text: string, sourceLang: string = 'en'): Pr
       result.en = await callTranslateAPI(text, sourceLang, 'en');
     }
   } catch (error) {
-    console.warn('[TRANSLATION] API failed, using fallback:', error);
+    logger.warn('[TRANSLATION] API failed, using fallback:', error);
     // Fallback to basic translation
     const fallback = fallbackTranslations[text.toLowerCase()];
     if (fallback) {
@@ -123,7 +125,9 @@ async function callTranslateAPI(text: string, source: string, target: string): P
     let bodyText = '';
     try {
       bodyText = await response.text();
-    } catch (e) {}
+    } catch {
+      // Ignore - bodyText will remain empty if response body can't be read
+    }
     throw new Error(`Translation API error: ${response.status} ${bodyText}`);
   }
 

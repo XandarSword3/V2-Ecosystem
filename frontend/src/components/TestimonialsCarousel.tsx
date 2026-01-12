@@ -92,7 +92,16 @@ export default function TestimonialsCarousel() {
           const statsData = data.data?.stats || data.stats;
           
           if (reviewsData.length > 0) {
-            const mappedTestimonials: Testimonial[] = reviewsData.map((review: any) => {
+            interface ReviewRecord {
+              id: string;
+              rating: number;
+              text: string;
+              service_type: string;
+              created_at?: string;
+              users?: { full_name?: string; profile_image_url?: string };
+              user?: { first_name: string; last_name: string };
+            }
+            const mappedTestimonials: Testimonial[] = reviewsData.map((review: ReviewRecord) => {
               // Handle both formats: users.full_name or user.first_name/last_name
               const name = review.users?.full_name || 
                 (review.user ? `${review.user.first_name} ${review.user.last_name}` : 'Guest');

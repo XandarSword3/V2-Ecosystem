@@ -51,7 +51,7 @@ export default function SnackCategoriesPage() {
       setLoading(true);
       const response = await api.get('/snack/categories');
       setCategories(response.data.data || []);
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to fetch categories');
       console.error(error);
     } finally {
@@ -92,7 +92,7 @@ export default function SnackCategoriesPage() {
       
       setShowModal(false);
       fetchCategories();
-    } catch (error: any) {
+    } catch (error) {
       toast.error(editingCategory ? 'Failed to update category' : 'Failed to create category');
       console.error(error);
     } finally {
@@ -107,7 +107,7 @@ export default function SnackCategoriesPage() {
       await api.delete(`/snack/admin/categories/${id}`);
       toast.success('Category deleted successfully');
       fetchCategories();
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to delete category');
       console.error(error);
     }

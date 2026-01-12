@@ -14,14 +14,14 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   
   // Attach request ID for tracking
-  (req as any).requestId = requestId;
+  req.requestId = requestId;
   
   // Sanitize body to hide sensitive fields
-  const sanitizeBody = (body: any): any => {
+  const sanitizeBody = (body: unknown): unknown => {
     if (!body || typeof body !== 'object') return body;
     
     const sensitiveFields = ['password', 'currentPassword', 'newPassword', 'token', 'refreshToken', 'secret'];
-    const sanitized = { ...body };
+    const sanitized = { ...(body as Record<string, unknown>) };
     
     for (const field of sensitiveFields) {
       if (sanitized[field]) {
@@ -36,18 +36,18 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const sanitizedBody = sanitizeBody(req.body);
   logger.info(`[${requestId}] ➡️  ${req.method} ${req.originalUrl}`);
   
-  if (Object.keys(sanitizedBody).length > 0) {
+  if (typeof sanitizedBody === 'object' && sanitizedBody !== null && Object.keys(sanitizedBody).length > 0) {
     logger.debug(`[${requestId}] Body: ${JSON.stringify(sanitizedBody, null, 2)}`);
   }
   
   // Log user info if authenticated
-  if ((req as any).user) {
-    logger.debug(`[${requestId}] User: ${(req as any).user.id} (${(req as any).user.email})`);
+  if (req.user) {
+    logger.debug(`[${requestId}] User: ${req.user.userId} (${req.user.email})`);
   }
   
   // Capture response
   const originalSend = res.send;
-  res.send = function(body: any): Response {
+  res.send = function(body: unknown): Response {
     const duration = Date.now() - startTime;
     const statusCode = res.statusCode;
     

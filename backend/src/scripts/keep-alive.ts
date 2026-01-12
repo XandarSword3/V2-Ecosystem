@@ -8,8 +8,9 @@ async function ping() {
     console.log(`Pinging ${BACKEND_URL}/health...`);
     const response = await axios.get(`${BACKEND_URL}/health`);
     console.log('Ping successful:', response.data);
-  } catch (error: any) {
-    console.error('Ping failed:', error.message);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Ping failed:', err.message);
   }
 }
 

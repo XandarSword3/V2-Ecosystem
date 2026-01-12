@@ -81,9 +81,10 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       sig,
       webhookSecret
     );
-  } catch (err: any) {
-    logger.error('Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+  } catch (err: unknown) {
+    const error = err as Error;
+    logger.error('Webhook signature verification failed:', error.message);
+    return res.status(400).send(`Webhook Error: ${error.message}`);
   }
 
   const supabase = getSupabase();
@@ -330,7 +331,14 @@ export async function refundPayment(req: Request, res: Response, next: NextFunct
       return res.status(400).json({ success: false, error: 'Payment is already refunded' });
     }
 
-    let refundDetails: any = {
+    interface RefundDetails {
+      status: string;
+      notes: string | null;
+      processed_at: string;
+      processed_by: string;
+    }
+
+    const refundDetails: RefundDetails = {
       status: 'refunded',
       notes: reason ? `${payment.notes || ''} [Refund Reason: ${reason}]` : payment.notes,
       processed_at: new Date().toISOString(),
@@ -347,9 +355,10 @@ export async function refundPayment(req: Request, res: Response, next: NextFunct
           reason: 'requested_by_customer', // Default reason
         });
         refundDetails.notes = `${refundDetails.notes || ''} [Stripe Refund ID: ${stripeRefund.id}]`;
-      } catch (stripeError: any) {
+      } catch (stripeError: unknown) {
+        const err = stripeError as Error;
         logger.error('Stripe refund failed:', stripeError);
-        return res.status(400).json({ success: false, error: `Stripe refund failed: ${stripeError.message}` });
+        return res.status(400).json({ success: false, error: `Stripe refund failed: ${err.message}` });
       }
     }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { socketLogger } from './logger';
 
 // SOCKET_URL should NOT include /api
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
@@ -95,14 +96,14 @@ export function useSocket(): UseSocketReturn {
     const handleConnect = () => {
       if (mountedRef.current) {
         setIsConnected(true);
-        console.log('[Socket] Connected:', socketInstance.id);
+        socketLogger.info('Connected', socketInstance.id);
       }
     };
 
     const handleDisconnect = (reason: string) => {
       if (mountedRef.current) {
         setIsConnected(false);
-        console.log('[Socket] Disconnected:', reason);
+        socketLogger.info('Disconnected', reason);
       }
       // Handle specific disconnect reasons
       if (reason === 'io server disconnect') {
@@ -110,24 +111,24 @@ export function useSocket(): UseSocketReturn {
         setTimeout(() => socketInstance.connect(), 1000);
       } else if (reason === 'transport close' || reason === 'transport error') {
         // Network issue - socket.io will auto-reconnect
-        console.log('[Socket] Transport issue, auto-reconnecting...');
+        socketLogger.debug('Transport issue, auto-reconnecting...');
       } else if (reason === 'ping timeout') {
         // Ping timeout - try to reconnect
-        console.log('[Socket] Ping timeout, reconnecting...');
+        socketLogger.debug('Ping timeout, reconnecting...');
         setTimeout(() => socketInstance.connect(), 2000);
       }
     };
 
     const handleConnectError = (error: Error) => {
-      console.log('[Socket] Connection error:', error.message);
+      socketLogger.warn('Connection error', error.message);
       // If auth error, try reconnecting without token
       if (error.message.includes('auth') || error.message.includes('unauthorized')) {
-        console.log('[Socket] Auth error, reconnecting...');
+        socketLogger.debug('Auth error, reconnecting...');
       }
     };
 
     const handleReconnect = (attemptNumber: number) => {
-      console.log('[Socket] Reconnected after', attemptNumber, 'attempts');
+      socketLogger.info(`Reconnected after ${attemptNumber} attempts`);
       // Re-authenticate on reconnect
       const token = getAuthToken();
       if (token && socketInstance.auth) {
@@ -136,7 +137,7 @@ export function useSocket(): UseSocketReturn {
     };
 
     const handleReconnectAttempt = (attemptNumber: number) => {
-      console.log('[Socket] Reconnect attempt:', attemptNumber);
+      socketLogger.debug(`Reconnect attempt: ${attemptNumber}`);
     };
 
     socketInstance.on('connect', handleConnect);
@@ -177,7 +178,7 @@ export function useSocket(): UseSocketReturn {
   const joinRoom = useCallback((room: string) => {
     socket?.emit('join-room', room, (success: boolean) => {
       if (success) {
-        console.log('[Socket] Joined room:', room);
+        socketLogger.debug(`Joined room: ${room}`);
       }
     });
   }, [socket]);

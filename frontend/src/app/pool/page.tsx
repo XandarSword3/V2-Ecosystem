@@ -40,7 +40,26 @@ interface PoolSession {
   availability?: {
     remaining?: number;
   };
-};
+}
+
+interface PurchaseTicketData {
+  sessionId: string;
+  ticketDate: string;
+  customerName: string;
+  customerPhone: string;
+  numberOfAdults: number;
+  numberOfChildren: number;
+  numberOfGuests: number;
+  paymentMethod: 'cash' | 'card' | 'online';
+}
+
+interface ApiError {
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
+}
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -117,13 +136,13 @@ export default function PoolPage() {
   
     const myTickets = myTicketsData?.data?.data || [];
     const purchaseMutation = useMutation({
-      mutationFn: (data: any) => poolApi.purchaseTicket(data),
+      mutationFn: (data: PurchaseTicketData) => poolApi.purchaseTicket(data),
       onSuccess: (response) => {
         toast.success(t('ticketPurchased'));
         const ticket = response.data.data;
         router.push(`/pool/confirmation?id=${ticket.id}`);
       },
-      onError: (err: any) => {
+      onError: (err: ApiError) => {
         toast.error(err.response?.data?.error || t('purchaseFailed'));
       },
     });
@@ -564,7 +583,7 @@ export default function PoolPage() {
               {t('yourTickets')}
             </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {myTickets.slice(0, 6).map((ticket: any) => (
+              {myTickets.slice(0, 6).map((ticket: { id: string; ticket_number: string; status: string; ticket_date: string; number_of_guests: number; total_amount: number }) => (
                 <Link
                   key={ticket.id}
                   href={`/pool/confirmation?id=${ticket.id}`}

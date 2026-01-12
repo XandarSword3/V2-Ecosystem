@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { clearModuleCache } from "../../middleware/moduleGuard.middleware";
 import { createModuleSchema, updateModuleSchema, validateBody } from "../../validation/schemas";
 import { logActivity } from "../../utils/activityLogger";
+import { logger } from "../../utils/logger.js";
 
 export async function getModules(req: Request, res: Response, next: NextFunction) {
   try {
@@ -30,7 +31,7 @@ export async function getModules(req: Request, res: Response, next: NextFunction
     if (error) throw error;
 
     res.json({ success: true, data });
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({ success: false, error: 'Failed to fetch modules' });
   }
 }
@@ -87,12 +88,49 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
         slug: finalSlug,
         description,
         settings: settings || {},
-        is_active: true
+        is_active: true,
+        show_in_main: true // New modules should show in main navbar by default
       })
       .select()
       .single();
 
     if (error) throw error;
+
+    // --- Auto-add to navbar CMS if configured ---
+    try {
+      const { data: siteSettings } = await supabase
+        .from('site_settings')
+        .select('id, navbar')
+        .single();
+
+      const settings = siteSettings as { id?: number; navbar?: { links?: unknown[] } } | null;
+      if (settings?.navbar?.links && Array.isArray(settings.navbar.links)) {
+        // Navbar is CMS-configured, auto-add the new module
+        const newNavLink = {
+          type: 'module',
+          moduleSlug: finalSlug,
+          label: name,
+          icon: template_type === 'menu_service' ? 'UtensilsCrossed' : 
+                template_type === 'session_access' ? 'Waves' : 'Home'
+        };
+        
+        const updatedLinks = [...settings.navbar.links, newNavLink];
+        await supabase
+          .from('site_settings')
+          .update({ 
+            navbar: { 
+              ...settings.navbar, 
+              links: updatedLinks 
+            } 
+          })
+          .eq('id', settings.id || 1);
+
+        logger.info(`[Modules] Auto-added ${finalSlug} to navbar CMS links`);
+      }
+    } catch (navError) {
+      logger.error('Failed to auto-add module to navbar:', navError);
+      // Non-fatal - module still created
+    }
 
     // --- Auto-create Roles & Staff User ---
     try {
@@ -124,7 +162,7 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
 
         if (!userError && userData) {
           // 3. Link User to Roles (using user_roles junction table)
-          const userRolesInserts = rolesData.map((role: any) => ({
+          const userRolesInserts = rolesData.map((role: { id: string; name: string }) => ({
             user_id: userData.id,
             role_id: role.id
           }));
@@ -132,7 +170,7 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
         }
       }
     } catch (innerError) {
-      console.error('Failed to auto-create staff/roles for module:', innerError);
+      logger.error('Failed to auto-create staff/roles for module:', innerError);
       // We don't fail the module creation itself, just log
     }
 

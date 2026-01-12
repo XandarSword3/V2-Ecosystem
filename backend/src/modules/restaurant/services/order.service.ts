@@ -1,14 +1,16 @@
 import { getSupabase } from "../../../database/connection.js";
 import { emitToUnit } from "../../../socket/index.js";
 import { emailService } from "../../../services/email.service.js";
+import { logger } from "../../../utils/logger.js";
 import dayjs from 'dayjs';
 
 const TAX_RATE = 0.11; // 11% VAT in Lebanon
 
 function generateOrderNumber(): string {
   const date = dayjs().format('YYMMDD');
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `R-${date}-${random}`;
+  const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+  const suffix = Date.now().toString(36).slice(-4);
+  return `R-${date}-${random}${suffix}`;
 }
 
 export async function createOrder(data: {
@@ -17,10 +19,10 @@ export async function createOrder(data: {
   customerEmail?: string;
   customerPhone?: string;
   tableId?: string;
-  orderType: 'dine_in' | 'takeaway' | 'delivery';
+  orderType: 'dine_in' | 'takeaway' | 'delivery' | 'room_service';
   items: Array<{ menuItemId: string; quantity: number; specialInstructions?: string }>;
   specialInstructions?: string;
-  paymentMethod?: 'cash' | 'card' | 'whish' | 'online';
+  paymentMethod?: 'cash' | 'card' | 'whish' | 'online' | 'room_charge';
 }) {
   const supabase = getSupabase();
 
@@ -150,7 +152,7 @@ export async function createOrder(data: {
       totalAmount: parseFloat(order.total_amount),
     }).catch((err) => {
       // Don't fail the order if email fails
-      console.warn('Failed to send order confirmation email:', err);
+      logger.warn('Failed to send order confirmation email:', err);
     });
   }
 
@@ -326,6 +328,8 @@ export async function updateOrderStatus(
   }
   if (status === 'completed') {
     updateData.completed_at = new Date().toISOString();
+    // Mark as paid when order is completed (for stress testing & realistic flow)
+    updateData.payment_status = 'paid';
   }
   if (status === 'cancelled') {
     updateData.cancelled_at = new Date().toISOString();

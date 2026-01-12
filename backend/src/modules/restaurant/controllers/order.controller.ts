@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import * as orderService from "../services/order.service.js";
+import { logActivity } from "../../../utils/activityLogger.js";
 
 import { createRestaurantOrderSchema, updateOrderStatusSchema, validateBody } from "../../../validation/schemas.js";
+import { isErrorWithStatusCode, RestaurantOrderRow, OrderItemRow } from "../../../types/index.js";
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
@@ -16,18 +18,29 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
     const order = await orderService.createOrder({
       customerName: validatedData.customerName || 'Guest',
       customerPhone: validatedData.customerPhone ?? undefined,
-      orderType: validatedData.orderType as any,
+      orderType: validatedData.orderType,
       items: formattedItems,
-      paymentMethod: validatedData.paymentMethod as any,
+      paymentMethod: validatedData.paymentMethod,
       specialInstructions: validatedData.specialInstructions,
-      customerId: (req as any).user?.userId,
+      customerId: req.user?.userId,
     });
+    
+    // Audit log for order creation
+    logActivity({
+      user_id: req.user?.userId || 'guest',
+      action: 'order_created',
+      resource: 'restaurant_order',
+      resource_id: order.id,
+      new_value: { order_number: order.order_number, total: order.total_amount, items: formattedItems.length },
+      ip_address: req.ip,
+    });
+    
     res.status(201).json({ success: true, data: order });
-  } catch (error: any) {
-    if (error.statusCode) {
-      res.status(error.statusCode).json({ success: false, error: error.message, errors: error.errors });
+  } catch (error: unknown) {
+    if (isErrorWithStatusCode(error)) {
+      res.status(error.statusCode).json({ success: false, error: error.message });
     } else {
-      res.status(500).json({ success: false, error: error.message, stack: error.stack });
+      next(error);
     }
   }
 }
@@ -83,7 +96,11 @@ export async function getMyOrders(req: Request, res: Response, next: NextFunctio
 }
 
 // Helper function to transform order data for frontend
-function transformOrderForFrontend(order: any) {
+interface OrderWithItems extends RestaurantOrderRow {
+  customer?: { full_name?: string } | null;
+}
+
+function transformOrderForFrontend(order: OrderWithItems) {
   return {
     id: order.id,
     orderNumber: order.order_number,
@@ -95,12 +112,12 @@ function transformOrderForFrontend(order: any) {
     totalAmount: parseFloat(order.total_amount || '0'),
     createdAt: order.created_at,
     estimatedReadyTime: order.estimated_ready_time,
-    items: (order.order_items || []).map((item: any) => ({
+    items: (order.order_items || []).map((item: OrderItemRow) => ({
       id: item.id,
       name: item.menu_items?.name || 'Unknown Item',
       quantity: item.quantity,
       unitPrice: parseFloat(item.unit_price || '0'),
-      specialInstructions: item.special_instructions,
+      specialInstructions: item.notes,
     })),
     // Also include snake_case for compatibility
     order_number: order.order_number,
@@ -148,6 +165,17 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
       req.user!.userId,
       notes
     );
+    
+    // Audit log for status change
+    logActivity({
+      user_id: req.user!.userId,
+      action: 'order_status_changed',
+      resource: 'restaurant_order',
+      resource_id: req.params.id,
+      new_value: { status, notes },
+      ip_address: req.ip,
+    });
+    
     res.json({ success: true, data: order });
   } catch (error) {
     next(error);

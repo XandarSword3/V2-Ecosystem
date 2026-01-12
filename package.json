@@ -20,11 +20,17 @@
     "test:frontend": "cd frontend && npm test",
     "lint": "npm run lint:backend && npm run lint:frontend",
     "lint:backend": "cd backend && npm run lint",
-    "lint:frontend": "cd frontend && npm run lint"
+    "lint:frontend": "cd frontend && npm run lint",
+    "stress-test": "npx ts-node tools/stress-test/run.ts",
+    "stress-test:quick": "npx ts-node tools/stress-test/run.ts --customers 5 --staff 3 --trainees 2 --admins 1 --duration 60",
+    "stress-test:medium": "npx ts-node tools/stress-test/run.ts --customers 25 --staff 10 --trainees 3 --admins 2 --duration 300",
+    "stress-test:full": "npx ts-node tools/stress-test/run.ts --customers 50 --staff 15 --trainees 5 --admins 2"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=18.0.0"

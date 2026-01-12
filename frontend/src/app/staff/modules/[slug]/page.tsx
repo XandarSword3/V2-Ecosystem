@@ -360,7 +360,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
       socket.emit('join:unit', moduleId); 
       socket.emit('join:unit', slug);
 
-      const handleNewOrder = (newOrder: any) => {
+      const handleNewOrder = (newOrder: Order) => {
         setOrders((prev) => [newOrder, ...prev]);
         toast.info(`New order #${newOrder.orderNumber}`, {
           description: newOrder.customerName,
@@ -369,7 +369,12 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
         audio.play().catch(() => {});
       };
 
-      const handleStatusUpdate = (update: any) => {
+      interface StatusUpdate {
+        orderId: string;
+        status: string;
+      }
+
+      const handleStatusUpdate = (update: StatusUpdate) => {
         setOrders((prev) =>
           prev.map((order) =>
             order.id === update.orderId

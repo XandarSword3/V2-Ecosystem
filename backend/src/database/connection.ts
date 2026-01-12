@@ -31,8 +31,9 @@ export async function initializeDatabase() {
     db = drizzle(pool, { schema });
     logger.info('Connected to PostgreSQL directly');
     return db;
-  } catch (error: any) {
-    logger.warn(`Direct PostgreSQL connection failed: ${error.message}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.warn(`Direct PostgreSQL connection failed: ${message}`);
     logger.warn('This is expected if using Supabase Transaction Pooler on port 6543 without prepared statements, or if the connection string is invalid.');
     logger.info('Falling back to Supabase client (HTTP API)...');
     

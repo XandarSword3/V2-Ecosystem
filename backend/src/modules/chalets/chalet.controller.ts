@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
 import { emailService } from "../../services/email.service.js";
 import { createChaletBookingSchema, validateBody, uuidSchema } from "../../validation/schemas.js";
+import { logger } from "../../utils/logger.js";
+import { logActivity } from "../../utils/activityLogger.js";
+import { emitToUnit } from "../../socket/index.js";
 import dayjs from 'dayjs';
 
 function generateBookingNumber(): string {
@@ -158,14 +161,17 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
     // 1. Check Availability (Overlap Check)
     const { data: existingBookings, error: availError } = await supabase
       .from('chalet_bookings')
-      .select('id, check_in_date, check_out_date')
+      .select('id, check_in_date, check_out_date, status')
       .eq('chalet_id', chaletId)
-      .is('deleted_at', null)
-      .not('status', 'in', '("cancelled", "no_show")');
+      .is('deleted_at', null);
 
     if (availError) throw availError;
 
-    const hasOverlap = (existingBookings || []).some(booking => {
+    // Filter out cancelled/no_show bookings and check for date overlaps
+    const activeBookings = (existingBookings || []).filter(
+      b => !['cancelled', 'no_show'].includes(b.status)
+    );
+    const hasOverlap = activeBookings.some(booking => {
       const bIn = dayjs(booking.check_in_date);
       const bOut = dayjs(booking.check_out_date);
       // Overlap if (start1 < end2) AND (end1 > start2)
@@ -272,7 +278,7 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
         depositFixed = chaletSettings.chaletDepositFixed || 100;
       }
     } catch (e) {
-      console.warn('Error fetching deposit settings, using default', e);
+      logger.warn('Error fetching deposit settings, using default', e);
     }
 
     // Calculate deposit based on type
@@ -311,7 +317,7 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
       .single();
 
     if (bookingError) {
-      console.error('[createBooking] Supabase insert error', { error: bookingError, payload: {
+      logger.error('[createBooking] Supabase insert error', { error: bookingError, payload: {
         chaletId, customerName, customerEmail, customerPhone, checkInDate, checkOutDate, numberOfGuests, paymentMethod
       }});
       // Return helpful error to client and also throw to be captured by global handler
@@ -357,9 +363,37 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
         totalAmount: parseFloat(booking.total_amount),
         paymentStatus: booking.payment_status,
       }).catch((err) => {
-        console.warn('Failed to send booking confirmation email:', err);
+        logger.warn('Failed to send booking confirmation email:', err);
       });
     }
+
+    // Audit log for booking creation
+    logActivity({
+      user_id: req.user?.userId || 'guest',
+      action: 'booking_created',
+      resource: 'chalet_booking',
+      resource_id: booking.id,
+      new_value: { 
+        booking_number: booking.booking_number, 
+        chalet_id: chaletId,
+        check_in: checkInDate,
+        check_out: checkOutDate,
+        total: booking.total_amount 
+      },
+      ip_address: req.ip,
+    });
+
+    // Emit real-time event for staff dashboard
+    emitToUnit('chalets', 'booking:new', {
+      id: booking.id,
+      bookingNumber: booking.booking_number,
+      chaletName: chalet.name,
+      customerName,
+      checkInDate,
+      checkOutDate,
+      status: booking.status,
+      totalAmount: booking.total_amount,
+    });
 
     res.status(201).json({
       success: true,
@@ -447,7 +481,7 @@ export async function cancelBooking(req: Request, res: Response, next: NextFunct
         bookingNumber: booking.booking_number,
         chaletName: (booking.chalet as any)?.name || 'Chalet',
         reason,
-      }).catch(err => console.warn('Failed to send cancellation email:', err));
+      }).catch(err => logger.warn('Failed to send cancellation email:', err));
     }
 
     res.json({ success: true, data, message: 'Booking cancelled' });
@@ -590,6 +624,23 @@ export async function updateBookingStatus(req: Request, res: Response, next: Nex
       .single();
 
     if (error) throw error;
+    
+    // Audit log for booking status change
+    logActivity({
+      user_id: req.user?.userId || 'system',
+      action: 'booking_status_changed',
+      resource: 'chalet_booking',
+      resource_id: req.params.id,
+      new_value: { status },
+      ip_address: req.ip,
+    });
+
+    // Emit real-time event for staff dashboard
+    emitToUnit('chalets', 'booking:statusChanged', {
+      id: req.params.id,
+      status,
+    });
+
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -643,12 +694,13 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
     }
 
     res.status(201).json({ success: true, data });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as Error & { code?: string; column?: string };
     // Return more specific error message
-    if (error.code === '23502') {
+    if (err.code === '23502') {
       return res.status(400).json({
         success: false,
-        message: `Missing required field: ${error.column || 'unknown'}`
+        message: `Missing required field: ${err.column || 'unknown'}`
       });
     }
     next(error);

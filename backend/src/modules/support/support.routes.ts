@@ -88,12 +88,13 @@ router.post('/contact', async (req: Request, res: Response, next: NextFunction) 
       data: { id: inquiry.id },
       message: 'Your message has been received. We will get back to you soon.',
     });
-  } catch (error: any) {
-    if (error.name === 'ZodError') {
+  } catch (error: unknown) {
+    const err = error as Error & { name?: string; errors?: unknown };
+    if (err.name === 'ZodError') {
       return res.status(400).json({
         success: false,
         error: 'Invalid form data',
-        details: error.errors,
+        details: err.errors,
       });
     }
     next(error);

@@ -56,13 +56,14 @@ export default function RolesPage() {
       setPermissions(Array.isArray(permsPayload) ? permsPayload : []);
       // Clear any previous auth error on success
       setAuthError(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
+      const axiosError = error as { response?: { status?: number; data?: { error?: string } } };
 
       // Give clearer feedback for auth/permission issues
-      if (error.response?.status === 401) {
+      if (axiosError.response?.status === 401) {
         setAuthError('You must be logged in to view roles. Please login.');
-      } else if (error.response?.status === 403) {
+      } else if (axiosError.response?.status === 403) {
         setAuthError('Access denied. You need the super_admin role to view and manage roles.');
       } else {
         toast.error('Failed to load roles');
@@ -93,8 +94,9 @@ export default function RolesPage() {
       setNewRoleName('');
       setNewRoleDescription('');
       fetchData(); // Refresh
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to create role');
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(errorMessage || 'Failed to create role');
     } finally {
       setSaving(false);
     }
@@ -132,8 +134,9 @@ export default function RolesPage() {
       });
       toast.success('Permissions updated successfully');
       setShowPermissionsModal(false);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update permissions');
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(errorMessage || 'Failed to update permissions');
     } finally {
       setSaving(false);
     }

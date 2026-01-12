@@ -89,7 +89,7 @@ export default function DynamicMenuPage() {
       ]);
       setItems(menuRes.data.data || []);
       setCategories(catRes.data.data || []);
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to fetch menu data');
       console.error(error);
     } finally {
@@ -142,8 +142,9 @@ export default function DynamicMenuPage() {
       }
       fetchData();
       setShowModal(false);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save menu item');
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(errorMessage || 'Failed to save menu item');
     } finally {
       setSaving(false);
     }
@@ -156,7 +157,7 @@ export default function DynamicMenuPage() {
       await api.delete(`/restaurant/admin/items/${id}`);
       toast.success('Menu item deleted');
       fetchData();
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to delete menu item');
     }
   };

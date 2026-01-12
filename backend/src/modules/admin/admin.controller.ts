@@ -2,11 +2,20 @@ import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
 import { emitToAll } from "../../socket/index";
 import { logActivity } from "../../utils/activityLogger";
+import { logger } from "../../utils/logger.js";
 import { createUserSchema, validateBody, validatePagination } from "../../validation/schemas.js";
 import dayjs from 'dayjs';
+import type {
+  PermissionRow,
+  UserRoleJoin,
+  UserRoleWithPermissions,
+  UserPermissionJoin,
+  RolePermissionJoin,
+  RestaurantOrderRow,
+} from './types.js';
 
 // Helper to derive canonical slug from permission object
-function deriveSlugFromPerm(perm: any): string | null {
+function deriveSlugFromPerm(perm: PermissionRow | null | undefined): string | null {
   if (!perm) return null;
   if (perm.slug) return perm.slug;
   if (perm.name && typeof perm.name === 'string' && perm.name.includes('.')) return perm.name;
@@ -94,9 +103,9 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
       // Total users
       supabase.from('users')
         .select('id', { count: 'exact', head: true }),
-      // Recent orders
+      // Recent orders (with item count)
       supabase.from('restaurant_orders')
-        .select('id, order_number, customer_name, status, total_amount, created_at')
+        .select('id, order_number, customer_name, status, total_amount, created_at, items:restaurant_order_items(id)')
         .order('created_at', { ascending: false })
         .limit(5),
       // Yesterday orders (restaurant + snack)
@@ -158,6 +167,26 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
     const bookingsTrend = calcTrend(chaletBookingsResult.count || 0, lastWeekBookings);
     const ticketsTrend = calcTrend(poolTicketsResult.count || 0, yesterdayTickets);
 
+    // Transform recent orders to camelCase for frontend
+    interface RecentOrderResult {
+      id: string;
+      order_number: string;
+      customer_name?: string | null;
+      status: string;
+      total_amount: string;
+      created_at: string;
+      items?: { id: string }[];
+    }
+    const recentOrders = ((recentOrdersResult.data || []) as RecentOrderResult[]).map((order) => ({
+      id: order.id,
+      orderNumber: order.order_number,
+      customerName: order.customer_name,
+      status: order.status,
+      totalAmount: parseFloat(order.total_amount) || 0,
+      itemCount: order.items?.length || 0,
+      createdAt: order.created_at,
+    }));
+
     res.json({
       success: true,
       data: {
@@ -166,7 +195,7 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
         todayBookings: chaletBookingsResult.count || 0,
         todayTickets: poolTicketsResult.count || 0,
         totalUsers: usersResult.count || 0,
-        recentOrders: recentOrdersResult.data || [],
+        recentOrders: recentOrders,
         revenueByUnit: {
           restaurant: restaurantRevenue,
           snackBar: snackRevenue,
@@ -188,7 +217,7 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
       },
     });
   } catch (error) {
-    console.error('[ADMIN] Dashboard error:', error);
+    logger.error('[ADMIN] Dashboard error:', error);
     next(error);
   }
 }
@@ -269,6 +298,7 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
     if (error) throw error;
 
     // Fetch roles for all users
+    interface SupabaseRoleJoin { roles?: { name?: string }[] | { name?: string } | null }
     const usersWithRoles = await Promise.all(
       (usersList || []).map(async (user) => {
         const { data: userRoles } = await supabase
@@ -278,7 +308,12 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
 
         return {
           ...user,
-          roles: (userRoles || []).map((ur: any) => ur.roles?.name).filter(Boolean),
+          roles: ((userRoles || []) as SupabaseRoleJoin[]).map((ur) => {
+            const roles = ur.roles;
+            if (!roles) return undefined;
+            if (Array.isArray(roles)) return roles[0]?.name;
+            return (roles as { name?: string }).name;
+          }).filter(Boolean),
         };
       })
     );
@@ -309,7 +344,8 @@ export async function createUser(req: Request, res: Response, next: NextFunction
     }
 
     // Hash password
-    const bcrypt = await import('bcryptjs');
+    const bcryptModule = await import('bcryptjs');
+    const bcrypt = bcryptModule.default || bcryptModule;
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Create user
@@ -407,10 +443,32 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
       const rolePermissions = new Set<string>();
       const effectivePermissions = new Set<string>();
 
-      user.user_roles?.forEach((ur: any) => {
-        ur.roles?.role_permissions?.forEach((rp: any) => {
-          const p = rp.permissions;
-          const pSlug = deriveSlugFromPerm(p);
+      // Helper to extract slug from permission (handles Supabase array/object join)
+      const getSlugFromPerm = (p: unknown): string | null => {
+        if (!p) return null;
+        const perm = Array.isArray(p) ? p[0] : p;
+        const permObj = perm as { slug?: string; resource?: string; action?: string } | null;
+        return permObj?.slug || (permObj?.resource && permObj?.action ? `${permObj.resource}.${permObj.action}` : null);
+      };
+
+      // Type for embedded query results
+      interface EmbeddedUserRole {
+        roles?: {
+          role_permissions?: Array<{ permissions?: unknown }>;
+          name?: string;
+        } | Array<{ role_permissions?: Array<{ permissions?: unknown }>; name?: string }> | null;
+      }
+      interface EmbeddedUserPerm {
+        is_granted?: boolean;
+        permissions?: unknown;
+      }
+
+      const typedUser = user as typeof user & { user_roles?: EmbeddedUserRole[]; user_permissions?: EmbeddedUserPerm[] };
+
+      typedUser.user_roles?.forEach((ur: EmbeddedUserRole) => {
+        const rolesData = Array.isArray(ur.roles) ? ur.roles[0] : ur.roles;
+        rolesData?.role_permissions?.forEach((rp: { permissions?: unknown }) => {
+          const pSlug = getSlugFromPerm(rp.permissions);
           if (pSlug) {
             rolePermissions.add(pSlug);
             effectivePermissions.add(pSlug);
@@ -418,9 +476,8 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
         });
       });
 
-      user.user_permissions?.forEach((up: any) => {
-        const p = up.permissions;
-        const pSlug = deriveSlugFromPerm(p);
+      typedUser.user_permissions?.forEach((up: EmbeddedUserPerm) => {
+        const pSlug = getSlugFromPerm(up.permissions);
         if (pSlug) {
           if (up.is_granted) {
             effectivePermissions.add(pSlug);
@@ -434,17 +491,21 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
 
       const detailedUser = {
         ...safeUser,
-        roles: user.user_roles?.map((ur: any) => ur.roles.name) || [],
+        roles: typedUser.user_roles?.map((ur: EmbeddedUserRole) => {
+          const rolesData = Array.isArray(ur.roles) ? ur.roles[0] : ur.roles;
+          return rolesData?.name;
+        }).filter(Boolean) || [],
         role_permissions: Array.from(rolePermissions),
-        user_permissions_overrides: user.user_permissions || [],
+        user_permissions_overrides: typedUser.user_permissions || [],
         effective_permissions: Array.from(effectivePermissions)
       };
 
       return res.json({ success: true, data: detailedUser });
-    } catch (embedError: any) {
+    } catch (embedError: unknown) {
       // If embedding failed (e.g., ambiguous relationships), fallback to safer series of queries
-      const msg = embedError?.message || embedError?.error || String(embedError);
-      console.warn('Embedded user fetch failed, falling back. Reason:', msg);
+      const err = embedError as Error;
+      const msg = err?.message || String(embedError);
+      logger.warn('Embedded user fetch failed, falling back. Reason:', msg);
 
       // Basic user
       const { data: user, error: userError } = await supabase
@@ -461,25 +522,29 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
       // Roles assigned
       const { data: userRolesList, error: rolesError } = await supabase
         .from('user_roles')
-        .select('roles(id,name)')
+        .select('role_id, roles(id,name)')
         .eq('user_id', id);
 
       if (rolesError) throw rolesError;
 
-      const roleIds = (userRolesList || []).map((r: any) => r.role_id).filter(Boolean);
+      // Type for Supabase join result (roles can be array or object)
+      interface RoleJoinResult { role_id?: string; roles?: { id?: string; name?: string }[] | { id?: string; name?: string } | null }
+      const roleIds = ((userRolesList || []) as RoleJoinResult[]).map((r) => r.role_id).filter(Boolean) as string[];
 
       // Role permissions
-      let rolePermRows: any[] = [];
+      interface PermJoinResult { role_id?: string; permission_id?: string; permissions?: { id?: string; slug?: string; name?: string; resource?: string; action?: string }[] | { id?: string; slug?: string; name?: string; resource?: string; action?: string } | null }
+      let rolePermRows: PermJoinResult[] = [];
       if (roleIds.length > 0) {
         const { data: rpData, error: rpErr } = await supabase
           .from('role_permissions')
           .select('role_id, permission_id, permissions(id,slug,name,resource,action)')
           .in('role_id', roleIds);
         if (rpErr) throw rpErr;
-        rolePermRows = rpData || [];
+        rolePermRows = (rpData || []) as PermJoinResult[];
       }
 
       // User permission overrides
+      interface UserPermJoinResult { is_granted?: boolean; permission_id?: string; permissions?: { id?: string; slug?: string; name?: string; resource?: string; action?: string }[] | { id?: string; slug?: string; name?: string; resource?: string; action?: string } | null }
       const { data: userPerms, error: userPermErr } = await supabase
         .from('user_permissions')
         .select('is_granted,permission_id,permissions(id,slug,name,resource,action)')
@@ -489,18 +554,22 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
       const rolePermissions = new Set<string>();
       const effectivePermissions = new Set<string>();
 
-      rolePermRows.forEach((rp: any) => {
-        const p = rp.permissions;
-        const slug = deriveSlugFromPerm(p);
+      const getPermSlug = (p: PermJoinResult['permissions']): string | null => {
+        if (!p) return null;
+        const perm = Array.isArray(p) ? p[0] : p;
+        return perm?.slug || (perm?.resource && perm?.action ? `${perm.resource}.${perm.action}` : null);
+      };
+
+      rolePermRows.forEach((rp) => {
+        const slug = getPermSlug(rp.permissions);
         if (slug) {
           rolePermissions.add(slug);
           effectivePermissions.add(slug);
         }
       });
 
-      (userPerms || []).forEach((up: any) => {
-        const p = up.permissions;
-        const slug = deriveSlugFromPerm(p);
+      ((userPerms || []) as UserPermJoinResult[]).forEach((up) => {
+        const slug = getPermSlug(up.permissions);
         if (slug) {
           if (up.is_granted) effectivePermissions.add(slug);
           else effectivePermissions.delete(slug);
@@ -509,7 +578,12 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
 
       const detailedUser = {
         ...user,
-        roles: (userRolesList || []).map((r: any) => r.roles?.name).filter(Boolean),
+        roles: ((userRolesList || []) as RoleJoinResult[]).map((r) => {
+          const roles = r.roles;
+          if (!roles) return undefined;
+          if (Array.isArray(roles)) return roles[0]?.name;
+          return (roles as { name?: string }).name;
+        }).filter(Boolean),
         role_permissions: Array.from(rolePermissions),
         user_permissions_overrides: userPerms || [],
         effective_permissions: Array.from(effectivePermissions)
@@ -645,7 +719,7 @@ export async function getRoles(req: Request, res: Response, next: NextFunction) 
       return res.json({ success: true, data: [] });
     }
 
-    const roleIds = roles.map((r: any) => r.id).filter(Boolean);
+    const roleIds = roles.map((r: { id: string }) => r.id).filter(Boolean);
 
     // Fetch user_roles for counts
     const { data: userRolesData } = await supabase
@@ -654,7 +728,7 @@ export async function getRoles(req: Request, res: Response, next: NextFunction) 
       .in('role_id', roleIds);
 
     const userCountMap: Record<string, number> = {};
-    (userRolesData || []).forEach((ur: any) => {
+    (userRolesData || []).forEach((ur: { role_id?: string }) => {
       if (!ur.role_id) return;
       userCountMap[ur.role_id] = (userCountMap[ur.role_id] || 0) + 1;
     });
@@ -666,12 +740,12 @@ export async function getRoles(req: Request, res: Response, next: NextFunction) 
       .in('role_id', roleIds);
 
     const permCountMap: Record<string, number> = {};
-    (rolePermsData || []).forEach((rp: any) => {
+    (rolePermsData || []).forEach((rp: { role_id?: string; permission_id?: string }) => {
       if (!rp.role_id) return;
       permCountMap[rp.role_id] = (permCountMap[rp.role_id] || 0) + 1;
     });
 
-    const enriched = roles.map((r: any) => ({
+    const enriched = roles.map((r: { id: string }) => ({
       ...r,
       users_count: userCountMap[r.id] || 0,
       permissions_count: permCountMap[r.id] || 0,
@@ -763,16 +837,35 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
 
     if (error) throw error;
 
-    // Combine all settings into a flat object, but flatten 'appearance' key into root
-    const combinedSettings: Record<string, any> = {};
-    (settings || []).forEach((s: any) => {
-      // Store keyed setting for specific CMS access
+    // Combine all settings into a flat object
+    const combinedSettings: Record<string, unknown> = {};
+    (settings || []).forEach((s: { key: string; value: unknown }) => {
+      // Store keyed setting
       combinedSettings[s.key] = s.value;
     });
 
-    // Flatten 'appearance' key into root if present
-    if (combinedSettings.appearance && typeof combinedSettings.appearance === 'object') {
-      Object.assign(combinedSettings, combinedSettings.appearance);
+    // Flatten nested settings keys into root to match default response structure
+    // This supports frontend expecting flat properties (e.g. resortName at root)
+    const nestedKeys = ['appearance', 'general', 'contact', 'hours', 'chalets', 'pool', 'legal'];
+    nestedKeys.forEach(key => {
+      if (combinedSettings[key] && typeof combinedSettings[key] === 'object') {
+        Object.assign(combinedSettings, combinedSettings[key]);
+      }
+    });
+
+    // Map mismatched keys to preserve default schema (DB uses shorter names in some groups)
+    const chalets = combinedSettings.chalets as Record<string, unknown> | undefined;
+    if (chalets) {
+      combinedSettings.chaletCheckIn = combinedSettings.checkIn || chalets.checkIn;
+      combinedSettings.chaletCheckOut = combinedSettings.checkOut || chalets.checkOut;
+      combinedSettings.chaletDeposit = combinedSettings.depositPercent || chalets.depositPercent;
+    }
+    const pool = combinedSettings.pool as Record<string, unknown> | undefined;
+    if (pool) {
+      combinedSettings.poolAdultPrice = combinedSettings.adultPrice || pool.adultPrice;
+      combinedSettings.poolChildPrice = combinedSettings.childPrice || pool.childPrice;
+      combinedSettings.poolInfantPrice = combinedSettings.infantPrice || pool.infantPrice;
+      combinedSettings.poolCapacity = combinedSettings.capacity || pool.capacity;
     }
 
     // If no settings in DB, return defaults
@@ -818,14 +911,14 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
     const userId = req.user?.userId;
 
     // Helper to check if an object has any non-undefined values
-    const hasValidData = (obj: Record<string, any>) => 
+    const hasValidData = (obj: Record<string, unknown>) => 
       Object.values(obj).some(v => v !== undefined);
 
     // Helper to filter out undefined values from an object
-    const filterUndefined = (obj: Record<string, any>) => 
+    const filterUndefined = (obj: Record<string, unknown>) => 
       Object.fromEntries(Object.entries(obj).filter(([_, v]) => v !== undefined));
 
-    const updates: { key: string; value: any }[] = [];
+    const updates: { key: string; value: unknown }[] = [];
 
     // Appearance settings (theme, weather, animations)
     const appearanceData = {
@@ -944,7 +1037,7 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
         }, { onConflict: 'key' });
       
       if (error) {
-        console.error(`Failed to update ${update.key}:`, error);
+        logger.error(`Failed to update ${update.key}:`, error);
         throw error;
       }
     }
@@ -991,8 +1084,21 @@ export async function getAuditLogs(req: Request, res: Response, next: NextFuncti
 
     if (error) throw error;
 
+    // Activity log row type
+    interface ActivityLogRow {
+      id: string;
+      user_id: string;
+      action: string;
+      resource: string;
+      resource_id?: string;
+      old_value?: string | Record<string, unknown>;
+      new_value?: string | Record<string, unknown>;
+      created_at: string;
+      users?: { full_name: string; email: string };
+    }
+
     // Map to frontend expected format
-    const mappedLogs = (logs || []).map((log: any) => ({
+    const mappedLogs = (logs || []).map((log: ActivityLogRow) => ({
       ...log,
       entity_type: log.resource,
       entity_id: log.resource_id,
@@ -1095,7 +1201,14 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
     // Process Top Items
     const topItemsMap = new Map<string, { name: string, quantity: number, revenue: number }>();
 
-    const processItems = (items: any[]) => {
+    interface OrderItemWithJoins {
+      quantity?: number;
+      unit_price?: number;
+      menu_items?: { name: string } | null;
+      snack_items?: { name: string } | null;
+    }
+
+    const processItems = (items: OrderItemWithJoins[]) => {
       items.forEach(item => {
         const name = item.menu_items?.name || item.snack_items?.name || 'Unknown Item';
         const current = topItemsMap.get(name) || { name, quantity: 0, revenue: 0 };
@@ -1105,8 +1218,8 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
       });
     };
 
-    processItems(restItemsResult.data || []);
-    processItems(snackItemsResult.data || []);
+    processItems((restItemsResult.data || []) as unknown as OrderItemWithJoins[]);
+    processItems((snackItemsResult.data || []) as unknown as OrderItemWithJoins[]);
 
     const topItems = Array.from(topItemsMap.values())
       .sort((a, b) => b.revenue - a.revenue)
@@ -1182,7 +1295,7 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
       start = dayjs().subtract(1, 'month').startOf('day').toISOString();
     }
 
-    let data: any[] = [];
+    let data: Record<string, unknown>[] = [];
     let filename = '';
 
     switch (type) {
@@ -1454,30 +1567,30 @@ export async function getOccupancyReport(req: Request, res: Response, next: Next
     const [chaletsResult, bookingsResult] = await Promise.all([
       supabase.from('chalets').select('id', { count: 'exact', head: true }).eq('is_active', true).is('deleted_at', null),
       supabase.from('chalet_bookings')
-        .select('number_of_nights, check_in_date')
+        .select('number_of_nights, check_in_date, status')
         .gte('check_in_date', start.toISOString())
         .lte('check_in_date', end.toISOString())
-        .not('status', 'in', '("cancelled", "no_show")')
     ]);
 
     const totalChalets = chaletsResult.count || 0;
     const totalChaletCapacity = totalChalets * daysInRange;
-    const bookedNights = (bookingsResult.data || []).reduce((sum, b) => sum + (b.number_of_nights || 0), 0);
+    const activeBookings = (bookingsResult.data || []).filter(b => !['cancelled', 'no_show'].includes(b.status));
+    const bookedNights = activeBookings.reduce((sum, b) => sum + (b.number_of_nights || 0), 0);
     const chaletOccupancyRate = totalChaletCapacity > 0 ? (bookedNights / totalChaletCapacity) * 100 : 0;
 
     // 2. Pool Occupancy
     const [sessionsResult, ticketsResult] = await Promise.all([
       supabase.from('pool_sessions').select('max_capacity').eq('is_active', true),
       supabase.from('pool_tickets')
-        .select('number_of_guests')
+        .select('number_of_guests, status')
         .gte('ticket_date', start.toISOString())
         .lte('ticket_date', end.toISOString())
-        .not('status', 'in', '("cancelled", "no_show")')
     ]);
 
     const dailyPoolCapacity = (sessionsResult.data || []).reduce((sum, s) => sum + (s.max_capacity || 0), 0);
     const totalPoolCapacity = dailyPoolCapacity * daysInRange;
-    const ticketsSold = (ticketsResult.data || []).reduce((sum, t) => sum + (t.number_of_guests || 0), 0);
+    const activeTickets = (ticketsResult.data || []).filter(t => !['cancelled', 'no_show'].includes(t.status));
+    const ticketsSold = activeTickets.reduce((sum, t) => sum + (t.number_of_guests || 0), 0);
     const poolOccupancyRate = totalPoolCapacity > 0 ? (ticketsSold / totalPoolCapacity) * 100 : 0;
 
     res.json({

@@ -133,8 +133,9 @@ export default function StaffPoolPage() {
       // The backend handles validation and marks as used
       toast.success(response.data.message || 'Ticket validated!', { icon: '🏊' });
       fetchTickets(); // Refresh the tickets list
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'Invalid ticket code';
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      const errorMessage = axiosError.response?.data?.error || 'Invalid ticket code';
       toast.error(errorMessage);
     }
 

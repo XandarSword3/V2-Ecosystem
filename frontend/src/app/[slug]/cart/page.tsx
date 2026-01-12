@@ -74,8 +74,24 @@ export default function ModuleCartPage() {
   const tax = subtotal * 0.11; // 11% VAT
   const total = subtotal + tax;
 
+  interface OrderData {
+    customerName: string;
+    customerPhone: string;
+    tableNumber?: string;
+    orderType: 'dine_in' | 'takeaway';
+    paymentMethod: 'cash' | 'card';
+    notes?: string;
+    items: Array<{ menuItemId: string; quantity: number; specialInstructions?: string }>;
+    moduleId?: string;
+  }
+
+  interface MutationError {
+    response?: { data?: { error?: string } };
+    message?: string;
+  }
+
   const orderMutation = useMutation({
-    mutationFn: (data: any) => restaurantApi.createOrder(data),
+    mutationFn: (data: OrderData) => restaurantApi.createOrder(data),
     onSuccess: (response) => {
       // Clear only items for this module
       // Since clearCart clears everything, we might want to be selective.
@@ -92,7 +108,7 @@ export default function ModuleCartPage() {
       router.push(`/${slug}`); 
       toast.success("Order confirmed. Check your email for details.");
     },
-    onError: (err: any) => {
+    onError: (err: MutationError) => {
       toast.error(err.response?.data?.error || t('orderFailed'));
     },
   });
@@ -118,10 +134,10 @@ export default function ModuleCartPage() {
     orderMutation.mutate({
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
-      tableNumber: orderType === 'dine_in' ? tableNumber.trim() : null,
+      tableNumber: orderType === 'dine_in' ? tableNumber.trim() : undefined,
       orderType,
       paymentMethod,
-      specialRequests: notes.trim(),
+      notes: notes.trim(),
       items: moduleItems.map((item) => ({
         menuItemId: item.id,
         quantity: item.quantity,

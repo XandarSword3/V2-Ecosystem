@@ -1,12 +1,14 @@
 import { getSupabase } from "../database/connection";
+import { logger } from "./logger";
 
 interface AuditLogEntry {
   user_id: string;
   action: string;
   resource: string;
   resource_id?: string;
-  old_value?: any;
-  new_value?: any;
+  entity_id?: string; // Alias for resource_id
+  old_value?: unknown;
+  new_value?: unknown;
   ip_address?: string;
   user_agent?: string;
 }
@@ -27,9 +29,9 @@ export async function logActivity(entry: AuditLogEntry) {
       .insert(safePayload);
 
     if (error) {
-      console.error('Failed to write audit log:', error);
+      logger.error('Failed to write audit log:', error);
     }
   } catch (err) {
-    console.error('Error logging activity:', err);
+    logger.error('Error logging activity:', err);
   }
 }

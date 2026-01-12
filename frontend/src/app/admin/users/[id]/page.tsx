@@ -41,7 +41,7 @@ export default function UserDetailsPage() {
                 setUser(userPayload);
                 // Initialize overrides from user data
                 const initialOverrides: Record<string, boolean> = {};
-                (userPayload.user_permissions_overrides || []).forEach((p: any) => {
+                (userPayload.user_permissions_overrides || []).forEach((p: { permission_id: string; is_granted: boolean }) => {
                     initialOverrides[p.permission_id] = p.is_granted;
                 });
                 setOverrides(initialOverrides);

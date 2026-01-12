@@ -241,8 +241,9 @@ export default function ChaletDetailPage() {
 
       toast.success('Booking submitted successfully!');
       router.push(`/chalets/booking-confirmation?id=${response.data.data.id}`);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to submit booking');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      toast.error(axiosError.response?.data?.error || 'Failed to submit booking');
     } finally {
       setIsSubmitting(false);
     }

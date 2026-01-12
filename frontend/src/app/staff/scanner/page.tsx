@@ -77,10 +77,11 @@ export default function StaffScannerPage() {
         ...prev.slice(0, 9),
       ]);
       toast.success(result.message);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
       const result: ValidationResult = {
         success: false,
-        message: error.response?.data?.error || 'Invalid or expired ticket',
+        message: axiosError.response?.data?.error || 'Invalid or expired ticket',
       };
       setLastResult(result);
       setScanHistory((prev) => [
@@ -102,8 +103,9 @@ export default function StaffScannerPage() {
       await api.post(`/pool/tickets/${lastResult.ticket.id}/entry`);
       toast.success('Entry recorded successfully');
       setLastResult(null);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to record entry');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || 'Failed to record entry');
     }
   };
 
@@ -114,8 +116,9 @@ export default function StaffScannerPage() {
       await api.post(`/pool/tickets/${lastResult.ticket.id}/exit`);
       toast.success('Exit recorded successfully');
       setLastResult(null);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to record exit');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || 'Failed to record exit');
     }
   };
 

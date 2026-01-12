@@ -1,12 +1,48 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection.js";
 import { emitToUnit } from "../../socket/index.js";
+import { createSnackOrderSchema, validateBody } from "../../validation/schemas.js";
 import dayjs from 'dayjs';
+import { z } from 'zod';
+
+// Types from Zod schema
+type CreateSnackOrderInput = z.infer<typeof createSnackOrderSchema>;
+
+// Database row types for Supabase responses
+interface SnackItemRow {
+  id: string;
+  name: string;
+  image_url?: string | null;
+}
+
+interface SnackOrderItemRow {
+  id: string;
+  quantity: number;
+  unit_price: string;
+  subtotal: string;
+  notes?: string;
+  snack_items?: SnackItemRow | null;
+}
+
+interface SnackOrderRow {
+  id: string;
+  order_number: string;
+  status: string;
+  total_amount: string;
+  payment_status: string;
+  payment_method?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  estimated_ready_time?: string;
+  created_at: string;
+  items?: SnackOrderItemRow[];
+}
 
 function generateOrderNumber(): string {
   const date = dayjs().format('YYMMDD');
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `S-${date}-${random}`;
+  const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+  const suffix = Date.now().toString(36).slice(-4);
+  return `S-${date}-${random}${suffix}`;
 }
 
 export async function getItems(req: Request, res: Response, next: NextFunction) {
@@ -63,11 +99,14 @@ export async function getItem(req: Request, res: Response, next: NextFunction) {
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
+    // Validate request body with Zod schema
+    const validatedData = validateBody(createSnackOrderSchema, req.body);
+    const { customerName, customerPhone, items, paymentMethod, notes } = validatedData;
+
     const supabase = getSupabase();
-    const { customerName, customerPhone, items, paymentMethod } = req.body;
 
     // Get snack items for pricing
-    const itemIds = items.map((i: any) => i.snackItemId);
+    const itemIds = items.map((i) => i.itemId);
     const { data: snackItemsList, error: itemsError } = await supabase
       .from('snack_items')
       .select('*')
@@ -79,9 +118,9 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
 
     // Calculate total
     let totalAmount = 0;
-    const orderItems = items.map((item: any) => {
-      const snackItem = itemMap.get(item.snackItemId);
-      if (!snackItem) throw new Error(`Item ${item.snackItemId} not found`);
+    const orderItems = items.map((item) => {
+      const snackItem = itemMap.get(item.itemId);
+      if (!snackItem) throw new Error(`Item ${item.itemId} not found`);
       if (!snackItem.is_available) throw new Error(`${snackItem.name} is not available`);
 
       const unitPrice = parseFloat(snackItem.price);
@@ -89,7 +128,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       totalAmount += subtotal;
 
       return {
-        snack_item_id: item.snackItemId,
+        snack_item_id: item.itemId,
         quantity: item.quantity,
         unit_price: unitPrice,
         subtotal,
@@ -120,7 +159,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
     // Insert order items
     const { error: itemsInsertError } = await supabase
       .from('snack_order_items')
-      .insert(orderItems.map((item: any) => ({
+      .insert(orderItems.map((item) => ({
         order_id: order.id,
         snack_item_id: item.snack_item_id,
         quantity: item.quantity,
@@ -307,9 +346,9 @@ export async function getStaffOrders(req: Request, res: Response, next: NextFunc
     if (error) throw error;
 
     // Transform items to have name at top level for frontend
-    const transformedOrders = (orders || []).map((order: any) => ({
+    const transformedOrders = (orders || []).map((order: SnackOrderRow) => ({
       ...order,
-      items: (order.items || []).map((item: any) => ({
+      items: (order.items || []).map((item: SnackOrderItemRow) => ({
         id: item.id,
         name: item.snack_items?.name || 'Unknown Item',
         quantity: item.quantity,
@@ -351,9 +390,9 @@ export async function getLiveOrders(req: Request, res: Response, next: NextFunct
     if (error) throw error;
 
     // Transform items to have name at top level for frontend
-    const transformedOrders = (orders || []).map((order: any) => ({
+    const transformedOrders = (orders || []).map((order: SnackOrderRow) => ({
       ...order,
-      items: (order.items || []).map((item: any) => ({
+      items: (order.items || []).map((item: SnackOrderItemRow) => ({
         id: item.id,
         name: item.snack_items?.name || 'Unknown Item',
         quantity: item.quantity,
@@ -379,6 +418,8 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
     };
     if (status === 'completed') {
       updateData.completed_at = new Date().toISOString();
+      // Mark as paid when order is completed (for stress testing & realistic flow)
+      updateData.payment_status = 'paid';
     }
 
     const { data: order, error } = await supabase

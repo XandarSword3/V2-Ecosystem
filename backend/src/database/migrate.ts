@@ -449,14 +449,39 @@ async function migrate() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         template_type VARCHAR(50) NOT NULL,
         name VARCHAR(100) NOT NULL,
+        name_ar VARCHAR(100),
+        name_fr VARCHAR(100),
         slug VARCHAR(100) NOT NULL UNIQUE,
         description TEXT,
+        description_ar TEXT,
+        description_fr TEXT,
         settings JSONB DEFAULT '{}'::jsonb,
         is_active BOOLEAN DEFAULT true,
+        show_in_main BOOLEAN DEFAULT true,
         sort_order INTEGER DEFAULT 0,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+
+      -- Add translation columns to modules if they don't exist (for upgrades)
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'modules' AND column_name = 'name_ar') THEN
+          ALTER TABLE modules ADD COLUMN name_ar VARCHAR(100);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'modules' AND column_name = 'name_fr') THEN
+          ALTER TABLE modules ADD COLUMN name_fr VARCHAR(100);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'modules' AND column_name = 'description_ar') THEN
+          ALTER TABLE modules ADD COLUMN description_ar TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'modules' AND column_name = 'description_fr') THEN
+          ALTER TABLE modules ADD COLUMN description_fr TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'modules' AND column_name = 'show_in_main') THEN
+          ALTER TABLE modules ADD COLUMN show_in_main BOOLEAN DEFAULT true;
+        END IF;
+      END $$;
 
       -- Insert default modules
       INSERT INTO modules (template_type, name, slug, description, sort_order, is_active)

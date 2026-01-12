@@ -85,7 +85,7 @@ test.describe('Admin Settings Tests', () => {
       
       if (loginRes.ok()) {
         const loginData = await loginRes.json();
-        authToken = loginData.data?.accessToken;
+        authToken = loginData.data?.tokens?.accessToken;
         
         // Now save settings
         const response = await request.put(`${API_URL}/api/admin/settings`, {
@@ -114,7 +114,7 @@ test.describe('Admin Settings Tests', () => {
       
       if (loginRes.ok()) {
         const loginData = await loginRes.json();
-        authToken = loginData.data?.accessToken;
+        authToken = loginData.data?.tokens?.accessToken;
         
         // Save a theme
         await request.put(`${API_URL}/api/admin/settings`, {
@@ -139,7 +139,7 @@ test.describe('Admin Settings Tests', () => {
       
       if (loginRes.ok()) {
         const loginData = await loginRes.json();
-        authToken = loginData.data?.accessToken;
+        authToken = loginData.data?.tokens?.accessToken;
         
         const heroSettings = {
           homepage: {
@@ -180,7 +180,7 @@ test.describe('Admin Settings Tests', () => {
       
       if (loginRes.ok()) {
         const loginData = await loginRes.json();
-        authToken = loginData.data?.accessToken;
+        authToken = loginData.data?.tokens?.accessToken;
         
         // Fetch settings
         const getRes = await request.get(`${API_URL}/api/settings`);
@@ -203,7 +203,7 @@ test.describe('Admin Settings Tests', () => {
       
       if (loginRes.ok()) {
         const loginData = await loginRes.json();
-        authToken = loginData.data?.accessToken;
+        authToken = loginData.data?.tokens?.accessToken;
         
         const response = await request.put(`${API_URL}/api/admin/settings`, {
           headers: { Authorization: `Bearer ${authToken}` },
@@ -342,7 +342,7 @@ test.describe('Visual Regression - Theme Tests', () => {
     });
     if (loginRes.ok()) {
       const loginData = await loginRes.json();
-      authToken = loginData.data?.accessToken;
+      authToken = loginData.data?.tokens?.accessToken;
     }
   });
 

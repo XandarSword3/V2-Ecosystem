@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import * as menuService from "../services/menu.service";
 import { translateText } from '../../../services/translation.service.js';
+import { MenuCategoryRow, MenuItemRow, getErrorMessage } from '../../../types/index.js';
+import { logger } from '../../../utils/logger.js';
 
 // Get full menu with categories and items
 export async function getFullMenu(req: Request, res: Response, next: NextFunction) {
@@ -12,9 +14,9 @@ export async function getFullMenu(req: Request, res: Response, next: NextFunctio
     ]);
 
     // Group items by category
-    const menuByCategory = categories.map((category: any) => ({
+    const menuByCategory = categories.map((category: MenuCategoryRow) => ({
       ...category,
-      items: items.filter((item: any) => item.category_id === category.id),
+      items: items.filter((item: MenuItemRow) => item.category_id === category.id),
     }));
 
     res.json({
@@ -89,7 +91,7 @@ export async function createCategory(req: Request, res: Response, next: NextFunc
         translatedData.name_ar = nameTranslations.ar;
         translatedData.name_fr = nameTranslations.fr;
       } catch (e) {
-        console.warn('[MENU] Auto-translation failed for category name');
+        logger.warn('[MENU] Auto-translation failed for category name');
       }
     }
 
@@ -100,7 +102,7 @@ export async function createCategory(req: Request, res: Response, next: NextFunc
         translatedData.description_ar = descTranslations.ar;
         translatedData.description_fr = descTranslations.fr;
       } catch (e) {
-        console.warn('[MENU] Auto-translation failed for category description');
+        logger.warn('[MENU] Auto-translation failed for category description');
       }
     }
 
@@ -179,15 +181,15 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
         translatedData.description_ar = descTranslations.ar;
         translatedData.description_fr = descTranslations.fr;
       } catch (e) {
-        console.warn('[MENU] Auto-translation failed for item description');
+        logger.warn('[MENU] Auto-translation failed for item description');
       }
     }
 
     const item = await menuService.createMenuItem(translatedData);
     res.status(201).json({ success: true, data: item, autoTranslated: true });
-  } catch (error: any) {
-    console.error('[MENU] Error creating menu item:', error);
-    if (error.code === '23503') {
+  } catch (error: unknown) {
+    const errWithCode = error as { code?: string; message?: string };
+    if (errWithCode.code === '23503') {
       return res.status(400).json({
         success: false,
         message: 'Invalid category - category does not exist'

@@ -6,6 +6,7 @@ import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
 import { emailService } from "../../services/email.service.js";
 import { AppError } from "../../utils/AppError.js";
+import { UserRoleRow } from "../../types/index.js";
 
 const isProduction = config.env === 'production';
 
@@ -148,7 +149,14 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     throw rolesError;
   }
 
-  const roleNames = (userRolesList || []).map((r: any) => r.roles?.name).filter(Boolean);
+  // Handle Supabase join which may return roles as array or object
+  interface RoleJoinResult { role_id?: string; roles?: { name?: string }[] | { name?: string } | null }
+  const roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
+    const roles = r.roles;
+    if (!roles) return undefined;
+    if (Array.isArray(roles)) return roles[0]?.name;
+    return (roles as { name?: string }).name;
+  }).filter(Boolean) as string[];
 
   // Generate tokens
   if (!isProduction) {
@@ -245,7 +253,12 @@ export async function refreshAccessToken(refreshToken: string) {
 
   if (rolesError) throw rolesError;
 
-  const roleNames = (userRolesList || []).map((r: any) => r.roles?.name).filter(Boolean);
+  // Handle Supabase join which may return roles as array or object
+  const roleNames = (userRolesList || []).map((r: { roles?: { name?: string }[] | { name?: string } | null }) => {
+    const roles = r.roles;
+    if (Array.isArray(roles)) return roles[0]?.name;
+    return roles?.name;
+  }).filter(Boolean) as string[];
 
   // Generate new tokens
   const tokens = generateTokens({
@@ -304,7 +317,11 @@ export async function getUserById(userId: string) {
 
   return {
     ...user,
-    roles: (userRolesList || []).map((r: any) => r.roles?.name).filter(Boolean),
+    roles: (userRolesList || []).map((r: { roles?: { name?: string }[] | { name?: string } | null }) => {
+      const roles = r.roles;
+      if (Array.isArray(roles)) return roles[0]?.name;
+      return roles?.name;
+    }).filter(Boolean) as string[],
   };
 }
 

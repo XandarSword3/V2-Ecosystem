@@ -119,6 +119,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { name: t('nav.appearance'), href: '/admin/settings/appearance' },
         { name: 'Homepage', href: '/admin/settings/homepage' },
         { name: 'Footer', href: '/admin/settings/footer' },
+        { name: 'Translations', href: '/admin/settings/translations' },
         { name: t('nav.payments'), href: '/admin/settings/payments' },
         { name: t('nav.notifications'), href: '/admin/settings/notifications' },
         { name: 'Database Backups', href: '/admin/settings/backups' },

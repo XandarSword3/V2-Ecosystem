@@ -4,6 +4,7 @@ import { loginSchema, registerSchema, changePasswordSchema } from "./auth.valida
 import { logger } from "../../utils/logger";
 import { config } from "../../config";
 import { logActivity } from "../../utils/activityLogger";
+import { getErrorMessage } from "../../types/index.js";
 
 const isProduction = config.env === 'production';
 
@@ -27,12 +28,13 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     });
 
     res.status(201).json({ success: true, data: result });
-  } catch (error: any) {
-    logger.error('Registration failed:', error.message);
+  } catch (error: unknown) {
+    const message = getErrorMessage(error);
+    logger.error('Registration failed:', message);
     // Only expose error details in development
     res.status(500).json({
       success: false,
-      error: isProduction ? 'Registration failed. Please try again.' : error.message
+      error: isProduction ? 'Registration failed. Please try again.' : message
     });
   }
 }
@@ -61,7 +63,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     });
 
     res.json({ success: true, data: result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.warn(`Login failed for email: ${req.body.email}`);
     next(error);
   }
