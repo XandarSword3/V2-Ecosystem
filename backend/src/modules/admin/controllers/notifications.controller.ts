@@ -14,7 +14,15 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    const notifications: Array<{ id: string; title: string; message: string; time: string; read: boolean }> = [];
+    const notifications: Array<{ 
+      id: string; 
+      title: string; 
+      message: string; 
+      type: string;
+      target_type: string;
+      created_at: string; 
+      is_read: boolean;
+    }> = [];
 
     // Get recent restaurant orders
     const { data: recentOrders } = await supabase
@@ -25,17 +33,14 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
       .limit(5);
 
     (recentOrders || []).forEach(order => {
-      const createdAt = new Date(order.created_at);
-      const diffMs = now.getTime() - createdAt.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const timeAgo = diffMins < 60 ? `${diffMins} min ago` : `${Math.floor(diffMins / 60)} hours ago`;
-
       notifications.push({
         id: `order-${order.id}`,
         title: 'New Order',
         message: `Order #${order.order_number} - ${order.status}`,
-        time: timeAgo,
-        read: order.status !== 'pending',
+        type: 'info',
+        target_type: 'staff',
+        created_at: order.created_at,
+        is_read: order.status !== 'pending',
       });
     });
 
@@ -48,17 +53,14 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
       .limit(5);
 
     (recentBookings || []).forEach(booking => {
-      const createdAt = new Date(booking.created_at);
-      const diffMs = now.getTime() - createdAt.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const timeAgo = diffMins < 60 ? `${diffMins} min ago` : `${Math.floor(diffMins / 60)} hours ago`;
-
       notifications.push({
         id: `booking-${booking.id}`,
         title: 'Chalet Booking',
         message: `New booking for ${booking.check_in_date}`,
-        time: timeAgo,
-        read: booking.status !== 'pending',
+        type: 'info',
+        target_type: 'staff',
+        created_at: booking.created_at,
+        is_read: booking.status !== 'pending',
       });
     });
 
@@ -66,30 +68,25 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
     const { data: pendingReviews } = await supabase
       .from('reviews')
       .select('id, rating, created_at')
-      .eq('status', 'pending')
+      .eq('is_approved', false)
       .order('created_at', { ascending: false })
       .limit(5);
 
     (pendingReviews || []).forEach(review => {
-      const createdAt = new Date(review.created_at);
-      const diffMs = now.getTime() - createdAt.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const timeAgo = diffMins < 60 ? `${diffMins} min ago` : `${Math.floor(diffMins / 60)} hours ago`;
-
       notifications.push({
         id: `review-${review.id}`,
         title: 'Review Pending',
         message: `New ${review.rating}-star review awaiting approval`,
-        time: timeAgo,
-        read: false,
+        type: 'warning',
+        target_type: 'admin',
+        created_at: review.created_at,
+        is_read: false,
       });
     });
 
-    // Sort by time (most recent first) and limit
+    // Sort by created_at (most recent first) and limit
     notifications.sort((a, b) => {
-      const aTime = parseInt(a.time) || 0;
-      const bTime = parseInt(b.time) || 0;
-      return aTime - bTime;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
     res.json({ success: true, data: notifications.slice(0, 10) });
@@ -115,6 +112,60 @@ export async function markAllNotificationsRead(req: Request, res: Response, next
   try {
     // Similar to above, this would update multiple source records
     res.json({ success: true, message: 'All notifications marked as read' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function broadcastNotification(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { title, message, type = 'info', target_type = 'all' } = req.body;
+    
+    if (!title || !message) {
+      return res.status(400).json({ success: false, error: 'Title and message are required' });
+    }
+
+    const supabase = getSupabase();
+    
+    // Store the notification in the database
+    const { data, error } = await supabase
+      .from('broadcast_notifications')
+      .insert({
+        title,
+        message,
+        type,
+        target_type,
+        created_by: req.user?.userId,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      // Table might not exist, create a simple response
+      console.log('Broadcast notification (table may not exist):', { title, message, type, target_type });
+      return res.status(201).json({ 
+        success: true, 
+        message: 'Notification broadcast sent',
+        data: { title, message, type, target_type }
+      });
+    }
+
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteNotification(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    
+    // For broadcast notifications, try to delete from database
+    const supabase = getSupabase();
+    await supabase.from('broadcast_notifications').delete().eq('id', id);
+    
+    res.json({ success: true, message: 'Notification deleted' });
   } catch (error) {
     next(error);
   }

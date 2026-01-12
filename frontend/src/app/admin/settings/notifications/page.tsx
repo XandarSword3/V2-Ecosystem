@@ -65,7 +65,7 @@ export default function AdminNotificationsPage() {
   const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/notifications/admin/all');
+      const response = await api.get('/admin/notifications');
       setNotifications(response.data.data || []);
     } catch (error) {
       // If endpoint doesn't exist yet, show empty
@@ -100,7 +100,7 @@ export default function AdminNotificationsPage() {
 
     try {
       setSending(true);
-      await api.post('/notifications/broadcast', newNotification);
+      await api.post('/admin/notifications/broadcast', newNotification);
       toast.success('Notification sent successfully');
       setShowCreateModal(false);
       setNewNotification({ title: '', message: '', type: 'info', target_type: 'all' });
@@ -114,7 +114,7 @@ export default function AdminNotificationsPage() {
 
   const deleteNotification = async (id: string) => {
     try {
-      await api.delete(`/notifications/${id}`);
+      await api.delete(`/admin/notifications/${id}`);
       setNotifications((prev) => prev.filter((n) => n.id !== id));
       toast.success('Notification deleted');
     } catch (error) {
@@ -129,7 +129,7 @@ export default function AdminNotificationsPage() {
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const todayCount = notifications.filter(
-    (n) => n.created_at.startsWith(new Date().toISOString().split('T')[0])
+    (n) => n.created_at?.startsWith(new Date().toISOString().split('T')[0])
   ).length;
 
   if (loading) {
@@ -293,7 +293,7 @@ export default function AdminNotificationsPage() {
                           <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
-                              {formatDate(notification.created_at)}
+                              {notification.created_at ? formatDate(notification.created_at) : 'Just now'}
                             </span>
                             {notification.is_read && (
                               <span className="flex items-center gap-1 text-green-500">

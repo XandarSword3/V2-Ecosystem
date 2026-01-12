@@ -658,6 +658,7 @@ export async function createSession(req: Request, res: Response, next: NextFunct
         start_time: startTime,
         end_time: endTime,
         max_capacity: Number(maxCapacity),
+        price: String(adult_price), // Legacy field - use adult_price for backwards compatibility
         adult_price: String(adult_price),
         child_price: String(child_price),
       })

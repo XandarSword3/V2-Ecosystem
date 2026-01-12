@@ -24,7 +24,7 @@ export async function getAuditLogs(req: Request, res: Response, next: NextFuncti
     const { limit = 50, offset = 0 } = req.query;
 
     const { data: logs, error } = await supabase
-      .from('activity_logs')
+      .from('audit_logs')
       .select(`
         *,
         users:user_id (

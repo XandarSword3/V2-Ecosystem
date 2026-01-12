@@ -405,7 +405,7 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
         .from('users')
         .select(`
           *,
-          user_roles (
+          user_roles!user_roles_user_id_fkey (
             roles (
               id,
               name,

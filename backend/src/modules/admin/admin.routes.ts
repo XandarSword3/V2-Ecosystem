@@ -77,6 +77,21 @@ router.get('/reports/export', rateLimits.expensive, reportsController.exportRepo
 router.get('/notifications', notificationsController.getNotifications);
 router.put('/notifications/:id/read', notificationsController.markNotificationRead);
 router.put('/notifications/read-all', notificationsController.markAllNotificationsRead);
+router.post('/notifications/broadcast', notificationsController.broadcastNotification);
+router.delete('/notifications/:id', notificationsController.deleteNotification);
+
+// Translation Management - Database Translations
+router.get('/translations/missing', translationsController.getMissingTranslations);
+router.get('/translations/stats', translationsController.getTranslationStats);
+router.put('/translations/:table/:id', translationsController.updateTranslation);
+router.post('/translations/auto-translate', translationsController.autoTranslate);
+router.post('/translations/batch-translate', translationsController.batchAutoTranslate);
+
+// Translation Management - Languages
+router.get('/translations/languages', translationsController.getSupportedLanguages);
+router.post('/translations/languages', translationsController.addLanguage);
+router.put('/translations/languages/:code', translationsController.updateLanguage);
+router.delete('/translations/languages/:code', translationsController.deleteLanguage);
 
 // Frontend Translation Files Comparison
 router.get('/translations/frontend/compare', translationsController.compareFrontendTranslations);
