@@ -144,6 +144,11 @@ export default function RestaurantMenuPage() {
   const { settings } = useSiteSettings();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
+  const [dietaryFilters, setDietaryFilters] = useState<{
+    vegetarian: boolean;
+    vegan: boolean;
+    glutenFree: boolean;
+  }>({ vegetarian: false, vegan: false, glutenFree: false });
   const currency = useSettingsStore((s) => s.currency);
   const { translateContent, isRTL } = useContentTranslation();
 
@@ -167,16 +172,32 @@ export default function RestaurantMenuPage() {
   const menuItems: MenuItem[] = rawItems.map(normalizeMenuItem);
   const categories = data?.data?.data?.categories || [];
 
-  // Filter items
+  // Filter items by category
   let filteredItems = selectedCategory
     ? menuItems.filter((item) => item.category.id === selectedCategory)
     : menuItems;
+
+  // Apply dietary filters
+  if (dietaryFilters.vegetarian) {
+    filteredItems = filteredItems.filter((item) => item.isVegetarian);
+  }
+  if (dietaryFilters.vegan) {
+    filteredItems = filteredItems.filter((item) => item.isVegan);
+  }
+  if (dietaryFilters.glutenFree) {
+    filteredItems = filteredItems.filter((item) => item.isGlutenFree);
+  }
 
   if (showFeaturedOnly) {
     filteredItems = filteredItems.filter((item) => item.isFeatured);
   }
 
   const featuredItems = menuItems.filter((item) => item.isFeatured).slice(0, 3);
+  const hasDietaryItems = menuItems.some((item) => item.isVegetarian || item.isVegan || item.isGlutenFree);
+
+  const toggleDietaryFilter = (filter: 'vegetarian' | 'vegan' | 'glutenFree') => {
+    setDietaryFilters((prev) => ({ ...prev, [filter]: !prev[filter] }));
+  };
 
   const addToCart = (item: MenuItem) => {
     const translatedName = translateContent(item, 'name');
@@ -538,6 +559,58 @@ export default function RestaurantMenuPage() {
                 </motion.button>
               ))}
             </div>
+
+            {/* Dietary Filters */}
+            {hasDietaryItems && (
+              <div className="flex flex-wrap gap-2 justify-center mt-4 pt-4 border-t border-slate-200/50 dark:border-slate-600/50">
+                <span className="text-sm text-slate-500 dark:text-slate-400 self-center mr-2">
+                  <Leaf className="w-4 h-4 inline mr-1" />
+                  {t('dietaryFilters') || 'Dietary:'}
+                </span>
+                <motion.button
+                  onClick={() => toggleDietaryFilter('vegetarian')}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`
+                    px-4 py-2 rounded-full text-sm font-medium transition-all duration-300
+                    ${dietaryFilters.vegetarian
+                      ? 'bg-green-500 text-white shadow-lg shadow-green-500/30'
+                      : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/40'
+                    }
+                  `}
+                >
+                  🥬 {t('vegetarian') || 'Vegetarian'}
+                </motion.button>
+                <motion.button
+                  onClick={() => toggleDietaryFilter('vegan')}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`
+                    px-4 py-2 rounded-full text-sm font-medium transition-all duration-300
+                    ${dietaryFilters.vegan
+                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                      : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                    }
+                  `}
+                >
+                  🌱 {t('vegan') || 'Vegan'}
+                </motion.button>
+                <motion.button
+                  onClick={() => toggleDietaryFilter('glutenFree')}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`
+                    px-4 py-2 rounded-full text-sm font-medium transition-all duration-300
+                    ${dietaryFilters.glutenFree
+                      ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                      : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                    }
+                  `}
+                >
+                  🌾 {t('glutenFree') || 'Gluten-Free'}
+                </motion.button>
+              </div>
+            )}
           </div>
         </motion.div>
 

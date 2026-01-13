@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -170,13 +171,13 @@ function RevenueBar({
 }
 
 // Order status badge
-function OrderStatus({ status }: { status: string }) {
-  const configs: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-    pending: { color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400', icon: Clock, label: 'Pending' },
-    preparing: { color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400', icon: Timer, label: 'Preparing' },
-    ready: { color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400', icon: CheckCircle2, label: 'Ready' },
-    completed: { color: 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300', icon: CheckCircle2, label: 'Completed' },
-    cancelled: { color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400', icon: AlertTriangle, label: 'Cancelled' },
+function OrderStatus({ status, t }: { status: string; t: (key: string) => string }) {
+  const configs: Record<string, { color: string; icon: React.ElementType; labelKey: string }> = {
+    pending: { color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400', icon: Clock, labelKey: 'pending' },
+    preparing: { color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400', icon: Timer, labelKey: 'preparing' },
+    ready: { color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400', icon: CheckCircle2, labelKey: 'ready' },
+    completed: { color: 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300', icon: CheckCircle2, labelKey: 'completed' },
+    cancelled: { color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400', icon: AlertTriangle, labelKey: 'cancelled' },
   };
 
   const config = configs[status] || configs.pending;
@@ -185,7 +186,7 @@ function OrderStatus({ status }: { status: string }) {
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${config.color}`}>
       <StatusIcon className="w-3 h-3" />
-      {config.label}
+      {t(`statuses.${config.labelKey}`)}
     </span>
   );
 }
@@ -193,6 +194,7 @@ function OrderStatus({ status }: { status: string }) {
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { socket } = useSocket();
+  const t = useTranslations('adminDashboard');
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -204,6 +206,9 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (socket) {
+      // Request current online users count when socket connects
+      socket.emit('request:online_users');
+      
       socket.on('stats:online_users', (data: { count: number }) => {
         setOnlineUsers(data.count);
       });
@@ -218,9 +223,9 @@ export default function AdminDashboard() {
     try {
       const response = await api.get('/admin/dashboard');
       setStats(response.data.data);
-      if (isRefresh) toast.success('Dashboard refreshed');
+      if (isRefresh) toast.success(t('refreshed'));
     } catch (error) {
-      toast.error('Failed to load dashboard data');
+      toast.error(t('errors.failedToLoad'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -275,7 +280,7 @@ export default function AdminDashboard() {
       <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            Welcome back
+            {t('welcomeBack')}
             <motion.span
               animate={{ rotate: [0, 14, -8, 14, -4, 10, 0] }}
               transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
@@ -285,7 +290,7 @@ export default function AdminDashboard() {
             </motion.span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Here&apos;s what&apos;s happening at V2 Resort today, <span className="font-medium text-slate-700 dark:text-slate-300">{user?.fullName}</span>
+            {t('subtitle', { name: user?.fullName })}
           </p>
         </div>
         <Button
@@ -295,54 +300,54 @@ export default function AdminDashboard() {
           className="gap-2"
         >
           <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh
+          {t('refresh')}
         </Button>
       </motion.div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          title="Online Users"
+          title={t('stats.onlineUsers')}
           value={onlineUsers}
           icon={Users}
           trend="neutral"
-          trendValue="Live Count"
+          trendValue={t('stats.liveCount')}
           gradient="bg-gradient-to-br from-blue-400 to-indigo-500"
           delay={0}
         />
         <StatCard
-          title="Today's Orders"
+          title={t('stats.todayOrders')}
           value={stats?.todayOrders || 0}
           icon={UtensilsCrossed}
           trend={stats?.trends?.orders !== undefined ? (stats.trends.orders >= 0 ? 'up' : 'down') : 'neutral'}
-          trendValue={stats?.trends?.orders !== undefined ? `${stats.trends.orders >= 0 ? '+' : ''}${stats.trends.orders}% from yesterday` : 'No data'}
+          trendValue={stats?.trends?.orders !== undefined ? t('stats.fromYesterday', { value: `${stats.trends.orders >= 0 ? '+' : ''}${stats.trends.orders}%` }) : t('stats.noData')}
           gradient="bg-gradient-to-br from-orange-400 to-rose-500"
           delay={0}
         />
         <StatCard
-          title="Today's Revenue"
+          title={t('stats.todayRevenue')}
           value={formatCurrency(stats?.todayRevenue || 0)}
           icon={DollarSign}
           trend={stats?.trends?.revenue !== undefined ? (stats.trends.revenue >= 0 ? 'up' : 'down') : 'neutral'}
-          trendValue={stats?.trends?.revenue !== undefined ? `${stats.trends.revenue >= 0 ? '+' : ''}${stats.trends.revenue}% from yesterday` : 'No data'}
+          trendValue={stats?.trends?.revenue !== undefined ? t('stats.fromYesterday', { value: `${stats.trends.revenue >= 0 ? '+' : ''}${stats.trends.revenue}%` }) : t('stats.noData')}
           gradient="bg-gradient-to-br from-emerald-400 to-teal-500"
           delay={0.1}
         />
         <StatCard
-          title="Active Bookings"
+          title={t('stats.activeBookings')}
           value={stats?.todayBookings || 0}
           icon={Home}
           trend={stats?.trends?.bookings !== undefined ? (stats.trends.bookings >= 0 ? 'up' : 'down') : 'neutral'}
-          trendValue={stats?.trends?.bookings !== undefined ? `${stats.trends.bookings >= 0 ? '+' : ''}${stats.trends.bookings}% from last week` : 'No data'}
+          trendValue={stats?.trends?.bookings !== undefined ? t('stats.fromLastWeek', { value: `${stats.trends.bookings >= 0 ? '+' : ''}${stats.trends.bookings}%` }) : t('stats.noData')}
           gradient="bg-gradient-to-br from-blue-400 to-indigo-500"
           delay={0.2}
         />
         <StatCard
-          title="Pool Tickets"
+          title={t('stats.poolTickets')}
           value={stats?.todayTickets || 0}
           icon={Waves}
           trend={stats?.trends?.tickets !== undefined ? (stats.trends.tickets >= 0 ? 'up' : 'down') : 'neutral'}
-          trendValue={stats?.trends?.tickets !== undefined ? `${stats.trends.tickets >= 0 ? '+' : ''}${stats.trends.tickets}% from yesterday` : 'No data'}
+          trendValue={stats?.trends?.tickets !== undefined ? t('stats.fromYesterday', { value: `${stats.trends.tickets >= 0 ? '+' : ''}${stats.trends.tickets}%` }) : t('stats.noData')}
           gradient="bg-gradient-to-br from-primary-400 to-secondary-500"
           delay={0.3}
         />
@@ -356,34 +361,34 @@ export default function AdminDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-primary-600" />
-                Revenue by Business Unit
+                {t('revenueByUnit.title')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-5">
                 <RevenueBar
-                  name="🍽️ Restaurant"
+                  name={`🍽️ ${t('revenueByUnit.restaurant')}`}
                   value={stats?.revenueByUnit?.restaurant || 0}
                   percentage={getPercentage(stats?.revenueByUnit?.restaurant || 0)}
                   color="bg-gradient-to-r from-orange-400 to-rose-500"
                   delay={0.4}
                 />
                 <RevenueBar
-                  name="🍿 Snack Bar"
+                  name={`🍿 ${t('revenueByUnit.snackBar')}`}
                   value={stats?.revenueByUnit?.snackBar || 0}
                   percentage={getPercentage(stats?.revenueByUnit?.snackBar || 0)}
                   color="bg-gradient-to-r from-amber-400 to-orange-500"
                   delay={0.5}
                 />
                 <RevenueBar
-                  name="🏠 Chalets"
+                  name={`🏠 ${t('revenueByUnit.chalets')}`}
                   value={stats?.revenueByUnit?.chalets || 0}
                   percentage={getPercentage(stats?.revenueByUnit?.chalets || 0)}
                   color="bg-gradient-to-r from-emerald-400 to-teal-500"
                   delay={0.6}
                 />
                 <RevenueBar
-                  name="🏊 Pool"
+                  name={`🏊 ${t('revenueByUnit.pool')}`}
                   value={stats?.revenueByUnit?.pool || 0}
                   percentage={getPercentage(stats?.revenueByUnit?.pool || 0)}
                   color="bg-gradient-to-r from-primary-400 to-secondary-500"
@@ -398,7 +403,7 @@ export default function AdminDashboard() {
                 className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-700"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-slate-700 dark:text-slate-300">Total Revenue</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{t('revenueByUnit.total')}</span>
                   <span className="text-2xl font-bold text-slate-900 dark:text-white">
                     {formatCurrency(totalRevenue)}
                   </span>
@@ -414,7 +419,7 @@ export default function AdminDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-primary-600" />
-                Recent Orders
+                {t('recentOrders.title')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -435,13 +440,13 @@ export default function AdminDashboard() {
                           #{order.orderNumber?.slice(-3) || '---'}
                         </div>
                         <div>
-                          <p className="font-medium text-slate-900 dark:text-white">{order.customerName || 'Guest'}</p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">{order.itemCount || 0} items</p>
+                          <p className="font-medium text-slate-900 dark:text-white">{order.customerName || t('recentOrders.guest')}</p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">{t('recentOrders.items', { count: order.itemCount || 0 })}</p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="font-semibold text-slate-900 dark:text-white">{formatCurrency(order.totalAmount || 0)}</p>
-                        <OrderStatus status={order.status || 'pending'} />
+                        <OrderStatus status={order.status || 'pending'} t={t} />
                       </div>
                     </motion.div>
                   ))}
@@ -454,8 +459,8 @@ export default function AdminDashboard() {
                     className="text-center py-8 text-slate-500 dark:text-slate-400"
                   >
                     <UtensilsCrossed className="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-                    <p>No orders yet today</p>
-                    <p className="text-sm">Orders will appear here as they come in</p>
+                    <p>{t('recentOrders.noOrders')}</p>
+                    <p className="text-sm">{t('recentOrders.ordersWillAppear')}</p>
                   </motion.div>
                 )}
               </div>
@@ -470,16 +475,16 @@ export default function AdminDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary-600" />
-              Quick Actions
+              {t('quickActions.title')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { href: '/admin/restaurant/menu', icon: UtensilsCrossed, label: 'Manage Menu', color: 'from-orange-400 to-rose-500' },
-                { href: '/admin/chalets', icon: Home, label: 'Manage Chalets', color: 'from-emerald-400 to-teal-500' },
-                { href: '/admin/pool', icon: Waves, label: 'Pool Sessions', color: 'from-primary-400 to-secondary-500' },
-                { href: '/admin/reports', icon: TrendingUp, label: 'View Reports', color: 'from-purple-400 to-indigo-500' },
+                { href: '/admin/restaurant/menu', icon: UtensilsCrossed, labelKey: 'manageMenu', color: 'from-orange-400 to-rose-500' },
+                { href: '/admin/chalets', icon: Home, labelKey: 'manageChalets', color: 'from-emerald-400 to-teal-500' },
+                { href: '/admin/pool', icon: Waves, labelKey: 'poolSessions', color: 'from-primary-400 to-secondary-500' },
+                { href: '/admin/reports', icon: TrendingUp, labelKey: 'viewReports', color: 'from-purple-400 to-indigo-500' },
               ].map((action, index) => (
                 <motion.div
                   key={action.href}
@@ -496,7 +501,7 @@ export default function AdminDashboard() {
                       <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg`}>
                         <action.icon className="w-7 h-7 text-white" />
                       </div>
-                      <span className="font-medium text-slate-700 dark:text-slate-200">{action.label}</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-200">{t(`quickActions.${action.labelKey}`)}</span>
                     </motion.div>
                   </Link>
                 </motion.div>

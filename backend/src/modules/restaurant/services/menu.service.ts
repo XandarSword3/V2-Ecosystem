@@ -19,7 +19,21 @@ export async function getAllCategories(moduleId?: string) {
   return data || [];
 }
 
-export async function getMenuItems(filters: { categoryId?: string; availableOnly?: boolean; moduleId?: string }) {
+export interface MenuItemFilters {
+  categoryId?: string;
+  availableOnly?: boolean;
+  moduleId?: string;
+  // Dietary filters
+  isVegetarian?: boolean;
+  isVegan?: boolean;
+  isGlutenFree?: boolean;
+  isDairyFree?: boolean;
+  isHalal?: boolean;
+  // Search filter
+  search?: string;
+}
+
+export async function getMenuItems(filters: MenuItemFilters) {
   const supabase = getSupabase();
 
   let query = supabase
@@ -39,6 +53,28 @@ export async function getMenuItems(filters: { categoryId?: string; availableOnly
   }
   if (filters.moduleId) {
     query = query.eq('module_id', filters.moduleId);
+  }
+
+  // Dietary filters - only filter if explicitly set to true
+  if (filters.isVegetarian === true) {
+    query = query.eq('is_vegetarian', true);
+  }
+  if (filters.isVegan === true) {
+    query = query.eq('is_vegan', true);
+  }
+  if (filters.isGlutenFree === true) {
+    query = query.eq('is_gluten_free', true);
+  }
+  if (filters.isDairyFree === true) {
+    query = query.eq('is_dairy_free', true);
+  }
+  if (filters.isHalal === true) {
+    query = query.eq('is_halal', true);
+  }
+
+  // Text search filter
+  if (filters.search) {
+    query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
   }
 
   const { data, error } = await query;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -45,6 +46,8 @@ const categoryConfig: Record<string, { color: string; label: string }> = {
 };
 
 export default function AdminChaletAddonsPage() {
+  const t = useTranslations('adminChalets');
+  const tc = useTranslations('adminCommon');
   const [addons, setAddons] = useState<Addon[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -65,7 +68,7 @@ export default function AdminChaletAddonsPage() {
       const response = await api.get('/chalets/add-ons');
       setAddons(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch addons');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -80,16 +83,16 @@ export default function AdminChaletAddonsPage() {
     try {
       if (editing) {
         await api.put(`/chalets/admin/add-ons/${editing.id}`, formData);
-        toast.success('Addon updated');
+        toast.success(t('addons.addonUpdated'));
       } else {
         await api.post('/chalets/admin/add-ons', formData);
-        toast.success('Addon created');
+        toast.success(t('addons.addonCreated'));
       }
       setShowModal(false);
       setEditing(null);
       fetchAddons();
     } catch (error) {
-      toast.error('Failed to save addon');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -108,13 +111,13 @@ export default function AdminChaletAddonsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this addon?')) return;
+    if (!confirm(tc('confirmDelete'))) return;
     try {
       await api.delete(`/chalets/admin/add-ons/${id}`);
       setAddons((prev) => prev.filter((a) => a.id !== id));
-      toast.success('Addon deleted');
+      toast.success(t('addons.addonDeleted'));
     } catch (error) {
-      toast.error('Failed to delete addon');
+      toast.error(tc('errors.failedToDelete'));
     }
   };
 
@@ -124,9 +127,9 @@ export default function AdminChaletAddonsPage() {
       setAddons((prev) =>
         prev.map((a) => (a.id === addon.id ? { ...a, is_active: !a.is_active } : a))
       );
-      toast.success(`Addon ${addon.is_active ? 'deactivated' : 'activated'}`);
+      toast.success(tc('success.updated'));
     } catch (error) {
-      toast.error('Failed to update addon');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -175,17 +178,17 @@ export default function AdminChaletAddonsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Chalet Addons</h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage extra services and equipment</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('addons.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400">{t('addons.addAddon')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchAddons}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <Button onClick={openNewModal}>
             <Plus className="w-4 h-4 mr-2" />
-            Add Addon
+            {t('addons.addAddon')}
           </Button>
         </div>
       </div>
@@ -286,10 +289,10 @@ export default function AdminChaletAddonsPage() {
           {filteredAddons.length === 0 ? (
             <div className="col-span-full text-center py-12">
               <Package className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">No addons found</p>
+              <p className="text-slate-500 dark:text-slate-400">{tc('noResults')}</p>
               <Button className="mt-4" onClick={openNewModal}>
                 <Plus className="w-4 h-4 mr-2" />
-                Add First Addon
+                {t('addons.addAddon')}
               </Button>
             </div>
           ) : (
@@ -407,7 +410,7 @@ export default function AdminChaletAddonsPage() {
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                    {editing ? 'Edit Addon' : 'Add Addon'}
+                    {editing ? tc('edit') : tc('add')} {t('addons.addAddon')}
                   </h2>
                   <button
                     onClick={() => setShowModal(false)}
@@ -515,11 +518,11 @@ export default function AdminChaletAddonsPage() {
 
                   <div className="flex gap-3 pt-4">
                     <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>
-                      Cancel
+                      {tc('cancel')}
                     </Button>
                     <Button type="submit" className="flex-1">
                       <Save className="w-4 h-4 mr-2" />
-                      {editing ? 'Update' : 'Create'}
+                      {editing ? tc('update') : tc('create')}
                     </Button>
                   </div>
                 </form>

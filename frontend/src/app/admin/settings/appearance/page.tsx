@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -123,6 +124,8 @@ function ColorPicker({
 }
 
 export default function AppearanceSettingsPage() {
+  const t = useTranslations('adminSettings');
+  const tc = useTranslations('adminCommon');
   const { settings, refetch, loading } = useSiteSettings();
   
   // Theme state
@@ -203,10 +206,10 @@ export default function AppearanceSettingsPage() {
       await api.put('/admin/settings', newSettings);
       await refetch();
       setHasChanges(false);
-      toast.success('Appearance settings saved! Theme applied across the site.');
+      toast.success(t('appearance.saved'));
     } catch (error) {
       console.error('Failed to save settings:', error);
-      toast.error('Failed to save settings');
+      toast.error(tc('errors.failedToSave'));
     } finally {
       setIsSaving(false);
     }
@@ -239,10 +242,10 @@ export default function AppearanceSettingsPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <Palette className="w-8 h-8 text-primary-600" />
-            Appearance Settings
+            {t('appearance.title')}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Customize the look and feel of V2 Resort for all visitors
+            {t('appearance.subtitle')}
           </p>
         </div>
         <div className="flex gap-3">
@@ -252,7 +255,7 @@ export default function AppearanceSettingsPage() {
           </Button>
           <Button onClick={handleSave} isLoading={isSaving} disabled={!hasChanges}>
             <Save className="w-4 h-4 mr-2" />
-            Save Changes
+            {tc('saveChanges')}
           </Button>
         </div>
       </motion.div>

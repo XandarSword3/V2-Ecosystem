@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useSiteSettings } from '@/lib/settings-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -22,6 +23,8 @@ import {
 export default function DynamicModuleDashboard() {
   const params = useParams();
   const { modules } = useSiteSettings();
+  const t = useTranslations('admin');
+  const tc = useTranslations('adminCommon');
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
   const currentModule = modules.find(m => m.slug === slug);
 
@@ -32,12 +35,12 @@ export default function DynamicModuleDashboard() {
       <Link href={`/admin/${slug}/menu`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Menu Items</CardTitle>
+            <CardTitle className="text-sm font-medium">{tc('menu.items')}</CardTitle>
             <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Manage Menu</div>
-            <p className="text-xs text-muted-foreground">Add or edit items</p>
+            <div className="text-2xl font-bold">{tc('menu.manageMenu')}</div>
+            <p className="text-xs text-muted-foreground">{tc('menu.addOrEdit')}</p>
           </CardContent>
         </Card>
       </Link>
@@ -45,12 +48,12 @@ export default function DynamicModuleDashboard() {
       <Link href={`/admin/${slug}/categories`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Categories</CardTitle>
+            <CardTitle className="text-sm font-medium">{tc('menu.categories')}</CardTitle>
             <List className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Categories</div>
-            <p className="text-xs text-muted-foreground">Organize your menu</p>
+            <div className="text-2xl font-bold">{tc('menu.categories')}</div>
+            <p className="text-xs text-muted-foreground">{tc('menu.organizeMenu')}</p>
           </CardContent>
         </Card>
       </Link>
@@ -58,12 +61,12 @@ export default function DynamicModuleDashboard() {
       <Link href={`/admin/${slug}/orders`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Orders</CardTitle>
+            <CardTitle className="text-sm font-medium">{tc('orders.title')}</CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Orders</div>
-            <p className="text-xs text-muted-foreground">View and manage orders</p>
+            <div className="text-2xl font-bold">{tc('orders.title')}</div>
+            <p className="text-xs text-muted-foreground">{tc('orders.viewAndManage')}</p>
           </CardContent>
         </Card>
       </Link>
@@ -75,12 +78,12 @@ export default function DynamicModuleDashboard() {
       <Link href={`/admin/${slug}/bookings`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bookings</CardTitle>
+            <CardTitle className="text-sm font-medium">{tc('bookings.title')}</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Manage Bookings</div>
-            <p className="text-xs text-muted-foreground">View calendar and reservations</p>
+            <div className="text-2xl font-bold">{tc('bookings.manageBookings')}</div>
+            <p className="text-xs text-muted-foreground">{tc('bookings.viewCalendar')}</p>
           </CardContent>
         </Card>
       </Link>
@@ -88,12 +91,12 @@ export default function DynamicModuleDashboard() {
       <Link href={`/admin/${slug}/pricing`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pricing</CardTitle>
+            <CardTitle className="text-sm font-medium">{tc('pricing.title')}</CardTitle>
             <Tags className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Pricing Rules</div>
-            <p className="text-xs text-muted-foreground">Set seasonal rates</p>
+            <div className="text-2xl font-bold">{tc('pricing.pricingRules')}</div>
+            <p className="text-xs text-muted-foreground">{tc('pricing.setSeasonalRates')}</p>
           </CardContent>
         </Card>
       </Link>
@@ -105,12 +108,12 @@ export default function DynamicModuleDashboard() {
       <Link href={`/admin/${slug}/sessions`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Sessions</CardTitle>
+            <CardTitle className="text-sm font-medium">{tc('sessions.title')}</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Sessions</div>
-            <p className="text-xs text-muted-foreground">Manage time slots</p>
+            <div className="text-2xl font-bold">{tc('sessions.title')}</div>
+            <p className="text-xs text-muted-foreground">{tc('sessions.manageTimeSlots')}</p>
           </CardContent>
         </Card>
       </Link>
@@ -118,12 +121,12 @@ export default function DynamicModuleDashboard() {
       <Link href={`/admin/${slug}/tickets`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tickets</CardTitle>
+            <CardTitle className="text-sm font-medium">{tc('tickets.title')}</CardTitle>
             <Ticket className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Tickets</div>
-            <p className="text-xs text-muted-foreground">View sold tickets</p>
+            <div className="text-2xl font-bold">{tc('tickets.title')}</div>
+            <p className="text-xs text-muted-foreground">{tc('tickets.viewSoldTickets')}</p>
           </CardContent>
         </Card>
       </Link>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -38,17 +39,21 @@ interface SnackOrder {
   created_at: string;
 }
 
-const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string; nextStatus?: string; nextLabel?: string }> = {
-  pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock, label: 'Pending', nextStatus: 'preparing', nextLabel: 'Start Preparing' },
-  confirmed: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle2, label: 'Confirmed', nextStatus: 'preparing', nextLabel: 'Start Preparing' },
-  preparing: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: ChefHat, label: 'Preparing', nextStatus: 'ready', nextLabel: 'Mark Ready' },
-  ready: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: Package, label: 'Ready', nextStatus: 'delivered', nextLabel: 'Delivered' },
-  delivered: { color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400', icon: Truck, label: 'Delivered', nextStatus: 'completed', nextLabel: 'Complete' },
-  completed: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: CheckCircle2, label: 'Completed' },
-  cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle, label: 'Cancelled' },
+const statusConfig: Record<string, { color: string; icon: React.ElementType; nextStatus?: string; nextLabelKey?: string }> = {
+  pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock, nextStatus: 'preparing', nextLabelKey: 'startPreparing' },
+  confirmed: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle2, nextStatus: 'preparing', nextLabelKey: 'startPreparing' },
+  preparing: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: ChefHat, nextStatus: 'ready', nextLabelKey: 'markReady' },
+  ready: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: Package, nextStatus: 'delivered', nextLabelKey: 'delivered' },
+  delivered: { color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400', icon: Truck, nextStatus: 'completed', nextLabelKey: 'complete' },
+  completed: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: CheckCircle2 },
+  cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle },
 };
 
 export default function StaffSnackPage() {
+  const t = useTranslations('staff');
+  const ts = useTranslations('staff.snack');
+  const tst = useTranslations('staff.statuses');
+  const tc = useTranslations('adminCommon');
   const [orders, setOrders] = useState<SnackOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'active' | 'all'>('active');
@@ -61,7 +66,7 @@ export default function StaffSnackPage() {
       const response = await api.get('/snack/staff/orders/live');
       setOrders(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch orders');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -104,9 +109,9 @@ export default function StaffSnackPage() {
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus as SnackOrder['status'] } : o))
       );
-      toast.success(`Order updated to ${newStatus}`);
+      toast.success(t('orders.orderUpdated', { status: newStatus }));
     } catch (error) {
-      toast.error('Failed to update order');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -158,16 +163,16 @@ export default function StaffSnackPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Cookie className="w-7 h-7 text-orange-500" />
-            Snack Bar Orders
+            {ts('title')}
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Manage snack bar orders in real-time
+            {ts('subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={fetchOrders}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {ts('refresh')}
           </Button>
         </div>
       </div>
@@ -179,7 +184,7 @@ export default function StaffSnackPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-yellow-100 text-sm">Pending</p>
+                  <p className="text-yellow-100 text-sm">{tst('pending')}</p>
                   <p className="text-3xl font-bold">{pendingCount}</p>
                 </div>
                 <Clock className="w-10 h-10 text-yellow-200" />
@@ -193,7 +198,7 @@ export default function StaffSnackPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-orange-100 text-sm">Preparing</p>
+                  <p className="text-orange-100 text-sm">{tst('preparing')}</p>
                   <p className="text-3xl font-bold">{preparingCount}</p>
                 </div>
                 <ChefHat className="w-10 h-10 text-orange-200" />
@@ -207,7 +212,7 @@ export default function StaffSnackPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-green-100 text-sm">Ready</p>
+                  <p className="text-green-100 text-sm">{tst('ready')}</p>
                   <p className="text-3xl font-bold">{readyCount}</p>
                 </div>
                 <Package className="w-10 h-10 text-green-200" />
@@ -225,7 +230,7 @@ export default function StaffSnackPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search orders..."
+                placeholder={ts('searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -240,7 +245,7 @@ export default function StaffSnackPage() {
                     : 'text-slate-600 dark:text-slate-400'
                 }`}
               >
-                Active Orders
+                {ts('activeOrders')}
               </button>
               <button
                 onClick={() => setFilter('all')}
@@ -250,7 +255,7 @@ export default function StaffSnackPage() {
                     : 'text-slate-600 dark:text-slate-400'
                 }`}
               >
-                All Orders
+                {ts('allOrders')}
               </button>
             </div>
           </div>
@@ -267,7 +272,7 @@ export default function StaffSnackPage() {
               className="col-span-full text-center py-12"
             >
               <Cookie className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">No orders to display</p>
+              <p className="text-slate-500 dark:text-slate-400">{ts('noOrdersDisplay')}</p>
             </motion.div>
           ) : (
             filteredOrders.map((order, index) => {
@@ -299,7 +304,7 @@ export default function StaffSnackPage() {
                         </CardTitle>
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${config?.color}`}>
                           <StatusIcon className="w-3 h-3" />
-                          {config?.label}
+                          {tst(order.status)}
                         </span>
                       </div>
                     </CardHeader>
@@ -335,7 +340,7 @@ export default function StaffSnackPage() {
                       </div>
 
                       {/* Action Button */}
-                      {config?.nextStatus && (
+                      {config?.nextStatus && config?.nextLabelKey && (
                         <Button
                           className="w-full"
                           onClick={(e) => {
@@ -343,7 +348,7 @@ export default function StaffSnackPage() {
                             updateOrderStatus(order.id, config.nextStatus!);
                           }}
                         >
-                          {config.nextLabel}
+                          {ts(config.nextLabelKey)}
                         </Button>
                       )}
 
@@ -409,7 +414,7 @@ export default function StaffSnackPage() {
                         return (
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-medium ${config?.color}`}>
                             <StatusIcon className="w-4 h-4" />
-                            {config?.label}
+                            {tst(selectedOrder.status)}
                           </span>
                         );
                       })()}
@@ -457,7 +462,7 @@ export default function StaffSnackPage() {
                       updateOrderStatus(selectedOrder.id, statusConfig[selectedOrder.status].nextStatus!);
                       setSelectedOrder(null);
                     }}>
-                      {statusConfig[selectedOrder.status].nextLabel}
+                      {tst(statusConfig[selectedOrder.status].nextLabelKey!)}
                     </Button>
                   )}
                 </div>

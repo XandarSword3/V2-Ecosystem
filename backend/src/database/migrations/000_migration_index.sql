@@ -1,0 +1,38 @@
+-- ============================================
+-- V2 Resort Database Migration Index
+-- ============================================
+-- 
+-- This file documents the migration execution order.
+-- Run migrations in sequence starting from 001.
+--
+-- Usage: Execute each numbered migration file in order.
+--
+-- Migration Files (execute in order):
+-- ============================================
+-- 001_initial_schema.sql       - Core database schema (users, roles, enums)
+-- 002_create_modules_table.sql - Module system tables
+-- 003_add_missing_tables.sql   - Additional required tables
+-- 004_add_module_id_to_all.sql - Add module references
+-- 005_update_settings_schema.sql - Settings table updates
+-- 006_add_pool_maintenance.sql - Pool maintenance fields
+-- 007_add_pool_entry_exit.sql  - Pool entry/exit tracking
+-- 008_add_served_status.sql    - Order served status
+-- 009_add_menu_discount.sql    - Menu discount fields
+-- 010_add_menu_spicy.sql       - Menu spicy indicator
+-- 011_add_order_served_at.sql  - Order served timestamp
+-- 012_add_chalet_price_rule.sql - Chalet pricing rules
+-- 013_create_backups_table.sql - Backup management
+-- 014_add_footer_settings.sql  - Footer configuration
+-- 015_add_navbar_settings.sql  - Navbar configuration  
+-- 016_add_theme_settings.sql   - Theme customization
+-- 017_add_pool_prices.sql      - Pool pricing tiers
+-- 018_add_settings_table.sql   - General settings
+-- 019_add_appearance_settings.sql - Appearance config
+-- 020_add_supported_languages.sql - i18n support
+-- 021_add_webhook_idempotency.sql - Webhook dedup
+-- 022_add_two_factor_auth.sql  - 2FA tables
+-- 023_add_scheduled_reports.sql - Report scheduling
+-- ============================================
+
+-- Verify this is being run in the correct order
+SELECT 'Migration index loaded - execute numbered files in sequence' AS status;

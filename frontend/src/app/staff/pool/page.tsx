@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -57,14 +58,18 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType }> =
   cancelled: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: XCircle },
 };
 
-const ticketTypeConfig: Record<string, { color: string; label: string }> = {
-  adult: { color: 'bg-blue-500', label: 'Adult' },
-  child: { color: 'bg-green-500', label: 'Child' },
-  family: { color: 'bg-purple-500', label: 'Family' },
-  vip: { color: 'bg-amber-500', label: 'VIP' },
-};
+const getTicketTypeConfig = (tp: (key: string) => string): Record<string, { color: string; label: string }> => ({
+  adult: { color: 'bg-blue-500', label: tp('ticketTypes.adult') },
+  child: { color: 'bg-green-500', label: tp('ticketTypes.child') },
+  family: { color: 'bg-purple-500', label: tp('ticketTypes.family') },
+  vip: { color: 'bg-amber-500', label: tp('ticketTypes.vip') },
+});
 
 export default function StaffPoolPage() {
+  const t = useTranslations('staff');
+  const tc = useTranslations('adminCommon');
+  const tp = useTranslations('staff.pool');
+  const tst = useTranslations('staff.statuses');
   const [tickets, setTickets] = useState<PoolTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanMode, setScanMode] = useState(false);
@@ -86,7 +91,7 @@ export default function StaffPoolPage() {
         response.data.data?.filter((t: PoolTicket) => t.status === 'active' && t.entry_time && !t.exit_time).length || 0
       );
     } catch (error) {
-      toast.error('Failed to load tickets');
+      toast.error(tc('errors.failedToLoad'));
       setTickets([]);
       setCurrentlyInPool(0);
     } finally {
@@ -131,7 +136,7 @@ export default function StaffPoolPage() {
       const ticket = response.data.data;
 
       // The backend handles validation and marks as used
-      toast.success(response.data.message || 'Ticket validated!', { icon: '🏊' });
+      toast.success(response.data.message || t('poolGuard.ticketValidated'), { icon: '🏊' });
       fetchTickets(); // Refresh the tickets list
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { error?: string } } };
@@ -157,7 +162,7 @@ export default function StaffPoolPage() {
         )
       );
       setCurrentlyInPool((prev) => prev + 1);
-      toast.success('Entry recorded!', { icon: '🏊' });
+      toast.success(t('poolGuard.entryRecorded'), { icon: '🏊' });
       playSound('entry');
     } catch (error) {
       // Mock for demo
@@ -170,7 +175,7 @@ export default function StaffPoolPage() {
         )
       );
       setCurrentlyInPool((prev) => prev + 1);
-      toast.success('Entry recorded!', { icon: '🏊' });
+      toast.success(t('poolGuard.entryRecorded'), { icon: '🏊' });
       playSound('entry');
     }
   };
@@ -187,7 +192,7 @@ export default function StaffPoolPage() {
         )
       );
       setCurrentlyInPool((prev) => Math.max(0, prev - 1));
-      toast.success('Exit recorded!', { icon: '👋' });
+      toast.success(t('poolGuard.exitRecorded'), { icon: '👋' });
       playSound('exit');
     } catch (error) {
       // Mock for demo
@@ -200,7 +205,7 @@ export default function StaffPoolPage() {
         )
       );
       setCurrentlyInPool((prev) => Math.max(0, prev - 1));
-      toast.success('Exit recorded!', { icon: '👋' });
+      toast.success(t('poolGuard.exitRecorded'), { icon: '👋' });
       playSound('exit');
     }
   };
@@ -257,10 +262,10 @@ export default function StaffPoolPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Waves className="w-7 h-7 text-blue-500" />
-            Pool Management
+            {tp('title')}
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Validate tickets and track pool usage
+            {tp('subtitle')}
           </p>
         </div>
         <div className="flex gap-2">
@@ -272,11 +277,11 @@ export default function StaffPoolPage() {
             }}
           >
             <QrCode className="w-4 h-4 mr-2" />
-            {scanMode ? 'Scanning...' : 'Scan Mode (F2)'}
+            {scanMode ? tp('scanning') : tp('scanModeF2')}
           </Button>
           <Button variant="outline" onClick={fetchTickets}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tp('refresh')}
           </Button>
         </div>
       </div>
@@ -288,14 +293,14 @@ export default function StaffPoolPage() {
           className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'tickets' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
         >
-          Tickets
+          {tp('tickets')}
         </button>
         <button
           onClick={() => setActiveTab('maintenance')}
           className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'maintenance' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
         >
-          Maintenance Logs
+          {tp('maintenanceLogs')}
         </button>
       </div>
 
@@ -317,8 +322,8 @@ export default function StaffPoolPage() {
                           <QrCode className="w-6 h-6" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-lg">Scan Mode Active</h3>
-                          <p className="text-blue-100 text-sm">Scan or enter ticket code</p>
+                          <h3 className="font-semibold text-lg">{tp('scanModeActive')}</h3>
+                          <p className="text-blue-100 text-sm">{tp('scanOrEnterCode')}</p>
                         </div>
                       </div>
                       <div className="flex-1">
@@ -332,7 +337,7 @@ export default function StaffPoolPage() {
                               validateTicket(manualCode);
                             }
                           }}
-                          placeholder="Enter ticket code (e.g., PT-001)"
+                          placeholder={tp('enterTicketCode')}
                           className="w-full px-4 py-3 rounded-lg bg-white/20 placeholder-white/60 text-white focus:bg-white/30 focus:outline-none text-center text-lg font-mono"
                           autoFocus
                         />
@@ -341,7 +346,7 @@ export default function StaffPoolPage() {
                         onClick={() => validateTicket(manualCode)}
                         className="bg-white text-blue-600 hover:bg-blue-50"
                       >
-                        Validate
+                        {tp('validate')}
                       </Button>
                     </div>
                   </CardContent>
@@ -357,7 +362,7 @@ export default function StaffPoolPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Total Today</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">{tp('totalToday')}</p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
                     </div>
                     <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
@@ -373,7 +378,7 @@ export default function StaffPoolPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Pending</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">{tst('pending')}</p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.pending}</p>
                     </div>
                     <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
@@ -389,7 +394,7 @@ export default function StaffPoolPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">In Pool Now</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">{tp('inPoolNow')}</p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">
                         {currentlyInPool}
                         <span className="text-sm font-normal text-slate-400">/{poolCapacity}</span>
@@ -422,7 +427,7 @@ export default function StaffPoolPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Completed</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">{tst('completed')}</p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.used}</p>
                     </div>
                     <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
@@ -443,9 +448,9 @@ export default function StaffPoolPage() {
             >
               <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
               <div>
-                <p className="font-medium text-red-800 dark:text-red-200">Pool Near Capacity</p>
+                <p className="font-medium text-red-800 dark:text-red-200">{tp('poolNearCapacity')}</p>
                 <p className="text-sm text-red-600 dark:text-red-300">
-                  Currently at {Math.round(capacityPercentage)}% capacity. Consider limiting new entries.
+                  {tp('capacityWarning', { percentage: Math.round(capacityPercentage) })}
                 </p>
               </div>
             </motion.div>
@@ -456,6 +461,7 @@ export default function StaffPoolPage() {
             <AnimatePresence mode="popLayout">
               {tickets.map((ticket, index) => {
                 const config = statusConfig[ticket.status];
+                const ticketTypeConfig = getTicketTypeConfig(tp);
                 const typeConfig = ticket.ticket_type ? ticketTypeConfig[ticket.ticket_type] : undefined;
                 const StatusIcon = config?.icon || Ticket;
                 const isInPool = ticket.status === 'active' && ticket.entry_time && !ticket.exit_time;
