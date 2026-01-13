@@ -9,6 +9,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 
 interface LoadingScreenProps {
@@ -16,6 +17,7 @@ interface LoadingScreenProps {
 }
 
 export function LoadingScreen({ minDuration = 2000 }: LoadingScreenProps) {
+  const t = useTranslations('common');
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const enableLoadingAnimation = useSettingsStore((s) => s.enableLoadingAnimation);
@@ -176,7 +178,7 @@ export function LoadingScreen({ minDuration = 2000 }: LoadingScreenProps) {
                 animate={{ opacity: [0.5, 1, 0.5] }}
                 transition={{ duration: 1.5, repeat: Infinity }}
               >
-                Loading experience...
+                {t('loading')}
               </motion.p>
             </motion.div>
           </div>

@@ -202,12 +202,12 @@ export default function ChaletDetailPage() {
     e.preventDefault();
     
     if (!chalet || !pricing) {
-      toast.error('Please select valid dates');
+      toast.error(t('selectValidDates'));
       return;
     }
 
     if (!customerName || !customerEmail || !customerPhone) {
-      toast.error('Please fill in all required fields');
+      toast.error(tCommon('fillAllFields'));
       return;
     }
 
@@ -218,7 +218,7 @@ export default function ChaletDetailPage() {
     while (current < checkOut) {
       const dateStr = current.toISOString().split('T')[0];
       if (blockedDates.includes(dateStr)) {
-        toast.error('Selected dates are not available');
+        toast.error(t('datesNotAvailable'));
         return;
       }
       current.setDate(current.getDate() + 1);
@@ -239,11 +239,11 @@ export default function ChaletDetailPage() {
         paymentMethod: 'cash',
       });
 
-      toast.success('Booking submitted successfully!');
+      toast.success(t('bookingConfirmed'));
       router.push(`/chalets/booking-confirmation?id=${response.data.data.id}`);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { error?: string } } };
-      toast.error(axiosError.response?.data?.error || 'Failed to submit booking');
+      toast.error(axiosError.response?.data?.error || t('bookingFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -262,9 +262,9 @@ export default function ChaletDetailPage() {
       <div className="min-h-screen flex items-center justify-center bg-resort-sand dark:bg-slate-900">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Chalet not found</h2>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{t('chaletNotFound')}</h2>
           <Link href="/chalets" className="btn btn-primary mt-4">
-            Back to Chalets
+            {t('backToChalets')}
           </Link>
         </div>
       </div>
@@ -575,7 +575,7 @@ export default function ChaletDetailPage() {
                   {pricing && (
                     <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span>{pricing.nights} {pricing.nights === 1 ? 'night' : 'nights'}</span>
+                        <span>{pricing.nights} {pricing.nights === 1 ? t('night') : t('nights')}</span>
                         <span>{formatCurrency(pricing.baseAmount, currency)}</span>
                       </div>
                       {pricing.addOnsAmount > 0 && (

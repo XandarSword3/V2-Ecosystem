@@ -1,0 +1,48 @@
+# Docker Compose for Integration Tests
+# Uses isolated database to prevent data conflicts with development
+#
+# Usage:
+#   docker-compose -f docker-compose.test.yml up -d
+#   npm run test:integration
+#   docker-compose -f docker-compose.test.yml down -v
+
+version: '3.8'
+
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: v2-resort-test-db
+    environment:
+      POSTGRES_USER: v2resort_test
+      POSTGRES_PASSWORD: v2resort_test_secret
+      POSTGRES_DB: v2resort_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data  # Use RAM for speed, data is ephemeral
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U v2resort_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - test-network
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: v2-resort-test-redis
+    ports:
+      - "6380:6379"
+    tmpfs:
+      - /data  # Use RAM for speed
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge

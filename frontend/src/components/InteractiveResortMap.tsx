@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { MapPin, Phone, Mail, Clock, Navigation, Waves, UtensilsCrossed, Home, Palmtree } from 'lucide-react';
 import { useState } from 'react';
+import { useSiteSettings } from '@/lib/settings-context';
 
 interface MapLocation {
   id: string;
@@ -17,6 +18,7 @@ interface MapLocation {
 
 export default function InteractiveResortMap() {
   const t = useTranslations('resortMap');
+  const { settings } = useSiteSettings();
   const [selectedLocation, setSelectedLocation] = useState<MapLocation | null>(null);
   const [isHovered, setIsHovered] = useState<string | null>(null);
 
@@ -212,15 +214,15 @@ export default function InteractiveResortMap() {
       <div className="grid grid-cols-3 border-t border-slate-200 dark:border-slate-700">
         <div className="p-4 text-center border-r border-slate-200 dark:border-slate-700">
           <Phone className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
-          <p className="text-xs text-slate-600 dark:text-slate-400">+961 X XXX XXX</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">{settings.phone || 'Contact us'}</p>
         </div>
         <div className="p-4 text-center border-r border-slate-200 dark:border-slate-700">
           <Mail className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
-          <p className="text-xs text-slate-600 dark:text-slate-400">info@v2resort.com</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">{settings.email || 'info@v2resort.com'}</p>
         </div>
         <div className="p-4 text-center">
           <Clock className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
-          <p className="text-xs text-slate-600 dark:text-slate-400">8AM - 11PM</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">{settings.receptionHours || '8AM - 11PM'}</p>
         </div>
       </div>
     </div>

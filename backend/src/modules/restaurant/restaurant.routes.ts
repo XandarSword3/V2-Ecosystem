@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, authorize, optionalAuth } from "../../middleware/auth.middleware";
+import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
 import * as menuController from "./controllers/menu.controller";
 import * as orderController from "./controllers/order.controller";
 import * as tableController from "./controllers/table.controller";
@@ -21,9 +22,9 @@ router.get('/categories', menuController.getCategories);
 router.get('/items', menuController.getMenuItems);
 
 // ============================================
-// Customer Routes (Orders)
+// Customer Routes (Orders) - rate limited for abuse prevention
 // ============================================
-router.post('/orders', optionalAuth, orderController.createOrder);
+router.post('/orders', optionalAuth, rateLimits.write, orderController.createOrder);
 // router.get('/orders/:id', optionalAuth, orderController.getOrder); // Moved to end
 // router.get('/orders/:id/status', orderController.getOrderStatus); // Moved to end
 

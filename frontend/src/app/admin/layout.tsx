@@ -101,15 +101,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin/users',
       icon: Users,
       children: [
-        { name: 'Customers', href: '/admin/users/customers' },
-        { name: 'Staff', href: '/admin/users/staff' },
-        { name: 'Admins', href: '/admin/users/admins' },
-        { name: 'Roles & Permissions', href: '/admin/users/roles' },
+        { name: t('nav.customers'), href: '/admin/users/customers' },
+        { name: t('nav.staff'), href: '/admin/users/staff' },
+        { name: t('nav.admins'), href: '/admin/users/admins' },
+        { name: t('nav.rolesPermissions'), href: '/admin/users/roles' },
+        { name: t('nav.liveUsers') || 'Live Users', href: '/admin/users/live' },
       ]
     },
     { name: t('nav.reviews') || 'Reviews', href: '/admin/reviews', icon: Star },
     { name: t('nav.reports'), href: '/admin/reports', icon: BarChart3 },
-    { name: 'Modules', href: '/admin/modules', icon: Cloud },
+    { name: t('nav.modules'), href: '/admin/modules', icon: Cloud },
     {
       name: t('nav.settings'),
       href: '/admin/settings',
@@ -117,12 +118,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       children: [
         { name: t('nav.general'), href: '/admin/settings' },
         { name: t('nav.appearance'), href: '/admin/settings/appearance' },
-        { name: 'Homepage', href: '/admin/settings/homepage' },
-        { name: 'Footer', href: '/admin/settings/footer' },
-        { name: 'Translations', href: '/admin/settings/translations' },
+        { name: t('nav.homepage'), href: '/admin/settings/homepage' },
+        { name: t('nav.footer'), href: '/admin/settings/footer' },
+        { name: t('nav.translations'), href: '/admin/settings/translations' },
         { name: t('nav.payments'), href: '/admin/settings/payments' },
         { name: t('nav.notifications'), href: '/admin/settings/notifications' },
-        { name: 'Database Backups', href: '/admin/settings/backups' },
+        { name: t('nav.databaseBackups'), href: '/admin/settings/backups' },
       ]
     },
     { name: t('nav.auditLogs'), href: '/admin/audit', icon: Shield },
@@ -171,8 +172,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         };
       });
 
-    // Insert before 'Modules' link
-    const modulesIndex = navigation.findIndex(n => n.name === 'Modules');
+    // Insert before 'Modules' link (use href since name is translated)
+    const modulesIndex = navigation.findIndex(n => n.href === '/admin/modules');
     if (modulesIndex !== -1) {
       // Insert dynamic modules before the 'Modules' management link so the management page stays available
       navigation.splice(modulesIndex, 0, ...dynamicModules);
@@ -243,7 +244,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleLogout = async () => {
     await logout();
-    toast.success('Logged out successfully');
+    toast.success(t('messages.loggedOutSuccessfully'));
     router.push('/');
   };
 
@@ -332,7 +333,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
                 >
                   <LogOut className="h-5 w-5" />
-                  <span>Logout</span>
+                  <span>{t('nav.logout')}</span>
                 </button>
               </div>
             </motion.aside>
@@ -411,7 +412,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             )}
           >
             <LogOut className="h-5 w-5 shrink-0" />
-            {sidebarOpen && <span>Logout</span>}
+            {sidebarOpen && <span>{t('nav.logout')}</span>}
           </button>
         </div>
       </aside>

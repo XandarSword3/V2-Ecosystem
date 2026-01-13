@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
@@ -35,6 +36,7 @@ interface Table {
 export default function DynamicTablesPage() {
   const params = useParams();
   const { modules } = useSiteSettings();
+  const tc = useTranslations('adminCommon');
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
   const currentModule = modules.find(m => m.slug === slug);
 
@@ -50,7 +52,7 @@ export default function DynamicTablesPage() {
       const response = await api.get('/restaurant/staff/tables', { params: { moduleId: currentModule.id } });
       setTables(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch tables');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export default function DynamicTablesPage() {
 
   const handleSubmit = async () => {
     if (!formData.table_number || !currentModule) {
-      toast.error('Table number is required');
+      toast.error(tc('tables.tableNumberRequired'));
       return;
     }
 
@@ -78,28 +80,28 @@ export default function DynamicTablesPage() {
 
       if (editingTable) {
         await api.patch(`/restaurant/staff/tables/${editingTable.id}`, payload);
-        toast.success('Table updated');
+        toast.success(tc('success.updated'));
       } else {
         await api.post('/restaurant/admin/tables', payload);
-        toast.success('Table created');
+        toast.success(tc('success.created'));
       }
       setShowModal(false);
       setEditingTable(null);
       setFormData({ table_number: '', capacity: '4', location: '' });
       fetchTables();
     } catch (error) {
-      toast.error('Failed to save table');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this table?')) return;
+    if (!confirm(tc('tables.confirmDelete'))) return;
     try {
       await api.delete(`/restaurant/admin/tables/${id}`);
-      toast.success('Table deleted');
+      toast.success(tc('success.deleted'));
       fetchTables();
     } catch (error) {
-      toast.error('Failed to delete table');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -107,9 +109,9 @@ export default function DynamicTablesPage() {
     try {
       await api.patch(`/restaurant/staff/tables/${table.id}`, { is_available: !table.is_available });
       setTables((prev) => prev.map((t) => (t.id === table.id ? { ...t, is_available: !t.is_available } : t)));
-      toast.success(`Table ${table.is_available ? 'marked occupied' : 'marked available'}`);
+      toast.success(table.is_available ? tc('tables.markedOccupied') : tc('tables.markedAvailable'));
     } catch (error) {
-      toast.error('Failed to update table');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -144,19 +146,19 @@ export default function DynamicTablesPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentModule.name} Tables</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentModule.name} {tc('tables.title')}</h1>
           <p className="text-slate-500 dark:text-slate-400">
-            {availableTables} available, {occupiedTables} occupied
+            {availableTables} {tc('tables.available')}, {occupiedTables} {tc('tables.occupied')}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={fetchTables}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <Button onClick={() => { setEditingTable(null); setFormData({ table_number: '', capacity: '4', location: '' }); setShowModal(true); }}>
             <Plus className="w-4 h-4 mr-2" />
-            Add Table
+            {tc('tables.addTable')}
           </Button>
         </div>
       </div>
@@ -167,10 +169,10 @@ export default function DynamicTablesPage() {
           {tables.length === 0 ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full text-center py-12">
               <Users className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">No tables configured</p>
+              <p className="text-slate-500 dark:text-slate-400">{tc('tables.noTablesConfigured')}</p>
               <Button className="mt-4" onClick={() => setShowModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Add your first table
+                {tc('tables.addFirstTable')}
               </Button>
             </motion.div>
           ) : (
@@ -202,7 +204,7 @@ export default function DynamicTablesPage() {
                         ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300'
                         : 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
                     }`}>
-                      {table.is_available ? <><CheckCircle2 className="w-3 h-3" /> Available</> : <><XCircle className="w-3 h-3" /> Occupied</>}
+                      {table.is_available ? <><CheckCircle2 className="w-3 h-3" /> {tc('tables.available')}</> : <><XCircle className="w-3 h-3" /> {tc('tables.occupied')}</>}
                     </div>
                     {table.location && (
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{table.location}</p>
@@ -249,7 +251,7 @@ export default function DynamicTablesPage() {
             >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-                  {editingTable ? 'Edit Table' : 'Add Table'}
+                  {editingTable ? tc('tables.editTable') : tc('tables.addTable')}
                 </h3>
                 <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                   <X className="w-5 h-5" />
@@ -258,7 +260,7 @@ export default function DynamicTablesPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Table Number *</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('tables.tableNumber')} *</label>
                   <input
                     type="number"
                     value={formData.table_number}
@@ -267,7 +269,7 @@ export default function DynamicTablesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Capacity</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('tables.capacity')}</label>
                   <input
                     type="number"
                     value={formData.capacity}
@@ -276,7 +278,7 @@ export default function DynamicTablesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Location</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('tables.location')}</label>
                   <input
                     type="text"
                     value={formData.location}
@@ -288,8 +290,8 @@ export default function DynamicTablesPage() {
               </div>
 
               <div className="flex gap-3 mt-6">
-                <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1">Cancel</Button>
-                <Button onClick={handleSubmit} className="flex-1">{editingTable ? 'Update' : 'Create'}</Button>
+                <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1">{tc('cancel')}</Button>
+                <Button onClick={handleSubmit} className="flex-1">{editingTable ? tc('update') : tc('create')}</Button>
               </div>
             </motion.div>
           </motion.div>

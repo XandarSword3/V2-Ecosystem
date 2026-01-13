@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -47,16 +48,31 @@ interface Booking {
   };
 }
 
-const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-  pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock, label: 'Pending' },
-  confirmed: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle2, label: 'Confirmed' },
-  checked_in: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: LogIn, label: 'Checked In' },
-  checked_out: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: LogOut, label: 'Checked Out' },
-  cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle, label: 'Cancelled' },
-  no_show: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: XCircle, label: 'No Show' },
+const statusConfigBase: Record<string, { color: string; icon: React.ElementType }> = {
+  pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock },
+  confirmed: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle2 },
+  checked_in: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: LogIn },
+  checked_out: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: LogOut },
+  cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle },
+  no_show: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: XCircle },
 };
 
 export default function StaffBookingsPage() {
+  const t = useTranslations('staff');
+  const tc = useTranslations('adminCommon');
+  const tb = useTranslations('staff.bookings');
+  const tst = useTranslations('staff.statuses');
+  const tch = useTranslations('staff.chalets');
+
+  const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
+    pending: { ...statusConfigBase.pending, label: tst('pending') },
+    confirmed: { ...statusConfigBase.confirmed, label: tst('confirmed') },
+    checked_in: { ...statusConfigBase.checked_in, label: tst('checkedIn') },
+    checked_out: { ...statusConfigBase.checked_out, label: tst('checkedOut') },
+    cancelled: { ...statusConfigBase.cancelled, label: tst('cancelled') },
+    no_show: { ...statusConfigBase.no_show, label: tst('noShow') },
+  };
+
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -69,7 +85,7 @@ export default function StaffBookingsPage() {
       setBookings(response.data.data || []);
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
-      toast.error('Failed to fetch bookings');
+      toast.error(tc('errors.failedToLoad'));
       setBookings([]);
     } finally {
       setLoading(false);
@@ -84,9 +100,9 @@ export default function StaffBookingsPage() {
     try {
       await api.patch(`/chalets/staff/bookings/${bookingId}/check-in`);
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'checked_in' as const } : b)));
-      toast.success('Guest checked in successfully');
+      toast.success(tc('success.updated'));
     } catch (error) {
-      toast.error('Failed to check in guest');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -94,9 +110,9 @@ export default function StaffBookingsPage() {
     try {
       await api.patch(`/chalets/staff/bookings/${bookingId}/check-out`);
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'checked_out' as const } : b)));
-      toast.success('Guest checked out successfully');
+      toast.success(tc('success.updated'));
     } catch (error) {
-      toast.error('Failed to check out guest');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -150,13 +166,13 @@ export default function StaffBookingsPage() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
               <Calendar className="w-5 h-5 text-white" />
             </div>
-            Booking Calendar
+            {tb('title')}
           </h1>
-          <p className="text-slate-500 dark:text-slate-400">View and manage today&apos;s check-ins and check-outs</p>
+          <p className="text-slate-500 dark:text-slate-400">{tb('subtitle')}</p>
         </div>
         <Button variant="outline" onClick={fetchBookings}>
           <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
+          {tb('refresh')}
         </Button>
       </div>
 
@@ -167,7 +183,7 @@ export default function StaffBookingsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 text-sm">Checking In Today</p>
+                  <p className="text-slate-500 text-sm">{tb('checkingInToday')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.checkingInToday}</p>
                 </div>
                 <LogIn className="w-8 h-8 text-green-500" />
@@ -181,7 +197,7 @@ export default function StaffBookingsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 text-sm">Checking Out Today</p>
+                  <p className="text-slate-500 text-sm">{tb('checkingOutToday')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.checkingOutToday}</p>
                 </div>
                 <LogOut className="w-8 h-8 text-orange-500" />
@@ -195,7 +211,7 @@ export default function StaffBookingsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 text-sm">Currently Staying</p>
+                  <p className="text-slate-500 text-sm">{tb('currentlyStaying')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.currentlyStaying}</p>
                 </div>
                 <Home className="w-8 h-8 text-blue-500" />
@@ -217,7 +233,7 @@ export default function StaffBookingsPage() {
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date())}>
-                Today
+                {tb('todayBtn')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => navigateDate('next')}>
                 <ChevronRight className="w-4 h-4" />
@@ -229,7 +245,7 @@ export default function StaffBookingsPage() {
           {todayBookings.length === 0 ? (
             <div className="text-center py-12">
               <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">No bookings for this date</p>
+              <p className="text-slate-500 dark:text-slate-400">{tb('noBookingsDate')}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -253,12 +269,12 @@ export default function StaffBookingsPage() {
                           </span>
                           {isCheckInDate && booking.status === 'confirmed' && (
                             <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                              Check-in Today
+                              {tch('checkInToday')}
                             </span>
                           )}
                           {isCheckOutDate && booking.status === 'checked_in' && (
                             <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
-                              Check-out Today
+                              {tch('checkOutToday')}
                             </span>
                           )}
                         </div>
@@ -302,13 +318,13 @@ export default function StaffBookingsPage() {
                         {booking.status === 'confirmed' && (
                           <Button size="sm" onClick={() => handleCheckIn(booking.id)}>
                             <LogIn className="w-4 h-4 mr-1" />
-                            Check In
+                            {tch('checkIn')}
                           </Button>
                         )}
                         {booking.status === 'checked_in' && (
                           <Button size="sm" variant="outline" onClick={() => handleCheckOut(booking.id)}>
                             <LogOut className="w-4 h-4 mr-1" />
-                            Check Out
+                            {tch('checkOut')}
                           </Button>
                         )}
                       </div>

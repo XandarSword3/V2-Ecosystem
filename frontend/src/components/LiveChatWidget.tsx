@@ -6,6 +6,7 @@ import { MessageCircle, X, Send, Phone, Mail } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { useSiteSettings } from '@/lib/settings-context';
 
 interface ContactFormData {
   name: string;
@@ -17,6 +18,7 @@ interface ContactFormData {
 
 export default function LiveChatWidget() {
   const t = useTranslations('common');
+  const { settings } = useSiteSettings();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -32,7 +34,7 @@ export default function LiveChatWidget() {
     e.preventDefault();
     
     if (!formData.name || !formData.email || !formData.message) {
-      toast.error('Please fill in all required fields');
+      toast.error(t('fillAllFields'));
       return;
     }
 
@@ -41,10 +43,10 @@ export default function LiveChatWidget() {
     try {
       await api.post('/contact', formData);
       setSubmitted(true);
-      toast.success('Message sent! We will get back to you soon.');
+      toast.success(t('messageSent'));
     } catch (error) {
       setSubmitted(true);
-      toast.success('Message sent! We will get back to you soon.');
+      toast.success(t('messageSent'));
     } finally {
       setIsSubmitting(false);
     }
@@ -201,13 +203,13 @@ export default function LiveChatWidget() {
               {/* Quick Contact Info */}
               <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <a href="tel:+961XXXXXXX" className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-primary-600">
+                  <a href={`tel:${settings.phone || ''}`} className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-primary-600">
                     <Phone className="w-3 h-3" />
-                    +961 X XXX XXX
+                    {settings.phone || 'Contact us'}
                   </a>
-                  <a href="mailto:info@v2resort.com" className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-primary-600">
+                  <a href={`mailto:${settings.email || 'info@v2resort.com'}`} className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-primary-600">
                     <Mail className="w-3 h-3" />
-                    info@v2resort.com
+                    {settings.email || 'info@v2resort.com'}
                   </a>
                 </div>
               </div>

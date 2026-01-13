@@ -48,6 +48,7 @@ function PoolConfirmationContent() {
   const searchParams = useSearchParams();
   const t = useTranslations('pool');
   const tCommon = useTranslations('common');
+  const tErrors = useTranslations('errors');
   const currency = useSettingsStore((s) => s.currency);
   const [ticket, setTicket] = useState<PoolTicket | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,7 +60,7 @@ function PoolConfirmationContent() {
     if (ticketId) {
       fetchTicket();
     } else {
-      setError('No ticket ID provided');
+      setError(tErrors('noTicketId'));
       setLoading(false);
     }
   }, [ticketId]);
@@ -69,7 +70,7 @@ function PoolConfirmationContent() {
       const response = await api.get(`/pool/tickets/${ticketId}`);
       setTicket(response.data.data);
     } catch (err) {
-      setError('Failed to load ticket details');
+      setError(tErrors('failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -89,7 +90,7 @@ function PoolConfirmationContent() {
         <Card className="max-w-md mx-auto">
           <CardContent className="text-center py-8">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">{error || 'Ticket not found'}</h2>
+            <h2 className="text-xl font-semibold mb-2">{error || tErrors('ticketNotFound')}</h2>
             <Link href="/pool">
               <Button className="mt-4">{t('backToPool')}</Button>
             </Link>
