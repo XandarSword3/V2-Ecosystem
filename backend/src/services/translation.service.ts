@@ -1,8 +1,27 @@
-// Auto-translation service using LibreTranslate API (free and self-hosted)
-// Falls back to basic translation mappings if API is unavailable
+/**
+ * Auto-translation service supporting multiple providers:
+ * 
+ * 1. GOOGLE TRANSLATE (Recommended - Most Reliable)
+ *    - Set GOOGLE_TRANSLATE_API_KEY in your .env
+ *    - Get an API key from: https://console.cloud.google.com/apis/credentials
+ *    - Enable "Cloud Translation API" in your Google Cloud project
+ *    - Cost: ~$20 per 1 million characters
+ * 
+ * 2. LIBRE TRANSLATE (Free / Self-Hosted)
+ *    - Set LIBRE_TRANSLATE_URL and optionally LIBRE_TRANSLATE_KEY
+ *    - Public API: https://libretranslate.com (rate limited, may require key)
+ *    - Self-hosted: https://github.com/LibreTranslate/LibreTranslate
+ * 
+ * 3. FALLBACK (No API Required)
+ *    - Uses built-in dictionary for common hospitality terms
+ *    - Limited vocabulary, returns original text for unknown phrases
+ */
 
 import { logger } from '../utils/logger.js';
 
+// Provider configuration
+const TRANSLATION_PROVIDER = process.env.TRANSLATION_PROVIDER || 'auto'; // 'google', 'libre', 'fallback', 'auto'
+const GOOGLE_TRANSLATE_API_KEY = process.env.GOOGLE_TRANSLATE_API_KEY || '';
 const LIBRE_TRANSLATE_URL = process.env.LIBRE_TRANSLATE_URL || 'https://libretranslate.com/translate';
 const LIBRE_TRANSLATE_KEY = process.env.LIBRE_TRANSLATE_KEY || '';
 
@@ -104,10 +123,91 @@ export async function translateText(text: string, sourceLang: string = 'en'): Pr
   return result;
 }
 
+/**
+ * Determine which translation provider to use
+ */
+function getActiveProvider(): 'google' | 'libre' | 'fallback' {
+  if (TRANSLATION_PROVIDER === 'google' && GOOGLE_TRANSLATE_API_KEY) {
+    return 'google';
+  }
+  if (TRANSLATION_PROVIDER === 'libre') {
+    return 'libre';
+  }
+  if (TRANSLATION_PROVIDER === 'fallback') {
+    return 'fallback';
+  }
+  // Auto-detect: prefer Google if key exists, then Libre, then fallback
+  if (GOOGLE_TRANSLATE_API_KEY) {
+    return 'google';
+  }
+  if (LIBRE_TRANSLATE_KEY || LIBRE_TRANSLATE_URL !== 'https://libretranslate.com/translate') {
+    return 'libre';
+  }
+  return 'fallback';
+}
+
+/**
+ * Call the appropriate translation API based on configuration
+ */
 async function callTranslateAPI(text: string, source: string, target: string): Promise<string> {
   // Skip if text is empty or very short
   if (!text || text.length < 2) return text;
 
+  const provider = getActiveProvider();
+  
+  if (provider === 'fallback') {
+    // Use fallback dictionary
+    const fallback = fallbackTranslations[text.toLowerCase()];
+    if (fallback) {
+      return target === 'ar' ? fallback.ar : fallback.fr;
+    }
+    logger.debug(`[TRANSLATION] No fallback for "${text}", returning original`);
+    return text;
+  }
+
+  if (provider === 'google') {
+    return callGoogleTranslateAPI(text, source, target);
+  }
+
+  return callLibreTranslateAPI(text, source, target);
+}
+
+/**
+ * Google Cloud Translation API v2
+ */
+async function callGoogleTranslateAPI(text: string, source: string, target: string): Promise<string> {
+  const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      q: text,
+      source,
+      target,
+      format: 'text',
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMsg = (errorData as { error?: { message?: string } })?.error?.message || response.statusText;
+    throw new Error(`Google Translate API error: ${response.status} - ${errorMsg}`);
+  }
+
+  const data = await response.json() as { 
+    data?: { translations?: Array<{ translatedText?: string }> } 
+  };
+  
+  return data?.data?.translations?.[0]?.translatedText || text;
+}
+
+/**
+ * LibreTranslate API (free / self-hosted)
+ */
+async function callLibreTranslateAPI(text: string, source: string, target: string): Promise<string> {
   const response = await fetch(LIBRE_TRANSLATE_URL, {
     method: 'POST',
     headers: {
@@ -128,7 +228,7 @@ async function callTranslateAPI(text: string, source: string, target: string): P
     } catch {
       // Ignore - bodyText will remain empty if response body can't be read
     }
-    throw new Error(`Translation API error: ${response.status} ${bodyText}`);
+    throw new Error(`LibreTranslate API error: ${response.status} ${bodyText}`);
   }
 
   const data = await response.json() as { translatedText?: string };
@@ -154,8 +254,52 @@ export function createTranslatableFields<T extends Record<string, any>>(
   };
 }
 
+/**
+ * Get the current translation service status
+ */
+export function getTranslationStatus(): {
+  provider: string;
+  configured: boolean;
+  apiKeySet: boolean;
+  message: string;
+} {
+  const provider = getActiveProvider();
+  
+  if (provider === 'google') {
+    return {
+      provider: 'Google Translate',
+      configured: true,
+      apiKeySet: true,
+      message: 'Google Translate API is configured and ready',
+    };
+  }
+  
+  if (provider === 'libre') {
+    const hasKey = !!LIBRE_TRANSLATE_KEY;
+    const isCustomUrl = LIBRE_TRANSLATE_URL !== 'https://libretranslate.com/translate';
+    return {
+      provider: 'LibreTranslate',
+      configured: true,
+      apiKeySet: hasKey || isCustomUrl,
+      message: isCustomUrl 
+        ? `Using custom LibreTranslate at ${LIBRE_TRANSLATE_URL}`
+        : hasKey 
+          ? 'LibreTranslate API key configured'
+          : 'Using public LibreTranslate (may be rate limited)',
+    };
+  }
+  
+  return {
+    provider: 'Fallback Dictionary',
+    configured: false,
+    apiKeySet: false,
+    message: 'No translation API configured. Using built-in dictionary (limited vocabulary). Set GOOGLE_TRANSLATE_API_KEY or LIBRE_TRANSLATE_KEY in your .env file for full auto-translation.',
+  };
+}
+
 export default {
   translateText,
   batchTranslate,
   createTranslatableFields,
+  getTranslationStatus,
 };

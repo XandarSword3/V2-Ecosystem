@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -26,6 +27,9 @@ interface PoolSettings {
 }
 
 export default function AdminPoolCapacityPage() {
+  const t = useTranslations('adminPool');
+  const tc = useTranslations('adminCommon');
+  
   const [settings, setSettings] = useState<PoolSettings>({
     max_capacity: 100,
     current_occupancy: 0,
@@ -61,23 +65,23 @@ export default function AdminPoolCapacityPage() {
     try {
       setSaving(true);
       await api.put('/pool/admin/settings', settings);
-      toast.success('Pool settings saved');
+      toast.success(t('capacity.settingsSaved'));
     } catch (error) {
-      toast.error('Failed to save settings');
+      toast.error(tc('errors.failedToSave'));
     } finally {
       setSaving(false);
     }
   };
 
   const resetOccupancy = async () => {
-    if (!confirm('Are you sure you want to reset the current occupancy to 0?')) return;
+    if (!confirm(tc('confirmAction'))) return;
     
     try {
       await api.post('/pool/admin/reset-occupancy');
       setSettings((prev) => ({ ...prev, current_occupancy: 0 }));
-      toast.success('Occupancy reset');
+      toast.success(t('capacity.occupancyReset'));
     } catch (error) {
-      toast.error('Failed to reset occupancy');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -99,17 +103,17 @@ export default function AdminPoolCapacityPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Pool Capacity</h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage pool capacity and hours</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('capacity.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400">{t('title')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchSettings}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <Button onClick={saveSettings} disabled={saving}>
             <Save className="w-4 h-4 mr-2" />
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? tc('saving') : tc('saveChanges')}
           </Button>
         </div>
       </div>
@@ -120,7 +124,7 @@ export default function AdminPoolCapacityPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Waves className="w-5 h-5 text-blue-500" />
-              Current Status
+              {tc('status')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -130,7 +134,7 @@ export default function AdminPoolCapacityPage() {
                   {settings.current_occupancy}
                   <span className="text-2xl text-slate-400">/{settings.max_capacity}</span>
                 </div>
-                <p className="text-slate-500 dark:text-slate-400">Current Occupancy</p>
+                <p className="text-slate-500 dark:text-slate-400">{t('capacity.currentOccupancy')}</p>
               </div>
 
               <div className="flex flex-col justify-center">
@@ -151,21 +155,21 @@ export default function AdminPoolCapacityPage() {
                 {isAtCapacity ? (
                   <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                     <AlertTriangle className="w-6 h-6" />
-                    <span className="font-semibold">Pool at capacity!</span>
+                    <span className="font-semibold">{t('capacity.title')}!</span>
                   </div>
                 ) : isNearCapacity ? (
                   <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
                     <AlertTriangle className="w-6 h-6" />
-                    <span className="font-semibold">Near capacity</span>
+                    <span className="font-semibold">{t('capacity.nearCapacity')}</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                     <Users className="w-6 h-6" />
-                    <span className="font-semibold">Open for guests</span>
+                    <span className="font-semibold">{tc('active')}</span>
                   </div>
                 )}
                 <Button variant="outline" className="mt-3" onClick={resetOccupancy}>
-                  Reset Occupancy
+                  {t('capacity.occupancyReset')}
                 </Button>
               </div>
             </div>
@@ -180,13 +184,13 @@ export default function AdminPoolCapacityPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-blue-500" />
-                Capacity Settings
+                {t('capacity.title')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Maximum Capacity
+                  {t('sessions.maxCapacity')}
                 </label>
                 <input
                   type="number"
@@ -199,8 +203,8 @@ export default function AdminPoolCapacityPage() {
 
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-slate-900 dark:text-white">Maintenance Mode</p>
-                  <p className="text-sm text-slate-500">Close pool for maintenance</p>
+                  <p className="font-medium text-slate-900 dark:text-white">{t('capacity.maintenanceMode')}</p>
+                  <p className="text-sm text-slate-500">{t('title')}</p>
                 </div>
                 <button
                   onClick={() => setSettings({ ...settings, maintenance_mode: !settings.maintenance_mode })}
@@ -224,13 +228,13 @@ export default function AdminPoolCapacityPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-blue-500" />
-                Operating Hours
+                {tc('time')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Opening Time
+                  {tc('time')}
                 </label>
                 <input
                   type="time"

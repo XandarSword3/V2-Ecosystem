@@ -12,6 +12,7 @@ import { HydrateSettingsFromBackend } from '@/lib/hydrate-settings';
 import { DirectionSync } from '@/components/DirectionSync';
 import { ThemeInjector } from '@/components/ThemeInjector';
 import { WeatherEffects } from '@/components/effects/WeatherEffects';
+import { PageTracker } from '@/components/PageTracker';
 
 // Import all messages statically to avoid async loading issues
 import enMessages from '../../messages/en.json';
@@ -77,6 +78,7 @@ export function Providers({ children }: ProvidersProps) {
               <WeatherEffects />
               <DirectionSync />
               <LoadingScreen />
+              <PageTracker />
               {children}
             </SettingsProvider>
           </AuthProvider>

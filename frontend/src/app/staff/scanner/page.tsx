@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -47,6 +48,10 @@ interface ScanHistory {
 }
 
 export default function StaffScannerPage() {
+  const t = useTranslations('staff');
+  const tc = useTranslations('adminCommon');
+  const tsc = useTranslations('staff.scanner');
+  const tp = useTranslations('staff.pool');
   const [manualCode, setManualCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [lastResult, setLastResult] = useState<ValidationResult | null>(null);
@@ -101,11 +106,11 @@ export default function StaffScannerPage() {
 
     try {
       await api.post(`/pool/tickets/${lastResult.ticket.id}/entry`);
-      toast.success('Entry recorded successfully');
+      toast.success(t('poolGuard.entryRecorded'));
       setLastResult(null);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || 'Failed to record entry');
+      toast.error(axiosError.response?.data?.message || tc('errors.generic'));
     }
   };
 
@@ -114,11 +119,11 @@ export default function StaffScannerPage() {
 
     try {
       await api.post(`/pool/tickets/${lastResult.ticket.id}/exit`);
-      toast.success('Exit recorded successfully');
+      toast.success(t('poolGuard.exitRecorded'));
       setLastResult(null);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || 'Failed to record exit');
+      toast.error(axiosError.response?.data?.message || tc('errors.generic'));
     }
   };
 
@@ -133,10 +138,10 @@ export default function StaffScannerPage() {
   };
 
   const ticketTypeLabels: Record<string, string> = {
-    adult: 'Adult',
-    child: 'Child',
-    family: 'Family',
-    vip: 'VIP',
+    adult: tp('ticketTypes.adult'),
+    child: tp('ticketTypes.child'),
+    family: tp('ticketTypes.family'),
+    vip: tp('ticketTypes.vip'),
   };
 
   return (
@@ -148,13 +153,13 @@ export default function StaffScannerPage() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
               <QrCode className="w-5 h-5 text-white" />
             </div>
-            Ticket Scanner
+            {tsc('title')}
           </h1>
-          <p className="text-slate-500 dark:text-slate-400">Scan pool tickets to validate entry</p>
+          <p className="text-slate-500 dark:text-slate-400">{tsc('subtitle')}</p>
         </div>
         <Button variant="outline" onClick={clearHistory}>
           <RefreshCw className="w-4 h-4 mr-2" />
-          Clear History
+          {tsc('clearHistory')}
         </Button>
       </div>
 
@@ -165,7 +170,7 @@ export default function StaffScannerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <QrCode className="w-5 h-5" />
-                Scan or Enter Code
+                {tsc('scanOrEnterCode')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -176,7 +181,7 @@ export default function StaffScannerPage() {
                     type="text"
                     value={manualCode}
                     onChange={(e) => setManualCode(e.target.value)}
-                    placeholder="Enter ticket code or scan QR..."
+                    placeholder={tsc('inputPlaceholder')}
                     className="text-center text-lg font-mono h-14"
                     autoFocus
                     autoComplete="off"
@@ -186,12 +191,12 @@ export default function StaffScannerPage() {
                   {loading ? (
                     <>
                       <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                      Validating...
+                      {tsc('validating')}
                     </>
                   ) : (
                     <>
                       <Ticket className="w-4 h-4 mr-2" />
-                      Validate Ticket
+                      {tsc('validateTicket')}
                     </>
                   )}
                 </Button>
@@ -219,7 +224,7 @@ export default function StaffScannerPage() {
                       )}
                       <div>
                         <h3 className={`text-xl font-bold ${lastResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                          {lastResult.success ? 'Valid Ticket' : 'Invalid Ticket'}
+                          {lastResult.success ? tsc('validTicket') : tsc('invalidTicket')}
                         </h3>
                         <p className="text-slate-600 dark:text-slate-400">{lastResult.message}</p>
                       </div>
@@ -252,11 +257,11 @@ export default function StaffScannerPage() {
                         <div className="flex gap-2">
                           <Button onClick={handleEntry} className="flex-1">
                             <LogIn className="w-4 h-4 mr-2" />
-                            Record Entry
+                            {tsc('recordEntry')}
                           </Button>
                           <Button onClick={handleExit} variant="outline" className="flex-1">
                             <LogOut className="w-4 h-4 mr-2" />
-                            Record Exit
+                            {tsc('recordExit')}
                           </Button>
                         </div>
                       </>
@@ -274,15 +279,15 @@ export default function StaffScannerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
-                Recent Scans
+                {tsc('recentScans')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {scanHistory.length === 0 ? (
                 <div className="text-center py-12">
                   <QrCode className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                  <p className="text-slate-500 dark:text-slate-400">No scans yet</p>
-                  <p className="text-sm text-slate-400 dark:text-slate-500">Scanned tickets will appear here</p>
+                  <p className="text-slate-500 dark:text-slate-400">{tsc('noScansYet')}</p>
+                  <p className="text-sm text-slate-400 dark:text-slate-500">{tsc('scannedTicketsAppear')}</p>
                 </div>
               ) : (
                 <div className="space-y-3">

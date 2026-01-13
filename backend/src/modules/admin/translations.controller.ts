@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection";
-import { translateText } from "../../services/translation.service";
+import { translateText, getTranslationStatus } from "../../services/translation.service";
 import { logActivity } from "../../utils/activityLogger";
 import { logger } from "../../utils/logger.js";
 
@@ -783,18 +783,27 @@ export async function compareFrontendTranslations(req: Request, res: Response, n
       }
     }
     
-    // Calculate stats
+    // Calculate stats and build the response structure expected by frontend
     const totalKeys = allKeys.size;
-    const stats: Record<string, { total: number; translated: number; missing: number; percentage: number }> = {};
+    
+    // Build languages object in the format frontend expects
+    const languagesData: Record<string, { 
+      file: string; 
+      keyCount: number; 
+      missingKeys: string[]; 
+      missingCount: number;
+      percentage: number;
+    }> = {};
     
     for (const lang of Object.keys(translations)) {
       const missing = missingByLanguage[lang].length;
       const translated = totalKeys - missing;
-      stats[lang] = {
-        total: totalKeys,
-        translated,
-        missing,
-        percentage: Math.round((translated / totalKeys) * 100),
+      languagesData[lang] = {
+        file: `${lang}.json`,
+        keyCount: totalKeys,
+        missingKeys: missingByLanguage[lang],
+        missingCount: missing,
+        percentage: totalKeys > 0 ? Math.round((translated / totalKeys) * 100) : 100,
       };
     }
     
@@ -802,9 +811,7 @@ export async function compareFrontendTranslations(req: Request, res: Response, n
       success: true,
       data: {
         totalKeys,
-        languages: Object.keys(translations),
-        stats,
-        missingByLanguage,
+        languages: languagesData,
         allKeys: Array.from(allKeys).sort(),
       },
     });
@@ -866,12 +873,28 @@ export async function updateFrontendTranslation(req: Request, res: Response, nex
   }
 }
 
+/**
+ * Get the translation service status (which API is configured)
+ */
+export async function getTranslationServiceStatus(req: Request, res: Response, next: NextFunction) {
+  try {
+    const status = getTranslationStatus();
+    res.json({
+      success: true,
+      ...status,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export default {
   getMissingTranslations,
   getTranslationStats,
   updateTranslation,
   autoTranslate,
   batchAutoTranslate,
+  getTranslationServiceStatus,
   // Language management
   getSupportedLanguages,
   addLanguage,

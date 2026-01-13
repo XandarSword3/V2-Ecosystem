@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useSocket } from '@/lib/socket';
@@ -47,15 +48,18 @@ interface Order {
 const statusFlow = ['pending', 'confirmed', 'preparing', 'ready', 'completed'];
 
 function SessionAccessDashboard({ slug, moduleName }: { slug: string, moduleName: string }) {
+  const ts = useTranslations('staff');
+  const tp = useTranslations('staff.pool');
+  
   return (
     <div className="space-y-6 p-6">
       <header className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
           <Ticket className="h-8 w-8 text-primary" />
-          {moduleName} Management
+          {moduleName} {ts('nav.pool')}
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Manage sessions, tickets, and capacity.
+          {tp('subtitle')}
         </p>
       </header>
       
@@ -65,11 +69,11 @@ function SessionAccessDashboard({ slug, moduleName }: { slug: string, moduleName
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-blue-500" />
-                Sessions
+                {ts('bookings.title')}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-500">Manage daily sessions and time slots.</p>
+              <p className="text-sm text-gray-500">{ts('bookings.subtitle')}</p>
             </CardContent>
           </Card>
         </Link>
@@ -79,11 +83,11 @@ function SessionAccessDashboard({ slug, moduleName }: { slug: string, moduleName
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Ticket className="w-5 h-5 text-green-500" />
-                Tickets
+                {ts('nav.ticketScanner')}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-500">Scan and validate tickets.</p>
+              <p className="text-sm text-gray-500">{ts('scanner.subtitle')}</p>
             </CardContent>
           </Card>
         </Link>
@@ -93,11 +97,11 @@ function SessionAccessDashboard({ slug, moduleName }: { slug: string, moduleName
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-purple-500" />
-                Capacity
+                {tp('inPoolNow')}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-500">View real-time occupancy and stats.</p>
+              <p className="text-sm text-gray-500">{tp('capacityWarning', { percent: '' }).replace('Currently at % capacity. Consider limiting new entries.', ts('pool.subtitle'))}</p>
             </CardContent>
           </Card>
         </Link>
@@ -107,6 +111,10 @@ function SessionAccessDashboard({ slug, moduleName }: { slug: string, moduleName
 }
 
 function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string, moduleName: string, moduleId: string }) {
+  const ts = useTranslations('staff');
+  const tc = useTranslations('staff.chalets');
+  const tst = useTranslations('staff.statuses');
+  const tCommon = useTranslations('common');
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'today' | 'all'>('today');
@@ -123,7 +131,7 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
       });
       setBookings(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to load bookings');
+      toast.error(tCommon('error'));
     } finally {
       setLoading(false);
     }
@@ -149,19 +157,19 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
     try {
       await api.patch(`/chalets/staff/bookings/${bookingId}/status`, { status });
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
-      toast.success(`Booking ${status.replace('_', ' ')}`);
+      toast.success(ts('orders.orderUpdated', { status }));
       setSelectedBooking(null);
     } catch (error) {
-      toast.error('Failed to update booking');
+      toast.error(tCommon('error'));
     }
   };
 
   const statusConfig: Record<string, { color: string; label: string }> = {
-    pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
-    confirmed: { color: 'bg-blue-100 text-blue-800', label: 'Confirmed' },
-    checked_in: { color: 'bg-green-100 text-green-800', label: 'Checked In' },
-    checked_out: { color: 'bg-slate-100 text-slate-800', label: 'Checked Out' },
-    cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelled' },
+    pending: { color: 'bg-yellow-100 text-yellow-800', label: tst('pending') },
+    confirmed: { color: 'bg-blue-100 text-blue-800', label: tst('confirmed') },
+    checked_in: { color: 'bg-green-100 text-green-800', label: tst('checkedIn') },
+    checked_out: { color: 'bg-slate-100 text-slate-800', label: tst('checkedOut') },
+    cancelled: { color: 'bg-red-100 text-red-800', label: tst('cancelled') },
   };
 
   if (loading) {
@@ -178,10 +186,10 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
             <LayoutDashboard className="h-8 w-8 text-primary" />
-            {moduleName} Bookings
+            {moduleName} {ts('nav.bookings')}
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Manage check-ins, check-outs, and bookings
+            {tc('subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -192,7 +200,7 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
                 filter === 'today' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
-              Today
+              {tc('today')}
             </button>
             <button
               onClick={() => setFilter('all')}
@@ -200,7 +208,7 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
                 filter === 'all' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
-              All
+              {tc('allBookings')}
             </button>
           </div>
           <Button variant="outline" size="icon" onClick={fetchBookings}>
@@ -215,7 +223,7 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Check-ins Today</p>
+                <p className="text-sm text-gray-500">{tc('todayCheckIns')}</p>
                 <p className="text-2xl font-bold">{bookings.filter((b) => b.status === 'confirmed').length}</p>
               </div>
               <LogIn className="w-8 h-8 text-green-500" />
@@ -226,7 +234,7 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Check-outs Today</p>
+                <p className="text-sm text-gray-500">{tc('todayCheckOuts')}</p>
                 <p className="text-2xl font-bold">{bookings.filter((b) => b.status === 'checked_in').length}</p>
               </div>
               <LogOut className="w-8 h-8 text-blue-500" />
@@ -237,7 +245,7 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Pending</p>
+                <p className="text-sm text-gray-500">{tst('pending')}</p>
                 <p className="text-2xl font-bold">{bookings.filter((b) => b.status === 'pending').length}</p>
               </div>
               <Clock className="w-8 h-8 text-yellow-500" />
@@ -248,7 +256,7 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Total Bookings</p>
+                <p className="text-sm text-gray-500">{ts('nav.bookings')}</p>
                 <p className="text-2xl font-bold">{bookings.length}</p>
               </div>
               <Calendar className="w-8 h-8 text-purple-500" />
@@ -262,7 +270,7 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
         <Card>
           <CardContent className="py-12 text-center">
             <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500">No bookings {filter === 'today' ? 'for today' : 'found'}</p>
+            <p className="text-gray-500">{tc('noBookings')}</p>
           </CardContent>
         </Card>
       ) : (
@@ -273,7 +281,7 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="font-semibold text-lg">#{booking.booking_number}</h3>
-                    <p className="text-sm text-gray-500">{booking.users?.full_name || booking.customer_name || 'Guest'}</p>
+                    <p className="text-sm text-gray-500">{booking.users?.full_name || booking.customer_name || tc('guests')}</p>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusConfig[booking.status]?.color || 'bg-gray-100'}`}>
                     {statusConfig[booking.status]?.label || booking.status}
@@ -286,23 +294,23 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
                   </div>
                   <div className="flex items-center gap-2 text-gray-600">
                     <Users className="w-4 h-4" />
-                    <span>{booking.guests || booking.number_of_guests || 1} guests</span>
+                    <span>{booking.guests || booking.number_of_guests || 1} {tc('guests')}</span>
                   </div>
                 </div>
                 <div className="mt-4 pt-3 border-t flex gap-2">
                   {booking.status === 'confirmed' && (
                     <Button size="sm" className="flex-1" onClick={(e) => { e.stopPropagation(); updateBookingStatus(booking.id, 'checked_in'); }}>
-                      <LogIn className="w-4 h-4 mr-1" /> Check In
+                      <LogIn className="w-4 h-4 mr-1" /> {tc('checkInBtn')}
                     </Button>
                   )}
                   {booking.status === 'checked_in' && (
                     <Button size="sm" variant="outline" className="flex-1" onClick={(e) => { e.stopPropagation(); updateBookingStatus(booking.id, 'checked_out'); }}>
-                      <LogOut className="w-4 h-4 mr-1" /> Check Out
+                      <LogOut className="w-4 h-4 mr-1" /> {tc('checkOutBtn')}
                     </Button>
                   )}
                   {booking.status === 'pending' && (
                     <Button size="sm" className="flex-1" onClick={(e) => { e.stopPropagation(); updateBookingStatus(booking.id, 'confirmed'); }}>
-                      <CheckCircle className="w-4 h-4 mr-1" /> Confirm
+                      <CheckCircle className="w-4 h-4 mr-1" /> {tc('confirm')}
                     </Button>
                   )}
                 </div>
@@ -321,19 +329,19 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
               <Button variant="ghost" size="icon" onClick={() => setSelectedBooking(null)}><XCircle className="w-5 h-5" /></Button>
             </div>
             <div className="space-y-3">
-              <div className="flex justify-between"><span className="text-gray-500">Guest</span><span>{selectedBooking.users?.full_name || selectedBooking.customer_name}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Check-in</span><span>{formatTime(selectedBooking.check_in_date)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Check-out</span><span>{formatTime(selectedBooking.check_out_date)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Guests</span><span>{selectedBooking.guests || selectedBooking.number_of_guests || 1}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Total</span><span className="font-bold">{formatCurrency(selectedBooking.total_amount || 0)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">{tc('guests')}</span><span>{selectedBooking.users?.full_name || selectedBooking.customer_name}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">{tc('checkIn')}</span><span>{formatTime(selectedBooking.check_in_date)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">{tc('checkOut')}</span><span>{formatTime(selectedBooking.check_out_date)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">{tc('guests')}</span><span>{selectedBooking.guests || selectedBooking.number_of_guests || 1}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">{tCommon('total')}</span><span className="font-bold">{formatCurrency(selectedBooking.total_amount || 0)}</span></div>
               {selectedBooking.special_requests && (
-                <div className="bg-yellow-50 p-3 rounded"><span className="font-medium">Notes:</span> {selectedBooking.special_requests}</div>
+                <div className="bg-yellow-50 p-3 rounded"><span className="font-medium">{tc('notes')}:</span> {selectedBooking.special_requests}</div>
               )}
             </div>
             <div className="mt-6 flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setSelectedBooking(null)}>Close</Button>
-              {selectedBooking.status === 'confirmed' && <Button className="flex-1" onClick={() => updateBookingStatus(selectedBooking.id, 'checked_in')}>Check In</Button>}
-              {selectedBooking.status === 'checked_in' && <Button className="flex-1" onClick={() => updateBookingStatus(selectedBooking.id, 'checked_out')}>Check Out</Button>}
+              <Button variant="outline" className="flex-1" onClick={() => setSelectedBooking(null)}>{tCommon('close')}</Button>
+              {selectedBooking.status === 'confirmed' && <Button className="flex-1" onClick={() => updateBookingStatus(selectedBooking.id, 'checked_in')}>{tc('checkInBtn')}</Button>}
+              {selectedBooking.status === 'checked_in' && <Button className="flex-1" onClick={() => updateBookingStatus(selectedBooking.id, 'checked_out')}>{tc('checkOutBtn')}</Button>}
             </div>
           </div>
         </div>
@@ -343,6 +351,10 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
 }
 
 function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName: string, moduleId: string }) {
+  const ts = useTranslations('staff');
+  const tr = useTranslations('staff.restaurant');
+  const tst = useTranslations('staff.statuses');
+  const tCommon = useTranslations('common');
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
@@ -362,7 +374,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
 
       const handleNewOrder = (newOrder: Order) => {
         setOrders((prev) => [newOrder, ...prev]);
-        toast.info(`New order #${newOrder.orderNumber}`, {
+        toast.info(ts('orders.newOrder', { number: newOrder.orderNumber }), {
           description: newOrder.customerName,
         });
         const audio = new Audio('/notification.mp3');
@@ -408,7 +420,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
       });
       setOrders(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to load orders');
+      toast.error(tCommon('error'));
     } finally {
       setIsLoading(false);
     }
@@ -424,10 +436,10 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
           order.id === orderId ? { ...order, status: newStatus } : order
         )
       );
-      toast.success(`Order updated to ${newStatus}`);
+      toast.success(ts('orders.orderUpdated', { status: newStatus }));
       setSelectedOrder(null);
     } catch (error) {
-      toast.error('Failed to update order status');
+      toast.error(tCommon('error'));
     }
   };
 
@@ -450,10 +462,10 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
             <ChefHat className="h-8 w-8 text-primary" />
-            {moduleName} Kitchen
+            {moduleName} {ts('kitchen.title')}
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Manage incoming orders and kitchen workflow
+            {tr('subtitle')}
           </p>
         </div>
         
@@ -477,7 +489,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
           onClick={() => setSelectedStatus(null)}
           className="whitespace-nowrap"
         >
-          All Orders ({orders.length})
+          {ts('snack.allOrders')} ({orders.length})
         </Button>
         {statusFlow.map((status) => (
           <Button
@@ -486,7 +498,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
             onClick={() => setSelectedStatus(status)}
             className="whitespace-nowrap capitalize"
           >
-            {status} ({orders.filter((o) => o.status === status).length})
+            {tst(status)} ({orders.filter((o) => o.status === status).length})
           </Button>
         ))}
       </div>
@@ -496,8 +508,8 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
         {filteredOrders.length === 0 ? (
           <div className="col-span-full flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
             <UtensilsCrossed className="h-16 w-16 mb-4 opacity-20" />
-            <p className="text-lg font-medium">No active orders</p>
-            <p className="text-sm">New orders will appear here automatically</p>
+            <p className="text-lg font-medium">{tr('noOrders')}</p>
+            <p className="text-sm">{ts('snack.noOrdersDisplay')}</p>
           </div>
         ) : (
           filteredOrders.map((order) => (
@@ -553,7 +565,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
 
                 {order.items.some((i) => i.specialInstructions) && (
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded text-xs text-yellow-800 dark:text-yellow-200 mb-3">
-                    <span className="font-bold">Note:</span>{' '}
+                    <span className="font-bold">{tCommon('note')}:</span>{' '}
                     {order.items.find((i) => i.specialInstructions)?.specialInstructions}
                   </div>
                 )}
@@ -582,7 +594,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
                       updateOrderStatus(order.id, 'confirmed');
                     }}
                   >
-                    Accept
+                    {tCommon('accept')}
                   </Button>
                 )}
                 {order.status === 'confirmed' && (
@@ -594,7 +606,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
                       updateOrderStatus(order.id, 'preparing');
                     }}
                   >
-                    Start Prep
+                    {ts('snack.startPreparing')}
                   </Button>
                 )}
                 {order.status === 'preparing' && (
@@ -606,7 +618,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
                       updateOrderStatus(order.id, 'ready');
                     }}
                   >
-                    Mark Ready
+                    {ts('snack.markReady')}
                   </Button>
                 )}
                 {order.status === 'ready' && (
@@ -618,7 +630,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
                       updateOrderStatus(order.id, 'completed');
                     }}
                   >
-                    Complete
+                    {ts('snack.complete')}
                   </Button>
                 )}
               </div>
@@ -667,7 +679,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
                         <p className="font-medium">{item.name}</p>
                         {item.specialInstructions && (
                           <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1 bg-yellow-50 dark:bg-yellow-900/20 p-1.5 rounded">
-                            Note: {item.specialInstructions}
+                            {tCommon('note')}: {item.specialInstructions}
                           </p>
                         )}
                       </div>
@@ -678,15 +690,15 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
 
               <div className="mt-6 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Status</span>
-                  <span className="font-medium capitalize">{selectedOrder.status}</span>
+                  <span className="text-gray-500">{tr('status')}</span>
+                  <span className="font-medium capitalize">{tst(selectedOrder.status)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Table</span>
-                  <span className="font-medium">{selectedOrder.tableNumber || 'N/A'}</span>
+                  <span className="text-gray-500">{tCommon('table')}</span>
+                  <span className="font-medium">{selectedOrder.tableNumber || tCommon('notAvailable')}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200 dark:border-gray-600">
-                  <span>Total</span>
+                  <span>{tCommon('total')}</span>
                   <span>{formatCurrency(selectedOrder.totalAmount)}</span>
                 </div>
               </div>
@@ -698,7 +710,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
                 className="flex-1"
                 onClick={() => setSelectedOrder(null)}
               >
-                Close
+                {tCommon('close')}
               </Button>
               {selectedOrder.status !== 'completed' && (
                 <Button
@@ -708,7 +720,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
                     if (nextStatus) updateOrderStatus(selectedOrder.id, nextStatus);
                   }}
                 >
-                  Advance Status
+                  {tr('markStatus', { status: '' })}
                 </Button>
               )}
             </div>
@@ -720,6 +732,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
 }
 
 export default function ModulePage({ params }: { params: { slug: string } }) {
+  const tCommon = useTranslations('common');
   const slug = params.slug;
   const [moduleId, setModuleId] = useState<string | null>(null);
   const [moduleName, setModuleName] = useState<string>('');
@@ -737,7 +750,7 @@ export default function ModulePage({ params }: { params: { slug: string } }) {
         }
       } catch (error) {
         console.error('Failed to fetch module:', error);
-        toast.error('Failed to load module details');
+        toast.error(tCommon('error'));
       } finally {
         setIsLoading(false);
       }
@@ -757,7 +770,7 @@ export default function ModulePage({ params }: { params: { slug: string } }) {
   if (!moduleId) {
       return (
           <div className="min-h-screen flex items-center justify-center">
-              <p className="text-gray-500">Module not found.</p>
+              <p className="text-gray-500">{tCommon('notFound')}</p>
           </div>
       );
   }
@@ -776,7 +789,7 @@ export default function ModulePage({ params }: { params: { slug: string } }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Unsupported Module Type: {templateType}</p>
+        <p className="text-gray-500">{tCommon('notSupported')}: {templateType}</p>
     </div>
   );
 }

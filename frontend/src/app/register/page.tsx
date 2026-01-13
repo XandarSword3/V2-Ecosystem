@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const t = useTranslations('auth.register');
   const tAuth = useTranslations('auth');
   const tCommon = useTranslations('common');
+  const tErrors = useTranslations('auth.errors');
   const router = useRouter();
   
   const [formData, setFormData] = useState({
@@ -31,7 +32,7 @@ export default function RegisterPage() {
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError(tErrors('passwordMismatch'));
       return;
     }
 
@@ -59,7 +60,7 @@ export default function RegisterPage() {
       router.push('/login');
     } catch (err: unknown) {
       const error = err as Error;
-      setError(error.message || 'Registration failed');
+      setError(error.message || tErrors('registerFailed'));
     } finally {
       setIsLoading(false);
     }

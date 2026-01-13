@@ -50,6 +50,7 @@ function BookingConfirmationContent() {
   const searchParams = useSearchParams();
   const t = useTranslations('chalets');
   const tCommon = useTranslations('common');
+  const tErrors = useTranslations('errors');
   const currency = useSettingsStore((s) => s.currency);
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +62,7 @@ function BookingConfirmationContent() {
     if (bookingId) {
       fetchBooking();
     } else {
-      setError('No booking ID provided');
+      setError(tErrors('noBookingId'));
       setLoading(false);
     }
   }, [bookingId]);
@@ -71,7 +72,7 @@ function BookingConfirmationContent() {
       const response = await api.get(`/chalets/bookings/${bookingId}`);
       setBooking(response.data.data);
     } catch (err) {
-      setError('Failed to load booking details');
+      setError(tErrors('failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -91,9 +92,9 @@ function BookingConfirmationContent() {
         <Card className="max-w-md mx-auto">
           <CardContent className="text-center py-8">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">{error || 'Booking not found'}</h2>
+            <h2 className="text-xl font-semibold mb-2">{error || tErrors('bookingNotFound')}</h2>
             <Link href="/chalets">
-              <Button className="mt-4">Back to Chalets</Button>
+              <Button className="mt-4">{t('backToChalets')}</Button>
             </Link>
           </CardContent>
         </Card>

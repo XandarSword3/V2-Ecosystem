@@ -15,6 +15,8 @@ import * as settingsController from "./controllers/settings.controller";
 import * as auditController from "./controllers/audit.controller";
 import * as reportsController from "./controllers/reports.controller";
 import * as notificationsController from "./controllers/notifications.controller";
+import * as uploadController from "./controllers/upload.controller";
+import * as scheduledReportsController from "./controllers/scheduled-reports.controller";
 
 const router = Router();
 
@@ -55,6 +57,12 @@ router.get('/permissions', permissionsController.getAllPermissions);
 router.get('/settings', settingsController.getSettings);
 router.put('/settings', settingsController.updateSettings);
 
+// File Uploads (branding assets)
+router.get('/uploads', uploadController.listFiles);
+router.post('/uploads', rateLimits.expensive, uploadController.uploadFile);
+router.delete('/uploads/:path(*)', uploadController.deleteFile);
+router.get('/branding', uploadController.getBranding);
+
 // Audit logs (using refactored controller)
 router.get('/audit-logs', auditController.getAuditLogs);
 router.get('/audit-logs/:resource', auditController.getAuditLogsByResource);
@@ -73,6 +81,14 @@ router.get('/reports/occupancy', reportsController.getOccupancyReport);
 router.get('/reports/customers', reportsController.getCustomerAnalytics);
 router.get('/reports/export', rateLimits.expensive, reportsController.exportReport);
 
+// Scheduled Reports
+router.get('/reports/scheduled', scheduledReportsController.getScheduledReports);
+router.post('/reports/scheduled', scheduledReportsController.createScheduledReport);
+router.put('/reports/scheduled/:id', scheduledReportsController.updateScheduledReport);
+router.delete('/reports/scheduled/:id', scheduledReportsController.deleteScheduledReport);
+router.post('/reports/scheduled/:id/send', rateLimits.expensive, scheduledReportsController.sendReportNow);
+router.get('/reports/preview', scheduledReportsController.previewReport);
+
 // Notifications (using refactored controller)
 router.get('/notifications', notificationsController.getNotifications);
 router.put('/notifications/:id/read', notificationsController.markNotificationRead);
@@ -81,6 +97,7 @@ router.post('/notifications/broadcast', notificationsController.broadcastNotific
 router.delete('/notifications/:id', notificationsController.deleteNotification);
 
 // Translation Management - Database Translations
+router.get('/translations/status', translationsController.getTranslationServiceStatus);
 router.get('/translations/missing', translationsController.getMissingTranslations);
 router.get('/translations/stats', translationsController.getTranslationStats);
 router.put('/translations/:table/:id', translationsController.updateTranslation);

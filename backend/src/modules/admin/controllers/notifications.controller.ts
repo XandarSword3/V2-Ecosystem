@@ -5,6 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from '../../../database/connection';
+import { logger } from '../../../utils/logger';
 
 export async function getNotifications(req: Request, res: Response, next: NextFunction) {
   try {
@@ -143,7 +144,7 @@ export async function broadcastNotification(req: Request, res: Response, next: N
     
     if (error) {
       // Table might not exist, create a simple response
-      console.log('Broadcast notification (table may not exist):', { title, message, type, target_type });
+      logger.warn('Broadcast notification (table may not exist):', { title, message, type, target_type });
       return res.status(201).json({ 
         success: true, 
         message: 'Notification broadcast sent',

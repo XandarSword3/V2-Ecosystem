@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 
 export default function CartPage() {
   const t = useTranslations('common');
+  const tErrors = useTranslations('errors');
   const router = useRouter();
   const currency = useSettingsStore((s) => s.currency);
 
@@ -52,12 +53,12 @@ export default function CartPage() {
       if (uniqueModules.length === 1) {
         targetModuleId = uniqueModules[0];
       } else if (uniqueModules.length > 1) {
-        toast.info("Please checkout each module separately using the buttons in each section.");
+        toast.info(tErrors('checkoutModulesSeparately'));
         return;
       } else {
         targetModuleId = items[0]?.moduleId;
         if (!targetModuleId) {
-            toast.error("Unable to determine checkout destination.");
+            toast.error(tErrors('unableToDetermineCheckout'));
             return;
         }
       }
@@ -78,14 +79,14 @@ export default function CartPage() {
           <ShoppingCart className="w-12 h-12 text-slate-400" />
         </div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-          Your cart is empty
+          {t('cartEmpty')}
         </h1>
         <p className="text-slate-600 dark:text-slate-400 mb-8 text-center max-w-md">
-          Looks like you haven't added anything yet. Browse our modules to find something!
+          {t('browseModules')}
         </p>
         <Link href="/">
           <Button variant="outline" className="gap-2">
-            Return Home
+            {t('returnHome')}
           </Button>
         </Link>
       </div>
@@ -97,11 +98,11 @@ export default function CartPage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-            Your Cart
+            {t('yourCart')}
           </h1>
           <Button variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={clearCart}>
             <Trash2 className="w-4 h-4 mr-2" />
-            Clear Cart
+            {t('clearCart')}
           </Button>
         </div>
 
@@ -124,7 +125,7 @@ export default function CartPage() {
                           onClick={() => handleCheckout(sectionModuleId)}
                           className="gap-2"
                         >
-                          Checkout {moduleName}
+                          {t('checkout')} {moduleName}
                           <ExternalLink className="w-4 h-4" />
                         </Button>
                     )}
@@ -191,7 +192,7 @@ export default function CartPage() {
           <div className="mt-8 flex justify-end">
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 w-full max-w-md">
               <div className="flex justify-between items-center mb-4">
-                <span className="text-slate-600 dark:text-slate-400">Total</span>
+                <span className="text-slate-600 dark:text-slate-400">{t('total')}</span>
                 <span className="text-2xl font-bold text-slate-900 dark:text-white">
                   {formatCurrency(total, currency)}
                 </span>
@@ -200,12 +201,12 @@ export default function CartPage() {
                 className="w-full h-12 text-lg gap-2"
                 onClick={() => handleCheckout()}
               >
-                Checkout
+                {t('checkout')}
                 <ArrowRight className="w-5 h-5" />
               </Button>
               {hasMultipleModules && (
                 <p className="text-xs text-center mt-2 text-slate-500">
-                  Please checkout each module separately using the buttons above
+                  {t('checkoutModulesSeparately')}
                 </p>
               )}
             </div>

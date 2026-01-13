@@ -63,7 +63,8 @@ const amenityOptions = [
 ];
 
 export default function ChaletsManagementPage() {
-  const t = useTranslations('admin');
+  const t = useTranslations('adminChalets');
+  const tc = useTranslations('adminCommon');
   const [chalets, setChalets] = useState<Chalet[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,7 +83,7 @@ export default function ChaletsManagementPage() {
       const response = await api.get('/chalets');
       setChalets(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch chalets');
+      toast.error(tc('errors.failedToLoad'));
       console.error(error);
     } finally {
       setLoading(false);
@@ -115,7 +116,7 @@ export default function ChaletsManagementPage() {
 
   const handleSave = async () => {
     if (!formData.name || !formData.base_price) {
-      toast.error('Please fill in all required fields');
+      toast.error(tc('errors.required'));
       return;
     }
 
@@ -123,30 +124,30 @@ export default function ChaletsManagementPage() {
       setSaving(true);
       if (editingChalet) {
         await api.put(`/chalets/admin/chalets/${editingChalet.id}`, formData);
-        toast.success('Chalet updated successfully');
+        toast.success(tc('success.updated'));
       } else {
         await api.post('/chalets/admin/chalets', formData);
-        toast.success('Chalet created successfully');
+        toast.success(tc('success.created'));
       }
       fetchChalets();
       setShowModal(false);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || 'Failed to save chalet');
+      toast.error(axiosError.response?.data?.message || tc('errors.failedToSave'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this chalet? This will also delete all associated bookings.')) return;
+    if (!confirm(tc('confirmDelete'))) return;
 
     try {
       await api.delete(`/chalets/admin/chalets/${id}`);
-      toast.success('Chalet deleted');
+      toast.success(tc('success.deleted'));
       fetchChalets();
     } catch (error) {
-      toast.error('Failed to delete chalet');
+      toast.error(tc('errors.failedToDelete'));
     }
   };
 
@@ -156,9 +157,9 @@ export default function ChaletsManagementPage() {
         is_active: !chalet.is_active,
       });
       fetchChalets();
-      toast.success(`Chalet ${chalet.is_active ? 'hidden' : 'shown'}`);
+      toast.success(tc('success.updated'));
     } catch (error) {
-      toast.error('Failed to update availability');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -189,24 +190,24 @@ export default function ChaletsManagementPage() {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
               <Home className="w-6 h-6 text-white" />
             </div>
-            Chalets Management
+            {t('title')}
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-2">
-            Manage chalets, pricing, and availability
+            {t('allChalets')}
           </p>
         </motion.div>
 
         <motion.div variants={fadeInUp} className="flex gap-2">
           <Button variant="outline" onClick={fetchChalets} className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <Button
             onClick={openCreateModal}
             className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white"
           >
             <Plus className="w-4 h-4" />
-            Add Chalet
+            {t('addChalet')}
           </Button>
         </motion.div>
       </div>
@@ -218,7 +219,7 @@ export default function ChaletsManagementPage() {
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
-                placeholder="Search chalets..."
+                placeholder={tc('searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -264,9 +265,9 @@ export default function ChaletsManagementPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <Home className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-              <p className="text-slate-500 dark:text-slate-400">No chalets found</p>
+              <p className="text-slate-500 dark:text-slate-400">{tc('noResults')}</p>
               <Button onClick={openCreateModal} className="mt-4">
-                Add your first chalet
+                {t('addChalet')}
               </Button>
             </CardContent>
           </Card>
@@ -422,7 +423,7 @@ export default function ChaletsManagementPage() {
             >
               <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6 flex justify-between items-center">
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-                  {editingChalet ? 'Edit Chalet' : 'Add New Chalet'}
+                  {editingChalet ? t('editChalet') : t('addChalet')}
                 </h3>
                 <button
                   onClick={() => setShowModal(false)}
@@ -619,7 +620,7 @@ export default function ChaletsManagementPage() {
                   className="flex-1"
                   onClick={() => setShowModal(false)}
                 >
-                  Cancel
+                  {tc('cancel')}
                 </Button>
                 <Button
                   onClick={handleSave}
@@ -631,7 +632,7 @@ export default function ChaletsManagementPage() {
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-2" />
-                      {editingChalet ? 'Update Chalet' : 'Create Chalet'}
+                      {editingChalet ? tc('update') : tc('create')}
                     </>
                   )}
                 </Button>

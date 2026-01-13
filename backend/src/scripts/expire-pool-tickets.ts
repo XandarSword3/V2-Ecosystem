@@ -16,7 +16,6 @@ async function expirePoolTickets() {
   try {
     logger.info('Starting pool ticket expiry job...');
     
-    await initializeDatabase();
     const supabase = getSupabase();
 
     // Get current date at midnight
@@ -81,15 +80,21 @@ async function expirePoolTickets() {
   }
 }
 
-// Run if called directly
-expirePoolTickets()
-  .then((result) => {
-    console.log(`✅ Expired ${result.expired} pool tickets.`);
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('❌ Expiry job failed:', error);
-    process.exit(1);
-  });
+// Only run directly if called as main module
+// Use require.main for CommonJS compatibility
+const isMainModule = require.main === module;
+
+if (isMainModule) {
+  initializeDatabase()
+    .then(() => expirePoolTickets())
+    .then((result) => {
+      console.log(`✅ Expired ${result.expired} pool tickets.`);
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('❌ Expiry job failed:', error);
+      process.exit(1);
+    });
+}
 
 export { expirePoolTickets };

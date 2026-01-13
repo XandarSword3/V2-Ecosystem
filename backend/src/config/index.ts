@@ -1,19 +1,34 @@
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 dotenv.config();
 
-// Validate critical environment variables in production
 const isProduction = process.env.NODE_ENV === 'production';
-if (isProduction) {
-  const requiredEnvVars = ['JWT_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
-  const missing = requiredEnvVars.filter(v => !process.env[v]);
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-  }
-  // Ensure JWT secret is strong in production
-  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-    throw new Error('JWT_SECRET must be at least 32 characters in production');
-  }
+const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+const isTest = process.env.NODE_ENV === 'test';
+
+// SECURITY: Validate critical environment variables
+// In production, these must be explicitly set - no fallbacks allowed
+const requiredEnvVars = isProduction 
+  ? ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'DATABASE_URL']
+  : ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY']; // Minimum for development
+
+const missing = requiredEnvVars.filter(v => !process.env[v]);
+if (missing.length > 0 && !isTest) {
+  throw new Error(`Missing required environment variables: ${missing.join(', ')}. Check your .env file.`);
 }
+
+// Ensure JWT secret is strong in production
+if (isProduction && process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+  throw new Error('JWT_SECRET must be at least 32 characters in production');
+}
+
+// Generate secure development-only secrets (never used in production)
+// These are randomly generated per-process so they're different each restart
+const generateDevSecret = (prefix: string) => {
+  if (isProduction) return ''; // Force failure if not set
+  console.warn(`⚠️  WARNING: Using auto-generated ${prefix} - set in .env for persistence`);
+  return `dev-only-${prefix}-${crypto.randomBytes(32).toString('hex')}`;
+};
 
 export const config = {
   env: process.env.NODE_ENV || 'development',
@@ -22,7 +37,7 @@ export const config = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 
   database: {
-    url: process.env.DATABASE_URL || (isProduction ? '' : 'postgresql://postgres:password@localhost:5432/v2_resort'),
+    url: process.env.DATABASE_URL || '',
   },
 
   supabase: {
@@ -32,8 +47,9 @@ export const config = {
   },
 
   jwt: {
-    secret: process.env.JWT_SECRET || (isProduction ? '' : 'development-secret-key-only-for-local'),
-    refreshSecret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || (isProduction ? '' : 'development-refresh-secret-key-only-for-local'),
+    // SECURITY: No hardcoded fallbacks - use generated dev secrets that change per-restart
+    secret: process.env.JWT_SECRET || (isTest ? 'test-secret-key-min-32-characters-long' : generateDevSecret('jwt-secret')),
+    refreshSecret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || (isTest ? 'test-refresh-secret-key-min-32-chars' : generateDevSecret('jwt-refresh')),
     expiresIn: process.env.JWT_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },

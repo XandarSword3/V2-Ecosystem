@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -49,6 +50,8 @@ interface Chalet {
 }
 
 export default function AdminChaletPricingPage() {
+  const t = useTranslations('adminChalets');
+  const tc = useTranslations('adminCommon');
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
   const [chalets, setChalets] = useState<Chalet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +80,7 @@ export default function AdminChaletPricingPage() {
       setPricingRules(rulesRes.data.data || []);
       setChalets(chaletsRes.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch pricing rules');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -92,16 +95,16 @@ export default function AdminChaletPricingPage() {
     try {
       if (editing) {
         await api.put(`/chalets/admin/price-rules/${editing.id}`, formData);
-        toast.success('Pricing rule updated');
+        toast.success(t('pricing.ruleUpdated'));
       } else {
         await api.post('/chalets/admin/price-rules', formData);
-        toast.success('Pricing rule created');
+        toast.success(t('pricing.ruleCreated'));
       }
       setShowModal(false);
       setEditing(null);
       fetchPricingRules();
     } catch (error) {
-      toast.error('Failed to save pricing rule');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -124,13 +127,13 @@ export default function AdminChaletPricingPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this pricing rule?')) return;
+    if (!confirm(tc('confirmDelete'))) return;
     try {
       await api.delete(`/chalets/admin/price-rules/${id}`);
       setPricingRules((prev) => prev.filter((r) => r.id !== id));
-      toast.success('Pricing rule deleted');
+      toast.success(t('pricing.ruleDeleted'));
     } catch (error) {
-      toast.error('Failed to delete pricing rule');
+      toast.error(tc('errors.failedToDelete'));
     }
   };
 
@@ -140,9 +143,9 @@ export default function AdminChaletPricingPage() {
       setPricingRules((prev) =>
         prev.map((r) => (r.id === rule.id ? { ...r, is_active: !r.is_active } : r))
       );
-      toast.success(`Rule ${rule.is_active ? 'deactivated' : 'activated'}`);
+      toast.success(tc('success.updated'));
     } catch (error) {
-      toast.error('Failed to update rule');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -180,12 +183,12 @@ export default function AdminChaletPricingPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Chalet Pricing</h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage pricing rules and rates</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('pricing.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400">{t('pricing.addRule')}</p>
         </div>
         <Button onClick={openNewModal}>
           <Plus className="w-4 h-4 mr-2" />
-          Add Pricing Rule
+          {t('pricing.addRule')}
         </Button>
       </div>
 
@@ -262,10 +265,10 @@ export default function AdminChaletPricingPage() {
           {pricingRules.length === 0 ? (
             <div className="col-span-full text-center py-12">
               <DollarSign className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">No pricing rules yet</p>
+              <p className="text-slate-500 dark:text-slate-400">{tc('noResults')}</p>
               <Button className="mt-4" onClick={openNewModal}>
                 <Plus className="w-4 h-4 mr-2" />
-                Add First Rule
+                {t('pricing.addRule')}
               </Button>
             </div>
           ) : (
@@ -378,7 +381,7 @@ export default function AdminChaletPricingPage() {
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                    {editing ? 'Edit Pricing Rule' : 'Add Pricing Rule'}
+                    {editing ? tc('edit') : tc('add')} {t('pricing.addRule')}
                   </h2>
                   <button
                     onClick={() => setShowModal(false)}
@@ -544,11 +547,11 @@ export default function AdminChaletPricingPage() {
 
                   <div className="flex gap-3 pt-4">
                     <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>
-                      Cancel
+                      {tc('cancel')}
                     </Button>
                     <Button type="submit" className="flex-1">
                       <Save className="w-4 h-4 mr-2" />
-                      {editing ? 'Update' : 'Create'}
+                      {editing ? tc('update') : tc('create')}
                     </Button>
                   </div>
                 </form>

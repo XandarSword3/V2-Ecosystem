@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Database,
@@ -41,6 +42,8 @@ const fadeInUp = {
 };
 
 export default function BackupsPage() {
+    const t = useTranslations('adminSettings');
+    const tc = useTranslations('adminCommon');
     const [backups, setBackups] = useState<Backup[]>([]);
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
@@ -55,7 +58,7 @@ export default function BackupsPage() {
             }
         } catch (error) {
             console.error('Failed to fetch backups:', error);
-            toast.error('Failed to load backup history');
+            toast.error(tc('errors.failedToLoad'));
         } finally {
             setLoading(false);
         }
@@ -78,7 +81,7 @@ export default function BackupsPage() {
             }
         } catch (error) {
             console.error('Backup failed:', error);
-            toast.error('Database backup failed', { id: 'backup-create' });
+            toast.error(tc('errors.failedToSave'), { id: 'backup-create' });
         } finally {
             setCreating(false);
         }
@@ -89,10 +92,10 @@ export default function BackupsPage() {
 
         try {
             await api.delete(`/admin/backups/${id}`);
-            toast.success('Backup deleted successfully');
+            toast.success(t('backups.backupDeleted'));
             setBackups(prev => prev.filter(b => b.id !== id));
         } catch (error) {
-            toast.error('Failed to delete backup');
+            toast.error(tc('errors.failedToDelete'));
         }
     };
 
@@ -121,11 +124,11 @@ export default function BackupsPage() {
                 
                 // Clean up the blob URL
                 window.URL.revokeObjectURL(blobUrl);
-                toast.success('Download started');
+                toast.success(t('backups.downloadStarted'));
             }
         } catch (error) {
             console.error('Download failed:', error);
-            toast.error('Failed to download backup');
+            toast.error(tc('errors.failedToLoad'));
         } finally {
             setDownloading(null);
         }
@@ -154,10 +157,10 @@ export default function BackupsPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <Database className="w-7 h-7 text-blue-600" />
-                        Database Backups
+                        {t('backups.title')}
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400">
-                        Create and manage point-in-time snapshots of your entire system data.
+                        {t('backups.subtitle')}
                     </p>
                 </div>
                 <Button
@@ -170,7 +173,7 @@ export default function BackupsPage() {
                     ) : (
                         <Plus className="w-4 h-4 mr-2" />
                     )}
-                    Create Manual Backup
+                    {t('backups.createBackup')}
                 </Button>
             </div>
 
@@ -179,13 +182,13 @@ export default function BackupsPage() {
                 <motion.div variants={fadeInUp} className="lg:col-span-1">
                     <Card className="h-full">
                         <CardHeader>
-                            <CardTitle className="text-lg">System Health</CardTitle>
-                            <CardDescription>Backup statistics and policies</CardDescription>
+                            <CardTitle className="text-lg">{t('backups.systemHealth')}</CardTitle>
+                            <CardDescription>{t('backups.subtitle')}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Backups</span>
+                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">{t('backups.totalBackups')}</span>
                                     <span className="text-lg font-bold text-slate-900 dark:text-white">{backups.length}</span>
                                 </div>
                                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">

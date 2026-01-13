@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/auth-context';
 import { useRestaurantOrders } from '@/lib/socket';
 import { formatCurrency, formatTime, getOrderStatusColor } from '@/lib/utils';
@@ -41,6 +42,10 @@ interface Order {
 const statusFlow = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed'];
 
 export default function RestaurantKitchenPage() {
+  const t = useTranslations('staff');
+  const tc = useTranslations('adminCommon');
+  const tr = useTranslations('staff.restaurant');
+  const ts = useTranslations('staff.statuses');
   const { user, logout } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,7 +86,7 @@ export default function RestaurantKitchenPage() {
       });
       setOrders(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to load orders');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setIsLoading(false);
     }
@@ -97,9 +102,9 @@ export default function RestaurantKitchenPage() {
           order.id === orderId ? { ...order, status: newStatus } : order
         )
       );
-      toast.success(`Order updated to ${newStatus}`);
+      toast.success(t('orders.orderUpdated', { status: newStatus }));
     } catch (error) {
-      toast.error('Failed to update order');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -128,11 +133,11 @@ export default function RestaurantKitchenPage() {
       {/* Status Summary */}
       <div className="grid grid-cols-5 gap-4 mb-6">
         {[
-          { status: 'pending', label: 'Pending', icon: Bell, color: 'bg-yellow-500' },
-          { status: 'confirmed', label: 'Confirmed', icon: CheckCircle, color: 'bg-blue-500' },
-          { status: 'preparing', label: 'Preparing', icon: ChefHat, color: 'bg-orange-500' },
-          { status: 'ready', label: 'Ready', icon: Clock, color: 'bg-green-500' },
-          { status: 'served', label: 'Served', icon: UtensilsCrossed, color: 'bg-emerald-500' },
+          { status: 'pending', label: ts('pending'), icon: Bell, color: 'bg-yellow-500' },
+          { status: 'confirmed', label: ts('confirmed'), icon: CheckCircle, color: 'bg-blue-500' },
+          { status: 'preparing', label: ts('preparing'), icon: ChefHat, color: 'bg-orange-500' },
+          { status: 'ready', label: ts('ready'), icon: Clock, color: 'bg-green-500' },
+          { status: 'served', label: ts('served'), icon: UtensilsCrossed, color: 'bg-emerald-500' },
         ].map(({ status, label, icon: Icon, color }) => (
           <button
             key={status}
@@ -163,7 +168,7 @@ export default function RestaurantKitchenPage() {
                         status === 'ready' ? 'bg-green-500' : 'bg-emerald-500'
                   }`}
               />
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+              {ts(status as 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served')}
               <span className="ml-2 text-slate-400">
                 ({ordersByStatus[status as keyof typeof ordersByStatus].length})
               </span>
@@ -223,7 +228,7 @@ export default function RestaurantKitchenPage() {
                         }}
                         className="btn btn-primary btn-sm text-xs"
                       >
-                        Mark {getNextStatus(order.status)}
+                        {tr('markStatus', { status: ts(getNextStatus(order.status) as 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served') })}
                       </button>
                     )}
                   </div>
@@ -232,7 +237,7 @@ export default function RestaurantKitchenPage() {
 
               {ordersByStatus[status as keyof typeof ordersByStatus].length === 0 && (
                 <div className="text-center py-8 text-slate-400">
-                  No orders
+                  {tr('noOrders')}
                 </div>
               )}
             </div>
@@ -271,7 +276,7 @@ export default function RestaurantKitchenPage() {
               {/* Customer Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                  <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Customer</h3>
+                  <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{tr('customer')}</h3>
                   <p className="font-medium text-slate-900 dark:text-white">
                     {selectedOrder.customerName}
                   </p>
@@ -282,7 +287,7 @@ export default function RestaurantKitchenPage() {
                   )}
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                  <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Status</h3>
+                  <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{tr('status')}</h3>
                   <div className="flex items-center gap-2">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-medium ${selectedOrder.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                         selectedOrder.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
@@ -290,7 +295,7 @@ export default function RestaurantKitchenPage() {
                             selectedOrder.status === 'ready' ? 'bg-green-100 text-green-800' :
                               'bg-emerald-100 text-emerald-800'
                       }`}>
-                      {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
+                      {ts(selectedOrder.status as 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served')}
                     </span>
                   </div>
                 </div>
@@ -298,7 +303,7 @@ export default function RestaurantKitchenPage() {
 
               {/* Items */}
               <div>
-                <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Order Items</h3>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-3">{tr('orderItems')}</h3>
                 <div className="space-y-3">
                   {selectedOrder.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-start p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
@@ -321,7 +326,7 @@ export default function RestaurantKitchenPage() {
 
             <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
               <div className="flex justify-between items-center mb-4">
-                <span className="text-lg font-semibold text-slate-900 dark:text-white">Total Amount</span>
+                <span className="text-lg font-semibold text-slate-900 dark:text-white">{tr('totalAmount')}</span>
                 <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
                   {formatCurrency(selectedOrder.totalAmount)}
                 </span>
@@ -333,7 +338,7 @@ export default function RestaurantKitchenPage() {
                     updateOrderStatus(selectedOrder.id, getNextStatus(selectedOrder.status)!);
                     setSelectedOrder(null);
                   }}>
-                    Mark {getNextStatus(selectedOrder.status)}
+                    {tr('markStatus', { status: ts(getNextStatus(selectedOrder.status) as 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served') })}
                   </Button>
                 )}
               </div>

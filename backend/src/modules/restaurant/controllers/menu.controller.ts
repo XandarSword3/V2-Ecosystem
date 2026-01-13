@@ -44,11 +44,32 @@ export async function getCategories(req: Request, res: Response, next: NextFunct
 
 export async function getMenuItems(req: Request, res: Response, next: NextFunction) {
   try {
-    const { categoryId, available, moduleId } = req.query;
+    const { 
+      categoryId, 
+      available, 
+      moduleId,
+      // Dietary filters
+      vegetarian,
+      vegan,
+      glutenFree,
+      dairyFree,
+      halal,
+      // Search filter
+      search
+    } = req.query;
+    
     const items = await menuService.getMenuItems({
       categoryId: categoryId as string,
       availableOnly: available === 'true',
       moduleId: moduleId as string,
+      // Parse dietary filters - only pass if explicitly 'true'
+      isVegetarian: vegetarian === 'true' ? true : undefined,
+      isVegan: vegan === 'true' ? true : undefined,
+      isGlutenFree: glutenFree === 'true' ? true : undefined,
+      isDairyFree: dairyFree === 'true' ? true : undefined,
+      isHalal: halal === 'true' ? true : undefined,
+      // Search filter
+      search: search as string,
     });
     res.json({ success: true, data: items });
   } catch (error) {
