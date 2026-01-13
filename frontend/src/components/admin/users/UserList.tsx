@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { Search, Filter, MoreVertical, Edit2, Trash2, Shield, Circle, User } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -26,6 +27,8 @@ interface UserListProps {
 }
 
 export default function UserList({ type, title }: UserListProps) {
+  const t = useTranslations('adminUsers');
+  const tCommon = useTranslations('adminCommon');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -55,13 +58,13 @@ export default function UserList({ type, title }: UserListProps) {
   };
 
   const handleDelete = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+    if (!confirm(tCommon('confirmDelete'))) return;
     try {
       await api.delete(`/admin/users/${userId}`);
-      toast.success('User deleted');
+      toast.success(t('userDeleted'));
       fetchUsers();
     } catch (error) {
-      toast.error('Failed to delete user');
+      toast.error(t('errors.failedToDelete'));
     }
   };
 
@@ -71,12 +74,12 @@ export default function UserList({ type, title }: UserListProps) {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
           <p className="text-muted-foreground">
-            Manage {type} accounts and permissions.
+            {t('subtitle')}
           </p>
         </div>
         {/* Only show 'Create' button for staff/admin if needed, or all types */}
         <Button onClick={() => router.push(`/admin/users/create?type=${type}`)}>
-          + Add {title}
+          + {t('addUser')}
         </Button>
       </div>
 
@@ -87,7 +90,7 @@ export default function UserList({ type, title }: UserListProps) {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search users..."
+                placeholder={tCommon('searchPlaceholder')}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 pl-8 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -101,18 +104,18 @@ export default function UserList({ type, title }: UserListProps) {
             <table className="w-full text-sm text-left">
               <thead className="bg-muted/50 text-muted-foreground">
                 <tr>
-                  <th className="h-10 px-4 font-medium align-middle">User</th>
-                  <th className="h-10 px-4 font-medium align-middle">Status</th>
-                  <th className="h-10 px-4 font-medium align-middle">Roles</th>
-                  <th className="h-10 px-4 font-medium align-middle">Joined</th>
-                  <th className="h-10 px-4 font-medium align-middle text-right">Actions</th>
+                  <th className="h-10 px-4 font-medium align-middle">{tCommon('tables.name')}</th>
+                  <th className="h-10 px-4 font-medium align-middle">{tCommon('status')}</th>
+                  <th className="h-10 px-4 font-medium align-middle">{t('roles')}</th>
+                  <th className="h-10 px-4 font-medium align-middle">{t('joined')}</th>
+                  <th className="h-10 px-4 font-medium align-middle text-right">{tCommon('actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                   <tr><td colSpan={5} className="p-4 text-center">Loading...</td></tr>
+                   <tr><td colSpan={5} className="p-4 text-center">{tCommon('loading')}</td></tr>
                 ) : users.length === 0 ? (
-                   <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No users found.</td></tr>
+                   <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">{tCommon('noResults')}</td></tr>
                 ) : (
                   users.map((user) => (
                     <tr 
@@ -136,14 +139,14 @@ export default function UserList({ type, title }: UserListProps) {
                            {user.is_online ? (
                                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors border-transparent bg-green-500/15 text-green-700">
                                    <Circle className="w-2 h-2 mr-1 fill-current" />
-                                   Online
+                                   {t('online')}
                                </span>
                            ) : (
-                               <span className="text-muted-foreground text-xs pl-2">Offline</span>
+                               <span className="text-muted-foreground text-xs pl-2">{t('offline')}</span>
                            )}
                            {!user.is_active && (
                                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors border-transparent bg-destructive/15 text-destructive">
-                                   Inactive
+                                   {tCommon('inactive')}
                                </span>
                            )}
                         </div>

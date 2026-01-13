@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, authorize, optionalAuth } from "../../middleware/auth.middleware";
+import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
 import * as poolController from "./pool.controller";
 
 const router = Router();
@@ -9,8 +10,8 @@ router.get('/sessions', poolController.getSessions);
 router.get('/sessions/:id', poolController.getSession);
 router.get('/availability', poolController.getAvailability);
 
-// Customer routes
-router.post('/tickets', optionalAuth, poolController.purchaseTicket);
+// Customer routes (rate limited - financial operations)
+router.post('/tickets', optionalAuth, rateLimits.write, poolController.purchaseTicket);
 router.get('/tickets/:id', optionalAuth, poolController.getTicket);
 
 // Authenticated customer routes

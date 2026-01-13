@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -29,6 +30,8 @@ interface Table {
 }
 
 export default function AdminTablesPage() {
+  const t = useTranslations('adminRestaurant');
+  const tc = useTranslations('adminCommon');
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -40,7 +43,7 @@ export default function AdminTablesPage() {
       const response = await api.get('/restaurant/staff/tables');
       setTables(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch tables');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -52,7 +55,7 @@ export default function AdminTablesPage() {
 
   const handleSubmit = async () => {
     if (!formData.table_number) {
-      toast.error('Table number is required');
+      toast.error(tc('errors.required'));
       return;
     }
 
@@ -65,29 +68,29 @@ export default function AdminTablesPage() {
 
       if (editingTable) {
         await api.patch(`/restaurant/staff/tables/${editingTable.id}`, payload);
-        toast.success('Table updated');
+        toast.success(t('tables.tableUpdated'));
       } else {
         await api.post('/restaurant/admin/tables', payload);
-        toast.success('Table created');
+        toast.success(t('tables.tableCreated'));
       }
       setShowModal(false);
       setEditingTable(null);
       setFormData({ table_number: '', capacity: '4', location: '' });
       fetchTables();
     } catch (error) {
-      toast.error('Failed to save table');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this table?')) return;
+    if (!confirm(tc('confirmDelete'))) return;
     
     try {
       await api.delete(`/restaurant/admin/tables/${id}`);
-      toast.success('Table deleted');
+      toast.success(t('tables.tableDeleted'));
       fetchTables();
     } catch (error) {
-      toast.error('Failed to delete table');
+      toast.error(tc('errors.failedToDelete'));
     }
   };
 
@@ -95,19 +98,18 @@ export default function AdminTablesPage() {
     try {
       await api.patch(`/restaurant/staff/tables/${table.id}`, { is_available: !table.is_available });
       setTables((prev) => prev.map((t) => (t.id === table.id ? { ...t, is_available: !t.is_available } : t)));
-      toast.success(`Table ${table.is_available ? 'marked occupied' : 'marked available'}`);
+      toast.success(t('tables.tableUpdated'));
     } catch (error) {
-      toast.error('Failed to update table');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
   const generateQR = async (tableId: string) => {
     try {
-      toast.success(`QR Code for Table ${tableId} generated`);
-      toast.success('QR code generated');
+      toast.success(t('tables.qrGenerated'));
       fetchTables();
     } catch (error) {
-      toast.error('Failed to generate QR code');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -140,7 +142,7 @@ export default function AdminTablesPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Restaurant Tables</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('tables.title')}</h1>
           <p className="text-slate-500 dark:text-slate-400">
             {availableTables} available, {occupiedTables} occupied
           </p>
@@ -148,11 +150,11 @@ export default function AdminTablesPage() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={fetchTables}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <Button onClick={() => { setEditingTable(null); setFormData({ table_number: '', capacity: '4', location: '' }); setShowModal(true); }}>
             <Plus className="w-4 h-4 mr-2" />
-            Add Table
+            {t('tables.addTable')}
           </Button>
         </div>
       </div>
@@ -167,10 +169,10 @@ export default function AdminTablesPage() {
               className="col-span-full text-center py-12"
             >
               <Users className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">No tables configured</p>
+              <p className="text-slate-500 dark:text-slate-400">{tc('noData')}</p>
               <Button className="mt-4" onClick={() => setShowModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Add your first table
+                {t('tables.addTable')}
               </Button>
             </motion.div>
           ) : (
@@ -205,12 +207,12 @@ export default function AdminTablesPage() {
                       {table.is_available ? (
                         <>
                           <CheckCircle2 className="w-3 h-3" />
-                          Available
+                          {t('tables.available')}
                         </>
                       ) : (
                         <>
                           <XCircle className="w-3 h-3" />
-                          Occupied
+                          {t('tables.occupied')}
                         </>
                       )}
                     </div>
@@ -259,13 +261,13 @@ export default function AdminTablesPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                {editingTable ? 'Edit Table' : 'Add Table'}
+                {editingTable ? tc('edit') : t('tables.addTable')}
               </h2>
 
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Table Number
+                    {t('tables.tableNumber')}
                   </label>
                   <input
                     type="number"
@@ -278,7 +280,7 @@ export default function AdminTablesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Capacity
+                    {t('tables.capacity')}
                   </label>
                   <input
                     type="number"
@@ -304,10 +306,10 @@ export default function AdminTablesPage() {
 
                 <div className="flex justify-end gap-2 pt-4">
                   <Button variant="outline" onClick={() => setShowModal(false)}>
-                    Cancel
+                    {tc('cancel')}
                   </Button>
                   <Button onClick={handleSubmit}>
-                    {editingTable ? 'Update' : 'Create'}
+                    {editingTable ? tc('update') : tc('create')}
                   </Button>
                 </div>
               </div>

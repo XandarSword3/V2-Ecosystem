@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
@@ -64,6 +65,7 @@ const ticketTypeColors: Record<string, string> = {
 export default function DynamicTicketsPage() {
   const params = useParams();
   const { modules } = useSiteSettings();
+  const tc = useTranslations('adminCommon');
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
   const currentModule = modules.find(m => m.slug === slug);
 
@@ -79,7 +81,7 @@ export default function DynamicTicketsPage() {
       const response = await api.get('/pool/staff/tickets/today', { params: { moduleId: currentModule.id } });
       setTickets(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch tickets');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -92,13 +94,13 @@ export default function DynamicTicketsPage() {
   }, [currentModule, fetchTickets]);
 
   const cancelTicket = async (id: string) => {
-    if (!confirm('Are you sure you want to cancel this ticket?')) return;
+    if (!confirm(tc('tickets.confirmCancel'))) return;
     try {
       await api.put(`/pool/tickets/${id}/cancel`);
-      toast.success('Ticket cancelled');
+      toast.success(tc('tickets.ticketCancelled'));
       fetchTickets();
     } catch (error) {
-      toast.error('Failed to cancel ticket');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -139,12 +141,12 @@ export default function DynamicTicketsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentModule.name} Tickets</h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage entry tickets</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentModule.name} {tc('tickets.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400">{tc('tickets.manageEntryTickets')}</p>
         </div>
         <Button variant="outline" onClick={fetchTickets}>
           <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
+          {tc('refresh')}
         </Button>
       </div>
 
@@ -155,7 +157,7 @@ export default function DynamicTicketsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">Total Tickets</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">{tc('tickets.totalTickets')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
                 </div>
                 <Ticket className="w-8 h-8 text-blue-500" />
@@ -169,7 +171,7 @@ export default function DynamicTicketsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">Active</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">{tc('tickets.active')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.active}</p>
                 </div>
                 <CheckCircle2 className="w-8 h-8 text-green-500" />
@@ -183,7 +185,7 @@ export default function DynamicTicketsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">Pending</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">{tc('orders.pending')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.pending}</p>
                 </div>
                 <Clock className="w-8 h-8 text-yellow-500" />
@@ -197,7 +199,7 @@ export default function DynamicTicketsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">Today&apos;s Revenue</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">{tc('tickets.todaysRevenue')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(stats.todayRevenue)}</p>
                 </div>
                 <Calendar className="w-8 h-8 text-purple-500" />
@@ -216,24 +218,24 @@ export default function DynamicTicketsPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800"
             >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="active">Active</option>
-              <option value="valid">Valid</option>
-              <option value="used">Used</option>
-              <option value="expired">Expired</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="all">{tc('filters.allStatus')}</option>
+              <option value="pending">{tc('orders.pending')}</option>
+              <option value="active">{tc('tickets.active')}</option>
+              <option value="valid">{tc('tickets.valid')}</option>
+              <option value="used">{tc('tickets.used')}</option>
+              <option value="expired">{tc('tickets.expired')}</option>
+              <option value="cancelled">{tc('orders.cancelled')}</option>
             </select>
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               className="px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800"
             >
-              <option value="all">All Types</option>
-              <option value="adult">Adult</option>
-              <option value="child">Child</option>
-              <option value="family">Family</option>
-              <option value="vip">VIP</option>
+              <option value="all">{tc('filters.allTypes')}</option>
+              <option value="adult">{tc('sessions.adult')}</option>
+              <option value="child">{tc('sessions.child')}</option>
+              <option value="family">{tc('tickets.family')}</option>
+              <option value="vip">{tc('tickets.vip')}</option>
             </select>
           </div>
         </CardContent>
@@ -246,18 +248,18 @@ export default function DynamicTicketsPage() {
             <table className="w-full">
               <thead className="bg-slate-50 dark:bg-slate-900/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Ticket #</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">{tc('tickets.ticketNumber')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">{tc('tickets.type')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">{tc('tickets.customer')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">{tc('tickets.price')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">{tc('tables.status')}</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase">{tc('tables.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {filteredTickets.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">No tickets found</td>
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">{tc('tickets.noTicketsFound')}</td>
                   </tr>
                 ) : (
                   filteredTickets.map((ticket) => (
@@ -315,7 +317,7 @@ export default function DynamicTicketsPage() {
               className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6"
             >
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-slate-900 dark:text-white">Ticket Details</h3>
+                <h3 className="text-xl font-semibold text-slate-900 dark:text-white">{tc('tickets.ticketDetails')}</h3>
                 <button onClick={() => setSelectedTicket(null)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                   <X className="w-5 h-5" />
                 </button>
@@ -323,27 +325,27 @@ export default function DynamicTicketsPage() {
 
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm text-slate-500">Ticket Number</p>
+                  <p className="text-sm text-slate-500">{tc('tickets.ticketNumber')}</p>
                   <p className="font-mono font-bold text-lg">{selectedTicket.ticket_number}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-slate-500">Type</p>
+                    <p className="text-sm text-slate-500">{tc('tickets.type')}</p>
                     <p className="font-medium capitalize">{selectedTicket.ticket_type || 'Adult'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500">Status</p>
+                    <p className="text-sm text-slate-500">{tc('tables.status')}</p>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[selectedTicket.status]}`}>
                       {selectedTicket.status}
                     </span>
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">Customer</p>
+                  <p className="text-sm text-slate-500">{tc('tickets.customer')}</p>
                   <p className="font-medium">{selectedTicket.customer_name || selectedTicket.users?.full_name || 'Guest'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">Price</p>
+                  <p className="text-sm text-slate-500">{tc('tickets.price')}</p>
                   <p className="font-bold text-lg text-green-600">{formatCurrency(getTicketPrice(selectedTicket))}</p>
                 </div>
                 {selectedTicket.qr_code && (

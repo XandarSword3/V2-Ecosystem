@@ -157,10 +157,10 @@ export default function ModuleCartPage() {
   if (!currentModule) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center">
-            <h2 className="text-xl font-bold mb-2">Module Not Found</h2>
-            <p className="text-slate-500 mb-4">Could not find module for slug: {slug}</p>
+            <h2 className="text-xl font-bold mb-2">{t('moduleNotFound')}</h2>
+            <p className="text-slate-500 mb-4">{t('couldNotFindModule')}: {slug}</p>
             <Link href="/">
-                <Button>Return Home</Button>
+                <Button>{t('returnHome')}</Button>
             </Link>
         </div>
       );
@@ -175,7 +175,7 @@ export default function ModuleCartPage() {
           <Link href={`/${slug}`}>
             <Button variant="outline" className="gap-2">
               <ArrowLeft className="w-4 h-4" />
-              Return to Menu
+              {t('backToMenu')}
             </Button>
           </Link>
         </div>
@@ -190,11 +190,11 @@ export default function ModuleCartPage() {
           <Link href={`/${slug}`}>
             <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+              {t('back')}
             </Button>
           </Link>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            {currentModule.name} Checkout
+            {currentModule.name} {t('checkout')}
           </h1>
         </div>
 
@@ -232,59 +232,59 @@ export default function ModuleCartPage() {
           <div className="lg:col-span-1">
             <Card>
                 <CardHeader>
-                    <CardTitle>Order Details</CardTitle>
+                    <CardTitle>{t('orderDetails')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Name</label>
-                        <input className="input w-full" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Full Name" />
+                        <label className="text-sm font-medium">{t('name')}</label>
+                        <input className="input w-full" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder={t('fullName')} />
                      </div>
                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Phone</label>
-                        <input className="input w-full" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Phone Number" />
+                        <label className="text-sm font-medium">{t('phone')}</label>
+                        <input className="input w-full" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder={t('phoneNumber')} />
                      </div>
                      
                      <div className="flex gap-2">
                          <button 
                             onClick={() => setOrderType('dine_in')}
                             className={`flex-1 p-2 rounded border ${orderType === 'dine_in' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10' : ''}`}
-                         >Dine In</button>
+                         >{t('dineIn')}</button>
                          <button 
                             onClick={() => setOrderType('takeaway')}
                             className={`flex-1 p-2 rounded border ${orderType === 'takeaway' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10' : ''}`}
-                         >Takeaway</button>
+                         >{t('takeaway')}</button>
                      </div>
 
                      {orderType === 'dine_in' && (
                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Table Number</label>
-                            <input className="input w-full" value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="Table #" />
+                            <label className="text-sm font-medium">{t('tableNumber')}</label>
+                            <input className="input w-full" value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder={t('tableNumberPlaceholder')} />
                          </div>
                      )}
 
                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Notes</label>
-                        <textarea className="input w-full" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Special instructions..." />
+                        <label className="text-sm font-medium">{t('notes')}</label>
+                        <textarea className="input w-full" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder={t('specialInstructions')} />
                      </div>
 
                      <div className="border-t pt-4 mt-4 space-y-2">
                         <div className="flex justify-between text-sm">
-                            <span>Subtotal</span>
+                            <span>{t('subtotal')}</span>
                             <span>{formatCurrency(subtotal, currency)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                            <span>Tax (11%)</span>
+                            <span>{t('tax')} (11%)</span>
                             <span>{formatCurrency(tax, currency)}</span>
                         </div>
                         <div className="flex justify-between font-bold text-lg">
-                            <span>Total</span>
+                            <span>{t('total')}</span>
                             <span>{formatCurrency(total, currency)}</span>
                         </div>
                      </div>
 
                      <Button className="w-full" onClick={handlePlaceOrder} disabled={orderMutation.isPending}>
                         {orderMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Place Order
+                        {t('placeOrder')}
                      </Button>
                 </CardContent>
             </Card>

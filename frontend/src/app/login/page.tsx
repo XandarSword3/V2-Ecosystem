@@ -57,7 +57,7 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       const error = err as Error;
-      setError(error.message || 'Login failed. Please try again.');
+      setError(error.message || t('loginFailed'));
       setIsLoading(false);
     }
   };
@@ -169,10 +169,10 @@ export default function LoginPage() {
 
           {/* Quick Login Hints */}
           <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700">
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold uppercase tracking-wider">Demo Credentials</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold uppercase tracking-wider">{t('demoCredentials')}</p>
             <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2">
               <div className="flex justify-between items-center group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 p-1 rounded" onClick={() => { setEmail('admin@v2resort.com'); setPassword('admin123'); }}>
-                <span className="font-medium text-primary-600">Super Admin:</span>
+                <span className="font-medium text-primary-600">{t('superAdmin')}:</span>
                 <span className="font-mono">admin@v2resort.com / admin123</span>
               </div>
             </div>

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
+import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 import {
   User,
   Mail,
@@ -363,6 +364,9 @@ export default function ProfilePage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Two-Factor Authentication */}
+              <TwoFactorSettings />
             </motion.div>
           )}
 

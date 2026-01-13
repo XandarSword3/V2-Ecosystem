@@ -876,7 +876,7 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
           resortName: 'V2 Resort',
           tagline: "Lebanon's Premier Resort Experience",
           description: 'Your premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences in the heart of Lebanon.',
-          phone: '+961 XX XXX XXX',
+          phone: '',
           email: 'info@v2resort.com',
           address: 'V2 Resort, Lebanon',
           poolHours: '9:00 AM - 7:00 PM',

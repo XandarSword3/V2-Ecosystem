@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useSiteSettings } from '@/lib/settings-context';
 import { MenuService } from '@/components/modules/MenuService';
 import { BookingService } from '@/components/modules/BookingService';
@@ -12,6 +13,8 @@ import { motion } from 'framer-motion';
 import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
 
 export default function ModulePage() {
+  const t = useTranslations('errors');
+  const tCommon = useTranslations('common');
   const params = useParams();
 
   const router = useRouter();
@@ -68,18 +71,17 @@ export default function ModulePage() {
             <AlertCircle className="w-10 h-10 text-amber-500" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-3">
-            Feature Currently Unavailable
+            {t('featureUnavailable')}
           </h1>
           <p className="text-slate-400 mb-6">
-            The {disabledModule.name} service is temporarily unavailable. 
-            Please check back later or contact us for more information.
+            {t('featureUnavailableDesc', { name: disabledModule.name })}
           </p>
           <button 
             onClick={() => router.push('/')}
             className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             <Home className="w-5 h-5" />
-            Return Home
+            {tCommon('returnHome')}
           </button>
         </motion.div>
       </div>
@@ -96,16 +98,16 @@ export default function ModulePage() {
           className="text-center max-w-md"
         >
           <h1 className="text-6xl font-bold text-white mb-4">404</h1>
-          <h2 className="text-2xl font-semibold text-slate-300 mb-3">Page Not Found</h2>
+          <h2 className="text-2xl font-semibold text-slate-300 mb-3">{t('pageNotFound')}</h2>
           <p className="text-slate-400 mb-6">
-            The page you&apos;re looking for doesn&apos;t exist or has been moved.
+            {t('pageNotFoundDesc')}
           </p>
           <button 
             onClick={() => router.push('/')}
             className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             <Home className="w-5 h-5" />
-            Return Home
+            {tCommon('returnHome')}
           </button>
         </motion.div>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
@@ -47,6 +48,8 @@ const typeConfig: Record<string, { icon: React.ElementType; color: string; bgCol
 };
 
 export default function AdminNotificationsPage() {
+  const t = useTranslations('adminSettings');
+  const tc = useTranslations('adminCommon');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -94,19 +97,19 @@ export default function AdminNotificationsPage() {
 
   const sendNotification = async () => {
     if (!newNotification.title || !newNotification.message) {
-      toast.error('Please fill in all fields');
+      toast.error(tc('errors.required'));
       return;
     }
 
     try {
       setSending(true);
       await api.post('/admin/notifications/broadcast', newNotification);
-      toast.success('Notification sent successfully');
+      toast.success(t('notifications.sent'));
       setShowCreateModal(false);
       setNewNotification({ title: '', message: '', type: 'info', target_type: 'all' });
       fetchNotifications();
     } catch (error) {
-      toast.error('Failed to send notification');
+      toast.error(tc('errors.failedToSave'));
     } finally {
       setSending(false);
     }
@@ -116,7 +119,7 @@ export default function AdminNotificationsPage() {
     try {
       await api.delete(`/admin/notifications/${id}`);
       setNotifications((prev) => prev.filter((n) => n.id !== id));
-      toast.success('Notification deleted');
+      toast.success(tc('success.deleted'));
     } catch (error) {
       toast.error('Failed to delete notification');
     }
@@ -156,20 +159,20 @@ export default function AdminNotificationsPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Notifications
+            {t('notifications.title')}
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Send and manage system notifications
+            {t('notifications.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={fetchNotifications}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Send Notification
+            {t('notifications.sendNotification')}
           </Button>
         </div>
       </div>
@@ -181,7 +184,7 @@ export default function AdminNotificationsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 text-sm">Total Sent</p>
+                  <p className="text-blue-100 text-sm">{t('notifications.totalSent')}</p>
                   <p className="text-3xl font-bold mt-1">{notifications.length}</p>
                 </div>
                 <Bell className="w-10 h-10 text-blue-200" />
@@ -195,7 +198,7 @@ export default function AdminNotificationsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-green-100 text-sm">Sent Today</p>
+                  <p className="text-green-100 text-sm">{t('notifications.sentToday')}</p>
                   <p className="text-3xl font-bold mt-1">{todayCount}</p>
                 </div>
                 <Megaphone className="w-10 h-10 text-green-200" />
@@ -338,7 +341,7 @@ export default function AdminNotificationsPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                Send Notification
+                {t('notifications.sendNotification')}
               </h2>
 
               <div className="space-y-4">
@@ -415,7 +418,7 @@ export default function AdminNotificationsPage() {
 
                 <div className="flex justify-end gap-2 pt-4">
                   <Button variant="outline" onClick={() => setShowCreateModal(false)}>
-                    Cancel
+                    {tc('cancel')}
                   </Button>
                   <Button onClick={sendNotification} disabled={sending}>
                     {sending ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -16,6 +17,8 @@ interface ChaletSettings {
 }
 
 export default function ChaletSettingsPage() {
+  const t = useTranslations('adminChalets');
+  const tc = useTranslations('adminCommon');
   const [settings, setSettings] = useState<ChaletSettings>({
     deposit_percentage: 30,
     check_in_time: '14:00',
@@ -36,7 +39,7 @@ export default function ChaletSettingsPage() {
       }
     } catch (error) {
       console.error('Failed to fetch settings:', error);
-      toast.error('Failed to fetch settings');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -50,9 +53,9 @@ export default function ChaletSettingsPage() {
     try {
       setSaving(true);
       await api.put('/chalets/admin/settings', settings);
-      toast.success('Settings saved successfully');
+      toast.success(t('settings.saved'));
     } catch (error) {
-      toast.error('Failed to save settings');
+      toast.error(tc('errors.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -63,15 +66,15 @@ export default function ChaletSettingsPage() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading settings...</div>;
+    return <div className="p-8 text-center text-muted-foreground">{tc('loading')}</div>;
   }
 
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Chalet Configuration</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t('settings.configuration')}</h1>
         <p className="text-muted-foreground">
-          Manage global settings for chalet bookings.
+          {t('settings.title')}
         </p>
       </div>
 
@@ -139,7 +142,7 @@ export default function ChaletSettingsPage() {
       <div className="flex justify-end">
         <Button onClick={saveSettings} disabled={saving} size="lg">
           <Save className="w-4 h-4 mr-2" />
-          {saving ? 'Saving...' : 'Save Changes'}
+          {saving ? tc('saving') : tc('saveChanges')}
         </Button>
       </div>
     </div>

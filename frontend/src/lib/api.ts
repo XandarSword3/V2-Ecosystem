@@ -137,6 +137,21 @@ export const authApi = {
     api.post('/auth/reset-password', { token, password }),
   
   getProfile: () => api.get('/auth/me'),
+  
+  // Two-Factor Authentication
+  get2FAStatus: () => api.get('/auth/2fa/status'),
+  
+  setup2FA: () => api.post('/auth/2fa/setup'),
+  
+  enable2FA: (code: string) => api.post('/auth/2fa/enable', { code }),
+  
+  disable2FA: (code: string) => api.post('/auth/2fa/disable', { code }),
+  
+  verify2FA: (userId: string, code: string, isBackupCode?: boolean) =>
+    api.post('/auth/2fa/verify', { userId, code, isBackupCode }),
+  
+  regenerateBackupCodes: (code: string) =>
+    api.post('/auth/2fa/backup-codes', { code }),
 };
 
 // Restaurant API

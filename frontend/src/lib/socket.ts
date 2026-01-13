@@ -231,3 +231,56 @@ export function useRestaurantOrders(onNewOrder: (data: any) => void, onStatusUpd
     }
   }, [socket]);
 }
+
+// Hook to track page navigation for live users monitoring
+export function usePageTracking() {
+  const { socket, isConnected } = useSocket();
+  
+  useEffect(() => {
+    if (socket && isConnected && typeof window !== 'undefined') {
+      // Send current page on connection
+      socket.emit('page:navigate', { path: window.location.pathname });
+      
+      // Track navigation via History API
+      const originalPushState = history.pushState;
+      const originalReplaceState = history.replaceState;
+      
+      const handleNavigation = () => {
+        socket.emit('page:navigate', { path: window.location.pathname });
+      };
+      
+      history.pushState = function(...args) {
+        const result = originalPushState.apply(this, args);
+        handleNavigation();
+        return result;
+      };
+      
+      history.replaceState = function(...args) {
+        const result = originalReplaceState.apply(this, args);
+        handleNavigation();
+        return result;
+      };
+      
+      // Handle back/forward navigation
+      window.addEventListener('popstate', handleNavigation);
+      
+      return () => {
+        history.pushState = originalPushState;
+        history.replaceState = originalReplaceState;
+        window.removeEventListener('popstate', handleNavigation);
+      };
+    }
+  }, [socket, isConnected]);
+}
+
+// Function to update user info after login
+export function updateSocketUserInfo(userInfo: { 
+  userId: string; 
+  email: string; 
+  fullName: string; 
+  roles: string[];
+}) {
+  if (globalSocket && globalSocket.connected) {
+    globalSocket.emit('user:update', userInfo);
+  }
+}

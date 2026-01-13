@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -72,6 +73,8 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
 };
 
 export default function AdminChaletBookingsPage() {
+  const t = useTranslations('adminChalets');
+  const tc = useTranslations('adminCommon');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -83,7 +86,7 @@ export default function AdminChaletBookingsPage() {
       const response = await api.get('/chalets/staff/bookings');
       setBookings(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch bookings');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -97,9 +100,9 @@ export default function AdminChaletBookingsPage() {
     try {
       await api.patch(`/chalets/staff/bookings/${bookingId}/status`, { status });
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: status as Booking['status'] } : b)));
-      toast.success('Booking status updated');
+      toast.success(t('bookings.statusUpdated'));
     } catch (error) {
-      toast.error('Failed to update booking');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -139,12 +142,12 @@ export default function AdminChaletBookingsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Chalet Bookings</h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage all chalet reservations</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('bookings.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400">{tc('all')} {tc('bookings.bookingNumber')}</p>
         </div>
         <Button variant="outline" onClick={fetchBookings}>
           <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
+          {tc('refresh')}
         </Button>
       </div>
 
@@ -215,7 +218,7 @@ export default function AdminChaletBookingsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search bookings..."
+                placeholder={tc('searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -243,7 +246,7 @@ export default function AdminChaletBookingsPage() {
           {filteredBookings.length === 0 ? (
             <div className="text-center py-12">
               <Home className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">No bookings found</p>
+              <p className="text-slate-500 dark:text-slate-400">{tc('noResults')}</p>
             </div>
           ) : (
             filteredBookings.map((booking, index) => {
@@ -321,28 +324,28 @@ export default function AdminChaletBookingsPage() {
                         <div className="flex flex-col gap-2">
                           <Button size="sm" variant="outline" onClick={() => setSelectedBooking(booking)}>
                             <Eye className="w-4 h-4 mr-1" />
-                            Details
+                            {tc('details')}
                           </Button>
                           {booking.status === 'pending' && (
                             <Button size="sm" onClick={() => updateBookingStatus(booking.id, 'confirmed')}>
-                              Confirm
+                              {tc('bookings.confirmed')}
                             </Button>
                           )}
                           {booking.status === 'confirmed' && (
                             <Button size="sm" onClick={() => updateBookingStatus(booking.id, 'checked_in')}>
                               <LogIn className="w-4 h-4 mr-1" />
-                              Check In
+                              {tc('bookings.checkIn')}
                             </Button>
                           )}
                           {booking.status === 'checked_in' && (
                             <Button size="sm" onClick={() => updateBookingStatus(booking.id, 'checked_out')}>
                               <LogOut className="w-4 h-4 mr-1" />
-                              Check Out
+                              {tc('bookings.checkOut')}
                             </Button>
                           )}
                           {(booking.status === 'pending' || booking.status === 'confirmed') && (
                             <Button size="sm" variant="danger" onClick={() => updateBookingStatus(booking.id, 'cancelled')}>
-                              Cancel
+                              {tc('bookings.cancelled')}
                             </Button>
                           )}
                         </div>
@@ -372,7 +375,7 @@ export default function AdminChaletBookingsPage() {
             >
               <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">Booking Details</h2>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('bookings.bookingDetails')}</h2>
                   <p className="text-sm text-slate-500">#{selectedBooking.booking_number}</p>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedBooking(null)}>
@@ -410,7 +413,7 @@ export default function AdminChaletBookingsPage() {
 
                 {/* Stay Details */}
                 <div>
-                  <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Stay Details</h3>
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-3">{t('bookings.stayDetails')}</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
                       <p className="text-sm text-slate-500 flex items-center gap-1"><Calendar className="w-3 h-3" /> Check-in</p>
@@ -433,7 +436,7 @@ export default function AdminChaletBookingsPage() {
 
                 {/* Customer Info */}
                 <div>
-                  <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Customer Information</h3>
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-3">{t('bookings.customerInfo')}</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-slate-500">Name</p>
@@ -513,22 +516,22 @@ export default function AdminChaletBookingsPage() {
               <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
                 {selectedBooking.status === 'pending' && (
                   <Button onClick={() => { updateBookingStatus(selectedBooking.id, 'confirmed'); setSelectedBooking(null); }}>
-                    Confirm Booking
+                    {tc('bookings.confirmed')}
                   </Button>
                 )}
                 {selectedBooking.status === 'confirmed' && (
                   <Button onClick={() => { updateBookingStatus(selectedBooking.id, 'checked_in'); setSelectedBooking(null); }}>
                     <LogIn className="w-4 h-4 mr-1" />
-                    Check In
+                    {tc('bookings.checkIn')}
                   </Button>
                 )}
                 {selectedBooking.status === 'checked_in' && (
                   <Button onClick={() => { updateBookingStatus(selectedBooking.id, 'checked_out'); setSelectedBooking(null); }}>
                     <LogOut className="w-4 h-4 mr-1" />
-                    Check Out
+                    {tc('bookings.checkOut')}
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => setSelectedBooking(null)}>Close</Button>
+                <Button variant="outline" onClick={() => setSelectedBooking(null)}>{tc('close')}</Button>
               </div>
             </motion.div>
           </div>

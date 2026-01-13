@@ -172,8 +172,9 @@ const isAllowedOrigin = (origin: string | undefined): boolean => {
   // Check exact match
   if (allowedOrigins.includes(origin)) return true;
 
-  // Check Vercel preview URLs
-  if (origin.endsWith('.vercel.app')) return true;
+  // Check Vercel preview URLs - only allow YOUR project's preview deployments
+  // Pattern: https://v2-ecosystem-{hash}-{username}.vercel.app
+  if (origin.match(/^https:\/\/v2-ecosystem(-[a-z0-9]+)*\.vercel\.app$/)) return true;
 
   return false;
 };

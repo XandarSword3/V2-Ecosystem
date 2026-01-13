@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -77,6 +78,8 @@ const defaultSettings: HomepageSettings = {
 };
 
 export default function HomepageSettingsPage() {
+  const t = useTranslations('adminSettings');
+  const tc = useTranslations('adminCommon');
   const [settings, setSettings] = useState<HomepageSettings>(defaultSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -101,10 +104,10 @@ export default function HomepageSettingsPage() {
     setIsSaving(true);
     try {
       await api.put('/admin/settings', { homepage: settings });
-      toast.success('Homepage settings saved!');
+      toast.success(t('homepage.saved'));
       setHasChanges(false);
     } catch (error) {
-      toast.error('Failed to save homepage settings');
+      toast.error(tc('errors.failedToSave'));
     } finally {
       setIsSaving(false);
     }
@@ -188,15 +191,15 @@ export default function HomepageSettingsPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <Layout className="w-8 h-8 text-primary-600" />
-            Homepage Settings
+            {t('homepage.title')}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Customize the homepage layout and content
+            {t('homepage.subtitle')}
           </p>
         </div>
         <Button onClick={handleSave} isLoading={isSaving} disabled={!hasChanges}>
           <Save className="w-4 h-4 mr-2" />
-          Save Changes
+          {tc('saveChanges')}
         </Button>
       </motion.div>
 

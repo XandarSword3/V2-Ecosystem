@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useModuleBuilderStore } from '@/store/module-builder-store';
@@ -19,6 +20,7 @@ import { UIBlock } from '@/types/module-builder';
 export default function ModuleBuilderPage() {
   const params = useParams();
   const router = useRouter();
+  const tc = useTranslations('adminCommon');
   const id = params.id as string;
   
   const { 
@@ -47,8 +49,8 @@ export default function ModuleBuilderPage() {
             }
         });
     },
-    onSuccess: () => toast.success('Layout saved successfully'),
-    onError: () => toast.error('Failed to save layout')
+    onSuccess: () => toast.success(tc('builder.layoutSaved')),
+    onError: () => toast.error(tc('builder.layoutSaveFailed'))
   });
 
   useEffect(() => {
@@ -73,8 +75,8 @@ export default function ModuleBuilderPage() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 dark:text-white">{data?.data?.name || 'Module Builder'}</h1>
-            <p className="text-xs text-slate-500">Visual Editor</p>
+            <h1 className="text-lg font-bold text-slate-900 dark:text-white">{data?.data?.name || tc('builder.title')}</h1>
+            <p className="text-xs text-slate-500">{tc('builder.visualEditor')}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -83,7 +85,7 @@ export default function ModuleBuilderPage() {
                 className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700"
             >
                 {isPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                {isPreview ? 'Back to Edit' : 'Preview'}
+                {isPreview ? tc('builder.backToEdit') : tc('builder.preview')}
             </button>
             <button 
                 onClick={() => saveMutation.mutate(layout)}
@@ -91,7 +93,7 @@ export default function ModuleBuilderPage() {
                 className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
             >
                 <Save className="h-4 w-4" />
-                {saveMutation.isPending ? 'Saving...' : 'Save Layout'}
+                {saveMutation.isPending ? tc('saving') : tc('builder.saveLayout')}
             </button>
         </div>
       </header>

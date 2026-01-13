@@ -6,8 +6,21 @@ import { verifyToken } from "../modules/auth/auth.utils";
 
 let io: Server;
 
-// Track active connections
-const activeConnections = new Map<string, { userId?: string; connectedAt: Date }>();
+// Enhanced connection tracking with user details and activity
+interface ActiveConnection {
+  socketId: string;
+  userId?: string;
+  email?: string;
+  fullName?: string;
+  roles: string[];
+  currentPage?: string;
+  connectedAt: Date;
+  lastActivity: Date;
+  userAgent?: string;
+  ipAddress?: string;
+}
+
+const activeConnections = new Map<string, ActiveConnection>();
 
 // Function to check if origin is allowed for socket.io (same as Express CORS)
 function isAllowedOrigin(origin: string | undefined): boolean {
@@ -25,8 +38,9 @@ function isAllowedOrigin(origin: string | undefined): boolean {
   // Check exact match
   if (allowedOrigins.includes(origin)) return true;
   
-  // Allow all Vercel preview URLs for this project
-  if (origin.includes('vercel.app')) return true;
+  // Allow only YOUR Vercel project's preview URLs
+  // Pattern: https://v2-ecosystem-{hash}-{username}.vercel.app
+  if (origin.match(/^https:\/\/v2-ecosystem(-[a-z0-9]+)*\.vercel\.app$/)) return true;
   
   return false;
 }
@@ -43,6 +57,20 @@ export function getOnlineUsers(): string[] {
   });
 
   return Array.from(userIds);
+}
+
+// Get detailed online users info for admin dashboard
+export function getOnlineUsersDetailed(): ActiveConnection[] {
+  return Array.from(activeConnections.values());
+}
+
+// Broadcast online users update to admins
+function broadcastOnlineUsersToAdmins() {
+  if (!io) return;
+  const count = io.engine.clientsCount;
+  const detailedUsers = getOnlineUsersDetailed();
+  io.to('role:admin').to('role:super_admin').emit('stats:online_users', { count });
+  io.to('role:admin').to('role:super_admin').emit('stats:online_users_detailed', { users: detailedUsers, count });
 }
 
 export function initializeSocketServer(httpServer: HttpServer) {
@@ -93,10 +121,22 @@ export function initializeSocketServer(httpServer: HttpServer) {
   });
 
   io.on('connection', (socket: Socket) => {
-    // Track connection
+    // Get connection metadata
+    const userAgent = socket.handshake.headers['user-agent'];
+    const ipAddress = socket.handshake.address;
+    
+    // Track connection with enhanced details
     activeConnections.set(socket.id, {
+      socketId: socket.id,
       userId: socket.data.userId,
+      email: socket.data.email,
+      fullName: socket.data.fullName,
+      roles: socket.data.roles || [],
+      currentPage: '/',
       connectedAt: new Date(),
+      lastActivity: new Date(),
+      userAgent,
+      ipAddress,
     });
     
     logger.info(`Socket connected: ${socket.id} (Total: ${activeConnections.size})`);
@@ -114,12 +154,57 @@ export function initializeSocketServer(httpServer: HttpServer) {
     }
 
     // Broadcast online count to admins
-    const onlineCount = io.engine.clientsCount;
-    io.to('role:admin').to('role:super_admin').emit('stats:online_users', { count: onlineCount });
+    broadcastOnlineUsersToAdmins();
 
     // Handle heartbeat to keep connection alive
     socket.on('heartbeat', () => {
       socket.emit('heartbeat:ack', { timestamp: Date.now() });
+    });
+
+    // Handle request for current online users count
+    socket.on('request:online_users', () => {
+      const count = io.engine.clientsCount;
+      socket.emit('stats:online_users', { count });
+    });
+
+    // Handle request for detailed online users (admin only)
+    socket.on('request:online_users_detailed', () => {
+      if (socket.data.roles?.includes('admin') || socket.data.roles?.includes('super_admin')) {
+        const users = getOnlineUsersDetailed();
+        socket.emit('stats:online_users_detailed', { users, count: users.length });
+      }
+    });
+
+    // Handle page navigation tracking
+    socket.on('page:navigate', (data: { page: string; title?: string }) => {
+      const connection = activeConnections.get(socket.id);
+      if (connection) {
+        connection.currentPage = data.page;
+        connection.lastActivity = new Date();
+        activeConnections.set(socket.id, connection);
+        // Notify admins of the update
+        broadcastOnlineUsersToAdmins();
+      }
+    });
+
+    // Handle user info update (after login)
+    socket.on('user:update', (data: { userId: string; email: string; fullName: string; roles: string[] }) => {
+      const connection = activeConnections.get(socket.id);
+      if (connection) {
+        connection.userId = data.userId;
+        connection.email = data.email;
+        connection.fullName = data.fullName;
+        connection.roles = data.roles;
+        activeConnections.set(socket.id, connection);
+        
+        // Join role rooms
+        data.roles.forEach(role => {
+          socket.join(`role:${role}`);
+        });
+        socket.join(`user:${data.userId}`);
+        
+        broadcastOnlineUsersToAdmins();
+      }
     });
 
     // Staff can join business unit rooms
@@ -152,10 +237,9 @@ export function initializeSocketServer(httpServer: HttpServer) {
       activeConnections.delete(socket.id);
       logger.info(`Socket disconnected: ${socket.id} - Reason: ${reason} (Remaining: ${activeConnections.size})`);
       
-      // Broadcast online count to admins (after a small delay to ensure count is updated)
+      // Broadcast updated online users to admins (after a small delay to ensure count is updated)
       setTimeout(() => {
-        const count = io.engine.clientsCount;
-        io.to('role:admin').to('role:super_admin').emit('stats:online_users', { count });
+        broadcastOnlineUsersToAdmins();
       }, 100);
     });
 

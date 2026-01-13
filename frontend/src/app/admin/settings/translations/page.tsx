@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import {
   Languages,
   AlertTriangle,
+  AlertCircle,
   Check,
   ChevronDown,
   ChevronRight,
@@ -90,11 +91,20 @@ const getTableIcon = (table: string) => {
 };
 
 export default function TranslationsPage() {
-  // Translations available for future i18n
-  const _t = useTranslations('admin'); void _t;
+  // Translations
+  const t = useTranslations('adminTranslations');
+  const tc = useTranslations('adminCommon');
   
   // Tabs
   const [activeTab, setActiveTab] = useState<'database' | 'frontend' | 'languages'>('database');
+  
+  // Translation service status
+  const [serviceStatus, setServiceStatus] = useState<{
+    provider: string;
+    configured: boolean;
+    apiKeySet: boolean;
+    message: string;
+  } | null>(null);
   
   // Database translations state
   const [stats, setStats] = useState<TranslationStats | null>(null);
@@ -127,9 +137,10 @@ export default function TranslationsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, missingRes] = await Promise.all([
+      const [statsRes, missingRes, statusRes] = await Promise.all([
         api.get('/admin/translations/stats'),
         api.get('/admin/translations/missing'),
+        api.get('/admin/translations/status'),
       ]);
 
       if (statsRes.data?.success) {
@@ -138,12 +149,20 @@ export default function TranslationsPage() {
       if (missingRes.data?.success) {
         setMissing(missingRes.data.data.byTable || {});
       }
+      if (statusRes.data?.success) {
+        setServiceStatus({
+          provider: statusRes.data.provider,
+          configured: statusRes.data.configured,
+          apiKeySet: statusRes.data.apiKeySet,
+          message: statusRes.data.message,
+        });
+      }
     } catch {
-      toast.error('Failed to load translation data');
+      toast.error(t('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Fetch supported languages
   const fetchLanguages = useCallback(async () => {
@@ -153,9 +172,9 @@ export default function TranslationsPage() {
         setLanguages(res.data.data || []);
       }
     } catch {
-      toast.error('Failed to load languages');
+      toast.error(t('errors.failedToLoad'));
     }
-  }, []);
+  }, [t]);
 
   // Fetch frontend translation comparison
   const fetchFrontendComparison = useCallback(async () => {
@@ -165,9 +184,9 @@ export default function TranslationsPage() {
         setFrontendComparison(res.data.data);
       }
     } catch {
-      toast.error('Failed to load frontend translations');
+      toast.error(t('errors.failedToLoad'));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -204,12 +223,12 @@ export default function TranslationsPage() {
         value: editValue,
       });
 
-      toast.success('Translation saved!');
+      toast.success(t('translationSaved'));
       setEditingItem(null);
       setEditValue('');
       fetchData();
     } catch {
-      toast.error('Failed to save translation');
+      toast.error(t('errors.failedToSave'));
     }
   };
 
@@ -218,11 +237,11 @@ export default function TranslationsPage() {
     try {
       const res = await api.post('/admin/translations/auto-translate', { table, id });
       if (res.data?.success) {
-        toast.success('Auto-translated successfully!');
+        toast.success(t('autoTranslated'));
         fetchData();
       }
     } catch {
-      toast.error('Auto-translation failed');
+      toast.error(t('errors.failedToTranslate'));
     } finally {
       setAutoTranslating(null);
     }
@@ -238,7 +257,7 @@ export default function TranslationsPage() {
         fetchData();
       }
     } catch {
-      toast.error('Batch translation failed');
+      toast.error(t('errors.failedToTranslate'));
     } finally {
       setBatchTranslating(null);
     }
@@ -247,36 +266,36 @@ export default function TranslationsPage() {
   // Language management functions
   const addLanguage = async () => {
     if (!newLanguage.code || !newLanguage.name || !newLanguage.native_name) {
-      toast.error('Please fill in all required fields');
+      toast.error(t('errors.fillRequired'));
       return;
     }
     try {
       const res = await api.post('/admin/translations/languages', newLanguage);
       if (res.data?.success) {
-        toast.success('Language added successfully!');
+        toast.success(t('languageAdded'));
         setShowAddLanguage(false);
         setNewLanguage({ code: '', name: '', native_name: '', direction: 'ltr', is_active: true });
         fetchLanguages();
       }
     } catch {
-      toast.error('Failed to add language');
+      toast.error(t('errors.failedToAddLanguage'));
     }
   };
 
   const deleteLanguage = async (code: string) => {
     if (code === 'en') {
-      toast.error('Cannot delete the default language (English)');
+      toast.error(t('languagesTab.cannotDeleteDefault'));
       return;
     }
     if (!confirm(`Are you sure you want to delete the ${code} language?`)) return;
     try {
       const res = await api.delete(`/admin/translations/languages/${code}`);
       if (res.data?.success) {
-        toast.success('Language deleted!');
+        toast.success(t('languageDeleted'));
         fetchLanguages();
       }
     } catch {
-      toast.error('Failed to delete language');
+      toast.error(tc('errors.failedToDelete'));
     }
   };
 
@@ -284,11 +303,11 @@ export default function TranslationsPage() {
     try {
       const res = await api.put(`/admin/translations/languages/${code}`, { is_active: !isActive });
       if (res.data?.success) {
-        toast.success(`Language ${!isActive ? 'enabled' : 'disabled'}`);
+        toast.success(tc('success.updated'));
         fetchLanguages();
       }
     } catch {
-      toast.error('Failed to update language');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -314,13 +333,13 @@ export default function TranslationsPage() {
         value: frontendEditValue,
       });
       if (res.data?.success) {
-        toast.success('Translation saved!');
+        toast.success(t('translationSaved'));
         setEditingFrontendKey(null);
         setFrontendEditValue('');
         fetchFrontendComparison();
       }
     } catch {
-      toast.error('Failed to save translation');
+      toast.error(t('errors.failedToSave'));
     }
   };
 
@@ -332,6 +351,20 @@ export default function TranslationsPage() {
     );
   }
 
+  // Calculate combined stats
+  const frontendPercentage = frontendComparison 
+    ? Math.round(Object.entries(frontendComparison.languages).reduce((sum, [, data]) => {
+        const langPercentage = frontendComparison.totalKeys > 0 
+          ? ((frontendComparison.totalKeys - data.missingCount) / frontendComparison.totalKeys) * 100 
+          : 100;
+        return sum + langPercentage;
+      }, 0) / Math.max(Object.keys(frontendComparison.languages).length, 1))
+    : 0;
+  
+  const frontendMissingCount = frontendComparison 
+    ? Object.values(frontendComparison.languages).reduce((sum, l) => sum + l.missingCount, 0)
+    : 0;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -339,16 +372,89 @@ export default function TranslationsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <Languages className="w-8 h-8 text-primary-500" />
-            Translation Management
+            {t('title')}
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Manage translations for all content across your resort
+            {t('subtitle')}
           </p>
         </div>
         <Button onClick={() => { fetchData(); fetchLanguages(); fetchFrontendComparison(); }} variant="outline" disabled={loading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh All
+          {t('frontendTab.refreshAll')}
         </Button>
+      </div>
+
+      {/* Combined Overview Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Frontend UI Translations */}
+        <Card className="border-2 border-blue-200 dark:border-blue-800">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <FileJson className="w-5 h-5 text-blue-500" />
+                <h3 className="font-semibold text-slate-900 dark:text-white">Frontend UI Translations</h3>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                frontendPercentage === 100 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                frontendPercentage > 80 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              }`}>
+                {frontendPercentage}% Complete
+              </div>
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+              User interface text in JSON files (buttons, labels, messages)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-3">
+                <div 
+                  className={`h-3 rounded-full transition-all ${
+                    frontendPercentage === 100 ? 'bg-green-500' : frontendPercentage > 80 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${frontendPercentage}%` }}
+                />
+              </div>
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                {frontendMissingCount} missing
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Database Content Translations */}
+        <Card className="border-2 border-purple-200 dark:border-purple-800">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-purple-500" />
+                <h3 className="font-semibold text-slate-900 dark:text-white">Database Content Translations</h3>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                (stats?.percentage || 0) === 100 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                (stats?.percentage || 0) > 50 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              }`}>
+                {stats?.percentage || 0}% Complete
+              </div>
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+              Menu items, chalets, pool sessions stored in database
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-3">
+                <div 
+                  className={`h-3 rounded-full transition-all ${
+                    (stats?.percentage || 0) === 100 ? 'bg-green-500' : (stats?.percentage || 0) > 50 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${stats?.percentage || 0}%` }}
+                />
+              </div>
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                {stats?.overall.missing || 0} missing
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tabs */}
@@ -362,7 +468,7 @@ export default function TranslationsPage() {
           }`}
         >
           <Settings className="w-4 h-4 inline mr-2" />
-          Database Translations
+          {t('tabs.database')}
         </button>
         <button
           onClick={() => setActiveTab('frontend')}
@@ -373,7 +479,7 @@ export default function TranslationsPage() {
           }`}
         >
           <FileJson className="w-4 h-4 inline mr-2" />
-          Frontend JSON Files
+          {t('tabs.frontend')}
         </button>
         <button
           onClick={() => setActiveTab('languages')}
@@ -384,7 +490,7 @@ export default function TranslationsPage() {
           }`}
         >
           <Globe className="w-4 h-4 inline mr-2" />
-          Languages ({languages.length})
+          {t('tabs.languages')} ({languages.length})
         </button>
       </div>
 
@@ -394,10 +500,10 @@ export default function TranslationsPage() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Supported Languages</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t('languagesTab.title')}</h2>
                 <Button onClick={() => setShowAddLanguage(true)} size="sm">
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Language
+                  {t('languagesTab.addLanguage')}
                 </Button>
               </div>
 
@@ -716,6 +822,34 @@ export default function TranslationsPage() {
               <p className="text-3xl font-bold text-red-600">{stats.overall.missing}</p>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Translation Service Status */}
+      {serviceStatus && !serviceStatus.configured && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-start gap-4">
+          <AlertCircle className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-medium text-blue-800 dark:text-blue-200">
+              Auto-Translation API Not Configured
+            </p>
+            <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+              {serviceStatus.message}
+            </p>
+            <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
+              <strong>To enable auto-translation:</strong> Add <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">GOOGLE_TRANSLATE_API_KEY</code> to your backend <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">.env</code> file.
+              Get a key from <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-800 dark:hover:text-blue-200">Google Cloud Console</a> (first 500K chars/month free).
+            </p>
+          </div>
+        </div>
+      )}
+
+      {serviceStatus && serviceStatus.configured && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3 flex items-center gap-3">
+          <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <p className="text-sm text-green-700 dark:text-green-300">
+            <strong>{serviceStatus.provider}</strong> — {serviceStatus.message}
+          </p>
         </div>
       )}
 

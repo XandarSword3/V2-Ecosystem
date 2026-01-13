@@ -205,7 +205,7 @@ export default function TestimonialsCarousel() {
 
   const handleSubmitReview = async () => {
     if (!reviewData.text.trim()) {
-      toast.error('Please write a review');
+      toast.error(t('pleaseWriteReview') || 'Please write a review');
       return;
     }
     
@@ -218,7 +218,7 @@ export default function TestimonialsCarousel() {
       });
       
       if (response.data?.success || response.status === 200 || response.status === 201) {
-        toast.success('Thank you for your review!');
+        toast.success(t('reviewSubmitted') || 'Thank you for your review!');
         setShowReviewForm(false);
         setReviewData({ rating: 5, text: '', service_type: 'general' });
         // Refresh reviews
@@ -358,7 +358,7 @@ export default function TestimonialsCarousel() {
         <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-3xl" />
         <div className="relative px-8 py-12 md:px-16 text-center">
           <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto" />
-          <p className="text-slate-500 dark:text-slate-400 mt-4">Loading reviews...</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-4">{t('loading') || 'Loading reviews...'}</p>
         </div>
       </div>
     );

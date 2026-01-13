@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +25,9 @@ interface Permission {
 }
 
 export default function RolesPage() {
+  const t = useTranslations('adminUsers');
+  const tc = useTranslations('adminCommon');
+  
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,11 +66,11 @@ export default function RolesPage() {
 
       // Give clearer feedback for auth/permission issues
       if (axiosError.response?.status === 401) {
-        setAuthError('You must be logged in to view roles. Please login.');
+        setAuthError(t('errors.failedToLoad'));
       } else if (axiosError.response?.status === 403) {
-        setAuthError('Access denied. You need the super_admin role to view and manage roles.');
+        setAuthError(tc('errors.unauthorized'));
       } else {
-        toast.error('Failed to load roles');
+        toast.error(t('errors.failedToLoad'));
       }
     } finally {
       setLoading(false);
@@ -75,7 +79,7 @@ export default function RolesPage() {
 
   const handleCreateRole = async () => {
     if (!newRoleName.trim()) {
-      toast.error('Role name is required');
+      toast.error(tc('errors.required'));
       return;
     }
     
@@ -89,14 +93,14 @@ export default function RolesPage() {
       if (res.data?.data) {
         setRoles([...roles, res.data.data]);
       }
-      toast.success('Role created successfully');
+      toast.success(tc('success.created'));
       setShowCreateModal(false);
       setNewRoleName('');
       setNewRoleDescription('');
       fetchData(); // Refresh
     } catch (error: unknown) {
       const errorMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(errorMessage || 'Failed to create role');
+      toast.error(errorMessage || tc('errors.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -132,11 +136,11 @@ export default function RolesPage() {
       await api.put(`/admin/roles/${selectedRole.id}/permissions`, {
         permission_ids: rolePermissions
       });
-      toast.success('Permissions updated successfully');
+      toast.success(t('permissionsSaved'));
       setShowPermissionsModal(false);
     } catch (error: unknown) {
       const errorMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(errorMessage || 'Failed to update permissions');
+      toast.error(errorMessage || tc('errors.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -154,32 +158,32 @@ export default function RolesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Roles & Permissions</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('roles')} & {t('permissions')}</h1>
           <p className="text-muted-foreground">
-            Manage system roles and their default permission sets.
+            {t('subtitle')}
           </p>
         </div>
         <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          Create Role
+          {tc('create')} {t('roles')}
         </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {loading ? (
-          <p className="col-span-full text-center py-8 text-muted-foreground">Loading...</p>
+          <p className="col-span-full text-center py-8 text-muted-foreground">{tc('loading')}</p>
         ) : authError ? (
           <div className="col-span-full text-center py-8 text-muted-foreground">
             <p className="mb-2 text-sm">{authError}</p>
             <div className="flex items-center justify-center gap-2">
-              <Button variant="outline" onClick={() => (window.location.href = '/login')}>Login</Button>
-              <Button variant="ghost" onClick={() => window.location.reload()}>Retry</Button>
+              <Button variant="outline" onClick={() => (window.location.href = '/login')}>{tc('back')}</Button>
+              <Button variant="ghost" onClick={() => window.location.reload()}>{tc('refresh')}</Button>
             </div>
           </div>
         ) : roles.length === 0 ? (
           <div className="col-span-full text-center py-8 text-muted-foreground space-y-2">
-            <p>No roles found</p>
-            <p className="text-xs">If this is a fresh install, run the seed script to create default roles and an admin user.</p>
+            <p>{tc('noResults')}</p>
+            <p className="text-xs">{t('subtitle')}</p>
           </div>
         ) : (
           roles.map(role => (
@@ -212,7 +216,7 @@ export default function RolesPage() {
                   onClick={() => openPermissionsModal(role)}
                 >
                   <Edit2 className="h-4 w-4 mr-2" />
-                  Edit Permissions
+                  {tc('edit')} {t('permissions')}
                 </Button>
               </CardContent>
             </Card>
@@ -225,7 +229,7 @@ export default function RolesPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-background rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Create New Role</h2>
+              <h2 className="text-xl font-bold">{tc('create')} {t('roles')}</h2>
               <Button variant="ghost" size="icon" onClick={() => setShowCreateModal(false)}>
                 <X className="h-4 w-4" />
               </Button>
@@ -233,7 +237,7 @@ export default function RolesPage() {
             
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-1 block">Role Name *</label>
+                <label className="text-sm font-medium mb-1 block">{tc('name')} *</label>
                 <Input
                   placeholder="e.g., pool_manager"
                   value={newRoleName}
@@ -245,7 +249,7 @@ export default function RolesPage() {
               </div>
               
               <div>
-                <label className="text-sm font-medium mb-1 block">Description</label>
+                <label className="text-sm font-medium mb-1 block">{tc('description')}</label>
                 <Input
                   placeholder="Describe this role..."
                   value={newRoleDescription}
@@ -255,10 +259,10 @@ export default function RolesPage() {
               
               <div className="flex gap-2 pt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setShowCreateModal(false)}>
-                  Cancel
+                  {tc('cancel')}
                 </Button>
                 <Button className="flex-1" onClick={handleCreateRole} disabled={saving}>
-                  {saving ? 'Creating...' : 'Create Role'}
+                  {saving ? tc('creating') : tc('create')}
                 </Button>
               </div>
             </div>
@@ -272,9 +276,9 @@ export default function RolesPage() {
           <div className="bg-background rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center p-6 border-b">
               <div>
-                <h2 className="text-xl font-bold">Edit Permissions</h2>
+                <h2 className="text-xl font-bold">{tc('edit')} {t('permissions')}</h2>
                 <p className="text-muted-foreground text-sm">
-                  Role: <span className="font-medium text-foreground">{selectedRole.name}</span>
+                  {t('roles')}: <span className="font-medium text-foreground">{selectedRole.name}</span>
                 </p>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setShowPermissionsModal(false)}>
@@ -323,10 +327,10 @@ export default function RolesPage() {
             
             <div className="p-6 border-t flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowPermissionsModal(false)}>
-                Cancel
+                {tc('cancel')}
               </Button>
               <Button className="flex-1" onClick={saveRolePermissions} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Permissions'}
+                {saving ? tc('saving') : tc('save')}
               </Button>
             </div>
           </div>

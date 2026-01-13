@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, authorize, optionalAuth } from "../../middleware/auth.middleware";
+import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
 import * as chaletController from "./chalet.controller";
 
 const router = Router();
@@ -10,10 +11,10 @@ router.get('/add-ons', chaletController.getAddOns);
 // router.get('/:id', chaletController.getChalet); // Moved to end
 // router.get('/:id/availability', chaletController.getAvailability); // Moved to end
 
-// Customer booking routes
-router.post('/bookings', optionalAuth, chaletController.createBooking);
+// Customer booking routes (rate limited - financial operations)
+router.post('/bookings', optionalAuth, rateLimits.write, chaletController.createBooking);
 router.get('/bookings/:id', optionalAuth, chaletController.getBooking);
-router.post('/bookings/:id/cancel', optionalAuth, chaletController.cancelBooking);
+router.post('/bookings/:id/cancel', optionalAuth, rateLimits.write, chaletController.cancelBooking);
 
 // Authenticated customer routes
 router.get('/my-bookings', authenticate, chaletController.getMyBookings);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
@@ -65,6 +66,7 @@ const getSessionIcon = (startTime: string) => {
 export default function DynamicSessionsPage() {
   const params = useParams();
   const { modules } = useSiteSettings();
+  const tc = useTranslations('adminCommon');
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
   const currentModule = modules.find(m => m.slug === slug);
 
@@ -89,7 +91,7 @@ export default function DynamicSessionsPage() {
       const response = await api.get('/pool/sessions', { params: { moduleId: currentModule.id } });
       setSessions(response.data.data || response.data.sessions || []);
     } catch (error) {
-      toast.error('Failed to fetch sessions');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -119,7 +121,7 @@ export default function DynamicSessionsPage() {
 
   const handleSave = async () => {
     if (!formData.name || !formData.start_time || !formData.end_time) {
-      toast.error('Please fill in all required fields');
+      toast.error(tc('errors.fillRequiredFields'));
       return;
     }
     if (!currentModule) return;
@@ -129,29 +131,29 @@ export default function DynamicSessionsPage() {
       const payload = { ...formData, module_id: currentModule.id };
       if (editingSession) {
         await api.put(`/pool/admin/sessions/${editingSession.id}`, payload);
-        toast.success('Session updated successfully');
+        toast.success(tc('success.updated'));
       } else {
         await api.post('/pool/admin/sessions', payload);
-        toast.success('Session created successfully');
+        toast.success(tc('success.created'));
       }
       fetchSessions();
       setShowModal(false);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(errorMessage || 'Failed to save session');
+      toast.error(errorMessage || tc('errors.failedToSave'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this session?')) return;
+    if (!confirm(tc('sessions.confirmDelete'))) return;
     try {
       await api.delete(`/pool/admin/sessions/${id}`);
-      toast.success('Session deleted');
+      toast.success(tc('success.deleted'));
       fetchSessions();
     } catch (error) {
-      toast.error('Failed to delete session');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -159,9 +161,9 @@ export default function DynamicSessionsPage() {
     try {
       await api.put(`/pool/admin/sessions/${session.id}`, { is_active: !session.is_active });
       fetchSessions();
-      toast.success(`Session ${session.is_active ? 'deactivated' : 'activated'}`);
+      toast.success(session.is_active ? tc('sessions.deactivated') : tc('sessions.activated'));
     } catch (error) {
-      toast.error('Failed to update session');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -197,21 +199,21 @@ export default function DynamicSessionsPage() {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center shadow-lg">
               <Waves className="w-6 h-6 text-white" />
             </div>
-            {currentModule.name} Sessions
+            {currentModule.name} {tc('sessions.title')}
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-2">
-            Manage sessions and capacity for {currentModule.name}
+            {tc('sessions.manageSessionsFor', { name: currentModule.name })}
           </p>
         </motion.div>
 
         <motion.div variants={fadeInUp} className="flex gap-2">
           <Button variant="outline" onClick={fetchSessions} className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <Button onClick={openCreateModal} className="flex items-center gap-2 bg-gradient-to-r from-primary-500 to-secondary-600 text-white">
             <Plus className="w-4 h-4" />
-            Add Session
+            {tc('sessions.addSession')}
           </Button>
         </motion.div>
       </div>
@@ -223,7 +225,7 @@ export default function DynamicSessionsPage() {
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
-                placeholder="Search sessions..."
+                placeholder={tc('sessions.searchSessions')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -236,19 +238,19 @@ export default function DynamicSessionsPage() {
       {/* Stats */}
       <motion.div variants={fadeInUp} className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Total Sessions</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{tc('sessions.totalSessions')}</p>
           <p className="text-2xl font-bold text-slate-900 dark:text-white">{sessions.length}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Active</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{tc('sessions.active')}</p>
           <p className="text-2xl font-bold text-emerald-600">{sessions.filter(s => s.is_active).length}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Total Capacity</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{tc('sessions.totalCapacity')}</p>
           <p className="text-2xl font-bold text-primary-600">{sessions.reduce((acc, s) => acc + (s.max_capacity || 0), 0)}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Avg Price</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{tc('sessions.avgPrice')}</p>
           <p className="text-2xl font-bold text-blue-600">
             {sessions.length > 0 ? formatCurrency(sessions.reduce((acc, s) => acc + s.adult_price, 0) / sessions.length) : '$0'}
           </p>
@@ -265,8 +267,8 @@ export default function DynamicSessionsPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <Waves className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-              <p className="text-slate-500 dark:text-slate-400">No sessions found</p>
-              <Button onClick={openCreateModal} className="mt-4">Add your first session</Button>
+              <p className="text-slate-500 dark:text-slate-400">{tc('sessions.noSessionsFound')}</p>
+              <Button onClick={openCreateModal} className="mt-4">{tc('sessions.addFirstSession')}</Button>
             </CardContent>
           </Card>
         ) : (
@@ -299,24 +301,24 @@ export default function DynamicSessionsPage() {
                             </div>
                           </div>
                           {!session.is_active && (
-                            <span className="px-2 py-1 bg-red-100 text-red-600 text-xs rounded-full dark:bg-red-900/30">Inactive</span>
+                            <span className="px-2 py-1 bg-red-100 text-red-600 text-xs rounded-full dark:bg-red-900/30">{tc('sessions.inactive')}</span>
                           )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 mb-4">
                           <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Adult</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{tc('sessions.adult')}</p>
                             <p className="text-lg font-bold text-primary-600">{formatCurrency(session.adult_price)}</p>
                           </div>
                           <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Child</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{tc('sessions.child')}</p>
                             <p className="text-lg font-bold text-secondary-600">{formatCurrency(session.child_price)}</p>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between mb-4 text-sm">
                           <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                            <Users className="w-4 h-4" />Capacity
+                            <Users className="w-4 h-4" />{tc('tables.capacity')}
                           </span>
                           <span className="font-medium text-slate-900 dark:text-white">{session.current_capacity || 0}/{session.max_capacity}</span>
                         </div>
@@ -337,13 +339,13 @@ export default function DynamicSessionsPage() {
                                 : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30'
                             }`}
                           >
-                            {session.is_active ? <><EyeOff className="w-4 h-4" />Deactivate</> : <><Eye className="w-4 h-4" />Activate</>}
+                            {session.is_active ? <><EyeOff className="w-4 h-4" />{tc('sessions.deactivate')}</> : <><Eye className="w-4 h-4" />{tc('sessions.activate')}</>}
                           </button>
                           <button
                             onClick={() => openEditModal(session)}
                             className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm bg-primary-100 text-primary-600 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-400 transition-colors"
                           >
-                            <Edit2 className="w-4 h-4" />Edit
+                            <Edit2 className="w-4 h-4" />{tc('edit')}
                           </button>
                           <button
                             onClick={() => handleDelete(session.id)}
@@ -381,7 +383,7 @@ export default function DynamicSessionsPage() {
             >
               <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6 flex justify-between items-center">
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-                  {editingSession ? 'Edit Session' : 'Add New Session'}
+                  {editingSession ? tc('sessions.editSession') : tc('sessions.addNewSession')}
                 </h3>
                 <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                   <X className="w-5 h-5" />
@@ -391,49 +393,49 @@ export default function DynamicSessionsPage() {
               <div className="p-6 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name (English) *</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('sessions.nameEnglish')} *</label>
                     <Input value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Morning Session" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name (Arabic)</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('sessions.nameArabic')}</label>
                     <Input value={formData.name_ar || ''} onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })} placeholder="الاسم بالعربية" dir="rtl" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Start Time *</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('sessions.startTime')} *</label>
                     <Input type="time" value={formData.start_time || ''} onChange={(e) => setFormData({ ...formData, start_time: e.target.value })} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">End Time *</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('sessions.endTime')} *</label>
                     <Input type="time" value={formData.end_time || ''} onChange={(e) => setFormData({ ...formData, end_time: e.target.value })} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Adult Price *</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('sessions.adultPrice')} *</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input type="number" step="0.01" value={formData.adult_price || ''} onChange={(e) => setFormData({ ...formData, adult_price: parseFloat(e.target.value) })} className="pl-10" />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Child Price *</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('sessions.childPrice')} *</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input type="number" step="0.01" value={formData.child_price || ''} onChange={(e) => setFormData({ ...formData, child_price: parseFloat(e.target.value) })} className="pl-10" />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Max Capacity</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('sessions.maxCapacity')}</label>
                     <Input type="number" value={formData.max_capacity || ''} onChange={(e) => setFormData({ ...formData, max_capacity: parseInt(e.target.value) })} />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Available Days</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">{tc('sessions.availableDays')}</label>
                   <div className="flex flex-wrap gap-2">
                     {daysOfWeek.map(day => {
                       const isSelected = formData.day_of_week?.includes(day.id);
@@ -460,14 +462,14 @@ export default function DynamicSessionsPage() {
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                     className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                   />
-                  <span className="text-sm text-slate-700 dark:text-slate-300">Session is active</span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{tc('sessions.sessionIsActive')}</span>
                 </label>
               </div>
 
               <div className="sticky bottom-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-6 flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button variant="outline" className="flex-1" onClick={() => setShowModal(false)}>{tc('cancel')}</Button>
                 <Button onClick={handleSave} disabled={saving} className="flex-1 bg-gradient-to-r from-primary-500 to-secondary-600 text-white">
-                  {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" />{editingSession ? 'Update Session' : 'Create Session'}</>}
+                  {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" />{editingSession ? tc('sessions.updateSession') : tc('sessions.createSession')}</>}
                 </Button>
               </div>
             </motion.div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -64,6 +65,9 @@ const ticketTypeColors: Record<string, string> = {
 };
 
 export default function AdminPoolTicketsPage() {
+  const t = useTranslations('adminPool');
+  const tc = useTranslations('adminCommon');
+  
   const [tickets, setTickets] = useState<PoolTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -75,25 +79,25 @@ export default function AdminPoolTicketsPage() {
       const response = await api.get('/pool/staff/tickets/today');
       setTickets(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch tickets');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tc]);
 
   useEffect(() => {
     fetchTickets();
   }, [fetchTickets]);
 
   const cancelTicket = async (id: string) => {
-    if (!confirm('Are you sure you want to cancel this ticket?')) return;
+    if (!confirm(tc('confirmAction'))) return;
     
     try {
       await api.put(`/pool/tickets/${id}/cancel`);
-      toast.success('Ticket cancelled');
+      toast.success(t('tickets.ticketCancelled'));
       fetchTickets();
     } catch (error) {
-      toast.error('Failed to cancel ticket');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -133,12 +137,12 @@ export default function AdminPoolTicketsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Pool Tickets</h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage pool entry tickets</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('tickets.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400">{t('title')}</p>
         </div>
         <Button variant="outline" onClick={fetchTickets}>
           <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
+          {tc('refresh')}
         </Button>
       </div>
 
@@ -149,7 +153,7 @@ export default function AdminPoolTicketsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">Total Tickets</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">{t('tickets.totalTickets')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
                 </div>
                 <Ticket className="w-8 h-8 text-blue-500" />
@@ -163,7 +167,7 @@ export default function AdminPoolTicketsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">Active</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">{tc('active')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.active}</p>
                 </div>
                 <CheckCircle2 className="w-8 h-8 text-green-500" />
@@ -177,7 +181,7 @@ export default function AdminPoolTicketsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">Pending</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">{tc('status')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.pending}</p>
                 </div>
                 <Clock className="w-8 h-8 text-yellow-500" />
@@ -191,7 +195,7 @@ export default function AdminPoolTicketsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">Today's Revenue</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">{tc('total')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(stats.todayRevenue)}</p>
                 </div>
                 <Calendar className="w-8 h-8 text-purple-500" />
@@ -210,12 +214,12 @@ export default function AdminPoolTicketsPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
             >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="active">Active</option>
-              <option value="used">Used</option>
-              <option value="expired">Expired</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="all">{tc('all')} {tc('status')}</option>
+              <option value="pending">{tc('status')}</option>
+              <option value="active">{tc('active')}</option>
+              <option value="used">{tc('status')}</option>
+              <option value="expired">{tc('status')}</option>
+              <option value="cancelled">{tc('status')}</option>
             </select>
 
             <select
@@ -223,7 +227,7 @@ export default function AdminPoolTicketsPage() {
               onChange={(e) => setTypeFilter(e.target.value)}
               className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
             >
-              <option value="all">All Types</option>
+              <option value="all">{tc('all')}</option>
               <option value="adult">Adult</option>
               <option value="child">Child</option>
               <option value="family">Family</option>
@@ -240,20 +244,20 @@ export default function AdminPoolTicketsPage() {
             <table className="w-full">
               <thead className="bg-slate-50 dark:bg-slate-800">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Ticket</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Type</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Guest</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Valid Date</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Price</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Actions</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">{t('tickets.ticketNumber')}</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">{tc('status')}</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">{t('tickets.guestInfo')}</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">{t('tickets.validDate')}</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">{tc('price')}</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">{tc('status')}</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">{tc('actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {filteredTickets.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
-                      No tickets found
+                      {tc('noResults')}
                     </td>
                   </tr>
                 ) : (
@@ -324,7 +328,7 @@ export default function AdminPoolTicketsPage() {
               className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden"
             >
               <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Ticket Details</h2>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('tickets.ticketDetails')}</h2>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(null)}>
                   <X className="w-5 h-5" />
                 </Button>
@@ -332,29 +336,29 @@ export default function AdminPoolTicketsPage() {
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-slate-500">Ticket Number</p>
+                    <p className="text-sm text-slate-500">{t('tickets.ticketNumber')}</p>
                     <p className="font-mono font-medium">{selectedTicket.ticket_number}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500">Status</p>
+                    <p className="text-sm text-slate-500">{tc('status')}</p>
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[selectedTicket.status] || 'bg-green-100 text-green-800'}`}>
                       {(selectedTicket.status || 'valid').toUpperCase()}
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500">Number of Guests</p>
+                    <p className="text-sm text-slate-500">{tc('quantity')}</p>
                     <p className="font-medium">{selectedTicket.number_of_guests || 1} guest(s)</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500">Price</p>
+                    <p className="text-sm text-slate-500">{tc('price')}</p>
                     <p className="font-medium text-lg text-green-600">{formatCurrency(getTicketPrice(selectedTicket))}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500">Ticket Date</p>
+                    <p className="text-sm text-slate-500">{t('tickets.ticketDate')}</p>
                     <p className="font-medium">{selectedTicket.ticket_date ? new Date(selectedTicket.ticket_date).toLocaleDateString() : selectedTicket.valid_date || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500">Created At</p>
+                    <p className="text-sm text-slate-500">{t('tickets.createdAt')}</p>
                     <p className="font-medium">{new Date(selectedTicket.created_at).toLocaleDateString()}</p>
                   </div>
                   <div>
@@ -368,14 +372,14 @@ export default function AdminPoolTicketsPage() {
                 </div>
                 
                 <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                  <h3 className="font-medium mb-2">Guest Information</h3>
+                  <h3 className="font-medium mb-2">{t('tickets.guestInfo')}</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-slate-500">Name</p>
+                      <p className="text-sm text-slate-500">{tc('name')}</p>
                       <p className="font-medium">{selectedTicket.customer_name || selectedTicket.users?.full_name || 'Guest'}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">Phone / Email</p>
+                      <p className="text-sm text-slate-500">{tc('phone')} / {tc('email')}</p>
                       <p className="font-medium">{selectedTicket.customer_phone || selectedTicket.users?.email || 'N/A'}</p>
                     </div>
                   </div>
@@ -384,7 +388,7 @@ export default function AdminPoolTicketsPage() {
                 {/* QR Code if available */}
                 {selectedTicket.qr_code && (
                   <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <h3 className="font-medium mb-2">QR Code</h3>
+                    <h3 className="font-medium mb-2">{t('tickets.qrCode')}</h3>
                     <div className="flex justify-center">
                       <img src={selectedTicket.qr_code} alt="Ticket QR Code" className="w-32 h-32" />
                     </div>
@@ -392,7 +396,7 @@ export default function AdminPoolTicketsPage() {
                 )}
               </div>
               <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
-                <Button onClick={() => setSelectedTicket(null)}>Close</Button>
+                <Button onClick={() => setSelectedTicket(null)}>{tc('close')}</Button>
               </div>
             </motion.div>
           </div>

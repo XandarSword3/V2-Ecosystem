@@ -43,6 +43,7 @@ export default function StaffDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { modules } = useSiteSettings();
   const t = useTranslations('staff');
+  const td = useTranslations('staff.dashboard');
   const { socket } = useSocket();
   
   const [stats, setStats] = useState<DashboardStats>({
@@ -132,12 +133,12 @@ export default function StaffDashboard() {
           {
             id: order.id,
             action: `New order #${order.order_number || order.id.slice(0, 8)} received`,
-            time: 'Just now',
+            time: td('justNow'),
             type: 'info',
           },
           ...prev.slice(0, 4),
         ]);
-        toast.info('New order received!');
+        toast.info(td('newOrderReceived'));
       });
 
       socket.on('order:statusChanged', ({ orderId, status }: { orderId: string; status: string }) => {
@@ -152,7 +153,7 @@ export default function StaffDashboard() {
           {
             id: orderId,
             action: `Order #${orderId.slice(0, 8)} ${status}`,
-            time: 'Just now',
+            time: td('justNow'),
             type: status === 'completed' ? 'success' : 'info',
           },
           ...prev.slice(0, 4),
@@ -172,10 +173,10 @@ export default function StaffDashboard() {
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
-    return `${Math.floor(diffMins / 1440)}d ago`;
+    if (diffMins < 1) return td('justNow');
+    if (diffMins < 60) return td('minAgo', { count: diffMins });
+    if (diffMins < 1440) return td('hoursAgo', { count: Math.floor(diffMins / 60) });
+    return td('daysAgo', { count: Math.floor(diffMins / 1440) });
   };
 
   if (isLoading) {
@@ -222,8 +223,8 @@ export default function StaffDashboard() {
 
   const quickActions = [
     {
-      title: 'Kitchen Orders',
-      description: 'View and manage restaurant orders',
+      title: td('kitchenOrders'),
+      description: td('kitchenOrdersDesc'),
       href: '/staff/restaurant',
       icon: ChefHat,
       color: 'from-orange-400 to-rose-500',
@@ -231,24 +232,24 @@ export default function StaffDashboard() {
     },
     ...moduleActions,
     {
-      title: 'Snack Bar',
-      description: 'Handle snack bar orders',
+      title: td('snackBar'),
+      description: td('snackBarDesc'),
       href: '/staff/snack',
       icon: Cookie,
       color: 'from-amber-400 to-orange-500',
       bgColor: 'bg-amber-50 dark:bg-amber-950/30',
     },
     {
-      title: 'Chalets',
-      description: 'Check-ins and check-outs',
+      title: td('chalets'),
+      description: td('chaletsDesc'),
       href: '/staff/chalets',
       icon: Home,
       color: 'from-emerald-400 to-teal-500',
       bgColor: 'bg-emerald-50 dark:bg-emerald-950/30',
     },
     {
-      title: 'Pool',
-      description: 'Manage pool access',
+      title: td('pool'),
+      description: td('poolDesc'),
       href: '/staff/pool',
       icon: Waves,
       color: 'from-primary-400 to-secondary-500',
@@ -257,10 +258,10 @@ export default function StaffDashboard() {
   ];
 
   const statsDisplay = [
-    { label: 'Pending Orders', value: stats.pendingOrders.toString(), icon: Clock, color: 'text-amber-600 dark:text-amber-400' },
-    { label: 'Completed Today', value: stats.completedToday.toString(), icon: CheckCircle, color: 'text-emerald-600 dark:text-emerald-400' },
-    { label: 'Issues', value: stats.issues.toString(), icon: AlertCircle, color: 'text-red-600 dark:text-red-400' },
-    { label: 'Avg Response', value: stats.avgResponseTime, icon: TrendingUp, color: 'text-blue-600 dark:text-blue-400' },
+    { label: td('pendingOrders'), value: stats.pendingOrders.toString(), icon: Clock, color: 'text-amber-600 dark:text-amber-400' },
+    { label: td('completedToday'), value: stats.completedToday.toString(), icon: CheckCircle, color: 'text-emerald-600 dark:text-emerald-400' },
+    { label: td('issues'), value: stats.issues.toString(), icon: AlertCircle, color: 'text-red-600 dark:text-red-400' },
+    { label: td('avgResponse'), value: stats.avgResponseTime, icon: TrendingUp, color: 'text-blue-600 dark:text-blue-400' },
   ];
 
   return (
@@ -276,7 +277,7 @@ export default function StaffDashboard() {
           Welcome, {user?.fullName?.split(' ')[0] || 'Staff'} 👋
         </h1>
         <p className="text-slate-600 dark:text-slate-400 mt-1">
-          Here&apos;s what&apos;s happening today at V2 Resort
+          {td('welcomeSubtitle')}
         </p>
       </motion.div>
 
@@ -306,7 +307,7 @@ export default function StaffDashboard() {
 
       {/* Quick Actions */}
       <motion.div variants={fadeInUp}>
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">Quick Actions</h2>
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">{td('quickActions')}</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {quickActions.map((action, index) => {
             const Icon = action.icon;
@@ -338,7 +339,7 @@ export default function StaffDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="w-5 h-5 text-primary-600" />
-              Recent Activity
+              {td('recentActivity')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -346,7 +347,7 @@ export default function StaffDashboard() {
               <AnimatePresence mode="popLayout">
                 {recentActivity.length === 0 ? (
                   <p className="text-center text-slate-500 dark:text-slate-400 py-4">
-                    No recent activity
+                    {td('noActivity')}
                   </p>
                 ) : (
                   recentActivity.map((activity, index) => (

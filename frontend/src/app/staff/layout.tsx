@@ -223,7 +223,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
               className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 bg-slate-800 shadow-xl"
             >
               <div className="flex items-center justify-between p-4 border-b border-slate-700">
-                <span className="font-semibold text-white">Navigation</span>
+                <span className="font-semibold text-white">{t('navigation')}</span>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
                   className="p-2 rounded-lg hover:bg-slate-700"
@@ -259,7 +259,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl transition-colors"
                 >
                   <LogOut className="h-5 w-5" />
-                  <span>Logout</span>
+                  <span>{t('logout')}</span>
                 </button>
               </div>
             </motion.aside>
@@ -297,10 +297,10 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
           <button
             onClick={handleLogout}
             className="w-full flex flex-col items-center gap-1 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
-            title="Logout"
+            title={t('logout')}
           >
             <LogOut className="h-5 w-5" />
-            <span className="text-[10px] font-medium">Logout</span>
+            <span className="text-[10px] font-medium">{t('logout')}</span>
           </button>
         </div>
       </aside>

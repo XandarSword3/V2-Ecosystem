@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -15,6 +16,8 @@ interface MaintenanceLog {
 }
 
 export function MaintenanceTab() {
+    const t = useTranslations('staff');
+    const tc = useTranslations('adminCommon');
     const [logs, setLogs] = useState<MaintenanceLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -29,7 +32,7 @@ export function MaintenanceTab() {
             const { data } = await api.get('/pool/staff/maintenance');
             setLogs(data.data || []);
         } catch (error) {
-            toast.error('Failed to load maintenance logs');
+            toast.error(tc('errors.failedToLoad'));
         } finally {
             setLoading(false);
         }
@@ -47,13 +50,13 @@ export function MaintenanceTab() {
                 notes: newLogNotes,
                 readings: newLogType === 'chemical_check' ? newLogReadings : {},
             });
-            toast.success('Log added successfully');
+            toast.success(tc('success.saved'));
             setShowAddForm(false);
             setNewLogNotes('');
             setNewLogReadings({ ph: '', chlorine: '', temperature: '' });
             fetchLogs();
         } catch (error) {
-            toast.error('Failed to add log');
+            toast.error(tc('errors.failedToSave'));
         }
     };
 

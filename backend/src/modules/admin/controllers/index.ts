@@ -22,3 +22,16 @@ export { getOverviewReport, exportReport, getOccupancyReport, getCustomerAnalyti
 
 // Notifications
 export { getNotifications, markNotificationRead, markAllNotificationsRead } from './notifications.controller.js';
+
+// File Uploads
+export { uploadFile, deleteFile, listFiles, getBranding } from './upload.controller.js';
+
+// Scheduled Reports
+export { 
+  getScheduledReports, 
+  createScheduledReport, 
+  updateScheduledReport, 
+  deleteScheduledReport, 
+  sendReportNow,
+  previewReport 
+} from './scheduled-reports.controller.js';

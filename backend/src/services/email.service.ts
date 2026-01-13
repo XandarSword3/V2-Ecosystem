@@ -101,8 +101,8 @@ class EmailService {
         if (s.key === 'contact' && s.value) {
           settings.contact_email = String(s.value.email || 'info@v2resort.com');
           settings.contactEmail = String(s.value.email || 'info@v2resort.com');
-          settings.contact_phone = String(s.value.phone || '+961 XX XXX XXX');
-          settings.contactPhone = String(s.value.phone || '+961 XX XXX XXX');
+          settings.contact_phone = String(s.value.phone || 'Not configured');
+          settings.contactPhone = String(s.value.phone || 'Not configured');
           settings.contact_address = String(s.value.address || 'V2 Resort, Lebanon');
           settings.companyAddress = String(s.value.address || 'V2 Resort, Lebanon');
         }
@@ -121,11 +121,11 @@ class EmailService {
     return {
       company_name: 'V2 Resort',
       contact_email: 'info@v2resort.com',
-      contact_phone: '+961 XX XXX XXX',
+      contact_phone: 'Not configured',
       contact_address: 'V2 Resort, Lebanon',
       companyName: 'V2 Resort',
       contactEmail: 'info@v2resort.com',
-      contactPhone: '+961 XX XXX XXX',
+      contactPhone: 'Not configured',
       companyAddress: 'V2 Resort, Lebanon',
     };
   }

@@ -28,7 +28,8 @@ interface Category {
 }
 
 export default function AdminCategoriesPage() {
-  const t = useTranslations('admin');
+  const t = useTranslations('adminRestaurant');
+  const tc = useTranslations('adminCommon');
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -40,7 +41,7 @@ export default function AdminCategoriesPage() {
       const response = await api.get('/restaurant/categories');
       setCategories(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch categories');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -52,36 +53,36 @@ export default function AdminCategoriesPage() {
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      toast.error('Category name is required');
+      toast.error(tc('errors.required'));
       return;
     }
 
     try {
       if (editingCategory) {
         await api.put(`/restaurant/admin/categories/${editingCategory.id}`, formData);
-        toast.success('Category updated');
+        toast.success(tc('success.updated'));
       } else {
         await api.post('/restaurant/admin/categories', formData);
-        toast.success('Category created');
+        toast.success(tc('success.created'));
       }
       setShowModal(false);
       setEditingCategory(null);
       setFormData({ name: '', description: '' });
       fetchCategories();
     } catch (error) {
-      toast.error('Failed to save category');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this category?')) return;
+    if (!confirm(tc('confirmDelete'))) return;
     
     try {
       await api.delete(`/restaurant/admin/categories/${id}`);
-      toast.success('Category deleted');
+      toast.success(tc('success.deleted'));
       fetchCategories();
     } catch (error) {
-      toast.error('Failed to delete category');
+      toast.error(tc('errors.failedToDelete'));
     }
   };
 
@@ -113,20 +114,20 @@ export default function AdminCategoriesPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Menu Categories
+            {t('categories.title')}
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Organize your menu items into categories
+            {tc('description')}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={fetchCategories}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <Button onClick={() => { setEditingCategory(null); setFormData({ name: '', description: '' }); setShowModal(true); }}>
             <Plus className="w-4 h-4 mr-2" />
-            Add Category
+            {t('categories.addCategory')}
           </Button>
         </div>
       </div>
@@ -141,10 +142,10 @@ export default function AdminCategoriesPage() {
               className="col-span-full text-center py-12"
             >
               <FolderOpen className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">No categories yet</p>
+              <p className="text-slate-500 dark:text-slate-400">{tc('noData')}</p>
               <Button className="mt-4" onClick={() => setShowModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Create your first category
+                {t('categories.addCategory')}
               </Button>
             </motion.div>
           ) : (
@@ -214,13 +215,13 @@ export default function AdminCategoriesPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                {editingCategory ? 'Edit Category' : 'Add Category'}
+                {editingCategory ? tc('edit') : t('categories.addCategory')}
               </h2>
 
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Name
+                    {tc('name')}
                   </label>
                   <input
                     type="text"
@@ -233,7 +234,7 @@ export default function AdminCategoriesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Description
+                    {tc('description')}
                   </label>
                   <textarea
                     value={formData.description}
@@ -246,10 +247,10 @@ export default function AdminCategoriesPage() {
 
                 <div className="flex justify-end gap-2 pt-4">
                   <Button variant="outline" onClick={() => setShowModal(false)}>
-                    Cancel
+                    {tc('cancel')}
                   </Button>
                   <Button onClick={handleSubmit}>
-                    {editingCategory ? 'Update' : 'Create'}
+                    {editingCategory ? tc('update') : tc('create')}
                   </Button>
                 </div>
               </div>

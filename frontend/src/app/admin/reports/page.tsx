@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -93,6 +94,9 @@ const EXPORT_OPTIONS: { value: ExportType; label: string }[] = [
 ];
 
 export default function AdminReportsPage() {
+  const t = useTranslations('adminReports');
+  const tc = useTranslations('adminCommon');
+  
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [occupancyData, setOccupancyData] = useState<OccupancyData | null>(null);
   const [customerData, setCustomerData] = useState<CustomerData | null>(null);
@@ -115,7 +119,7 @@ export default function AdminReportsPage() {
       setCustomerData(customerRes.data.data || null);
     } catch (error) {
       console.error('Failed to fetch reports:', error);
-      toast.error('Failed to fetch reports data');
+      toast.error(t('errors.failedToLoad'));
       setReportData(null);
     } finally {
       setLoading(false);
@@ -143,9 +147,9 @@ export default function AdminReportsPage() {
       link.click();
       link.remove();
 
-      toast.success('Report exported successfully');
+      toast.success(t('exported'));
     } catch (error) {
-      toast.error('Failed to export report');
+      toast.error(t('errors.failedToExport'));
     } finally {
       setExporting(false);
     }
@@ -174,22 +178,22 @@ export default function AdminReportsPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-              Reports & Analytics
+              {t('title')}
             </h1>
             <p className="text-slate-500 dark:text-slate-400">
-              Business performance overview
+              {t('subtitle')}
             </p>
           </div>
           <Button variant="outline" onClick={fetchReports}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tc('refresh')}
           </Button>
         </div>
         <Card>
           <CardContent className="p-12 text-center">
             <BarChart3 className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-            <p className="text-lg font-medium text-slate-700 dark:text-slate-300">No report data available</p>
-            <p className="text-slate-500 dark:text-slate-400">Check back once there is transaction data in the system.</p>
+            <p className="text-lg font-medium text-slate-700 dark:text-slate-300">{tc('noData')}</p>
+            <p className="text-slate-500 dark:text-slate-400">{t('subtitle')}</p>
           </CardContent>
         </Card>
       </div>
@@ -212,10 +216,10 @@ export default function AdminReportsPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Reports & Analytics
+            {t('title')}
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Business performance overview
+            {t('subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -236,12 +240,12 @@ export default function AdminReportsPage() {
           </div>
           <Button variant="outline" onClick={fetchReports}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <div className="relative">
             <Button onClick={() => setShowExportMenu(!showExportMenu)} disabled={exporting}>
               <Download className="w-4 h-4 mr-2" />
-              {exporting ? 'Exporting...' : 'Export'}
+              {exporting ? tc('loading') : tc('export')}
             </Button>
             {showExportMenu && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-10">
@@ -268,7 +272,7 @@ export default function AdminReportsPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Total Revenue</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{t('totalRevenue')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
                     {formatCurrency(data.overview.totalRevenue)}
                   </p>
@@ -296,7 +300,7 @@ export default function AdminReportsPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Total Orders</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{t('totalOrders')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
                     {data.overview.totalOrders}
                   </p>
@@ -324,11 +328,11 @@ export default function AdminReportsPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Total Bookings</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{t('totalBookings')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
                     {data.overview.totalBookings}
                   </p>
-                  <p className="text-sm text-slate-400 mt-2">Chalets & Pool</p>
+                  <p className="text-sm text-slate-400 mt-2">{t('chaletBookings')} & {t('poolSessions')}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/30">
                   <Calendar className="w-6 h-6 text-purple-600 dark:text-purple-400" />
@@ -344,11 +348,11 @@ export default function AdminReportsPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Total Users</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{t('totalUsers')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
                     {data.overview.totalUsers}
                   </p>
-                  <p className="text-sm text-slate-400 mt-2">Registered accounts</p>
+                  <p className="text-sm text-slate-400 mt-2">{t('registeredAccounts')}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-orange-100 dark:bg-orange-900/30">
                   <Users className="w-6 h-6 text-orange-600 dark:text-orange-400" />
@@ -373,7 +377,7 @@ export default function AdminReportsPage() {
                   <>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Chalet Bookings</span>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('chaletBookings')}</span>
                         <span className="text-sm font-semibold text-slate-900 dark:text-white">{occupancyData.chalets.occupancyRate}%</span>
                       </div>
                       <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -388,7 +392,7 @@ export default function AdminReportsPage() {
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Pool Sessions</span>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('poolSessions')}</span>
                         <span className="text-sm font-semibold text-slate-900 dark:text-white">{occupancyData.pool.occupancyRate}%</span>
                       </div>
                       <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -432,7 +436,7 @@ export default function AdminReportsPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-sm bg-indigo-500" />
-                        <span className="text-sm text-slate-600 dark:text-slate-400">New Customers</span>
+                        <span className="text-sm text-slate-600 dark:text-slate-400">{t('newCustomers')}</span>
                       </div>
                       <span className="font-semibold">{customerData.customerRetention.new}</span>
                     </div>

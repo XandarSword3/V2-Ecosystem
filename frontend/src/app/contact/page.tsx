@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -37,6 +38,7 @@ const initialForm: ContactForm = {
 };
 
 export default function ContactPage() {
+  const t = useTranslations('contact');
   const { settings } = useSiteSettings();
   const [form, setForm] = useState<ContactForm>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,11 +54,11 @@ export default function ContactPage() {
       await api.post('/support/contact', form);
       setSubmitted(true);
       setForm(initialForm);
-      toast.success('Message sent successfully! We\'ll get back to you soon.');
+      toast.success(t('successToast'));
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
-      setError(axiosError.response?.data?.error || 'Failed to send message. Please try again.');
-      toast.error('Failed to send message');
+      setError(axiosError.response?.data?.error || t('errorToast'));
+      toast.error(t('errorToast'));
     } finally {
       setIsSubmitting(false);
     }
@@ -65,25 +67,25 @@ export default function ContactPage() {
   const contactInfo = [
     {
       icon: Phone,
-      label: 'Phone',
+      label: t('phone'),
       value: settings.phone || '+961 XX XXX XXX',
       href: `tel:${settings.phone || '+961000000000'}`,
     },
     {
       icon: Mail,
-      label: 'Email',
+      label: t('email'),
       value: settings.email || 'info@v2resort.com',
       href: `mailto:${settings.email || 'info@v2resort.com'}`,
     },
     {
       icon: MapPin,
-      label: 'Address',
+      label: t('address'),
       value: settings.address || 'V2 Resort, Lebanon',
       href: '#',
     },
     {
       icon: Clock,
-      label: 'Reception Hours',
+      label: t('receptionHours'),
       value: settings.receptionHours || '24/7',
       href: '#',
     },
@@ -101,10 +103,10 @@ export default function ContactPage() {
           {/* Header */}
           <motion.div variants={fadeInUp} className="text-center">
             <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">
-              Contact Us
+              {t('title')}
             </h1>
             <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-              Have a question or need assistance? We're here to help. Reach out to us and we'll respond as soon as possible.
+              {t('subtitle')}
             </p>
           </motion.div>
 
@@ -115,10 +117,10 @@ export default function ContactPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <MessageCircle className="w-5 h-5 text-primary-600" />
-                    Send us a Message
+                    {t('sendMessage')}
                   </CardTitle>
                   <CardDescription>
-                    Fill out the form below and we'll get back to you within 24 hours.
+                    {t('formDescription')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -126,13 +128,13 @@ export default function ContactPage() {
                     <div className="text-center py-8">
                       <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
                       <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
-                        Message Sent!
+                        {t('messageSent')}
                       </h3>
                       <p className="text-slate-600 dark:text-slate-400 mb-4">
-                        Thank you for contacting us. We'll respond to your inquiry shortly.
+                        {t('thankYou')}
                       </p>
                       <Button onClick={() => setSubmitted(false)}>
-                        Send Another Message
+                        {t('sendAnother')}
                       </Button>
                     </div>
                   ) : (
@@ -147,7 +149,7 @@ export default function ContactPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            Your Name *
+                            {t('yourName')} *
                           </label>
                           <Input
                             required
@@ -158,7 +160,7 @@ export default function ContactPage() {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            Email Address *
+                            {t('emailAddress')} *
                           </label>
                           <Input
                             required
@@ -173,7 +175,7 @@ export default function ContactPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            Phone Number
+                            {t('phoneNumber')}
                           </label>
                           <Input
                             value={form.phone}
@@ -183,34 +185,34 @@ export default function ContactPage() {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            Subject *
+                            {t('subject')} *
                           </label>
                           <Input
                             required
                             value={form.subject}
                             onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                            placeholder="How can we help?"
+                            placeholder={t('subjectPlaceholder')}
                           />
                         </div>
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                          Message *
+                          {t('message')} *
                         </label>
                         <textarea
                           required
                           rows={5}
                           value={form.message}
                           onChange={(e) => setForm({ ...form, message: e.target.value })}
-                          placeholder="Tell us more about your inquiry..."
+                          placeholder={t('messagePlaceholder')}
                           className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
                         />
                       </div>
 
                       <Button type="submit" isLoading={isSubmitting} className="w-full">
                         <Send className="w-4 h-4 mr-2" />
-                        Send Message
+                        {t('sendMessageButton')}
                       </Button>
                     </form>
                   )}
@@ -222,7 +224,7 @@ export default function ContactPage() {
             <motion.div variants={fadeInUp} className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Contact Information</CardTitle>
+                  <CardTitle>{t('contactInfo')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -251,24 +253,24 @@ export default function ContactPage() {
               {/* Business Hours */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Business Hours</CardTitle>
+                  <CardTitle>{t('businessHours')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">Restaurant</span>
+                      <span className="text-slate-600 dark:text-slate-400">{t('restaurant')}</span>
                       <span className="font-medium text-slate-900 dark:text-white">
                         {settings.restaurantHours || '8:00 AM - 11:00 PM'}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">Pool</span>
+                      <span className="text-slate-600 dark:text-slate-400">{t('pool')}</span>
                       <span className="font-medium text-slate-900 dark:text-white">
                         {settings.poolHours || '9:00 AM - 7:00 PM'}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">Reception</span>
+                      <span className="text-slate-600 dark:text-slate-400">{t('reception')}</span>
                       <span className="font-medium text-slate-900 dark:text-white">
                         {settings.receptionHours || '24/7'}
                       </span>

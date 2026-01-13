@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/Button';
 import { ArrowLeft, Save, Shield, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { RoleAssignmentModal } from '@/components/admin/RoleAssignmentModal';
 
 interface Permission {
     id: string;
@@ -26,6 +27,7 @@ export default function UserDetailsPage() {
   const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
   
   // State for overrides
   const [overrides, setOverrides] = useState<Record<string, boolean>>({}); // permissionId -> is_granted
@@ -129,13 +131,23 @@ export default function UserDetailsPage() {
                           ))}
                       </div>
                       <Button variant="ghost" className="px-0 mt-4 text-primary hover:bg-transparent hover:underline" onClick={() => {
-                          // TODO: Open role assignment modal (reuse existing logic from UserEditModal or similar)
-                          toast.info("Role editing modal would open here");
+                          setShowRoleModal(true);
                       }}>
                           Manage Roles
                       </Button>
                   </CardContent>
               </Card>
+
+              <RoleAssignmentModal
+                isOpen={showRoleModal}
+                onClose={() => setShowRoleModal(false)}
+                userId={user.id}
+                userName={user.full_name}
+                currentRoles={user.roles || []}
+                onRolesUpdated={(newRoles) => {
+                  setUser({ ...user, roles: newRoles });
+                }}
+              />
 
                <Card>
                   <CardHeader>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/auth-context';
 import { useSocket } from '@/lib/socket';
 import { formatCurrency, formatTime, getOrderStatusColor } from '@/lib/utils';
@@ -107,6 +108,8 @@ function SessionAccessDashboard({ slug, moduleName }: { slug: string, moduleName
 }
 
 function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string, moduleName: string, moduleId: string }) {
+  const t = useTranslations('staff');
+  const tc = useTranslations('adminCommon');
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'today' | 'all'>('today');
@@ -123,7 +126,7 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
       });
       setBookings(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to load bookings');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -149,10 +152,10 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
     try {
       await api.patch(`/chalets/staff/bookings/${bookingId}/status`, { status });
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
-      toast.success(`Booking ${status.replace('_', ' ')}`);
+      toast.success(tc('success.updated'));
       setSelectedBooking(null);
     } catch (error) {
-      toast.error('Failed to update booking');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -343,6 +346,8 @@ function MultiDayBookingDashboard({ slug, moduleName, moduleId }: { slug: string
 }
 
 function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName: string, moduleId: string }) {
+  const t = useTranslations('staff');
+  const tc = useTranslations('adminCommon');
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
@@ -407,7 +412,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
       });
       setOrders(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to load orders');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setIsLoading(false);
     }
@@ -423,10 +428,10 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
           order.id === orderId ? { ...order, status: newStatus } : order
         )
       );
-      toast.success(`Order updated to ${newStatus}`);
+      toast.success(t('orders.orderUpdated', { status: newStatus }));
       setSelectedOrder(null);
     } catch (error) {
-      toast.error('Failed to update order status');
+      toast.error(tc('errors.failedToUpdate'));
     }
   };
 
@@ -720,6 +725,7 @@ function KitchenView({ slug, moduleName, moduleId }: { slug: string, moduleName:
 
 export default function ModulePage({ params }: { params: { slug: string } }) {
   const slug = params.slug;
+  const tc = useTranslations('adminCommon');
   const [moduleId, setModuleId] = useState<string | null>(null);
   const [moduleName, setModuleName] = useState<string>('');
   const [templateType, setTemplateType] = useState<string>('');
@@ -736,14 +742,14 @@ export default function ModulePage({ params }: { params: { slug: string } }) {
         }
       } catch (error) {
         console.error('Failed to fetch module:', error);
-        toast.error('Failed to load module details');
+        toast.error(tc('errors.failedToLoad'));
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchModule();
-  }, [slug]);
+  }, [slug, tc]);
 
   if (isLoading) {
     return (

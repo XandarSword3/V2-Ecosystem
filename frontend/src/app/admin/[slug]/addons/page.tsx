@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
@@ -39,6 +40,7 @@ interface Addon {
 export default function DynamicAddonsPage() {
   const params = useParams();
   const { modules } = useSiteSettings();
+  const tc = useTranslations('adminCommon');
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
   const currentModule = modules.find(m => m.slug === slug);
 
@@ -62,7 +64,7 @@ export default function DynamicAddonsPage() {
       const response = await api.get('/chalets/addons', { params: { moduleId: currentModule.id } });
       setAddons(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch add-ons');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -76,7 +78,7 @@ export default function DynamicAddonsPage() {
 
   const handleSubmit = async () => {
     if (!formData.name || !currentModule) {
-      toast.error('Please fill in all required fields');
+      toast.error(tc('errors.fillRequiredFields'));
       return;
     }
     try {
@@ -84,16 +86,16 @@ export default function DynamicAddonsPage() {
       const payload = { ...formData, module_id: currentModule.id };
       if (editing) {
         await api.put(`/chalets/admin/addons/${editing.id}`, payload);
-        toast.success('Add-on updated');
+        toast.success(tc('success.updated'));
       } else {
         await api.post('/chalets/admin/addons', payload);
-        toast.success('Add-on created');
+        toast.success(tc('success.created'));
       }
       setShowModal(false);
       setEditing(null);
       fetchAddons();
     } catch (error) {
-      toast.error('Failed to save add-on');
+      toast.error(tc('errors.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -113,13 +115,13 @@ export default function DynamicAddonsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this add-on?')) return;
+    if (!confirm(tc('addons.confirmDelete'))) return;
     try {
       await api.delete(`/chalets/admin/addons/${id}`);
       setAddons((prev) => prev.filter((a) => a.id !== id));
-      toast.success('Add-on deleted');
+      toast.success(tc('success.deleted'));
     } catch (error) {
-      toast.error('Failed to delete add-on');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -127,9 +129,9 @@ export default function DynamicAddonsPage() {
     try {
       await api.put(`/chalets/admin/addons/${addon.id}`, { is_available: !addon.is_available });
       setAddons((prev) => prev.map((a) => (a.id === addon.id ? { ...a, is_available: !a.is_available } : a)));
-      toast.success(`Add-on ${addon.is_available ? 'hidden' : 'shown'}`);
+      toast.success(addon.is_available ? tc('addons.hidden') : tc('addons.shown'));
     } catch (error) {
-      toast.error('Failed to update add-on');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -164,17 +166,17 @@ export default function DynamicAddonsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentModule.name} Add-ons</h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage additional services and items</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentModule.name} {tc('addons.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400">{tc('addons.manageAddons')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchAddons}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <Button onClick={openNewModal}>
             <Plus className="w-4 h-4 mr-2" />
-            Add Add-on
+            {tc('addons.addAddon')}
           </Button>
         </div>
       </div>
@@ -186,7 +188,7 @@ export default function DynamicAddonsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 text-sm">Total Add-ons</p>
+                  <p className="text-slate-500 text-sm">{tc('addons.totalAddons')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{addons.length}</p>
                 </div>
                 <Package className="w-8 h-8 text-purple-500" />
@@ -200,7 +202,7 @@ export default function DynamicAddonsPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 text-sm">Available</p>
+                  <p className="text-slate-500 text-sm">{tc('tables.available')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">
                     {addons.filter(a => a.is_available).length}
                   </p>
@@ -217,8 +219,8 @@ export default function DynamicAddonsPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <Package className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-            <p className="text-slate-500 dark:text-slate-400">No add-ons configured</p>
-            <Button onClick={openNewModal} className="mt-4">Add your first add-on</Button>
+            <p className="text-slate-500 dark:text-slate-400">{tc('addons.noAddonsConfigured')}</p>
+            <Button onClick={openNewModal} className="mt-4">{tc('addons.addFirstAddon')}</Button>
           </CardContent>
         </Card>
       ) : (
@@ -248,7 +250,7 @@ export default function DynamicAddonsPage() {
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                       addon.is_available ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'
                     }`}>
-                      {addon.is_available ? 'Available' : 'Hidden'}
+                      {addon.is_available ? tc('tables.available') : tc('addons.hiddenStatus')}
                     </span>
                   </div>
 
@@ -261,7 +263,7 @@ export default function DynamicAddonsPage() {
                           : 'bg-green-100 text-green-600 hover:bg-green-200'
                       }`}
                     >
-                      {addon.is_available ? <><EyeOff className="w-4 h-4" />Hide</> : <><Eye className="w-4 h-4" />Show</>}
+                      {addon.is_available ? <><EyeOff className="w-4 h-4" />{tc('addons.hide')}</> : <><Eye className="w-4 h-4" />{tc('addons.show')}</>}
                     </button>
                     <button onClick={() => handleEdit(addon)} className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200">
                       <Pencil className="w-4 h-4" />
@@ -296,7 +298,7 @@ export default function DynamicAddonsPage() {
             >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-                  {editing ? 'Edit Add-on' : 'Add Add-on'}
+                  {editing ? tc('addons.editAddon') : tc('addons.addAddon')}
                 </h3>
                 <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                   <X className="w-5 h-5" />
@@ -306,17 +308,17 @@ export default function DynamicAddonsPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name (English) *</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('addons.nameEnglish')} *</label>
                     <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., BBQ Equipment" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name (Arabic)</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('addons.nameArabic')}</label>
                     <Input value={formData.name_ar} onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })} placeholder="الاسم بالعربية" dir="rtl" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('addons.description')}</label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -327,7 +329,7 @@ export default function DynamicAddonsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Price *</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('tickets.price')} *</label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input type="number" step="0.01" value={formData.price} onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })} className="pl-10" />
@@ -335,7 +337,7 @@ export default function DynamicAddonsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Image URL</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('addons.imageUrl')}</label>
                   <Input value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} placeholder="https://..." />
                 </div>
 
@@ -346,15 +348,15 @@ export default function DynamicAddonsPage() {
                     onChange={(e) => setFormData({ ...formData, is_available: e.target.checked })}
                     className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                   />
-                  <span className="text-sm text-slate-700 dark:text-slate-300">Available for booking</span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{tc('addons.availableForBooking')}</span>
                 </label>
               </div>
 
               <div className="flex gap-3 mt-6">
-                <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1">Cancel</Button>
+                <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1">{tc('cancel')}</Button>
                 <Button onClick={handleSubmit} disabled={saving} className="flex-1">
                   {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                  {editing ? 'Update' : 'Create'}
+                  {editing ? tc('update') : tc('create')}
                 </Button>
               </div>
             </motion.div>

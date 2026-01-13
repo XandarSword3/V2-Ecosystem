@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -79,6 +80,8 @@ const DEFAULT_CONFIG: NavbarConfig = {
 };
 
 export default function NavbarSettingsPage() {
+    const t = useTranslations('adminSettings');
+    const tc = useTranslations('adminCommon');
     const [navbar, setNavbar] = useState<NavbarConfig>(DEFAULT_CONFIG);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -96,7 +99,7 @@ export default function NavbarSettingsPage() {
             }
         } catch (error) {
             console.error('Failed to fetch navbar settings:', error);
-            toast.error('Failed to load settings');
+            toast.error(tc('errors.failedToLoad'));
         } finally {
             setLoading(false);
         }
@@ -106,10 +109,10 @@ export default function NavbarSettingsPage() {
         setSaving(true);
         try {
             await api.put('/admin/settings', { key: 'navbar', value: navbar });
-            toast.success('Navbar configuration saved successfully');
+            toast.success(t('navbar.saved'));
         } catch (error: unknown) {
             const axiosError = error as { response?: { data?: { error?: string } } };
-            toast.error(axiosError.response?.data?.error || 'Failed to save settings');
+            toast.error(axiosError.response?.data?.error || tc('errors.failedToSave'));
         } finally {
             setSaving(false);
         }
@@ -172,15 +175,15 @@ export default function NavbarSettingsPage() {
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                         <MousePointer2 className="w-8 h-8 text-primary-600" />
-                        Navigation Bar CMS
+                        {t('navbar.title')}
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400">
-                        Customize your website''s top navigation bar, links, and action buttons.
+                        {t('navbar.subtitle')}
                     </p>
                 </div>
                 <Button onClick={handleSave} disabled={saving} className="shadow-lg shadow-primary-500/20">
                     <Save className="w-4 h-4 mr-2" />
-                    {saving ? 'Saving...' : 'Save Changes'}
+                    {saving ? tc('saving') : tc('saveChanges')}
                 </Button>
             </div>
 

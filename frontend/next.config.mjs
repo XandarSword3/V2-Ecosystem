@@ -1,3 +1,4 @@
+import { withSentryConfig } from '@sentry/nextjs';
 import createNextIntlPlugin from 'next-intl/plugin';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
@@ -25,4 +26,21 @@ const nextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+// Sentry configuration options
+const sentryWebpackPluginOptions = {
+  // Suppresses source map uploading logs during build
+  silent: true,
+  // Org and project from Sentry dashboard
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  // Only upload source maps in production
+  dryRun: process.env.NODE_ENV !== 'production',
+};
+
+// Wrap with Sentry only if DSN is configured
+const configWithIntl = withNextIntl(nextConfig);
+const finalConfig = process.env.NEXT_PUBLIC_SENTRY_DSN 
+  ? withSentryConfig(configWithIntl, sentryWebpackPluginOptions)
+  : configWithIntl;
+
+export default finalConfig;

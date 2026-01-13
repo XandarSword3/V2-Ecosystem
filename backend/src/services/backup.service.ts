@@ -3,6 +3,7 @@ import { config } from "../config";
 import { logger } from "../utils/logger";
 
 interface BackupResult {
+    id: string;
     filename: string;
     storagePath: string;
     sizeBytes: number;

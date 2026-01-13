@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
@@ -43,6 +44,7 @@ interface PricingRule {
 export default function DynamicPricingPage() {
   const params = useParams();
   const { modules } = useSiteSettings();
+  const tc = useTranslations('adminCommon');
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
   const currentModule = modules.find(m => m.slug === slug);
 
@@ -70,7 +72,7 @@ export default function DynamicPricingPage() {
       const response = await api.get('/chalets/admin/price-rules', { params: { moduleId: currentModule.id } });
       setPricingRules(response.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch pricing rules');
+      toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -84,7 +86,7 @@ export default function DynamicPricingPage() {
 
   const handleSubmit = async () => {
     if (!formData.name || !currentModule) {
-      toast.error('Please fill in all required fields');
+      toast.error(tc('errors.fillRequiredFields'));
       return;
     }
     try {
@@ -92,16 +94,16 @@ export default function DynamicPricingPage() {
       const payload = { ...formData, module_id: currentModule.id };
       if (editing) {
         await api.put(`/chalets/admin/price-rules/${editing.id}`, payload);
-        toast.success('Pricing rule updated');
+        toast.success(tc('success.updated'));
       } else {
         await api.post('/chalets/admin/price-rules', payload);
-        toast.success('Pricing rule created');
+        toast.success(tc('success.created'));
       }
       setShowModal(false);
       setEditing(null);
       fetchPricingRules();
     } catch (error) {
-      toast.error('Failed to save pricing rule');
+      toast.error(tc('errors.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -125,13 +127,13 @@ export default function DynamicPricingPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this pricing rule?')) return;
+    if (!confirm(tc('pricing.confirmDelete'))) return;
     try {
       await api.delete(`/chalets/admin/price-rules/${id}`);
       setPricingRules((prev) => prev.filter((r) => r.id !== id));
-      toast.success('Pricing rule deleted');
+      toast.success(tc('success.deleted'));
     } catch (error) {
-      toast.error('Failed to delete pricing rule');
+      toast.error(tc('errors.failedToSave'));
     }
   };
 
@@ -170,17 +172,17 @@ export default function DynamicPricingPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentModule.name} Pricing</h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage pricing rules and rates</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentModule.name} {tc('pricing.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400">{tc('pricing.manageRules')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchPricingRules}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tc('refresh')}
           </Button>
           <Button onClick={openNewModal}>
             <Plus className="w-4 h-4 mr-2" />
-            Add Rule
+            {tc('pricing.addRule')}
           </Button>
         </div>
       </div>
@@ -192,7 +194,7 @@ export default function DynamicPricingPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 text-sm">Total Rules</p>
+                  <p className="text-slate-500 text-sm">{tc('pricing.totalRules')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{pricingRules.length}</p>
                 </div>
                 <DollarSign className="w-8 h-8 text-green-500" />
@@ -206,7 +208,7 @@ export default function DynamicPricingPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-500 text-sm">Active</p>
+                  <p className="text-slate-500 text-sm">{tc('sessions.active')}</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">
                     {pricingRules.filter(r => r.is_active).length}
                   </p>
@@ -223,8 +225,8 @@ export default function DynamicPricingPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <DollarSign className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-            <p className="text-slate-500 dark:text-slate-400">No pricing rules configured</p>
-            <Button onClick={openNewModal} className="mt-4">Add your first rule</Button>
+            <p className="text-slate-500 dark:text-slate-400">{tc('pricing.noRulesConfigured')}</p>
+            <Button onClick={openNewModal} className="mt-4">{tc('pricing.addFirstRule')}</Button>
           </CardContent>
         </Card>
       ) : (
@@ -239,7 +241,7 @@ export default function DynamicPricingPage() {
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${
                         rule.is_active ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'
                       }`}>
-                        {rule.is_active ? 'Active' : 'Inactive'}
+                        {rule.is_active ? tc('sessions.active') : tc('sessions.inactive')}
                       </span>
                     </div>
                     <div className="flex gap-1">
@@ -254,15 +256,15 @@ export default function DynamicPricingPage() {
 
                   <div className="grid grid-cols-3 gap-3 text-sm">
                     <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2">
-                      <p className="text-xs text-slate-500">Base</p>
+                      <p className="text-xs text-slate-500">{tc('pricing.base')}</p>
                       <p className="font-bold text-green-600">{formatCurrency(rule.base_price)}</p>
                     </div>
                     <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2">
-                      <p className="text-xs text-slate-500">Weekend</p>
+                      <p className="text-xs text-slate-500">{tc('pricing.weekend')}</p>
                       <p className="font-bold text-blue-600">{formatCurrency(rule.weekend_price || 0)}</p>
                     </div>
                     <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2">
-                      <p className="text-xs text-slate-500">Holiday</p>
+                      <p className="text-xs text-slate-500">{tc('pricing.holiday')}</p>
                       <p className="font-bold text-purple-600">{formatCurrency(rule.holiday_price || 0)}</p>
                     </div>
                   </div>
@@ -297,7 +299,7 @@ export default function DynamicPricingPage() {
             >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-                  {editing ? 'Edit Pricing Rule' : 'Add Pricing Rule'}
+                  {editing ? tc('pricing.editPricingRule') : tc('pricing.addPricingRule')}
                 </h3>
                 <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                   <X className="w-5 h-5" />
@@ -306,27 +308,27 @@ export default function DynamicPricingPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name *</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('tables.name')} *</label>
                   <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Summer Season" />
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Base Price</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('pricing.basePrice')}</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input type="number" value={formData.base_price} onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) || 0 })} className="pl-10" />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Weekend</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('pricing.weekend')}</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input type="number" value={formData.weekend_price} onChange={(e) => setFormData({ ...formData, weekend_price: parseFloat(e.target.value) || 0 })} className="pl-10" />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Holiday</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('pricing.holiday')}</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input type="number" value={formData.holiday_price} onChange={(e) => setFormData({ ...formData, holiday_price: parseFloat(e.target.value) || 0 })} className="pl-10" />
@@ -336,22 +338,22 @@ export default function DynamicPricingPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Min Guests</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('pricing.minGuests')}</label>
                     <Input type="number" value={formData.min_guests} onChange={(e) => setFormData({ ...formData, min_guests: parseInt(e.target.value) || 1 })} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Max Guests</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('pricing.maxGuests')}</label>
                     <Input type="number" value={formData.max_guests} onChange={(e) => setFormData({ ...formData, max_guests: parseInt(e.target.value) || 10 })} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Start Date</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('pricing.startDate')}</label>
                     <Input type="date" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">End Date</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('pricing.endDate')}</label>
                     <Input type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} />
                   </div>
                 </div>
@@ -363,15 +365,15 @@ export default function DynamicPricingPage() {
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                     className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm text-slate-700 dark:text-slate-300">Rule is active</span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{tc('pricing.ruleIsActive')}</span>
                 </label>
               </div>
 
               <div className="flex gap-3 mt-6">
-                <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1">Cancel</Button>
+                <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1">{tc('cancel')}</Button>
                 <Button onClick={handleSubmit} disabled={saving} className="flex-1">
                   {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                  {editing ? 'Update' : 'Create'}
+                  {editing ? tc('update') : tc('create')}
                 </Button>
               </div>
             </motion.div>
