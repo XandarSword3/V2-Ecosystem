@@ -6,6 +6,7 @@ export type UIComponentType =
   | 'button'
   | 'grid'
   | 'menu_list'
+  | 'session_list'
   | 'booking_calendar'
   | 'form_container';
 

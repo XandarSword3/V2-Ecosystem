@@ -33,6 +33,11 @@ interface Table {
   module_id?: string;
 }
 
+interface QRModalState {
+  open: boolean;
+  table: Table | null;
+}
+
 export default function DynamicTablesPage() {
   const params = useParams();
   const { modules } = useSiteSettings();
@@ -45,6 +50,7 @@ export default function DynamicTablesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [formData, setFormData] = useState({ table_number: '', capacity: '4', location: '' });
+  const [qrModal, setQrModal] = useState<QRModalState>({ open: false, table: null });
 
   const fetchTables = useCallback(async () => {
     if (!currentModule) return;
@@ -217,6 +223,9 @@ export default function DynamicTablesPage() {
                       >
                         {table.is_available ? <XCircle className="w-4 h-4 text-red-500" /> : <CheckCircle2 className="w-4 h-4 text-green-500" />}
                       </button>
+                      <button onClick={() => setQrModal({ open: true, table })} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="View QR Code">
+                        <QrCode className="w-4 h-4 text-purple-500" />
+                      </button>
                       <button onClick={() => openEdit(table)} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                         <Edit2 className="w-4 h-4 text-blue-500" />
                       </button>
@@ -292,6 +301,65 @@ export default function DynamicTablesPage() {
               <div className="flex gap-3 mt-6">
                 <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1">{tc('cancel')}</Button>
                 <Button onClick={handleSubmit} className="flex-1">{editingTable ? tc('update') : tc('create')}</Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* QR Code Modal */}
+      <AnimatePresence>
+        {qrModal.open && qrModal.table && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setQrModal({ open: false, table: null })}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                Table {qrModal.table.table_number}
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
+                Scan to order from this table
+              </p>
+
+              <div className="flex justify-center p-4 bg-white rounded-lg border border-slate-200 mb-4">
+                {qrModal.table.qr_code ? (
+                  <img 
+                    src={qrModal.table.qr_code} 
+                    alt={`QR Code for Table ${qrModal.table.table_number}`}
+                    className="w-48 h-48"
+                  />
+                ) : (
+                  <div className="w-48 h-48 flex flex-col items-center justify-center text-slate-400">
+                    <QrCode className="w-16 h-16 mb-2" />
+                    <p className="text-sm">No QR code generated</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-center gap-2">
+                <Button variant="outline" onClick={() => setQrModal({ open: false, table: null })}>
+                  {tc('close')}
+                </Button>
+                {qrModal.table.qr_code && (
+                  <Button onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = qrModal.table!.qr_code!;
+                    link.download = `table-${qrModal.table!.table_number}-qr.png`;
+                    link.click();
+                  }}>
+                    Download
+                  </Button>
+                )}
               </div>
             </motion.div>
           </motion.div>
