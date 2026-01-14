@@ -13,6 +13,7 @@ import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { Loader2, Cookie, ShoppingCart, AlertCircle, Plus, Minus, Sparkles, UtensilsCrossed } from 'lucide-react';
+import { JsonLd, generateSnackBarSchema, generateBreadcrumbSchema } from '@/lib/structured-data';
 import { toast } from 'sonner';
 import { FloatingCard } from '@/components/effects/Card3D';
 import { SpotlightCard } from '@/components/effects/GlowingBorder';
@@ -160,7 +161,64 @@ export default function SnackBarPage() {
     );
   }
 
+  // Static SEO data for bots
+  const snackBarSchema = generateSnackBarSchema({
+    name: settings.snackBarName || 'V2 Snack Bar',
+    description: 'Quick bites and refreshing beverages at V2 Resort. Sandwiches, drinks, snacks, and ice cream available poolside.',
+    url: 'https://v2-ecosystem.vercel.app/snack-bar',
+    priceRange: '$',
+    menuItems: items.slice(0, 10).map(item => ({
+      name: item.name,
+      description: item.description,
+      price: item.price,
+      category: item.category,
+    })),
+  });
+
+  const breadcrumbSchema = generateBreadcrumbSchema([
+    { name: 'Home', url: 'https://v2-ecosystem.vercel.app/' },
+    { name: 'Snack Bar', url: 'https://v2-ecosystem.vercel.app/snack-bar' },
+  ]);
+
   return (
+    <>
+      {/* JSON-LD Structured Data for SEO */}
+      <JsonLd data={[snackBarSchema, breadcrumbSchema]} />
+      
+      {/* Static content for bots/LLMs that don't run JavaScript */}
+      <noscript>
+        <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
+          <h1>V2 Resort Snack Bar</h1>
+          <p>Quick bites and refreshing beverages at V2 Resort in Lebanon. Perfect for a poolside snack or light meal.</p>
+          
+          <h2>Menu Categories</h2>
+          <ul>
+            <li><strong>Sandwiches</strong> - Fresh, delicious sandwiches made to order</li>
+            <li><strong>Drinks</strong> - Cold beverages and refreshments</li>
+            <li><strong>Snacks</strong> - Light bites and appetizers</li>
+            <li><strong>Ice Cream</strong> - Cool treats for hot days</li>
+          </ul>
+          
+          <h2>Popular Items</h2>
+          <ul>
+            {items.slice(0, 8).map(item => (
+              <li key={item.id}>
+                <strong>{item.name}</strong> - ${item.price.toFixed(2)}
+                {item.description && <span> - {item.description}</span>}
+              </li>
+            ))}
+          </ul>
+          
+          <h2>Location</h2>
+          <p>Located poolside at V2 Resort for your convenience. Open during pool hours.</p>
+          
+          <h2>Contact</h2>
+          <p>For snack bar inquiries: info@v2resort.com | +961 XX XXX XXX</p>
+          
+          <p><a href="/">← Return to V2 Resort Home</a></p>
+        </div>
+      </noscript>
+      
     <div className="min-h-screen bg-gradient-to-br from-amber-50/50 via-orange-50/50 to-yellow-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       {/* Animated Hero Section with Aurora */}
       <div className="relative overflow-hidden pt-24 pb-20">
@@ -537,5 +595,6 @@ export default function SnackBarPage() {
         )}
       </AnimatePresence>
     </div>
+    </>
   );
 }
