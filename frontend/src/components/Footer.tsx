@@ -219,7 +219,9 @@ export default function Footer() {
                                     <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
                                         <MapPin className="w-4 h-4 text-primary-400" />
                                     </div>
-                                    <span className="text-sm leading-relaxed">{settings.address || tFooter('address')}</span>
+                                    <span className="text-sm leading-relaxed">
+                                        {(settings.address && settings.address !== '123 Lane') ? settings.address : "Mtayleb Main Road, Mount Lebanon, Lebanon"}
+                                    </span>
                                 </li>
                             )}
                             {footerConfig.contact.showPhone && (
@@ -227,7 +229,9 @@ export default function Footer() {
                                     <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
                                         <Phone className="w-4 h-4 text-primary-400" />
                                     </div>
-                                    <span className="text-sm">{settings.phone || tFooter('phone')}</span>
+                                    <span className="text-sm">
+                                        {(settings.phone && !settings.phone.includes('XX')) ? settings.phone : "+961 70 123 456"}
+                                    </span>
                                 </li>
                             )}
                             {footerConfig.contact.showEmail && (
@@ -235,7 +239,9 @@ export default function Footer() {
                                     <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
                                         <Mail className="w-4 h-4 text-primary-400" />
                                     </div>
-                                    <span className="text-sm">{settings.email || tFooter('email')}</span>
+                                    <span className="text-sm">
+                                        {(settings.email && settings.email !== 'info@v2resort.com') ? settings.email : "bookings@v2resort.com"}
+                                    </span>
                                 </li>
                             )}
                         </ul>
