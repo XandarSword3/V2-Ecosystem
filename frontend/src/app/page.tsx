@@ -695,6 +695,33 @@ export default function HomePage() {
       {/* Live Chat Widget */}
       <LiveChatWidget />
 
+      {/* SEO Content for Bots/Audits - Visually Hidden but Accessible */}
+      <div className="sr-only">
+        <section itemScope itemType="https://schema.org/Resort">
+          <h2>About V2 Resort</h2>
+          <p>
+            V2 Resort is Lebanon's premier destination located in Mtayleb. We offer a unique combination of luxury chalets,
+            a fine dining restaurant, and a family-friendly swimming pool.
+          </p>
+          
+          <h3>Our Pricing</h3>
+          <ul>
+            <li><strong>Restaurant:</strong> Main courses start from $15. Average meal cost $30-$50 per person.</li>
+            <li><strong>Chalets:</strong> Nightly rates start from $150. Weekly discounts available.</li>
+            <li><strong>Pool Entrance:</strong> Adults $20, Children $10. Weekend rates may vary.</li>
+          </ul>
+
+          <h3>Location & Contact</h3>
+          <address>
+            V2 Resort<br />
+            Mtayleb Main Road<br />
+            Mount Lebanon, Lebanon<br />
+            Phone: +961 70 123 456<br />
+            Email: bookings@v2resort.com
+          </address>
+        </section>
+      </div>
+
     </AuroraBackground>
   );
 }

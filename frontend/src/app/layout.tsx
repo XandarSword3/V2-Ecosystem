@@ -10,6 +10,7 @@ import Footer from '@/components/Footer';
 import { PageTransition } from '@/components/effects/PageTransition';
 import { useSiteSettings } from '@/lib/settings-context';
 import { resortThemes } from '@/lib/theme-config';
+import { JsonLd, generateResortSchema } from '@/lib/structured-data';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -23,16 +24,16 @@ const notoArabic = Noto_Sans_Arabic({
 
 export const metadata: Metadata = {
   title: 'V2 Resort | Restaurant, Chalets & Pool',
-  description: 'Welcome to V2 Resort - Your premium destination for dining, chalets, and pool experiences in Lebanon.',
-  keywords: 'resort, restaurant, chalets, pool, Lebanon, vacation, dining',
+  description: 'Welcome to V2 Resort - Your premium destination for dining, chalets, and pool experiences in Lebanon. Featuring luxury chalets, fine dining restaurant, and family pool.',
+  keywords: 'resort, restaurant, chalets, pool, Lebanon, vacation, dining, getaway, mtayleb',
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
     apple: '/favicon.svg',
   },
   openGraph: {
-    title: 'V2 Resort',
-    description: 'Premium resort experience in Lebanon',
+    title: 'V2 Resort | Luxury Getaway in Lebanon',
+    description: 'Experience the perfect blend of relaxation and entertainment. Luxury chalets, exquisite dining, and refreshing pool sessions.',
     type: 'website',
   },
 };
@@ -46,8 +47,26 @@ export default function RootLayout({
   const locale = defaultLocale;
   const isRtl = locale === 'ar';
 
+  const resortSchema = generateResortSchema({
+    name: 'V2 Resort',
+    description: 'Premier resort in Lebanon offering luxury chalets, fine dining, and pool experiences.',
+    url: 'https://v2-ecosystem.vercel.app',
+    telephone: '+961 70 123 456',
+    email: 'bookings@v2resort.com',
+    address: {
+      street: 'Mtayleb Main Road',
+      city: 'Mtayleb',
+      region: 'Mount Lebanon',
+      country: 'Lebanon',
+    },
+    images: ['https://v2-ecosystem.vercel.app/images/resort-cover.jpg'],
+    priceRange: '$$',
+    openingHours: ['10:00-23:00'],
+  });
+
   // Get theme from settings context (client only)
   let themeClass = '';
+
   if (typeof window !== 'undefined') {
     try {
       // Dynamically import hook to avoid SSR issues
@@ -64,6 +83,9 @@ export default function RootLayout({
       dir={isRtl ? 'rtl' : 'ltr'}
       suppressHydrationWarning
     >
+      <head>
+        <JsonLd data={resortSchema} />
+      </head>
       <body className={`${inter.variable} ${notoArabic.variable} ${isRtl ? 'font-arabic' : 'font-sans'} ${themeClass}`}>
         <Providers>
           <Header />
