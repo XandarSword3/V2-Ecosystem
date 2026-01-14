@@ -700,7 +700,7 @@ export default function HomePage() {
         <section itemScope itemType="https://schema.org/Resort">
           <h2>About V2 Resort</h2>
           <p>
-            V2 Resort is Lebanon's premier destination located in Mtayleb. We offer a unique combination of luxury chalets,
+            V2 Resort is a premier destination located in Global City. We offer a unique combination of luxury chalets,
             a fine dining restaurant, and a family-friendly swimming pool.
           </p>
           
@@ -714,9 +714,9 @@ export default function HomePage() {
           <h3>Location & Contact</h3>
           <address>
             V2 Resort<br />
-            Mtayleb Main Road<br />
-            Mount Lebanon, Lebanon<br />
-            Phone: +961 70 123 456<br />
+            123 Resort Boulevard<br />
+            Global City<br />
+            Phone: +1 234 567 8900<br />
             Email: bookings@v2resort.com
           </address>
         </section>
