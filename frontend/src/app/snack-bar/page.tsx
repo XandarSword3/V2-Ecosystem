@@ -199,15 +199,9 @@ export default function SnackBarPage() {
             <li><strong>Ice Cream</strong> - Cool treats for hot days</li>
           </ul>
           
-          <h2>Popular Items</h2>
-          <ul>
-            {items.slice(0, 8).map(item => (
-              <li key={item.id}>
-                <strong>{item.name}</strong> - ${item.price.toFixed(2)}
-                {item.description && <span> - {item.description}</span>}
-              </li>
-            ))}
-          </ul>
+          <h2>About Our Menu</h2>
+          <p>We offer a variety of quick bites and refreshments perfect for enjoying by the pool. From freshly made sandwiches to cold drinks and sweet ice cream treats, our snack bar has something for everyone.</p>
+          <p>All items are prepared fresh and available for immediate pickup or poolside delivery.</p>
           
           <h2>Location</h2>
           <p>Located poolside at V2 Resort for your convenience. Open during pool hours.</p>
