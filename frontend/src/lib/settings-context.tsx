@@ -108,7 +108,7 @@ const defaultSettings: SiteSettings = {
   reducedMotion: false,
   soundEnabled: true,
   showWeatherWidget: true,
-  weatherLocation: 'Beirut, Lebanon',
+  weatherLocation: 'New York, USA',
   footer: null,
   navbar: null,
 };
