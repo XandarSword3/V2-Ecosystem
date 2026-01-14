@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api, chaletsApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
@@ -85,6 +86,8 @@ export default function ChaletDetailPage() {
   const t = useTranslations('chalets');
   const tCommon = useTranslations('common');
   const currency = useSettingsStore((s) => s.currency);
+  const { settings } = useSiteSettings();
+  const depositPercent = settings.depositPercent || 30;
   const { translateContent, isRTL } = useContentTranslation();
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -171,7 +174,7 @@ export default function ChaletDetailPage() {
       }
     });
 
-    const depositAmount = baseAmount * 0.3;
+    const depositAmount = baseAmount * (depositPercent / 100);
     const totalAmount = baseAmount + addOnsAmount;
 
     return { nights, baseAmount, addOnsAmount, depositAmount, totalAmount };
@@ -589,7 +592,7 @@ export default function ChaletDetailPage() {
                         <span className="text-lg text-green-600">{formatCurrency(pricing.totalAmount, currency)}</span>
                       </div>
                       <div className="flex justify-between text-sm text-amber-600">
-                        <span>{t('depositRequired')} (30%)</span>
+                        <span>{t('depositRequired')} ({depositPercent}%)</span>
                         <span>{formatCurrency(pricing.depositAmount, currency)}</span>
                       </div>
                     </div>

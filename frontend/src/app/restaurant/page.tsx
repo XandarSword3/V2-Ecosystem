@@ -141,7 +141,8 @@ const categoryIcons: Record<string, string> = {
 export default function RestaurantMenuPage() {
   const t = useTranslations('restaurant');
   const tCommon = useTranslations('common');
-  const { settings } = useSiteSettings();
+  const { settings, modules } = useSiteSettings();
+  const restaurantModule = modules.find(m => m.slug === 'restaurant');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
   const [dietaryFilters, setDietaryFilters] = useState<{
@@ -163,8 +164,9 @@ export default function RestaurantMenuPage() {
   const cartCount = getRestaurantCount();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['restaurant-menu'],
-    queryFn: () => restaurantApi.getMenu(),
+    queryKey: ['restaurant-menu', restaurantModule?.id],
+    queryFn: () => restaurantApi.getMenu(restaurantModule?.id),
+    enabled: !!restaurantModule,
   });
 
   // Normalize menu items from API (snake_case → camelCase)

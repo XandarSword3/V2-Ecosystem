@@ -6,7 +6,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocaleFromCookie, defaultLocale, type Locale } from '@/i18n';
-import { LoadingScreen } from '@/components/effects/LoadingScreen';
+import { LoadingScreenWrapper } from '@/components/effects/LoadingScreen';
 import { SettingsProvider } from '@/lib/settings-context';
 import { HydrateSettingsFromBackend } from '@/lib/hydrate-settings';
 import { DirectionSync } from '@/components/DirectionSync';
@@ -77,9 +77,10 @@ export function Providers({ children }: ProvidersProps) {
               <ThemeInjector />
               <WeatherEffects />
               <DirectionSync />
-              <LoadingScreen />
               <PageTracker />
-              {children}
+              <LoadingScreenWrapper>
+                {children}
+              </LoadingScreenWrapper>
             </SettingsProvider>
           </AuthProvider>
         </ThemeProvider>

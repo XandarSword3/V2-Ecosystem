@@ -6,17 +6,26 @@ interface ModuleBuilderStore {
   layout: UIBlock[];
   selectedBlockId: string | null;
   isPreview: boolean;
+  zoom: number;
+  history: UIBlock[][];
+  historyIndex: number;
   
   // Actions
   setActiveModuleId: (id: string) => void;
-  setLayout: (layout: UIBlock[]) => void;
+  setLayout: (layout: UIBlock[], skipHistory?: boolean) => void;
   selectBlock: (id: string | null) => void;
   togglePreview: () => void;
+  setZoom: (zoom: number) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
   
   addBlock: (type: UIComponentType, parentId?: string) => void;
   updateBlock: (id: string, updates: Partial<UIBlock>) => void;
   removeBlock: (id: string) => void;
-  moveBlock: (activeId: string, overId: string) => void; // Simplified for flat list initially
+  moveBlock: (activeId: string, overId: string) => void;
+  duplicateBlock: (id: string) => void;
 }
 
 // Helper to find path to node
@@ -31,36 +40,87 @@ const findNode = (nodes: UIBlock[], id: string): UIBlock | undefined => {
   return undefined;
 };
 
-export const useModuleBuilderStore = create<ModuleBuilderStore>((set) => ({
+// Simple history management: past holds previous states, future holds undone states
+// When we make a change, we push current to past and clear future
+// When we undo, we push current to future and pop from past
+// When we redo, we push current to past and pop from future
+
+export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
   activeModuleId: null,
   layout: [],
   selectedBlockId: null,
   isPreview: false,
+  zoom: 100,
+  history: [], // past states
+  historyIndex: -1, // not used in new approach, keeping for compatibility
+  
+  // Internal state for redo
+  _futureStates: [] as UIBlock[][],
 
   setActiveModuleId: (id) => set({ activeModuleId: id }),
-  setLayout: (layout) => set({ layout }),
+  setLayout: (layout, skipHistory = false) => set((state) => {
+    if (skipHistory) return { layout };
+    const newHistory = [...state.history, [...state.layout]].slice(-50);
+    return { layout, history: newHistory, _futureStates: [] };
+  }),
   selectBlock: (id) => set({ selectedBlockId: id }),
   togglePreview: () => set((state) => ({ isPreview: !state.isPreview, selectedBlockId: null })),
+  setZoom: (zoom) => set({ zoom: Math.max(50, Math.min(150, zoom)) }),
+  
+  undo: () => set((state: any) => {
+    if (state.history.length === 0) return state;
+    const newHistory = [...state.history];
+    const previousLayout = newHistory.pop()!;
+    const newFuture = [...(state._futureStates || []), [...state.layout]];
+    return { 
+      layout: [...previousLayout], 
+      history: newHistory,
+      _futureStates: newFuture
+    };
+  }),
+  
+  redo: () => set((state: any) => {
+    if (!state._futureStates?.length) return state;
+    const newFuture = [...state._futureStates];
+    const nextLayout = newFuture.pop()!;
+    const newHistory = [...state.history, [...state.layout]];
+    return { 
+      layout: [...nextLayout], 
+      history: newHistory,
+      _futureStates: newFuture
+    };
+  }),
+  
+  canUndo: () => get().history.length > 0,
+  canRedo: () => (get() as any)._futureStates?.length > 0,
 
   addBlock: (type, parentId) => set((state) => {
+    const defaultProps: Record<string, any> = {};
+    
+    // Set default props based on type
+    if (type === 'hero') {
+      defaultProps.title = 'Welcome';
+      defaultProps.subtitle = 'Discover our services';
+    } else if (type === 'grid') {
+      defaultProps.columns = '3';
+      defaultProps.dataSource = 'menu';
+    }
+    
     const newBlock: UIBlock = {
       id: crypto.randomUUID(),
       type,
       label: `New ${type}`,
-      props: {},
+      props: defaultProps,
+      style: { width: '100%' },
       children: type === 'container' || type === 'grid' || type === 'form_container' ? [] : undefined
     };
 
-    if (!parentId) {
-      return { layout: [...state.layout, newBlock] };
-    }
-
-    const newLayout = [...state.layout];
-    // Deep update logic would go here for nested blocks
-    return { layout: newLayout }; 
+    const newLayout = [...state.layout, newBlock];
+    const newHistory = [...state.history, [...state.layout]].slice(-50);
+    return { layout: newLayout, history: newHistory, _futureStates: [] };
   }),
 
-  updateBlock: (id, updates) => set((state) => {
+  updateBlock: (id, updates) => set((state: any) => {
     const updateRecursive = (nodes: UIBlock[]): UIBlock[] => {
       return nodes.map(node => {
         if (node.id === id) {
@@ -72,26 +132,31 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set) => ({
         return node;
       });
     };
-    return { layout: updateRecursive(state.layout) };
+    const newLayout = updateRecursive(state.layout);
+    const newHistory = [...state.history, [...state.layout]].slice(-50);
+    return { layout: newLayout, history: newHistory, _futureStates: [] };
   }),
 
-  removeBlock: (id) => set((state) => {
+  removeBlock: (id) => set((state: any) => {
     const removeRecursive = (nodes: UIBlock[]): UIBlock[] => {
       return nodes.filter(node => node.id !== id).map(node => ({
         ...node,
         children: node.children ? removeRecursive(node.children) : undefined
       }));
     };
+    const newLayout = removeRecursive(state.layout);
+    const newHistory = [...state.history, [...state.layout]].slice(-50);
     return { 
-      layout: removeRecursive(state.layout),
-      selectedBlockId: state.selectedBlockId === id ? null : state.selectedBlockId
+      layout: newLayout,
+      selectedBlockId: state.selectedBlockId === id ? null : state.selectedBlockId,
+      history: newHistory,
+      _futureStates: []
     };
   }),
 
-  moveBlock: (activeId, overId) => set((state) => {
-    // Basic reordering implementation for root level
-    const oldIndex = state.layout.findIndex(x => x.id === activeId);
-    const newIndex = state.layout.findIndex(x => x.id === overId);
+  moveBlock: (activeId, overId) => set((state: any) => {
+    const oldIndex = state.layout.findIndex((x: UIBlock) => x.id === activeId);
+    const newIndex = state.layout.findIndex((x: UIBlock) => x.id === overId);
     
     if (oldIndex === -1 || newIndex === -1) return state;
 
@@ -99,6 +164,25 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set) => ({
     const [movedItem] = newLayout.splice(oldIndex, 1);
     newLayout.splice(newIndex, 0, movedItem);
     
-    return { layout: newLayout };
+    const newHistory = [...state.history, [...state.layout]].slice(-50);
+    return { layout: newLayout, history: newHistory, _futureStates: [] };
+  }),
+  
+  duplicateBlock: (id) => set((state: any) => {
+    const blockToDuplicate = state.layout.find((b: UIBlock) => b.id === id);
+    if (!blockToDuplicate) return state;
+    
+    const duplicatedBlock: UIBlock = {
+      ...blockToDuplicate,
+      id: crypto.randomUUID(),
+      label: `${blockToDuplicate.label} (copy)`,
+    };
+    
+    const index = state.layout.findIndex((b: UIBlock) => b.id === id);
+    const newLayout = [...state.layout];
+    newLayout.splice(index + 1, 0, duplicatedBlock);
+    
+    const newHistory = [...state.history, [...state.layout]].slice(-50);
+    return { layout: newLayout, history: newHistory, _futureStates: [] };
   }),
 }));

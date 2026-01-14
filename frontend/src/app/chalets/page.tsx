@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { chaletsApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { Loader2, Home, Users, Bed, Bath, Wifi, Wind, UtensilsCrossed, Car, AlertCircle, Star, MapPin, ChevronRight, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -75,11 +76,16 @@ export default function ChaletsPage() {
   const t = useTranslations('chalets');
   const tCommon = useTranslations('common');
   const currency = useSettingsStore((s) => s.currency);
+  const { settings, modules } = useSiteSettings();
+  const chaletsModule = modules.find(m => m.slug === 'chalets');
   const { translateContent, isRTL } = useContentTranslation();
 
+  const depositPercent = settings.depositPercent || 30;
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['chalets'],
-    queryFn: () => chaletsApi.getChalets(),
+    queryKey: ['chalets', chaletsModule?.id],
+    queryFn: () => chaletsApi.getChalets(chaletsModule?.id),
+    enabled: !!chaletsModule,
   });
 
   const chalets: Chalet[] = data?.data?.data || [];
@@ -425,7 +431,7 @@ export default function ChaletsPage() {
                 iconBg: 'bg-blue-100 dark:bg-blue-900/50',
                 iconColor: 'text-blue-600 dark:text-blue-400',
                 title: t('bookingInfo.deposit'),
-                content: t('bookingInfo.depositDescription'),
+                content: t('bookingInfo.depositDescription', { percent: depositPercent }),
                 gradientFrom: 'rgba(59, 130, 246, 0.15)'
               },
               {

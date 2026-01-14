@@ -64,7 +64,13 @@ export function TwoFactorSettings() {
     setProcessing(true);
     try {
       const response = await authApi.setup2FA();
-      setSetupData(response.data.data);
+      // Backend returns qrCode, map to qrCodeDataUrl for consistency
+      const data = response.data.data;
+      setSetupData({
+        qrCodeDataUrl: data.qrCodeDataUrl || data.qrCode,
+        secret: data.secret,
+        backupCodes: data.backupCodes,
+      });
       setStep('setup');
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };

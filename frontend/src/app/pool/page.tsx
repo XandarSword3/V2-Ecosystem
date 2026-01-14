@@ -98,7 +98,8 @@ export default function PoolPage() {
     const t = useTranslations('pool');
     const tCommon = useTranslations('common');
     const router = useRouter();
-    const { settings } = useSiteSettings();
+    const { settings, modules } = useSiteSettings();
+    const poolModule = modules.find(m => m.slug === 'pool');
     const currency = useSettingsStore((s) => s.currency);
     const { translateContent } = useContentTranslation();
     const [customerName, setCustomerName] = useState('');
@@ -122,8 +123,9 @@ export default function PoolPage() {
     };
 
     const { data, isLoading, error, refetch } = useQuery({
-      queryKey: ['pool-sessions', selectedDate],
-      queryFn: () => poolApi.getSessions(selectedDate),
+      queryKey: ['pool-sessions', selectedDate, poolModule?.id],
+      queryFn: () => poolApi.getSessions(selectedDate, poolModule?.id),
+      enabled: !!poolModule,
     });
       const sessions = data?.data?.data || [];
   

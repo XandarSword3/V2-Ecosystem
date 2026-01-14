@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Mail, Lock, Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { useSiteSettings } from '@/lib/settings-context';
 
 export default function LoginPage() {
   const t = useTranslations('auth.login');
@@ -14,6 +15,12 @@ export default function LoginPage() {
   const tCommon = useTranslations('common');
   const router = useRouter();
   const { user, isAuthenticated, login } = useAuth();
+  const { settings } = useSiteSettings();
+  
+  // Dynamic branding
+  const resortName = settings.resortName || 'V2 Resort';
+  const logoText = resortName.substring(0, 2).toUpperCase();
+  const displayName = resortName.length > 2 ? resortName.substring(2).trim() : 'Resort';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -73,9 +80,9 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-primary-600 font-bold text-xl">V2</span>
+              <span className="text-primary-600 font-bold text-xl">{logoText}</span>
             </div>
-            <span className="text-2xl font-bold text-white">Resort</span>
+            <span className="text-2xl font-bold text-white">{displayName || 'Resort'}</span>
           </Link>
         </div>
 

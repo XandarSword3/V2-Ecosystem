@@ -166,7 +166,7 @@ export const restaurantApi = {
 
 // Snack Bar API
 export const snackApi = {
-  getItems: () => api.get('/snack/items'),
+  getItems: (moduleId?: string) => api.get('/snack/items', { params: { moduleId } }),
   createOrder: (data: CreateSnackOrderData) => api.post('/snack/orders', data),
   getMyOrders: () => api.get('/snack/orders/my'),
   getOrder: (orderId: string) => api.get(`/snack/orders/${orderId}`),
