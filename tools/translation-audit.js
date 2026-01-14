@@ -7,23 +7,11 @@
  * 3. Reports missing translations
  * 4. Suggests translation keys for hardcoded text
  * 
- * Usage: node --loader ts-node/esm tools/translation-audit.ts
+ * Usage: node tools/translation-audit.js
  */
 
 const fs = require('fs');
 const path = require('path');
-
-interface AuditResult {
-  file: string;
-  line: number;
-  type: 'hardcoded' | 'missing-translation' | 'inconsistent';
-  text: string;
-  suggestion?: string;
-}
-
-interface TranslationFile {
-  [key: string]: string | TranslationFile;
-}
 
 const MESSAGES_DIR = path.join(__dirname, '..', 'frontend', 'messages');
 const APP_DIR = path.join(__dirname, '..', 'frontend', 'src', 'app');
@@ -41,9 +29,12 @@ const IGNORE_WORDS = [
   'motion', 'div', 'span', 'button', 'Link', 'href',
 ];
 
-// Load translation files
-function loadTranslations(): Map<string, TranslationFile> {
-  const translations = new Map<string, TranslationFile>();
+/**
+ * Load translation files
+ * @returns {Map<string, object>}
+ */
+function loadTranslations() {
+  const translations = new Map();
   
   for (const lang of SUPPORTED_LANGUAGES) {
     const filePath = path.join(MESSAGES_DIR, `${lang}.json`);
@@ -56,14 +47,19 @@ function loadTranslations(): Map<string, TranslationFile> {
   return translations;
 }
 
-// Get all keys from a translation object (flattened)
-function getAllKeys(obj: TranslationFile, prefix = ''): string[] {
-  const keys: string[] = [];
+/**
+ * Get all keys from a translation object (flattened)
+ * @param {object} obj 
+ * @param {string} prefix 
+ * @returns {string[]}
+ */
+function getAllKeys(obj, prefix = '') {
+  const keys = [];
   
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key;
     if (typeof value === 'object' && value !== null) {
-      const nestedKeys = getAllKeys(value as TranslationFile, fullKey);
+      const nestedKeys = getAllKeys(value, fullKey);
       keys.push(...nestedKeys);
     } else {
       keys.push(fullKey);
@@ -73,9 +69,13 @@ function getAllKeys(obj: TranslationFile, prefix = ''): string[] {
   return keys;
 }
 
-// Find all TSX/JSX files
-function findSourceFiles(dir: string): string[] {
-  const files: string[] = [];
+/**
+ * Find all TSX/JSX files
+ * @param {string} dir 
+ * @returns {string[]}
+ */
+function findSourceFiles(dir) {
+  const files = [];
   
   if (!fs.existsSync(dir)) {
     return files;
@@ -96,9 +96,14 @@ function findSourceFiles(dir: string): string[] {
   return files;
 }
 
-// Find potential hardcoded strings
-function findHardcodedStrings(content: string, filePath: string): AuditResult[] {
-  const results: AuditResult[] = [];
+/**
+ * Find potential hardcoded strings
+ * @param {string} content 
+ * @param {string} filePath 
+ * @returns {Array<{file: string, line: number, type: string, text: string, suggestion?: string}>}
+ */
+function findHardcodedStrings(content, filePath) {
+  const results = [];
   const lines = content.split('\n');
   
   for (let i = 0; i < lines.length; i++) {
@@ -152,8 +157,12 @@ function findHardcodedStrings(content: string, filePath: string): AuditResult[] 
   return results;
 }
 
-// Suggest a translation key based on text
-function suggestTranslationKey(text: string): string {
+/**
+ * Suggest a translation key based on text
+ * @param {string} text 
+ * @returns {string}
+ */
+function suggestTranslationKey(text) {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
@@ -161,9 +170,13 @@ function suggestTranslationKey(text: string): string {
     .substring(0, 40);
 }
 
-// Compare translations across languages
-function findMissingTranslations(translations: Map<string, TranslationFile>): AuditResult[] {
-  const results: AuditResult[] = [];
+/**
+ * Compare translations across languages
+ * @param {Map<string, object>} translations 
+ * @returns {Array<{file: string, line: number, type: string, text: string}>}
+ */
+function findMissingTranslations(translations) {
+  const results = [];
   const enTranslations = translations.get('en');
   
   if (!enTranslations) {
@@ -191,6 +204,8 @@ function findMissingTranslations(translations: Map<string, TranslationFile>): Au
           line: 0,
           type: 'missing-translation',
           text: `Key "${key}" exists in English but not in ${lang}`,
+          key: key,
+          lang: lang,
         });
       }
     }
@@ -203,6 +218,8 @@ function findMissingTranslations(translations: Map<string, TranslationFile>): Au
           line: 0,
           type: 'inconsistent',
           text: `Key "${key}" exists in ${lang} but not in English (orphaned)`,
+          key: key,
+          lang: lang,
         });
       }
     }
@@ -211,8 +228,11 @@ function findMissingTranslations(translations: Map<string, TranslationFile>): Au
   return results;
 }
 
-// Generate report
-function generateReport(results: AuditResult[]): void {
+/**
+ * Generate report
+ * @param {Array} results 
+ */
+function generateReport(results) {
   console.log('\n========================================');
   console.log('   TRANSLATION AUDIT REPORT');
   console.log('========================================\n');
@@ -224,7 +244,7 @@ function generateReport(results: AuditResult[]): void {
   console.log(`📊 Summary:`);
   console.log(`   - Hardcoded strings found: ${hardcoded.length}`);
   console.log(`   - Missing translations: ${missing.length}`);
-  console.log(`   - Inconsistent keys: ${inconsistent.length}`);
+  console.log(`   - Inconsistent/orphaned keys: ${inconsistent.length}`);
   console.log('');
   
   if (hardcoded.length > 0) {
@@ -245,19 +265,50 @@ function generateReport(results: AuditResult[]): void {
   }
   
   if (missing.length > 0) {
-    console.log('❌ MISSING TRANSLATIONS:');
+    console.log('\n❌ MISSING TRANSLATIONS:');
     console.log('─'.repeat(50));
-    for (const result of missing.slice(0, 20)) {
-      console.log(`  📄 ${result.file}`);
-      console.log(`     ${result.text}`);
-      console.log('');
+    
+    // Group by language
+    const byLang = {};
+    for (const r of missing) {
+      if (!byLang[r.lang]) byLang[r.lang] = [];
+      byLang[r.lang].push(r.key);
     }
-    if (missing.length > 20) {
-      console.log(`   ... and ${missing.length - 20} more\n`);
+    
+    for (const [lang, keys] of Object.entries(byLang)) {
+      console.log(`\n  📁 ${lang.toUpperCase()}.json - ${keys.length} missing keys:`);
+      for (const key of keys.slice(0, 15)) {
+        console.log(`     • ${key}`);
+      }
+      if (keys.length > 15) {
+        console.log(`     ... and ${keys.length - 15} more`);
+      }
     }
   }
   
-  console.log('========================================');
+  if (inconsistent.length > 0) {
+    console.log('\n⚠️  ORPHANED KEYS (exist in non-English but not in English):');
+    console.log('─'.repeat(50));
+    
+    // Group by language
+    const byLang = {};
+    for (const r of inconsistent) {
+      if (!byLang[r.lang]) byLang[r.lang] = [];
+      byLang[r.lang].push(r.key);
+    }
+    
+    for (const [lang, keys] of Object.entries(byLang)) {
+      console.log(`\n  📁 ${lang.toUpperCase()}.json - ${keys.length} orphaned keys:`);
+      for (const key of keys.slice(0, 10)) {
+        console.log(`     • ${key}`);
+      }
+      if (keys.length > 10) {
+        console.log(`     ... and ${keys.length - 10} more`);
+      }
+    }
+  }
+  
+  console.log('\n========================================');
   console.log('   RECOMMENDATIONS');
   console.log('========================================\n');
   
@@ -271,8 +322,33 @@ function generateReport(results: AuditResult[]): void {
   if (missing.length > 0) {
     console.log('2. Add missing translations:');
     console.log('   - Check messages/*.json files');
-    console.log('   - Ensure all keys exist in all languages\n');
+    console.log('   - Ensure all keys exist in all languages');
+    console.log('   - Use admin dashboard Translation Management to fix\n');
   }
+  
+  if (inconsistent.length > 0) {
+    console.log('3. Clean up orphaned keys:');
+    console.log('   - Remove keys from non-English files that don\'t exist in English');
+    console.log('   - Or add the missing keys to English if they should exist\n');
+  }
+  
+  // Output JSON summary for programmatic use
+  const summary = {
+    hardcodedCount: hardcoded.length,
+    missingCount: missing.length,
+    inconsistentCount: inconsistent.length,
+    missingByLang: {},
+  };
+  
+  for (const r of missing) {
+    if (!summary.missingByLang[r.lang]) summary.missingByLang[r.lang] = [];
+    summary.missingByLang[r.lang].push(r.key);
+  }
+  
+  // Write JSON report for admin dashboard consumption
+  const reportPath = path.join(__dirname, 'translation-audit-results.json');
+  fs.writeFileSync(reportPath, JSON.stringify(summary, null, 2));
+  console.log(`📝 JSON report saved to: ${reportPath}\n`);
   
   console.log('✅ Audit complete!\n');
 }
@@ -293,7 +369,7 @@ async function main() {
   const allFiles = [...appFiles, ...componentFiles];
   console.log(`   Found ${allFiles.length} source files\n`);
   
-  const results: AuditResult[] = [];
+  const results = [];
   
   // Scan for hardcoded strings
   console.log('🔎 Scanning for hardcoded strings...');

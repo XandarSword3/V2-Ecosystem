@@ -49,7 +49,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations('admin');
-  const { modules } = useSiteSettings();
+  const { modules, settings } = useSiteSettings();
+  
+  // Dynamic branding from CMS
+  const resortName = settings.resortName || 'V2 Resort';
+  const logoText = resortName.substring(0, 2).toUpperCase();
 
   const navigation: NavItem[] = [
     { name: t('nav.dashboard'), href: '/admin', icon: LayoutDashboard },
@@ -262,8 +266,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 h-16 flex items-center justify-between">
+      {/* Mobile Header - Premium Glassmorphism */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/50 dark:border-slate-700/50 px-4 h-16 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileMenuOpen(true)}
@@ -272,7 +276,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <Menu className="h-5 w-5 text-slate-600 dark:text-slate-400" />
           </button>
           <div className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-bold text-lg px-2.5 py-1 rounded-lg">
-            V2
+            {logoText}
           </div>
           <span className="font-semibold text-slate-900 dark:text-white">Admin</span>
         </div>
@@ -299,12 +303,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-slate-800 shadow-xl"
+              className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 backdrop-blur-xl bg-gradient-to-b from-white/95 via-slate-50/90 to-white/95 dark:from-slate-900/95 dark:via-slate-800/90 dark:to-slate-900/95 shadow-2xl border-r border-slate-200/30 dark:border-slate-700/30"
             >
-              <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between p-4 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-transparent via-slate-100/50 dark:via-slate-800/50 to-transparent">
                 <div className="flex items-center gap-2">
                   <div className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-bold text-lg px-2.5 py-1 rounded-lg">
-                    V2
+                    {logoText}
                   </div>
                   <span className="font-semibold text-slate-900 dark:text-white">Admin Panel</span>
                 </div>
@@ -327,7 +331,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   />
                 ))}
               </nav>
-              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200 dark:border-slate-700">
+              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-t from-white dark:from-slate-900 to-transparent">
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
@@ -341,18 +345,22 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         )}
       </AnimatePresence>
 
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - Premium Glassmorphism */}
       <aside
         className={cn(
-          'hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transition-all duration-300',
+          'hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 transition-all duration-300',
+          'bg-gradient-to-b from-slate-50/95 via-white/90 to-slate-50/95',
+          'dark:from-slate-900/95 dark:via-slate-800/90 dark:to-slate-900/95',
+          'backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/50',
+          'shadow-[4px_0_24px_-4px_rgba(0,0,0,0.1)] dark:shadow-[4px_0_24px_-4px_rgba(0,0,0,0.3)]',
           sidebarOpen ? 'w-64' : 'w-20'
         )}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-slate-700">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-transparent via-slate-100/50 dark:via-slate-800/50 to-transparent">
           <div className="flex items-center gap-2">
             <div className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-bold text-lg px-2.5 py-1 rounded-lg shrink-0">
-              V2
+              {logoText}
             </div>
             {sidebarOpen && (
               <motion.span
@@ -374,7 +382,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600">
           {navigation.map((item) => (
             <NavItemComponent
               key={item.name}
@@ -388,7 +396,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </nav>
 
         {/* User Section */}
-        <div className="p-3 border-t border-slate-200 dark:border-slate-700">
+        <div className="p-3 border-t border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-t from-slate-100/80 dark:from-slate-800/80 to-transparent">
           {sidebarOpen && (
             <div className="flex items-center gap-3 px-3 py-2 mb-2">
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-medium text-sm">
@@ -424,8 +432,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'
         )}
       >
-        {/* Top Bar */}
-        <div className="hidden lg:flex items-center justify-between h-16 px-6 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+        {/* Top Bar - Premium Glassmorphism */}
+        <div className="hidden lg:flex items-center justify-between h-16 px-6 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/50 dark:border-slate-700/50 shadow-sm">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
               {navigation.find((n) => pathname === n.href || pathname.startsWith(n.href + '/'))?.name || 'Dashboard'}
@@ -546,10 +554,10 @@ function NavItemComponent({ item, pathname, expanded, onToggle, onNavigate, coll
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           className={cn(
-            'flex items-center justify-center p-3 rounded-xl transition-colors',
+            'flex items-center justify-center p-3 rounded-xl transition-all duration-200',
             isActive
-              ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+              ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-600 dark:text-blue-300 shadow-sm ring-1 ring-blue-500/20'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-700/50 hover:shadow-sm'
           )}
           title={item.name}
         >
@@ -565,14 +573,19 @@ function NavItemComponent({ item, pathname, expanded, onToggle, onNavigate, coll
         <button
           onClick={onToggle}
           className={cn(
-            'w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors',
+            'w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group',
             isActive
-              ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+              ? 'bg-gradient-to-r from-blue-500/15 to-purple-500/15 text-blue-600 dark:text-blue-300 shadow-sm ring-1 ring-blue-500/20'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-700/50 hover:shadow-sm'
           )}
         >
           <div className="flex items-center gap-3">
-            <Icon className="h-5 w-5" />
+            <div className={cn(
+              'p-1.5 rounded-lg transition-colors',
+              isActive ? 'bg-blue-500/10' : 'group-hover:bg-slate-200/50 dark:group-hover:bg-slate-600/30'
+            )}>
+              <Icon className="h-4 w-4" />
+            </div>
             <span className="text-sm font-medium">{item.name}</span>
           </div>
           <motion.div
@@ -591,19 +604,20 @@ function NavItemComponent({ item, pathname, expanded, onToggle, onNavigate, coll
               transition={{ duration: 0.2 }}
               className="overflow-hidden"
             >
-              <div className="pl-8 mt-1 space-y-1">
+              <div className="pl-8 mt-1 space-y-0.5 border-l-2 border-slate-200/60 dark:border-slate-700/60 ml-4">
                 {item.children!.map((child) => (
                   <Link key={child.href} href={child.href} onClick={onNavigate}>
-                    <div
+                    <motion.div
+                      whileHover={{ x: 2 }}
                       className={cn(
-                        'px-3 py-2 rounded-lg text-sm transition-colors',
+                        'px-3 py-2 rounded-lg text-sm transition-all duration-200',
                         pathname === child.href
-                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium'
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 font-medium shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/60 dark:hover:bg-slate-700/40'
                       )}
                     >
                       {child.name}
-                    </div>
+                    </motion.div>
                   </Link>
                 ))}
               </div>
@@ -617,15 +631,21 @@ function NavItemComponent({ item, pathname, expanded, onToggle, onNavigate, coll
   return (
     <Link href={item.href} onClick={onNavigate}>
       <motion.div
-        whileHover={{ x: 2 }}
+        whileHover={{ x: 2, scale: 1.01 }}
+        whileTap={{ scale: 0.98 }}
         className={cn(
-          'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
+          'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group',
           isActive
-            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+            ? 'bg-gradient-to-r from-blue-500/15 to-purple-500/15 text-blue-600 dark:text-blue-300 shadow-sm ring-1 ring-blue-500/20'
+            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-700/50 hover:shadow-sm'
         )}
       >
-        <Icon className="h-5 w-5" />
+        <div className={cn(
+          'p-1.5 rounded-lg transition-colors',
+          isActive ? 'bg-blue-500/10' : 'group-hover:bg-slate-200/50 dark:group-hover:bg-slate-600/30'
+        )}>
+          <Icon className="h-4 w-4" />
+        </div>
         <span className="text-sm font-medium">{item.name}</span>
       </motion.div>
     </Link>

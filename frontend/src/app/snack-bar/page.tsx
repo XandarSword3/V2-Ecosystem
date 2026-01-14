@@ -93,6 +93,7 @@ export default function SnackBarPage() {
     ice_cream: t('categories.iceCream'),
   };
 
+  // Note: snack_items table doesn't have module_id - it's a shared menu
   const { data, isLoading, error } = useQuery({
     queryKey: ['snack-items'],
     queryFn: () => snackApi.getItems(),

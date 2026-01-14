@@ -348,8 +348,8 @@ export default function Header() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: 'easeInOut' }}
-              className="lg:hidden overflow-hidden border-t border-white/20 dark:border-slate-700/30 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl"
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="lg:hidden overflow-hidden border-t border-white/20 dark:border-slate-700/30 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl"
             >
               <motion.div
                 initial="hidden"
@@ -358,12 +358,12 @@ export default function Header() {
                   hidden: { opacity: 0 },
                   visible: {
                     opacity: 1,
-                    transition: { staggerChildren: 0.05 },
+                    transition: { staggerChildren: 0.08, delayChildren: 0.1 },
                   },
                 }}
                 className="py-4 space-y-1"
               >
-                {navigation.map((item: any) => {
+                {navigation.map((item: any, index: number) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
 
@@ -371,21 +371,31 @@ export default function Header() {
                     <motion.div
                       key={item.href}
                       variants={{
-                        hidden: { opacity: 0, x: -20 },
-                        visible: { opacity: 1, x: 0 },
+                        hidden: { opacity: 0, x: -30, filter: 'blur(4px)' },
+                        visible: { 
+                          opacity: 1, 
+                          x: 0, 
+                          filter: 'blur(0px)',
+                          transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] }
+                        },
                       }}
                     >
                       <Link
                         href={item.href}
                         onClick={() => setMobileMenuOpen(false)}
                         className={cn(
-                          'flex items-center gap-3 px-4 py-3 mx-2 rounded-xl transition-all duration-300',
+                          'flex items-center gap-3 px-4 py-3 mx-2 rounded-xl transition-all duration-300 group',
                           isActive
-                            ? 'bg-primary-500/10 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 font-medium border border-primary-200/50 dark:border-primary-700/30'
-                            : 'text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60'
+                            ? 'bg-gradient-to-r from-primary-500/15 to-primary-600/10 dark:from-primary-500/25 dark:to-primary-600/15 text-primary-700 dark:text-primary-300 font-medium shadow-sm'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60 hover:shadow-sm'
                         )}
                       >
-                        <Icon className="h-5 w-5" />
+                        <div className={cn(
+                          'p-1.5 rounded-lg transition-colors',
+                          isActive ? 'bg-primary-500/10' : 'group-hover:bg-slate-200/50 dark:group-hover:bg-slate-700/50'
+                        )}>
+                          <Icon className="h-4 w-4" />
+                        </div>
                         <span>{item.name}</span>
                       </Link>
                     </motion.div>
@@ -395,8 +405,13 @@ export default function Header() {
                 {/* Mobile Auth */}
                 <motion.div
                   variants={{
-                    hidden: { opacity: 0, x: -20 },
-                    visible: { opacity: 1, x: 0 },
+                    hidden: { opacity: 0, x: -30, filter: 'blur(4px)' },
+                    visible: { 
+                      opacity: 1, 
+                      x: 0, 
+                      filter: 'blur(0px)',
+                      transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] }
+                    },
                   }}
                   className="pt-4 mt-4 mx-2 border-t border-white/20 dark:border-slate-700/30"
                 >
