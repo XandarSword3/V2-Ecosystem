@@ -24,8 +24,8 @@ const notoArabic = Noto_Sans_Arabic({
 
 export const metadata: Metadata = {
   title: 'V2 Resort | Restaurant, Chalets & Pool',
-  description: 'Welcome to V2 Resort - Your premium destination for dining, chalets, and pool experiences in Lebanon. Featuring luxury chalets, fine dining restaurant, and family pool.',
-  keywords: 'resort, restaurant, chalets, pool, Lebanon, vacation, dining, getaway, mtayleb',
+  description: 'Welcome to V2 Resort - Your premium destination for dining, chalets, and pool experiences. Featuring luxury chalets, fine dining restaurant, and family pool.',
+  keywords: 'resort, restaurant, chalets, pool, vacation, dining, getaway, luxury',
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
@@ -49,15 +49,15 @@ export default function RootLayout({
 
   const resortSchema = generateResortSchema({
     name: 'V2 Resort',
-    description: 'Premier resort in Lebanon offering luxury chalets, fine dining, and pool experiences.',
+    description: 'Premier resort offering luxury chalets, fine dining, and pool experiences.',
     url: 'https://v2-ecosystem.vercel.app',
-    telephone: '+961 70 123 456',
+    telephone: '+1 234 567 8900',
     email: 'bookings@v2resort.com',
     address: {
-      street: 'Mtayleb Main Road',
-      city: 'Mtayleb',
-      region: 'Mount Lebanon',
-      country: 'Lebanon',
+      street: '123 Resort Boulevard',
+      city: 'Global City',
+      region: 'State',
+      country: 'Country',
     },
     images: ['https://v2-ecosystem.vercel.app/images/resort-cover.jpg'],
     priceRange: '$$',

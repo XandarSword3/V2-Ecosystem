@@ -220,7 +220,7 @@ export default function Footer() {
                                         <MapPin className="w-4 h-4 text-primary-400" />
                                     </div>
                                     <span className="text-sm leading-relaxed">
-                                        {(settings.address && settings.address !== '123 Lane') ? settings.address : "Mtayleb Main Road, Mount Lebanon, Lebanon"}
+                                        {(settings.address && settings.address !== '123 Lane') ? settings.address : "123 Resort Boulevard, Global City"}
                                     </span>
                                 </li>
                             )}
@@ -230,7 +230,7 @@ export default function Footer() {
                                         <Phone className="w-4 h-4 text-primary-400" />
                                     </div>
                                     <span className="text-sm">
-                                        {(settings.phone && !settings.phone.includes('XX')) ? settings.phone : "+961 70 123 456"}
+                                        {(settings.phone && !settings.phone.includes('XX')) ? settings.phone : "+1 234 567 8900"}
                                     </span>
                                 </li>
                             )}

@@ -138,9 +138,9 @@
     "hero": {
       "title": "Welcome to V2 Resort",
       "titleHighlight": "V2 Resort",
-      "subtitle": "Your premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences in the heart of Lebanon.",
+      "subtitle": "Your premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences.",
       "cta": "Explore Now",
-      "badge": "Lebanon's Premier Resort Experience"
+      "badge": "Premier Resort Experience"
     },
     "services": {
       "title": "Our Services",
@@ -168,11 +168,11 @@
       "subtitle": "Why Choose Us",
       "primeLocation": {
         "title": "Prime Location",
-        "description": "Nestled in the beautiful Lebanese mountains with stunning views"
+        "description": "Nestled in a beautiful location with stunning views"
       },
       "authenticCuisine": {
-        "title": "Authentic Cuisine",
-        "description": "Traditional Lebanese dishes prepared by expert chefs"
+        "title": "Exquisite Cuisine",
+        "description": "International dishes prepared by expert chefs"
       },
       "modernAmenities": {
         "title": "Modern Amenities",
@@ -215,19 +215,19 @@
       "bookChalet": "Book a Chalet",
       "bookNow": "Book Now",
       "readyGetaway": "Ready for Your Perfect Getaway?",
-      "bookStayNow": "Book your stay now and experience the best of Lebanese hospitality at V2 Resort",
+      "bookStayNow": "Book your stay now and experience the best of hospitality at V2 Resort",
       "bookYourChaletNow": "Book Your Chalet Now"
     }
   },
   "restaurant": {
     "title": "Restaurant",
     "menu": "Our Menu",
-    "menuSubtitle": "Discover our delicious Lebanese and international cuisine, crafted with passion",
+    "menuSubtitle": "Discover our delicious international cuisine, crafted with passion",
     "featured": "Featured",
     "featuredDishes": "Chef's Featured Dishes",
     "showAll": "Show All",
     "viewFeatured": "View Featured",
-    "authenticLebanese": "Authentic Lebanese Cuisine",
+    "authenticLebanese": "Signature Cuisine",
     "dishes": "Dishes",
     "categories": "Categories",
     "rating": "Rating",
@@ -1518,15 +1518,15 @@
     "newMessage": "New message"
   },
   "footer": {
-    "description": "Your premium destination for exceptional experiences in Lebanon.",
+    "description": "Your premium destination for exceptional experiences.",
     "quickLinks": "Quick Links",
     "legal": "Legal",
     "privacyPolicy": "Privacy Policy",
     "termsOfService": "Terms of Service",
     "cancellationPolicy": "Cancellation Policy",
     "contact": "Contact",
-    "address": "Mtayleb, Mount Lebanon, Lebanon",
-    "phone": "+961 70 123 456",
+    "address": "123 Resort Boulevard, Global City",
+    "phone": "+1 234 567 8900",
     "email": "bookings@v2resort.com",
     "followUs": "Follow Us",
     "copyright": "© {year} V2 Resort. All rights reserved."
