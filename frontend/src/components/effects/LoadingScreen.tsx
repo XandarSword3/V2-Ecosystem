@@ -488,17 +488,28 @@ export function LoadingScreenWrapper({ children, minDuration = 2500 }: LoadingSc
     return () => clearTimeout(timer);
   }, [mounted, minDuration, enableLoadingAnimation]);
 
-  // Server render: show nothing (prevents hydration mismatch)
-  if (!mounted) {
-    return (
-      <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900" />
-    );
-  }
+  // IMPORTANT: For SEO/Bots, we MUST render children on the server.
+  // We use CSS to hide/reveal the content visually for users, 
+  // but ensure the HTML structure is present for crawlers.
 
   return (
     <>
-      {isAnimating && <LoadingScreenContent />}
-      {showContent && children}
+      {/* Loader Overlay - only active on client to prevent blocking server HTML */}
+      {isAnimating && mounted && (
+        <div className="fixed inset-0 z-[9999]">
+          <LoadingScreenContent />
+        </div>
+      )}
+      
+      {/* Main Content - Always rendered for SEO */}
+      {/* Hidden visually initially, then revealed */}
+      <div 
+        className={`min-h-screen transition-opacity duration-700 ease-in-out ${
+          showContent ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        {children}
+      </div>
     </>
   );
 }
