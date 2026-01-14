@@ -16,7 +16,7 @@ interface PageTransitionProps {
   children: ReactNode;
 }
 
-// Animation variants
+// Animation variants - Premium transitions
 const pageVariants = {
   // Fade transition
   fade: {
@@ -26,33 +26,90 @@ const pageVariants = {
   },
   // Slide from right
   slideRight: {
-    initial: { opacity: 0, x: 20 },
+    initial: { opacity: 0, x: 50 },
     animate: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: -20 },
+    exit: { opacity: 0, x: -30 },
   },
   // Slide from bottom
   slideUp: {
-    initial: { opacity: 0, y: 20 },
+    initial: { opacity: 0, y: 40 },
     animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -20 },
+    exit: { opacity: 0, y: -30 },
   },
   // Scale and fade
   scale: {
-    initial: { opacity: 0, scale: 0.95 },
+    initial: { opacity: 0, scale: 0.92 },
     animate: { opacity: 1, scale: 1 },
-    exit: { opacity: 0, scale: 1.05 },
+    exit: { opacity: 0, scale: 1.08 },
   },
-  // Elegant reveal
+  // Elegant reveal with blur - Default premium option
   reveal: {
-    initial: { opacity: 0, y: 50, filter: 'blur(10px)' },
+    initial: { opacity: 0, y: 60, filter: 'blur(12px)' },
     animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
-    exit: { opacity: 0, y: -30, filter: 'blur(5px)' },
+    exit: { opacity: 0, y: -40, filter: 'blur(8px)' },
+  },
+  // Cinematic zoom reveal
+  cinematic: {
+    initial: { 
+      opacity: 0, 
+      scale: 1.1, 
+      filter: 'blur(20px) saturate(0.5)',
+    },
+    animate: { 
+      opacity: 1, 
+      scale: 1, 
+      filter: 'blur(0px) saturate(1)',
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.95, 
+      filter: 'blur(10px) saturate(0.8)',
+    },
+  },
+  // Dramatic sweep from side
+  sweep: {
+    initial: { 
+      opacity: 0, 
+      x: -100,
+      skewX: -5,
+    },
+    animate: { 
+      opacity: 1, 
+      x: 0,
+      skewX: 0,
+    },
+    exit: { 
+      opacity: 0, 
+      x: 100,
+      skewX: 5,
+    },
+  },
+  // Luxury fade with scale
+  luxury: {
+    initial: { 
+      opacity: 0, 
+      scale: 0.96,
+      y: 30,
+      filter: 'blur(8px)',
+    },
+    animate: { 
+      opacity: 1, 
+      scale: 1,
+      y: 0,
+      filter: 'blur(0px)',
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 1.02,
+      y: -20,
+      filter: 'blur(6px)',
+    },
   },
 };
 
 const transitionConfig = {
-  duration: 0.4,
-  ease: [0.25, 0.46, 0.45, 0.94] as const, // Custom easing
+  duration: 0.5,
+  ease: [0.22, 1, 0.36, 1] as const, // Smooth cubic bezier (expo out)
 };
 
 export function PageTransition({ children }: PageTransitionProps) {
@@ -103,10 +160,14 @@ export function AnimatedSection({ children, delay = 0, className = '' }: Animate
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-100px' }}
-      transition={{ duration: 0.5, delay, ease: 'easeOut' }}
+      initial={{ opacity: 0, y: 40, filter: 'blur(8px)' }}
+      whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      viewport={{ once: true, margin: '-80px' }}
+      transition={{ 
+        duration: 0.7, 
+        delay, 
+        ease: [0.22, 1, 0.36, 1],
+      }}
     >
       {children}
     </motion.div>
@@ -154,10 +215,96 @@ export function StaggeredItem({ children, className = '' }: { children: ReactNod
     <motion.div
       className={className}
       variants={{
-        hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0 },
+        hidden: { opacity: 0, y: 30, scale: 0.95 },
+        visible: { opacity: 1, y: 0, scale: 1 },
       }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * Premium card reveal animation
+ * Use for cards that should have a luxury reveal effect
+ */
+export function LuxuryReveal({ children, className = '', delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
+  const enableTransitions = useSettingsStore((s) => s.enableTransitions);
+
+  if (!enableTransitions) {
+    return <div className={className}>{children}</div>;
+  }
+
+  return (
+    <motion.div
+      className={className}
+      initial={{ 
+        opacity: 0, 
+        y: 60, 
+        scale: 0.9,
+        filter: 'blur(10px)',
+      }}
+      whileInView={{ 
+        opacity: 1, 
+        y: 0, 
+        scale: 1,
+        filter: 'blur(0px)',
+      }}
+      viewport={{ once: true, margin: '-50px' }}
+      transition={{ 
+        duration: 0.8, 
+        delay,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * Horizontal slide reveal
+ * Use for content that should slide in from the side
+ */
+export function SlideReveal({ 
+  children, 
+  className = '', 
+  direction = 'left',
+  delay = 0 
+}: { 
+  children: ReactNode; 
+  className?: string; 
+  direction?: 'left' | 'right';
+  delay?: number;
+}) {
+  const enableTransitions = useSettingsStore((s) => s.enableTransitions);
+
+  if (!enableTransitions) {
+    return <div className={className}>{children}</div>;
+  }
+
+  const xOffset = direction === 'left' ? -80 : 80;
+
+  return (
+    <motion.div
+      className={className}
+      initial={{ 
+        opacity: 0, 
+        x: xOffset,
+        filter: 'blur(8px)',
+      }}
+      whileInView={{ 
+        opacity: 1, 
+        x: 0,
+        filter: 'blur(0px)',
+      }}
+      viewport={{ once: true, margin: '-50px' }}
+      transition={{ 
+        duration: 0.7, 
+        delay,
+        ease: [0.22, 1, 0.36, 1],
+      }}
     >
       {children}
     </motion.div>

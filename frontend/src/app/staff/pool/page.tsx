@@ -594,9 +594,19 @@ export default function StaffPoolPage() {
               </div>
 
               <div className="p-6 overflow-y-auto flex-1 space-y-6">
-                {/* QR Code Placeholder/Area */}
+                {/* QR Code */}
                 <div className="flex justify-center p-4 bg-white rounded-lg border border-slate-200">
-                  <QrCode className="w-32 h-32 text-slate-900" />
+                  {selectedTicket.qr_code ? (
+                    <img 
+                      src={selectedTicket.qr_code} 
+                      alt="Ticket QR Code" 
+                      className="w-32 h-32"
+                    />
+                  ) : (
+                    <div className="w-32 h-32 flex items-center justify-center text-slate-400">
+                      <QrCode className="w-16 h-16" />
+                    </div>
+                  )}
                 </div>
 
                 {/* Status & Info */}

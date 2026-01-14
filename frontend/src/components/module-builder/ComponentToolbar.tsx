@@ -1,5 +1,5 @@
 import { useModuleBuilderStore } from '@/store/module-builder-store';
-import { Layout, Type, Image as ImageIcon, Grid, List, Box, Calendar } from 'lucide-react';
+import { Layout, Type, Image as ImageIcon, Grid, List, Box, Calendar, Clock } from 'lucide-react';
 import { UIComponentType } from '@/types/module-builder';
 
 const COMPONENTS: { type: UIComponentType; label: string; icon: any }[] = [
@@ -8,6 +8,7 @@ const COMPONENTS: { type: UIComponentType; label: string; icon: any }[] = [
   { type: 'image', label: 'Image', icon: ImageIcon },
   { type: 'grid', label: 'Grid / Cards', icon: Grid },
   { type: 'menu_list', label: 'Menu List', icon: List },
+  { type: 'session_list', label: 'Sessions', icon: Clock },
   { type: 'container', label: 'Container', icon: Box },
   { type: 'booking_calendar', label: 'Calendar', icon: Calendar },
 ];
