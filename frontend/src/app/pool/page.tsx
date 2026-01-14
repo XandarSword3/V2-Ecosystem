@@ -12,6 +12,7 @@ import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { useAuth } from '@/lib/auth-context';
 import { useSocket } from '@/lib/socket';
+import { JsonLd, generatePoolSchema, generateBreadcrumbSchema } from '@/lib/structured-data';
 import { Loader2, Waves, Users, Clock, Calendar, AlertCircle, Ticket, Droplets, Sun, Umbrella, QrCode, ChevronRight, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -184,7 +185,58 @@ export default function PoolPage() {
 
 
 
+  // Static SEO data for bots
+  const poolSchema = generatePoolSchema({
+    name: settings.poolName || 'V2 Resort Pool',
+    description: 'Refreshing swimming pool experience at V2 Resort. Multiple daily sessions available with family-friendly options.',
+    url: 'https://v2-ecosystem.vercel.app/pool',
+    priceRange: '$$',
+    openingHours: 'Mo-Su 09:00-20:00',
+  });
+
+  const breadcrumbSchema = generateBreadcrumbSchema([
+    { name: 'Home', url: 'https://v2-ecosystem.vercel.app/' },
+    { name: 'Pool', url: 'https://v2-ecosystem.vercel.app/pool' },
+  ]);
+
   return (
+    <>
+      {/* JSON-LD Structured Data for SEO */}
+      <JsonLd data={[poolSchema, breadcrumbSchema]} />
+      
+      {/* Static content for bots/LLMs that don't run JavaScript */}
+      <noscript>
+        <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
+          <h1>V2 Resort Swimming Pool</h1>
+          <p>Experience our refreshing swimming pool at V2 Resort in Lebanon. We offer multiple daily pool sessions suitable for all ages.</p>
+          
+          <h2>Pool Features</h2>
+          <ul>
+            <li>Clean, refreshing water maintained daily</li>
+            <li>Multiple sessions throughout the day</li>
+            <li>Family-friendly environment</li>
+            <li>Poolside amenities available</li>
+            <li>Separate adult and child pricing</li>
+          </ul>
+          
+          <h2>How to Book</h2>
+          <ol>
+            <li>Select your preferred date</li>
+            <li>Choose an available session time</li>
+            <li>Enter number of adults and children</li>
+            <li>Complete your booking</li>
+          </ol>
+          
+          <h2>Pricing</h2>
+          <p>Pool entry includes access for the full session duration. Special rates for children available. Weekend sessions may have different pricing.</p>
+          
+          <h2>Contact</h2>
+          <p>For pool reservations or inquiries: info@v2resort.com | +961 XX XXX XXX</p>
+          
+          <p><a href="/">← Return to V2 Resort Home</a></p>
+        </div>
+      </noscript>
+      
     <div className="min-h-screen bg-gradient-to-b from-primary-50/50 via-white to-secondary-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       {/* Hero Section with Aurora Effect */}
       <div className="relative min-h-[45vh] overflow-hidden">
@@ -700,5 +752,6 @@ export default function PoolPage() {
         </motion.div>
       </main>
     </div>
+    </>
   );
 }

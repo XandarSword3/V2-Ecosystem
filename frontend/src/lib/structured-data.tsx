@@ -218,6 +218,52 @@ export function generatePoolSchema(props: PoolSchemaProps): object {
   };
 }
 
+export interface SnackBarSchemaProps {
+  name: string;
+  description?: string;
+  url: string;
+  images?: string[];
+  priceRange?: string;
+  menuItems?: Array<{
+    name: string;
+    description?: string;
+    price: number;
+    category: string;
+  }>;
+}
+
+export function generateSnackBarSchema(props: SnackBarSchemaProps): object {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FastFoodRestaurant',
+    name: props.name,
+    description: props.description,
+    url: props.url,
+    image: props.images,
+    priceRange: props.priceRange || '$',
+    servesCuisine: ['Snacks', 'Fast Food', 'Beverages'],
+    hasMenu: props.menuItems ? {
+      '@type': 'Menu',
+      hasMenuSection: [
+        {
+          '@type': 'MenuSection',
+          name: 'Menu Items',
+          hasMenuItem: props.menuItems.map(item => ({
+            '@type': 'MenuItem',
+            name: item.name,
+            description: item.description,
+            offers: {
+              '@type': 'Offer',
+              price: item.price,
+              priceCurrency: 'USD',
+            },
+          })),
+        },
+      ],
+    } : undefined,
+  };
+}
+
 // Component to render JSON-LD script tag
 export function JsonLd({ data }: { data: object | object[] }): JSX.Element {
   const jsonLd = Array.isArray(data) 
