@@ -16,6 +16,9 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   // Attach request ID for tracking
   req.requestId = requestId;
   
+  // Track if response has been logged to prevent duplicate logging
+  let hasLogged = false;
+  
   // Sanitize body to hide sensitive fields
   const sanitizeBody = (body: unknown): unknown => {
     if (!body || typeof body !== 'object') return body;
@@ -45,27 +48,37 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     logger.debug(`[${requestId}] User: ${req.user.userId} (${req.user.email})`);
   }
   
-  // Capture response
+  // Capture response - protect against double-send errors
   const originalSend = res.send;
   res.send = function(body: unknown): Response {
-    const duration = Date.now() - startTime;
-    const statusCode = res.statusCode;
-    
-    // Log response summary
-    const statusEmoji = statusCode >= 500 ? '❌' : statusCode >= 400 ? '⚠️' : '✅';
-    logger.info(`[${requestId}] ${statusEmoji} ${req.method} ${req.originalUrl} - ${statusCode} (${duration}ms)`);
-    
-    // Log error responses in detail
-    if (statusCode >= 400) {
-      try {
-        const responseBody = typeof body === 'string' ? JSON.parse(body) : body;
-        logger.warn(`[${requestId}] Error Response: ${JSON.stringify(responseBody)}`);
-      } catch {
-        logger.warn(`[${requestId}] Error Response: ${body}`);
+    // Only log once per request
+    if (!hasLogged) {
+      hasLogged = true;
+      const duration = Date.now() - startTime;
+      const statusCode = res.statusCode;
+      
+      // Log response summary
+      const statusEmoji = statusCode >= 500 ? '❌' : statusCode >= 400 ? '⚠️' : '✅';
+      logger.info(`[${requestId}] ${statusEmoji} ${req.method} ${req.originalUrl} - ${statusCode} (${duration}ms)`);
+      
+      // Log error responses in detail
+      if (statusCode >= 400) {
+        try {
+          const responseBody = typeof body === 'string' ? JSON.parse(body) : body;
+          logger.warn(`[${requestId}] Error Response: ${JSON.stringify(responseBody)}`);
+        } catch {
+          logger.warn(`[${requestId}] Error Response: ${body}`);
+        }
       }
     }
     
-    return originalSend.call(this, body);
+    // Only call original send if headers haven't been sent yet
+    if (!res.headersSent) {
+      return originalSend.call(this, body);
+    }
+    
+    // Return this for chaining even if we didn't actually send
+    return this;
   };
   
   next();

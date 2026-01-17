@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { authenticate, authorize } from "../../middleware/auth.middleware";
 import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
-import * as adminController from "./admin.controller";
 import * as modulesController from "./modules.controller";
 import * as backupsController from "./backups.controller";
 import * as translationsController from "./translations.controller";
@@ -10,6 +9,7 @@ import * as usersController from "./users.controller";
 import * as permissionsController from "./permissions.controller";
 
 // Import refactored controllers
+import * as dashboardController from "./controllers/dashboard.controller";
 import * as rolesController from "./controllers/roles.controller";
 import * as settingsController from "./controllers/settings.controller";
 import * as auditController from "./controllers/audit.controller";
@@ -32,16 +32,16 @@ router.put('/modules/:id', modulesController.updateModule);
 router.delete('/modules/:id', modulesController.deleteModule);
 
 // Dashboard
-router.get('/dashboard', adminController.getDashboard);
-router.get('/dashboard/revenue', adminController.getRevenueStats);
+router.get('/dashboard', dashboardController.getDashboard);
+router.get('/dashboard/revenue', dashboardController.getRevenueStats);
 
 // Users (Enhanced)
 router.get('/users', usersController.getUsers); // Supports ?type=customer|staff|...
-router.post('/users', adminController.createUser);
+router.post('/users', usersController.createUser);
 router.get('/users/:id', usersController.getUserDetails); // Enhanced details
-router.put('/users/:id', adminController.updateUser);
-router.put('/users/:id/roles', adminController.updateUserRoles);
-router.delete('/users/:id', adminController.deleteUser);
+router.put('/users/:id', usersController.updateUser);
+router.put('/users/:id/roles', usersController.updateUserRoles);
+router.delete('/users/:id', usersController.deleteUser);
 router.put('/users/:id/permissions', permissionsController.updateUserPermissions); // User Override
 
 // Roles & Permissions (using refactored controller)
@@ -91,10 +91,22 @@ router.get('/reports/preview', scheduledReportsController.previewReport);
 
 // Notifications (using refactored controller)
 router.get('/notifications', notificationsController.getNotifications);
+router.get('/notifications/broadcasts', notificationsController.getBroadcasts);
+router.get('/notifications/priorities', notificationsController.getValidPriorities);
 router.put('/notifications/:id/read', notificationsController.markNotificationRead);
 router.put('/notifications/read-all', notificationsController.markAllNotificationsRead);
 router.post('/notifications/broadcast', notificationsController.broadcastNotification);
+router.post('/notifications/delete-multiple', notificationsController.deleteMultipleNotifications);
+router.post('/notifications/process-scheduled', rateLimits.expensive, notificationsController.processScheduledNotifications);
 router.delete('/notifications/:id', notificationsController.deleteNotification);
+
+// Notification Templates
+router.get('/notifications/templates', notificationsController.getTemplates);
+router.get('/notifications/templates/:id', notificationsController.getTemplateById);
+router.post('/notifications/templates', notificationsController.createTemplate);
+router.put('/notifications/templates/:id', notificationsController.updateTemplate);
+router.delete('/notifications/templates/:id', notificationsController.deleteTemplate);
+router.post('/notifications/templates/:id/send', notificationsController.sendFromTemplate);
 
 // Translation Management - Database Translations
 router.get('/translations/status', translationsController.getTranslationServiceStatus);

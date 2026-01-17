@@ -26,15 +26,24 @@ export const metadata: Metadata = {
   title: 'V2 Resort | Restaurant, Chalets & Pool',
   description: 'Welcome to V2 Resort - Your premium destination for dining, chalets, and pool experiences. Featuring luxury chalets, fine dining restaurant, and family pool.',
   keywords: 'resort, restaurant, chalets, pool, vacation, dining, getaway, luxury',
+  manifest: '/manifest.json',
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
-    apple: '/favicon.svg',
+    apple: '/icons/icon-192x192.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'V2 Resort',
   },
   openGraph: {
-    title: 'V2 Resort | Luxury Getaway in Lebanon',
+    title: 'V2 Resort | Luxury Getaway',
     description: 'Experience the perfect blend of relaxation and entertainment. Luxury chalets, exquisite dining, and refreshing pool sessions.',
     type: 'website',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
   },
 };
 
@@ -85,6 +94,10 @@ export default function RootLayout({
     >
       <head>
         <JsonLd data={resortSchema} />
+        <meta name="theme-color" content="#3b82f6" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body className={`${inter.variable} ${notoArabic.variable} ${isRtl ? 'font-arabic' : 'font-sans'} ${themeClass}`}>
         <Providers>

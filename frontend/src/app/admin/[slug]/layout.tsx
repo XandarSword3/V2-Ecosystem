@@ -15,7 +15,8 @@ export default function DynamicModuleLayout({ children }: { children: React.Reac
   useEffect(() => {
     if (!loading && modules.length > 0 && params?.slug) {
       const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
-      const foundModule = modules.find(m => m.slug === slug);
+      const decodedSlug = slug ? decodeURIComponent(slug).toLowerCase() : '';
+      const foundModule = modules.find(m => m.slug.toLowerCase() === decodedSlug);
       
       if (foundModule) {
         setCurrentModule(foundModule);

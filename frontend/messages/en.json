@@ -4,6 +4,7 @@
     "loading": "Loading...",
     "error": "An error occurred",
     "retry": "Retry",
+    "refresh": "Refresh",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -127,6 +128,7 @@
     "gym": "Gym",
     "spa": "Spa & Wellness",
     "cafe": "Cafe & Drinks",
+    "chocolateBox": "Chocolate Box",
     "admin": "Admin",
     "staff": "Staff",
     "profile": "Profile",
@@ -251,6 +253,7 @@
     "orderType": "Order Type",
     "dineIn": "Dine In",
     "takeaway": "Takeaway",
+    "delivery": "Delivery",
     "yourName": "Your Name",
     "enterName": "Enter your name",
     "phoneNumber": "Phone Number",
@@ -547,7 +550,8 @@
       "signingIn": "Signing in...",
       "loginFailed": "Login failed. Please try again.",
       "demoCredentials": "Demo Credentials",
-      "superAdmin": "Super Admin"
+      "superAdmin": "Super Admin",
+      "orContinueWith": "Or continue with"
     },
     "register": {
       "title": "Create Account",
@@ -697,6 +701,8 @@
       "created": "Successfully created"
     },
     "tables": {
+      "title": "Tables",
+      "noTablesConfigured": "No tables have been configured for this module yet",
       "id": "ID",
       "name": "Name",
       "status": "Status",
@@ -1262,6 +1268,9 @@
       "title": "Live Users Monitor",
       "description": "Real-time view of who is online and their activity",
       "totalOnline": "Total Online",
+      "uniqueUsers": "Unique Users",
+      "connections": "connections",
+      "guests": "Guests",
       "admins": "Admins",
       "staff": "Staff",
       "customers": "Customers",
@@ -1277,7 +1286,8 @@
       "lastActivity": "Last Activity",
       "guest": "Guest",
       "autoRefreshOn": "Auto-refresh ON",
-      "autoRefreshOff": "Auto-refresh OFF"
+      "autoRefreshOff": "Auto-refresh OFF",
+      "connectionNote": "Each browser tab counts as a separate connection"
     },
     "stats": {
       "totalRevenue": "Total Revenue",
@@ -1620,7 +1630,7 @@
     "pleaseWriteReview": "Please write a review"
   },
   "weather": {
-    "location": "V2 Resort, Lebanon",
+    "location": "V2 Resort",
     "goodMorning": "Good Morning",
     "goodAfternoon": "Good Afternoon",
     "goodEvening": "Good Evening",

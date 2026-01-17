@@ -3,7 +3,17 @@ import { getSupabase } from "../../database/connection.js";
 import { emitToAll } from "../../socket/index";
 import { logActivity } from "../../utils/activityLogger";
 import { logger } from "../../utils/logger.js";
-import { createUserSchema, validateBody, validatePagination } from "../../validation/schemas.js";
+import { 
+  createUserSchema, 
+  validateBody, 
+  validatePagination,
+  adminUpdateUserSchema,
+  assignUserRolesSchema,
+  createRoleSchema,
+  updateRoleSchema,
+  createPermissionSchema,
+  assignRolePermissionsSchema
+} from "../../validation/schemas.js";
 import dayjs from 'dayjs';
 import type {
   PermissionRow,
@@ -598,15 +608,16 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
 
 export async function updateUser(req: Request, res: Response, next: NextFunction) {
   try {
+    const validatedData = validateBody(adminUpdateUserSchema, req.body);
     const supabase = getSupabase();
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     };
 
-    if (req.body.fullName !== undefined) updateData.full_name = req.body.fullName;
-    if (req.body.phone !== undefined) updateData.phone = req.body.phone;
-    if (req.body.isActive !== undefined) updateData.is_active = req.body.isActive;
-    if (req.body.preferredLanguage !== undefined) updateData.preferred_language = req.body.preferredLanguage;
+    if (validatedData.fullName !== undefined) updateData.full_name = validatedData.fullName;
+    if (validatedData.phone !== undefined) updateData.phone = validatedData.phone;
+    if (validatedData.isActive !== undefined) updateData.is_active = validatedData.isActive;
+    if (validatedData.preferredLanguage !== undefined) updateData.preferred_language = validatedData.preferredLanguage;
 
     const { data: user, error } = await supabase
       .from('users')
@@ -633,8 +644,9 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
 
 export async function updateUserRoles(req: Request, res: Response, next: NextFunction) {
   try {
+    const validatedData = validateBody(assignUserRolesSchema, req.body);
     const supabase = getSupabase();
-    const { roleIds } = req.body;
+    const { roleIds } = validatedData;
     const userId = req.params.id;
 
     // Remove existing roles
@@ -759,14 +771,15 @@ export async function getRoles(req: Request, res: Response, next: NextFunction) 
 
 export async function createRole(req: Request, res: Response, next: NextFunction) {
   try {
+    const validatedData = validateBody(createRoleSchema, req.body);
     const supabase = getSupabase();
     const { data: role, error } = await supabase
       .from('roles')
       .insert({
-        name: req.body.name,
-        display_name: req.body.displayName,
-        description: req.body.description,
-        business_unit: req.body.businessUnit,
+        name: validatedData.name,
+        display_name: validatedData.displayName,
+        description: validatedData.description,
+        business_unit: validatedData.businessUnit,
       })
       .select()
       .single();
@@ -778,7 +791,7 @@ export async function createRole(req: Request, res: Response, next: NextFunction
       action: 'CREATE_ROLE',
       resource: 'roles',
       resource_id: role.id,
-      new_value: req.body
+      new_value: validatedData
     });
 
     res.status(201).json({ success: true, data: role });
@@ -789,15 +802,15 @@ export async function createRole(req: Request, res: Response, next: NextFunction
 
 export async function updateRole(req: Request, res: Response, next: NextFunction) {
   try {
+    const validatedData = validateBody(updateRoleSchema, req.body);
     const supabase = getSupabase();
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     };
 
-    if (req.body.name !== undefined) updateData.name = req.body.name;
-    if (req.body.displayName !== undefined) updateData.display_name = req.body.displayName;
-    if (req.body.description !== undefined) updateData.description = req.body.description;
-    if (req.body.businessUnit !== undefined) updateData.business_unit = req.body.businessUnit;
+    if (validatedData.name !== undefined) updateData.name = validatedData.name;
+    if (validatedData.displayName !== undefined) updateData.display_name = validatedData.displayName;
+    if (validatedData.description !== undefined) updateData.description = validatedData.description;
 
     const { data: role, error } = await supabase
       .from('roles')
@@ -813,7 +826,7 @@ export async function updateRole(req: Request, res: Response, next: NextFunction
       action: 'UPDATE_ROLE',
       resource: 'roles',
       resource_id: role.id,
-      new_value: updateData
+      new_value: validatedData
     });
 
     res.json({ success: true, data: role });

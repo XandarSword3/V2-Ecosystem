@@ -12,6 +12,15 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 async function seed() {
   console.log('🌱 Starting database seed with Supabase...\n');
 
+  // Get passwords from environment or use defaults only in development
+  const isDev = process.env.NODE_ENV !== 'production';
+  const adminPasswordPlain = process.env.SEED_ADMIN_PASSWORD || (isDev ? 'admin123' : undefined);
+  const staffPasswordPlain = process.env.SEED_STAFF_PASSWORD || (isDev ? 'staff123' : undefined);
+  
+  if (!adminPasswordPlain || !staffPasswordPlain) {
+    throw new Error('SEED_ADMIN_PASSWORD and SEED_STAFF_PASSWORD are required in production');
+  }
+
   try {
     // 1. Create roles
     console.log('Creating roles...');
@@ -36,7 +45,7 @@ async function seed() {
 
     // 2. Create admin user
     console.log('Creating admin user...');
-    const adminPassword = await bcrypt.hash('admin123', 12);
+    const adminPassword = await bcrypt.hash(adminPasswordPlain, 12);
     
     const { data: adminUser, error: adminError } = await supabase
       .from('users')
@@ -83,7 +92,7 @@ async function seed() {
 
     // 4. Create staff users
     console.log('Creating staff users...');
-    const staffPassword = await bcrypt.hash('staff123', 12);
+    const staffPassword = await bcrypt.hash(staffPasswordPlain, 12);
     
     const staffUsers = [
       { email: 'restaurant.staff@v2resort.com', full_name: 'Restaurant Staff', role: 'restaurant_staff' },

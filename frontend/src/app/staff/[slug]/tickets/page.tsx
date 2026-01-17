@@ -1,7 +1,6 @@
 'use client';
 
 import { use, useEffect, useState, useCallback, useRef } from 'react';
-import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -35,8 +34,6 @@ const statusConfig: Record<string, { color: string; icon: LucideIcon }> = {
 
 export default function ModuleTicketsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
-  const t = useTranslations('staff');
-  const tc = useTranslations('adminCommon');
   const [tickets, setTickets] = useState<ModuleTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [manualCode, setManualCode] = useState('');
@@ -57,7 +54,7 @@ export default function ModuleTicketsPage({ params }: { params: Promise<{ slug: 
       
       setTickets(response.data.data || []);
     } catch (error) {
-      toast.error(tc('errors.failedToLoad'));
+      toast.error('Failed to load tickets');
       console.error(error);
     } finally {
       setLoading(false);
@@ -77,7 +74,7 @@ export default function ModuleTicketsPage({ params }: { params: Promise<{ slug: 
       // Generic endpoint: /api/:slug/staff/validate
       const response = await api.post(`/${slug}/staff/validate`, { ticketNumber: manualCode });
       
-      toast.success(response.data.message || t('poolGuard.ticketValidated'), { icon: '🎫' });
+      toast.success(response.data.message || 'Ticket validated!', { icon: '🎟️' });
       setManualCode('');
       fetchTickets(); // Refresh list to show status change
     } catch (error: unknown) {

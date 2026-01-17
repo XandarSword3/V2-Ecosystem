@@ -29,9 +29,8 @@ const localeSuffixMap: Record<SupportedLocale, string> = {
  * Interface for translatable content
  * Content should have fields like: name, name_ar, name_fr, description, description_ar, etc.
  */
-export interface TranslatableItem {
-  [key: string]: any;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type TranslatableItem = Record<string, any>;
 
 /**
  * Get translated field from an item
@@ -51,13 +50,15 @@ export function getTranslatedField(
   const translatedField = `${field}${suffix}`;
   
   // Try to get the translated version
-  if (item[translatedField] && item[translatedField].trim()) {
-    return item[translatedField];
+  const translated = item[translatedField];
+  if (translated && typeof translated === 'string' && translated.trim()) {
+    return translated;
   }
   
   // Fallback to English (no suffix)
-  if (item[field]) {
-    return item[field];
+  const fallback = item[field];
+  if (fallback && typeof fallback === 'string') {
+    return fallback;
   }
   
   return '';

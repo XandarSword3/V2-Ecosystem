@@ -3,17 +3,17 @@
  * TOTP-based 2FA using authenticator apps (Google Authenticator, Authy, etc.)
  */
 
-import { authenticator } from 'otplib';
+import { generate, verify, generateSecret, generateURI } from 'otplib';
 import QRCode from 'qrcode';
 import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
 import crypto from 'crypto';
 
-// Configure authenticator options (v12.x API)
-authenticator.options = {
-  digits: 6,
-  step: 30, // 30 second window
-  window: 1, // Allow 1 step before/after for clock drift
+// TOTP configuration
+const TOTP_OPTIONS = {
+  digits: 6 as const,
+  period: 30, // 30 second window
+  algorithm: 'sha1' as const,
 };
 
 interface TwoFactorSetup {
@@ -35,11 +35,16 @@ class TwoFactorService {
    * Generate a new 2FA secret and QR code for setup
    */
   async generateSetup(userId: string, userEmail: string): Promise<TwoFactorSetup> {
-    // Generate secret
-    const secret = authenticator.generateSecret(20);
+    // Generate secret (v13 functional API)
+    const secret = generateSecret({ length: 20 });
     
-    // Generate OTP Auth URL for QR code
-    const otpAuthUrl = authenticator.keyuri(userEmail, this.APP_NAME, secret);
+    // Generate OTP Auth URL for QR code (v13 functional API)
+    const otpAuthUrl = generateURI({
+      secret,
+      issuer: this.APP_NAME,
+      label: userEmail,
+      ...TOTP_OPTIONS,
+    });
     
     // Generate QR code as data URL
     const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl, {
@@ -102,11 +107,11 @@ class TwoFactorService {
       return false;
     }
     
-    // Decrypt secret and verify code
+    // Decrypt secret and verify code (v13 functional API)
     const secret = this.decryptSecret(pending.secret);
-    const isValid = authenticator.verify({ token: code, secret });
+    const result = await verify({ token: code, secret, ...TOTP_OPTIONS });
     
-    if (!isValid) {
+    if (!result.valid) {
       logger.warn(`Invalid 2FA code during setup for user: ${userId}`);
       return false;
     }
@@ -154,8 +159,9 @@ class TwoFactorService {
     
     const secret = this.decryptSecret(twoFactor.secret);
     
-    // Try TOTP verification first
-    if (authenticator.verify({ token: code, secret })) {
+    // Try TOTP verification first (v13 functional API)
+    const result = await verify({ token: code, secret, ...TOTP_OPTIONS });
+    if (result.valid) {
       logger.info(`2FA code verified for user: ${userId}`);
       return true;
     }
@@ -311,7 +317,7 @@ class TwoFactorService {
     encrypted += cipher.final('hex');
     return iv.toString('hex') + ':' + encrypted;
   }
-  
+
   /**
    * Decrypt 2FA secret from storage
    */

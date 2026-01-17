@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
@@ -71,9 +70,6 @@ const entityConfig: Record<string, { icon: React.ElementType; label: string }> =
 };
 
 export default function AdminAuditPage() {
-  const t = useTranslations('adminAudit');
-  const tc = useTranslations('adminCommon');
-  
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,7 +84,7 @@ export default function AdminAuditPage() {
       setLogs(response.data.data || []);
     } catch (error) {
       console.error('Failed to fetch audit logs:', error);
-      toast.error(t('errors.failedToLoad'));
+      toast.error('Failed to fetch audit logs');
       setLogs([]);
     } finally {
       setLoading(false);
@@ -151,15 +147,15 @@ export default function AdminAuditPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            {t('title')}
+            Audit Logs
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            {t('subtitle')}
+            Track all system activities and changes
           </p>
         </div>
         <Button variant="outline" onClick={fetchLogs}>
           <RefreshCw className="w-4 h-4 mr-2" />
-          {tc('refresh')}
+          Refresh
         </Button>
       </div>
 
@@ -173,7 +169,7 @@ export default function AdminAuditPage() {
                   <Activity className="w-5 h-5 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{t('totalEvents')}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Total Events</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-white">
                     {logs.length}
                   </p>
@@ -191,7 +187,7 @@ export default function AdminAuditPage() {
                   <Plus className="w-5 h-5 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{t('action')}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Logins</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-white">
                     {logs.filter((l) => l.action === 'LOGIN').length}
                   </p>
@@ -209,7 +205,7 @@ export default function AdminAuditPage() {
                   <Edit className="w-5 h-5 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{tc('update')}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Updates</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-white">
                     {logs.filter((l) => l.action.includes('UPDATE')).length}
                   </p>
@@ -227,7 +223,7 @@ export default function AdminAuditPage() {
                   <Trash2 className="w-5 h-5 text-red-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{tc('delete')}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Deletes</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-white">
                     {logs.filter((l) => l.action.includes('DELETE')).length}
                   </p>
@@ -247,7 +243,7 @@ export default function AdminAuditPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder={tc('searchPlaceholder')}
+                placeholder="Search logs..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
@@ -260,7 +256,7 @@ export default function AdminAuditPage() {
               onChange={(e) => setActionFilter(e.target.value)}
               className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
             >
-              <option value="all">{tc('all')} {t('action')}</option>
+              <option value="all">All Actions</option>
               {uniqueActions.map((action) => (
                 <option key={action} value={action}>
                   {action.replace('_', ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase())}
@@ -274,7 +270,7 @@ export default function AdminAuditPage() {
               onChange={(e) => setEntityFilter(e.target.value)}
               className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
             >
-              <option value="all">{tc('all')} {t('resource')}</option>
+              <option value="all">All Resources</option>
               {uniqueEntities.map((entity) => (
                 <option key={entity} value={entity}>
                   {entity.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
@@ -297,7 +293,7 @@ export default function AdminAuditPage() {
                   className="text-center py-12"
                 >
                   <Shield className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-                  <p className="text-slate-500 dark:text-slate-400">{tc('noResults')}</p>
+                  <p className="text-slate-500 dark:text-slate-400">No audit logs found</p>
                 </motion.div>
               ) : (
                 filteredLogs.map((log, index) => {
@@ -395,7 +391,7 @@ export default function AdminAuditPage() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  {tc('details')}
+                  Audit Log Details
                 </h2>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedLog(null)}>
                   ×
@@ -405,26 +401,26 @@ export default function AdminAuditPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">{t('action')}</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Action</span>
                     <p className="font-medium text-slate-900 dark:text-white capitalize">
                       {selectedLog.action.replace('_', ' ').toLowerCase()}
                     </p>
                   </div>
                   <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">{t('resource')}</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Resource</span>
                     <p className="font-medium text-slate-900 dark:text-white capitalize">
                       {selectedLog.resource.replace('_', ' ')}
                     </p>
                   </div>
                   <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">{t('user')}</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">User</span>
                     <p className="font-medium text-slate-900 dark:text-white">
                       {selectedLog.users?.full_name || 'System'}
                     </p>
                     <p className="text-xs text-slate-500">{selectedLog.users?.email}</p>
                   </div>
                   <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">{t('timestamp')}</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Timestamp</span>
                     <p className="font-medium text-slate-900 dark:text-white">
                       {formatDate(selectedLog.created_at)}
                     </p>
@@ -433,7 +429,7 @@ export default function AdminAuditPage() {
 
                 {selectedLog.ip_address && (
                   <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">{t('ipAddress')}</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">IP Address</span>
                     <p className="font-mono text-sm text-slate-900 dark:text-white">
                       {selectedLog.ip_address}
                     </p>
@@ -442,7 +438,7 @@ export default function AdminAuditPage() {
 
                 {selectedLog.old_value && (
                   <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">{t('previousValues')}</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Previous Values</span>
                     <pre className="mt-1 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm overflow-x-auto text-red-800 dark:text-red-200">
                       {typeof parseValue(selectedLog.old_value) === 'object'
                         ? JSON.stringify(parseValue(selectedLog.old_value), null, 2)
@@ -453,7 +449,7 @@ export default function AdminAuditPage() {
 
                 {selectedLog.new_value && (
                   <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">{t('newValues')}</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">New Values</span>
                     <pre className="mt-1 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm overflow-x-auto text-green-800 dark:text-green-200">
                       {typeof parseValue(selectedLog.new_value) === 'object'
                         ? JSON.stringify(parseValue(selectedLog.new_value), null, 2)

@@ -29,7 +29,7 @@ interface PoolSessionWithPrices extends PoolSessionRow {
 export async function getSessions(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const { moduleId } = req.query;
+    const { moduleId, gender } = req.query;
 
         let query = supabase
           .from('pool_sessions')
@@ -40,6 +40,11 @@ export async function getSessions(req: Request, res: Response, next: NextFunctio
       query = query.eq('module_id', moduleId);
     }
 
+    // Filter by gender restriction if specified
+    if (gender && ['male', 'female'].includes(gender as string)) {
+      query = query.or(`gender_restriction.eq.mixed,gender_restriction.eq.${gender}`);
+    }
+
         const { data: sessions, error } = await query;
         if (error) throw error;
         // Normalize price fields for frontend compatibility
@@ -47,6 +52,7 @@ export async function getSessions(req: Request, res: Response, next: NextFunctio
           ...s,
           adult_price: s.adult_price ?? s.price ?? 0,
           child_price: s.child_price ?? s.price ?? 0,
+          genderRestriction: (s as unknown as Record<string, unknown>).gender_restriction || 'mixed',
         }));
         res.json({ success: true, data: sessionsWithPrices });
   } catch (error) {
@@ -74,6 +80,7 @@ export async function getSession(req: Request, res: Response, next: NextFunction
       ...session,
       adult_price: session.adult_price ?? session.price ?? 0,
       child_price: session.child_price ?? session.price ?? 0,
+      genderRestriction: session.gender_restriction || 'mixed',
     } : null;
     res.json({ success: true, data: sessionWithPrices });
   } catch (error) {
@@ -84,7 +91,7 @@ export async function getSession(req: Request, res: Response, next: NextFunction
 export async function getAvailability(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const { date, sessionId, moduleId } = req.query;
+    const { date, sessionId, moduleId, gender } = req.query;
 
     if (!date) {
       return res.status(400).json({ success: false, error: 'date required' });
@@ -101,6 +108,13 @@ export async function getAvailability(req: Request, res: Response, next: NextFun
 
     if (moduleId) {
       sessionsQuery = sessionsQuery.eq('module_id', moduleId);
+    }
+
+    // Filter by gender restriction if specified
+    // If gender is 'male', show sessions with 'mixed' or 'male' restriction
+    // If gender is 'female', show sessions with 'mixed' or 'female' restriction
+    if (gender && ['male', 'female'].includes(gender as string)) {
+      sessionsQuery = sessionsQuery.or(`gender_restriction.eq.mixed,gender_restriction.eq.${gender}`);
     }
 
     const { data: sessions, error: sessionsError } = await sessionsQuery;
@@ -133,6 +147,7 @@ export async function getAvailability(req: Request, res: Response, next: NextFun
         available: Math.max(0, available),
         adult_price: session.adult_price ?? session.price ?? 0,
         child_price: session.child_price ?? session.price ?? 0,
+        genderRestriction: session.gender_restriction || 'mixed',
       };
     });
 
@@ -356,6 +371,102 @@ export async function getMyTickets(req: Request, res: Response, next: NextFuncti
     if (error) throw error;
 
     res.json({ success: true, data: tickets || [] });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function cancelTicket(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Fetch the ticket
+    const { data: ticket, error: ticketError } = await supabase
+      .from('pool_tickets')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (ticketError) {
+      if (ticketError.code === 'PGRST116') {
+        return res.status(404).json({ success: false, error: 'Ticket not found' });
+      }
+      throw ticketError;
+    }
+
+    // Check ownership or admin permission
+    const userId = req.user?.userId;
+    const userRoles = req.user?.roles || [];
+    const isOwner = ticket.customer_id === userId;
+    const isAdminOrStaff = userRoles.some(role => 
+      ['admin', 'super_admin', 'pool_admin', 'pool_staff', 'staff'].includes(role)
+    );
+
+    if (!isOwner && !isAdminOrStaff) {
+      return res.status(403).json({ success: false, error: 'Not authorized to cancel this ticket' });
+    }
+
+    // Check if ticket can be cancelled
+    if (ticket.status === 'cancelled') {
+      return res.status(400).json({ success: false, error: 'Ticket is already cancelled' });
+    }
+
+    if (ticket.status === 'used' || ticket.status === 'active') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Cannot cancel a ticket that has already been used or is currently active' 
+      });
+    }
+
+    // Check if ticket date has passed
+    const today = dayjs().startOf('day');
+    const ticketDay = dayjs(ticket.ticket_date).startOf('day');
+    if (ticketDay.isBefore(today)) {
+      return res.status(400).json({ success: false, error: 'Cannot cancel a ticket for a past date' });
+    }
+
+    // Cancel the ticket
+    const { data: cancelledTicket, error: updateError } = await supabase
+      .from('pool_tickets')
+      .update({
+        status: 'cancelled',
+        cancellation_reason: reason || null,
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Emit socket event for real-time capacity updates
+    emitToUnit('pool', 'pool:ticket:cancelled', {
+      ticketId: ticket.id,
+      sessionId: ticket.session_id,
+      ticketDate: ticket.ticket_date,
+      numberOfGuests: ticket.number_of_guests,
+    });
+
+    // Audit log
+    logActivity({
+      user_id: userId || 'system',
+      action: 'ticket_cancelled',
+      resource: 'pool_ticket',
+      resource_id: ticket.id,
+      old_value: { status: ticket.status },
+      new_value: { status: 'cancelled', reason },
+      ip_address: req.ip,
+    });
+
+    res.json({ 
+      success: true, 
+      data: cancelledTicket,
+      message: 'Ticket cancelled successfully',
+    });
   } catch (error) {
     next(error);
   }
@@ -631,7 +742,7 @@ export async function getTodayTickets(req: Request, res: Response, next: NextFun
 
 export async function createSession(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, startTime, endTime, maxCapacity, moduleId, adult_price, child_price } = req.body as {
+    const { name, startTime, endTime, maxCapacity, moduleId, adult_price, child_price, genderRestriction } = req.body as {
       name: string;
       startTime: string;
       endTime: string;
@@ -639,6 +750,7 @@ export async function createSession(req: Request, res: Response, next: NextFunct
       moduleId: string;
       adult_price: string | number;
       child_price: string | number;
+      genderRestriction?: 'mixed' | 'male' | 'female';
     };
 
     // Validate required fields
@@ -646,6 +758,14 @@ export async function createSession(req: Request, res: Response, next: NextFunct
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: name, startTime, endTime, maxCapacity, adult_price, child_price'
+      });
+    }
+
+    // Validate genderRestriction if provided
+    if (genderRestriction && !['mixed', 'male', 'female'].includes(genderRestriction)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid genderRestriction. Must be one of: mixed, male, female'
       });
     }
 
@@ -661,6 +781,7 @@ export async function createSession(req: Request, res: Response, next: NextFunct
         price: String(adult_price), // Legacy field - use adult_price for backwards compatibility
         adult_price: String(adult_price),
         child_price: String(child_price),
+        gender_restriction: genderRestriction || 'mixed',
       })
       .select()
       .single();
@@ -690,6 +811,16 @@ export async function updateSession(req: Request, res: Response, next: NextFunct
     if (req.body.adult_price !== undefined) updateData.adult_price = req.body.adult_price.toString();
     if (req.body.child_price !== undefined) updateData.child_price = req.body.child_price.toString();
     if (req.body.isActive !== undefined) updateData.is_active = req.body.isActive;
+    if (req.body.genderRestriction !== undefined) {
+      // Validate gender restriction value
+      if (!['mixed', 'male', 'female'].includes(req.body.genderRestriction)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid genderRestriction. Must be one of: mixed, male, female'
+        });
+      }
+      updateData.gender_restriction = req.body.genderRestriction;
+    }
 
     const { data: session, error } = await supabase
       .from('pool_sessions')
@@ -896,4 +1027,222 @@ export async function createMaintenanceLog(req: Request, res: Response, next: Ne
     if (error) throw error;
     res.status(201).json({ success: true, data: log });
   } catch (error) { next(error); }
+}
+
+// ============================================
+// Bracelet Management
+// ============================================
+
+/**
+ * Assign a bracelet to a ticket
+ */
+export async function assignBracelet(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { id } = req.params;
+    const { braceletNumber, braceletColor } = req.body;
+
+    if (!braceletNumber) {
+      return res.status(400).json({ success: false, error: 'braceletNumber is required' });
+    }
+
+    // Verify ticket exists and is valid
+    const { data: ticket, error: ticketError } = await supabase
+      .from('pool_tickets')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (ticketError || !ticket) {
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    }
+
+    if (ticket.status !== 'valid' && ticket.status !== 'used') {
+      return res.status(400).json({ success: false, error: 'Ticket is not valid for bracelet assignment' });
+    }
+
+    // Check if bracelet is already in use today
+    const today = dayjs().startOf('day').toISOString();
+    const endOfDay = dayjs().endOf('day').toISOString();
+
+    const { data: existingBracelet, error: braceletCheckError } = await supabase
+      .from('pool_tickets')
+      .select('id, customer_name')
+      .eq('bracelet_number', braceletNumber)
+      .gte('ticket_date', today)
+      .lte('ticket_date', endOfDay)
+      .is('bracelet_returned_at', null)
+      .neq('id', id);
+
+    if (braceletCheckError) throw braceletCheckError;
+
+    if (existingBracelet && existingBracelet.length > 0) {
+      return res.status(409).json({ 
+        success: false, 
+        error: `Bracelet ${braceletNumber} is already assigned to ${existingBracelet[0].customer_name}` 
+      });
+    }
+
+    // Assign the bracelet
+    const { data: updatedTicket, error: updateError } = await supabase
+      .from('pool_tickets')
+      .update({
+        bracelet_number: braceletNumber,
+        bracelet_color: braceletColor || null,
+        bracelet_assigned_at: new Date().toISOString(),
+        bracelet_assigned_by: req.user!.userId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Log activity
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'bracelet_assigned',
+      resource: 'pool_ticket',
+      resource_id: id,
+    });
+
+    logger.info(`Bracelet ${braceletNumber} assigned to ticket ${ticket.ticket_number}`);
+    res.json({ success: true, data: updatedTicket });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Return a bracelet (mark as returned)
+ */
+export async function returnBracelet(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { id } = req.params;
+
+    // Verify ticket exists and has a bracelet assigned
+    const { data: ticket, error: ticketError } = await supabase
+      .from('pool_tickets')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (ticketError || !ticket) {
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    }
+
+    if (!ticket.bracelet_number) {
+      return res.status(400).json({ success: false, error: 'No bracelet assigned to this ticket' });
+    }
+
+    if (ticket.bracelet_returned_at) {
+      return res.status(400).json({ success: false, error: 'Bracelet has already been returned' });
+    }
+
+    // Mark bracelet as returned
+    const { data: updatedTicket, error: updateError } = await supabase
+      .from('pool_tickets')
+      .update({
+        bracelet_returned_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Log activity
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'bracelet_returned',
+      resource: 'pool_ticket',
+      resource_id: id,
+    });
+
+    logger.info(`Bracelet ${ticket.bracelet_number} returned for ticket ${ticket.ticket_number}`);
+    res.json({ success: true, data: updatedTicket });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get all active bracelets (assigned but not returned) for today
+ */
+export async function getActiveBracelets(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const today = dayjs().startOf('day').toISOString();
+    const endOfDay = dayjs().endOf('day').toISOString();
+
+    const { data: bracelets, error } = await supabase
+      .from('pool_tickets')
+      .select(`
+        id,
+        ticket_number,
+        customer_name,
+        number_of_guests,
+        bracelet_number,
+        bracelet_color,
+        bracelet_assigned_at,
+        pool_sessions (name, start_time, end_time)
+      `)
+      .gte('ticket_date', today)
+      .lte('ticket_date', endOfDay)
+      .not('bracelet_number', 'is', null)
+      .is('bracelet_returned_at', null)
+      .order('bracelet_assigned_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ 
+      success: true, 
+      data: bracelets,
+      count: bracelets?.length || 0
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Search for a ticket by bracelet number
+ */
+export async function searchByBracelet(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { braceletNumber } = req.query;
+
+    if (!braceletNumber) {
+      return res.status(400).json({ success: false, error: 'braceletNumber query parameter is required' });
+    }
+
+    const today = dayjs().startOf('day').toISOString();
+    const endOfDay = dayjs().endOf('day').toISOString();
+
+    const { data: ticket, error } = await supabase
+      .from('pool_tickets')
+      .select(`
+        *,
+        pool_sessions (id, name, start_time, end_time)
+      `)
+      .eq('bracelet_number', braceletNumber)
+      .gte('ticket_date', today)
+      .lte('ticket_date', endOfDay)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ success: false, error: 'No ticket found with this bracelet number today' });
+      }
+      throw error;
+    }
+
+    res.json({ success: true, data: ticket });
+  } catch (error) {
+    next(error);
+  }
 }

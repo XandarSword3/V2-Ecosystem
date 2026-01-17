@@ -241,8 +241,9 @@ export default function TestimonialsCarousel() {
           }
         }
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to submit review');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to submit review';
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }

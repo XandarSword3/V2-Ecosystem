@@ -26,7 +26,7 @@ export default function ModulePage() {
   useEffect(() => {
     const fetchAllModules = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/modules`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/modules`);
         if (response.ok) {
           const data = await response.json();
           setAllModules(data.data || []);
@@ -40,7 +40,9 @@ export default function ModulePage() {
 
   useEffect(() => {
     if (params?.slug) {
-      setSlug(Array.isArray(params.slug) ? params.slug[0] : params.slug);
+      // Decode and normalize the slug for comparison
+      const rawSlug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
+      setSlug(decodeURIComponent(rawSlug).toLowerCase());
     }
   }, [params]);
 
@@ -52,11 +54,11 @@ export default function ModulePage() {
     );
   }
 
-  // Check if module is active
-  const currentModule = modules.find((m) => m.slug === slug);
+  // Check if module is active (case-insensitive comparison)
+  const currentModule = modules.find((m) => m.slug.toLowerCase() === slug);
   
   // Check if module exists but is disabled
-  const disabledModule = !currentModule && allModules.find((m) => m.slug === slug && !m.is_active);
+  const disabledModule = !currentModule && allModules.find((m) => m.slug.toLowerCase() === slug && !m.is_active);
 
   if (disabledModule) {
     // Module exists but is disabled - show friendly message

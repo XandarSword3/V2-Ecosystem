@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -20,9 +19,6 @@ interface FormData {
 }
 
 export default function CreateUserPage() {
-  const t = useTranslations('adminUsers');
-  const tc = useTranslations('adminCommon');
-  
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -77,11 +73,11 @@ export default function CreateUserPage() {
         role: formData.role,
       });
       
-      toast.success(t('userCreated'));
+      toast.success('User created successfully');
       router.push(`/admin/users/${formData.role === 'customer' ? 'customers' : formData.role === 'staff' ? 'staff' : 'admins'}`);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string; error?: string } } };
-      const message = axiosError.response?.data?.message || axiosError.response?.data?.error || t('errors.failedToSave');
+      const message = axiosError.response?.data?.message || axiosError.response?.data?.error || 'Failed to create user';
       toast.error(message);
     } finally {
       setLoading(false);
@@ -105,8 +101,8 @@ export default function CreateUserPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">{t('addUser')}</h1>
-          <p className="text-muted-foreground">{t('subtitle')}</p>
+          <h1 className="text-2xl font-bold">Create New User</h1>
+          <p className="text-muted-foreground">Add a new user to the system</p>
         </div>
       </div>
 
@@ -114,10 +110,10 @@ export default function CreateUserPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-primary" />
-            {t('userDetails')}
+            User Details
           </CardTitle>
           <CardDescription>
-            {t('subtitle')}
+            Fill in the information below to create a new user account.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -126,7 +122,7 @@ export default function CreateUserPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Mail className="h-4 w-4" />
-                {tc('email')} *
+                Email Address *
               </label>
               <Input
                 type="email"
@@ -144,7 +140,7 @@ export default function CreateUserPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <User className="h-4 w-4" />
-                {tc('name')} *
+                Full Name *
               </label>
               <Input
                 type="text"
@@ -162,7 +158,7 @@ export default function CreateUserPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                {tc('phone')}
+                Phone Number
               </label>
               <Input
                 type="tel"
@@ -176,7 +172,7 @@ export default function CreateUserPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Shield className="h-4 w-4" />
-                {t('roles')} *
+                Role *
               </label>
               <select
                 value={formData.role}
@@ -198,7 +194,7 @@ export default function CreateUserPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Lock className="h-4 w-4" />
-                {tc('status')} *
+                Password *
               </label>
               <Input
                 type="password"
@@ -216,7 +212,7 @@ export default function CreateUserPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Lock className="h-4 w-4" />
-                {tc('status')} *
+                Confirm Password *
               </label>
               <Input
                 type="password"
@@ -238,14 +234,14 @@ export default function CreateUserPage() {
                 onClick={() => router.back()}
                 className="flex-1"
               >
-                {tc('cancel')}
+                Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={loading}
                 className="flex-1"
               >
-                {loading ? tc('creating') : t('addUser')}
+                {loading ? 'Creating...' : 'Create User'}
               </Button>
             </div>
           </form>

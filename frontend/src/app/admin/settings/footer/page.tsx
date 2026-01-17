@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -84,8 +83,6 @@ const DEFAULT_CONFIG: FooterConfig = {
 };
 
 export default function FooterSettingsPage() {
-  const t = useTranslations('adminSettings');
-  const tc = useTranslations('adminCommon');
   const [config, setConfig] = useState<FooterConfig>(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -102,7 +99,7 @@ export default function FooterSettingsPage() {
       }
     } catch (error) {
       console.error('Failed to fetch footer settings:', error);
-      toast.error(tc('errors.failedToLoad'));
+      toast.error('Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -112,10 +109,10 @@ export default function FooterSettingsPage() {
     setSaving(true);
     try {
       await api.put('/admin/settings', { key: 'footer', value: config });
-      toast.success(t('footer.saved'));
+      toast.success('Footer configuration saved successfully');
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { error?: string } } };
-      toast.error(axiosError.response?.data?.error || tc('errors.failedToSave'));
+      toast.error(axiosError.response?.data?.error || 'Failed to save settings');
     } finally {
       setSaving(false);
     }
@@ -197,15 +194,15 @@ export default function FooterSettingsPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <Layout className="w-8 h-8 text-primary-600" />
-            {t('footer.title')}
+            Footer CMS
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            {t('footer.subtitle')}
+            Customize your website''s footer layout, links, and information.
           </p>
         </div>
         <Button onClick={handleSave} disabled={saving} className="shadow-lg shadow-primary-500/20">
           <Save className="w-4 h-4 mr-2" />
-          {saving ? tc('saving') : tc('saveChanges')}
+          {saving ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>
 
