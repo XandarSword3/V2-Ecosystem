@@ -9,6 +9,7 @@ interface ModuleBuilderStore {
   zoom: number;
   history: UIBlock[][];
   historyIndex: number;
+  _futureStates: UIBlock[][];
   
   // Actions
   setActiveModuleId: (id: string) => void;
@@ -53,9 +54,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
   zoom: 100,
   history: [], // past states
   historyIndex: -1, // not used in new approach, keeping for compatibility
-  
-  // Internal state for redo
-  _futureStates: [] as UIBlock[][],
+  _futureStates: [],
 
   setActiveModuleId: (id) => set({ activeModuleId: id }),
   setLayout: (layout, skipHistory = false) => set((state) => {
@@ -67,11 +66,11 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
   togglePreview: () => set((state) => ({ isPreview: !state.isPreview, selectedBlockId: null })),
   setZoom: (zoom) => set({ zoom: Math.max(50, Math.min(150, zoom)) }),
   
-  undo: () => set((state: any) => {
+  undo: () => set((state) => {
     if (state.history.length === 0) return state;
     const newHistory = [...state.history];
     const previousLayout = newHistory.pop()!;
-    const newFuture = [...(state._futureStates || []), [...state.layout]];
+    const newFuture = [...state._futureStates, [...state.layout]];
     return { 
       layout: [...previousLayout], 
       history: newHistory,
@@ -79,8 +78,8 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
     };
   }),
   
-  redo: () => set((state: any) => {
-    if (!state._futureStates?.length) return state;
+  redo: () => set((state) => {
+    if (!state._futureStates.length) return state;
     const newFuture = [...state._futureStates];
     const nextLayout = newFuture.pop()!;
     const newHistory = [...state.history, [...state.layout]];
@@ -92,10 +91,10 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
   }),
   
   canUndo: () => get().history.length > 0,
-  canRedo: () => (get() as any)._futureStates?.length > 0,
+  canRedo: () => get()._futureStates.length > 0,
 
   addBlock: (type, parentId) => set((state) => {
-    const defaultProps: Record<string, any> = {};
+    const defaultProps: Record<string, string | number | boolean> = {};
     
     // Set default props based on type
     if (type === 'hero') {
@@ -120,7 +119,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
     return { layout: newLayout, history: newHistory, _futureStates: [] };
   }),
 
-  updateBlock: (id, updates) => set((state: any) => {
+  updateBlock: (id, updates) => set((state) => {
     const updateRecursive = (nodes: UIBlock[]): UIBlock[] => {
       return nodes.map(node => {
         if (node.id === id) {
@@ -137,7 +136,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
     return { layout: newLayout, history: newHistory, _futureStates: [] };
   }),
 
-  removeBlock: (id) => set((state: any) => {
+  removeBlock: (id) => set((state) => {
     const removeRecursive = (nodes: UIBlock[]): UIBlock[] => {
       return nodes.filter(node => node.id !== id).map(node => ({
         ...node,
@@ -154,9 +153,9 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
     };
   }),
 
-  moveBlock: (activeId, overId) => set((state: any) => {
-    const oldIndex = state.layout.findIndex((x: UIBlock) => x.id === activeId);
-    const newIndex = state.layout.findIndex((x: UIBlock) => x.id === overId);
+  moveBlock: (activeId, overId) => set((state) => {
+    const oldIndex = state.layout.findIndex((x) => x.id === activeId);
+    const newIndex = state.layout.findIndex((x) => x.id === overId);
     
     if (oldIndex === -1 || newIndex === -1) return state;
 
@@ -168,8 +167,8 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
     return { layout: newLayout, history: newHistory, _futureStates: [] };
   }),
   
-  duplicateBlock: (id) => set((state: any) => {
-    const blockToDuplicate = state.layout.find((b: UIBlock) => b.id === id);
+  duplicateBlock: (id) => set((state) => {
+    const blockToDuplicate = state.layout.find((b) => b.id === id);
     if (!blockToDuplicate) return state;
     
     const duplicatedBlock: UIBlock = {
@@ -178,7 +177,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
       label: `${blockToDuplicate.label} (copy)`,
     };
     
-    const index = state.layout.findIndex((b: UIBlock) => b.id === id);
+    const index = state.layout.findIndex((b) => b.id === id);
     const newLayout = [...state.layout];
     newLayout.splice(index + 1, 0, duplicatedBlock);
     

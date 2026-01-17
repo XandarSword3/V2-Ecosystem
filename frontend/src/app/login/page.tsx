@@ -7,7 +7,6 @@ import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Mail, Lock, Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { useSiteSettings } from '@/lib/settings-context';
 
 export default function LoginPage() {
   const t = useTranslations('auth.login');
@@ -15,12 +14,6 @@ export default function LoginPage() {
   const tCommon = useTranslations('common');
   const router = useRouter();
   const { user, isAuthenticated, login } = useAuth();
-  const { settings } = useSiteSettings();
-  
-  // Dynamic branding
-  const resortName = settings.resortName || 'V2 Resort';
-  const logoText = resortName.substring(0, 2).toUpperCase();
-  const displayName = resortName.length > 2 ? resortName.substring(2).trim() : 'Resort';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,7 +57,7 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       const error = err as Error;
-      setError(error.message || t('loginFailed'));
+      setError(error.message || 'Login failed. Please try again.');
       setIsLoading(false);
     }
   };
@@ -80,9 +73,9 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-primary-600 font-bold text-xl">{logoText}</span>
+              <span className="text-primary-600 font-bold text-xl">V2</span>
             </div>
-            <span className="text-2xl font-bold text-white">{displayName || 'Resort'}</span>
+            <span className="text-2xl font-bold text-white">Resort</span>
           </Link>
         </div>
 
@@ -176,10 +169,10 @@ export default function LoginPage() {
 
           {/* Quick Login Hints */}
           <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700">
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold uppercase tracking-wider">{t('demoCredentials')}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold uppercase tracking-wider">Demo Credentials</p>
             <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2">
               <div className="flex justify-between items-center group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 p-1 rounded" onClick={() => { setEmail('admin@v2resort.com'); setPassword('admin123'); }}>
-                <span className="font-medium text-primary-600">{t('superAdmin')}:</span>
+                <span className="font-medium text-primary-600">Super Admin:</span>
                 <span className="font-mono">admin@v2resort.com / admin123</span>
               </div>
             </div>

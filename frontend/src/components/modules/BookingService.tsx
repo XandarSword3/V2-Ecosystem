@@ -14,6 +14,21 @@ interface BookingServiceProps {
   module: Module;
 }
 
+interface BookingUnit {
+  id: string;
+  name: string;
+  name_ar?: string;
+  name_fr?: string;
+  description?: string;
+  description_ar?: string;
+  description_fr?: string;
+  images?: string[];
+  price_per_night?: number;
+  base_price?: number;
+  capacity?: number;
+  bedroom_count?: number;
+}
+
 export function BookingService({ module }: BookingServiceProps) {
   const t = useTranslations('chalets');
   const tCommon = useTranslations('common');
@@ -25,7 +40,7 @@ export function BookingService({ module }: BookingServiceProps) {
     queryFn: () => chaletApi.getChalets(module.id),
   });
 
-  const units = data?.data?.data || [];
+  const units: BookingUnit[] = data?.data?.data || [];
 
   if (isLoading) {
     return (
@@ -74,7 +89,7 @@ export function BookingService({ module }: BookingServiceProps) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {units.map((unit: any) => (
+          {units.map((unit) => (
             <motion.div
               key={unit.id}
               initial={{ opacity: 0, y: 20 }}

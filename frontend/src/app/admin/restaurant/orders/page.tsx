@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -83,8 +82,6 @@ interface SocketOrderEvent {
 import { useSiteSettings } from '@/lib/settings-context';
 
 export default function AdminRestaurantOrdersPage() {
-  const t = useTranslations('adminRestaurant');
-  const tc = useTranslations('adminCommon');
   const { modules } = useSiteSettings();
   const restaurantModule = modules.find(m => m.slug === 'restaurant');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -102,7 +99,7 @@ export default function AdminRestaurantOrdersPage() {
       });
       setOrders(response.data.data || []);
     } catch (error) {
-      toast.error(tc('errors.failedToLoad'));
+      toast.error('Failed to fetch orders');
     } finally {
       setLoading(false);
     }
@@ -122,7 +119,7 @@ export default function AdminRestaurantOrdersPage() {
           // Since socket payload is partial, we might want to refetch or just add brief info
           // For now, let's refetch to be safe, or just toast
           fetchOrders();
-          toast.success(t('orders.newOrder', { number: order.orderNumber || order.order_number }));
+          toast.success(`New order #${order.orderNumber || order.order_number}`);
         }
       });
 
@@ -143,9 +140,9 @@ export default function AdminRestaurantOrdersPage() {
     try {
       await api.patch(`/restaurant/staff/orders/${orderId}/status`, { status });
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: status as Order['status'] } : o)));
-      toast.success(t('orders.statusUpdated'));
+      toast.success('Order status updated');
     } catch (error) {
-      toast.error(tc('errors.failedToUpdate'));
+      toast.error('Failed to update order');
     }
   };
 
@@ -180,12 +177,12 @@ export default function AdminRestaurantOrdersPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('orders.title')}</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Restaurant Orders</h1>
           <p className="text-slate-500 dark:text-slate-400">Manage and track kitchen orders</p>
         </div>
         <Button variant="outline" onClick={fetchOrders}>
           <RefreshCw className="w-4 h-4 mr-2" />
-          {tc('refresh')}
+          Refresh
         </Button>
       </div>
 
@@ -242,7 +239,7 @@ export default function AdminRestaurantOrdersPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder={tc('searchPlaceholder')}
+                placeholder="Search orders..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -271,7 +268,7 @@ export default function AdminRestaurantOrdersPage() {
           {filteredOrders.length === 0 ? (
             <div className="text-center py-12">
               <UtensilsCrossed className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">{tc('noResults')}</p>
+              <p className="text-slate-500 dark:text-slate-400">No orders found</p>
             </div>
           ) : (
             filteredOrders.map((order, index) => {
@@ -409,7 +406,7 @@ export default function AdminRestaurantOrdersPage() {
                 {/* Customer Info */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{tc('name')}</h3>
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Customer</h3>
                     <p className="font-medium text-slate-900 dark:text-white">
                       {selectedOrder.customerName || selectedOrder.customer?.full_name || selectedOrder.users?.full_name || 'Guest'}
                     </p>
@@ -420,7 +417,7 @@ export default function AdminRestaurantOrdersPage() {
                     )}
                   </div>
                   <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{tc('status')}</h3>
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Status</h3>
                     <div className="flex items-center gap-2">
                       {(() => {
                         const config = statusConfig[selectedOrder.status];
@@ -438,10 +435,10 @@ export default function AdminRestaurantOrdersPage() {
 
                 {/* Items */}
                 <div>
-                  <h3 className="font-semibold text-slate-900 dark:text-white mb-3">{t('orders.orderItems')}</h3>
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Order Items</h3>
                   <div className="space-y-3">
                     {(selectedOrder.items || selectedOrder.order_items)?.length === 0 ? (
-                      <p className="text-slate-500 dark:text-slate-400 italic">{tc('noResults')}</p>
+                      <p className="text-slate-500 dark:text-slate-400 italic">No items found</p>
                     ) : (
                       (selectedOrder.items || selectedOrder.order_items)?.map((item) => (
                         <div key={item.id} className="flex justify-between items-start p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
@@ -468,7 +465,7 @@ export default function AdminRestaurantOrdersPage() {
                 {/* Notes */}
                 {selectedOrder.notes && (
                   <div>
-                    <h3 className="font-semibold text-slate-900 dark:text-white mb-2">{t('orders.orderNotes')}</h3>
+                    <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Order Notes</h3>
                     <p className="text-sm text-slate-600 dark:text-slate-300 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border border-yellow-100 dark:border-yellow-900/30">
                       {selectedOrder.notes}
                     </p>
@@ -478,7 +475,7 @@ export default function AdminRestaurantOrdersPage() {
 
               <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-lg font-semibold text-slate-900 dark:text-white">{t('orders.totalAmount')}</span>
+                  <span className="text-lg font-semibold text-slate-900 dark:text-white">Total Amount</span>
                   <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
                     {formatCurrency(selectedOrder.total_amount)}
                   </span>

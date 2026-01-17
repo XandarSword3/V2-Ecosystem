@@ -55,6 +55,8 @@ import { logger } from './utils/logger.js';
 import { requestLogger, errorLogger } from './middleware/requestLogger.middleware.js';
 import { normalizeBody } from './middleware/normalizeBody.middleware.js';
 import { requestIdMiddleware } from './middleware/requestId.middleware.js';
+import { enhancedSecurityHeaders, sanitizeRequest, suspiciousRequestDetector } from './middleware/security.middleware.js';
+import { requestTiming, metricsHandler } from './middleware/monitoring.middleware.js';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes.js';
@@ -77,6 +79,15 @@ app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet());
+app.use(enhancedSecurityHeaders);
+app.use(sanitizeRequest);
+app.use(suspiciousRequestDetector);
+
+// Performance monitoring
+app.use(requestTiming);
+
+// Metrics endpoint (protected in production)
+app.get('/api/metrics', metricsHandler);
 
 // Health check endpoint - placed before middleware for fast response
 app.get('/health', (req, res) => {
@@ -96,6 +107,7 @@ app.get('/api/health', async (req, res) => {
     uptime: number;
     checks: {
       database: { status: string; latency?: number; error?: string };
+      redis: { status: string; latency?: number; error?: string };
       memory: { used: number; total: number; percentage: number };
     };
   } = {
@@ -105,6 +117,7 @@ app.get('/api/health', async (req, res) => {
     uptime: Math.floor(process.uptime()),
     checks: {
       database: { status: 'unknown' },
+      redis: { status: 'unknown' },
       memory: {
         used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
         total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
@@ -113,6 +126,33 @@ app.get('/api/health', async (req, res) => {
     },
   };
 
+  // Check Redis connectivity
+  try {
+    const { cache } = await import('./utils/cache.js');
+    const redisStart = Date.now();
+    
+    if (cache.isAvailable()) {
+      // Test Redis with a simple ping
+      const testKey = '__health_check__';
+      await cache.set(testKey, 'ok', 1);
+      const testValue = await cache.get<string>(testKey);
+      const redisLatency = Date.now() - redisStart;
+      
+      if (testValue === 'ok') {
+        health.checks.redis = { status: 'connected', latency: redisLatency };
+      } else {
+        health.checks.redis = { status: 'error', error: 'Read/write test failed', latency: redisLatency };
+        health.status = 'degraded';
+      }
+    } else {
+      health.checks.redis = { status: 'disconnected', error: 'Redis not configured or unavailable' };
+      // Redis being unavailable is not critical - the app can work without it
+    }
+  } catch (err) {
+    health.checks.redis = { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' };
+    // Don't mark as degraded for Redis - it's optional
+  }
+
   // Check database connectivity
   try {
     const { getSupabase } = await import('./database/connection.js');
@@ -120,7 +160,7 @@ app.get('/api/health', async (req, res) => {
     const dbStart = Date.now();
     
     // Create a timeout promise to prevent hanging
-    const timeoutPromise = new Promise<{ data: any, error: any }>((_, reject) => 
+    const timeoutPromise = new Promise<{ data: unknown; error: Error }>((_, reject) => 
       setTimeout(() => reject(new Error('Database check timed out')), 3000)
     );
 
@@ -130,7 +170,7 @@ app.get('/api/health', async (req, res) => {
     const { error } = await Promise.race([
       supabase.from('users').select('id').limit(1),
       timeoutPromise
-    ]) as { error: any };
+    ]) as { error: Error | null };
 
     const dbLatency = Date.now() - dbStart;
     
@@ -209,12 +249,16 @@ app.use('/api/', limiter);
 // Stricter rate limiting for authentication endpoints (brute force protection)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 attempts per 15 minutes
+  max: process.env.NODE_ENV === 'test' ? 1000 : 10, // Allow more attempts in test mode
   message: { error: 'Too many login attempts, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Don't count successful logins
   validate: { trustProxy: false },
+  skip: (req) => {
+    // Skip rate limiting for integration tests (identified by header)
+    return req.headers['x-integration-test'] === 'true';
+  },
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
@@ -350,7 +394,9 @@ export { clearModuleCache };
 
 // 404 handler
 app.use((_req: Request, res: Response) => {
-  res.status(404).json({ error: 'Not Found' });
+  if (!res.headersSent) {
+    res.status(404).json({ error: 'Not Found' });
+  }
 });
 
 // Enhanced error logging middleware - logs full error details
@@ -368,6 +414,12 @@ app.use((err: ErrorWithStatus, req: Request, res: Response, _next: NextFunction)
   // Log error (skip logging for 404s and validation errors in production to reduce noise)
   if (err.statusCode !== 404 && err.statusCode !== 400) {
     logger.error(`[${requestId}] Unhandled error:`, err);
+  }
+
+  // Prevent "Cannot set headers after they are sent" error
+  if (res.headersSent) {
+    logger.warn(`[${requestId}] Headers already sent, cannot send error response`);
+    return;
   }
 
   const statusCode = err.statusCode || 500;

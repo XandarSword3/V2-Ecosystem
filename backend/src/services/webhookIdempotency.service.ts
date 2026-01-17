@@ -14,7 +14,7 @@ interface ProcessedEvent {
   event_type: string;
   processed_at: Date;
   payload_hash: string | null;
-  result: any | null;
+  result: Record<string, unknown> | null;
 }
 
 /**
@@ -42,7 +42,7 @@ export async function isEventProcessed(eventId: string): Promise<boolean> {
 export async function markEventProcessed(
   eventId: string,
   eventType: string,
-  result?: any
+  result?: Record<string, unknown>
 ): Promise<boolean> {
   const { data, error } = await getSupabase()
     .from('processed_webhook_events')
@@ -87,7 +87,11 @@ export async function processWithIdempotency<T>(
     const result = await handler();
 
     // Mark as processed (with race condition protection)
-    const wasMarked = await markEventProcessed(eventId, eventType, result);
+    // Convert result to Record<string, unknown> if it's an object
+    const resultRecord = result && typeof result === 'object' 
+      ? (result as Record<string, unknown>) 
+      : undefined;
+    const wasMarked = await markEventProcessed(eventId, eventType, resultRecord);
     
     if (!wasMarked) {
       // Another process beat us to it
