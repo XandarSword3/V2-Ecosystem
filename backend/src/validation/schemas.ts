@@ -224,6 +224,41 @@ export const updateUserSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
+export const adminUpdateUserSchema = z.object({
+  fullName: nameSchema.optional(),
+  phone: phoneSchema,
+  isActive: z.boolean().optional(),
+  preferredLanguage: z.enum(['en', 'ar', 'fr']).optional(),
+});
+
+export const assignUserRolesSchema = z.object({
+  roleIds: z.array(uuidSchema).min(1, 'At least one role is required'),
+});
+
+export const createRoleSchema = z.object({
+  name: z.string().min(2).max(50).regex(/^[a-z_]+$/, 'Role name must be lowercase with underscores only'),
+  displayName: z.string().min(2).max(100),
+  description: sanitizedString(500).optional(),
+  businessUnit: z.enum(['restaurant', 'chalets', 'pool', 'snack_bar', 'admin', 'general']).optional(),
+});
+
+export const updateRoleSchema = z.object({
+  name: z.string().min(2).max(50).regex(/^[a-z_]+$/, 'Role name must be lowercase with underscores only').optional(),
+  displayName: z.string().min(2).max(100).optional(),
+  description: sanitizedString(500).optional(),
+});
+
+export const createPermissionSchema = z.object({
+  name: z.string().min(2).max(100),
+  resource: z.string().min(2).max(50).optional(),
+  action: z.enum(['create', 'read', 'update', 'delete', 'manage', 'view', 'export']).optional(),
+  description: sanitizedString(500).optional(),
+});
+
+export const assignRolePermissionsSchema = z.object({
+  permissionIds: z.array(uuidSchema),
+});
+
 // ============ REVIEW SCHEMAS ============
 
 export const createReviewSchema = z.object({

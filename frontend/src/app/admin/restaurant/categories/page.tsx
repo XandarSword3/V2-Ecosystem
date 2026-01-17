@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
+import { useSiteSettings } from '@/lib/settings-context';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -30,6 +31,8 @@ interface Category {
 export default function AdminCategoriesPage() {
   const t = useTranslations('adminRestaurant');
   const tc = useTranslations('adminCommon');
+  const { modules } = useSiteSettings();
+  const restaurantModule = modules.find(m => m.slug === 'restaurant');
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -37,19 +40,24 @@ export default function AdminCategoriesPage() {
   const [formData, setFormData] = useState({ name: '', description: '' });
 
   const fetchCategories = useCallback(async () => {
+    if (!restaurantModule) return;
     try {
-      const response = await api.get('/restaurant/categories');
+      const response = await api.get('/restaurant/categories', {
+        params: { moduleId: restaurantModule.id }
+      });
       setCategories(response.data.data || []);
     } catch (error) {
       toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [restaurantModule, tc]);
 
   useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+    if (restaurantModule) {
+      fetchCategories();
+    }
+  }, [fetchCategories, restaurantModule]);
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
@@ -57,12 +65,15 @@ export default function AdminCategoriesPage() {
       return;
     }
 
+    if (!restaurantModule) return;
+
     try {
+      const payload = { ...formData, moduleId: restaurantModule.id };
       if (editingCategory) {
-        await api.put(`/restaurant/admin/categories/${editingCategory.id}`, formData);
+        await api.put(`/restaurant/admin/categories/${editingCategory.id}`, payload);
         toast.success(tc('success.updated'));
       } else {
-        await api.post('/restaurant/admin/categories', formData);
+        await api.post('/restaurant/admin/categories', payload);
         toast.success(tc('success.created'));
       }
       setShowModal(false);

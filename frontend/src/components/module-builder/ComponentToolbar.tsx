@@ -1,8 +1,8 @@
 import { useModuleBuilderStore } from '@/store/module-builder-store';
-import { Layout, Type, Image as ImageIcon, Grid, List, Box, Calendar, Clock } from 'lucide-react';
+import { Layout, Type, Image as ImageIcon, Grid, List, Box, Calendar, Clock, LucideIcon } from 'lucide-react';
 import { UIComponentType } from '@/types/module-builder';
 
-const COMPONENTS: { type: UIComponentType; label: string; icon: any }[] = [
+const COMPONENTS: { type: UIComponentType; label: string; icon: LucideIcon }[] = [
   { type: 'hero', label: 'Hero Section', icon: Layout },
   { type: 'text_block', label: 'Text Block', icon: Type },
   { type: 'image', label: 'Image', icon: ImageIcon },

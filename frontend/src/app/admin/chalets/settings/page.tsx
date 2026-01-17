@@ -13,7 +13,7 @@ interface ChaletSettings {
   deposit_percentage: number;
   check_in_time: string;
   check_out_time: string;
-  [key: string]: any;
+  [key: string]: string | number | boolean;
 }
 
 export default function ChaletSettingsPage() {

@@ -46,8 +46,8 @@ describeIf('Booking Cycle Integration', () => {
     staffClient = createGuestClient(); // Will be replaced if services available
     
     const services = await waitForServices(5, 1000);
-    if (!services.database || !services.redis) {
-      console.warn('⚠️ Test services not available, tests will be skipped');
+    if (!services.api) {
+      console.warn('⚠️ API not available, tests will be skipped');
       return;
     }
 

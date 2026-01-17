@@ -64,6 +64,7 @@ export class TestApiClient {
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'X-Integration-Test': 'true', // Bypass rate limiting for integration tests
     };
 
     if (requiresAuth && this.accessToken) {
@@ -117,7 +118,7 @@ export class TestApiClient {
     const result = await this.request<AuthResponse>(
       '/auth/register',
       'POST',
-      { email, password, full_name: fullName, phone },
+      { email, password, fullName, phone },
       { requiresAuth: false }
     );
 
@@ -218,7 +219,7 @@ export class TestApiClient {
   }
 
   async updateOrderStatus(id: string, status: string): Promise<ApiResponse> {
-    return this.request(`/restaurant/orders/${id}/status`, 'PATCH', { status });
+    return this.request(`/restaurant/staff/orders/${id}/status`, 'PATCH', { status });
   }
 
   // ============ CHALETS ============
@@ -232,7 +233,7 @@ export class TestApiClient {
 
   async getChaletAvailability(chaletId: string, startDate: string, endDate: string): Promise<ApiResponse> {
     return this.request(
-      `/chalets/${chaletId}/availability?start_date=${startDate}&end_date=${endDate}`,
+      `/chalets/${chaletId}/availability?startDate=${startDate}&endDate=${endDate}`,
       'GET',
       null,
       { requiresAuth: false }

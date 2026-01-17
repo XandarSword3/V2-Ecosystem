@@ -8,6 +8,9 @@ const nextConfig = {
   // Enable React strict mode for better development experience
   reactStrictMode: true,
   
+  // Enable standalone output for Docker deployment
+  output: 'standalone',
+  
   // Ignore ESLint warnings during builds (only fail on errors)
   eslint: {
     ignoreDuringBuilds: true,

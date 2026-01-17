@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, authorize, optionalAuth } from '../../middleware/auth.middleware.js';
+import { rateLimits } from '../../middleware/userRateLimit.middleware.js';
 import * as snackController from './snack.controller.js';
 
 const router = Router();
@@ -10,7 +11,7 @@ router.get('/items', snackController.getItems);
 router.get('/items/:id', snackController.getItem);
 
 // Customer routes
-router.post('/orders', optionalAuth, snackController.createOrder);
+router.post('/orders', optionalAuth, rateLimits.write, snackController.createOrder);
 router.get('/orders/my', authenticate, snackController.getMyOrders);
 router.get('/orders/:id', snackController.getOrder);
 router.get('/orders/:id/status', snackController.getOrderStatus);

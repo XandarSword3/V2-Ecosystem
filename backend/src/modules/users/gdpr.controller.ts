@@ -120,7 +120,13 @@ export async function exportUserData(req: Request, res: Response, next: NextFunc
       },
       reviews: reviewsResult.data || [],
       support_tickets: supportTicketsResult.data || [],
-      activity_logs: (activityLogsResult.data || []).map((log: any) => ({
+      activity_logs: (activityLogsResult.data || []).map((log: {
+        resource?: string;
+        resource_id?: string;
+        new_value?: Record<string, unknown>;
+        old_value?: Record<string, unknown>;
+        [key: string]: unknown;
+      }) => ({
         ...log,
         entity_type: log.resource,
         entity_id: log.resource_id,

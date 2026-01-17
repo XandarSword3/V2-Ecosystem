@@ -55,3 +55,26 @@ BEGIN
     UPDATE pool_tickets SET module_id = pool_id WHERE module_id IS NULL;
   END IF;
 END $$;
+
+-- ============================================================================
+-- FIX FOR USER PERMISSIONS (discovered via E2E testing)
+-- ============================================================================
+-- The user_permissions table is required for permission overrides feature
+
+CREATE TABLE IF NOT EXISTS user_permissions (
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE NOT NULL,
+  is_granted BOOLEAN DEFAULT TRUE NOT NULL,
+  granted_by UUID REFERENCES users(id),
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+  PRIMARY KEY (user_id, permission_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_permissions_user ON user_permissions(user_id);
+
+-- ============================================================================
+-- FIX FOR ORDER SERVED_AT COLUMN (discovered via E2E testing)
+-- ============================================================================
+-- The served_at column is required for marking orders as served in KDS
+
+ALTER TABLE restaurant_orders ADD COLUMN IF NOT EXISTS served_at TIMESTAMPTZ;

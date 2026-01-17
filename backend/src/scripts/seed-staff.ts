@@ -31,9 +31,16 @@ const STAFF_ACCOUNTS = [
   { email: 'snack.admin@v2resort.com', name: 'Snack Bar Admin', role: 'snack_bar_admin' },
 ];
 
-const DEFAULT_PASSWORD = 'staff123';
+// Get password from environment or use default only in development
+const isDev = process.env.NODE_ENV !== 'production';
+const DEFAULT_PASSWORD = process.env.SEED_STAFF_PASSWORD || (isDev ? 'staff123' : undefined);
 
 async function seedStaff() {
+  if (!DEFAULT_PASSWORD) {
+    console.error('❌ SEED_STAFF_PASSWORD environment variable is required in production');
+    process.exit(1);
+  }
+
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('🌱 SEEDING STAFF ACCOUNTS');
   console.log('═══════════════════════════════════════════════════════════════\n');

@@ -88,9 +88,21 @@ export default function Footer() {
         titleKey?: string;
         links?: FooterLink[];
     }
+    interface FooterLogo {
+        text: string;
+        showIcon: boolean;
+    }
+    
+    // Normalize logo to always be an object
+    const normalizeLogo = (logo: string | FooterLogo | undefined): FooterLogo => {
+        if (!logo) return defaultFooterConfig.logo;
+        if (typeof logo === 'string') return { text: logo, showIcon: true };
+        return { text: logo.text || defaultFooterConfig.logo.text, showIcon: logo.showIcon ?? true };
+    };
+    
     const footerConfig = settings.footer ? {
         ...settings.footer,
-        logo: settings.footer.logo || defaultFooterConfig.logo,
+        logo: normalizeLogo(settings.footer.logo),
         description: settings.footer.description || defaultFooterConfig.description,
         columns: settings.footer.columns?.map((col: FooterColumn) => ({
             ...col,
@@ -214,34 +226,28 @@ export default function Footer() {
                             {tFooter('contact')}
                         </h4>
                         <ul className="space-y-4 text-slate-400/90">
-                            {footerConfig.contact.showAddress && (
+                            {footerConfig.contact?.showAddress && (
                                 <li className="flex items-start gap-3 group">
                                     <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
                                         <MapPin className="w-4 h-4 text-primary-400" />
                                     </div>
-                                    <span className="text-sm leading-relaxed">
-                                        {(settings.address && settings.address !== '123 Lane') ? settings.address : "123 Resort Boulevard, Global City"}
-                                    </span>
+                                    <span className="text-sm leading-relaxed">{settings.address || tFooter('address')}</span>
                                 </li>
                             )}
-                            {footerConfig.contact.showPhone && (
+                            {footerConfig.contact?.showPhone && (
                                 <li className="flex items-center gap-3 group">
                                     <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
                                         <Phone className="w-4 h-4 text-primary-400" />
                                     </div>
-                                    <span className="text-sm">
-                                        {(settings.phone && !settings.phone.includes('XX')) ? settings.phone : "+1 234 567 8900"}
-                                    </span>
+                                    <span className="text-sm">{settings.phone || tFooter('phone')}</span>
                                 </li>
                             )}
-                            {footerConfig.contact.showEmail && (
+                            {footerConfig.contact?.showEmail && (
                                 <li className="flex items-center gap-3 group">
                                     <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
                                         <Mail className="w-4 h-4 text-primary-400" />
                                     </div>
-                                    <span className="text-sm">
-                                        {(settings.email && settings.email !== 'info@v2resort.com') ? settings.email : "bookings@v2resort.com"}
-                                    </span>
+                                    <span className="text-sm">{settings.email || tFooter('email')}</span>
                                 </li>
                             )}
                         </ul>

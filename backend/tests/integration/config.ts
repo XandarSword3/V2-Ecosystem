@@ -6,42 +6,45 @@
  */
 
 export const TEST_CONFIG = {
-  // Database configuration (uses docker-compose.test.yml)
+  // Database configuration - defaults to live database when TEST_DB_* not set
   database: {
+    // Use the DATABASE_URL env var if no test-specific config is provided
+    url: process.env.DATABASE_URL,
     host: process.env.TEST_DB_HOST || 'localhost',
-    port: parseInt(process.env.TEST_DB_PORT || '5433', 10),
-    user: process.env.TEST_DB_USER || 'v2resort_test',
-    password: process.env.TEST_DB_PASSWORD || 'v2resort_test_secret',
-    database: process.env.TEST_DB_NAME || 'v2resort_test',
+    port: parseInt(process.env.TEST_DB_PORT || '5432', 10),
+    user: process.env.TEST_DB_USER || 'postgres',
+    password: process.env.TEST_DB_PASSWORD || '',
+    database: process.env.TEST_DB_NAME || 'postgres',
   },
 
-  // Redis configuration
+  // Redis configuration - optional, tests should work without it
   redis: {
-    host: process.env.TEST_REDIS_HOST || 'localhost',
-    port: parseInt(process.env.TEST_REDIS_PORT || '6380', 10),
+    host: process.env.TEST_REDIS_HOST || process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.TEST_REDIS_PORT || process.env.REDIS_PORT || '6379', 10),
+    url: process.env.REDIS_URL,
   },
 
   // API configuration
   api: {
-    baseUrl: process.env.TEST_API_URL || 'http://localhost:3001/api',
+    baseUrl: process.env.TEST_API_URL || 'http://localhost:3005/api',
     timeout: 30000, // 30 seconds for slow operations
   },
 
-  // Test users (seeded in database)
+  // Test users (must exist in database - use real credentials for live testing)
   users: {
     admin: {
-      email: 'admin.test@v2resort.local',
-      password: 'TestAdmin123!',
-      fullName: 'Test Administrator',
+      email: process.env.TEST_ADMIN_EMAIL || 'admin@v2resort.com',
+      password: process.env.TEST_ADMIN_PASSWORD || 'admin123',
+      fullName: 'Administrator',
     },
     staff: {
-      email: 'staff.test@v2resort.local',
-      password: 'TestStaff123!',
-      fullName: 'Test Staff Member',
+      email: process.env.TEST_STAFF_EMAIL || 'restaurant.staff@v2resort.com',
+      password: process.env.TEST_STAFF_PASSWORD || 'staff123',
+      fullName: 'Restaurant Staff',
     },
     customer: {
-      email: 'customer.test@v2resort.local',
-      password: 'TestCustomer123!',
+      email: process.env.TEST_CUSTOMER_EMAIL || 'customer.test@v2resort.local',
+      password: process.env.TEST_CUSTOMER_PASSWORD || 'TestCustomer123!',
       fullName: 'Test Customer',
     },
   },
@@ -56,16 +59,25 @@ export const TEST_CONFIG = {
 
 /**
  * Get database connection string for integration tests
+ * Uses DATABASE_URL env var if available (for live environment testing)
  */
 export function getTestDatabaseUrl(): string {
+  // Prefer explicit DATABASE_URL from environment
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
   const { host, port, user, password, database } = TEST_CONFIG.database;
   return `postgresql://${user}:${password}@${host}:${port}/${database}`;
 }
 
 /**
  * Get Redis connection string for integration tests
+ * Uses REDIS_URL env var if available
  */
 export function getTestRedisUrl(): string {
+  if (TEST_CONFIG.redis.url) {
+    return TEST_CONFIG.redis.url;
+  }
   const { host, port } = TEST_CONFIG.redis;
   return `redis://${host}:${port}`;
 }

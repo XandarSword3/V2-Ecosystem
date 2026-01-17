@@ -3,11 +3,11 @@ import { JsonLd, generatePoolSchema, generateBreadcrumbSchema } from '@/lib/stru
 
 export const metadata: Metadata = {
   title: 'Swimming Pool | V2 Resort',
-  description: 'Refreshing swimming pool experience at V2 Resort Lebanon. Multiple daily sessions, family-friendly environment, competitive pricing for adults and children.',
-  keywords: ['swimming pool', 'Lebanon resort', 'V2 Resort', 'pool sessions', 'family pool', 'pool tickets'],
+  description: 'Refreshing swimming pool experience at V2 Resort. Multiple daily sessions, family-friendly environment, competitive pricing for adults and children.',
+  keywords: ['swimming pool', 'resort', 'V2 Resort', 'pool sessions', 'family pool', 'pool tickets'],
   openGraph: {
     title: 'Swimming Pool | V2 Resort',
-    description: 'Refreshing swimming pool experience at V2 Resort Lebanon. Book your pool session today!',
+    description: 'Refreshing swimming pool experience at V2 Resort. Book your pool session today!',
     type: 'website',
     url: 'https://v2-ecosystem.vercel.app/pool',
   },
@@ -39,7 +39,7 @@ export default function PoolLayout({
       {/* Static content for bots/LLMs - hidden when JS runs, visible in raw HTML */}
       <div id="static-pool-content" className="sr-only">
         <h1>V2 Resort Swimming Pool</h1>
-        <p>Experience our refreshing swimming pool at V2 Resort in Lebanon. We offer multiple daily pool sessions suitable for all ages.</p>
+        <p>Experience our refreshing swimming pool at V2 Resort. We offer multiple daily pool sessions suitable for all ages.</p>
         
         <h2>Pool Features</h2>
         <ul>
@@ -76,9 +76,9 @@ export default function PoolLayout({
         
         <h2>Contact</h2>
         <p>For pool reservations or inquiries:</p>
-        <p>Email: info@v2resort.com</p>
-        <p>Phone: +961 XX XXX XXX</p>
-        <p>Address: 123 Lane, Lebanon</p>
+        <p>Email: bookings@v2resort.com</p>
+        <p>Phone: +1 234 567 8900</p>
+        <p>Address: 123 Resort Boulevard, Global City</p>
         
         <nav>
           <a href="/">Home</a> | 

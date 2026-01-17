@@ -97,6 +97,16 @@ CREATE TABLE IF NOT EXISTS role_permissions (
   PRIMARY KEY (role_id, permission_id)
 );
 
+-- User permission overrides (grant/revoke specific permissions per user)
+CREATE TABLE IF NOT EXISTS user_permissions (
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE NOT NULL,
+  is_granted BOOLEAN DEFAULT TRUE NOT NULL,
+  granted_by UUID REFERENCES users(id),
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+  PRIMARY KEY (user_id, permission_id)
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,

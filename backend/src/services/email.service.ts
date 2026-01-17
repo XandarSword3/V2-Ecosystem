@@ -169,6 +169,39 @@ class EmailService {
     }
   }
 
+  /**
+   * Send email using a template name with variables
+   */
+  async sendTemplatedEmail(templateName: string, to: string, variables: Record<string, unknown>): Promise<boolean> {
+    const template = await this.getTemplate(templateName);
+    if (!template) {
+      logger.warn(`Template '${templateName}' not found`);
+      return false;
+    }
+    
+    const html = this.replaceVariables(template.html_body, variables as TemplateVariables);
+    const subject = this.replaceVariables(template.subject, variables as TemplateVariables);
+    
+    return this.sendEmail({ to, subject, html });
+  }
+
+  /**
+   * Send pool ticket confirmation email
+   */
+  async sendPoolTicketConfirmation(ticket: { ticket_number: string; guest_name: string; guest_email?: string }, session: { name: string; start_time: string }): Promise<boolean> {
+    if (!ticket.guest_email) {
+      logger.warn('Cannot send pool ticket confirmation - no email provided');
+      return false;
+    }
+    
+    return this.sendTemplatedEmail('pool_ticket_confirmation', ticket.guest_email, {
+      ticketNumber: ticket.ticket_number,
+      guestName: ticket.guest_name,
+      sessionName: session.name,
+      sessionTime: session.start_time,
+    });
+  }
+
   async sendOrderConfirmation(data: {
     customerEmail: string;
     customerName: string;
@@ -447,6 +480,92 @@ class EmailService {
       customerName: data.customerName,
       siteUrl,
       companyAddress: settings.contact_address,
+    };
+
+    const subject = this.replaceVariables(template.subject, variables);
+    const html = this.replaceVariables(template.html_body, variables);
+
+    return this.sendEmail({
+      to: data.customerEmail,
+      subject,
+      html,
+    });
+  }
+
+  async sendPreArrivalReminder(data: {
+    customerEmail: string;
+    customerName: string;
+    bookingNumber: string;
+    chaletName: string;
+    checkInDate: string;
+    checkInTime?: string;
+    numberOfNights: number;
+    specialInstructions?: string;
+  }): Promise<boolean> {
+    const template = await this.getTemplate('pre_arrival_reminder');
+    const settings = await this.getSiteSettings();
+    const siteUrl = config.frontendUrl || 'https://v2resort.com';
+
+    if (!template) {
+      // Fallback email if template doesn't exist
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #16a34a;">${settings.company_name}</h1>
+          <h2>Your Stay Begins Tomorrow!</h2>
+          <p>Dear ${data.customerName},</p>
+          <p>We're excited to welcome you tomorrow! Here's a reminder about your upcoming stay:</p>
+          
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Booking Reference:</strong> ${data.bookingNumber}</p>
+            <p><strong>Chalet:</strong> ${data.chaletName}</p>
+            <p><strong>Check-in Date:</strong> ${data.checkInDate}</p>
+            <p><strong>Check-in Time:</strong> ${data.checkInTime || settings.chalet_check_in || '3:00 PM'}</p>
+            <p><strong>Duration:</strong> ${data.numberOfNights} night(s)</p>
+          </div>
+
+          <h3>Before You Arrive</h3>
+          <ul>
+            <li>Bring a valid ID for check-in</li>
+            <li>Your chalet will be ready by check-in time</li>
+            <li>Early check-in may be available upon request</li>
+            <li>Free parking is available on-site</li>
+          </ul>
+
+          ${data.specialInstructions ? `
+          <h3>Your Special Requests</h3>
+          <p>${data.specialInstructions}</p>
+          ` : ''}
+
+          <h3>Contact Us</h3>
+          <p>If you have any questions or need assistance:</p>
+          <p>📞 ${settings.contact_phone || 'Call Reception'}</p>
+          <p>📧 ${settings.contact_email || ''}</p>
+
+          <p style="margin-top: 30px;">We can't wait to see you!</p>
+          <p>Warm regards,<br><strong>${settings.company_name} Team</strong></p>
+        </div>
+      `;
+
+      return this.sendEmail({
+        to: data.customerEmail,
+        subject: `Reminder: Your Stay at ${settings.company_name} Begins Tomorrow!`,
+        html,
+      });
+    }
+
+    const variables: TemplateVariables = {
+      companyName: settings.company_name,
+      customerName: data.customerName,
+      bookingNumber: data.bookingNumber,
+      chaletName: data.chaletName,
+      checkInDate: data.checkInDate,
+      checkInTime: data.checkInTime || settings.chalet_check_in || '3:00 PM',
+      numberOfNights: data.numberOfNights,
+      specialInstructions: data.specialInstructions || '',
+      contactPhone: settings.contact_phone,
+      contactEmail: settings.contact_email,
+      companyAddress: settings.contact_address,
+      siteUrl,
     };
 
     const subject = this.replaceVariables(template.subject, variables);

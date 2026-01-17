@@ -60,9 +60,10 @@ export default function RestaurantKitchenPage() {
   // Real-time updates
   useRestaurantOrders(
     (newOrder) => {
-      setOrders((prev) => [newOrder, ...prev]);
-      toast.info(`New order #${newOrder.orderNumber}`, {
-        description: newOrder.customerName,
+      // Refetch orders to get full order data
+      loadOrders();
+      toast.info(`New order received`, {
+        description: newOrder.customerName || `Order with ${newOrder.items} items`,
       });
       // Play notification sound
       const audio = new Audio('/notification.mp3');

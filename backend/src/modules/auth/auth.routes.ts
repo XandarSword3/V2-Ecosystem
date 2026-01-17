@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as authController from "./auth.controller";
 import * as twoFactorController from "./two-factor.controller";
+import * as oauthController from "./oauth.controller";
 import { authenticate } from "../../middleware/auth.middleware";
 
 const router = Router();
@@ -11,6 +12,12 @@ router.post('/login', authController.login);
 router.post('/refresh', authController.refreshToken);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
+
+// OAuth routes
+router.get('/google', oauthController.googleAuth);
+router.get('/google/callback', oauthController.googleCallback);
+router.get('/facebook', oauthController.facebookAuth);
+router.get('/facebook/callback', oauthController.facebookCallback);
 
 // 2FA verification (during login flow - semi-public)
 router.post('/2fa/verify', twoFactorController.verifyTwoFactor);

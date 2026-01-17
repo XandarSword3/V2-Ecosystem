@@ -28,13 +28,13 @@ export function PropertyPanel() {
     );
   }
 
-  const handleChange = (key: string, value: any) => {
+  const handleChange = (key: string, value: string | number | boolean) => {
     updateBlock(selectedBlock.id, {
         props: { ...selectedBlock.props, [key]: value }
     });
   };
 
-  const handleStyleChange = (key: string, value: any) => {
+  const handleStyleChange = (key: string, value: string | number) => {
     updateBlock(selectedBlock.id, {
         style: { ...selectedBlock.style, [key]: value }
     });

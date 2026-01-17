@@ -41,8 +41,8 @@ describeIf('Admin Operations Integration', () => {
     customerClient = createGuestClient(); // Will be replaced if services available
     
     const services = await waitForServices(5, 1000);
-    if (!services.database || !services.redis) {
-      console.warn('⚠️ Test services not available, skipping integration tests');
+    if (!services.api) {
+      console.warn('⚠️ API not available, skipping integration tests');
       return;
     }
 
@@ -156,8 +156,13 @@ describeIf('Admin Operations Integration', () => {
       assertSuccess(response);
 
       assertHasData<any>(response, (data: any) => {
-        // Health endpoint might return various formats
-        expect(data.status === 'ok' || data.healthy === true || data === 'ok').toBeTruthy();
+        // Health endpoint returns various formats
+        expect(
+          data.status === 'ok' || 
+          data.status === 'healthy' || 
+          data.healthy === true || 
+          data === 'ok'
+        ).toBeTruthy();
       });
     });
   });

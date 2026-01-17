@@ -150,8 +150,15 @@ export default function LiveUsersPage() {
   const { socket, isConnected } = useSocket();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Mark as mounted to avoid hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+    setLastRefresh(new Date());
+  }, []);
 
   const fetchOnlineUsers = useCallback(() => {
     if (socket && isConnected) {
@@ -192,12 +199,12 @@ export default function LiveUsersPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       // Force re-render to update durations
-      setLastRefresh(prev => new Date(prev));
+      setLastRefresh(prev => prev ? new Date(prev) : new Date());
     }, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Group users by role
+  // Group users by role (connections)
   const adminUsers = onlineUsers.filter(u => 
     u.roles.includes('super_admin') || u.roles.includes('admin')
   );
@@ -210,6 +217,18 @@ export default function LiveUsersPage() {
   const guestUsers = onlineUsers.filter(u => 
     !u.roles.includes('admin') && !u.roles.includes('staff') && !u.roles.includes('customer') && !u.roles.includes('super_admin')
   );
+
+  // Count unique users (by userId, guests count as 1 per connection)
+  const uniqueUserIds = new Set<string>();
+  let guestCount = 0;
+  onlineUsers.forEach(u => {
+    if (u.userId) {
+      uniqueUserIds.add(u.userId);
+    } else {
+      guestCount++;
+    }
+  });
+  const uniqueUsersCount = uniqueUserIds.size + guestCount;
 
   return (
     <motion.div
@@ -252,16 +271,19 @@ export default function LiveUsersPage() {
       </div>
 
       {/* Stats Cards */}
-      <motion.div variants={fadeInUp} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <motion.div variants={fadeInUp} className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-                  {t('admin.liveUsers.totalOnline', { fallback: 'Total Online' })}
+                  {t('admin.liveUsers.uniqueUsers', { fallback: 'Unique Users' })}
                 </p>
                 <p className="text-3xl font-bold text-green-700 dark:text-green-300">
-                  {onlineUsers.length}
+                  {uniqueUsersCount}
+                </p>
+                <p className="text-xs text-green-500 dark:text-green-500 mt-1">
+                  {onlineUsers.length} {t('admin.liveUsers.connections', { fallback: 'connections' })}
                 </p>
               </div>
               <Users className="h-10 w-10 text-green-500 opacity-70" />
@@ -309,25 +331,46 @@ export default function LiveUsersPage() {
                   {t('admin.liveUsers.customers', { fallback: 'Customers' })}
                 </p>
                 <p className="text-3xl font-bold text-amber-700 dark:text-amber-300">
-                  {customerUsers.length + guestUsers.length}
+                  {customerUsers.length}
                 </p>
               </div>
               <UserCircle className="h-10 w-10 text-amber-500 opacity-70" />
             </div>
           </CardContent>
         </Card>
+
+        <Card className="bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/20 dark:to-gray-900/20 border-slate-200 dark:border-slate-800">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                  {t('admin.liveUsers.guests', { fallback: 'Guests' })}
+                </p>
+                <p className="text-3xl font-bold text-slate-700 dark:text-slate-300">
+                  {guestUsers.length}
+                </p>
+              </div>
+              <Globe className="h-10 w-10 text-slate-500 opacity-70" />
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
 
-      {/* Connection Status */}
-      <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-        {isConnected 
-          ? t('admin.liveUsers.connected', { fallback: 'Connected to live updates' })
-          : t('admin.liveUsers.disconnected', { fallback: 'Disconnected - trying to reconnect...' })
-        }
-        <span className="mx-2">•</span>
-        <Clock className="h-4 w-4" />
-        {t('admin.liveUsers.lastUpdate', { fallback: 'Last update' })}: {lastRefresh.toLocaleTimeString()}
+      {/* Connection Status & Info */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+          {isConnected 
+            ? t('admin.liveUsers.connected', { fallback: 'Connected to live updates' })
+            : t('admin.liveUsers.disconnected', { fallback: 'Disconnected - trying to reconnect...' })
+          }
+          <span className="mx-2">•</span>
+          <Clock className="h-4 w-4" />
+          {t('admin.liveUsers.lastUpdate', { fallback: 'Last update' })}: {isMounted && lastRefresh ? lastRefresh.toLocaleTimeString() : '--:--:--'}
+        </div>
+        <div className="text-xs text-slate-400 dark:text-slate-500 italic">
+          {t('admin.liveUsers.connectionNote', { fallback: 'Each browser tab counts as a separate connection' })}
+        </div>
       </div>
 
       {/* Users List */}

@@ -142,35 +142,38 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       .map(module => {
         let children: { name: string; href: string }[] = [];
         let icon = Cloud;
+        
+        // Ensure slug is URL-safe (encode any problematic characters from legacy data)
+        const safeSlug = encodeURIComponent(module.slug);
 
         if (module.template_type === 'menu_service') {
           icon = UtensilsCrossed;
           children = [
-            { name: t('nav.menuItems'), href: `/admin/${module.slug}/menu` },
-            { name: t('nav.categories'), href: `/admin/${module.slug}/categories` },
-            { name: t('nav.orders'), href: `/admin/${module.slug}/orders` },
-            { name: t('nav.tables'), href: `/admin/${module.slug}/tables` },
+            { name: t('nav.menuItems'), href: `/admin/${safeSlug}/menu` },
+            { name: t('nav.categories'), href: `/admin/${safeSlug}/categories` },
+            { name: t('nav.orders'), href: `/admin/${safeSlug}/orders` },
+            { name: t('nav.tables'), href: `/admin/${safeSlug}/tables` },
           ];
         } else if (module.template_type === 'multi_day_booking') {
           icon = Home;
           children = [
-            { name: t('nav.allChalets'), href: `/admin/${module.slug}` },
-            { name: t('nav.bookings'), href: `/admin/${module.slug}/bookings` },
-            { name: t('nav.pricingRules'), href: `/admin/${module.slug}/pricing` },
-            { name: t('nav.addons'), href: `/admin/${module.slug}/addons` },
+            { name: t('nav.allChalets'), href: `/admin/${safeSlug}` },
+            { name: t('nav.bookings'), href: `/admin/${safeSlug}/bookings` },
+            { name: t('nav.pricingRules'), href: `/admin/${safeSlug}/pricing` },
+            { name: t('nav.addons'), href: `/admin/${safeSlug}/addons` },
           ];
         } else if (module.template_type === 'session_access') {
           icon = Waves;
           children = [
-            { name: t('nav.sessions'), href: `/admin/${module.slug}/sessions` },
-            { name: t('nav.tickets'), href: `/admin/${module.slug}/tickets` },
-            { name: t('nav.capacity'), href: `/admin/${module.slug}/capacity` },
+            { name: t('nav.sessions'), href: `/admin/${safeSlug}/sessions` },
+            { name: t('nav.tickets'), href: `/admin/${safeSlug}/tickets` },
+            { name: t('nav.capacity'), href: `/admin/${safeSlug}/capacity` },
           ];
         }
 
         return {
           name: module.name,
-          href: `/admin/${module.slug}`,
+          href: `/admin/${safeSlug}`,
           icon,
           children
         };

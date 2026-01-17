@@ -13,6 +13,7 @@ import { DirectionSync } from '@/components/DirectionSync';
 import { ThemeInjector } from '@/components/ThemeInjector';
 import { WeatherEffects } from '@/components/effects/WeatherEffects';
 import { PageTracker } from '@/components/PageTracker';
+import { PWAPrompt } from '@/components/pwa';
 
 // Import all messages statically to avoid async loading issues
 import enMessages from '../../messages/en.json';
@@ -68,7 +69,7 @@ export function Providers({ children }: ProvidersProps) {
   const messages = useMemo(() => allMessages[locale], [locale]);
 
   return (
-    <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Beirut">
+    <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC">
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <AuthProvider>
@@ -78,6 +79,7 @@ export function Providers({ children }: ProvidersProps) {
               <WeatherEffects />
               <DirectionSync />
               <PageTracker />
+              <PWAPrompt />
               <LoadingScreenWrapper>
                 {children}
               </LoadingScreenWrapper>

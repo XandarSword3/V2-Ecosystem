@@ -7,16 +7,32 @@
 
 import { beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { TEST_CONFIG, getTestDatabaseUrl, getTestRedisUrl } from './config';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load .env file from backend directory
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Set test environment variables before any imports
 process.env.NODE_ENV = 'test';
-process.env.DATABASE_URL = getTestDatabaseUrl();
-process.env.REDIS_URL = getTestRedisUrl();
-process.env.JWT_SECRET = 'integration-test-jwt-secret-key-very-long-and-secure';
-process.env.JWT_REFRESH_SECRET = 'integration-test-refresh-secret-key-very-long';
-process.env.JWT_EXPIRES_IN = '15m';
-process.env.JWT_REFRESH_EXPIRES_IN = '7d';
-process.env.CORS_ORIGIN = 'http://localhost:3000';
+// Don't override DATABASE_URL if it's already set from .env
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = getTestDatabaseUrl();
+}
+// Only set REDIS_URL if not already set
+if (!process.env.REDIS_URL) {
+  process.env.REDIS_URL = getTestRedisUrl();
+}
+// Use JWT secrets from .env if available, otherwise use test defaults
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'integration-test-jwt-secret-key-very-long-and-secure';
+}
+if (!process.env.JWT_REFRESH_SECRET) {
+  process.env.JWT_REFRESH_SECRET = 'integration-test-refresh-secret-key-very-long';
+}
+process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
+process.env.JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
 /**
  * Test context shared across tests
@@ -92,25 +108,45 @@ export async function isRedisAvailable(): Promise<boolean> {
 }
 
 /**
+ * Check if API is available (more important than direct DB check for integration tests)
+ */
+export async function isApiAvailable(): Promise<boolean> {
+  try {
+    const response = await fetch(`${TEST_CONFIG.api.baseUrl}/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Wait for services to be ready
+ * For integration tests against live API, we primarily need the API to be available
  */
 export async function waitForServices(
   maxAttempts = 10,
   delayMs = 1000
-): Promise<{ database: boolean; redis: boolean }> {
+): Promise<{ database: boolean; redis: boolean; api: boolean }> {
   let dbReady = false;
   let redisReady = false;
+  let apiReady = false;
 
-  for (let i = 0; i < maxAttempts && (!dbReady || !redisReady); i++) {
+  for (let i = 0; i < maxAttempts && !apiReady; i++) {
+    if (!apiReady) apiReady = await isApiAvailable();
     if (!dbReady) dbReady = await isDatabaseAvailable();
     if (!redisReady) redisReady = await isRedisAvailable();
 
-    if (!dbReady || !redisReady) {
+    if (!apiReady) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
 
-  return { database: dbReady, redis: redisReady };
+  // API availability is the primary requirement
+  // Database/Redis checks are secondary since the API handles its own connections
+  return { database: dbReady, redis: redisReady, api: apiReady };
 }
 
 /**

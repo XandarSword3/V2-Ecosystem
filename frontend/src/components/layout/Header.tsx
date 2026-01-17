@@ -34,11 +34,17 @@ export default function Header() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const [preferencesOpen, setPreferencesOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const { user, isAuthenticated } = useAuth();
     const cartCount = useCartStore((s) => s.getCount());
 
     const t = useTranslations('nav');
   const tCommon = useTranslations('common');
+
+  // Prevent hydration mismatch by only rendering client-specific content after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Handle scroll effect
   useEffect(() => {
@@ -91,34 +97,34 @@ export default function Header() {
 
   // Get translated name for module - dynamic lookup with fallback
   const getModuleTranslatedName = (slug: string, fallbackName: string) => {
-    // Normalize slug to camelCase for translation key lookup
-    const normalizeSlug = (s: string) => {
-      return s.toLowerCase()
-        .split('-')
-        .map((part, i) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1))
-        .join('');
+    // Known translation keys mapping
+    const knownKeys: Record<string, string> = {
+      'restaurant': 'restaurant',
+      'chalets': 'chalets', 
+      'pool': 'pool',
+      'snack-bar': 'snackBar',
+      'snackbar': 'snackBar',
+      'gym': 'gym',
+      'spa': 'spa',
+      'cafe': 'cafe',
+      'chocolate-box': 'chocolateBox',
+      'chocolate box': 'chocolateBox',
+      'chocolatebox': 'chocolateBox',
     };
     
-    // Try multiple key formats
-    const keysToTry = [
-      normalizeSlug(slug),           // snack-bar -> snackBar
-      slug.toLowerCase(),             // restaurant -> restaurant
-      slug.replace(/-/g, '_'),        // snack-bar -> snack_bar
-    ];
-    
-    for (const key of keysToTry) {
+    const translationKey = knownKeys[slug.toLowerCase()];
+    if (translationKey) {
       try {
-        const translated = t(key as any);
-        // next-intl returns the key if not found, so check if translation exists
-        if (translated && translated !== key) {
+        const translated = t(translationKey as any);
+        if (translated && translated !== translationKey) {
           return translated;
         }
       } catch {
-        // Key not found, try next
+        // Ignore translation errors
       }
     }
     
-    // Final fallback: use the module name from database
+    // Final fallback: use the module name from database (properly formatted)
     return fallbackName;
   };
 
@@ -129,15 +135,35 @@ export default function Header() {
     href: string;
     icon?: string;
   }
+
+  interface NavigationItem {
+    name: string;
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }
+
   // Build navigation from CMS or Fallback - recalculate when locale changes
-  const navigation = useMemo(() => {
+  const navigation: NavigationItem[] = useMemo(() => {
     return settings.navbar?.links?.map((link: NavLink) => {
       if (link.type === 'module') {
-        const module = modules.find(m => m.slug === link.moduleSlug);
+        // Case-insensitive module lookup
+        const module = modules.find(m => m.slug.toLowerCase() === link.moduleSlug?.toLowerCase());
+        if (module) {
+          return {
+            name: getModuleTranslatedName(module.slug, module.name),
+            href: `/${module.slug}`,
+            icon: getIconForModule(module)
+          };
+        }
+        // Module not found - skip this link or show label
+        // Use the stored label but don't try to translate it (it might be a bad translation key)
+        const fallbackName = link.label.startsWith('nav.') 
+          ? link.label.split('.').pop()?.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || link.label 
+          : link.label;
         return {
-          name: module ? getModuleTranslatedName(module.slug, module.name) : link.label,
-          href: module ? `/${module.slug}` : link.href,
-          icon: module ? getIconForModule(module) : getIconByName(link.icon || 'Home')
+          name: fallbackName,
+          href: link.href,
+          icon: getIconByName(link.icon || 'Home')
         };
       }
       return {
@@ -206,7 +232,7 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-1">
-            {navigation.map((item: any) => {
+            {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
 
@@ -232,8 +258,8 @@ export default function Header() {
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-2">
-            {/* Cart Button */}
-            {navConfig.showCart && cartCount > 0 && (
+            {/* Cart Button - only show after mount to prevent hydration mismatch */}
+            {mounted && navConfig.showCart && cartCount > 0 && (
               <Link href="/cart">
                 <motion.div
                   initial={{ scale: 0 }}
@@ -271,9 +297,9 @@ export default function Header() {
               </motion.button>
             )}
 
-            {/* Auth Buttons - Desktop */}
+            {/* Auth Buttons - Desktop - only render after mount to prevent hydration mismatch */}
             <div className="hidden md:flex items-center gap-2 ml-2">
-              {isAuthenticated ? (
+              {mounted && isAuthenticated ? (
                 <Link href="/profile">
                   <motion.div
                     whileHover={{ scale: 1.02, y: -1 }}
@@ -284,7 +310,7 @@ export default function Header() {
                     <span className="text-sm font-medium">{user?.fullName?.split(' ')[0] || 'Profile'}</span>
                   </motion.div>
                 </Link>
-              ) : (
+              ) : mounted ? (
                 <>
                   <Link href="/login">
                     <motion.div
@@ -305,7 +331,7 @@ export default function Header() {
                     </motion.div>
                   </Link>
                 </>
-              )}
+              ) : null}
             </div>
 
             {/* Mobile Menu Button */}
@@ -363,7 +389,7 @@ export default function Header() {
                 }}
                 className="py-4 space-y-1"
               >
-                {navigation.map((item: any, index: number) => {
+                {navigation.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
 
@@ -402,7 +428,8 @@ export default function Header() {
                   );
                 })}
 
-                {/* Mobile Auth */}
+                {/* Mobile Auth - only render after mount */}
+                {mounted && (
                 <motion.div
                   variants={{
                     hidden: { opacity: 0, x: -30, filter: 'blur(4px)' },
@@ -443,6 +470,7 @@ export default function Header() {
                     </div>
                   )}
                 </motion.div>
+                )}
               </motion.div>
             </motion.nav>
           )}

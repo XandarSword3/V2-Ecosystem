@@ -6,20 +6,41 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
 const isTest = process.env.NODE_ENV === 'test';
 
-// SECURITY: Validate critical environment variables
-// In production, these must be explicitly set - no fallbacks allowed
-const requiredEnvVars = isProduction 
-  ? ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'DATABASE_URL']
-  : ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY']; // Minimum for development
+/**
+ * Validate that required environment variables are set.
+ * Called at application startup, NOT at import time.
+ * This allows tests to import modules without env validation.
+ */
+export function validateEnvironment(): void {
+  const requiredEnvVars = isProduction 
+    ? ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'DATABASE_URL']
+    : ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
 
-const missing = requiredEnvVars.filter(v => !process.env[v]);
-if (missing.length > 0 && !isTest) {
-  throw new Error(`Missing required environment variables: ${missing.join(', ')}. Check your .env file.`);
+  const missing = requiredEnvVars.filter(v => !process.env[v]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}. Check your .env file.`);
+  }
+
+  if (isProduction && process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters in production');
+  }
 }
 
-// Ensure JWT secret is strong in production
-if (isProduction && process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-  throw new Error('JWT_SECRET must be at least 32 characters in production');
+// Only validate at import time in non-test environments
+// Tests can call validateEnvironment() explicitly if needed
+if (!isTest) {
+  const requiredEnvVars = isProduction 
+    ? ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'DATABASE_URL']
+    : ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
+
+  const missing = requiredEnvVars.filter(v => !process.env[v]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}. Check your .env file.`);
+  }
+
+  if (isProduction && process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters in production');
+  }
 }
 
 // Generate secure development-only secrets (never used in production)
@@ -77,6 +98,20 @@ export const config = {
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10), // 1 minute
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000', 10), // 1000 requests per minute for dev
+  },
+
+  // OAuth Configuration
+  oauth: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      callbackUrl: process.env.GOOGLE_CALLBACK_URL || `http://localhost:${process.env.PORT || 3005}/api/auth/google/callback`,
+    },
+    facebook: {
+      clientId: process.env.FACEBOOK_CLIENT_ID || '',
+      clientSecret: process.env.FACEBOOK_CLIENT_SECRET || '',
+      callbackUrl: process.env.FACEBOOK_CALLBACK_URL || `http://localhost:${process.env.PORT || 3005}/api/auth/facebook/callback`,
+    },
   },
 } as const;
 

@@ -101,33 +101,47 @@ export async function getFeaturedItems(req: Request, res: Response, next: NextFu
 
 export async function createCategory(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, description, moduleId, ...rest } = req.body;
+    const { name, description, moduleId, module_id, ...rest } = req.body;
+    const resolvedModuleId = moduleId || module_id;
 
     // Auto-translate name and description if not provided
-    const translatedData = { ...rest, name, moduleId };
+    const translatedData: Record<string, unknown> = { 
+      name,
+      description,
+      moduleId: resolvedModuleId
+    };
 
     if (name && !req.body.name_ar) {
       try {
         const nameTranslations = await translateText(name, 'en');
-        translatedData.name_ar = nameTranslations.ar;
-        translatedData.name_fr = nameTranslations.fr;
+        translatedData.nameAr = nameTranslations.ar;
+        translatedData.nameFr = nameTranslations.fr;
       } catch (e) {
         logger.warn('[MENU] Auto-translation failed for category name');
       }
+    } else {
+      if (req.body.name_ar) translatedData.nameAr = req.body.name_ar;
+      if (req.body.name_fr) translatedData.nameFr = req.body.name_fr;
     }
 
     if (description && !req.body.description_ar) {
       try {
         const descTranslations = await translateText(description, 'en');
-        translatedData.description = description;
-        translatedData.description_ar = descTranslations.ar;
-        translatedData.description_fr = descTranslations.fr;
+        translatedData.descriptionAr = descTranslations.ar;
+        translatedData.descriptionFr = descTranslations.fr;
       } catch (e) {
         logger.warn('[MENU] Auto-translation failed for category description');
       }
+    } else {
+      if (req.body.description_ar) translatedData.descriptionAr = req.body.description_ar;
+      if (req.body.description_fr) translatedData.descriptionFr = req.body.description_fr;
     }
 
-    const category = await menuService.createCategory(translatedData);
+    // Copy other fields
+    if (rest.displayOrder !== undefined) translatedData.displayOrder = rest.displayOrder;
+    if (rest.imageUrl !== undefined) translatedData.imageUrl = rest.imageUrl;
+
+    const category = await menuService.createCategory(translatedData as Parameters<typeof menuService.createCategory>[0]);
     res.status(201).json({ success: true, data: category });
   } catch (error) {
     next(error);

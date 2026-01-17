@@ -66,8 +66,9 @@ export default function DynamicTicketsPage() {
   const params = useParams();
   const { modules } = useSiteSettings();
   const tc = useTranslations('adminCommon');
-  const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
-  const currentModule = modules.find(m => m.slug === slug);
+  const rawSlug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
+  const slug = rawSlug ? decodeURIComponent(rawSlug).toLowerCase() : '';
+  const currentModule = modules.find(m => m.slug.toLowerCase() === slug);
 
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [loading, setLoading] = useState(true);

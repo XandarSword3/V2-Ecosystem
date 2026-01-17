@@ -495,7 +495,7 @@ Frontend runs on: http://localhost:3002 (or next available port)
 
 ## 📝 Notes
 
-- All times are in Lebanon timezone
+- All times are in UTC timezone
 - Prices are in USD and LBP
 - Tax (11% VAT) automatically calculated
 - Booking changes require approval

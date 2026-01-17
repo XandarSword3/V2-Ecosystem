@@ -4,6 +4,27 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { socketLogger } from './logger';
 
+// Type definitions for socket events
+interface OrderStatusUpdate {
+  orderId: string;
+  status: string;
+  previousStatus?: string;
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+interface NewOrderNotification {
+  orderId: string;
+  moduleId: string;
+  customerName?: string;
+  totalAmount: number;
+  items: number;
+  createdAt: string;
+}
+
+type OrderUpdateCallback = (data: OrderStatusUpdate) => void;
+type NewOrderCallback = (data: NewOrderNotification) => void;
+
 // SOCKET_URL should NOT include /api
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
 
@@ -196,40 +217,63 @@ export function useSocket(): UseSocketReturn {
   };
 }
 
-export function useOrderUpdates(orderId: string, onUpdate: (data: any) => void) {
+export function useOrderUpdates(orderId: string, onUpdate: OrderUpdateCallback) {
   const { socket, joinRoom, leaveRoom } = useSocket();
 
   useEffect(() => {
     if (socket && orderId) {
       joinRoom(`order-${orderId}`);
 
-      socket.on('order-status-updated', onUpdate);
+      // Listen for order:updated event (consistent with backend)
+      socket.on('order:updated', onUpdate);
 
       return () => {
         leaveRoom(`order-${orderId}`);
-        socket.off('order-status-updated', onUpdate);
+        socket.off('order:updated', onUpdate);
       };
     }
-  }, [socket, orderId]);
+  }, [socket, orderId, onUpdate, joinRoom, leaveRoom]);
 }
 
-export function useRestaurantOrders(onNewOrder: (data: any) => void, onStatusUpdate: (data: any) => void) {
-  const { socket, joinRoom, leaveRoom } = useSocket();
+export function useRestaurantOrders(onNewOrder: NewOrderCallback, onStatusUpdate: OrderUpdateCallback) {
+  const { socket } = useSocket();
 
   useEffect(() => {
     if (socket) {
-      joinRoom('restaurant-kitchen');
+      // Join the restaurant unit room (backend emits to 'unit:restaurant')
+      socket.emit('join:unit', 'restaurant');
 
-      socket.on('new-order', onNewOrder);
-      socket.on('order-status-updated', onStatusUpdate);
+      // Listen for backend events (order:new and order:updated)
+      socket.on('order:new', onNewOrder);
+      socket.on('order:updated', onStatusUpdate);
 
       return () => {
-        leaveRoom('restaurant-kitchen');
-        socket.off('new-order', onNewOrder);
-        socket.off('order-status-updated', onStatusUpdate);
+        socket.off('order:new', onNewOrder);
+        socket.off('order:updated', onStatusUpdate);
       };
     }
-  }, [socket]);
+  }, [socket, onNewOrder, onStatusUpdate]);
+}
+
+// Hook for snack bar real-time updates
+export function useSnackBarOrders(onNewOrder: NewOrderCallback, onStatusUpdate: OrderUpdateCallback) {
+  const { socket } = useSocket();
+
+  useEffect(() => {
+    if (socket) {
+      // Join the snack bar unit room (backend emits to 'unit:snack_bar')
+      socket.emit('join:unit', 'snack_bar');
+
+      // Listen for backend events
+      socket.on('order:new', onNewOrder);
+      socket.on('order:updated', onStatusUpdate);
+
+      return () => {
+        socket.off('order:new', onNewOrder);
+        socket.off('order:updated', onStatusUpdate);
+      };
+    }
+  }, [socket, onNewOrder, onStatusUpdate]);
 }
 
 // Hook to track page navigation for live users monitoring

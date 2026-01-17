@@ -60,8 +60,7 @@ interface Category {
 }
 
 export default function MenuManagementPage() {
-  const t = useTranslations('adminRestaurant');
-  const tc = useTranslations('adminCommon');
+  const t = useTranslations('admin');
   const { modules } = useSiteSettings();
   const restaurantModule = modules.find(m => m.slug === 'restaurant');
 
@@ -92,7 +91,7 @@ export default function MenuManagementPage() {
       setItems(menuRes.data.data || []);
       setCategories(catRes.data.data || []);
     } catch (error) {
-      toast.error(tc('errors.failedToLoad'));
+      toast.error('Failed to fetch menu data');
       console.error(error);
     } finally {
       setLoading(false);
@@ -125,12 +124,12 @@ export default function MenuManagementPage() {
 
   const handleSave = async () => {
     if (!formData.name || !formData.price || !formData.category_id) {
-      toast.error(tc('errors.required'));
+      toast.error('Please fill in all required fields');
       return;
     }
 
     if (!restaurantModule) {
-      toast.error(tc('errors.generic'));
+      toast.error('Restaurant module not found');
       return;
     }
 
@@ -140,30 +139,30 @@ export default function MenuManagementPage() {
 
       if (editingItem) {
         await api.put(`/restaurant/admin/items/${editingItem.id}`, payload);
-        toast.success(tc('success.updated'));
+        toast.success('Menu item updated successfully');
       } else {
         await api.post('/restaurant/admin/items', payload);
-        toast.success(tc('success.created'));
+        toast.success('Menu item created successfully');
       }
       fetchData();
       setShowModal(false);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || tc('errors.failedToSave'));
+      toast.error(axiosError.response?.data?.message || 'Failed to save menu item');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(tc('confirmDelete'))) return;
+    if (!confirm('Are you sure you want to delete this menu item?')) return;
 
     try {
       await api.delete(`/restaurant/admin/items/${id}`);
-      toast.success(tc('success.deleted'));
+      toast.success('Menu item deleted');
       fetchData();
     } catch (error) {
-      toast.error(tc('errors.failedToDelete'));
+      toast.error('Failed to delete menu item');
     }
   };
 
@@ -173,9 +172,9 @@ export default function MenuManagementPage() {
         is_available: !item.is_available,
       });
       fetchData();
-      toast.success(tc('success.updated'));
+      toast.success(`Item ${item.is_available ? 'hidden' : 'shown'}`);
     } catch (error) {
-      toast.error(tc('errors.failedToUpdate'));
+      toast.error('Failed to update availability');
     }
   };
 
@@ -203,24 +202,24 @@ export default function MenuManagementPage() {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
               <UtensilsCrossed className="w-6 h-6 text-white" />
             </div>
-            {t('menu.title')}
+            Menu Management
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-2">
-            {tc('description')}
+            Add, edit, and manage restaurant menu items
           </p>
         </motion.div>
 
         <motion.div variants={fadeInUp} className="flex gap-2">
           <Button variant="outline" onClick={fetchData} className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4" />
-            {tc('refresh')}
+            Refresh
           </Button>
           <Button
             onClick={openCreateModal}
             className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 text-white"
           >
             <Plus className="w-4 h-4" />
-            {t('menu.addItem')}
+            Add Item
           </Button>
         </motion.div>
       </div>
@@ -233,7 +232,7 @@ export default function MenuManagementPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <Input
-                  placeholder={tc('searchPlaceholder')}
+                  placeholder="Search menu items..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -245,7 +244,7 @@ export default function MenuManagementPage() {
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 >
-                  <option value="all">{tc('all')} {t('categories.title')}</option>
+                  <option value="all">All Categories</option>
                   {categories.map(cat => (
                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
@@ -291,9 +290,9 @@ export default function MenuManagementPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <UtensilsCrossed className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-              <p className="text-slate-500 dark:text-slate-400">{tc('noResults')}</p>
+              <p className="text-slate-500 dark:text-slate-400">No menu items found</p>
               <Button onClick={openCreateModal} className="mt-4">
-                {t('menu.addItem')}
+                Add your first item
               </Button>
             </CardContent>
           </Card>
@@ -326,12 +325,12 @@ export default function MenuManagementPage() {
                       <div className="absolute top-2 right-2 flex gap-1">
                         {item.is_featured && (
                           <span className="px-2 py-1 bg-amber-500 text-white text-xs rounded-full">
-                            {t('menu.featured')}
+                            Featured
                           </span>
                         )}
                         {!item.is_available && (
                           <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full">
-                            {t('menu.unavailable')}
+                            Hidden
                           </span>
                         )}
                       </div>
@@ -405,12 +404,12 @@ export default function MenuManagementPage() {
                           {item.is_available ? (
                             <>
                               <EyeOff className="w-4 h-4" />
-                              {t('menu.unavailable')}
+                              Hide
                             </>
                           ) : (
                             <>
                               <Eye className="w-4 h-4" />
-                              {t('menu.available')}
+                              Show
                             </>
                           )}
                         </button>
@@ -419,7 +418,7 @@ export default function MenuManagementPage() {
                           className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 transition-colors"
                         >
                           <Edit2 className="w-4 h-4" />
-                          {tc('edit')}
+                          Edit
                         </button>
                         <button
                           onClick={() => handleDelete(item.id)}
@@ -456,7 +455,7 @@ export default function MenuManagementPage() {
             >
               <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6 flex justify-between items-center">
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-                  {editingItem ? t('menu.editItem') : t('menu.addItem')}
+                  {editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}
                 </h3>
                 <button
                   onClick={() => setShowModal(false)}
@@ -666,7 +665,7 @@ export default function MenuManagementPage() {
                   className="flex-1"
                   onClick={() => setShowModal(false)}
                 >
-                  {tc('cancel')}
+                  Cancel
                 </Button>
                 <Button
                   onClick={handleSave}
@@ -678,7 +677,7 @@ export default function MenuManagementPage() {
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-2" />
-                      {editingItem ? tc('update') : tc('create')}
+                      {editingItem ? 'Update Item' : 'Create Item'}
                     </>
                   )}
                 </Button>

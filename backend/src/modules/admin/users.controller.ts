@@ -2,6 +2,13 @@ import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection";
 import { getOnlineUsers } from "../../socket";
 import { logger } from "../../utils/logger.js";
+import { logActivity } from "../../utils/activityLogger";
+import { 
+  createUserSchema, 
+  validateBody, 
+  adminUpdateUserSchema,
+  assignUserRolesSchema,
+} from "../../validation/schemas.js";
 import { 
   UserRow, 
   RoleRow, 
@@ -162,7 +169,7 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
     }
 
     // First try the full query with user_permissions
-    let user: any = null;
+    let user: UserDetailsQuery | null = null;
     let typedUser: UserDetailsQuery;
     
     try {
@@ -274,6 +281,186 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
     };
 
     res.json({ success: true, data: detailedUser });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ============================================
+// User Management (Create, Update, Delete)
+// ============================================
+
+export async function createUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    // Validate input with strong password requirements
+    const validatedData = validateBody(createUserSchema, req.body);
+    const { email, password, full_name, phone, roles } = validatedData;
+
+    const supabase = getSupabase();
+
+    // Check if email already exists
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (existing) {
+      return res.status(400).json({ success: false, error: 'Email already exists' });
+    }
+
+    // Hash password
+    const bcryptModule = await import('bcryptjs');
+    const bcrypt = bcryptModule.default || bcryptModule;
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create user
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .insert({
+        email: email.toLowerCase(),
+        password_hash: passwordHash,
+        full_name,
+        phone,
+        is_active: true,
+        email_verified: true, // Admin-created users are auto-verified
+      })
+      .select('id, email, full_name, phone, is_active, created_at')
+      .single();
+
+    if (userError) throw userError;
+
+    // Assign roles - roles has default value from schema so is guaranteed to exist
+    const rolesToAssign = roles || ['customer'];
+    if (rolesToAssign.length > 0) {
+      const { data: roleRecords } = await supabase
+        .from('roles')
+        .select('id, name')
+        .in('name', rolesToAssign);
+
+      if (roleRecords && roleRecords.length > 0) {
+        const roleInserts = roleRecords.map(role => ({
+          user_id: user.id,
+          role_id: role.id,
+        }));
+
+        await supabase.from('user_roles').insert(roleInserts);
+      }
+    }
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'CREATE_USER',
+      resource: 'users',
+      resource_id: user.id
+    });
+
+    res.status(201).json({ success: true, data: { ...user, roles } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    const validatedData = validateBody(adminUpdateUserSchema, req.body);
+    const supabase = getSupabase();
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (validatedData.fullName !== undefined) updateData.full_name = validatedData.fullName;
+    if (validatedData.phone !== undefined) updateData.phone = validatedData.phone;
+    if (validatedData.isActive !== undefined) updateData.is_active = validatedData.isActive;
+    if (validatedData.preferredLanguage !== undefined) updateData.preferred_language = validatedData.preferredLanguage;
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'UPDATE_USER',
+      resource: 'users',
+      resource_id: req.params.id,
+      new_value: updateData
+    });
+
+    res.json({ success: true, data: user });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateUserRoles(req: Request, res: Response, next: NextFunction) {
+  try {
+    const validatedData = validateBody(assignUserRolesSchema, req.body);
+    const supabase = getSupabase();
+    const { roleIds } = validatedData;
+    const userId = req.params.id;
+
+    // Remove existing roles
+    const { error: deleteError } = await supabase
+      .from('user_roles')
+      .delete()
+      .eq('user_id', userId);
+
+    if (deleteError) throw deleteError;
+
+    // Add new roles
+    if (roleIds && roleIds.length > 0) {
+      const { error: insertError } = await supabase
+        .from('user_roles')
+        .insert(
+          roleIds.map((roleId: string) => ({
+            user_id: userId,
+            role_id: roleId,
+            granted_by: req.user!.userId,
+          }))
+        );
+
+      if (insertError) throw insertError;
+    }
+
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'UPDATE_ROLES',
+      resource: 'users',
+      resource_id: userId,
+      new_value: { roleIds }
+    });
+
+    res.json({ success: true, message: 'Roles updated' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from('users')
+      .update({
+        deleted_at: new Date().toISOString(),
+        is_active: false
+      })
+      .eq('id', req.params.id);
+
+    if (error) throw error;
+
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'DELETE_USER',
+      resource: 'users',
+      resource_id: req.params.id
+    });
+
+    res.json({ success: true, message: 'User deleted' });
   } catch (error) {
     next(error);
   }

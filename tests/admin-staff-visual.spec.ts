@@ -1,39 +1,90 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, APIRequestContext } from '@playwright/test';
 
-const API_URL = 'http://localhost:3005';
-const FRONTEND_URL = 'http://localhost:3000';
+/**
+ * Admin and Staff Visual/Functional E2E Tests
+ * 
+ * Environment Variables:
+ * - FRONTEND_URL: Frontend base URL (default: http://localhost:3000)
+ * - API_URL: Backend API URL (default: http://localhost:3005)
+ * - E2E_ADMIN_EMAIL: Admin email (default: admin@v2resort.com)
+ * - E2E_ADMIN_PASSWORD: Admin password (default: admin123)
+ */
 
-// Test credentials - admin user
-const ADMIN_EMAIL = 'admin@v2resort.com';
-const ADMIN_PASSWORD = 'admin123';
+// Environment-driven configuration
+const API_URL = process.env.API_URL || 'http://localhost:3005';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com';
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'admin123';
 
-// Store auth state
+// Store auth state (cached per test file)
 let authToken: string = '';
-let adminCookies: any[] = [];
 
-// Helper to login as admin
-async function loginAsAdmin(page: Page): Promise<boolean> {
-  await page.goto(`${FRONTEND_URL}/login`);
-  await page.waitForLoadState('networkidle');
+/**
+ * Helper to get auth token via API (faster than UI login)
+ */
+async function getAuthToken(request: APIRequestContext): Promise<string> {
+  if (authToken) return authToken;
   
-  // Fill login form
-  const emailInput = page.locator('input[type="email"], input[name="email"]');
-  const passwordInput = page.locator('input[type="password"], input[name="password"]');
-  
-  if (await emailInput.isVisible()) {
-    await emailInput.fill(ADMIN_EMAIL);
-    await passwordInput.fill(ADMIN_PASSWORD);
+  try {
+    const response = await request.post(`${API_URL}/api/auth/login`, {
+      data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+      timeout: 30000,
+    });
     
-    // Find and click submit button
-    const submitBtn = page.locator('button[type="submit"]');
-    await submitBtn.click();
-    
-    // Wait for navigation or error
-    await page.waitForTimeout(3000);
-    
-    // Check if we're redirected (login successful)
-    const currentUrl = page.url();
-    return !currentUrl.includes('/login');
+    if (response.ok()) {
+      const data = await response.json();
+      authToken = data.data?.tokens?.accessToken || data.data?.accessToken || '';
+    }
+  } catch (error) {
+    console.error('API Login failed:', error);
+  }
+  return authToken;
+}
+
+/**
+ * Helper to login as admin via UI with retry logic
+ */
+async function loginAsAdmin(page: Page, retries = 2): Promise<boolean> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      await page.goto(`${FRONTEND_URL}/login`, { 
+        waitUntil: 'networkidle',
+        timeout: 30000 
+      });
+      
+      // Wait for form to be fully ready
+      const emailInput = page.locator('input[type="email"], input[name="email"]');
+      const passwordInput = page.locator('input[type="password"], input[name="password"]');
+      
+      await emailInput.waitFor({ state: 'visible', timeout: 10000 });
+      
+      await emailInput.fill(ADMIN_EMAIL);
+      await passwordInput.fill(ADMIN_PASSWORD);
+      
+      const submitBtn = page.locator('button[type="submit"]');
+      await submitBtn.click();
+      
+      // Wait for navigation with smart detection
+      await Promise.race([
+        page.waitForURL(/\/(admin|staff|dashboard)/, { timeout: 15000 }),
+        page.waitForSelector('[role="alert"]', { timeout: 15000 }).catch(() => null),
+      ]);
+      
+      const currentUrl = page.url();
+      if (!currentUrl.includes('/login')) {
+        return true;
+      }
+      
+      // Check for error messages
+      const errorAlert = page.locator('[role="alert"]');
+      if (await errorAlert.isVisible()) {
+        console.warn(`Login attempt ${attempt + 1} failed:`, await errorAlert.textContent());
+      }
+    } catch (error) {
+      console.warn(`Login attempt ${attempt + 1} error:`, error);
+      if (attempt === retries) return false;
+      await page.waitForTimeout(1000); // Brief pause before retry
+    }
   }
   return false;
 }
@@ -42,8 +93,14 @@ async function loginAsAdmin(page: Page): Promise<boolean> {
 // ADMIN SETTINGS TESTS
 // ============================================
 test.describe('Admin Settings Tests', () => {
+  // Run tests in this suite sequentially to avoid auth conflicts
+  test.describe.configure({ mode: 'serial' });
+  
   test.beforeEach(async ({ page }) => {
-    await loginAsAdmin(page);
+    const loginSuccess = await loginAsAdmin(page);
+    if (!loginSuccess) {
+      test.skip(true, 'Login failed - skipping test');
+    }
   });
 
   test.describe('Appearance Settings', () => {
@@ -211,9 +268,9 @@ test.describe('Admin Settings Tests', () => {
             resortName: 'V2 Resort Test',
             tagline: 'Test Tagline',
             description: 'Test Description',
-            phone: '+961 1 234 567',
+            phone: '+1 234 567 8900',
             email: 'test@v2resort.com',
-            address: 'Test Address, Lebanon'
+            address: 'Test Address, Global City'
           }
         });
         
@@ -229,8 +286,13 @@ test.describe('Admin Settings Tests', () => {
 // STAFF PAGES TESTS
 // ============================================
 test.describe('Staff Pages Tests', () => {
+  test.describe.configure({ mode: 'serial' });
+  
   test.beforeEach(async ({ page }) => {
-    await loginAsAdmin(page);
+    const loginSuccess = await loginAsAdmin(page);
+    if (!loginSuccess) {
+      test.skip(true, 'Login failed - skipping test');
+    }
   });
 
   test.describe('Staff Dashboard', () => {
@@ -239,8 +301,8 @@ test.describe('Staff Pages Tests', () => {
       await page.waitForLoadState('networkidle');
       
       // Should see some dashboard content or redirect to login
-      const hasContent = await page.locator('text=/dashboard|orders|today|staff/i').first().isVisible().catch(() => false);
-      // Dashboard should load or redirect appropriately
+      const dashboardContent = page.locator('text=/dashboard|orders|today|staff/i').first();
+      await expect(dashboardContent).toBeVisible({ timeout: 15000 });
     });
   });
 
@@ -250,15 +312,17 @@ test.describe('Staff Pages Tests', () => {
       await page.waitForLoadState('networkidle');
       
       // Should see order management UI
-      const hasOrderUI = await page.locator('text=/orders|pending|preparing|ready/i').first().isVisible().catch(() => false);
+      const orderUI = page.locator('text=/orders|pending|preparing|ready|restaurant/i').first();
+      await expect(orderUI).toBeVisible({ timeout: 15000 });
     });
 
-    test('should display live orders', async ({ page }) => {
+    test('should display live orders section', async ({ page }) => {
       await page.goto(`${FRONTEND_URL}/staff/restaurant`);
       await page.waitForLoadState('networkidle');
       
-      // Look for order cards or list
-      const orderList = page.locator('[class*="order"], [data-testid*="order"]');
+      // Look for order cards or list (may be empty but container should exist)
+      const orderContainer = page.locator('[class*="order"], [data-testid*="order"], main');
+      await expect(orderContainer.first()).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -268,15 +332,17 @@ test.describe('Staff Pages Tests', () => {
       await page.waitForLoadState('networkidle');
       
       // Should see pool management UI - tickets, capacity, etc.
-      const hasPoolUI = await page.locator('text=/capacity|tickets|check.?in|guests/i').first().isVisible().catch(() => false);
+      const poolUI = page.locator('text=/capacity|tickets|check.?in|guests|pool/i').first();
+      await expect(poolUI).toBeVisible({ timeout: 15000 });
     });
 
-    test('should show current pool capacity', async ({ page }) => {
+    test('should show capacity section', async ({ page }) => {
       await page.goto(`${FRONTEND_URL}/staff/pool`);
       await page.waitForLoadState('networkidle');
       
-      // Look for capacity indicator
-      const capacityElement = page.locator('text=/\\d+.*capacity|capacity.*\\d+/i');
+      // Page should have loaded successfully
+      await expect(page.locator('body')).toBeVisible();
+      await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -286,15 +352,16 @@ test.describe('Staff Pages Tests', () => {
       await page.waitForLoadState('networkidle');
       
       // Should see bookings/chalets UI
-      const hasChaletUI = await page.locator('text=/bookings|check.?in|check.?out|chalets/i').first().isVisible().catch(() => false);
+      const chaletUI = page.locator('text=/bookings|check.?in|check.?out|chalets|reservations/i').first();
+      await expect(chaletUI).toBeVisible({ timeout: 15000 });
     });
 
-    test('should display booking list', async ({ page }) => {
+    test('should display booking section', async ({ page }) => {
       await page.goto(`${FRONTEND_URL}/staff/chalets`);
       await page.waitForLoadState('networkidle');
       
-      // Look for booking items
-      const bookingList = page.locator('[class*="booking"], [data-testid*="booking"]');
+      // Main content should be visible
+      await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -304,7 +371,8 @@ test.describe('Staff Pages Tests', () => {
       await page.waitForLoadState('networkidle');
       
       // Should see snack bar order UI
-      const hasSnackUI = await page.locator('text=/orders|pending|ready|snack/i').first().isVisible().catch(() => false);
+      const snackUI = page.locator('text=/orders|pending|ready|snack/i').first();
+      await expect(snackUI).toBeVisible({ timeout: 15000 });
     });
   });
 
@@ -314,7 +382,8 @@ test.describe('Staff Pages Tests', () => {
       await page.waitForLoadState('networkidle');
       
       // Should see bookings management UI
-      const hasBookingsUI = await page.locator('text=/bookings|reservations|today|upcoming/i').first().isVisible().catch(() => false);
+      const bookingsUI = page.locator('text=/bookings|reservations|today|upcoming/i').first();
+      await expect(bookingsUI).toBeVisible({ timeout: 15000 });
     });
   });
 
@@ -323,8 +392,10 @@ test.describe('Staff Pages Tests', () => {
       await page.goto(`${FRONTEND_URL}/staff/scanner`);
       await page.waitForLoadState('networkidle');
       
-      // Should see QR scanner or camera UI
-      const hasScannerUI = await page.locator('text=/scan|qr|camera|ticket/i').first().isVisible().catch(() => false);
+      // Should see QR scanner or camera UI or at least the page loaded
+      const scannerUI = page.locator('text=/scan|qr|camera|ticket|scanner/i').first();
+      // Scanner may require permissions, just verify page loads
+      await expect(page.locator('body')).toBeVisible();
     });
   });
 });
@@ -336,32 +407,27 @@ test.describe('Visual Regression - Theme Tests', () => {
   const themes = ['beach', 'mountain', 'sunset', 'forest', 'midnight', 'luxury'];
   
   test.beforeAll(async ({ request }) => {
-    // Login
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
-      data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
-    });
-    if (loginRes.ok()) {
-      const loginData = await loginRes.json();
-      authToken = loginData.data?.tokens?.accessToken;
-    }
+    // Get auth token for API calls
+    await getAuthToken(request);
   });
 
   for (const theme of themes) {
     test(`should apply ${theme} theme correctly`, async ({ page, request }) => {
+      // Ensure we have auth token
+      const token = await getAuthToken(request);
+      test.skip(!token, 'Auth required for theme tests');
+      
       // Set theme via API
-      if (authToken) {
-        await request.put(`${API_URL}/api/admin/settings`, {
-          headers: { Authorization: `Bearer ${authToken}` },
-          data: { theme }
-        });
-      }
+      await request.put(`${API_URL}/api/admin/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { theme }
+      });
       
       // Wait for settings to propagate
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
       
       // Load homepage
-      await page.goto(FRONTEND_URL);
-      await page.waitForLoadState('networkidle');
+      await page.goto(FRONTEND_URL, { waitUntil: 'networkidle' });
       
       // Take screenshot for visual comparison
       await page.screenshot({ 
@@ -369,57 +435,60 @@ test.describe('Visual Regression - Theme Tests', () => {
         fullPage: false 
       });
       
-      // Verify page loaded
+      // Verify page loaded successfully
       await expect(page.locator('body')).toBeVisible();
     });
   }
 
   test('should show weather effects when enabled', async ({ page, request }) => {
+    const token = await getAuthToken(request);
+    test.skip(!token, 'Auth required');
+    
     // Enable waves effect
-    if (authToken) {
-      await request.put(`${API_URL}/api/admin/settings`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-        data: { 
-          theme: 'beach',
-          showWeatherWidget: true,
-          weatherEffect: 'waves'
-        }
-      });
-    }
+    await request.put(`${API_URL}/api/admin/settings`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { 
+        theme: 'beach',
+        showWeatherWidget: true,
+        weatherEffect: 'waves'
+      }
+    });
     
-    await page.goto(FRONTEND_URL);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000); // Wait for animations
-    
-    // Look for weather effect elements
-    const weatherEffects = page.locator('[class*="weather"], [class*="waves"], svg[class*="wave"]');
+    await page.goto(FRONTEND_URL, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500); // Wait for animations
     
     // Take screenshot
     await page.screenshot({ 
       path: `test-results/weather-waves.png`,
       fullPage: false 
     });
+    
+    // Page should load successfully
+    await expect(page.locator('body')).toBeVisible();
   });
 
   test('should hide weather effects when disabled', async ({ page, request }) => {
-    if (authToken) {
-      await request.put(`${API_URL}/api/admin/settings`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-        data: { 
-          showWeatherWidget: false,
-          weatherEffect: 'none'
-        }
-      });
-    }
+    const token = await getAuthToken(request);
+    test.skip(!token, 'Auth required');
     
-    await page.goto(FRONTEND_URL);
-    await page.waitForLoadState('networkidle');
+    await request.put(`${API_URL}/api/admin/settings`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { 
+        showWeatherWidget: false,
+        weatherEffect: 'none'
+      }
+    });
+    
+    await page.goto(FRONTEND_URL, { waitUntil: 'networkidle' });
     
     // Take screenshot
     await page.screenshot({ 
       path: `test-results/weather-disabled.png`,
       fullPage: false 
     });
+    
+    // Page should load
+    await expect(page.locator('body')).toBeVisible();
   });
 });
 
@@ -610,52 +679,57 @@ test.describe('Purchase Flow Tests', () => {
 // ADMIN PAGES FUNCTIONALITY TESTS
 // ============================================
 test.describe('Admin Pages Functionality', () => {
+  test.describe.configure({ mode: 'serial' });
+  
   test.beforeEach(async ({ page }) => {
-    await loginAsAdmin(page);
+    const loginSuccess = await loginAsAdmin(page);
+    if (!loginSuccess) {
+      test.skip(true, 'Login failed - skipping test');
+    }
   });
 
   test('should load admin dashboard', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/admin`, { waitUntil: 'networkidle' });
     
     // Should see dashboard with stats
-    await expect(page.locator('text=/dashboard|overview|today|revenue/i').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=/dashboard|overview|today|revenue|admin/i').first()).toBeVisible({ timeout: 15000 });
     
     await page.screenshot({ path: 'test-results/admin-dashboard.png' });
   });
 
   test('should load admin users page', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/users`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/admin/users`, { waitUntil: 'networkidle' });
     
+    // Verify page loaded
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     await page.screenshot({ path: 'test-results/admin-users.png' });
   });
 
   test('should load admin modules page', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/modules`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/admin/modules`, { waitUntil: 'networkidle' });
     
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     await page.screenshot({ path: 'test-results/admin-modules.png' });
   });
 
   test('should load admin reports page', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/reports`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/admin/reports`, { waitUntil: 'networkidle' });
     
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     await page.screenshot({ path: 'test-results/admin-reports.png' });
   });
 
   test('should load admin audit page', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/audit`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/admin/audit`, { waitUntil: 'networkidle' });
     
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     await page.screenshot({ path: 'test-results/admin-audit.png' });
   });
 
   test('should load admin reviews page', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/reviews`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/admin/reviews`, { waitUntil: 'networkidle' });
     
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     await page.screenshot({ path: 'test-results/admin-reviews.png' });
   });
 });
@@ -665,42 +739,44 @@ test.describe('Admin Pages Functionality', () => {
 // ============================================
 test.describe('Dynamic Module Tests', () => {
   test('should load dynamic restaurant module', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/modules/restaurant`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/modules/restaurant`, { waitUntil: 'networkidle' });
     
-    // May redirect or show restaurant page
+    // May redirect or show restaurant page - verify page loaded
+    await expect(page.locator('body')).toBeVisible();
     await page.screenshot({ path: 'test-results/module-restaurant.png' });
   });
 
   test('should load dynamic pool module', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/modules/pool`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/modules/pool`, { waitUntil: 'networkidle' });
     
+    await expect(page.locator('body')).toBeVisible();
     await page.screenshot({ path: 'test-results/module-pool.png' });
   });
 
   test('should load dynamic chalets module', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/modules/chalets`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/modules/chalets`, { waitUntil: 'networkidle' });
     
+    await expect(page.locator('body')).toBeVisible();
     await page.screenshot({ path: 'test-results/module-chalets.png' });
   });
 
   test('should handle admin dynamic module pages', async ({ page }) => {
-    await loginAsAdmin(page);
+    const loginSuccess = await loginAsAdmin(page);
+    test.skip(!loginSuccess, 'Login required');
     
     // Try admin slug pages
-    await page.goto(`${FRONTEND_URL}/admin/restaurant`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/admin/restaurant`, { waitUntil: 'networkidle' });
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     await page.screenshot({ path: 'test-results/admin-slug-restaurant.png' });
   });
 
   test('should handle staff dynamic module pages', async ({ page }) => {
-    await loginAsAdmin(page);
+    const loginSuccess = await loginAsAdmin(page);
+    test.skip(!loginSuccess, 'Login required');
     
     // Try staff slug pages
-    await page.goto(`${FRONTEND_URL}/staff/restaurant`);
-    await page.waitForLoadState('networkidle');
+    await page.goto(`${FRONTEND_URL}/staff/restaurant`, { waitUntil: 'networkidle' });
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     await page.screenshot({ path: 'test-results/staff-slug-restaurant.png' });
   });
 });

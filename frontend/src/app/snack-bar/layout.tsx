@@ -3,11 +3,11 @@ import { JsonLd, generateSnackBarSchema, generateBreadcrumbSchema } from '@/lib/
 
 export const metadata: Metadata = {
   title: 'Snack Bar | V2 Resort',
-  description: 'Quick bites and refreshing beverages at V2 Resort Lebanon. Sandwiches, drinks, snacks, and ice cream available poolside.',
-  keywords: ['snack bar', 'Lebanon resort', 'V2 Resort', 'poolside snacks', 'drinks', 'ice cream', 'sandwiches'],
+  description: 'Quick bites and refreshing beverages at V2 Resort. Sandwiches, drinks, snacks, and ice cream available poolside.',
+  keywords: ['snack bar', 'resort', 'V2 Resort', 'poolside snacks', 'drinks', 'ice cream', 'sandwiches'],
   openGraph: {
     title: 'Snack Bar | V2 Resort',
-    description: 'Quick bites and refreshing beverages at V2 Resort Lebanon. Perfect for a poolside snack!',
+    description: 'Quick bites and refreshing beverages at V2 Resort. Perfect for a poolside snack!',
     type: 'website',
     url: 'https://v2-ecosystem.vercel.app/snack-bar',
   },
@@ -38,7 +38,7 @@ export default function SnackBarLayout({
       {/* Static content for bots/LLMs - hidden when JS runs, visible in raw HTML */}
       <div id="static-snackbar-content" className="sr-only">
         <h1>V2 Resort Snack Bar</h1>
-        <p>Quick bites and refreshing beverages at V2 Resort in Lebanon. Perfect for a poolside snack or light meal.</p>
+        <p>Quick bites and refreshing beverages at V2 Resort. Perfect for a poolside snack or light meal.</p>
         
         <h2>Menu Categories</h2>
         
@@ -65,9 +65,9 @@ export default function SnackBarLayout({
         
         <h2>Contact</h2>
         <p>For snack bar inquiries:</p>
-        <p>Email: info@v2resort.com</p>
-        <p>Phone: +961 XX XXX XXX</p>
-        <p>Address: 123 Lane, Lebanon</p>
+        <p>Email: bookings@v2resort.com</p>
+        <p>Phone: +1 234 567 8900</p>
+        <p>Address: 123 Resort Boulevard, Global City</p>
         
         <nav>
           <a href="/">Home</a> | 

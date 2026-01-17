@@ -92,9 +92,10 @@ async function runMigrations() {
         await client.query('COMMIT');
         console.log(`✅ Applied ${file}`);
         applied++;
-      } catch (err: any) {
+      } catch (err) {
         await client.query('ROLLBACK');
-        console.error(`❌ Failed to apply ${file}: ${err.message}`);
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        console.error(`❌ Failed to apply ${file}: ${message}`);
         throw err;
       }
     }
@@ -111,8 +112,9 @@ async function runMigrations() {
     await pool.end();
     
     console.log('✨ Migrations complete!');
-  } catch (err: any) {
-    console.error('❌ Migration failed:', err.message);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Migration failed:', message);
     await pool.end();
     process.exit(1);
   }
