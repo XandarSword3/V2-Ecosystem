@@ -5,13 +5,14 @@ import { pgTable, uuid, varchar, text, boolean, timestamp, integer, decimal, pgE
 // ============================================
 export const businessUnitEnum = pgEnum('business_unit', ['restaurant', 'snack_bar', 'chalets', 'pool', 'admin']);
 export const orderTypeEnum = pgEnum('order_type', ['dine_in', 'takeaway', 'delivery']);
-export const orderStatusEnum = pgEnum('order_status', ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled']);
+export const orderStatusEnum = pgEnum('order_status', ['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivered', 'completed', 'cancelled']);
 export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'partial', 'paid', 'refunded']);
 export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'card', 'whish', 'online']);
 export const bookingStatusEnum = pgEnum('booking_status', ['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'no_show']);
 export const ticketStatusEnum = pgEnum('ticket_status', ['valid', 'used', 'expired', 'cancelled']);
 export const snackCategoryEnum = pgEnum('snack_category', ['sandwich', 'drink', 'snack', 'ice_cream']);
 export const priceTypeEnum = pgEnum('price_type', ['per_night', 'one_time']);
+export const poolGenderRestrictionEnum = pgEnum('pool_gender_restriction', ['mixed', 'male', 'female']);
 
 // ============================================
 // Users & Auth
@@ -337,6 +338,7 @@ export const poolSessions = pgTable('pool_sessions', {
   endTime: varchar('end_time', { length: 5 }).notNull(),
   maxCapacity: integer('max_capacity').notNull(),
   price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  genderRestriction: poolGenderRestrictionEnum('gender_restriction').default('mixed'),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -358,6 +360,12 @@ export const poolTickets = pgTable('pool_tickets', {
   qrCode: text('qr_code').notNull(),
   validatedAt: timestamp('validated_at'),
   validatedBy: uuid('validated_by').references(() => users.id),
+  // Bracelet tracking fields
+  braceletNumber: varchar('bracelet_number', { length: 50 }),
+  braceletColor: varchar('bracelet_color', { length: 30 }),
+  braceletAssignedAt: timestamp('bracelet_assigned_at'),
+  braceletAssignedBy: uuid('bracelet_assigned_by').references(() => users.id),
+  braceletReturnedAt: timestamp('bracelet_returned_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),

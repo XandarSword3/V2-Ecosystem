@@ -25,14 +25,18 @@ export default function DynamicModuleDashboard() {
   const { modules } = useSiteSettings();
   const t = useTranslations('admin');
   const tc = useTranslations('adminCommon');
-  const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
-  const currentModule = modules.find(m => m.slug === slug);
+  const rawSlug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
+  // Decode and normalize for case-insensitive matching
+  const slug = rawSlug ? decodeURIComponent(rawSlug).toLowerCase() : '';
+  const currentModule = modules.find(m => m.slug.toLowerCase() === slug);
+  // Use the actual module slug for URLs (not the decoded one) to maintain consistency
+  const moduleSlug = currentModule?.slug || slug;
 
   if (!currentModule) return null;
 
   const renderMenuServiceDashboard = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Link href={`/admin/${slug}/menu`}>
+      <Link href={`/admin/${moduleSlug}/menu`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{tc('menu.items')}</CardTitle>
@@ -45,7 +49,7 @@ export default function DynamicModuleDashboard() {
         </Card>
       </Link>
       
-      <Link href={`/admin/${slug}/categories`}>
+      <Link href={`/admin/${moduleSlug}/categories`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{tc('menu.categories')}</CardTitle>
@@ -58,7 +62,7 @@ export default function DynamicModuleDashboard() {
         </Card>
       </Link>
 
-      <Link href={`/admin/${slug}/orders`}>
+      <Link href={`/admin/${moduleSlug}/orders`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{tc('orders.title')}</CardTitle>
@@ -75,7 +79,7 @@ export default function DynamicModuleDashboard() {
 
   const renderBookingDashboard = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Link href={`/admin/${slug}/bookings`}>
+      <Link href={`/admin/${moduleSlug}/bookings`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{tc('bookings.title')}</CardTitle>
@@ -88,7 +92,7 @@ export default function DynamicModuleDashboard() {
         </Card>
       </Link>
       
-      <Link href={`/admin/${slug}/pricing`}>
+      <Link href={`/admin/${moduleSlug}/pricing`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{tc('pricing.title')}</CardTitle>
@@ -105,7 +109,7 @@ export default function DynamicModuleDashboard() {
 
   const renderSessionDashboard = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Link href={`/admin/${slug}/sessions`}>
+      <Link href={`/admin/${moduleSlug}/sessions`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{tc('sessions.title')}</CardTitle>
@@ -118,7 +122,7 @@ export default function DynamicModuleDashboard() {
         </Card>
       </Link>
 
-      <Link href={`/admin/${slug}/tickets`}>
+      <Link href={`/admin/${moduleSlug}/tickets`}>
         <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{tc('tickets.title')}</CardTitle>

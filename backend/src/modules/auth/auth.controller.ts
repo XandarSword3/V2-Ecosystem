@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import * as authService from "./auth.service";
 import { loginSchema, registerSchema, changePasswordSchema } from "./auth.validation";
 import { logger } from "../../utils/logger";
@@ -29,8 +30,26 @@ export async function register(req: Request, res: Response, next: NextFunction) 
 
     res.status(201).json({ success: true, data: result });
   } catch (error: unknown) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: error.errors[0].message,
+        code: 'VALIDATION_ERROR',
+      });
+    }
     const message = getErrorMessage(error);
     logger.error('Registration failed:', message);
+    
+    // Handle known business errors with appropriate status codes
+    if (message.includes('Email already registered')) {
+      return res.status(409).json({
+        success: false,
+        error: message,
+        code: 'EMAIL_EXISTS',
+      });
+    }
+    
     // Only expose error details in development
     res.status(500).json({
       success: false,
@@ -64,6 +83,14 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 
     res.json({ success: true, data: result });
   } catch (error: unknown) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: error.errors[0].message,
+        code: 'VALIDATION_ERROR',
+      });
+    }
     logger.warn(`Login failed for email: ${req.body.email}`);
     next(error);
   }

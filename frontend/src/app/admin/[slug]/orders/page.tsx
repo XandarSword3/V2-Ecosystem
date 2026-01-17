@@ -3,7 +3,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
@@ -86,7 +85,6 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
 export default function DynamicOrdersPage() {
   const params = useParams();
   const { modules } = useSiteSettings();
-  const tc = useTranslations('adminCommon');
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
   const currentModule = modules.find(m => m.slug === slug);
 
@@ -105,7 +103,7 @@ export default function DynamicOrdersPage() {
       });
       setOrders(response.data.data || []);
     } catch (error) {
-      toast.error(tc('errors.failedToLoad'));
+      toast.error('Failed to fetch orders');
     } finally {
       setLoading(false);
     }
@@ -144,13 +142,13 @@ export default function DynamicOrdersPage() {
   const updateStatus = async (orderId: string, status: string) => {
     try {
       await api.put(`/restaurant/staff/orders/${orderId}/status`, { status });
-      toast.success(tc('success.updated'));
+      toast.success(`Order status updated to ${status}`);
       fetchOrders();
       if (selectedOrder?.id === orderId) {
         setSelectedOrder(prev => prev ? { ...prev, status: status as Order['status'] } : null);
       }
     } catch (error) {
-      toast.error(tc('errors.failedToSave'));
+      toast.error('Failed to update order status');
     }
   };
 
@@ -172,15 +170,15 @@ export default function DynamicOrdersPage() {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
               <UtensilsCrossed className="w-6 h-6 text-white" />
             </div>
-            {currentModule.name} {tc('orders.title')}
+            {currentModule.name} Orders
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-2">
-            {tc('orders.manageIncoming', { name: currentModule.name })}
+            Manage incoming orders for {currentModule.name}
           </p>
         </div>
         <Button onClick={fetchOrders} variant="outline" className="gap-2">
           <RefreshCw className="w-4 h-4" />
-          {tc('refresh')}
+          Refresh
         </Button>
       </div>
 
@@ -192,7 +190,7 @@ export default function DynamicOrdersPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="text"
-                placeholder={tc('orders.searchOrders')}
+                placeholder="Search by order # or customer..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
@@ -230,11 +228,11 @@ export default function DynamicOrdersPage() {
               <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <UtensilsCrossed className="w-8 h-8 text-slate-400" />
               </div>
-              <h3 className="text-lg font-medium text-slate-900 dark:text-white">{tc('orders.noOrdersFound')}</h3>
+              <h3 className="text-lg font-medium text-slate-900 dark:text-white">No orders found</h3>
               <p className="text-slate-500 dark:text-slate-400">
                 {searchQuery || statusFilter !== 'all'
-                  ? tc('orders.tryAdjustingFilters')
-                  : tc('orders.newOrdersWillAppear')}
+                  ? 'Try adjusting your filters'
+                  : 'New orders will appear here'}
               </p>
             </div>
           ) : (
@@ -300,7 +298,7 @@ export default function DynamicOrdersPage() {
                         ))}
                         {items.length > 3 && (
                           <p className="text-xs text-center text-slate-500 italic">
-                            + {items.length - 3} {tc('orders.moreItems')}
+                            + {items.length - 3} more items
                           </p>
                         )}
                       </div>
@@ -314,13 +312,13 @@ export default function DynamicOrdersPage() {
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               onClick={() => updateStatus(order.id, 'cancelled')}
                             >
-                              {tc('orders.reject')}
+                              Reject
                             </Button>
                             <Button
                               className="bg-blue-600 hover:bg-blue-700 text-white"
                               onClick={() => updateStatus(order.id, 'confirmed')}
                             >
-                              {tc('orders.accept')}
+                              Accept
                             </Button>
                           </>
                         )}
@@ -329,7 +327,7 @@ export default function DynamicOrdersPage() {
                             className="col-span-2 bg-orange-500 hover:bg-orange-600 text-white"
                             onClick={() => updateStatus(order.id, 'preparing')}
                           >
-                            {tc('orders.startPreparing')}
+                            Start Preparing
                           </Button>
                         )}
                         {order.status === 'preparing' && (
@@ -337,7 +335,7 @@ export default function DynamicOrdersPage() {
                             className="col-span-2 bg-green-600 hover:bg-green-700 text-white"
                             onClick={() => updateStatus(order.id, 'ready')}
                           >
-                            {tc('orders.markReady')}
+                            Mark Ready
                           </Button>
                         )}
                         {order.status === 'ready' && (
@@ -345,7 +343,7 @@ export default function DynamicOrdersPage() {
                             className="col-span-2 bg-slate-800 hover:bg-slate-900 text-white"
                             onClick={() => updateStatus(order.id, 'delivered')}
                           >
-                            {tc('orders.markDelivered')}
+                            Mark Delivered
                           </Button>
                         )}
                       </div>

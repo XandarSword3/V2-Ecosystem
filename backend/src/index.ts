@@ -91,6 +91,13 @@ async function main() {
     // Handle uncaught exceptions and unhandled rejections
     process.on('uncaughtException', (error) => {
       logger.error('Uncaught exception:', error);
+      
+      // Don't shutdown for "headers already sent" errors - these are recoverable
+      if (error.message?.includes('Cannot set headers after they are sent')) {
+        logger.warn('Ignoring "headers already sent" error - not triggering shutdown');
+        return;
+      }
+      
       shutdown('uncaughtException');
     });
 

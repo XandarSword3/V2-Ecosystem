@@ -13,6 +13,7 @@ router.get('/availability', poolController.getAvailability);
 // Customer routes (rate limited - financial operations)
 router.post('/tickets', optionalAuth, rateLimits.write, poolController.purchaseTicket);
 router.get('/tickets/:id', optionalAuth, poolController.getTicket);
+router.delete('/tickets/:id', authenticate, poolController.cancelTicket);
 
 // Authenticated customer routes
 router.get('/my-tickets', authenticate, poolController.getMyTickets);
@@ -26,6 +27,12 @@ router.get('/staff/capacity', authenticate, authorize(...staffRoles), poolContro
 router.get('/staff/tickets/today', authenticate, authorize(...staffRoles), poolController.getTodayTickets);
 router.get('/staff/maintenance', authenticate, authorize(...staffRoles), poolController.getMaintenanceLogs);
 router.post('/staff/maintenance', authenticate, authorize(...staffRoles), poolController.createMaintenanceLog);
+
+// Bracelet management routes (staff)
+router.post('/tickets/:id/bracelet', authenticate, authorize(...staffRoles), poolController.assignBracelet);
+router.delete('/tickets/:id/bracelet', authenticate, authorize(...staffRoles), poolController.returnBracelet);
+router.get('/staff/bracelets/active', authenticate, authorize(...staffRoles), poolController.getActiveBracelets);
+router.get('/staff/bracelets/search', authenticate, authorize(...staffRoles), poolController.searchByBracelet);
 
 // Admin routes
 const adminRoles = ['pool_admin', 'super_admin'];

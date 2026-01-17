@@ -4,6 +4,7 @@
     "loading": "Chargement...",
     "error": "Une erreur s'est produite",
     "retry": "Réessayer",
+    "refresh": "Actualiser",
     "save": "Enregistrer",
     "cancel": "Annuler",
     "delete": "Supprimer",
@@ -127,6 +128,7 @@
     "gym": "Salle de Sport",
     "spa": "Spa & Bien-être",
     "cafe": "Café & Boissons",
+    "chocolateBox": "Boîte de Chocolat",
     "admin": "Administration",
     "staff": "Personnel",
     "profile": "Profil",
@@ -251,6 +253,7 @@
     "orderType": "Type de Commande",
     "dineIn": "Sur Place",
     "takeaway": "À Emporter",
+    "delivery": "Livraison",
     "yourName": "Votre Nom",
     "enterName": "Entrez votre nom",
     "phoneNumber": "Numéro de Téléphone",
@@ -547,7 +550,8 @@
       "signingIn": "Connexion en cours...",
       "loginFailed": "Échec de la connexion. Veuillez réessayer.",
       "demoCredentials": "Identifiants de Démonstration",
-      "superAdmin": "Super Administrateur"
+      "superAdmin": "Super Administrateur",
+      "orContinueWith": "Ou continuer avec"
     },
     "register": {
       "title": "Créer un Compte",
@@ -697,6 +701,8 @@
       "created": "Créé avec succès"
     },
     "tables": {
+      "title": "Tables",
+      "noTablesConfigured": "Aucune table n'a encore été configurée pour ce module",
       "id": "ID",
       "name": "Nom",
       "status": "Statut",
@@ -1260,6 +1266,9 @@
       "title": "Moniteur d'Utilisateurs en Direct",
       "description": "Vue en temps réel des utilisateurs connectés et de leur activité",
       "totalOnline": "Total en Ligne",
+      "uniqueUsers": "Utilisateurs Uniques",
+      "connections": "connexions",
+      "guests": "Visiteurs",
       "admins": "Admins",
       "staff": "Personnel",
       "customers": "Clients",
@@ -1275,7 +1284,8 @@
       "lastActivity": "Dernière Activité",
       "guest": "Visiteur",
       "autoRefreshOn": "Auto-actualisation ACTIVÉE",
-      "autoRefreshOff": "Auto-actualisation DÉSACTIVÉE"
+      "autoRefreshOff": "Auto-actualisation DÉSACTIVÉE",
+      "connectionNote": "Chaque onglet du navigateur compte comme une connexion séparée"
     },
     "stats": {
       "totalRevenue": "Revenu Total",

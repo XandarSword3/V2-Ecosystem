@@ -63,8 +63,7 @@ const getSessionIcon = (startTime: string) => {
 };
 
 export default function PoolSessionsManagementPage() {
-  const t = useTranslations('adminPool');
-  const tc = useTranslations('adminCommon');
+  const t = useTranslations('admin');
   const [sessions, setSessions] = useState<PoolSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,7 +82,7 @@ export default function PoolSessionsManagementPage() {
       const response = await api.get('/pool/sessions');
       setSessions(response.data.data || response.data.sessions || []);
     } catch (error) {
-      toast.error(tc('errors.failedToLoad'));
+      toast.error('Failed to fetch pool sessions');
       console.error(error);
     } finally {
       setLoading(false);
@@ -114,7 +113,7 @@ export default function PoolSessionsManagementPage() {
 
   const handleSave = async () => {
     if (!formData.name || !formData.start_time || !formData.end_time) {
-      toast.error(tc('errors.required'));
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -122,30 +121,30 @@ export default function PoolSessionsManagementPage() {
       setSaving(true);
       if (editingSession) {
         await api.put(`/pool/admin/sessions/${editingSession.id}`, formData);
-        toast.success(t('sessions.sessionUpdated'));
+        toast.success('Session updated successfully');
       } else {
         await api.post('/pool/admin/sessions', formData);
-        toast.success(t('sessions.sessionCreated'));
+        toast.success('Session created successfully');
       }
       fetchSessions();
       setShowModal(false);
     } catch (error: unknown) {
       const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(errorMessage || tc('errors.failedToSave'));
+      toast.error(errorMessage || 'Failed to save session');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(tc('confirmDelete'))) return;
+    if (!confirm('Are you sure you want to delete this session?')) return;
 
     try {
       await api.delete(`/pool/admin/sessions/${id}`);
-      toast.success(t('sessions.sessionDeleted'));
+      toast.success('Session deleted');
       fetchSessions();
     } catch (error) {
-      toast.error(tc('errors.failedToDelete'));
+      toast.error('Failed to delete session');
     }
   };
 
@@ -155,9 +154,9 @@ export default function PoolSessionsManagementPage() {
         is_active: !session.is_active,
       });
       fetchSessions();
-      toast.success(tc('success.updated'));
+      toast.success(`Session ${session.is_active ? 'deactivated' : 'activated'}`);
     } catch (error) {
-      toast.error(tc('errors.failedToUpdate'));
+      toast.error('Failed to update session');
     }
   };
 
@@ -196,24 +195,24 @@ export default function PoolSessionsManagementPage() {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center shadow-lg">
               <Waves className="w-6 h-6 text-white" />
             </div>
-            {t('sessions.title')}
+            Pool Sessions
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-2">
-            {t('title')}
+            Manage swimming pool sessions and capacity
           </p>
         </motion.div>
 
         <motion.div variants={fadeInUp} className="flex gap-2">
           <Button variant="outline" onClick={fetchSessions} className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4" />
-            {tc('refresh')}
+            Refresh
           </Button>
           <Button
             onClick={openCreateModal}
             className="flex items-center gap-2 bg-gradient-to-r from-primary-500 to-secondary-600 text-white"
           >
             <Plus className="w-4 h-4" />
-            {t('sessions.addSession')}
+            Add Session
           </Button>
         </motion.div>
       </div>
@@ -225,7 +224,7 @@ export default function PoolSessionsManagementPage() {
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
-                placeholder={tc('searchPlaceholder')}
+                placeholder="Search sessions..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -238,23 +237,23 @@ export default function PoolSessionsManagementPage() {
       {/* Stats */}
       <motion.div variants={fadeInUp} className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t('sessions.totalSessions')}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Total Sessions</p>
           <p className="text-2xl font-bold text-slate-900 dark:text-white">{sessions.length}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">{tc('active')}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Active</p>
           <p className="text-2xl font-bold text-emerald-600">
             {sessions.filter(s => s.is_active).length}
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t('sessions.totalCapacity')}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Total Capacity</p>
           <p className="text-2xl font-bold text-primary-600">
             {sessions.reduce((acc, s) => acc + (s.max_capacity || 0), 0)}
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t('sessions.avgPrice')}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Avg Price</p>
           <p className="text-2xl font-bold text-secondary-600">
             {sessions.length > 0
               ? formatCurrency(sessions.reduce((acc, s) => acc + s.adult_price, 0) / sessions.length)
@@ -273,9 +272,9 @@ export default function PoolSessionsManagementPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <Waves className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-              <p className="text-slate-500 dark:text-slate-400">{tc('noResults')}</p>
+              <p className="text-slate-500 dark:text-slate-400">No pool sessions found</p>
               <Button onClick={openCreateModal} className="mt-4">
-                {t('sessions.addSession')}
+                Add your first session
               </Button>
             </CardContent>
           </Card>
@@ -312,7 +311,7 @@ export default function PoolSessionsManagementPage() {
                           </div>
                           {!session.is_active && (
                             <span className="px-2 py-1 bg-red-100 text-red-600 text-xs rounded-full dark:bg-red-900/30">
-                              {tc('inactive')}
+                              Inactive
                             </span>
                           )}
                         </div>
@@ -337,7 +336,7 @@ export default function PoolSessionsManagementPage() {
                         <div className="flex items-center justify-between mb-4 text-sm">
                           <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
                             <Users className="w-4 h-4" />
-                            {t('sessions.maxCapacity')}
+                            Capacity
                           </span>
                           <span className="font-medium text-slate-900 dark:text-white">
                             {session.current_capacity || 0}/{session.max_capacity}
@@ -367,12 +366,12 @@ export default function PoolSessionsManagementPage() {
                             {session.is_active ? (
                               <>
                                 <EyeOff className="w-4 h-4" />
-                                {tc('disabled')}
+                                Deactivate
                               </>
                             ) : (
                               <>
                                 <Eye className="w-4 h-4" />
-                                {tc('enabled')}
+                                Activate
                               </>
                             )}
                           </button>
@@ -381,7 +380,7 @@ export default function PoolSessionsManagementPage() {
                             className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm bg-primary-100 text-primary-600 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-400 transition-colors"
                           >
                             <Edit2 className="w-4 h-4" />
-                            {tc('edit')}
+                            Edit
                           </button>
                           <button
                             onClick={() => handleDelete(session.id)}
@@ -419,7 +418,7 @@ export default function PoolSessionsManagementPage() {
             >
               <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6 flex justify-between items-center">
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-                  {editingSession ? tc('edit') : tc('add')} {t('sessions.title')}
+                  {editingSession ? 'Edit Session' : 'Add New Session'}
                 </h3>
                 <button
                   onClick={() => setShowModal(false)}
@@ -434,7 +433,7 @@ export default function PoolSessionsManagementPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      {tc('name')} (EN) *
+                      Name (English) *
                     </label>
                     <Input
                       value={formData.name || ''}
@@ -444,7 +443,7 @@ export default function PoolSessionsManagementPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      {tc('name')} (AR)
+                      Name (Arabic)
                     </label>
                     <Input
                       value={formData.name_ar || ''}
@@ -459,7 +458,7 @@ export default function PoolSessionsManagementPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      {tc('time')} *
+                      Start Time *
                     </label>
                     <Input
                       type="time"
@@ -469,7 +468,7 @@ export default function PoolSessionsManagementPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      {tc('time')} *
+                      End Time *
                     </label>
                     <Input
                       type="time"
@@ -483,7 +482,7 @@ export default function PoolSessionsManagementPage() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      {tc('price')} *
+                      Adult Price *
                     </label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -498,7 +497,7 @@ export default function PoolSessionsManagementPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      {tc('price')} *
+                      Child Price *
                     </label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -513,7 +512,7 @@ export default function PoolSessionsManagementPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      {t('sessions.maxCapacity')}
+                      Max Capacity
                     </label>
                     <Input
                       type="number"
@@ -526,7 +525,7 @@ export default function PoolSessionsManagementPage() {
                 {/* Days of Week */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                    {t('sessions.availableDays')}
+                    Available Days
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {daysOfWeek.map(day => {
@@ -557,7 +556,7 @@ export default function PoolSessionsManagementPage() {
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                     className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                   />
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{tc('active')}</span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">Session is active</span>
                 </label>
               </div>
 
@@ -567,7 +566,7 @@ export default function PoolSessionsManagementPage() {
                   className="flex-1"
                   onClick={() => setShowModal(false)}
                 >
-                  {tc('cancel')}
+                  Cancel
                 </Button>
                 <Button
                   onClick={handleSave}
@@ -579,7 +578,7 @@ export default function PoolSessionsManagementPage() {
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-2" />
-                      {editingSession ? tc('update') : tc('create')}
+                      {editingSession ? 'Update Session' : 'Create Session'}
                     </>
                   )}
                 </Button>

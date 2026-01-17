@@ -36,8 +36,9 @@ interface Category {
 export default function DynamicCategoriesPage() {
   const params = useParams();
   const { modules } = useSiteSettings();
-  const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
-  const currentModule = modules.find(m => m.slug === slug);
+  const rawSlug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
+  const slug = rawSlug ? decodeURIComponent(rawSlug).toLowerCase() : '';
+  const currentModule = modules.find(m => m.slug.toLowerCase() === slug);
 
   const t = useTranslations('admin');
   const [categories, setCategories] = useState<Category[]>([]);

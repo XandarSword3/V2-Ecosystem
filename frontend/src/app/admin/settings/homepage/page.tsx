@@ -56,7 +56,7 @@ const defaultSettings: HomepageSettings = {
     {
       id: '1',
       title: 'Welcome to V2 Resort',
-      subtitle: "Lebanon's Premier Resort Experience",
+      subtitle: "Premier Resort Experience",
       buttonText: 'Explore Our Services',
       buttonLink: '#services',
       imageUrl: '',
@@ -72,7 +72,7 @@ const defaultSettings: HomepageSettings = {
     { id: '6', type: 'cta', title: 'Call to Action', enabled: true, order: 6 },
   ],
   ctaTitle: 'Ready to Experience V2 Resort?',
-  ctaSubtitle: 'Book your stay today and discover why we\'re the preferred destination in Lebanon.',
+  ctaSubtitle: 'Book your stay today and discover why we\'re the preferred destination.',
   ctaButtonText: 'Book Now',
   ctaButtonLink: '/chalets',
 };

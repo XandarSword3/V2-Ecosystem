@@ -3,6 +3,7 @@ import { BackupService } from './backup.service.js';
 import { logger } from '../utils/logger.js';
 import { expirePoolTickets } from '../scripts/expire-pool-tickets.js';
 import { getSupabase } from '../database/connection.js';
+import { bookingRemindersService } from './booking-reminders.service.js';
 
 export class SchedulerService {
   /**
@@ -19,6 +20,9 @@ export class SchedulerService {
     
     // Session cleanup - expire stale user sessions
     this.scheduleSessionCleanup();
+    
+    // Pre-arrival booking reminders at 9:00 AM
+    this.scheduleBookingReminders();
     
     logger.info('Scheduler service initialized.');
   }
@@ -123,5 +127,24 @@ export class SchedulerService {
     });
     
     logger.info('Scheduled session cleanup job (0 4 * * *)');
+  }
+
+  /**
+   * Schedule pre-arrival booking reminders
+   * Sends email reminders to guests checking in the next day
+   * Runs daily at 9:00 AM
+   */
+  private static scheduleBookingReminders() {
+    cron.schedule('0 9 * * *', async () => {
+      logger.info('Starting scheduled booking reminders...');
+      try {
+        await bookingRemindersService.sendPreArrivalReminders();
+        logger.info('Booking reminders job completed.');
+      } catch (error) {
+        logger.error('Scheduled booking reminders failed:', error);
+      }
+    });
+    
+    logger.info('Scheduled booking reminders job (0 9 * * *)');
   }
 }

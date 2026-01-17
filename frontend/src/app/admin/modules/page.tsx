@@ -6,7 +6,7 @@ import { modulesApi } from '@/lib/api';
 import { Loader2, Plus, Edit, Trash2, Check, X, AlertCircle, LayoutTemplate } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Module } from '@/lib/settings-context';
+import { Module, ModuleSettings } from '@/lib/settings-context';
 
 import { isSameDay } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -17,12 +17,7 @@ interface ModuleFormData {
   description: string;
   template_type: string;
   is_active: boolean;
-  settings: {
-    header_color: string;
-    accent_color: string;
-    show_in_nav: boolean;
-    icon: string;
-  };
+  settings: ModuleSettings;
 }
 
 interface ApiError {
@@ -226,6 +221,32 @@ function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: ModuleFormPr
     },
   });
 
+  // Helper to normalize slug: lowercase, replace spaces with hyphens, remove special chars
+  const normalizeSlug = (value: string) => {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-')           // Replace spaces with hyphens
+      .replace(/[^a-z0-9-]/g, '')     // Remove non-alphanumeric except hyphens
+      .replace(/-+/g, '-')            // Replace multiple hyphens with single
+      .replace(/^-|-$/g, '');         // Remove leading/trailing hyphens
+  };
+
+  // Auto-generate slug from name if slug is empty
+  const handleNameChange = (value: string) => {
+    const newData = { ...formData, name: value };
+    // Auto-generate slug if it's empty or was auto-generated before
+    if (!formData.slug || formData.slug === normalizeSlug(formData.name)) {
+      newData.slug = normalizeSlug(value);
+    }
+    setFormData(newData);
+  };
+
+  const handleSlugChange = (value: string) => {
+    // Normalize the slug on every change
+    setFormData({ ...formData, slug: normalizeSlug(value) });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
@@ -253,7 +274,7 @@ function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: ModuleFormPr
               type="text"
               required
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => handleNameChange(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -265,9 +286,13 @@ function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: ModuleFormPr
               type="text"
               required
               value={formData.slug}
-              onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+              onChange={(e) => handleSlugChange(e.target.value)}
+              placeholder="e.g., chocolate-box"
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500"
             />
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              URL-friendly identifier (lowercase, hyphens only)
+            </p>
           </div>
         </div>
 

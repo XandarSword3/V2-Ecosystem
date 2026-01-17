@@ -14,19 +14,63 @@ import { Loader2, Clock, Users, ShoppingCart, Plus, Minus, Calendar } from 'luci
 import { toast } from 'sonner';
 import { useState } from 'react';
 
+// Type definitions for menu and session data
+interface MenuItem {
+  id: string;
+  name: string;
+  name_ar?: string;
+  name_fr?: string;
+  description?: string;
+  description_ar?: string;
+  description_fr?: string;
+  price: number;
+  image_url?: string;
+  image?: string;
+  category_id: string;
+  is_available: boolean;
+}
+
+interface MenuCategory {
+  id: string;
+  name: string;
+  name_ar?: string;
+  name_fr?: string;
+  sort_order: number;
+}
+
+interface PoolSession {
+  id: string;
+  name: string;
+  name_ar?: string;
+  name_fr?: string;
+  description?: string;
+  description_ar?: string;
+  description_fr?: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  available_spots?: number;
+  price?: number;
+  adult_price?: number;
+  gender?: 'mixed' | 'male' | 'female';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type BlockProps = Record<string, any>;
+
 interface RendererProps {
   layout: UIBlock[];
   module: Module;
 }
 
 // Helper to parse props - handles both JSON objects and PowerShell-style strings
-function parseProps(props: Record<string, any>): Record<string, any> {
+function parseProps(props: Record<string, unknown>): BlockProps {
   if (!props) return {};
   
   // If props is already a proper object, return it
   if (typeof props === 'object' && !Array.isArray(props)) {
     // Check if any value looks like a PowerShell object string
-    const parsed: Record<string, any> = {};
+    const parsed: BlockProps = {};
     for (const [key, value] of Object.entries(props)) {
       if (typeof value === 'string' && value.startsWith('@{') && value.endsWith('}')) {
         // Parse PowerShell-style string: @{key=value; key2=value2}
@@ -47,7 +91,7 @@ function parseProps(props: Record<string, any>): Record<string, any> {
     return parsed;
   }
   
-  return props;
+  return props as BlockProps;
 }
 
 export function DynamicModuleRenderer({ layout, module }: RendererProps) {
@@ -149,7 +193,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
 // ============================================
 // Menu List Component for menu_service modules
 // ============================================
-function MenuListComponent({ module, props }: { module: Module; props: Record<string, any> }) {
+function MenuListComponent({ module, props }: { module: Module; props: BlockProps }) {
   const t = useTranslations('restaurant');
   const tCommon = useTranslations('common');
   const { translateContent } = useContentTranslation();
@@ -165,11 +209,11 @@ function MenuListComponent({ module, props }: { module: Module; props: Record<st
     queryFn: () => restaurantApi.getMenu(module.id),
   });
 
-  const categories = data?.data?.data?.categories || [];
-  const items = data?.data?.data?.items || [];
+  const categories: MenuCategory[] = data?.data?.data?.categories || [];
+  const items: MenuItem[] = data?.data?.data?.items || [];
 
   const filteredItems = selectedCategory
-    ? items.filter((item: any) => item.category_id === selectedCategory)
+    ? items.filter((item) => item.category_id === selectedCategory)
     : items;
 
   const getItemQuantity = (itemId: string) => {
@@ -177,7 +221,7 @@ function MenuListComponent({ module, props }: { module: Module; props: Record<st
     return item?.quantity || 0;
   };
 
-  const addToCart = (item: any) => {
+  const addToCart = (item: MenuItem) => {
     const cartItem = {
       id: item.id,
       name: item.name,
@@ -224,7 +268,7 @@ function MenuListComponent({ module, props }: { module: Module; props: Record<st
           >
             {tCommon('all')}
           </button>
-          {categories.map((cat: any) => (
+          {categories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
@@ -242,7 +286,7 @@ function MenuListComponent({ module, props }: { module: Module; props: Record<st
 
       {/* Menu Items Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredItems.map((item: any) => {
+        {filteredItems.map((item) => {
           const qty = getItemQuantity(item.id);
           return (
             <motion.div
@@ -319,7 +363,7 @@ function MenuListComponent({ module, props }: { module: Module; props: Record<st
 // ============================================
 // Session List Component for session_access modules
 // ============================================
-function SessionListComponent({ module, props }: { module: Module; props: Record<string, any> }) {
+function SessionListComponent({ module, props }: { module: Module; props: BlockProps }) {
   const t = useTranslations('pool');
   const tCommon = useTranslations('common');
   const { translateContent } = useContentTranslation();
@@ -331,7 +375,7 @@ function SessionListComponent({ module, props }: { module: Module; props: Record
     queryFn: () => poolApi.getSessions(selectedDate, module.id),
   });
 
-  const sessions = data?.data?.data || [];
+  const sessions: PoolSession[] = data?.data?.data || [];
 
   if (isLoading) {
     return (
@@ -364,7 +408,7 @@ function SessionListComponent({ module, props }: { module: Module; props: Record
 
       {/* Sessions Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sessions.map((session: any) => (
+        {sessions.map((session) => (
           <motion.div
             key={session.id}
             initial={{ opacity: 0, scale: 0.95 }}
@@ -438,7 +482,7 @@ function SessionListComponent({ module, props }: { module: Module; props: Record
 // ============================================
 // Booking Calendar Component for multi_day_booking modules
 // ============================================
-function BookingCalendarComponent({ module, props }: { module: Module; props: Record<string, any> }) {
+function BookingCalendarComponent({ module, props }: { module: Module; props: BlockProps }) {
   const tCommon = useTranslations('common');
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');

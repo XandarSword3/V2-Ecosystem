@@ -143,7 +143,7 @@ export default function AppearanceSettingsPage() {
   
   // Weather widget state
   const [showWeatherWidget, setShowWeatherWidget] = useState(settings.showWeatherWidget ?? true);
-  const [weatherLocation, setWeatherLocation] = useState(settings.weatherLocation || 'Beirut, Lebanon');
+  const [weatherLocation, setWeatherLocation] = useState(settings.weatherLocation || 'New York, USA');
   const [weatherEffect, setWeatherEffect] = useState<string>(settings.weatherEffect || 'auto');
   
   // Animation state
@@ -172,7 +172,7 @@ export default function AppearanceSettingsPage() {
         });
       }
       setShowWeatherWidget(settings.showWeatherWidget ?? true);
-      setWeatherLocation(settings.weatherLocation || 'Beirut, Lebanon');
+      setWeatherLocation(settings.weatherLocation || 'New York, USA');
       setWeatherEffect(settings.weatherEffect || 'auto');
       setAnimationsEnabled(settings.animationsEnabled ?? true);
       setReducedMotion(settings.reducedMotion ?? false);
@@ -220,7 +220,7 @@ export default function AppearanceSettingsPage() {
     setUseCustomColors(false);
     setCustomColors(resortThemes.beach.colors);
     setShowWeatherWidget(true);
-    setWeatherLocation('Beirut, Lebanon');
+    setWeatherLocation('New York, USA');
     setWeatherEffect('auto');
     setAnimationsEnabled(true);
     setReducedMotion(false);
@@ -395,7 +395,7 @@ export default function AppearanceSettingsPage() {
                     type="text"
                     value={weatherLocation}
                     onChange={(e) => { setWeatherLocation(e.target.value); markChanged(); }}
-                    placeholder="e.g., Beirut, Lebanon"
+                    placeholder="e.g., New York, USA"
                     className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                   />
                   <p className="text-xs text-slate-500 mt-1">

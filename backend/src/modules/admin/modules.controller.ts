@@ -142,7 +142,52 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
         .select();
 
       if (!rolesError && rolesData) {
-        // 2. Create Default Staff User
+        // 2. Create Module Permissions
+        const modulePermissions = [
+          { slug: `${finalSlug}.view`, description: `View ${name}`, module_slug: finalSlug },
+          { slug: `${finalSlug}.manage`, description: `Manage ${name}`, module_slug: finalSlug },
+          { slug: `${finalSlug}.orders.view`, description: `View ${name} orders`, module_slug: finalSlug },
+          { slug: `${finalSlug}.orders.manage`, description: `Manage ${name} orders`, module_slug: finalSlug },
+          { slug: `${finalSlug}.menu.view`, description: `View ${name} menu`, module_slug: finalSlug },
+          { slug: `${finalSlug}.menu.manage`, description: `Manage ${name} menu`, module_slug: finalSlug },
+          { slug: `${finalSlug}.tables.view`, description: `View ${name} tables`, module_slug: finalSlug },
+          { slug: `${finalSlug}.tables.manage`, description: `Manage ${name} tables`, module_slug: finalSlug },
+        ];
+
+        const { data: permissionsData } = await supabase
+          .from('permissions')
+          .insert(modulePermissions)
+          .select();
+
+        // 3. Link Permissions to Roles
+        if (permissionsData && permissionsData.length > 0) {
+          const adminRole = rolesData.find((r: { name: string }) => r.name === `${finalSlug}_admin`);
+          const staffRole = rolesData.find((r: { name: string }) => r.name === `${finalSlug}_staff`);
+
+          const rolePermissions: { role_id: string; permission_id: string }[] = [];
+
+          // Admin gets all permissions
+          if (adminRole) {
+            permissionsData.forEach((perm: { id: string }) => {
+              rolePermissions.push({ role_id: adminRole.id, permission_id: perm.id });
+            });
+          }
+
+          // Staff gets view permissions only
+          if (staffRole) {
+            const viewPerms = permissionsData.filter((p: { slug: string }) => p.slug.includes('.view'));
+            viewPerms.forEach((perm: { id: string }) => {
+              rolePermissions.push({ role_id: staffRole.id, permission_id: perm.id });
+            });
+          }
+
+          if (rolePermissions.length > 0) {
+            await supabase.from('role_permissions').insert(rolePermissions);
+            logger.info(`[Modules] Created ${rolePermissions.length} role-permission links for ${finalSlug}`);
+          }
+        }
+
+        // 4. Create Default Staff User
         const staffEmail = `staff.${finalSlug}@v2resort.com`;
         const staffPassword = await bcrypt.hash(`Staff${finalSlug.charAt(0).toUpperCase() + finalSlug.slice(1)}123!`, 10);
 
@@ -161,16 +206,17 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
           .single();
 
         if (!userError && userData) {
-          // 3. Link User to Roles (using user_roles junction table)
+          // 5. Link User to Roles (using user_roles junction table)
           const userRolesInserts = rolesData.map((role: { id: string; name: string }) => ({
             user_id: userData.id,
             role_id: role.id
           }));
           await supabase.from('user_roles').insert(userRolesInserts);
+          logger.info(`[Modules] Created staff user ${staffEmail} with roles for ${finalSlug}`);
         }
       }
     } catch (innerError) {
-      logger.error('Failed to auto-create staff/roles for module:', innerError);
+      logger.error('Failed to auto-create staff/roles/permissions for module:', innerError);
       // We don't fail the module creation itself, just log
     }
 

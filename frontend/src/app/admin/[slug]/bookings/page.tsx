@@ -73,8 +73,9 @@ export default function DynamicBookingsPage() {
   const params = useParams();
   const { modules } = useSiteSettings();
   const tc = useTranslations('adminCommon');
-  const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
-  const currentModule = modules.find(m => m.slug === slug);
+  const rawSlug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
+  const slug = rawSlug ? decodeURIComponent(rawSlug).toLowerCase() : '';
+  const currentModule = modules.find(m => m.slug.toLowerCase() === slug);
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);

@@ -70,8 +70,80 @@ export interface SiteSettings {
   weatherEffect?: 'auto' | 'waves' | 'snow' | 'rain' | 'leaves' | 'stars' | 'fireflies' | 'none';
 
   // CMS
-  footer?: any;
-  navbar?: any;
+  footer?: FooterConfig | null;
+  navbar?: NavbarConfig | null;
+}
+
+export interface FooterLogo {
+  text: string;
+  showIcon: boolean;
+}
+
+export interface FooterContact {
+  showAddress?: boolean;
+  showPhone?: boolean;
+  showEmail?: boolean;
+}
+
+export interface FooterSocial {
+  platform: string;
+  url: string;
+}
+
+export interface FooterConfig {
+  sections?: FooterSection[];
+  socialLinks?: SocialLink[];
+  copyright?: string;
+  showNewsletter?: boolean;
+  logo?: string | FooterLogo;
+  description?: string;
+  columns?: FooterColumn[];
+  socials?: FooterSocial[];
+  contact?: FooterContact;
+}
+
+export interface FooterColumn {
+  title?: string;
+  titleKey?: string;
+  links?: FooterLink[];
+}
+
+export interface FooterLink {
+  label?: string;
+  labelKey?: string;
+  href: string;
+  moduleSlug?: string;
+}
+
+export interface FooterSection {
+  title: string;
+  links: { label: string; href: string }[];
+}
+
+export interface SocialLink {
+  platform: string;
+  url: string;
+  icon?: string;
+}
+
+export interface NavbarConfig {
+  links?: NavbarLink[];
+  config?: {
+    showLanguageSwitcher?: boolean;
+    showThemeToggle?: boolean;
+    showCurrencySwitcher?: boolean;
+    showUserPreferences?: boolean;
+    showCart?: boolean;
+    sticky?: boolean;
+  };
+}
+
+export interface NavbarLink {
+  type?: 'module' | 'custom';
+  moduleSlug?: string;
+  label: string;
+  href: string;
+  icon?: string;
 }
 
 const defaultSettings: SiteSettings = {
@@ -113,6 +185,14 @@ const defaultSettings: SiteSettings = {
   navbar: null,
 };
 
+export interface ModuleSettings {
+  header_color?: string;
+  accent_color?: string;
+  show_in_nav?: boolean;
+  icon?: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
 export interface Module {
   id: string;
   template_type: 'menu_service' | 'multi_day_booking' | 'session_access';
@@ -121,7 +201,7 @@ export interface Module {
   description?: string;
   is_active: boolean;
   show_in_main?: boolean;
-  settings?: any;
+  settings?: ModuleSettings;
   sort_order: number;
 }
 
