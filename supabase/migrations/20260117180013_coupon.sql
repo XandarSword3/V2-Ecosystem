@@ -1,0 +1,51 @@
+-- Migration: Coupon Function
+-- Date: 2026-01-17
+
+CREATE OR REPLACE FUNCTION apply_coupon_atomic(p_code TEXT, p_user_id UUID, p_order_total DECIMAL, p_order_id UUID, p_module_type TEXT DEFAULT 'all')
+RETURNS TABLE(success BOOLEAN, discount_amount DECIMAL, coupon_id UUID, error_message TEXT)
+LANGUAGE plpgsql SECURITY DEFINER AS $func$
+DECLARE
+    v_coupon RECORD;
+    v_user_usage_count INTEGER;
+    v_calculated_discount DECIMAL;
+BEGIN
+    SELECT * INTO v_coupon FROM coupons WHERE code = UPPER(p_code) AND is_active = true AND (valid_from IS NULL OR valid_from <= NOW()) AND (valid_until IS NULL OR valid_until > NOW()) FOR UPDATE;
+    IF NOT FOUND THEN
+        RETURN QUERY SELECT false, 0::DECIMAL, NULL::UUID, 'Coupon not found, inactive, or expired'::TEXT;
+        RETURN;
+    END IF;
+    IF v_coupon.applies_to != 'all' AND v_coupon.applies_to != p_module_type THEN
+        RETURN QUERY SELECT false, 0::DECIMAL, v_coupon.id, 'Coupon not valid for this order type'::TEXT;
+        RETURN;
+    END IF;
+    IF v_coupon.min_order_amount IS NOT NULL AND p_order_total < v_coupon.min_order_amount THEN
+        RETURN QUERY SELECT false, 0::DECIMAL, v_coupon.id, ('Order total below minimum of $' || v_coupon.min_order_amount::TEXT)::TEXT;
+        RETURN;
+    END IF;
+    IF v_coupon.usage_limit IS NOT NULL AND v_coupon.usage_count >= v_coupon.usage_limit THEN
+        RETURN QUERY SELECT false, 0::DECIMAL, v_coupon.id, 'Coupon usage limit reached'::TEXT;
+        RETURN;
+    END IF;
+    IF p_user_id IS NOT NULL AND v_coupon.per_user_limit IS NOT NULL THEN
+        SELECT COUNT(*) INTO v_user_usage_count FROM coupon_usage WHERE coupon_id = v_coupon.id AND user_id = p_user_id;
+        IF v_user_usage_count >= v_coupon.per_user_limit THEN
+            RETURN QUERY SELECT false, 0::DECIMAL, v_coupon.id, 'You have already used this coupon the maximum number of times'::TEXT;
+            RETURN;
+        END IF;
+    END IF;
+    IF v_coupon.discount_type = 'percentage' THEN
+        v_calculated_discount := p_order_total * (v_coupon.discount_value / 100);
+        IF v_coupon.max_discount_amount IS NOT NULL THEN
+            v_calculated_discount := LEAST(v_calculated_discount, v_coupon.max_discount_amount);
+        END IF;
+    ELSIF v_coupon.discount_type = 'fixed_amount' THEN
+        v_calculated_discount := LEAST(v_coupon.discount_value, p_order_total);
+    ELSE
+        v_calculated_discount := 0;
+    END IF;
+    v_calculated_discount := ROUND(v_calculated_discount, 2);
+    UPDATE coupons SET usage_count = usage_count + 1, updated_at = NOW() WHERE id = v_coupon.id;
+    INSERT INTO coupon_usage(coupon_id, user_id, order_id, discount_applied) VALUES (v_coupon.id, p_user_id, p_order_id, v_calculated_discount);
+    RETURN QUERY SELECT true, v_calculated_discount, v_coupon.id, NULL::TEXT;
+END;
+$func$;

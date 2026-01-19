@@ -72,6 +72,35 @@ export interface SiteSettings {
   // CMS
   footer?: FooterConfig | null;
   navbar?: NavbarConfig | null;
+  homepage?: HomepageConfig | null;
+}
+
+// Homepage CMS
+export interface HeroSlide {
+  id: string;
+  title: string;
+  subtitle: string;
+  buttonText: string;
+  buttonLink: string;
+  imageUrl: string;
+  enabled: boolean;
+}
+
+export interface HomepageSection {
+  id: string;
+  type: 'services' | 'features' | 'stats' | 'testimonials' | 'map' | 'cta';
+  title: string;
+  enabled: boolean;
+  order: number;
+}
+
+export interface HomepageConfig {
+  heroSlides?: HeroSlide[];
+  sections?: HomepageSection[];
+  ctaTitle?: string;
+  ctaSubtitle?: string;
+  ctaButtonText?: string;
+  ctaButtonLink?: string;
 }
 
 export interface FooterLogo {

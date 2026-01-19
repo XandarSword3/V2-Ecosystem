@@ -258,6 +258,11 @@ export function createRestaurantRepository(supabase: SupabaseClient): Restaurant
       if (error) throw error;
       return data as RestaurantTable;
     },
+
+    async rpc(fn: string, params?: Record<string, unknown>): Promise<{ data: unknown; error: Error | null }> {
+      // @ts-ignore - PostgrestError is close enough to Error for our needs
+      return supabase.rpc(fn, params);
+    },
   };
 }
 

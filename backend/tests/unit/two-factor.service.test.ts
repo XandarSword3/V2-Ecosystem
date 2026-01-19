@@ -13,15 +13,27 @@ vi.mock('qrcode', () => ({
   },
 }));
 
-// Mock otplib authenticator
-vi.mock('otplib', () => ({
-  authenticator: {
-    options: {},
-    generateSecret: vi.fn().mockReturnValue('JBSWY3DPEHPK3PXP'),
-    keyuri: vi.fn().mockReturnValue('otpauth://totp/V2%20Resort:test@test.com?secret=JBSWY3DPEHPK3PXP&issuer=V2%20Resort'),
-    verify: vi.fn().mockReturnValue(true),
-  },
-}));
+// Mock otplib - define mocks inside factory to avoid hoisting issues
+vi.mock('otplib', () => {
+  const mockGenerateSecret = vi.fn().mockReturnValue('JBSWY3DPEHPK3PXP');
+  const mockGenerateURI = vi.fn().mockReturnValue('otpauth://totp/V2%20Resort:test@test.com?secret=JBSWY3DPEHPK3PXP&issuer=V2%20Resort');
+  const mockGenerate = vi.fn().mockReturnValue('123456');
+  const mockVerify = vi.fn().mockReturnValue(true);
+  
+  return {
+    generateSecret: mockGenerateSecret,
+    generateURI: mockGenerateURI,
+    generate: mockGenerate,
+    verify: mockVerify,
+    // Keep authenticator for compatibility
+    authenticator: {
+      options: {},
+      generateSecret: mockGenerateSecret,
+      keyuri: mockGenerateURI,
+      verify: mockVerify,
+    },
+  };
+});
 
 // Mock database connection
 const mockSupabaseClient = {
@@ -51,7 +63,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 
 // Import after mocking
 import { twoFactorService } from '../../src/services/two-factor.service.js';
-import { authenticator } from 'otplib';
+import { generateSecret, generateURI } from 'otplib';
 
 describe('Two-Factor Authentication Service', () => {
   beforeEach(() => {
@@ -83,19 +95,21 @@ describe('Two-Factor Authentication Service', () => {
       expect(mockSupabaseClient.upsert).toHaveBeenCalled();
     });
 
-    it('should generate unique secret using authenticator', async () => {
+    it('should generate unique secret using generateSecret', async () => {
       await twoFactorService.generateSetup('user-123', 'test@example.com');
       
-      expect(authenticator.generateSecret).toHaveBeenCalledWith(20);
+      expect(vi.mocked(generateSecret)).toHaveBeenCalledWith({ length: 20 });
     });
 
     it('should generate OTP auth URL with correct parameters', async () => {
       await twoFactorService.generateSetup('user-123', 'test@example.com');
       
-      expect(authenticator.keyuri).toHaveBeenCalledWith(
-        'test@example.com',
-        'V2 Resort',
-        expect.any(String)
+      expect(vi.mocked(generateURI)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          secret: expect.any(String),
+          issuer: 'V2 Resort',
+          label: 'test@example.com',
+        })
       );
     });
   });

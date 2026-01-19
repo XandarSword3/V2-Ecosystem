@@ -97,10 +97,11 @@ describe('BookingService', () => {
     return date;
   }
 
-  // Helper to get next weekend day (Friday or Saturday)
+  // Helper to get next Friday for weekend pricing tests
   function getNextWeekend(): dayjs.Dayjs {
     let date = dayjs().add(7, 'day');
-    while (date.day() !== 5 && date.day() !== 6) {
+    // Find the next Friday specifically (day 5)
+    while (date.day() !== 5) {
       date = date.add(1, 'day');
     }
     return date;

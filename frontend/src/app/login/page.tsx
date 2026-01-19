@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
-import { Mail, Lock, Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Loader2, Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 
 export default function LoginPage() {
@@ -13,13 +13,18 @@ export default function LoginPage() {
   const tAuth = useTranslations('auth');
   const tCommon = useTranslations('common');
   const router = useRouter();
-  const { user, isAuthenticated, login } = useAuth();
+  const { user, isAuthenticated, login, verify2FA } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // 2FA state
+  const [show2FA, setShow2FA] = useState(false);
+  const [pending2FAUserId, setPending2FAUserId] = useState<string | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -42,7 +47,18 @@ export default function LoginPage() {
 
     try {
       // Use auth context login which updates state immediately
-      const userData = await login(email, password);
+      const result = await login(email, password);
+
+      // Check if 2FA is required
+      if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
+        setPending2FAUserId(result.userId);
+        setShow2FA(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Normal login success - result is a User at this point
+      const userData = result as { id: string; email: string; fullName: string; roles: string[] };
 
       // Determine redirect based on roles
       const roles = userData.roles || [];
@@ -58,6 +74,33 @@ export default function LoginPage() {
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || 'Login failed. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pending2FAUserId) return;
+    
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const userData = await verify2FA(pending2FAUserId, twoFactorCode);
+
+      // Determine redirect based on roles
+      const roles = userData.roles || [];
+
+      if (roles.includes('super_admin') || roles.includes('admin')) {
+        window.location.href = '/admin';
+      } else if (roles.some((r: string) => r.includes('staff') || r.includes('manager'))) {
+        window.location.href = '/staff';
+      } else {
+        window.location.href = '/';
+      }
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || '2FA verification failed. Please try again.');
       setIsLoading(false);
     }
   };
@@ -101,71 +144,126 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t('email')}
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                  placeholder="admin@v2resort.com"
-                  required
-                />
+          {show2FA ? (
+            /* 2FA Verification Form */
+            <form onSubmit={handle2FASubmit} className="space-y-5">
+              <div className="text-center mb-4">
+                <Shield className="w-12 h-12 text-primary-600 mx-auto mb-2" />
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Two-Factor Authentication
+                </h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Enter the 6-digit code from your authenticator app
+                </p>
               </div>
-            </div>
 
-            {/* Password */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  {t('password')}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Verification Code
                 </label>
-                <Link href="#" className="text-xs text-primary-600 hover:text-primary-700">
-                  {t('forgotPassword')}
-                </Link>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                  placeholder="••••••••"
+                  type="text"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-center text-2xl tracking-widest font-mono"
+                  placeholder="000000"
+                  maxLength={6}
                   required
+                  autoFocus
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
               </div>
-            </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg shadow-primary-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  {t('signingIn')}
-                </>
-              ) : (
-                t('title')
-              )}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={isLoading || twoFactorCode.length !== 6}
+                className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg shadow-primary-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify & Sign In'
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setShow2FA(false); setPending2FAUserId(null); setTwoFactorCode(''); setError(''); }}
+                className="w-full py-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 text-sm"
+              >
+                ← Back to login
+              </button>
+            </form>
+          ) : (
+            /* Normal Login Form */
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  {t('email')}
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    placeholder="admin@v2resort.com"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    {t('password')}
+                  </label>
+                  <Link href="#" className="text-xs text-primary-600 hover:text-primary-700">
+                    {t('forgotPassword')}
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-12 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg shadow-primary-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    {t('signingIn')}
+                  </>
+                ) : (
+                  t('title')
+                )}
+              </button>
+            </form>
+          )}
 
           {/* Quick Login Hints */}
           <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700">

@@ -19,10 +19,16 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       customerName: validatedData.customerName || 'Guest',
       customerPhone: validatedData.customerPhone ?? undefined,
       orderType: validatedData.orderType,
+      tableNumber: validatedData.tableNumber,
       items: formattedItems,
       paymentMethod: validatedData.paymentMethod,
       specialInstructions: validatedData.specialInstructions,
       customerId: req.user?.userId,
+      // Pass discount fields from request body
+      couponCode: req.body.couponCode,
+      giftCardRedemptions: req.body.giftCardRedemptions,
+      loyaltyPointsToRedeem: req.body.loyaltyPointsToRedeem,
+      loyaltyPointsDollarValue: req.body.loyaltyPointsDollarValue,
     });
     
     // Audit log for order creation
@@ -57,9 +63,13 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     const userRoles = req.user?.roles || [];
     const isOwner = order.customer_id === userId;
     const isAdminOrStaff = userRoles.includes('admin') || userRoles.includes('staff');
+    
+    // Guest orders (no customer_id) can be viewed by anyone with the order ID
+    // This allows guests to see their order confirmation page
+    const isGuestOrder = !order.customer_id;
 
-    if (!isOwner && !isAdminOrStaff) {
-      // For non-owners, only return limited info (status tracking)
+    if (!isOwner && !isAdminOrStaff && !isGuestOrder) {
+      // For non-owners viewing non-guest orders, only return limited info (status tracking)
       return res.json({
         success: true,
         data: {

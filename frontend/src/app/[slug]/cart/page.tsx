@@ -34,7 +34,9 @@ import {
   Truck,
   Store,
   Receipt,
+  Tag,
 } from 'lucide-react';
+import { PaymentDiscounts } from '@/components/customer/PaymentDiscounts';
 
 export default function ModuleCartPage() {
   const t = useTranslations('common');
@@ -70,9 +72,26 @@ export default function ModuleCartPage() {
   const [notes, setNotes] = useState('');
   const [activeStep, setActiveStep] = useState(1);
 
+  // Discount tracking state
+  interface AppliedDiscount {
+    type: 'coupon' | 'giftcard' | 'loyalty';
+    code?: string;
+    amount: number;
+    details?: string;
+  }
+  const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
+  const [finalTotal, setFinalTotal] = useState(0);
+
   const subtotal = moduleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const tax = subtotal * 0.11;
-  const total = subtotal + tax;
+  const preDiscountTotal = subtotal + tax;
+  const totalDiscount = appliedDiscounts.reduce((sum, d) => sum + d.amount, 0);
+  const total = Math.max(0, preDiscountTotal - totalDiscount);
+
+  // Update final total when discounts change
+  useEffect(() => {
+    setFinalTotal(total);
+  }, [total]);
 
   interface OrderData {
     customerName: string;
@@ -83,6 +102,11 @@ export default function ModuleCartPage() {
     notes?: string;
     items: Array<{ menuItemId: string; quantity: number; specialInstructions?: string }>;
     moduleId?: string;
+    // Discount integration fields
+    couponCode?: string;
+    giftCardRedemptions?: Array<{ code: string; amount: number }>;
+    loyaltyPointsToRedeem?: number;
+    loyaltyPointsDollarValue?: number;
   }
 
   interface MutationError {
@@ -124,6 +148,11 @@ export default function ModuleCartPage() {
       return;
     }
 
+    // Build discount data from applied discounts
+    const couponDiscount = appliedDiscounts.find(d => d.type === 'coupon');
+    const giftCardDiscounts = appliedDiscounts.filter(d => d.type === 'giftcard');
+    const loyaltyDiscount = appliedDiscounts.find(d => d.type === 'loyalty');
+
     orderMutation.mutate({
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
@@ -137,6 +166,15 @@ export default function ModuleCartPage() {
         specialInstructions: item.specialInstructions,
       })),
       moduleId,
+      // Pass discount information to backend
+      couponCode: couponDiscount?.code,
+      giftCardRedemptions: giftCardDiscounts.length > 0 
+        ? giftCardDiscounts.map(gc => ({ code: gc.code!, amount: gc.amount }))
+        : undefined,
+      loyaltyPointsToRedeem: loyaltyDiscount 
+        ? parseInt(loyaltyDiscount.details?.replace(/[^\d]/g, '') || '0')
+        : undefined,
+      loyaltyPointsDollarValue: loyaltyDiscount?.amount,
     });
   };
 
@@ -591,6 +629,24 @@ export default function ModuleCartPage() {
                       </motion.button>
                     </div>
 
+                    {/* Discounts Section - Coupons, Gift Cards, Loyalty Points */}
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Tag className="w-5 h-5 text-orange-500" />
+                        <h3 className="font-semibold text-slate-900 dark:text-white">Apply Discounts</h3>
+                      </div>
+                      <PaymentDiscounts
+                        orderTotal={preDiscountTotal}
+                        orderType={orderType}
+                        moduleId={moduleId}
+                        onTotalChange={(newTotal, discounts) => {
+                          setAppliedDiscounts(discounts);
+                          setFinalTotal(newTotal);
+                        }}
+                        className="mt-2"
+                      />
+                    </div>
+
                     <div className="pt-4 flex justify-start">
                       <Button variant="outline" onClick={() => setActiveStep(2)}>
                         <ArrowLeft className="w-4 h-4 mr-2" />
@@ -648,12 +704,46 @@ export default function ModuleCartPage() {
                       <span className="text-slate-500">Tax (11%)</span>
                       <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, currency)}</span>
                     </div>
+                    
+                    {/* Show applied discounts */}
+                    {appliedDiscounts.length > 0 && (
+                      <>
+                        <div className="border-t border-dashed border-slate-200 dark:border-slate-700 pt-2" />
+                        {appliedDiscounts.map((discount, index) => (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                              {discount.type === 'coupon' && <Tag className="w-3 h-3" />}
+                              {discount.type === 'giftcard' && <CreditCard className="w-3 h-3" />}
+                              {discount.type === 'loyalty' && <Sparkles className="w-3 h-3" />}
+                              {discount.type === 'coupon' && `Coupon: ${discount.code}`}
+                              {discount.type === 'giftcard' && `Gift Card: ${discount.code}`}
+                              {discount.type === 'loyalty' && `Loyalty Points`}
+                            </span>
+                            <span className="text-green-600 dark:text-green-400 font-medium">
+                              -{formatCurrency(discount.amount, currency)}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between text-sm text-green-600 dark:text-green-400 font-semibold">
+                          <span>Total Savings</span>
+                          <span>-{formatCurrency(totalDiscount, currency)}</span>
+                        </div>
+                      </>
+                    )}
+                    
                     <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-slate-900 dark:text-white">Total</span>
-                        <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
-                          {formatCurrency(total, currency)}
-                        </span>
+                        <div className="text-right">
+                          {totalDiscount > 0 && (
+                            <span className="text-sm text-slate-400 line-through mr-2">
+                              {formatCurrency(preDiscountTotal, currency)}
+                            </span>
+                          )}
+                          <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
+                            {formatCurrency(total, currency)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
