@@ -156,7 +156,7 @@ export default function HomePage() {
             </MagneticButton>
           </motion.div>
 
-          {/* Main heading */}
+          {/* Main heading - Uses CMS heroSlides if available */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -169,16 +169,16 @@ export default function HomePage() {
               <br />
               <span className="relative inline-block mt-2">
                 <GradientText className="text-6xl md:text-8xl lg:text-9xl font-black">
-                  {settings.resortName || tHome('hero.titleHighlight')}
+                  {settings.homepage?.heroSlides?.[0]?.title || settings.resortName || tHome('hero.titleHighlight')}
                 </GradientText>
               </span>
             </h1>
           </motion.div>
 
-          {/* Subtitle */}
+          {/* Subtitle - Uses CMS heroSlides if available */}
           <BlurReveal delay={0.6}>
             <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 mb-12 max-w-3xl mx-auto leading-relaxed">
-              {settings.description || tHome('hero.subtitle')}
+              {settings.homepage?.heroSlides?.[0]?.subtitle || settings.description || tHome('hero.subtitle')}
             </p>
           </BlurReveal>
 

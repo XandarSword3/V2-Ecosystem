@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
@@ -22,6 +22,9 @@ import {
   CheckCircle2,
   Eye,
   X,
+  QrCode,
+  Search,
+  LogOut,
 } from 'lucide-react';
 
 interface PoolTicket {
@@ -41,6 +44,8 @@ interface PoolTicket {
   customer_phone?: string;
   session_id?: string;
   qr_code?: string;
+  entry_time?: string;
+  exit_time?: string;
   users?: {
     full_name: string;
     email: string;
@@ -73,6 +78,42 @@ export default function AdminPoolTicketsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedTicket, setSelectedTicket] = useState<PoolTicket | null>(null);
+  const [validationCode, setValidationCode] = useState('');
+  const [validating, setValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState<{ success: boolean; message: string; ticket?: PoolTicket } | null>(null);
+  const validationInputRef = useRef<HTMLInputElement>(null);
+
+  const validateTicket = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!validationCode.trim() || validating) return;
+
+    setValidating(true);
+    setValidationResult(null);
+
+    try {
+      const response = await api.post('/pool/staff/validate', { ticketNumber: validationCode.trim() });
+      const ticket = response.data.data;
+      setValidationResult({
+        success: true,
+        message: response.data.message || 'Ticket validated successfully!',
+        ticket,
+      });
+      toast.success(response.data.message || 'Ticket validated!', { icon: '🏊' });
+      fetchTickets(); // Refresh list
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      const errorMessage = axiosError.response?.data?.error || 'Invalid ticket code';
+      setValidationResult({
+        success: false,
+        message: errorMessage,
+      });
+      toast.error(errorMessage);
+    } finally {
+      setValidating(false);
+      setValidationCode('');
+      validationInputRef.current?.focus();
+    }
+  };
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -99,6 +140,21 @@ export default function AdminPoolTicketsPage() {
     } catch (error) {
       toast.error(tc('errors.failedToUpdate'));
     }
+  };
+
+  const recordExit = async (id: string) => {
+    try {
+      await api.post(`/pool/tickets/${id}/exit`);
+      toast.success('Exit recorded successfully!', { icon: '🚪' });
+      fetchTickets();
+    } catch (error) {
+      toast.error('Failed to record exit');
+    }
+  };
+
+  // Helper to check if guest is currently in pool (has entry_time but no exit_time)
+  const isInPool = (ticket: PoolTicket) => {
+    return ticket.entry_time && !ticket.exit_time;
   };
 
   const filteredTickets = tickets.filter((t) => {
@@ -205,6 +261,78 @@ export default function AdminPoolTicketsPage() {
         </motion.div>
       </div>
 
+      {/* Ticket Validation Section */}
+      <motion.div variants={fadeInUp}>
+        <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-blue-200 dark:border-blue-800">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <QrCode className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Validate Ticket</h3>
+            </div>
+            <form onSubmit={validateTicket} className="flex gap-3">
+              <div className="flex-1">
+                <input
+                  ref={validationInputRef}
+                  type="text"
+                  value={validationCode}
+                  onChange={(e) => setValidationCode(e.target.value)}
+                  placeholder="Enter ticket number (e.g., P-260118-1234)"
+                  className="w-full px-4 py-3 rounded-lg border border-blue-200 dark:border-blue-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <Button 
+                type="submit" 
+                disabled={validating || !validationCode.trim()}
+                className="px-6 bg-blue-600 hover:bg-blue-700"
+              >
+                {validating ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Search className="w-5 h-5 mr-2" />
+                    Validate
+                  </>
+                )}
+              </Button>
+            </form>
+            
+            {/* Validation Result */}
+            <AnimatePresence>
+              {validationResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`mt-4 p-4 rounded-lg ${
+                    validationResult.success
+                      ? 'bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800'
+                      : 'bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {validationResult.success ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <X className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    )}
+                    <span className={validationResult.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}>
+                      {validationResult.message}
+                    </span>
+                  </div>
+                  {validationResult.ticket && (
+                    <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                      <p>Ticket: {validationResult.ticket.ticket_number}</p>
+                      <p>Customer: {validationResult.ticket.customer_name || 'N/A'}</p>
+                      <p>Guests: {validationResult.ticket.number_of_guests || 1}</p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </CardContent>
+        </Card>
+      </motion.div>
+
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
@@ -297,11 +425,26 @@ export default function AdminPoolTicketsPage() {
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[ticket.status] || 'bg-green-100 text-green-800'}`}>
                           {(ticket.status || 'valid').toUpperCase()}
                         </span>
+                        {isInPool(ticket) && (
+                          <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                            🏊 IN POOL
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 flex items-center gap-2">
                         <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(ticket)}>
                           <Eye className="w-4 h-4 text-slate-500" />
                         </Button>
+                        {isInPool(ticket) && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => recordExit(ticket.id)}
+                            title="Record Exit"
+                          >
+                            <LogOut className="w-4 h-4 text-orange-500" />
+                          </Button>
+                        )}
                         {(ticket.status === 'pending' || ticket.status === 'active') && (
                           <Button variant="ghost" size="sm" onClick={() => cancelTicket(ticket.id)}>
                             <Trash2 className="w-4 h-4 text-red-500" />

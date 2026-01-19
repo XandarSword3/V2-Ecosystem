@@ -286,3 +286,4 @@ export async function toggleAvailability(req: Request, res: Response, next: Next
     next(error);
   }
 }
+

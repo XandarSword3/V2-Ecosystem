@@ -1,0 +1,633 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - link "v2 Resort" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e7]: v2
+          - generic [ref=e8]: Resort
+        - navigation [ref=e9]:
+          - link "Home" [ref=e10] [cursor=pointer]:
+            - /url: /
+            - generic [ref=e11]:
+              - img [ref=e12]
+              - generic [ref=e15]: Home
+          - link "Chocolate Box" [ref=e16] [cursor=pointer]:
+            - /url: /Chocolate Box
+            - generic [ref=e17]:
+              - img [ref=e18]
+              - generic [ref=e23]: Chocolate Box
+          - link "Test Beach Bar" [ref=e24] [cursor=pointer]:
+            - /url: /test-beach-bar
+            - generic [ref=e25]:
+              - img [ref=e26]
+              - generic [ref=e31]: Test Beach Bar
+          - link "Restaurant" [ref=e32] [cursor=pointer]:
+            - /url: /restaurant
+            - generic [ref=e33]:
+              - img [ref=e34]
+              - generic [ref=e39]: Restaurant
+          - link "Chalets" [ref=e40] [cursor=pointer]:
+            - /url: /chalets
+            - generic [ref=e41]:
+              - img [ref=e42]
+              - generic [ref=e45]: Chalets
+          - link "Pool" [ref=e46] [cursor=pointer]:
+            - /url: /pool
+            - generic [ref=e47]:
+              - img [ref=e48]
+              - generic [ref=e52]: Pool
+          - link "Snack Bar" [ref=e53] [cursor=pointer]:
+            - /url: /snack-bar
+            - generic [ref=e54]:
+              - img [ref=e55]
+              - generic [ref=e57]: Snack Bar
+        - generic [ref=e58]:
+          - button "$" [ref=e60] [cursor=pointer]:
+            - img [ref=e61]
+            - generic [ref=e66]: $
+            - img [ref=e67]
+          - button "🇬🇧 English" [ref=e70] [cursor=pointer]:
+            - img [ref=e71]
+            - generic [ref=e74]: 🇬🇧 English
+          - 'button "Current theme: system. Click to change." [ref=e75] [cursor=pointer]':
+            - img [ref=e76]
+          - button "Settings" [ref=e82] [cursor=pointer]:
+            - img [ref=e83]
+          - generic [ref=e86]:
+            - link "Sign In" [ref=e87] [cursor=pointer]:
+              - /url: /login
+              - generic [ref=e88]: Sign In
+            - link "Register" [ref=e89] [cursor=pointer]:
+              - /url: /register
+              - generic [ref=e90]: Register
+    - main [ref=e91]:
+      - generic [ref=e92]:
+        - article [ref=e94]:
+          - heading "V2 Resort Fine Dining Restaurant" [level=1] [ref=e95]
+          - generic [ref=e96]:
+            - heading "About Our Cuisine" [level=2] [ref=e97]
+            - paragraph [ref=e98]: Welcome to the V2 Resort Restaurant, where traditional flavors meet modern culinary techniques. Our chefs use only the freshest local ingredients to create memorable dining experiences.
+            - paragraph [ref=e99]: We are open for lunch and dinner, serving a wide variety of appetizers, main courses including premium steaks and fresh seafood, and handcrafted desserts.
+          - generic [ref=e100]:
+            - heading "Menu Highlights" [level=2] [ref=e101]
+            - list [ref=e102]:
+              - listitem [ref=e103]:
+                - strong [ref=e104]: "Signature Appetizers:"
+                - text: Fresh salads, artisanal breads, and savory starters.
+              - listitem [ref=e105]:
+                - strong [ref=e106]: "Premium Grills:"
+                - text: Charcoal-grilled Steaks, Chops, and Skewers.
+              - listitem [ref=e107]:
+                - strong [ref=e108]: "Fresh Seafood:"
+                - text: Daily catch prepared to your liking.
+              - listitem [ref=e109]:
+                - strong [ref=e110]: "International Specialties:"
+                - text: Pasta, Burgers, and gourmet Salads.
+          - generic [ref=e111]:
+            - heading "Dining Experience" [level=2] [ref=e112]
+            - paragraph [ref=e113]: Enjoy your meal in our elegant indoor dining room or al fresco on our terrace with panoramic views of the resort and surrounding nature. Perfect for romantic dinners, family gatherings, and special celebrations.
+          - generic [ref=e114]:
+            - paragraph [ref=e115]:
+              - strong [ref=e116]: "Location:"
+              - text: V2 Resort Main Building
+            - paragraph [ref=e117]:
+              - strong [ref=e118]: "Cuisine:"
+              - text: International & Mediterranean
+            - paragraph [ref=e119]:
+              - strong [ref=e120]: "Service Options:"
+              - text: Dine-in, Takeaway
+        - generic [ref=e122]:
+          - generic [ref=e123]:
+            - generic:
+              - generic: 🍽️
+              - generic: 🍷
+              - generic: 🥗
+              - generic: 🍝
+              - generic: 🥩
+              - generic: 🍰
+            - img [ref=e129]
+            - generic [ref=e132]:
+              - generic [ref=e133]:
+                - img [ref=e134]
+                - generic [ref=e136]: Signature Cuisine
+              - heading "V2 Restaurant" [level=1] [ref=e137]
+              - paragraph [ref=e138]: Discover our delicious international cuisine, crafted with passion
+              - generic [ref=e139]:
+                - generic [ref=e140]:
+                  - generic [ref=e141]:
+                    - img [ref=e142]
+                    - generic [ref=e148]: 22+
+                  - generic [ref=e149]: Dishes
+                - generic [ref=e150]:
+                  - generic [ref=e151]:
+                    - img [ref=e152]
+                    - generic [ref=e155]: "8"
+                  - generic [ref=e156]: Categories
+                - generic [ref=e157]:
+                  - generic [ref=e158]:
+                    - img [ref=e159]
+                    - generic [ref=e162]: "5"
+                  - generic [ref=e163]: Rating
+          - main [ref=e164]:
+            - generic [ref=e165]:
+              - generic [ref=e166]:
+                - heading "Chef's Featured Dishes" [level=2] [ref=e169]:
+                  - img [ref=e170]
+                  - generic [ref=e172]: Chef's Featured Dishes
+                - button "View Featured" [ref=e173] [cursor=pointer]
+              - generic [ref=e174]:
+                - generic [ref=e178] [cursor=pointer]:
+                  - generic [ref=e179]:
+                    - img "Fattoush" [ref=e180]
+                    - generic [ref=e183]:
+                      - img [ref=e184]
+                      - text: Featured
+                    - generic [ref=e187]: $12.00
+                  - generic [ref=e188]:
+                    - heading "Fattoush" [level=3] [ref=e189]
+                    - paragraph [ref=e190]: Lebanese bread salad
+                    - button "Add to Cart" [ref=e191]:
+                      - generic [ref=e192]:
+                        - img [ref=e193]
+                        - text: Add to Cart
+                - generic [ref=e197] [cursor=pointer]:
+                  - generic [ref=e198]:
+                    - img "Chicken Shawarma Plate" [ref=e199]
+                    - generic [ref=e202]:
+                      - img [ref=e203]
+                      - text: Featured
+                    - generic [ref=e206]: $18.00
+                  - generic [ref=e207]:
+                    - heading "Chicken Shawarma Plate" [level=3] [ref=e208]
+                    - paragraph [ref=e209]: Marinated chicken with rice and salad
+                    - button "Add to Cart" [ref=e210]:
+                      - generic [ref=e211]:
+                        - img [ref=e212]
+                        - text: Add to Cart
+                - generic [ref=e216] [cursor=pointer]:
+                  - generic [ref=e217]:
+                    - img "Lamb Kofta" [ref=e218]
+                    - generic [ref=e221]:
+                      - img [ref=e222]
+                      - text: Featured
+                    - generic [ref=e225]: $22.00
+                  - generic [ref=e226]:
+                    - heading "Lamb Kofta" [level=3] [ref=e227]
+                    - paragraph [ref=e228]: Spiced lamb skewers
+                    - button "Add to Cart" [ref=e229]:
+                      - generic [ref=e230]:
+                        - img [ref=e231]
+                        - text: Add to Cart
+            - generic [ref=e234]:
+              - button "All" [ref=e235] [cursor=pointer]:
+                - generic [ref=e236]:
+                  - img [ref=e237]
+                  - text: All
+              - button "🥗 Appetizers" [ref=e242] [cursor=pointer]:
+                - generic [ref=e243]:
+                  - generic [ref=e244]: 🥗
+                  - text: Appetizers
+              - button "🥬 Salads" [ref=e245] [cursor=pointer]:
+                - generic [ref=e246]:
+                  - generic [ref=e247]: 🥬
+                  - text: Salads
+              - button "🍴 Main Courses" [ref=e248] [cursor=pointer]:
+                - generic [ref=e249]:
+                  - generic [ref=e250]: 🍴
+                  - text: Main Courses
+              - button "🥩 Grills" [ref=e251] [cursor=pointer]:
+                - generic [ref=e252]:
+                  - generic [ref=e253]: 🥩
+                  - text: Grills
+              - button "🦐 Seafood" [ref=e254] [cursor=pointer]:
+                - generic [ref=e255]:
+                  - generic [ref=e256]: 🦐
+                  - text: Seafood
+              - button "🍰 Desserts" [ref=e257] [cursor=pointer]:
+                - generic [ref=e258]:
+                  - generic [ref=e259]: 🍰
+                  - text: Desserts
+              - button "🍹 Beverages" [ref=e260] [cursor=pointer]:
+                - generic [ref=e261]:
+                  - generic [ref=e262]: 🍹
+                  - text: Beverages
+              - button "🍴 Kids Menu" [ref=e263] [cursor=pointer]:
+                - generic [ref=e264]:
+                  - generic [ref=e265]: 🍴
+                  - text: Kids Menu
+            - generic [ref=e266]:
+              - generic [ref=e270]:
+                - generic [ref=e271]:
+                  - img "Baba Ganoush" [ref=e272]
+                  - generic [ref=e275]: $9.00
+                  - generic [ref=e277]:
+                    - img [ref=e278]
+                    - text: 10 min
+                - generic [ref=e281]:
+                  - generic [ref=e282]:
+                    - heading "Baba Ganoush" [level=3] [ref=e284]
+                    - paragraph [ref=e285]: Smoky eggplant dip
+                  - button "Add to Cart" [ref=e287] [cursor=pointer]:
+                    - img [ref=e288]
+                    - text: Add to Cart
+              - generic [ref=e292]:
+                - generic [ref=e293]:
+                  - img "Fattoush" [ref=e294]
+                  - generic [ref=e297]: $12.00
+                  - generic [ref=e299]:
+                    - img [ref=e300]
+                    - text: Featured
+                  - generic [ref=e303]:
+                    - img [ref=e304]
+                    - text: 10 min
+                - generic [ref=e307]:
+                  - generic [ref=e308]:
+                    - heading "Fattoush" [level=3] [ref=e310]
+                    - paragraph [ref=e311]: Lebanese bread salad
+                  - button "Add to Cart" [ref=e313] [cursor=pointer]:
+                    - img [ref=e314]
+                    - text: Add to Cart
+              - generic [ref=e318]:
+                - generic [ref=e319]:
+                  - img "Greek Salad" [ref=e320]
+                  - generic [ref=e323]: $14.00
+                  - generic [ref=e325]:
+                    - img [ref=e326]
+                    - text: 10 min
+                - generic [ref=e329]:
+                  - generic [ref=e330]:
+                    - heading "Greek Salad" [level=3] [ref=e332]
+                    - paragraph [ref=e333]: Feta, olives, tomatoes
+                  - button "Add to Cart" [ref=e335] [cursor=pointer]:
+                    - img [ref=e336]
+                    - text: Add to Cart
+              - generic [ref=e340]:
+                - generic [ref=e341]:
+                  - img "Chicken Shawarma Plate" [ref=e342]
+                  - generic [ref=e345]: $18.00
+                  - generic [ref=e347]:
+                    - img [ref=e348]
+                    - text: Featured
+                  - generic [ref=e351]:
+                    - img [ref=e352]
+                    - text: 20 min
+                - generic [ref=e355]:
+                  - generic [ref=e356]:
+                    - heading "Chicken Shawarma Plate" [level=3] [ref=e358]
+                    - paragraph [ref=e359]: Marinated chicken with rice and salad
+                  - button "Add to Cart" [ref=e361] [cursor=pointer]:
+                    - img [ref=e362]
+                    - text: Add to Cart
+              - generic [ref=e366]:
+                - generic [ref=e367]:
+                  - img "Lamb Kofta" [ref=e368]
+                  - generic [ref=e371]: $22.00
+                  - generic [ref=e373]:
+                    - img [ref=e374]
+                    - text: Featured
+                  - generic [ref=e377]:
+                    - img [ref=e378]
+                    - text: 25 min
+                - generic [ref=e381]:
+                  - generic [ref=e382]:
+                    - heading "Lamb Kofta" [level=3] [ref=e384]
+                    - paragraph [ref=e385]: Spiced lamb skewers
+                  - button "Add to Cart" [ref=e387] [cursor=pointer]:
+                    - img [ref=e388]
+                    - text: Add to Cart
+              - generic [ref=e392]:
+                - generic [ref=e393]:
+                  - img "Mixed Grill" [ref=e394]
+                  - generic [ref=e397]: $35.00
+                  - generic [ref=e399]:
+                    - img [ref=e400]
+                    - text: Featured
+                  - generic [ref=e403]:
+                    - img [ref=e404]
+                    - text: 30 min
+                - generic [ref=e407]:
+                  - generic [ref=e408]:
+                    - heading "Mixed Grill" [level=3] [ref=e410]
+                    - paragraph [ref=e411]: Assortment of grilled meats
+                  - button "Add to Cart" [ref=e413] [cursor=pointer]:
+                    - img [ref=e414]
+                    - text: Add to Cart
+              - generic [ref=e418]:
+                - generic [ref=e419]:
+                  - img "Grilled Sea Bass" [ref=e420]
+                  - generic [ref=e423]: $32.00
+                  - generic [ref=e425]:
+                    - img [ref=e426]
+                    - text: Featured
+                  - generic [ref=e429]:
+                    - img [ref=e430]
+                    - text: 30 min
+                - generic [ref=e433]:
+                  - generic [ref=e434]:
+                    - heading "Grilled Sea Bass" [level=3] [ref=e436]
+                    - paragraph [ref=e437]: Fresh whole fish with herbs
+                  - button "Add to Cart" [ref=e439] [cursor=pointer]:
+                    - img [ref=e440]
+                    - text: Add to Cart
+              - generic [ref=e444]:
+                - generic [ref=e445]:
+                  - img "Beef Kebab" [ref=e446]
+                  - generic [ref=e449]: $28.00
+                  - generic [ref=e451]:
+                    - img [ref=e452]
+                    - text: Featured
+                  - generic [ref=e455]:
+                    - img [ref=e456]
+                    - text: 25 min
+                - generic [ref=e459]:
+                  - generic [ref=e460]:
+                    - heading "Beef Kebab" [level=3] [ref=e462]
+                    - paragraph [ref=e463]: Premium beef skewers
+                  - button "Add to Cart" [ref=e465] [cursor=pointer]:
+                    - img [ref=e466]
+                    - text: Add to Cart
+              - generic [ref=e470]:
+                - generic [ref=e471]:
+                  - img "Grilled Prawns" [ref=e472]
+                  - generic [ref=e475]: $38.00
+                  - generic [ref=e477]:
+                    - img [ref=e478]
+                    - text: Featured
+                  - generic [ref=e481]:
+                    - img [ref=e482]
+                    - text: 20 min
+                - generic [ref=e485]:
+                  - generic [ref=e486]:
+                    - heading "Grilled Prawns" [level=3] [ref=e488]
+                    - paragraph [ref=e489]: Jumbo prawns with garlic butter
+                  - button "Add to Cart" [ref=e491] [cursor=pointer]:
+                    - img [ref=e492]
+                    - text: Add to Cart
+              - generic [ref=e496]:
+                - generic [ref=e497]:
+                  - img "Calamari" [ref=e498]
+                  - generic [ref=e501]: $16.00
+                  - generic [ref=e503]:
+                    - img [ref=e504]
+                    - text: 15 min
+                - generic [ref=e507]:
+                  - generic [ref=e508]:
+                    - heading "Calamari" [level=3] [ref=e510]
+                    - paragraph [ref=e511]: Crispy fried squid
+                  - button "Add to Cart" [ref=e513] [cursor=pointer]:
+                    - img [ref=e514]
+                    - text: Add to Cart
+              - generic [ref=e518]:
+                - generic [ref=e519]:
+                  - img "Baklava" [ref=e520]
+                  - generic [ref=e523]: $10.00
+                  - generic [ref=e525]:
+                    - img [ref=e526]
+                    - text: 5 min
+                - generic [ref=e529]:
+                  - generic [ref=e530]:
+                    - heading "Baklava" [level=3] [ref=e532]
+                    - paragraph [ref=e533]: Honey-soaked pastry
+                  - button "Add to Cart" [ref=e535] [cursor=pointer]:
+                    - img [ref=e536]
+                    - text: Add to Cart
+              - generic [ref=e540]:
+                - generic [ref=e541]:
+                  - img "Kunafa" [ref=e542]
+                  - generic [ref=e545]: $12.00
+                  - generic [ref=e547]:
+                    - img [ref=e548]
+                    - text: Featured
+                  - generic [ref=e551]:
+                    - img [ref=e552]
+                    - text: 10 min
+                - generic [ref=e555]:
+                  - generic [ref=e556]:
+                    - heading "Kunafa" [level=3] [ref=e558]
+                    - paragraph [ref=e559]: Cheese pastry with syrup
+                  - button "Add to Cart" [ref=e561] [cursor=pointer]:
+                    - img [ref=e562]
+                    - text: Add to Cart
+              - generic [ref=e566]:
+                - generic [ref=e567]:
+                  - img "Fresh Orange Juice" [ref=e568]
+                  - generic [ref=e571]: $6.00
+                  - generic [ref=e573]:
+                    - img [ref=e574]
+                    - text: 5 min
+                - generic [ref=e577]:
+                  - generic [ref=e578]:
+                    - heading "Fresh Orange Juice" [level=3] [ref=e580]
+                    - paragraph [ref=e581]: Freshly squeezed
+                  - button "Add to Cart" [ref=e583] [cursor=pointer]:
+                    - img [ref=e584]
+                    - text: Add to Cart
+              - generic [ref=e588]:
+                - generic [ref=e589]:
+                  - img "Mint Lemonade" [ref=e590]
+                  - generic [ref=e593]: $5.00
+                  - generic [ref=e595]:
+                    - img [ref=e596]
+                    - text: 5 min
+                - generic [ref=e599]:
+                  - generic [ref=e600]:
+                    - heading "Mint Lemonade" [level=3] [ref=e602]
+                    - paragraph [ref=e603]: Refreshing lemon drink
+                  - button "Add to Cart" [ref=e605] [cursor=pointer]:
+                    - img [ref=e606]
+                    - text: Add to Cart
+              - generic [ref=e610]:
+                - generic [ref=e611]:
+                  - img "Turkish Coffee" [ref=e612]
+                  - generic [ref=e615]: $4.00
+                  - generic [ref=e617]:
+                    - img [ref=e618]
+                    - text: 10 min
+                - generic [ref=e621]:
+                  - generic [ref=e622]:
+                    - heading "Turkish Coffee" [level=3] [ref=e624]
+                    - paragraph [ref=e625]: Traditional Arabic coffee
+                  - button "Add to Cart" [ref=e627] [cursor=pointer]:
+                    - img [ref=e628]
+                    - text: Add to Cart
+              - generic [ref=e632]:
+                - generic [ref=e633]:
+                  - img "Chicken Nuggets" [ref=e634]
+                  - generic [ref=e637]: $10.00
+                  - generic [ref=e639]:
+                    - img [ref=e640]
+                    - text: 15 min
+                - generic [ref=e643]:
+                  - generic [ref=e644]:
+                    - heading "Chicken Nuggets" [level=3] [ref=e646]
+                    - paragraph [ref=e647]: Crispy chicken bites with fries
+                  - button "Add to Cart" [ref=e649] [cursor=pointer]:
+                    - img [ref=e650]
+                    - text: Add to Cart
+              - generic [ref=e654]:
+                - generic [ref=e655]:
+                  - img "Mini Burger" [ref=e656]
+                  - generic [ref=e659]: $12.00
+                  - generic [ref=e661]:
+                    - img [ref=e662]
+                    - text: 15 min
+                - generic [ref=e665]:
+                  - generic [ref=e666]:
+                    - heading "Mini Burger" [level=3] [ref=e668]
+                    - paragraph [ref=e669]: Kids-sized beef burger
+                  - button "Add to Cart" [ref=e671] [cursor=pointer]:
+                    - img [ref=e672]
+                    - text: Add to Cart
+              - generic [ref=e676]:
+                - generic [ref=e677]:
+                  - img "Falafel" [ref=e678]
+                  - generic [ref=e681]: $10.00
+                  - generic [ref=e683]:
+                    - img [ref=e684]
+                    - text: Featured
+                  - generic [ref=e687]:
+                    - img [ref=e688]
+                    - text: 15 min
+                - generic [ref=e691]:
+                  - generic [ref=e692]:
+                    - heading "Falafel" [level=3] [ref=e694]
+                    - paragraph [ref=e695]: Crispy chickpea fritters
+                  - button "Add to Cart" [ref=e697] [cursor=pointer]:
+                    - img [ref=e698]
+                    - text: Add to Cart
+              - generic [ref=e702]:
+                - generic [ref=e703]:
+                  - generic [ref=e705]: 🍰
+                  - generic [ref=e707]:
+                    - generic [ref=e708]: $80.00
+                    - generic [ref=e709]: $100.00
+                - generic [ref=e710]:
+                  - generic [ref=e711]:
+                    - heading "Tiramisu" [level=3] [ref=e713]
+                    - paragraph
+                  - button "Add to Cart" [ref=e715] [cursor=pointer]:
+                    - img [ref=e716]
+                    - text: Add to Cart
+              - generic [ref=e720]:
+                - generic [ref=e721]:
+                  - generic [ref=e723]: 🥩
+                  - generic [ref=e726]: $15.99
+                - generic [ref=e727]:
+                  - generic [ref=e728]:
+                    - heading "Test Burger" [level=3] [ref=e730]
+                    - paragraph [ref=e731]: A delicious burger created during end-to-end testing
+                  - button "Add to Cart" [ref=e733] [cursor=pointer]:
+                    - img [ref=e734]
+                    - text: Add to Cart
+              - generic [ref=e738]:
+                - generic [ref=e739]:
+                  - img "Hummus" [ref=e740]
+                  - generic [ref=e743]: $8.50
+                  - generic [ref=e745]:
+                    - img [ref=e746]
+                    - text: Featured
+                  - generic [ref=e749]:
+                    - img [ref=e750]
+                    - text: 10 min
+                - generic [ref=e753]:
+                  - generic [ref=e754]:
+                    - heading "Hummus" [level=3] [ref=e756]
+                    - paragraph [ref=e757]: Classic chickpea dip with tahini
+                  - button "Add to Cart" [ref=e759] [cursor=pointer]:
+                    - img [ref=e760]
+                    - text: Add to Cart
+              - generic [ref=e764]:
+                - generic [ref=e765]:
+                  - generic [ref=e767]: 🍴
+                  - generic [ref=e770]: $19.99
+                  - generic [ref=e772]:
+                    - img [ref=e773]
+                    - text: Featured
+                - generic [ref=e775]:
+                  - generic [ref=e776]:
+                    - heading "Playwright Test Dish" [level=3] [ref=e778]
+                    - paragraph [ref=e779]: A delicious test dish created via Playwright browser testing
+                  - button "Add to Cart" [ref=e781] [cursor=pointer]:
+                    - img [ref=e782]
+                    - text: Add to Cart
+    - contentinfo [ref=e783]:
+      - generic [ref=e784]:
+        - generic [ref=e785]:
+          - generic [ref=e786]:
+            - generic [ref=e787]:
+              - generic [ref=e789]: V2
+              - generic [ref=e790]: Resort
+            - paragraph [ref=e791]: Premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences in the heart of Lebanon.
+            - generic [ref=e792]:
+              - link [ref=e793] [cursor=pointer]:
+                - /url: https://facebook.com/v2resort
+                - img [ref=e794]
+              - link [ref=e796] [cursor=pointer]:
+                - /url: https://instagram.com/v2resort
+                - img [ref=e797]
+              - link [ref=e800] [cursor=pointer]:
+                - /url: https://twitter.com/v2resort
+                - img [ref=e801]
+          - generic [ref=e803]:
+            - heading "Quick Links" [level=4] [ref=e804]
+            - list [ref=e805]:
+              - listitem [ref=e806]:
+                - link "Restaurant" [ref=e807] [cursor=pointer]:
+                  - /url: /restaurant
+                  - generic [ref=e808]: Restaurant
+                  - img [ref=e809]
+              - listitem [ref=e812]:
+                - link "Snack Bar" [ref=e813] [cursor=pointer]:
+                  - /url: /snack-bar
+                  - generic [ref=e814]: Snack Bar
+                  - img [ref=e815]
+              - listitem [ref=e818]:
+                - link "Chalets" [ref=e819] [cursor=pointer]:
+                  - /url: /chalets
+                  - generic [ref=e820]: Chalets
+                  - img [ref=e821]
+              - listitem [ref=e824]:
+                - link "Pool" [ref=e825] [cursor=pointer]:
+                  - /url: /pool
+                  - generic [ref=e826]: Pool
+                  - img [ref=e827]
+          - generic [ref=e830]:
+            - heading "Legal" [level=4] [ref=e831]
+            - list [ref=e832]:
+              - listitem [ref=e833]:
+                - link "Privacy Policy" [ref=e834] [cursor=pointer]:
+                  - /url: /privacy
+                  - generic [ref=e835]: Privacy Policy
+                  - img [ref=e836]
+              - listitem [ref=e839]:
+                - link "Terms of Service" [ref=e840] [cursor=pointer]:
+                  - /url: /terms
+                  - generic [ref=e841]: Terms of Service
+                  - img [ref=e842]
+              - listitem [ref=e845]:
+                - link "Cancellation Policy" [ref=e846] [cursor=pointer]:
+                  - /url: /cancellation
+                  - generic [ref=e847]: Cancellation Policy
+                  - img [ref=e848]
+          - generic [ref=e851]:
+            - heading "Contact" [level=4] [ref=e852]
+            - list [ref=e853]:
+              - listitem [ref=e854]:
+                - img [ref=e856]
+                - generic [ref=e859]: 123 Lane
+              - listitem [ref=e860]:
+                - img [ref=e862]
+                - generic [ref=e864]: +1 234 567 8900
+              - listitem [ref=e865]:
+                - img [ref=e867]
+                - generic [ref=e870]: bookings@v2resort.com
+        - generic [ref=e871]:
+          - paragraph [ref=e872]: © 2026 V2 Resort. All rights reserved.
+          - generic [ref=e874]: V2 Ecosystem v2.0
+    - region "Notifications alt+T"
+  - alert [ref=e875]
+```

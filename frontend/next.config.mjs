@@ -24,8 +24,8 @@ const nextConfig = {
   
   // Environment variables - DO NOT add /api here, api.ts adds it
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-resort-backend.onrender.com' : 'http://localhost:3001'),
-    NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-resort-backend.onrender.com' : 'http://localhost:3001'),
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-resort-backend.onrender.com' : 'http://localhost:3005'),
+    NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-resort-backend.onrender.com' : 'http://localhost:3005'),
   },
 };
 

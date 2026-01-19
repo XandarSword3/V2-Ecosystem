@@ -132,6 +132,17 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     throw new AppError('Invalid credentials', 401);
   }
 
+  // Check if 2FA is enabled - if so, return pending status instead of full login
+  if (user.two_factor_enabled) {
+    logger.info('[AUTH SERVICE] 2FA is enabled for user, requiring verification:', email);
+    return {
+      requiresTwoFactor: true,
+      userId: user.id,
+      email: user.email,
+      message: 'Two-factor authentication required',
+    };
+  }
+
   // Get user roles
   if (!isProduction) {
     logger.info('[AUTH SERVICE] Step 3: Getting user roles...');
@@ -214,6 +225,95 @@ export async function login(email: string, password: string, meta: SessionMeta) 
   logger.info('[AUTH SERVICE] Returning user:', JSON.stringify(result.user, null, 2));
 
   return result;
+}
+
+/**
+ * Complete login after 2FA verification
+ * Called when user has successfully verified their 2FA code
+ */
+export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
+  logger.info('[AUTH SERVICE] ========== 2FA LOGIN COMPLETION ==========');
+  const supabase = getSupabase();
+
+  // Get user
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (userError || !user) {
+    throw new AppError('User not found', 404);
+  }
+
+  if (!user.is_active) {
+    throw new AppError('Account is disabled', 403);
+  }
+
+  // Get user roles
+  const { data: userRolesList, error: rolesError } = await supabase
+    .from('user_roles')
+    .select(`
+      role_id,
+      roles (id, name, display_name)
+    `)
+    .eq('user_id', user.id);
+
+  if (rolesError) throw rolesError;
+
+  interface RoleJoinResult { role_id?: string; roles?: { name?: string }[] | { name?: string } | null }
+  const roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
+    const roles = r.roles;
+    if (!roles) return undefined;
+    if (Array.isArray(roles)) return roles[0]?.name;
+    return (roles as { name?: string }).name;
+  }).filter(Boolean) as string[];
+
+  // Generate tokens
+  const tokens = generateTokens({
+    userId: user.id,
+    email: user.email,
+    roles: roleNames,
+  });
+
+  // Create session
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  const { error: sessionError } = await supabase
+    .from('sessions')
+    .insert({
+      user_id: user.id,
+      token: tokens.accessToken,
+      refresh_token: tokens.refreshToken,
+      expires_at: expiresAt.toISOString(),
+      ip_address: meta.ipAddress,
+      user_agent: meta.userAgent,
+    });
+
+  if (sessionError) {
+    logger.error('[AUTH SERVICE] Error creating session after 2FA:', JSON.stringify(sessionError));
+  }
+
+  // Update last login
+  await supabase
+    .from('users')
+    .update({ last_login_at: new Date().toISOString() })
+    .eq('id', user.id);
+
+  logger.info('[AUTH SERVICE] ========== 2FA LOGIN SUCCESS ==========');
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      fullName: user.full_name,
+      profileImageUrl: user.profile_image_url,
+      preferredLanguage: user.preferred_language,
+      roles: roleNames,
+    },
+    tokens,
+  };
 }
 
 export async function refreshAccessToken(refreshToken: string) {

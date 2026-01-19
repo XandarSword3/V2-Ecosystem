@@ -33,7 +33,10 @@ import {
   Truck,
   Store,
   Receipt,
+  Tag,
 } from 'lucide-react';
+import { PaymentDiscounts, AppliedDiscount } from '@/components/customer/PaymentDiscounts';
+import StripePayment from '@/components/payments/StripePayment';
 
 export default function RestaurantCartPage() {
   const t = useTranslations('restaurant');
@@ -54,10 +57,21 @@ export default function RestaurantCartPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
   const [notes, setNotes] = useState('');
   const [activeStep, setActiveStep] = useState(1);
+  
+  // Discount state
+  const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
+  const [finalTotal, setFinalTotal] = useState(0);
+  
+  // Stripe payment state
+  const [showStripePayment, setShowStripePayment] = useState(false);
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
   const subtotal = getRestaurantTotal();
   const tax = subtotal * 0.11;
-  const total = subtotal + tax;
+  const serviceCharge = orderType === 'dine_in' ? subtotal * 0.10 : 0; // 10% service charge for dine-in
+  const deliveryFee = orderType === 'delivery' ? 5 : 0; // $5 flat delivery fee
+  const preDiscountTotal = subtotal + tax + serviceCharge + deliveryFee;
+  const total = finalTotal > 0 ? finalTotal : preDiscountTotal;
 
   interface CreateOrderData {
     customerName: string;
@@ -67,6 +81,11 @@ export default function RestaurantCartPage() {
     paymentMethod: 'cash' | 'card';
     notes?: string;
     items: Array<{ menuItemId: string; quantity: number; notes?: string }>;
+    // Discount fields (matching backend expected format)
+    couponCode?: string;
+    giftCardRedemptions?: Array<{ code: string; amount: number }>;
+    loyaltyPointsToRedeem?: number;
+    loyaltyPointsDollarValue?: number;
   }
 
   interface ApiError {
@@ -76,9 +95,19 @@ export default function RestaurantCartPage() {
   const orderMutation = useMutation({
     mutationFn: (data: CreateOrderData) => restaurantApi.createOrder(data),
     onSuccess: (response) => {
-      clearRestaurantCart();
-      toast.success(t('orderPlaced'));
-      router.push(`/restaurant/confirmation?id=${response.data.data.id}`);
+      const orderId = response.data.data.id;
+      
+      // For card payments, show Stripe checkout instead of redirecting
+      if (paymentMethod === 'card' && total > 0) {
+        setPendingOrderId(orderId);
+        setShowStripePayment(true);
+        toast.info('Please complete your card payment');
+      } else {
+        // For cash payments or zero total, redirect directly
+        clearRestaurantCart();
+        toast.success(t('orderPlaced'));
+        router.push(`/restaurant/confirmation?id=${orderId}`);
+      }
     },
     onError: (err: ApiError) => {
       toast.error(err.response?.data?.error || t('orderFailed'));
@@ -106,6 +135,11 @@ export default function RestaurantCartPage() {
       return;
     }
 
+    // Extract discount info from appliedDiscounts
+    const couponDiscount = appliedDiscounts.find(d => d.type === 'coupon');
+    const giftCardDiscounts = appliedDiscounts.filter(d => d.type === 'giftcard');
+    const loyaltyDiscount = appliedDiscounts.find(d => d.type === 'loyalty');
+
     orderMutation.mutate({
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
@@ -118,7 +152,31 @@ export default function RestaurantCartPage() {
         quantity: item.quantity,
         notes: item.specialInstructions,
       })),
+      // Include discount information in backend-expected format
+      couponCode: couponDiscount?.code,
+      giftCardRedemptions: giftCardDiscounts.length > 0 
+        ? giftCardDiscounts.map(gc => ({ code: gc.code!, amount: gc.amount }))
+        : undefined,
+      loyaltyPointsToRedeem: loyaltyDiscount?.pointsUsed,
+      loyaltyPointsDollarValue: loyaltyDiscount?.amount,
     });
+  };
+
+  // Stripe payment handlers
+  const handleStripePaymentSuccess = () => {
+    clearRestaurantCart();
+    toast.success(t('orderPlaced'));
+    router.push(`/restaurant/confirmation?id=${pendingOrderId}`);
+  };
+
+  const handleStripePaymentError = (error: string) => {
+    toast.error(`Payment failed: ${error}`);
+    // Keep the order but show error - user can retry
+  };
+
+  const handleStripePaymentCancel = () => {
+    setShowStripePayment(false);
+    toast.info('Payment cancelled. Your order is saved - you can pay when ready.');
   };
 
   // Empty cart state
@@ -588,6 +646,24 @@ export default function RestaurantCartPage() {
                       </motion.button>
                     </div>
 
+                    {/* Discounts Section - Coupons, Gift Cards, Loyalty Points */}
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Tag className="w-5 h-5 text-orange-500" />
+                        <h3 className="font-semibold text-slate-900 dark:text-white">Apply Discounts</h3>
+                      </div>
+                      <PaymentDiscounts
+                        orderTotal={preDiscountTotal}
+                        orderType={orderType}
+                        moduleId="restaurant"
+                        onTotalChange={(newTotal, discounts) => {
+                          setAppliedDiscounts(discounts);
+                          setFinalTotal(newTotal);
+                        }}
+                        className="mt-2"
+                      />
+                    </div>
+
                     <div className="pt-4 flex justify-start">
                       <Button 
                         variant="outline"
@@ -656,6 +732,32 @@ export default function RestaurantCartPage() {
                       <span className="text-slate-500">Tax (11%)</span>
                       <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, currency)}</span>
                     </div>
+                    {serviceCharge > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Service Charge (10%)</span>
+                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(serviceCharge, currency)}</span>
+                      </div>
+                    )}
+                    {deliveryFee > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Delivery Fee</span>
+                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(deliveryFee, currency)}</span>
+                      </div>
+                    )}
+                    {appliedDiscounts.length > 0 && (
+                      <>
+                        {appliedDiscounts.map((discount, idx) => (
+                          <div key={idx} className="flex justify-between text-sm">
+                            <span className="text-green-600 dark:text-green-400">
+                              {discount.type === 'coupon' && `Coupon (${discount.code})`}
+                              {discount.type === 'giftcard' && `Gift Card (${discount.code})`}
+                              {discount.type === 'loyalty' && 'Loyalty Points'}
+                            </span>
+                            <span className="text-green-600 dark:text-green-400">-{formatCurrency(discount.amount, currency)}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
                     <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-slate-900 dark:text-white">Total</span>
@@ -734,6 +836,47 @@ export default function RestaurantCartPage() {
           </div>
         </div>
       </div>
+
+      {/* Stripe Payment Modal */}
+      <AnimatePresence>
+        {showStripePayment && pendingOrderId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-full flex items-center justify-center">
+                  <CreditCard className="w-8 h-8 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                  Complete Payment
+                </h3>
+                <p className="text-slate-500 dark:text-slate-400 mt-1">
+                  Enter your card details to complete your order
+                </p>
+              </div>
+
+              <StripePayment
+                amount={total}
+                currency="USD"
+                referenceType="restaurant_order"
+                referenceId={pendingOrderId}
+                onSuccess={handleStripePaymentSuccess}
+                onError={handleStripePaymentError}
+                onCancel={handleStripePaymentCancel}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

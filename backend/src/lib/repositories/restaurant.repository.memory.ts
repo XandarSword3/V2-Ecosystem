@@ -254,6 +254,12 @@ export function createInMemoryRestaurantRepository(): InMemoryRestaurantReposito
     getAllTables(): RestaurantTable[] {
       return Array.from(tables.values());
     },
+
+    // RPC method for stored procedures - in memory just returns empty success
+    async rpc(_fn: string, _params?: Record<string, unknown>): Promise<{ data: unknown; error: Error | null }> {
+      // In-memory mock - stored procedures don't apply here
+      return { data: null, error: null };
+    },
   };
 }
 

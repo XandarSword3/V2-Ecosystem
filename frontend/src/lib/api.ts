@@ -10,6 +10,11 @@ interface CreateOrderData {
   specialInstructions?: string;
   tableNumber?: string;
   chaletNumber?: string;
+  // Discount integration fields
+  couponCode?: string;
+  giftCardRedemptions?: Array<{ code: string; amount: number }>;
+  loyaltyPointsToRedeem?: number;
+  loyaltyPointsDollarValue?: number;
 }
 
 interface CreateSnackOrderData {
@@ -94,7 +99,8 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
+        // Validate that we have a real refresh token (not null, undefined, or the string "undefined")
+        if (refreshToken && refreshToken !== 'undefined' && refreshToken !== 'null') {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
             refreshToken,
           });
@@ -105,11 +111,16 @@ api.interceptors.response.use(
 
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return api(originalRequest);
+        } else {
+          // No valid refresh token - clear tokens and don't redirect automatically
+          // (let the calling code handle the failure)
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
         }
       } catch (refreshError) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
+        // Don't automatically redirect - let the component handle the auth state
       }
     }
 

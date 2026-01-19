@@ -56,6 +56,7 @@
     "andMore": "+{count} de plus",
     "items": "articles",
     "total": "Total",
+    "discount": "Réduction",
     "optional": "(Optionnel)",
     "contactUs": "Contactez-nous",
     "weAreHereToHelp": "Nous sommes là pour vous aider",
@@ -282,6 +283,7 @@
     "orderMore": "Commander Plus",
     "viewMyOrders": "Voir Mes Commandes",
     "backToMenu": "Retour au Menu",
+    "qrCode": "Montrez ce code QR au personnel",
     "categoryNames": {
       "appetizers": "Entrées",
       "mains": "Plats Principaux",
@@ -1208,6 +1210,7 @@
   },
   "adminPool": {
     "title": "Gestion de la piscine",
+    "subtitle": "Gérer les sessions de piscine, les billets et la capacité",
     "sessions": {
       "title": "Sessions de piscine",
       "addSession": "Ajouter une session",
@@ -1218,7 +1221,33 @@
       "availableDays": "Jours disponibles",
       "sessionCreated": "Session créée",
       "sessionUpdated": "Session mise à jour",
-      "sessionDeleted": "Session supprimée"
+      "sessionDeleted": "Session supprimée",
+      "active": "Sessions actives",
+      "activeDescription": "sessions actuellement actives",
+      "manage": "Gérer"
+    },
+    "stats": {
+      "todayTickets": "Billets du jour",
+      "todayRevenue": "Revenus du jour",
+      "currentOccupancy": "Occupation actuelle",
+      "validatedTickets": "Validés aujourd'hui"
+    },
+    "occupancy": {
+      "title": "Occupation de la piscine",
+      "guests": "invités",
+      "capacity": "capacité",
+      "nearCapacity": "La piscine approche de sa capacité!"
+    },
+    "quickActions": {
+      "title": "Actions rapides",
+      "manageSessions": "Gérer les sessions",
+      "manageSessionsDesc": "Créer et modifier les créneaux horaires de la piscine",
+      "viewTickets": "Voir les billets",
+      "viewTicketsDesc": "Parcourir et gérer les billets de piscine",
+      "capacity": "Moniteur de capacité",
+      "capacityDesc": "Occupation de la piscine en temps réel",
+      "reports": "Rapports",
+      "reportsDesc": "Voir les analyses et rapports de la piscine"
     },
     "tickets": {
       "title": "Billets de piscine",
@@ -1332,6 +1361,11 @@
       "footer": "Pied de page",
       "translations": "Traductions",
       "databaseBackups": "Sauvegardes de Base de Données",
+      "loyalty": "Programme de Fidélité",
+      "giftCards": "Cartes Cadeaux",
+      "coupons": "Coupons",
+      "housekeeping": "Entretien",
+      "inventory": "Inventaire",
       "logout": "Déconnexion"
     },
     "messages": {
@@ -1386,10 +1420,13 @@
       "daysAgo": "Il y a {count}j",
       "kitchenOrders": "Commandes Cuisine",
       "kitchenOrdersDesc": "Voir et gérer les commandes du restaurant",
+      "snackBar": "Snack-Bar",
       "snackBarTitle": "Snack-Bar",
       "snackBarDesc": "Gérer les commandes du snack-bar",
+      "chalets": "Chalets",
       "chaletsTitle": "Chalets",
       "chaletsDesc": "Arrivées et départs",
+      "pool": "Piscine",
       "poolTitle": "Piscine",
       "poolDesc": "Gérer l'accès à la piscine",
       "pendingOrders": "Commandes en Attente",

@@ -56,6 +56,7 @@
     "andMore": "+{count} more",
     "items": "items",
     "total": "Total",
+    "discount": "Discount",
     "optional": "(Optional)",
     "contactUs": "Contact Us",
     "weAreHereToHelp": "We're here to help",
@@ -282,6 +283,7 @@
     "orderMore": "Order More",
     "viewMyOrders": "View My Orders",
     "backToMenu": "Back to Menu",
+    "qrCode": "Show this QR code to staff",
     "categoryNames": {
       "appetizers": "Appetizers",
       "mains": "Main Courses",
@@ -1210,6 +1212,7 @@
   },
   "adminPool": {
     "title": "Pool Management",
+    "subtitle": "Manage pool sessions, tickets, and capacity",
     "sessions": {
       "title": "Pool Sessions",
       "addSession": "Add Session",
@@ -1220,7 +1223,33 @@
       "availableDays": "Available Days",
       "sessionCreated": "Session created",
       "sessionUpdated": "Session updated",
-      "sessionDeleted": "Session deleted"
+      "sessionDeleted": "Session deleted",
+      "active": "Active Sessions",
+      "activeDescription": "sessions currently active",
+      "manage": "Manage"
+    },
+    "stats": {
+      "todayTickets": "Today's Tickets",
+      "todayRevenue": "Today's Revenue",
+      "currentOccupancy": "Current Occupancy",
+      "validatedTickets": "Validated Today"
+    },
+    "occupancy": {
+      "title": "Pool Occupancy",
+      "guests": "guests",
+      "capacity": "capacity",
+      "nearCapacity": "Pool is near capacity!"
+    },
+    "quickActions": {
+      "title": "Quick Actions",
+      "manageSessions": "Manage Sessions",
+      "manageSessionsDesc": "Create and edit pool time slots",
+      "viewTickets": "View Tickets",
+      "viewTicketsDesc": "Browse and manage pool tickets",
+      "capacity": "Capacity Monitor",
+      "capacityDesc": "Real-time pool occupancy",
+      "reports": "Reports",
+      "reportsDesc": "View pool analytics and reports"
     },
     "tickets": {
       "title": "Pool Tickets",
@@ -1334,7 +1363,12 @@
       "footer": "Footer",
       "translations": "Translations",
       "databaseBackups": "Database Backups",
-      "logout": "Logout"
+      "logout": "Logout",
+      "loyalty": "Loyalty Program",
+      "giftCards": "Gift Cards",
+      "coupons": "Coupons",
+      "housekeeping": "Housekeeping",
+      "inventory": "Inventory"
     },
     "messages": {
       "loggedOutSuccessfully": "Logged out successfully"
@@ -1388,10 +1422,13 @@
       "daysAgo": "{count}d ago",
       "kitchenOrders": "Kitchen Orders",
       "kitchenOrdersDesc": "View and manage restaurant orders",
+      "snackBar": "Snack Bar",
       "snackBarTitle": "Snack Bar",
       "snackBarDesc": "Handle snack bar orders",
+      "chalets": "Chalets",
       "chaletsTitle": "Chalets",
       "chaletsDesc": "Check-ins and check-outs",
+      "pool": "Pool",
       "poolTitle": "Pool",
       "poolDesc": "Manage pool access",
       "pendingOrders": "Pending Orders",

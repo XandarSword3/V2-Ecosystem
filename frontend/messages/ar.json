@@ -56,6 +56,7 @@
     "andMore": "+{count} المزيد",
     "items": "عناصر",
     "total": "المجموع",
+    "discount": "خصم",
     "optional": "(اختياري)",
     "contactUs": "تواصل معنا",
     "weAreHereToHelp": "نحن هنا للمساعدة",
@@ -282,6 +283,7 @@
     "orderMore": "اطلب المزيد",
     "viewMyOrders": "عرض طلباتي",
     "backToMenu": "العودة للقائمة",
+    "qrCode": "أظهر رمز QR هذا للموظفين",
     "categoryNames": {
       "appetizers": "المقبلات",
       "mains": "الأطباق الرئيسية",
@@ -1208,6 +1210,30 @@
   },
   "adminPool": {
     "title": "إدارة المسبح",
+    "subtitle": "إدارة جلسات المسبح والتذاكر والسعة",
+    "quickActions": {
+      "title": "إجراءات سريعة",
+      "manageSessions": "إدارة الجلسات",
+      "manageSessionsDesc": "إنشاء وتعديل فترات المسبح",
+      "viewTickets": "عرض التذاكر",
+      "viewTicketsDesc": "تصفح وإدارة تذاكر المسبح",
+      "capacity": "مراقبة السعة",
+      "capacityDesc": "إشغال المسبح في الوقت الفعلي",
+      "reports": "التقارير",
+      "reportsDesc": "عرض تحليلات وتقارير المسبح"
+    },
+    "stats": {
+      "todayTickets": "تذاكر اليوم",
+      "todayRevenue": "إيرادات اليوم",
+      "currentOccupancy": "الإشغال الحالي",
+      "validatedTickets": "التذاكر المصدقة اليوم"
+    },
+    "occupancy": {
+      "title": "إشغال المسبح",
+      "guests": "ضيوف",
+      "capacity": "السعة",
+      "nearCapacity": "المسبح قريب من السعة القصوى!"
+    },
     "sessions": {
       "title": "جلسات المسبح",
       "addSession": "إضافة جلسة",
@@ -1218,7 +1244,10 @@
       "availableDays": "الأيام المتاحة",
       "sessionCreated": "تم إنشاء الجلسة",
       "sessionUpdated": "تم تحديث الجلسة",
-      "sessionDeleted": "تم حذف الجلسة"
+      "sessionDeleted": "تم حذف الجلسة",
+      "active": "الجلسات النشطة",
+      "activeDescription": "الجلسات النشطة حالياً",
+      "manage": "إدارة"
     },
     "tickets": {
       "title": "تذاكر المسبح",
@@ -1332,6 +1361,11 @@
       "footer": "التذييل",
       "translations": "الترجمات",
       "databaseBackups": "نسخ قاعدة البيانات",
+      "loyalty": "برنامج الولاء",
+      "giftCards": "بطاقات الهدايا",
+      "coupons": "القسائم",
+      "housekeeping": "التدبير المنزلي",
+      "inventory": "المخزون",
       "logout": "تسجيل الخروج"
     },
     "messages": {
@@ -1386,10 +1420,13 @@
       "daysAgo": "منذ {count} يوم",
       "kitchenOrders": "طلبات المطبخ",
       "kitchenOrdersDesc": "عرض وإدارة طلبات المطعم",
+      "snackBar": "البوفيه",
       "snackBarTitle": "البوفيه",
       "snackBarDesc": "إدارة طلبات البوفيه",
+      "chalets": "الشاليهات",
       "chaletsTitle": "الشاليهات",
       "chaletsDesc": "تسجيل الوصول والمغادرة",
+      "pool": "المسبح",
       "poolTitle": "المسبح",
       "poolDesc": "إدارة الوصول للمسبح",
       "pendingOrders": "الطلبات المعلقة",

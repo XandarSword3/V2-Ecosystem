@@ -413,10 +413,10 @@ export async function cancelTicket(req: Request, res: Response, next: NextFuncti
       return res.status(400).json({ success: false, error: 'Ticket is already cancelled' });
     }
 
-    if (ticket.status === 'used' || ticket.status === 'active') {
+    if (ticket.status === 'used' || ticket.entry_time) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Cannot cancel a ticket that has already been used or is currently active' 
+        error: 'Cannot cancel a ticket that has already been used or validated' 
       });
     }
 
@@ -521,11 +521,21 @@ export async function validateTicket(req: Request, res: Response, next: NextFunc
     }
 
     // Validate ticket
-    if (['used', 'active'].includes(ticket.status)) {
+    // Check if ticket is already used (has exit_time) or currently in pool (has entry_time but no exit_time)
+    if (ticket.status === 'used') {
       return res.status(400).json({
         success: false,
-        error: ticket.status === 'active' ? 'Ticket already active (In Pool)' : 'Ticket already used',
+        error: 'Ticket already used',
         validatedAt: ticket.validated_at,
+      });
+    }
+    
+    // Check if guest is currently in pool (entered but not exited)
+    if (ticket.entry_time && !ticket.exit_time) {
+      return res.status(400).json({
+        success: false,
+        error: 'Guest is currently in the pool. Record exit first.',
+        entryTime: ticket.entry_time,
       });
     }
 
@@ -537,9 +547,11 @@ export async function validateTicket(req: Request, res: Response, next: NextFunc
     }
 
     // Check if ticket is for today
-    const today = dayjs().startOf('day');
-    const ticketDay = dayjs(ticket.ticket_date).startOf('day');
-    if (!ticketDay.isSame(today)) {
+    // Compare dates in local timezone - the ticket_date stores midnight UTC for the booking day
+    // Add 2 hours to the UTC time to get Lebanon timezone (UTC+2), then compare dates
+    const today = dayjs().format('YYYY-MM-DD');
+    const ticketDay = dayjs(ticket.ticket_date).add(2, 'hour').format('YYYY-MM-DD');
+    if (ticketDay !== today) {
       return res.status(400).json({
         success: false,
         error: 'Ticket is not valid for today',
@@ -547,11 +559,11 @@ export async function validateTicket(req: Request, res: Response, next: NextFunc
       });
     }
 
-    // Mark as active (Entered)
+    // Mark as used (Entered) - status stays 'valid' but with entry_time recorded
+    // The ticket is still valid and tracks entry/exit via timestamps
     const { data: updatedTicket, error: updateError } = await supabase
       .from('pool_tickets')
       .update({
-        status: 'active',
         validated_at: new Date().toISOString(),
         validated_by: req.user!.userId,
         entry_time: new Date().toISOString(),

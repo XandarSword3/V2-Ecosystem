@@ -19,12 +19,33 @@ export async function createOrder(data: {
   customerEmail?: string;
   customerPhone?: string;
   tableId?: string;
+  tableNumber?: string;
   orderType: 'dine_in' | 'takeaway' | 'delivery' | 'room_service';
   items: Array<{ menuItemId: string; quantity: number; specialInstructions?: string }>;
   specialInstructions?: string;
   paymentMethod?: 'cash' | 'card' | 'whish' | 'online' | 'room_charge';
+  // Discount integration fields
+  couponCode?: string;
+  giftCardRedemptions?: Array<{ code: string; amount: number }>;
+  loyaltyPointsToRedeem?: number;
+  loyaltyPointsDollarValue?: number;
 }) {
   const supabase = getSupabase();
+
+  // Resolve Table ID from number if ID is missing
+  let finalTableId = data.tableId;
+  if (!finalTableId && data.tableNumber) {
+    const { data: tableRes } = await supabase
+      .from('restaurant_tables')
+      .select('id')
+      .eq('table_number', data.tableNumber)
+      .eq('is_active', true)
+      .single();
+    
+    if (tableRes) {
+      finalTableId = tableRes.id;
+    }
+  }
 
   // Get menu items for pricing
   const itemIds = data.items.map(i => i.menuItemId);
@@ -65,13 +86,23 @@ export async function createOrder(data: {
   const taxAmount = subtotal * TAX_RATE;
   const serviceCharge = data.orderType === 'dine_in' ? subtotal * 0.1 : 0; // 10% service for dine-in
   const deliveryFee = data.orderType === 'delivery' ? 5 : 0; // Flat delivery fee
-  const totalAmount = subtotal + taxAmount + serviceCharge + deliveryFee;
+  const preDiscountTotal = subtotal + taxAmount + serviceCharge + deliveryFee;
+
+  // Initialize discount tracking
+  let totalDiscount = 0;
+  let couponDiscount = 0;
+  let taxSavings = 0; // Track tax reduction from pre-tax coupons
+  let couponId: string | undefined;
+  let giftCardAmount = 0;
+  const giftCardRedemptions: Array<{ code: string; amount: number; giftCardId: string }> = [];
+  let loyaltyPointsUsed = 0;
+  let loyaltyDiscount = 0;
 
   // Estimate ready time (average prep time + buffer)
   const avgPrepTime = Math.max(...(menuItemsList || []).map(i => i.preparation_time_minutes || 15));
   const estimatedReadyTime = dayjs().add(avgPrepTime + 5, 'minute').toISOString();
 
-  // Create order
+  // Create order first (we need the ID for discount tracking)
   const { data: order, error: orderError } = await supabase
     .from('restaurant_orders')
     .insert({
@@ -79,7 +110,7 @@ export async function createOrder(data: {
       customer_id: data.customerId,
       customer_name: data.customerName,
       customer_phone: data.customerPhone,
-      table_id: data.tableId,
+      table_id: finalTableId,
       module_id: moduleId,
       order_type: data.orderType,
       status: 'pending',
@@ -87,8 +118,8 @@ export async function createOrder(data: {
       tax_amount: taxAmount.toFixed(2),
       service_charge: serviceCharge.toFixed(2),
       delivery_fee: deliveryFee.toFixed(2),
-      discount_amount: '0',
-      total_amount: totalAmount.toFixed(2),
+      discount_amount: '0', // Will be updated after discounts
+      total_amount: preDiscountTotal.toFixed(2), // Will be updated
       special_instructions: data.specialInstructions,
       estimated_ready_time: estimatedReadyTime,
       payment_status: 'pending',
@@ -112,6 +143,185 @@ export async function createOrder(data: {
     })));
 
   if (insertItemsError) throw insertItemsError;
+
+  // === APPLY DISCOUNTS (Order: Coupon -> Gift Cards -> Loyalty Points) ===
+  let remainingTotal = preDiscountTotal;
+
+  // 1. Apply Coupon (if provided)
+  if (data.couponCode) {
+    try {
+      const { data: couponResult, error: couponError } = await supabase.rpc(
+        'apply_coupon_atomic',
+        {
+          p_code: data.couponCode.toUpperCase(),
+          p_user_id: data.customerId || null,
+          p_order_total: subtotal, // Coupon applies to subtotal
+          p_order_id: order.id,
+          p_module_type: 'all',
+        }
+      );
+
+      if (couponError) {
+        logger.warn('[ORDER SERVICE] Coupon application failed:', couponError);
+      } else if (couponResult && couponResult[0]?.success) {
+        couponDiscount = parseFloat(couponResult[0].discount_amount) || 0;
+        couponId = couponResult[0].coupon_id;
+        
+        // Coupons are pre-tax, so we need to reduce the tax amount
+        const currentTaxSavings = couponDiscount * TAX_RATE;
+        taxSavings += currentTaxSavings;
+        
+        totalDiscount += couponDiscount;
+        // Reduce remaining total by discount AND the tax that is no longer applicable
+        remainingTotal -= (couponDiscount + currentTaxSavings);
+        
+        logger.info('[ORDER SERVICE] Coupon applied:', { code: data.couponCode, discount: couponDiscount, taxSavings: currentTaxSavings });
+      } else if (couponResult && couponResult[0]?.error_message) {
+        logger.warn('[ORDER SERVICE] Coupon invalid:', couponResult[0].error_message);
+      }
+    } catch (err) {
+      logger.warn('[ORDER SERVICE] Coupon error (non-fatal):', err);
+    }
+  }
+
+  // 2. Apply Gift Cards (if provided)
+  if (data.giftCardRedemptions && data.giftCardRedemptions.length > 0) {
+    for (const gc of data.giftCardRedemptions) {
+      if (remainingTotal <= 0) break;
+
+      try {
+        const { data: gcResult, error: gcError } = await supabase.rpc(
+          'redeem_giftcard_atomic',
+          {
+            p_code: gc.code.toUpperCase(),
+            p_amount: Math.min(gc.amount, remainingTotal),
+            p_order_id: order.id,
+          }
+        );
+
+        if (gcError) {
+          logger.warn('[ORDER SERVICE] Gift card redemption failed:', gcError);
+        } else if (gcResult && gcResult[0]?.success) {
+          const redeemed = parseFloat(gcResult[0].amount_redeemed) || 0;
+          giftCardAmount += redeemed;
+          totalDiscount += redeemed;
+          remainingTotal -= redeemed;
+          giftCardRedemptions.push({
+            code: gc.code,
+            amount: redeemed,
+            giftCardId: gcResult[0].gift_card_id,
+          });
+          logger.info('[ORDER SERVICE] Gift card redeemed:', { code: gc.code, amount: redeemed });
+        }
+      } catch (err) {
+        logger.warn('[ORDER SERVICE] Gift card error (non-fatal):', err);
+      }
+    }
+  }
+
+  // 3. Apply Loyalty Points (if provided)
+  if (data.loyaltyPointsToRedeem && data.loyaltyPointsToRedeem > 0 && data.customerId) {
+    try {
+      const pointsDollarValue = data.loyaltyPointsDollarValue || (data.loyaltyPointsToRedeem / 100);
+      const redeemAmount = Math.min(pointsDollarValue, remainingTotal);
+
+      const { data: loyaltyResult, error: loyaltyError } = await supabase.rpc(
+        'redeem_loyalty_points_atomic',
+        {
+          p_user_id: data.customerId,
+          p_points: data.loyaltyPointsToRedeem,
+          p_order_id: order.id,
+          p_dollar_value: redeemAmount,
+        }
+      );
+
+      if (loyaltyError) {
+        logger.warn('[ORDER SERVICE] Loyalty redemption failed:', loyaltyError);
+      } else if (loyaltyResult && loyaltyResult[0]?.success) {
+        loyaltyPointsUsed = loyaltyResult[0].points_redeemed || 0;
+        loyaltyDiscount = redeemAmount;
+        totalDiscount += loyaltyDiscount;
+        remainingTotal -= loyaltyDiscount;
+        logger.info('[ORDER SERVICE] Loyalty points redeemed:', { points: loyaltyPointsUsed, value: loyaltyDiscount });
+      }
+    } catch (err) {
+      logger.warn('[ORDER SERVICE] Loyalty error (non-fatal):', err);
+    }
+  }
+
+  // Calculate final total
+  // original preDiscountTotal included full tax. We subtract the discount amounts AND the tax savings.
+  const finalTotal = Math.max(0, preDiscountTotal - totalDiscount - taxSavings);
+  const finalTaxAmount = Math.max(0, taxAmount - taxSavings);
+
+  // Update order with discount information if any discounts were applied
+  if (totalDiscount > 0) {
+    await supabase
+      .from('restaurant_orders')
+      .update({
+        discount_amount: totalDiscount.toFixed(2),
+        total_amount: finalTotal.toFixed(2),
+        tax_amount: finalTaxAmount.toFixed(2), // Update tax to reflect pre-tax discount
+        coupon_id: couponId,
+        coupon_code: data.couponCode,
+        coupon_discount: couponDiscount.toFixed(2),
+        gift_card_amount: giftCardAmount.toFixed(2),
+        loyalty_points_used: loyaltyPointsUsed,
+        loyalty_discount: loyaltyDiscount.toFixed(2),
+      })
+      .eq('id', order.id);
+    
+    // Update local order object
+    order.discount_amount = totalDiscount.toFixed(2);
+    order.total_amount = finalTotal.toFixed(2);
+    order.tax_amount = finalTaxAmount.toFixed(2);
+  }
+
+  // === EARN LOYALTY POINTS (if customer is logged in) ===
+  let loyaltyPointsEarned = 0;
+  if (data.customerId && finalTotal > 0) {
+    try {
+      const { data: earnResult } = await supabase.rpc(
+        'earn_loyalty_points_atomic',
+        {
+          p_user_id: data.customerId,
+          p_order_total: finalTotal,
+          p_order_id: order.id,
+          p_points_per_dollar: 1, // Could be configurable
+        }
+      );
+
+      if (earnResult && earnResult[0]?.success) {
+        loyaltyPointsEarned = earnResult[0].points_earned || 0;
+        logger.info('[ORDER SERVICE] Loyalty points earned:', loyaltyPointsEarned);
+      }
+    } catch (err) {
+      logger.warn('[ORDER SERVICE] Points earning error (non-fatal):', err);
+    }
+  }
+
+  // === DEDUCT INVENTORY (for ingredients linked to menu items) ===
+  try {
+    const { data: inventoryResult, error: inventoryError } = await supabase.rpc(
+      'deduct_inventory_for_order',
+      { p_order_id: order.id }
+    );
+
+    if (inventoryError) {
+      logger.warn('[ORDER SERVICE] Inventory deduction failed:', inventoryError);
+    } else if (inventoryResult && inventoryResult[0]?.items_deducted > 0) {
+      logger.info('[ORDER SERVICE] Inventory deducted:', inventoryResult[0].items_deducted, 'items');
+    }
+  } catch (err) {
+    logger.warn('[ORDER SERVICE] Inventory deduction error (non-fatal):', err);
+  }
+
+  logger.info('[ORDER SERVICE] Order created:', order.order_number, {
+    subtotal,
+    totalDiscount,
+    finalTotal,
+    pointsEarned: loyaltyPointsEarned,
+  });
 
   // Create status history
   await supabase
@@ -192,7 +402,14 @@ export async function getOrderById(id: string) {
 
   if (itemsError) throw itemsError;
 
-  return { ...order, items: items || [] };
+  // Transform items to match frontend expectations
+  const transformedItems = (items || []).map((item: Record<string, unknown>) => ({
+    ...item,
+    menu_item: item.menu_items, // Frontend expects menu_item (singular)
+    total_price: item.subtotal, // Frontend expects total_price
+  }));
+
+  return { ...order, items: transformedItems };
 }
 
 export async function getOrderStatus(id: string) {

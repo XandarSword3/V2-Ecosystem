@@ -15,14 +15,21 @@ vi.mock('../../../src/utils/logger.js', () => ({
   }
 }));
 
-vi.mock('otplib', () => ({
-  authenticator: {
-    options: {},
-    generateSecret: vi.fn().mockReturnValue('ABCDEFGHIJKLMNOP1234'),
-    keyuri: vi.fn().mockReturnValue('otpauth://totp/V2%20Resort:test%40example.com?secret=ABCDEFGHIJKLMNOP1234'),
-    verify: vi.fn()
-  }
-}));
+// Mock otplib v13 - uses functional API with standalone exports
+// Define mocks inside factory to avoid hoisting issues
+vi.mock('otplib', () => {
+  const mockGenerateSecret = vi.fn().mockReturnValue('ABCDEFGHIJKLMNOP1234');
+  const mockGenerateURI = vi.fn().mockReturnValue('otpauth://totp/V2%20Resort:test%40example.com?secret=ABCDEFGHIJKLMNOP1234');
+  const mockGenerate = vi.fn().mockReturnValue('123456');
+  const mockVerify = vi.fn().mockReturnValue(true);
+  
+  return {
+    generateSecret: mockGenerateSecret,
+    generateURI: mockGenerateURI,
+    generate: mockGenerate,
+    verify: mockVerify
+  };
+});
 
 vi.mock('qrcode', () => ({
   default: {
@@ -34,7 +41,7 @@ vi.mock('qrcode', () => ({
 process.env.JWT_SECRET = 'test-jwt-secret-for-encryption-key-testing';
 
 import { getSupabase } from '../../../src/database/connection';
-import { authenticator } from 'otplib';
+import { generateSecret, generateURI, generate, verify } from 'otplib';
 import { twoFactorService } from '../../../src/services/two-factor.service';
 
 describe('TwoFactorService', () => {

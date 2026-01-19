@@ -69,6 +69,12 @@ import paymentRoutes from './modules/payments/payment.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import reviewsRoutes from './modules/reviews/reviews.routes.js';
 import supportRoutes from './modules/support/support.routes.js';
+// Tier 1 feature routes
+import loyaltyRoutes from './modules/loyalty/loyalty.routes.js';
+import giftcardRoutes from './modules/giftcards/giftcard.routes.js';
+import couponRoutes from './modules/coupons/coupon.routes.js';
+import housekeepingRoutes from './modules/housekeeping/housekeeping.routes.js';
+import inventoryRoutes from './modules/inventory/inventory.routes.js';
 import * as modulesController from './modules/admin/modules.controller.js';
 import { requireModule, clearModuleCache } from './middleware/moduleGuard.middleware.js';
 
@@ -267,7 +273,12 @@ app.use('/api/auth/refresh', authLimiter);
 app.use('/api/auth/reset-password', authLimiter);
 
 // Parsing & compression
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ 
+  limit: '10mb',
+  verify: (req: Request, _res: Response, buf: Buffer) => {
+    (req as any).rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(compression());
 
@@ -388,6 +399,12 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/support', supportRoutes);
+// Tier 1 feature routes
+app.use('/api/loyalty', loyaltyRoutes);
+app.use('/api/giftcards', giftcardRoutes);
+app.use('/api/coupons', couponRoutes);
+app.use('/api/housekeeping', housekeepingRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 // Export clearModuleCache for use when modules are updated
 export { clearModuleCache };

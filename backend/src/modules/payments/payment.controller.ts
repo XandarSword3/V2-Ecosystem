@@ -52,7 +52,7 @@ export async function createPaymentIntent(req: Request, res: Response, next: Nex
       metadata: {
         referenceType,
         referenceId,
-        userId: req.user!.userId,
+        userId: req.user?.userId || 'guest',
       },
     });
 
@@ -77,7 +77,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     const stripe = await getStripeInstance();
     const webhookSecret = await getStripeWebhookSecret();
     event = stripe.webhooks.constructEvent(
-      req.body,
+      (req as any).rawBody,
       sig,
       webhookSecret
     );
