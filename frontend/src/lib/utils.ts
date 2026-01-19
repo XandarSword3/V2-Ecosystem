@@ -103,6 +103,11 @@ export function generateOrderNumber(): string {
   return `ORD-${timestamp}-${random}`;
 }
 
+export function formatNumber(num: number | undefined | null): string {
+  if (num === undefined || num === null) return '0';
+  return new Intl.NumberFormat('en-US').format(num);
+}
+
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';

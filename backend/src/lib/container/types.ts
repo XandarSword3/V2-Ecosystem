@@ -286,6 +286,7 @@ export interface RestaurantRepository {
   getTableById(id: string): Promise<RestaurantTable | null>;
   getTables(moduleId?: string): Promise<RestaurantTable[]>;
   updateTable(id: string, data: Partial<RestaurantTable>): Promise<RestaurantTable>;
+  rpc(fn: string, params?: Record<string, unknown>): Promise<{ data: unknown; error: Error | null }>;
 }
 
 export interface MenuItemFilters {

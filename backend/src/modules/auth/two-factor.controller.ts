@@ -7,6 +7,7 @@ import { Request, Response, NextFunction } from 'express';
 import { twoFactorService } from '../../services/two-factor.service.js';
 import { logActivity } from '../../utils/activityLogger.js';
 import { logger } from '../../utils/logger.js';
+import { completeLoginAfter2FA } from './auth.service.js';
 
 /**
  * Get 2FA status for current user
@@ -185,8 +186,25 @@ export async function verifyTwoFactor(req: Request, res: Response, next: NextFun
       });
     }
     
+    // Complete login and issue tokens after successful 2FA verification
+    const loginResult = await completeLoginAfter2FA(userId, {
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    
+    await logActivity({
+      user_id: userId,
+      action: 'LOGIN_2FA',
+      resource: 'auth',
+      ip_address: req.ip,
+      user_agent: req.get('user-agent'),
+    });
+    
+    logger.info(`2FA verification successful, login completed for user: ${userId}`);
+    
     res.json({
       success: true,
+      data: loginResult,
       message: 'Verification successful',
     });
   } catch (error) {

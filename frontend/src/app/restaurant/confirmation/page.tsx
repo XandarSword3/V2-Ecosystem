@@ -21,6 +21,7 @@ import {
   UtensilsCrossed,
   Hash,
   User,
+  Tag,
 } from 'lucide-react';
 import { QRCode } from '@/components/ui/QRCode';
 
@@ -33,7 +34,12 @@ interface RestaurantOrder {
   order_type: 'dine_in' | 'takeaway';
   subtotal: number;
   tax_amount: number;
+  service_charge?: number;
+  delivery_fee?: number;
   total_amount: number;
+  discount_amount?: number;
+  coupon_discount?: number;
+  coupon_code?: string;
   status: string;
   payment_method: string;
   payment_status: string;
@@ -233,13 +239,45 @@ function RestaurantConfirmationContent() {
                 <span className="text-slate-600 dark:text-slate-400">{t('subtotal')}</span>
                 <span>{formatCurrency(order.subtotal, currency)}</span>
               </div>
+              
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600 dark:text-slate-400">{t('tax')}</span>
                 <span>{formatCurrency(order.tax_amount, currency)}</span>
               </div>
+
+              {/* Service Charge Display */}
+              {(order.service_charge ?? 0) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">Service Charge (10%)</span>
+                  <span>{formatCurrency(order.service_charge ?? 0, currency)}</span>
+                </div>
+              )}
+
+              {/* Delivery Fee Display */}
+              {(order.delivery_fee ?? 0) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">Delivery Fee</span>
+                  <span>{formatCurrency(order.delivery_fee ?? 0, currency)}</span>
+                </div>
+              )}
+              
+              {/* Discount Display */}
+              {((order.discount_amount ?? 0) > 0 || (order.coupon_discount ?? 0) > 0) && (
+                <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                  <span className="flex items-center gap-1">
+                    <Tag className="w-3 h-3" />
+                    {tCommon('discount')}
+                    {order.coupon_code && <span className="text-xs ml-1 bg-green-100 dark:bg-green-900 px-1 rounded">({order.coupon_code})</span>}
+                  </span>
+                  <span>-{formatCurrency((order.discount_amount ?? 0) || (order.coupon_discount ?? 0), currency)}</span>
+                </div>
+              )}
+
               <div className="flex justify-between items-center pt-2 border-t dark:border-slate-700">
                 <span className="font-semibold">{tCommon('total')}</span>
-                <span className="text-2xl font-bold text-orange-600">{formatCurrency(order.total_amount, currency)}</span>
+                <span className="text-2xl font-bold text-orange-600">
+                  {formatCurrency(order.total_amount, currency)}
+                </span>
               </div>
               <div className="mt-2">
                 <span className={`text-xs px-2 py-1 rounded-full ${

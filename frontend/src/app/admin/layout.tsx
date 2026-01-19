@@ -31,6 +31,11 @@ import {
   Palette,
   Cloud,
   Star,
+  Award,
+  Gift,
+  Ticket,
+  Brush,
+  Package,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -100,6 +105,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { name: t('nav.orders'), href: '/admin/snack/orders' },
       ]
     },
+    { name: t('nav.loyalty') || 'Loyalty Program', href: '/admin/loyalty', icon: Award },
+    { name: t('nav.giftCards') || 'Gift Cards', href: '/admin/giftcards', icon: Gift },
+    { name: t('nav.coupons') || 'Coupons', href: '/admin/coupons', icon: Ticket },
+    { name: t('nav.housekeeping') || 'Housekeeping', href: '/admin/housekeeping', icon: Brush },
+    { name: t('nav.inventory') || 'Inventory', href: '/admin/inventory', icon: Package },
     {
       name: t('nav.users'),
       href: '/admin/users',

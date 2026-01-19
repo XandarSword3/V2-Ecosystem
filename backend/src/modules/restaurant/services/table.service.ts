@@ -44,6 +44,7 @@ export async function createTable(data: {
       capacity: data.capacity,
       location: data.location,
       qr_code: qrCode,
+      is_active: true,
     })
     .select()
     .single();
