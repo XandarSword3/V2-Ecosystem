@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, authorize } from "../../middleware/auth.middleware";
+import { authenticate, authorize, optionalAuth } from "../../middleware/auth.middleware";
 import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
 import * as paymentController from "./payment.controller";
 
@@ -9,7 +9,8 @@ const router = Router();
 router.post('/webhook/stripe', paymentController.handleStripeWebhook);
 
 // Customer routes (rate limited - financial operations)
-router.post('/create-intent', authenticate, rateLimits.write, paymentController.createPaymentIntent);
+// Use optionalAuth to support guest checkout while still capturing user if logged in
+router.post('/create-intent', optionalAuth, rateLimits.write, paymentController.createPaymentIntent);
 router.get('/methods', authenticate, paymentController.getPaymentMethods);
 
 // Staff routes (record cash payments) - rate limited to prevent abuse

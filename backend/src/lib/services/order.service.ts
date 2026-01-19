@@ -50,6 +50,14 @@ export interface CreateOrderInput {
   }>;
   specialInstructions?: string;
   paymentMethod?: 'cash' | 'card' | 'whish' | 'online' | 'room_charge';
+  // Discount integration fields
+  couponCode?: string;
+  giftCardRedemptions?: Array<{
+    code: string;
+    amount: number;
+  }>;
+  loyaltyPointsToRedeem?: number;
+  loyaltyPointsDollarValue?: number;
 }
 
 export interface OrderResult {
@@ -60,6 +68,13 @@ export interface OrderResult {
     unitPrice: number;
     subtotal: number;
   }>;
+  discountsApplied?: {
+    coupon?: { code: string; discount: number; couponId: string };
+    giftCards?: Array<{ code: string; amount: number; giftCardId: string }>;
+    loyalty?: { pointsUsed: number; discount: number };
+    totalDiscount: number;
+  };
+  loyaltyPointsEarned?: number;
 }
 
 export interface OrderServiceDependencies {
@@ -171,11 +186,20 @@ export function createOrderService(deps: OrderServiceDependencies): OrderService
       const taxAmount = subtotal * TAX_RATE;
       const serviceCharge = input.orderType === 'dine_in' ? subtotal * SERVICE_CHARGE_RATE : 0;
       const deliveryFee = input.orderType === 'delivery' ? DELIVERY_FEE : 0;
-      const totalAmount = subtotal + taxAmount + serviceCharge + deliveryFee;
+      let preDiscountTotal = subtotal + taxAmount + serviceCharge + deliveryFee;
+
+      // Initialize discount tracking
+      let totalDiscount = 0;
+      let couponDiscount = 0;
+      let couponId: string | undefined;
+      let giftCardAmount = 0;
+      const giftCardRedemptions: Array<{ code: string; amount: number; giftCardId: string }> = [];
+      let loyaltyPointsUsed = 0;
+      let loyaltyDiscount = 0;
 
       const estimatedReadyTime = calculateEstimatedReadyTime(menuItemsList);
 
-      // Create the order
+      // Create the order first (we need the ID for discount tracking)
       const order = await restaurantRepository.createOrder({
         order_number: generateOrderNumber(),
         customer_id: input.customerId,
@@ -190,8 +214,8 @@ export function createOrderService(deps: OrderServiceDependencies): OrderService
         tax_amount: taxAmount.toFixed(2),
         service_charge: serviceCharge.toFixed(2),
         delivery_fee: deliveryFee.toFixed(2),
-        discount_amount: '0',
-        total_amount: totalAmount.toFixed(2),
+        discount_amount: '0', // Will be updated after discounts are applied
+        total_amount: preDiscountTotal.toFixed(2), // Will be updated
         special_instructions: input.specialInstructions,
         estimated_ready_time: estimatedReadyTime,
         payment_status: 'pending',
@@ -206,7 +230,197 @@ export function createOrderService(deps: OrderServiceDependencies): OrderService
         }))
       );
 
-      logger.info('[ORDER SERVICE] Order created:', order.order_number);
+      // === APPLY DISCOUNTS (Order: Coupon -> Gift Cards -> Loyalty Points) ===
+      let remainingTotal = preDiscountTotal;
+
+      // Define types for RPC results
+      interface CouponRpcResult {
+        success: boolean;
+        discount_amount: string;
+        coupon_id: string;
+        error_message?: string;
+      }
+      interface GiftCardRpcResult {
+        success: boolean;
+        amount_redeemed: string;
+        gift_card_id: string;
+      }
+      interface LoyaltyRpcResult {
+        success: boolean;
+        points_redeemed: number;
+        points_earned: number;
+      }
+      interface InventoryRpcResult {
+        items_deducted: number;
+      }
+
+      // 1. Apply Coupon (if provided)
+      if (input.couponCode) {
+        try {
+          const { data: couponData, error: couponError } = await restaurantRepository.rpc(
+            'apply_coupon_atomic',
+            {
+              p_code: input.couponCode.toUpperCase(),
+              p_user_id: input.customerId || null,
+              p_order_total: subtotal, // Coupon applies to subtotal, not total with tax
+              p_order_id: order.id,
+              p_module_type: 'all', // Could map moduleId to type
+            }
+          );
+          const couponResult = couponData as CouponRpcResult[] | null;
+
+          if (couponError) {
+            logger.warn('[ORDER SERVICE] Coupon application failed:', couponError);
+          } else if (couponResult && couponResult[0]?.success) {
+            couponDiscount = parseFloat(couponResult[0].discount_amount) || 0;
+            couponId = couponResult[0].coupon_id;
+            totalDiscount += couponDiscount;
+            remainingTotal -= couponDiscount;
+            logger.info('[ORDER SERVICE] Coupon applied:', { code: input.couponCode, discount: couponDiscount });
+          } else if (couponResult && couponResult[0]?.error_message) {
+            logger.warn('[ORDER SERVICE] Coupon invalid:', couponResult[0].error_message);
+            // Don't fail the order, just skip the coupon
+          }
+        } catch (err) {
+          logger.warn('[ORDER SERVICE] Coupon error (non-fatal):', err);
+        }
+      }
+
+      // 2. Apply Gift Cards (if provided)
+      if (input.giftCardRedemptions && input.giftCardRedemptions.length > 0) {
+        for (const gc of input.giftCardRedemptions) {
+          if (remainingTotal <= 0) break;
+
+          try {
+            const { data: gcData, error: gcError } = await restaurantRepository.rpc(
+              'redeem_giftcard_atomic',
+              {
+                p_code: gc.code.toUpperCase(),
+                p_amount: Math.min(gc.amount, remainingTotal),
+                p_order_id: order.id,
+              }
+            );
+            const gcResult = gcData as GiftCardRpcResult[] | null;
+
+            if (gcError) {
+              logger.warn('[ORDER SERVICE] Gift card redemption failed:', gcError);
+            } else if (gcResult && gcResult[0]?.success) {
+              const redeemed = parseFloat(gcResult[0].amount_redeemed) || 0;
+              giftCardAmount += redeemed;
+              totalDiscount += redeemed;
+              remainingTotal -= redeemed;
+              giftCardRedemptions.push({
+                code: gc.code,
+                amount: redeemed,
+                giftCardId: gcResult[0].gift_card_id,
+              });
+              logger.info('[ORDER SERVICE] Gift card redeemed:', { code: gc.code, amount: redeemed });
+            }
+          } catch (err) {
+            logger.warn('[ORDER SERVICE] Gift card error (non-fatal):', err);
+          }
+        }
+      }
+
+      // 3. Apply Loyalty Points (if provided)
+      if (input.loyaltyPointsToRedeem && input.loyaltyPointsToRedeem > 0 && input.customerId) {
+        try {
+          const pointsDollarValue = input.loyaltyPointsDollarValue || (input.loyaltyPointsToRedeem / 100);
+          const redeemAmount = Math.min(pointsDollarValue, remainingTotal);
+
+          const { data: loyaltyData, error: loyaltyError } = await restaurantRepository.rpc(
+            'redeem_loyalty_points_atomic',
+            {
+              p_user_id: input.customerId,
+              p_points: input.loyaltyPointsToRedeem,
+              p_order_id: order.id,
+              p_dollar_value: redeemAmount,
+            }
+          );
+          const loyaltyResult = loyaltyData as LoyaltyRpcResult[] | null;
+
+          if (loyaltyError) {
+            logger.warn('[ORDER SERVICE] Loyalty redemption failed:', loyaltyError);
+          } else if (loyaltyResult && loyaltyResult[0]?.success) {
+            loyaltyPointsUsed = loyaltyResult[0].points_redeemed || 0;
+            loyaltyDiscount = redeemAmount;
+            totalDiscount += loyaltyDiscount;
+            remainingTotal -= loyaltyDiscount;
+            logger.info('[ORDER SERVICE] Loyalty points redeemed:', { points: loyaltyPointsUsed, value: loyaltyDiscount });
+          }
+        } catch (err) {
+          logger.warn('[ORDER SERVICE] Loyalty error (non-fatal):', err);
+        }
+      }
+
+      // Calculate final total
+      const finalTotal = Math.max(0, preDiscountTotal - totalDiscount);
+
+      // Update order with discount information
+      if (totalDiscount > 0) {
+        await restaurantRepository.updateOrder(order.id, {
+          discount_amount: totalDiscount.toFixed(2),
+          total_amount: finalTotal.toFixed(2),
+          coupon_id: couponId,
+          coupon_code: input.couponCode,
+          coupon_discount: couponDiscount.toFixed(2),
+          gift_card_amount: giftCardAmount.toFixed(2),
+          loyalty_points_used: loyaltyPointsUsed,
+          loyalty_discount: loyaltyDiscount.toFixed(2),
+        } as any);
+        
+        // Update local order object
+        order.discount_amount = totalDiscount.toFixed(2);
+        order.total_amount = finalTotal.toFixed(2);
+      }
+
+      // === EARN LOYALTY POINTS (if customer is logged in) ===
+      let loyaltyPointsEarned = 0;
+      if (input.customerId && finalTotal > 0) {
+        try {
+          const { data: earnData } = await restaurantRepository.rpc(
+            'earn_loyalty_points_atomic',
+            {
+              p_user_id: input.customerId,
+              p_order_total: finalTotal,
+              p_order_id: order.id,
+              p_points_per_dollar: 1, // Could be configurable
+            }
+          );
+          const earnResult = earnData as LoyaltyRpcResult[] | null;
+
+          if (earnResult && earnResult[0]?.success) {
+            loyaltyPointsEarned = earnResult[0].points_earned || 0;
+            logger.info('[ORDER SERVICE] Loyalty points earned:', loyaltyPointsEarned);
+          }
+        } catch (err) {
+          logger.warn('[ORDER SERVICE] Points earning error (non-fatal):', err);
+        }
+      }
+
+      // === DEDUCT INVENTORY (for ingredients linked to menu items) ===
+      try {
+        const { data: inventoryData, error: inventoryError } = await restaurantRepository.rpc(
+          'deduct_inventory_for_order',
+          { p_order_id: order.id }
+        );
+        const inventoryResult = inventoryData as InventoryRpcResult[] | null;
+
+        if (inventoryError) {
+          logger.warn('[ORDER SERVICE] Inventory deduction failed:', inventoryError);
+        } else if (inventoryResult && inventoryResult[0]?.items_deducted > 0) {
+          logger.info('[ORDER SERVICE] Inventory deducted:', inventoryResult[0].items_deducted, 'items');
+        }
+      } catch (err) {
+        logger.warn('[ORDER SERVICE] Inventory deduction error (non-fatal):', err);
+      }
+
+      logger.info('[ORDER SERVICE] Order created:', order.order_number, {
+        subtotal,
+        totalDiscount,
+        finalTotal,
+        pointsEarned: loyaltyPointsEarned,
+      });
 
       // Emit real-time event to restaurant staff
       socketEmitter.emitToUnit('restaurant', 'order:new', {
@@ -223,6 +437,7 @@ export function createOrderService(deps: OrderServiceDependencies): OrderService
         orderNumber: order.order_number,
         totalAmount: order.total_amount,
         itemCount: input.items.length,
+        discountApplied: totalDiscount,
       }, input.customerId);
 
       // Send confirmation email (non-blocking)

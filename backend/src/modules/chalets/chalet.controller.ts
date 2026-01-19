@@ -185,11 +185,33 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
       });
     }
 
-    // 2. Fetch Seasonal Price Rules
-    const { data: priceRules } = await supabase
+    // 2. Fetch Seasonal Price Rules (only active ones)
+    const { data: rawPriceRules } = await supabase
       .from('chalet_price_rules')
       .select('*')
-      .eq('chalet_id', chaletId);
+      .eq('chalet_id', chaletId)
+      .eq('is_active', true);
+
+    // Sort rules so most specific apply first:
+    // 1. Priority (if exists) descending
+    // 2. Duration ascending (shorter rules = specific holidays)
+    // 3. Start date ascending
+    const priceRules = (rawPriceRules || []).sort((a, b) => {
+      // If priority column exists, use it
+      if ('priority' in a && 'priority' in b) {
+        // @ts-ignore
+        const pA = a.priority as number;
+        // @ts-ignore
+        const pB = b.priority as number;
+        if (pA !== pB) return pB - pA;
+      }
+
+      const durA = dayjs(a.end_date).diff(dayjs(a.start_date), 'minute');
+      const durB = dayjs(b.end_date).diff(dayjs(b.start_date), 'minute');
+      if (durA !== durB) return durA - durB;
+
+      return dayjs(a.start_date).valueOf() - dayjs(b.start_date).valueOf();
+    });
 
     // 3. Calculate Base Amount (Night-by-night)
     let baseAmount = 0;
@@ -768,6 +790,12 @@ export async function createAddOn(req: Request, res: Response, next: NextFunctio
       }
     }
     
+    // Convert is_per_day to price_type if not already provided
+    if (insertData.price_type === undefined) {
+      const isPerDay = req.body.is_per_day ?? req.body.isPerDay ?? false;
+      insertData.price_type = isPerDay ? 'per_night' : 'one_time';
+    }
+    
     const { data, error } = await supabase
       .from('chalet_add_ons')
       .insert(insertData)
@@ -795,6 +823,12 @@ export async function updateAddOn(req: Request, res: Response, next: NextFunctio
       if (req.body[field] !== undefined) {
         updateData[field] = req.body[field];
       }
+    }
+    
+    // Convert is_per_day to price_type if provided
+    if (req.body.is_per_day !== undefined || req.body.isPerDay !== undefined) {
+      const isPerDay = req.body.is_per_day ?? req.body.isPerDay ?? false;
+      updateData.price_type = isPerDay ? 'per_night' : 'one_time';
     }
     
     const { data, error } = await supabase
@@ -854,7 +888,12 @@ export async function createPriceRule(req: Request, res: Response, next: NextFun
     const insertData: Record<string, any> = {};
     for (const field of validFields) {
       if (req.body[field] !== undefined) {
-        insertData[field] = req.body[field];
+        // Convert empty strings to null for UUID fields
+        if (field === 'chalet_id' && req.body[field] === '') {
+          insertData[field] = null;
+        } else {
+          insertData[field] = req.body[field];
+        }
       }
     }
     
@@ -884,7 +923,12 @@ export async function updatePriceRule(req: Request, res: Response, next: NextFun
     const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
     for (const field of validFields) {
       if (req.body[field] !== undefined) {
-        updateData[field] = req.body[field];
+        // Convert empty strings to null for UUID fields
+        if (field === 'chalet_id' && req.body[field] === '') {
+          updateData[field] = null;
+        } else {
+          updateData[field] = req.body[field];
+        }
       }
     }
     

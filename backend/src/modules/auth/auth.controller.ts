@@ -71,17 +71,34 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       userAgent: req.get('user-agent'),
     });
 
-    logger.info(`Login successful for user: ${result.user.id}`);
+    // Check if 2FA is required
+    if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
+      logger.info(`2FA required for user: ${result.userId}`);
+      return res.json({
+        success: true,
+        data: {
+          requiresTwoFactor: true,
+          userId: result.userId,
+          email: result.email,
+        },
+        message: 'Two-factor authentication required',
+      });
+    }
+
+    // At this point, result is a full login response
+    const loginResult = result as { user: { id: string; email: string; fullName: string; profileImageUrl: string; preferredLanguage: string; roles: string[] }; tokens: { accessToken: string; refreshToken: string } };
+
+    logger.info(`Login successful for user: ${loginResult.user.id}`);
 
     await logActivity({
-      user_id: result.user.id,
+      user_id: loginResult.user.id,
       action: 'LOGIN',
       resource: 'auth',
       ip_address: req.ip,
       user_agent: req.get('user-agent')
     });
 
-    res.json({ success: true, data: result });
+    res.json({ success: true, data: loginResult });
   } catch (error: unknown) {
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {

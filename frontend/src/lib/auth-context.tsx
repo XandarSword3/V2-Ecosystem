@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { API_BASE_URL } from './api';
+import { api, API_BASE_URL } from './api';
 import { authLogger } from './logger';
 
 interface User {
@@ -15,11 +15,23 @@ interface User {
   roles: string[];
 }
 
+interface TwoFactorRequired {
+  requiresTwoFactor: true;
+  userId: string;
+  email: string;
+}
+
+interface LoginResult {
+  user: User;
+  requiresTwoFactor?: false;
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string) => Promise<User | TwoFactorRequired>;
+  verify2FA: (userId: string, code: string) => Promise<User>;
   logout: () => void;
   refreshUser: () => void;
 }
@@ -43,36 +55,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       try {
-        // Validate token with backend - this prevents localStorage spoofing
-        const response = await fetch(`${API_BASE_URL}/auth/me`, {
-          headers: { 
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        // Validate token with backend using the api instance (which handles token refresh)
+        const response = await api.get('/auth/me');
         
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.data) {
-            // Use server-validated user data, not localStorage
-            const validatedUser: User = {
-              id: data.data.id,
-              email: data.data.email,
-              fullName: data.data.full_name || data.data.fullName,
-              phone: data.data.phone,
-              profileImageUrl: data.data.profile_image_url || data.data.profileImageUrl,
-              preferredLanguage: data.data.preferred_language || data.data.preferredLanguage || 'en',
-              roles: data.data.roles || []
-            };
-            setUser(validatedUser);
-            // Update localStorage with validated data
-            localStorage.setItem('user', JSON.stringify(validatedUser));
-          } else {
-            throw new Error('Invalid session');
-          }
+        if (response.data.success && response.data.data) {
+          // Use server-validated user data, not localStorage
+          const validatedUser: User = {
+            id: response.data.data.id,
+            email: response.data.data.email,
+            fullName: response.data.data.full_name || response.data.data.fullName,
+            phone: response.data.data.phone,
+            profileImageUrl: response.data.data.profile_image_url || response.data.data.profileImageUrl,
+            preferredLanguage: response.data.data.preferred_language || response.data.data.preferredLanguage || 'en',
+            roles: response.data.data.roles || []
+          };
+          setUser(validatedUser);
+          // Update localStorage with validated data
+          localStorage.setItem('user', JSON.stringify(validatedUser));
         } else {
-          // Token invalid - clear everything
-          throw new Error('Token validation failed');
+          throw new Error('Invalid session');
         }
       } catch (e) {
         // Clear invalid session data
@@ -89,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     validateSession();
   }, []);
 
-  const login = async (email: string, password: string): Promise<User> => {
+  const login = async (email: string, password: string): Promise<User | TwoFactorRequired> => {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -102,7 +103,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error || 'Login failed');
     }
 
+    // Check if 2FA is required
+    if (data.data.requiresTwoFactor) {
+      return {
+        requiresTwoFactor: true,
+        userId: data.data.userId,
+        email: data.data.email,
+      };
+    }
+
     const { user: userData, tokens } = data.data;
+    
+    // Debug logging
+    console.log('[Auth] Login response tokens:', tokens);
+    console.log('[Auth] accessToken:', tokens?.accessToken?.substring(0, 20) + '...');
+    console.log('[Auth] refreshToken:', tokens?.refreshToken?.substring(0, 20) + '...');
+    
+    if (!tokens?.accessToken || !tokens?.refreshToken) {
+      console.error('[Auth] Missing tokens in login response!');
+      throw new Error('Invalid login response - missing tokens');
+    }
+    
+    localStorage.setItem('accessToken', tokens.accessToken);
+    localStorage.setItem('refreshToken', tokens.refreshToken);
+    localStorage.setItem('user', JSON.stringify(userData));
+    
+    setUser(userData);
+    
+    return userData;
+  };
+
+  const verify2FA = async (userId: string, code: string): Promise<User> => {
+    const response = await fetch(`${API_BASE_URL}/auth/2fa/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, code }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || '2FA verification failed');
+    }
+
+    const { user: userData, tokens } = data.data;
+    
+    if (!tokens?.accessToken || !tokens?.refreshToken) {
+      throw new Error('Invalid response - missing tokens');
+    }
     
     localStorage.setItem('accessToken', tokens.accessToken);
     localStorage.setItem('refreshToken', tokens.refreshToken);
@@ -135,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         login,
+        verify2FA,
         logout,
         refreshUser,
       }}
