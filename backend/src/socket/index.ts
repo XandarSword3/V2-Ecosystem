@@ -64,10 +64,22 @@ export function getOnlineUsersDetailed(): ActiveConnection[] {
   return Array.from(activeConnections.values());
 }
 
+// Get count of authenticated users only
+function getAuthenticatedUserCount(): number {
+  let count = 0;
+  activeConnections.forEach(conn => {
+    if (conn.userId) {
+      count++;
+    }
+  });
+  return count;
+}
+
 // Broadcast online users update to admins
 function broadcastOnlineUsersToAdmins() {
   if (!io) return;
-  const count = io.engine.clientsCount;
+  // Use authenticated user count instead of all socket connections
+  const count = getAuthenticatedUserCount();
   const detailedUsers = getOnlineUsersDetailed();
   io.to('role:admin').to('role:super_admin').emit('stats:online_users', { count });
   io.to('role:admin').to('role:super_admin').emit('stats:online_users_detailed', { users: detailedUsers, count });
@@ -111,6 +123,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
       if (token) {
         const payload = verifyToken(token);
         socket.data.userId = payload.userId;
+        socket.data.email = payload.email;
         socket.data.roles = payload.roles;
       }
       next();
@@ -139,7 +152,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
       ipAddress,
     });
     
-    logger.info(`Socket connected: ${socket.id} (Total: ${activeConnections.size})`);
+    logger.info(`Socket connected: ${socket.id} (Total: ${activeConnections.size}) [userId: ${socket.data.userId || 'unauthenticated'}]`);
 
     // Join rooms based on user role
     if (socket.data.roles) {
@@ -163,7 +176,9 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
     // Handle request for current online users count
     socket.on('request:online_users', () => {
-      const count = io.engine.clientsCount;
+      // Return authenticated user count only
+      const count = getAuthenticatedUserCount();
+      logger.debug(`[Socket] request:online_users - returning count: ${count}, authenticated: ${!!socket.data.userId}, activeConnections: ${activeConnections.size}`);
       socket.emit('stats:online_users', { count });
     });
 

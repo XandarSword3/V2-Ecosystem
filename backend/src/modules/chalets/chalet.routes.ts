@@ -29,6 +29,7 @@ router.patch('/staff/bookings/:id/status', authenticate, authorize(...staffRoles
 
 // Admin routes
 const adminRoles = ['chalet_admin', 'super_admin'];
+router.get('/admin/add-ons', authenticate, authorize(...adminRoles), chaletController.getAdminAddOns);
 router.post('/admin/chalets', authenticate, authorize(...adminRoles), chaletController.createChalet);
 router.put('/admin/chalets/:id', authenticate, authorize(...adminRoles), chaletController.updateChalet);
 router.delete('/admin/chalets/:id', authenticate, authorize(...adminRoles), chaletController.deleteChalet);

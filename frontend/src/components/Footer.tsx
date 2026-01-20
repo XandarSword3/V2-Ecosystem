@@ -52,7 +52,8 @@ export default function Footer() {
                     { label: tNav('restaurant'), href: '/restaurant' },
                     { label: tNav('snackBar'), href: '/snack-bar' },
                     { label: tNav('chalets'), href: '/chalets' },
-                    { label: tNav('pool'), href: '/pool' }
+                    { label: tNav('pool'), href: '/pool' },
+                    { label: tFooter('giftCards') || 'Gift Cards', href: '/giftcards' }
                 ]
             },
             {

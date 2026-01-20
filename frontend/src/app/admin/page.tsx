@@ -207,6 +207,15 @@ export default function AdminDashboard() {
       socket.on('stats:online_users', (data: { count: number }) => {
         setOnlineUsers(data.count);
       });
+      
+      // Request initial online users count when socket is ready
+      if (socket.connected) {
+        socket.emit('request:online_users');
+      } else {
+        socket.once('connect', () => {
+          socket.emit('request:online_users');
+        });
+      }
     }
     return () => {
       socket?.off('stats:online_users');

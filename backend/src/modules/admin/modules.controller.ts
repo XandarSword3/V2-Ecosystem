@@ -283,33 +283,179 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
     const force = req.query.force === 'true';
 
     if (force) {
-      // Attempt hard delete
+      // First, get module info for logging and cache clearing
+      const { data: moduleData } = await supabase
+        .from('modules')
+        .select('slug, name')
+        .eq('id', id)
+        .single();
+
+      const deletedCounts: Record<string, number> = {};
+      const errors: string[] = [];
+
+      // Helper to safely delete from a table
+      const safeDelete = async (table: string, column: string = 'module_id') => {
+        try {
+          const { count } = await supabase
+            .from(table)
+            .select('id', { count: 'exact', head: true })
+            .eq(column, id);
+          
+          if (count && count > 0) {
+            const { error: delError } = await supabase
+              .from(table)
+              .delete()
+              .eq(column, id);
+            
+            if (delError) {
+              errors.push(`${table}: ${delError.message}`);
+            } else {
+              deletedCounts[table] = count;
+            }
+          }
+        } catch (e: any) {
+          // Table might not exist or not have the column, skip it
+        }
+      };
+
+      // Get menu item IDs for this module to delete orders referencing them
+      const { data: menuItems } = await supabase
+        .from('menu_items')
+        .select('id')
+        .eq('module_id', id);
+      
+      const menuItemIds = menuItems?.map(item => item.id) || [];
+      
+      // Delete order_items that reference menu items from this module
+      if (menuItemIds.length > 0) {
+        try {
+          const { data: orderItems } = await supabase
+            .from('order_items')
+            .select('order_id')
+            .in('menu_item_id', menuItemIds);
+          
+          const orderIds = [...new Set(orderItems?.map(oi => oi.order_id) || [])];
+          
+          if (orderIds.length > 0) {
+            // Delete order items first
+            const { error: oiError } = await supabase
+              .from('order_items')
+              .delete()
+              .in('menu_item_id', menuItemIds);
+            
+            if (oiError) {
+              errors.push(`order_items: ${oiError.message}`);
+            } else {
+              deletedCounts['order_items'] = orderIds.length;
+            }
+            
+            // Then delete orders that have no remaining items
+            // (checking each order)
+            for (const orderId of orderIds) {
+              const { count } = await supabase
+                .from('order_items')
+                .select('id', { count: 'exact', head: true })
+                .eq('order_id', orderId);
+              
+              if (count === 0) {
+                await supabase.from('restaurant_orders').delete().eq('id', orderId);
+              }
+            }
+          }
+        } catch (e: any) {
+          errors.push(`order cascade: ${e.message}`);
+        }
+      }
+
+      // CASCADE DELETE: Delete all dependent data in correct order
+      // Tables that have direct module_id column
+      const directModuleTables = [
+        'menu_items',
+        'menu_categories',
+        'snack_items',
+        'pool_tickets',
+        'pool_sessions',
+        'chalets',
+        'chalet_bookings',
+        'reviews',
+        'pages',
+      ];
+
+      for (const table of directModuleTables) {
+        await safeDelete(table);
+      }
+
+      // Also clean up roles and permissions created for this module
+      if (moduleData?.slug) {
+        try {
+          // Delete permissions for this module
+          const { data: perms } = await supabase
+            .from('permissions')
+            .select('id')
+            .eq('module_slug', moduleData.slug);
+          
+          const permIds = perms?.map(p => p.id) || [];
+          
+          if (permIds.length > 0) {
+            // Delete role_permissions links
+            await supabase.from('role_permissions').delete().in('permission_id', permIds);
+            // Delete permissions
+            await supabase.from('permissions').delete().eq('module_slug', moduleData.slug);
+            deletedCounts['permissions'] = permIds.length;
+          }
+          
+          // Delete roles for this module
+          const { error: rolesError } = await supabase
+            .from('roles')
+            .delete()
+            .or(`name.eq.${moduleData.slug}_admin,name.eq.${moduleData.slug}_staff`);
+          
+          if (!rolesError) {
+            deletedCounts['roles'] = 2;
+          }
+          
+          // Remove from navbar CMS if present
+          const { data: siteSettings } = await supabase
+            .from('site_settings')
+            .select('id, navbar')
+            .single();
+          
+          const settings = siteSettings as { id?: number; navbar?: { links?: unknown[] } } | null;
+          if (settings?.navbar?.links && Array.isArray(settings.navbar.links)) {
+            const updatedLinks = settings.navbar.links.filter(
+              (link: any) => link.moduleSlug !== moduleData.slug
+            );
+            await supabase
+              .from('site_settings')
+              .update({ navbar: { ...settings.navbar, links: updatedLinks } })
+              .eq('id', settings.id || 1);
+          }
+        } catch (e: any) {
+          errors.push(`cleanup: ${e.message}`);
+        }
+      }
+
+      // Now delete the module itself
       const { error: delErr } = await supabase
         .from('modules')
         .delete()
         .eq('id', id);
 
       if (delErr) {
-        // If deletion fails due to FK constraints, try to list dependent rows to help the user
-        const candidateTables = [
-          'menu_categories', 'menu_items', 'snack_items', 'chalets', 'pool_sessions', 'pool_tickets', 'restaurant_orders', 'reviews', 'pages', 'modules', 'users'
-        ];
-        const deps: Record<string, number> = {};
-        for (const table of candidateTables) {
-          try {
-            const { count } = await supabase
-              .from(table)
-              .select('id', { count: 'exact', head: true })
-              .eq('module_id', id);
-            deps[table] = typeof count === 'number' ? count : 0;
-          } catch (e) {
-            // ignore tables that don't exist or cannot be queried
-            deps[table] = -1;
-          }
-        }
-        return res.status(400).json({ success: false, error: 'Failed to hard-delete module. Remove dependent data or use soft-delete.', dependencies: deps });
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Failed to hard-delete module after cleaning dependencies.', 
+          details: delErr.message,
+          cascadeResults: deletedCounts,
+          cascadeErrors: errors.length > 0 ? errors : undefined
+        });
       }
 
+      // Clear cache if we had module data
+      if (moduleData?.slug) {
+        clearModuleCache(moduleData.slug);
+      }
+      
       emitToAll('modules.updated', { id, deleted: true });
 
       await logActivity({
@@ -317,11 +463,16 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
         action: 'DELETE_MODULE_HARD',
         resource: 'module',
         resource_id: id,
+        old_value: { deletedDependencies: deletedCounts },
         ip_address: req.ip,
         user_agent: req.get('user-agent')
       });
 
-      return res.json({ success: true, message: 'Module hard-deleted' });
+      return res.json({ 
+        success: true, 
+        message: 'Module and all dependencies hard-deleted',
+        deletedDependencies: deletedCounts
+      });
     }
 
     // Soft delete: mark as inactive
