@@ -17,6 +17,8 @@ import * as reportsController from "./controllers/reports.controller";
 import * as notificationsController from "./controllers/notifications.controller";
 import * as uploadController from "./controllers/upload.controller";
 import * as scheduledReportsController from "./controllers/scheduled-reports.controller";
+import * as deletePreviewController from "./controllers/delete-preview.controller";
+import * as softDeleteController from "./controllers/soft-delete.controller";
 
 const router = Router();
 
@@ -125,5 +127,14 @@ router.delete('/translations/languages/:code', translationsController.deleteLang
 // Frontend Translation Files Comparison
 router.get('/translations/frontend/compare', translationsController.compareFrontendTranslations);
 router.post('/translations/frontend/update', translationsController.updateFrontendTranslation);
+
+// Delete Preview - Impact Analysis
+router.get('/delete-preview/:entityType/:entityId', deletePreviewController.getDeletePreview);
+
+// Soft Delete Management
+router.get('/deleted/:entityType', softDeleteController.getDeletedRecords);
+router.post('/deleted/:entityType/:entityId/restore', softDeleteController.restoreRecord);
+router.delete('/deleted/:entityType/:entityId/permanent', softDeleteController.permanentDelete);
+router.post('/soft-delete/:entityType/:entityId', softDeleteController.softDelete);
 
 export default router;

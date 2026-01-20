@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as authController from "./auth.controller";
 import * as twoFactorController from "./two-factor.controller";
 import * as oauthController from "./oauth.controller";
+import * as biometricController from "./biometric.controller";
 import { authenticate } from "../../middleware/auth.middleware";
 
 const router = Router();
@@ -22,6 +23,10 @@ router.get('/facebook/callback', oauthController.facebookCallback);
 // 2FA verification (during login flow - semi-public)
 router.post('/2fa/verify', twoFactorController.verifyTwoFactor);
 
+// Biometric/WebAuthn routes (semi-public for authentication)
+router.post('/biometric/authenticate-begin', biometricController.authenticateBegin);
+router.post('/biometric/authenticate-complete', biometricController.authenticateComplete);
+
 // Protected routes
 router.get('/me', authenticate, authController.getCurrentUser);
 router.post('/logout', authenticate, authController.logout);
@@ -33,5 +38,11 @@ router.post('/2fa/setup', authenticate, twoFactorController.initializeTwoFactor)
 router.post('/2fa/enable', authenticate, twoFactorController.enableTwoFactor);
 router.post('/2fa/disable', authenticate, twoFactorController.disableTwoFactor);
 router.post('/2fa/backup-codes', authenticate, twoFactorController.regenerateBackupCodes);
+
+// Biometric management (protected)
+router.post('/biometric/register-begin', authenticate, biometricController.registerBegin);
+router.post('/biometric/register-complete', authenticate, biometricController.registerComplete);
+router.get('/biometric/credentials', authenticate, biometricController.listCredentials);
+router.delete('/biometric/credentials/:id', authenticate, biometricController.deleteCredential);
 
 export default router;

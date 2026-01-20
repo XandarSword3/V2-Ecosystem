@@ -30,11 +30,13 @@ export function googleAuth(req: Request, res: Response): void {
     const state = oauthService.generateOAuthState();
 
     // Store state in session/cookie for validation
+    // Use 'none' for sameSite in development to allow cross-site cookies during OAuth redirect
     res.cookie('oauth_state', state, {
       httpOnly: true,
-      secure: config.env === 'production',
-      sameSite: 'lax',
+      secure: config.env === 'production', // Must be secure in production with sameSite=none
+      sameSite: config.env === 'production' ? 'lax' : 'lax',
       maxAge: 10 * 60 * 1000, // 10 minutes
+      path: '/', // Ensure cookie is available on all paths
     });
 
     // Build Google OAuth URL
@@ -71,6 +73,7 @@ export async function googleCallback(req: Request, res: Response, next: NextFunc
 
     // Validate state for CSRF protection
     const storedState = req.cookies?.oauth_state;
+    
     if (!state || state !== storedState) {
       logger.warn('OAuth state mismatch - possible CSRF attack');
       res.redirect(`${FRONTEND_URL}/login?error=invalid_state`);
@@ -88,21 +91,6 @@ export async function googleCallback(req: Request, res: Response, next: NextFunc
     // Exchange code for tokens and get user info
     const result = await oauthService.handleGoogleCallback(code);
 
-    // Set authentication cookies
-    res.cookie('accessToken', result.accessToken, {
-      httpOnly: true,
-      secure: config.env === 'production',
-      sameSite: 'lax',
-      maxAge: 15 * 60 * 1000, // 15 minutes
-    });
-
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: config.env === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-
     // Redirect based on user role
     const roles = result.user.roles || [];
     let redirectPath = '/';
@@ -113,8 +101,14 @@ export async function googleCallback(req: Request, res: Response, next: NextFunc
       redirectPath = '/staff';
     }
 
-    // Redirect to frontend with success
-    res.redirect(`${FRONTEND_URL}${redirectPath}?oauth=success`);
+    // Pass tokens in URL for frontend to capture (since httpOnly cookies don't work cross-port)
+    // The frontend will read these from URL, store them, and clear from URL
+    const redirectUrl = new URL(`${FRONTEND_URL}${redirectPath}`);
+    redirectUrl.searchParams.set('oauth', 'success');
+    redirectUrl.searchParams.set('accessToken', result.accessToken);
+    redirectUrl.searchParams.set('refreshToken', result.refreshToken);
+    
+    res.redirect(redirectUrl.toString());
   } catch (error) {
     logger.error('Error handling Google OAuth callback:', error);
     res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`);

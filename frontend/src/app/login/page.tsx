@@ -264,7 +264,7 @@ export default function LoginPage() {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                     {t('password')}
                   </label>
-                  <Link href="#" className="text-xs text-primary-600 hover:text-primary-700">
+                  <Link href="/forgot-password" className="text-xs text-primary-600 hover:text-primary-700">
                     {t('forgotPassword')}
                   </Link>
                 </div>
