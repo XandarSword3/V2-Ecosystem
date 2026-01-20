@@ -6,9 +6,6 @@ import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
 import { emailService } from "../../services/email.service.js";
 import { AppError } from "../../utils/AppError.js";
-import { UserRoleRow } from "../../types/index.js";
-
-const isProduction = config.env === 'production';
 
 interface RegisterData {
   email: string;
@@ -24,11 +21,9 @@ interface SessionMeta {
 }
 
 export async function register(data: RegisterData) {
-  logger.info('[AUTH SERVICE] Starting registration for:', data.email);
   const supabase = getSupabase();
 
   // Check if email exists
-  logger.info('[AUTH SERVICE] Checking if email exists...');
   const { data: existing, error: checkError } = await supabase
     .from('users')
     .select('id')
@@ -36,20 +31,17 @@ export async function register(data: RegisterData) {
     .limit(1);
 
   if (checkError) {
-    logger.error('[AUTH SERVICE] Error checking email:', checkError);
+    logger.error('Error checking email during registration:', checkError.message);
     throw checkError;
   }
   if (existing && existing.length > 0) {
-    logger.warn('[AUTH SERVICE] Email already exists:', data.email);
     throw new Error('Email already registered');
   }
 
   // Hash password
-  logger.info('[AUTH SERVICE] Hashing password...');
   const passwordHash = await bcrypt.hash(data.password, 12);
 
   // Create user
-  logger.info('[AUTH SERVICE] Creating user in database...');
   const { data: user, error: userError } = await supabase
     .from('users')
     .insert({
@@ -63,13 +55,11 @@ export async function register(data: RegisterData) {
     .single();
 
   if (userError) {
-    logger.error('[AUTH SERVICE] Error creating user:', userError);
+    logger.error('Error creating user:', userError.message);
     throw userError;
   }
-  logger.info('[AUTH SERVICE] User created with ID:', user.id);
 
   // Assign default customer role
-  logger.info('[AUTH SERVICE] Assigning customer role...');
   const { data: customerRole, error: roleError } = await supabase
     .from('roles')
     .select('id')
@@ -83,58 +73,38 @@ export async function register(data: RegisterData) {
         user_id: user.id,
         role_id: customerRole[0].id,
       });
-    logger.info('[AUTH SERVICE] Customer role assigned');
-  } else {
-    logger.warn('[AUTH SERVICE] Could not assign customer role:', roleError);
   }
 
   return { user };
 }
 
 export async function login(email: string, password: string, meta: SessionMeta) {
-  logger.info('[AUTH SERVICE] ========== LOGIN START ==========');
-  logger.info('[AUTH SERVICE] Email:', email);
   const supabase = getSupabase();
 
   // Find user
-  logger.info('[AUTH SERVICE] Step 1: Finding user in database...');
   const { data: user, error: userError } = await supabase
     .from('users')
     .select('*')
     .eq('email', email.toLowerCase())
     .single();
 
-  if (userError) {
-    logger.error('[AUTH SERVICE] Database error finding user:', JSON.stringify(userError));
+  if (userError || !user) {
     throw new AppError('Invalid credentials', 401);
   }
-
-  if (!user) {
-    logger.error('[AUTH SERVICE] User not found for email:', email);
-    throw new AppError('Invalid credentials', 401);
-  }
-
-  logger.info('[AUTH SERVICE] User found:', { id: user.id, email: user.email, is_active: user.is_active });
 
   if (!user.is_active) {
-    logger.error('[AUTH SERVICE] Account is disabled for:', email);
     throw new AppError('Account is disabled', 403);
   }
 
   // Verify password
-  if (!isProduction) {
-    logger.info('[AUTH SERVICE] Step 2: Verifying password...');
-  }
   const isValid = await bcrypt.compare(password, user.password_hash);
 
   if (!isValid) {
-    logger.warn('[AUTH SERVICE] Invalid password attempt for:', email);
     throw new AppError('Invalid credentials', 401);
   }
 
-  // Check if 2FA is enabled - if so, return pending status instead of full login
+  // Check if 2FA is enabled
   if (user.two_factor_enabled) {
-    logger.info('[AUTH SERVICE] 2FA is enabled for user, requiring verification:', email);
     return {
       requiresTwoFactor: true,
       userId: user.id,
@@ -144,9 +114,6 @@ export async function login(email: string, password: string, meta: SessionMeta) 
   }
 
   // Get user roles
-  if (!isProduction) {
-    logger.info('[AUTH SERVICE] Step 3: Getting user roles...');
-  }
   const { data: userRolesList, error: rolesError } = await supabase
     .from('user_roles')
     .select(`
@@ -156,7 +123,7 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     .eq('user_id', user.id);
 
   if (rolesError) {
-    logger.error('[AUTH SERVICE] Error getting roles:', JSON.stringify(rolesError));
+    logger.error('Error getting user roles:', rolesError.message);
     throw rolesError;
   }
 
@@ -170,17 +137,14 @@ export async function login(email: string, password: string, meta: SessionMeta) 
   }).filter(Boolean) as string[];
 
   // Generate tokens
-  if (!isProduction) {
-    logger.info('[AUTH SERVICE] Step 4: Generating tokens...');
-  }
   const tokens = generateTokens({
     userId: user.id,
     email: user.email,
     roles: roleNames,
+    tokenVersion: user.token_version ?? 0,
   });
 
   // Create session
-  logger.info('[AUTH SERVICE] Step 5: Creating session...');
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
 
@@ -196,20 +160,16 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     });
 
   if (sessionError) {
-    logger.error('[AUTH SERVICE] Error creating session:', JSON.stringify(sessionError));
-    // Don't throw, session is not critical
-  } else {
-    logger.info('[AUTH SERVICE] Session created successfully');
+    logger.error('Error creating session:', sessionError.message);
   }
 
   // Update last login
-  logger.info('[AUTH SERVICE] Step 6: Updating last login...');
   await supabase
     .from('users')
     .update({ last_login_at: new Date().toISOString() })
     .eq('id', user.id);
 
-  const result = {
+  return {
     user: {
       id: user.id,
       email: user.email,
@@ -220,19 +180,12 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     },
     tokens,
   };
-
-  logger.info('[AUTH SERVICE] ========== LOGIN SUCCESS ==========');
-  logger.info('[AUTH SERVICE] Returning user:', JSON.stringify(result.user, null, 2));
-
-  return result;
 }
 
 /**
  * Complete login after 2FA verification
- * Called when user has successfully verified their 2FA code
  */
 export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
-  logger.info('[AUTH SERVICE] ========== 2FA LOGIN COMPLETION ==========');
   const supabase = getSupabase();
 
   // Get user
@@ -274,6 +227,7 @@ export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
     userId: user.id,
     email: user.email,
     roles: roleNames,
+    tokenVersion: user.token_version ?? 0,
   });
 
   // Create session
@@ -292,7 +246,7 @@ export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
     });
 
   if (sessionError) {
-    logger.error('[AUTH SERVICE] Error creating session after 2FA:', JSON.stringify(sessionError));
+    logger.error('Error creating session after 2FA:', sessionError.message);
   }
 
   // Update last login
@@ -300,8 +254,6 @@ export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
     .from('users')
     .update({ last_login_at: new Date().toISOString() })
     .eq('id', user.id);
-
-  logger.info('[AUTH SERVICE] ========== 2FA LOGIN SUCCESS ==========');
 
   return {
     user: {
@@ -344,20 +296,31 @@ export async function refreshAccessToken(refreshToken: string) {
     throw new Error('User not found or inactive');
   }
 
-  const { data: userRolesList, error: rolesError } = await supabase
+  // Check token_version - if user's version has been incremented, reject this token
+  const userTokenVersion = user.token_version ?? 0;
+  const tokenTokenVersion = payload.tokenVersion ?? 0;
+  if (tokenTokenVersion < userTokenVersion) {
+    // Token was issued before a logout-all-devices, invalidate this session
+    await supabase
+      .from('sessions')
+      .update({ is_active: false })
+      .eq('id', session.id);
+    throw new Error('Token has been invalidated. Please log in again.');
+  }
+
+  const { data: userRolesList } = await supabase
     .from('user_roles')
     .select(`
       roles (name)
     `)
     .eq('user_id', user.id);
 
-  if (rolesError) throw rolesError;
-
-  // Handle Supabase join which may return roles as array or object
-  const roleNames = (userRolesList || []).map((r: { roles?: { name?: string }[] | { name?: string } | null }) => {
+  interface RoleJoinResult { roles?: { name?: string }[] | { name?: string } | null }
+  const roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
     const roles = r.roles;
+    if (!roles) return undefined;
     if (Array.isArray(roles)) return roles[0]?.name;
-    return roles?.name;
+    return (roles as { name?: string }).name;
   }).filter(Boolean) as string[];
 
   // Generate new tokens
@@ -365,88 +328,159 @@ export async function refreshAccessToken(refreshToken: string) {
     userId: user.id,
     email: user.email,
     roles: roleNames,
+    tokenVersion: user.token_version ?? 0,
   });
 
   // Update session
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7);
-
   await supabase
     .from('sessions')
     .update({
       token: tokens.accessToken,
       refresh_token: tokens.refreshToken,
-      expires_at: expiresAt.toISOString(),
-      last_activity: new Date().toISOString(),
     })
     .eq('id', session.id);
 
-  return { tokens };
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      fullName: user.full_name,
+      profileImageUrl: user.profile_image_url,
+      preferredLanguage: user.preferred_language,
+      roles: roleNames,
+    },
+    tokens,
+  };
 }
 
-export async function logout(token: string) {
+export async function logout(userId: string, refreshToken?: string) {
   const supabase = getSupabase();
-  await supabase
-    .from('sessions')
-    .update({ is_active: false })
-    .eq('token', token);
+
+  if (refreshToken) {
+    // Logout specific session
+    await supabase
+      .from('sessions')
+      .update({ is_active: false })
+      .eq('refresh_token', refreshToken);
+  } else {
+    // Logout all sessions - increment token_version to invalidate all JWTs
+    await supabase
+      .from('sessions')
+      .update({ is_active: false })
+      .eq('user_id', userId);
+    
+    // Increment token_version to invalidate all previously issued JWTs
+    try {
+      await supabase.rpc('increment_token_version', { p_user_id: userId });
+    } catch {
+      // Fallback if RPC doesn't exist: direct update
+      const { data: user } = await supabase
+        .from('users')
+        .select('token_version')
+        .eq('id', userId)
+        .single();
+      
+      await supabase
+        .from('users')
+        .update({ token_version: (user?.token_version ?? 0) + 1 })
+        .eq('id', userId);
+    }
+  }
 }
 
-export async function getUserById(userId: string) {
+export async function getCurrentUser(userId: string) {
   const supabase = getSupabase();
 
-  const { data: user, error: userError } = await supabase
+  const { data: user, error } = await supabase
     .from('users')
-    .select('id, email, full_name, phone, profile_image_url, preferred_language, email_verified, created_at')
+    .select('id, email, full_name, phone, profile_image_url, preferred_language')
     .eq('id', userId)
     .single();
 
-  if (userError || !user) {
+  if (error || !user) {
     throw new Error('User not found');
   }
 
   // Get roles
-  const { data: userRolesList, error: rolesError } = await supabase
+  const { data: userRolesList } = await supabase
     .from('user_roles')
     .select(`
-      roles (name, display_name)
+      roles (name)
     `)
     .eq('user_id', userId);
 
-  if (rolesError) throw rolesError;
+  interface RoleJoinResult { roles?: { name?: string }[] | { name?: string } | null }
+  const roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
+    const roles = r.roles;
+    if (!roles) return undefined;
+    if (Array.isArray(roles)) return roles[0]?.name;
+    return (roles as { name?: string }).name;
+  }).filter(Boolean) as string[];
 
   return {
-    ...user,
-    roles: (userRolesList || []).map((r: { roles?: { name?: string }[] | { name?: string } | null }) => {
-      const roles = r.roles;
-      if (Array.isArray(roles)) return roles[0]?.name;
-      return roles?.name;
-    }).filter(Boolean) as string[],
+    id: user.id,
+    email: user.email,
+    fullName: user.full_name,
+    phone: user.phone,
+    profileImageUrl: user.profile_image_url,
+    preferredLanguage: user.preferred_language,
+    roles: roleNames,
   };
+}
+
+export async function getUserById(userId: string) {
+  return getCurrentUser(userId);
 }
 
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
   const supabase = getSupabase();
 
-  const { data: user, error: userError } = await supabase
+  // Get user with password hash
+  const { data: user, error } = await supabase
     .from('users')
-    .select('*')
+    .select('id, password_hash')
     .eq('id', userId)
     .single();
 
-  if (userError || !user) {
-    throw new Error('User not found');
+  if (error || !user) {
+    throw new AppError('User not found', 404);
   }
 
+  // Verify current password
   const isValid = await bcrypt.compare(currentPassword, user.password_hash);
   if (!isValid) {
-    throw new Error('Current password is incorrect');
+    throw new AppError('Current password is incorrect', 400);
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 12);
+  // Hash new password
+  const newPasswordHash = await bcrypt.hash(newPassword, 12);
+
+  // Update password
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ 
+      password_hash: newPasswordHash,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', userId);
+
+  if (updateError) {
+    throw new AppError('Failed to update password', 500);
+  }
+
+  logger.info(`Password changed for user ${userId}`);
+}
+
+export async function disable2FA(userId: string) {
+  const supabase = getSupabase();
+
   await supabase
     .from('users')
-    .update({ password_hash: passwordHash, updated_at: new Date().toISOString() })
+    .update({
+      two_factor_enabled: false,
+      two_factor_secret: null,
+      backup_codes: null,
+    })
     .eq('id', userId);
 
   // Invalidate all sessions
@@ -462,13 +496,12 @@ export async function sendPasswordResetEmail(email: string) {
   // Find user
   const { data: user, error: userError } = await supabase
     .from('users')
-    .select('id, name, email')
+    .select('id, full_name, email')
     .eq('email', email.toLowerCase())
     .single();
 
   if (userError || !user) {
-    // Don't reveal if email exists
-    logger.info(`Password reset requested for non-existent email: ${email}`);
+    // Don't reveal if email exists - just return silently
     return;
   }
 
@@ -476,16 +509,29 @@ export async function sendPasswordResetEmail(email: string) {
   const resetToken = uuidv4();
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-  // Store token (you may need to create a password_reset_tokens table)
-  // For now, we'll use the sessions table with a special session type
+  // Delete any existing reset tokens for this user
   await supabase
+    .from('sessions')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .not('refresh_token', 'is', null);
+
+  // Store token in sessions table
+  const { error: insertError } = await supabase
     .from('sessions')
     .insert({
       user_id: user.id,
+      token: resetToken,
       refresh_token: resetToken,
       expires_at: expiresAt.toISOString(),
       is_active: true,
     });
+
+  if (insertError) {
+    logger.error('Failed to store reset token:', insertError.message);
+    throw new Error('Failed to initiate password reset');
+  }
 
   // Send email with reset link
   const resetUrl = `${config.frontendUrl}/reset-password?token=${resetToken}`;
@@ -495,7 +541,7 @@ export async function sendPasswordResetEmail(email: string) {
     subject: 'Reset Your Password - V2 Resort',
     html: `
       <h1>Password Reset Request</h1>
-      <p>Hi ${user.name},</p>
+      <p>Hi ${user.full_name},</p>
       <p>You requested to reset your password. Click the link below to set a new password:</p>
       <p><a href="${resetUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Reset Password</a></p>
       <p>This link will expire in 1 hour.</p>
@@ -503,27 +549,33 @@ export async function sendPasswordResetEmail(email: string) {
       <p>Thanks,<br>V2 Resort Team</p>
     `,
   });
-
-  logger.info(`Password reset email sent to: ${email}`);
 }
 
 export async function resetPassword(token: string, newPassword: string) {
   const supabase = getSupabase();
 
   // Find valid reset token
-  const { data: session, error: sessionError } = await supabase
+  const { data: sessions, error: sessionError } = await supabase
     .from('sessions')
-    .select('id, user_id, expires_at')
+    .select('id, user_id, expires_at, refresh_token')
     .eq('refresh_token', token)
-    .eq('is_active', true)
-    .single();
+    .eq('is_active', true);
+
+  const session = sessions?.[0];
 
   if (sessionError || !session) {
     throw new Error('Invalid or expired reset token');
   }
 
-  // Check expiration
-  if (new Date(session.expires_at) < new Date()) {
+  // Check expiration - handle timezone properly
+  let expiresAtStr = session.expires_at;
+  if (!expiresAtStr.endsWith('Z') && !expiresAtStr.includes('+')) {
+    expiresAtStr = expiresAtStr + 'Z';
+  }
+  const expiresAtDate = new Date(expiresAtStr);
+  const now = new Date();
+  
+  if (expiresAtDate < now) {
     await supabase.from('sessions').delete().eq('id', session.id);
     throw new Error('Reset token has expired');
   }
@@ -541,6 +593,7 @@ export async function resetPassword(token: string, newPassword: string) {
     .eq('id', session.user_id);
 
   if (updateError) {
+    logger.error('Failed to update password:', updateError.message);
     throw new Error('Failed to update password');
   }
 
@@ -553,6 +606,5 @@ export async function resetPassword(token: string, newPassword: string) {
     .update({ is_active: false })
     .eq('user_id', session.user_id);
 
-  logger.info(`Password reset completed for user: ${session.user_id}`);
   return { user_id: session.user_id };
 }

@@ -116,6 +116,24 @@ export async function getAddOns(req: Request, res: Response, next: NextFunction)
   }
 }
 
+/**
+ * Get ALL add-ons for admin management (including inactive)
+ */
+export async function getAdminAddOns(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('chalet_add_ons')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ success: true, data: data || [] });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // ============================================
 // Booking Routes
 // ============================================
@@ -974,31 +992,32 @@ export async function getChaletSettings(req: Request, res: Response, next: NextF
       check_out_time: '11:00',
     };
 
+    // Get settings with chalet_ prefix
     const { data: settings, error } = await supabase
       .from('site_settings')
-      .select('*')
-      .eq('category', 'chalet');
+      .select('key, value')
+      .like('key', 'chalet_%');
 
     if (error) {
-      // Handle schema mismatch (missing category column)
-      if (error.code === '42703' || error.message?.includes('column')) {
-        const { data: oldData } = await supabase
-          .from('site_settings')
-          .select('value')
-          .eq('key', 'chalets')
-          .single();
+      // Fallback to legacy 'chalets' key format
+      const { data: oldData } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'chalets')
+        .single();
 
-        if (oldData?.value) {
-          settingsObj.deposit_percentage = oldData.value.depositPercent || 30;
-          settingsObj.check_in_time = oldData.value.checkIn || '14:00';
-          settingsObj.check_out_time = oldData.value.checkOut || '11:00';
-        }
-      } else {
-        throw error;
+      if (oldData?.value) {
+        const val = typeof oldData.value === 'string' ? JSON.parse(oldData.value) : oldData.value;
+        settingsObj.deposit_percentage = val.depositPercent || val.deposit_percentage || 30;
+        settingsObj.check_in_time = val.checkIn || val.check_in_time || '14:00';
+        settingsObj.check_out_time = val.checkOut || val.check_out_time || '11:00';
       }
     } else {
       (settings || []).forEach(s => {
-        settingsObj[s.key] = s.value;
+        // Remove chalet_ prefix from key
+        const key = s.key.replace('chalet_', '');
+        const val = typeof s.value === 'string' ? JSON.parse(s.value) : s.value;
+        settingsObj[key] = val;
       });
     }
 
@@ -1014,16 +1033,17 @@ export async function updateChaletSettings(req: Request, res: Response, next: Ne
     const settings = req.body;
 
     for (const [key, value] of Object.entries(settings)) {
+      // Use chalet_ prefix for keys to namespace them
+      const settingKey = key.startsWith('chalet_') ? key : `chalet_${key}`;
       await supabase
         .from('site_settings')
         .upsert(
           {
-            key,
-            value: String(value),
-            category: 'chalet',
+            key: settingKey,
+            value: JSON.stringify(value),
             updated_at: new Date().toISOString()
           },
-          { onConflict: 'key,category' }
+          { onConflict: 'key' }
         );
     }
 

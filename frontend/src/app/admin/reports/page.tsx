@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
+import Link from 'next/link';
 import {
   BarChart3,
   TrendingUp,
@@ -25,6 +26,7 @@ import {
   Cookie,
   ArrowUpRight,
   ArrowDownRight,
+  CalendarClock,
 } from 'lucide-react';
 
 interface OccupancyData {
@@ -238,6 +240,12 @@ export default function AdminReportsPage() {
               </button>
             ))}
           </div>
+          <Link href="/admin/reports/scheduled">
+            <Button variant="outline">
+              <CalendarClock className="w-4 h-4 mr-2" />
+              Scheduled
+            </Button>
+          </Link>
           <Button variant="outline" onClick={fetchReports}>
             <RefreshCw className="w-4 h-4 mr-2" />
             {tc('refresh')}
