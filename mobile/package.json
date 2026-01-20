@@ -11,6 +11,10 @@
     "lint": "eslint . --ext .ts,.tsx",
     "test": "jest"
   },
+  "overrides": {
+    "react-native-worklets": "0.5.4",
+    "react-native-reanimated": "3.16.7"
+  },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.3",
@@ -38,11 +42,11 @@
     "expo-tracking-transparency": "~6.0.8",
     "expo-updates": "~29.0.16",
     "lucide-react-native": "^0.562.0",
-    "nativewind": "^4.2.1",
+    "nativewind": "4.1.23",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-reanimated": "~4.1.1",
+    "react-native-reanimated": "3.16.7",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
