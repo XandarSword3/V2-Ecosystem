@@ -44,12 +44,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    // Handle OAuth callback - check for tokens in URL
+    const handleOAuthCallback = () => {
+      if (typeof window === 'undefined') return false;
+      
+      const params = new URLSearchParams(window.location.search);
+      const oauth = params.get('oauth');
+      const accessToken = params.get('accessToken');
+      const refreshToken = params.get('refreshToken');
+      
+      if (oauth === 'success' && accessToken && refreshToken) {
+        // Store tokens from OAuth callback
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        
+        // Clean URL by removing OAuth params
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+        
+        authLogger.info('OAuth tokens received and stored');
+        return true;
+      }
+      return false;
+    };
+
     // Validate stored credentials on mount by checking with the server
     const validateSession = async () => {
+      // First check for OAuth callback
+      const oauthHandled = handleOAuthCallback();
+      
       const storedUser = localStorage.getItem('user');
       const accessToken = localStorage.getItem('accessToken');
       
-      if (!storedUser || !accessToken) {
+      // If no access token (and OAuth didn't just set one), nothing to validate
+      if (!accessToken) {
         setIsLoading(false);
         return;
       }
@@ -72,6 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(validatedUser);
           // Update localStorage with validated data
           localStorage.setItem('user', JSON.stringify(validatedUser));
+          
+          // If this was an OAuth login, log success
+          if (oauthHandled) {
+            authLogger.info('OAuth login successful for:', validatedUser.email);
+          }
         } else {
           throw new Error('Invalid session');
         }
@@ -114,13 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { user: userData, tokens } = data.data;
     
-    // Debug logging
-    console.log('[Auth] Login response tokens:', tokens);
-    console.log('[Auth] accessToken:', tokens?.accessToken?.substring(0, 20) + '...');
-    console.log('[Auth] refreshToken:', tokens?.refreshToken?.substring(0, 20) + '...');
-    
     if (!tokens?.accessToken || !tokens?.refreshToken) {
-      console.error('[Auth] Missing tokens in login response!');
       throw new Error('Invalid login response - missing tokens');
     }
     

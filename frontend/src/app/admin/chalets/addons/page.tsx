@@ -65,7 +65,8 @@ export default function AdminChaletAddonsPage() {
 
   const fetchAddons = useCallback(async () => {
     try {
-      const response = await api.get('/chalets/add-ons');
+      // Use admin endpoint to get ALL add-ons (including inactive)
+      const response = await api.get('/chalets/admin/add-ons');
       setAddons(response.data.data || []);
     } catch (error) {
       toast.error(tc('errors.failedToLoad'));

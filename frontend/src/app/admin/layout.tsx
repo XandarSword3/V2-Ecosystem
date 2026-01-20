@@ -446,14 +446,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         )}
       >
         {/* Top Bar - Premium Glassmorphism */}
-        <div className="hidden lg:flex items-center justify-between h-16 px-6 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/50 dark:border-slate-700/50 shadow-sm">
+        <div className="hidden lg:flex items-center justify-between h-16 px-6 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/50 dark:border-slate-700/50 shadow-sm sticky top-0 z-[100]">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
               {navigation.find((n) => pathname === n.href || pathname.startsWith(n.href + '/'))?.name || 'Dashboard'}
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="relative">
+            <div className="relative z-[110]">
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
                 className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 relative"
@@ -471,7 +471,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 z-50 overflow-hidden"
+                    className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 z-[120] overflow-hidden"
                   >
                     <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                       <h3 className="font-semibold text-slate-900 dark:text-white">Notifications</h3>

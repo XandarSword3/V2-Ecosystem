@@ -56,6 +56,7 @@ export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   apiUrl: process.env.API_URL || 'http://localhost:3000',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
 
   database: {
     url: process.env.DATABASE_URL || '',
@@ -112,6 +113,26 @@ export const config = {
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET || '',
       callbackUrl: process.env.FACEBOOK_CALLBACK_URL || `http://localhost:${process.env.PORT || 3005}/api/auth/facebook/callback`,
     },
+  },
+
+  // Firebase Configuration (for mobile push notifications)
+  firebase: {
+    serviceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || '',
+    // Alternative: JSON string of service account credentials
+    // serviceAccount: process.env.FIREBASE_SERVICE_ACCOUNT || '',
+    projectId: process.env.FIREBASE_PROJECT_ID || '',
+  },
+
+  // Mobile App Configuration
+  mobile: {
+    bundleId: {
+      ios: process.env.IOS_BUNDLE_ID || 'com.v2resort.app',
+      android: process.env.ANDROID_BUNDLE_ID || 'com.v2resort.app',
+    },
+    // Apple Developer Team ID for Apple Sign In
+    appleTeamId: process.env.APPLE_TEAM_ID || '',
+    // Deep linking scheme
+    deepLinkScheme: process.env.DEEP_LINK_SCHEME || 'v2resort',
   },
 } as const;
 

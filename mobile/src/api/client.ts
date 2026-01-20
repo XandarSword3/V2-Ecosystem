@@ -401,4 +401,568 @@ export const deviceApi = {
   },
 };
 
+/**
+ * Profile API methods
+ */
+export const profileApi = {
+  /**
+   * Update user profile
+   */
+  async update(data: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+  }): Promise<ApiResponse<User>> {
+    const response = await apiClient.put<ApiResponse<User>>('/users/me', data);
+    if (response.data.success && response.data.data) {
+      await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(response.data.data));
+    }
+    return response.data;
+  },
+
+  /**
+   * Change password
+   */
+  async changePassword(data: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<ApiResponse<void>> {
+    const response = await apiClient.put<ApiResponse<void>>('/users/me/password', data);
+    return response.data;
+  },
+};
+
+/**
+ * Loyalty API methods
+ */
+export const loyaltyApi = {
+  /**
+   * Get loyalty status (alias for getBalance with extended data)
+   */
+  async getStatus(): Promise<ApiResponse<{
+    points: number;
+    tier: string;
+    tierBenefits: string[];
+    nextTier: string | null;
+    pointsToNextTier: number | null;
+    lifetimePoints: number;
+  }>> {
+    const response = await apiClient.get<ApiResponse<any>>('/loyalty/status');
+    return response.data;
+  },
+
+  /**
+   * Get loyalty balance and tier info
+   */
+  async getBalance(): Promise<ApiResponse<{
+    points: number;
+    tier: string;
+    tierMultiplier: number;
+    nextTier?: string;
+    pointsToNextTier?: number;
+  }>> {
+    const response = await apiClient.get<ApiResponse<any>>('/loyalty/balance');
+    return response.data;
+  },
+
+  /**
+   * Get points history
+   */
+  async getHistory(page?: number, limit?: number): Promise<ApiResponse<Array<{
+    id: string;
+    type: 'earn' | 'redeem';
+    points: number;
+    description: string;
+    date: string;
+    category: string;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/loyalty/history', { 
+      params: { page, limit } 
+    });
+    // Transform response if needed
+    const data = response.data.data;
+    if (data?.transactions) {
+      return { ...response.data, data: data.transactions };
+    }
+    return response.data;
+  },
+
+  /**
+   * Get available rewards
+   */
+  async getAvailableRewards(): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    pointsCost: number;
+    description: string;
+    available: boolean;
+    category: string;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/loyalty/rewards');
+    return response.data;
+  },
+
+  /**
+   * Redeem a reward
+   */
+  async redeemReward(rewardId: string): Promise<ApiResponse<{ success: boolean }>> {
+    const response = await apiClient.post<ApiResponse<any>>(`/loyalty/rewards/${rewardId}/redeem`);
+    return response.data;
+  },
+};
+
+/**
+ * Gift Card API methods
+ */
+export const giftCardApi = {
+  /**
+   * Check gift card balance
+   */
+  async checkBalance(code: string): Promise<ApiResponse<{
+    code: string;
+    balance: number;
+    expiresAt?: string;
+    isValid: boolean;
+  }>> {
+    const response = await apiClient.get<ApiResponse<any>>(`/giftcards/balance/${code}`);
+    return response.data;
+  },
+
+  /**
+   * Get user's gift cards (alias: getMyCards)
+   */
+  async getMyCards(): Promise<ApiResponse<Array<{
+    id: string;
+    code: string;
+    balance: number;
+    initialValue: number;
+    status: 'active' | 'depleted' | 'expired';
+    expiresAt: string | null;
+    createdAt: string;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/giftcards/my');
+    return response.data;
+  },
+
+  /**
+   * Get user's gift cards
+   */
+  async list(): Promise<ApiResponse<Array<{
+    id: string;
+    code: string;
+    balance: number;
+    expiresAt?: string;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/giftcards/my');
+    return response.data;
+  },
+
+  /**
+   * Get gift card transaction history
+   */
+  async getHistory(): Promise<ApiResponse<Array<{
+    id: string;
+    type: 'purchase' | 'redeem' | 'refund';
+    amount: number;
+    description: string;
+    date: string;
+    cardCode: string;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/giftcards/history');
+    return response.data;
+  },
+
+  /**
+   * Purchase a gift card
+   */
+  async purchase(data: {
+    amount: number;
+    recipientEmail: string;
+    recipientName?: string;
+    message?: string;
+  }): Promise<ApiResponse<{
+    id: string;
+    code: string;
+    balance: number;
+  }>> {
+    const response = await apiClient.post<ApiResponse<any>>('/giftcards/purchase', data);
+    return response.data;
+  },
+
+  /**
+   * Redeem a gift card code
+   */
+  async redeem(code: string): Promise<ApiResponse<{
+    id: string;
+    balance: number;
+  }>> {
+    const response = await apiClient.post<ApiResponse<any>>('/giftcards/redeem', { code });
+    return response.data;
+  },
+};
+
+/**
+ * Restaurant API methods  
+ */
+export const restaurantApi = {
+  /**
+   * Get restaurant modules
+   */
+  async getModules(): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    type: string;
+    description?: string;
+    image?: string;
+    isActive: boolean;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/modules?type=restaurant');
+    return response.data;
+  },
+
+  /**
+   * Get menu categories
+   */
+  async getCategories(): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    icon: string;
+    itemCount: number;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/restaurant/categories');
+    return response.data;
+  },
+
+  /**
+   * Get menu items (optionally filtered by category)
+   */
+  async getMenu(categoryId?: string): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    category: string;
+    imageUrl: string | null;
+    available: boolean;
+    preparationTime: number;
+    dietaryFlags: string[];
+    allergens: string[];
+    popular: boolean;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/restaurant/menu', { 
+      params: categoryId ? { category: categoryId } : undefined 
+    });
+    return response.data;
+  },
+
+  /**
+   * Get menu items for a module
+   */
+  async getModuleMenu(moduleId: string, params?: { category?: string }): Promise<ApiResponse<{
+    categories: string[];
+    items: Array<{
+      id: string;
+      name: string;
+      description?: string;
+      price: number;
+      category: string;
+      image?: string;
+      isAvailable: boolean;
+    }>;
+  }>> {
+    const response = await apiClient.get<ApiResponse<any>>(`/restaurant/${moduleId}/menu`, { params });
+    return response.data;
+  },
+
+  /**
+   * Get cart items
+   */
+  async getCart(): Promise<ApiResponse<Array<{
+    id: string;
+    menuItemId: string;
+    name: string;
+    price: number;
+    quantity: number;
+    specialInstructions?: string;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/restaurant/cart');
+    return response.data;
+  },
+
+  /**
+   * Add item to cart
+   */
+  async addToCart(data: {
+    menuItemId: string;
+    quantity: number;
+    specialInstructions?: string;
+  }): Promise<ApiResponse<{ id: string }>> {
+    const response = await apiClient.post<ApiResponse<any>>('/restaurant/cart', data);
+    return response.data;
+  },
+
+  /**
+   * Update cart item
+   */
+  async updateCartItem(itemId: string, data: {
+    quantity?: number;
+    specialInstructions?: string;
+  }): Promise<ApiResponse<void>> {
+    const response = await apiClient.put<ApiResponse<any>>(`/restaurant/cart/${itemId}`, data);
+    return response.data;
+  },
+
+  /**
+   * Remove item from cart
+   */
+  async removeFromCart(itemId: string): Promise<ApiResponse<void>> {
+    const response = await apiClient.delete<ApiResponse<any>>(`/restaurant/cart/${itemId}`);
+    return response.data;
+  },
+
+  /**
+   * Place order
+   */
+  async placeOrder(data: {
+    items: Array<{ menuItemId: string; quantity: number; specialInstructions?: string }>;
+    deliveryOption: 'room' | 'pickup';
+    roomNumber?: string;
+    specialInstructions?: string;
+    couponCode?: string;
+  }): Promise<ApiResponse<{
+    orderId: string;
+    orderNumber: string;
+    total: number;
+    status: string;
+  }>> {
+    // Transform to API format
+    const apiData = {
+      items: data.items.map(i => ({ 
+        itemId: i.menuItemId, 
+        quantity: i.quantity, 
+        notes: i.specialInstructions 
+      })),
+      deliveryOption: data.deliveryOption,
+      roomNumber: data.roomNumber,
+      notes: data.specialInstructions,
+      couponCode: data.couponCode,
+    };
+    const response = await apiClient.post<ApiResponse<any>>('/restaurant/orders', apiData);
+    return response.data;
+  },
+
+  /**
+   * Get user's orders
+   */
+  async getOrders(params?: { page?: number; limit?: number; status?: string }): Promise<ApiResponse<Array<{
+    id: string;
+    orderNumber: string;
+    status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
+    items: Array<{ name: string; quantity: number; price: number }>;
+    total: number;
+    deliveryOption: 'room' | 'pickup';
+    roomNumber?: string;
+    createdAt: string;
+    estimatedTime?: number;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/restaurant/orders', { params });
+    // Transform paginated response to array
+    const data = response.data.data;
+    if (data?.orders) {
+      return { ...response.data, data: data.orders };
+    }
+    return response.data;
+  },
+};
+
+/**
+ * Pool API methods
+ */
+export const poolApi = {
+  /**
+   * Get pool info
+   */
+  async getInfo(): Promise<ApiResponse<{
+    id: string;
+    name: string;
+    description: string;
+    amenities: string[];
+    hours: string;
+    rules: string[];
+  }>> {
+    const response = await apiClient.get<ApiResponse<any>>('/pool/info');
+    return response.data;
+  },
+
+  /**
+   * Get pool areas
+   */
+  async getAreas(): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    description?: string;
+    capacity: number;
+    currentOccupancy: number;
+    image?: string;
+    isOpen: boolean;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/pool/areas');
+    return response.data;
+  },
+
+  /**
+   * Get availability for a date
+   */
+  async getAvailability(date: string): Promise<ApiResponse<Array<{
+    id: string;
+    startTime: string;
+    endTime: string;
+    available: boolean;
+    spotsAvailable: number;
+    maxCapacity: number;
+    price: number;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/pool/availability', {
+      params: { date }
+    });
+    return response.data;
+  },
+
+  /**
+   * Get user's bookings
+   */
+  async getMyBookings(): Promise<ApiResponse<Array<{
+    id: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    status: 'confirmed' | 'pending' | 'cancelled';
+    guests: number;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/pool/bookings/my');
+    return response.data;
+  },
+
+  /**
+   * Book a pool slot
+   */
+  async book(data: {
+    date: string;
+    slotId: string;
+    guests: number;
+  }): Promise<ApiResponse<{
+    bookingId: string;
+    qrCode: string;
+  }>> {
+    const response = await apiClient.post<ApiResponse<any>>('/pool/book', data);
+    return response.data;
+  },
+
+  /**
+   * Cancel a booking
+   */
+  async cancelBooking(bookingId: string): Promise<ApiResponse<void>> {
+    const response = await apiClient.delete<ApiResponse<any>>(`/pool/bookings/${bookingId}`);
+    return response.data;
+  },
+
+  /**
+   * Book pool ticket
+   */
+  async bookTicket(data: {
+    areaId?: string;
+    date: string;
+    quantity: number;
+  }): Promise<ApiResponse<{
+    ticketId: string;
+    qrCode: string;
+    validFrom: string;
+    validTo: string;
+  }>> {
+    const response = await apiClient.post<ApiResponse<any>>('/pool/tickets', data);
+    return response.data;
+  },
+
+  /**
+   * Get user's tickets
+   */
+  async getTickets(): Promise<ApiResponse<Array<{
+    id: string;
+    qrCode: string;
+    status: string;
+    validFrom: string;
+    validTo: string;
+    area?: string;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/pool/tickets/my');
+    return response.data;
+  },
+};
+
+/**
+ * Coupon API methods
+ */
+export const couponApi = {
+  /**
+   * Validate coupon code
+   */
+  async validate(code: string, context?: { moduleId?: string; subtotal?: number }): Promise<ApiResponse<{
+    code: string;
+    discount: number;
+    type: 'percentage' | 'fixed';
+    discountType: 'percentage' | 'fixed';
+    discountValue: number;
+    isValid: boolean;
+    message?: string;
+  }>> {
+    const response = await apiClient.post<ApiResponse<any>>('/coupons/validate', { code, ...context });
+    // Normalize response to include both formats
+    if (response.data.data) {
+      const data = response.data.data;
+      response.data.data = {
+        ...data,
+        discount: data.discountValue || data.discount,
+        type: data.discountType || data.type,
+      };
+    }
+    return response.data;
+  },
+};
+
+/**
+ * Payment API methods
+ */
+export const paymentApi = {
+  /**
+   * Create payment intent
+   */
+  async createIntent(data: {
+    amount: number;
+    orderId?: string;
+    bookingId?: string;
+    couponCode?: string;
+    giftCardCode?: string;
+    loyaltyPointsToRedeem?: number;
+  }): Promise<ApiResponse<{
+    clientSecret: string;
+    paymentIntentId: string;
+    amount: number;
+    discounts: Array<{ type: string; amount: number }>;
+  }>> {
+    const response = await apiClient.post<ApiResponse<any>>('/payments/create-intent', data);
+    return response.data;
+  },
+
+  /**
+   * Confirm payment
+   */
+  async confirm(paymentIntentId: string): Promise<ApiResponse<{
+    status: string;
+    receiptUrl?: string;
+  }>> {
+    const response = await apiClient.post<ApiResponse<any>>('/payments/confirm', { paymentIntentId });
+    return response.data;
+  },
+};
+
 export default apiClient;

@@ -232,7 +232,15 @@ export const adminUpdateUserSchema = z.object({
 });
 
 export const assignUserRolesSchema = z.object({
-  roleIds: z.array(uuidSchema).min(1, 'At least one role is required'),
+  roleIds: z.array(uuidSchema).optional(),
+  roles: z.array(z.string()).optional(),
+}).transform(data => {
+  // Ensure at least one array exists and has values
+  if ((!data.roleIds || data.roleIds.length === 0) && (!data.roles || data.roles.length === 0)) {
+    // Allow empty roles to remove all roles from user
+    return { roleIds: data.roleIds || [], roles: data.roles || [] };
+  }
+  return data;
 });
 
 export const createRoleSchema = z.object({

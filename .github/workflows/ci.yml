@@ -24,31 +24,31 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: |
-            backend/package-lock.json
-            frontend/package-lock.json
+            v2-resort/backend/package-lock.json
+            v2-resort/frontend/package-lock.json
       
       - name: Install backend dependencies
-        working-directory: backend
+        working-directory: v2-resort/backend
         run: npm ci
       
       - name: Install frontend dependencies
-        working-directory: frontend
+        working-directory: v2-resort/frontend
         run: npm ci
       
       - name: Lint backend
-        working-directory: backend
+        working-directory: v2-resort/backend
         run: npm run lint || true  # Allow lint warnings
       
       - name: Lint frontend
-        working-directory: frontend
+        working-directory: v2-resort/frontend
         run: npm run lint || true
       
       - name: Typecheck backend
-        working-directory: backend
+        working-directory: v2-resort/backend
         run: npx tsc --noEmit
       
       - name: Typecheck frontend
-        working-directory: frontend
+        working-directory: v2-resort/frontend
         run: npx tsc --noEmit
 
   backend-tests:
@@ -65,20 +65,29 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: v2-resort/backend/package-lock.json
       
       - name: Install dependencies
-        working-directory: backend
+        working-directory: v2-resort/backend
         run: npm ci
       
       - name: Run unit tests
-        working-directory: backend
+        working-directory: v2-resort/backend
         run: npm test
         env:
           NODE_ENV: test
           JWT_SECRET: test-jwt-secret-for-ci-minimum-32-characters
           SUPABASE_URL: https://test.supabase.co
           SUPABASE_SERVICE_KEY: test-service-key
+      
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        if: success()
+        with:
+          working-directory: v2-resort/backend
+          files: ./coverage/lcov.info
+          flags: backend
+          fail_ci_if_error: false
 
   frontend-tests:
     name: Frontend Tests
@@ -94,14 +103,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: v2-resort/frontend/package-lock.json
       
       - name: Install dependencies
-        working-directory: frontend
+        working-directory: v2-resort/frontend
         run: npm ci
       
       - name: Run unit tests
-        working-directory: frontend
+        working-directory: v2-resort/frontend
         run: npm test
         env:
           NODE_ENV: test
@@ -121,23 +130,23 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: |
-            backend/package-lock.json
-            frontend/package-lock.json
+            v2-resort/backend/package-lock.json
+            v2-resort/frontend/package-lock.json
       
       - name: Install backend dependencies
-        working-directory: backend
+        working-directory: v2-resort/backend
         run: npm ci
       
       - name: Build backend
-        working-directory: backend
+        working-directory: v2-resort/backend
         run: npm run build
       
       - name: Install frontend dependencies
-        working-directory: frontend
+        working-directory: v2-resort/frontend
         run: npm ci
       
       - name: Build frontend
-        working-directory: frontend
+        working-directory: v2-resort/frontend
         run: npm run build
         env:
           NEXT_PUBLIC_API_URL: https://api.example.com
@@ -157,15 +166,18 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: v2-resort/package-lock.json
       
       - name: Install dependencies
+        working-directory: v2-resort
         run: npm ci
       
       - name: Install Playwright browsers
+        working-directory: v2-resort
         run: npx playwright install --with-deps chromium
       
       - name: Run Playwright tests
+        working-directory: v2-resort
         run: npx playwright test --project=chromium
         env:
           CI: true
@@ -175,5 +187,47 @@ jobs:
         if: failure()
         with:
           name: playwright-report
-          path: playwright-report/
+          path: v2-resort/playwright-report/
           retention-days: 7
+
+  # Security scan for dependencies
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Audit backend dependencies
+        working-directory: v2-resort/backend
+        run: npm audit --audit-level=high || true
+      
+      - name: Audit frontend dependencies
+        working-directory: v2-resort/frontend
+        run: npm audit --audit-level=high || true
+
+  # Deployment staging (only on main branch)
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Deploy notification
+        run: |
+          echo "🚀 Ready for staging deployment"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Author: ${{ github.actor }}"

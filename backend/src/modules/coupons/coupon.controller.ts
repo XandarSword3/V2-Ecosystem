@@ -3,6 +3,15 @@ import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
 
 // Validation schemas
+// Helper to parse date or datetime strings - accepts YYYY-MM-DD or ISO datetime
+const dateOrDatetimeSchema = z.string().transform((val) => {
+  if (!val) return undefined;
+  // If it's already a valid ISO datetime, return as-is
+  if (val.includes('T')) return val;
+  // If it's just a date (YYYY-MM-DD), append time
+  return `${val}T00:00:00.000Z`;
+}).optional();
+
 const createCouponSchema = z.object({
   code: z.string().min(3).max(50).transform(val => val.toUpperCase()),
   name: z.string().max(100),
@@ -14,8 +23,9 @@ const createCouponSchema = z.object({
   appliesTo: z.enum(['all', 'restaurant', 'chalets', 'pool', 'snack', 'snack_bar']).default('all'),
   usageLimit: z.number().int().positive().optional(),
   perUserLimit: z.number().int().positive().default(1),
-  validFrom: z.string().datetime().optional(),
-  validUntil: z.string().datetime().optional(),
+  validFrom: dateOrDatetimeSchema,
+  validUntil: dateOrDatetimeSchema,
+  firstOrderOnly: z.boolean().optional(),
 });
 
 const updateCouponSchema = createCouponSchema.partial().extend({

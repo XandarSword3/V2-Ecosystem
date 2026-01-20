@@ -137,9 +137,10 @@ describe('Order Service - Table Resolution', () => {
         items: [{ menuItemId: 'item-1', quantity: 1 }]
     });
 
+    // The service resolves tableNumber to table_id - it does NOT store table_number in the order
+    // This confirms the table resolution worked correctly
     expect(insertOrderSpy).toHaveBeenCalledWith(expect.objectContaining({
         table_id: tableId,      // This confirms resolution worked!
-        table_number: tableNumber
     }));
 
   });

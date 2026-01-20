@@ -5,6 +5,7 @@ interface TokenPayload {
   userId: string;
   email: string;
   roles: string[];
+  tokenVersion?: number;
 }
 
 export interface GeneratedTokens {
@@ -35,14 +36,19 @@ export function generateTokens(payload: TokenPayload): GeneratedTokens {
   const refreshExpiresIn = parseExpiryToSeconds(config.jwt.refreshExpiresIn);
 
   const accessToken = jwt.sign(
-    { userId: payload.userId, email: payload.email, roles: payload.roles },
+    { 
+      userId: payload.userId, 
+      email: payload.email, 
+      roles: payload.roles,
+      tokenVersion: payload.tokenVersion ?? 0
+    },
     config.jwt.secret,
     { expiresIn: accessExpiresIn }
   );
 
   // Use separate secret for refresh tokens for better security
   const refreshToken = jwt.sign(
-    { userId: payload.userId, type: 'refresh' },
+    { userId: payload.userId, type: 'refresh', tokenVersion: payload.tokenVersion ?? 0 },
     config.jwt.refreshSecret,
     { expiresIn: refreshExpiresIn }
   );
@@ -55,11 +61,11 @@ export function verifyToken(token: string): TokenPayload {
   return decoded;
 }
 
-export function verifyRefreshToken(token: string): { userId: string } {
+export function verifyRefreshToken(token: string): { userId: string; tokenVersion?: number } {
   // Use separate secret for refresh tokens
-  const decoded = jwt.verify(token, config.jwt.refreshSecret) as { userId: string; type: string };
+  const decoded = jwt.verify(token, config.jwt.refreshSecret) as { userId: string; type: string; tokenVersion?: number };
   if (decoded.type !== 'refresh') {
     throw new Error('Invalid token type');
   }
-  return { userId: decoded.userId };
+  return { userId: decoded.userId, tokenVersion: decoded.tokenVersion };
 }

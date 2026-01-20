@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { authenticate, authorize, optionalAuth } from "../../middleware/auth.middleware";
 import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
-import * as poolController from "./pool.controller";
+// Import from refactored controllers
+import * as poolController from "./controllers/index";
 
 const router = Router();
 

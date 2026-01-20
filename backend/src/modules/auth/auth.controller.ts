@@ -10,14 +10,9 @@ import { getErrorMessage } from "../../types/index.js";
 const isProduction = config.env === 'production';
 
 export async function register(req: Request, res: Response, next: NextFunction) {
-  if (!isProduction) {
-    logger.info('=== REGISTER ATTEMPT ===');
-    logger.info('Email:', req.body.email);
-  }
   try {
     const data = registerSchema.parse(req.body);
     const result = await authService.register(data);
-    logger.info(`Registration successful for: ${data.email}`);
 
     await logActivity({
       user_id: result.user.id,
@@ -59,10 +54,6 @@ export async function register(req: Request, res: Response, next: NextFunction) 
 }
 
 export async function login(req: Request, res: Response, next: NextFunction) {
-  if (!isProduction) {
-    logger.info('=== LOGIN ATTEMPT ===');
-    logger.info('Email:', req.body.email);
-  }
   try {
     const data = loginSchema.parse(req.body);
 
@@ -73,7 +64,6 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 
     // Check if 2FA is required
     if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
-      logger.info(`2FA required for user: ${result.userId}`);
       return res.json({
         success: true,
         data: {
@@ -87,8 +77,6 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 
     // At this point, result is a full login response
     const loginResult = result as { user: { id: string; email: string; fullName: string; profileImageUrl: string; preferredLanguage: string; roles: string[] }; tokens: { accessToken: string; refreshToken: string } };
-
-    logger.info(`Login successful for user: ${loginResult.user.id}`);
 
     await logActivity({
       user_id: loginResult.user.id,

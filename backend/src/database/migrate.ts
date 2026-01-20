@@ -1,5 +1,7 @@
 import { getPool, initializeDatabase, closeDatabase } from './connection';
 import { logger } from '../utils/logger';
+import * as fs from 'fs';
+import * as path from 'path';
 
 async function migrate() {
   try {
@@ -549,6 +551,34 @@ async function migrate() {
         END IF;
       END $$;
     `);
+
+    // Apply SQL file migrations from supabase/migrations
+    logger.info('Applying SQL file migrations...');
+    const migrationsDir = path.join(__dirname, '../../../supabase/migrations');
+    
+    if (fs.existsSync(migrationsDir)) {
+      const files = fs.readdirSync(migrationsDir)
+        .filter(f => f.endsWith('.sql'))
+        .sort(); // Run in order
+
+      for (const file of files) {
+        logger.info(`Processing migration file: ${file}`);
+        const filePath = path.join(migrationsDir, file);
+        const sql = fs.readFileSync(filePath, 'utf8');
+        try {
+           await pool.query(sql); 
+           logger.info(`Applied: ${file}`);
+        } catch (e: any) {
+           logger.warn(`Error applying ${file}: ${e.message}`);
+           // Continue if error is likely harmless (e.g. object exists), otherwise throw
+           if (!e.message.includes('already exists')) {
+             throw e;
+           }
+        }
+      }
+    } else {
+       logger.warn(`Migrations directory not found at ${migrationsDir}`);
+    }
 
     logger.info('Migrations completed successfully');
     await closeDatabase();

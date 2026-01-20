@@ -88,18 +88,14 @@ export function PaymentDiscounts({
       // Check if token exists before making the call
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       if (!token) {
-        console.log('[PaymentDiscounts] No access token found, skipping loyalty load');
         return;
       }
       
-      console.log('[PaymentDiscounts] Loading loyalty info...');
       const res = await api.get('/loyalty/me');
-      console.log('[PaymentDiscounts] Loyalty response:', res.data);
       if (res.data.success) {
         const account = res.data.data;
         // Map backend field name (available_points) to frontend field name (currentPoints)
         const currentPoints = account.available_points || account.currentPoints || 0;
-        console.log('[PaymentDiscounts] Current points:', currentPoints);
         // Assuming 100 points = $1
         const pointsRate = 100; // This should come from settings
         setLoyaltyAccount({
