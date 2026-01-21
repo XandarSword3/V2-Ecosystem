@@ -61,12 +61,12 @@ export default function RestaurantScreen() {
   // Handle both array response and object response with items property
   // Backend /restaurant/menu returns { data: { categories, items, menuByCategory } }
   const rawData = menuData?.data;
-  const menuItems = Array.isArray(rawData) ? rawData : (rawData?.items || []);
-  const categories = categoriesData?.data || rawData?.categories || [];
+  const menuItems: any[] = Array.isArray(rawData) ? rawData : ((rawData as any)?.items || []);
+  const categories: any[] = categoriesData?.data || (rawData as any)?.categories || [];
   const categoryNames = ['All', ...categories.map((c: any) => c.name)];
 
   // Filter items by search and category
-  const filteredItems = menuItems.filter(item => {
+  const filteredItems = menuItems.filter((item: any) => {
     const matchesSearch = !searchQuery || 
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -183,7 +183,7 @@ export default function RestaurantScreen() {
               {activeCategory === 'All' ? 'All Items' : activeCategory} ({filteredItems.length})
             </Text>
 
-            {filteredItems.map((item) => (
+            {filteredItems.map((item: any) => (
               <TouchableOpacity
                 key={item.id}
                 activeOpacity={0.9}
@@ -231,7 +231,7 @@ export default function RestaurantScreen() {
                       {/* Dietary Flags */}
                       {item.dietaryFlags && item.dietaryFlags.length > 0 && (
                         <View className="flex-row flex-wrap mt-1">
-                          {item.dietaryFlags.slice(0, 3).map((flag, i) => (
+                          {item.dietaryFlags.slice(0, 3).map((flag: string, i: number) => (
                             <Text
                               key={i}
                               className="text-xs text-green-600 dark:text-green-400 mr-2"

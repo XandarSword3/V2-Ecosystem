@@ -19,6 +19,10 @@ import { useAuthStore } from '../../src/store/auth';
 import { authApi, twoFactorApi, STORAGE_KEYS } from '../../src/api/client';
 import { createMockUser, createMockAuthTokens } from '../__mocks__/fixtures';
 
+declare global {
+  function clearAllMockStorage(): void;
+}
+
 // Mock the API client module
 jest.mock('../../src/api/client', () => ({
   authApi: {

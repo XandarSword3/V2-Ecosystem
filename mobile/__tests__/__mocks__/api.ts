@@ -103,11 +103,13 @@ export const createMockAuthApi = () => ({
   }),
 
   isAuthenticated: jest.fn(async (): Promise<boolean> => {
-    return getMockResponse('auth.isAuthenticated', { success: true, data: true }).data;
+    const response = getMockResponse('auth.isAuthenticated', { success: true, data: true });
+    return response.data ?? false;
   }),
 
   getStoredUser: jest.fn(async (): Promise<User | null> => {
-    return getMockResponse('auth.getStoredUser', { success: true, data: createMockUser() }).data;
+    const response = getMockResponse('auth.getStoredUser', { success: true, data: createMockUser() });
+    return response.data ?? null;
   }),
 });
 

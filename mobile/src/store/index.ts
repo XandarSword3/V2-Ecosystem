@@ -9,7 +9,7 @@ export { useAuthStore, isTwoFactorRequired } from './auth';
 export type { AuthState } from './auth';
 
 // Cart Store
-export { useCartStore, TAX_RATE, SERVICE_FEE_RATE, LOYALTY_POINTS_TO_DOLLAR } from './cart';
+export { useCartStore } from './cart';
 export type {
   CartItem,
   CartItemAddon,

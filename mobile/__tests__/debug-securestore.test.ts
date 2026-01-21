@@ -3,6 +3,10 @@
  */
 import * as SecureStore from 'expo-secure-store';
 
+declare global {
+  function clearAllMockStorage(): void;
+}
+
 describe('SecureStore Mock Debug', () => {
   beforeEach(() => {
     jest.clearAllMocks();
