@@ -5,11 +5,11 @@
  */
 
 // Auth Store
-export { useAuthStore } from './auth';
+export { useAuthStore, isTwoFactorRequired } from './auth';
 export type { AuthState } from './auth';
 
 // Cart Store
-export { useCartStore } from './cart';
+export { useCartStore, TAX_RATE, SERVICE_FEE_RATE, LOYALTY_POINTS_TO_DOLLAR } from './cart';
 export type {
   CartItem,
   CartItemAddon,
@@ -41,3 +41,13 @@ export type {
   PaymentPreferences,
   SettingsState,
 } from './settings';
+
+// API Types (re-exported for convenience)
+export type { 
+  User, 
+  AuthTokens, 
+  TwoFactorRequired, 
+  TwoFactorSetup, 
+  TwoFactorStatus,
+  LoginResult,
+} from '../api/client';

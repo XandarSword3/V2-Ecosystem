@@ -4,6 +4,8 @@
  * Comprehensive test coverage for useAuthStore including:
  * - Initialization
  * - Login (success/failure)
+ * - Two-factor authentication
+ * - Biometric authentication
  * - Registration (success/failure)
  * - Logout (single device/all devices)
  * - Token refresh
@@ -14,7 +16,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '../../src/store/auth';
-import { authApi, STORAGE_KEYS } from '../../src/api/client';
+import { authApi, twoFactorApi, STORAGE_KEYS } from '../../src/api/client';
 import { createMockUser, createMockAuthTokens } from '../__mocks__/fixtures';
 
 // Mock the API client module
@@ -27,6 +29,15 @@ jest.mock('../../src/api/client', () => ({
     getMe: jest.fn(),
     isAuthenticated: jest.fn(),
     getStoredUser: jest.fn(),
+  },
+  twoFactorApi: {
+    verifyLogin: jest.fn(),
+    initiateSetup: jest.fn(),
+    enableTwoFactor: jest.fn(),
+    disableTwoFactor: jest.fn(),
+    getStatus: jest.fn(),
+    regenerateBackupCodes: jest.fn(),
+    verifyWithBackupCode: jest.fn(),
   },
   STORAGE_KEYS: {
     ACCESS_TOKEN: 'v2_access_token',
@@ -41,7 +52,25 @@ jest.mock('../../src/services/push-notifications', () => ({
   unregisterDevice: jest.fn().mockResolvedValue(true),
 }));
 
+// Mock biometric service
+jest.mock('../../src/services/biometric', () => ({
+  biometricService: {
+    checkCapabilities: jest.fn().mockResolvedValue({
+      isAvailable: true,
+      biometricTypes: ['fingerprint'],
+      isEnrolled: true,
+      securityLevel: 'biometric',
+    }),
+    isBiometricLoginEnabled: jest.fn().mockResolvedValue(false),
+    getBiometricCredentials: jest.fn().mockResolvedValue(null),
+    enableBiometricLogin: jest.fn().mockResolvedValue({ success: true }),
+    disableBiometricLogin: jest.fn().mockResolvedValue(undefined),
+    clearBiometricData: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
 const mockAuthApi = authApi as jest.Mocked<typeof authApi>;
+const mockTwoFactorApi = twoFactorApi as jest.Mocked<typeof twoFactorApi>;
 
 describe('useAuthStore', () => {
   beforeEach(() => {
@@ -52,10 +81,21 @@ describe('useAuthStore', () => {
       isLoading: false,
       isInitialized: false,
       error: null,
+      twoFactorPending: null,
+      twoFactorStatus: null,
+      twoFactorSetup: null,
+      biometricCapabilities: null,
+      isBiometricEnabled: false,
     });
     
     jest.clearAllMocks();
     global.clearAllMockStorage();
+    
+    // Default mock for 2FA status (called after successful login)
+    mockTwoFactorApi.getStatus.mockResolvedValue({
+      success: true,
+      data: { enabled: false, method: null, backupCodesRemaining: 0 },
+    });
   });
 
   // =========================================================================
@@ -694,6 +734,365 @@ describe('useAuthStore', () => {
       });
       expect(result.current.isAuthenticated).toBe(true);
       expect(result.current.user).toEqual(mockUser);
+    });
+  });
+
+  // =========================================================================
+  // Two-Factor Authentication Tests
+  // =========================================================================
+
+  describe('Two-Factor Authentication', () => {
+    it('should set twoFactorPending when login requires 2FA', async () => {
+      mockAuthApi.login.mockResolvedValue({
+        success: true,
+        data: {
+          requiresTwoFactor: true,
+          userId: 'user-123',
+          email: 'test@example.com',
+        },
+      } as any);
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let loginResult: boolean = false;
+      await act(async () => {
+        loginResult = await result.current.login('test@example.com', 'password');
+      });
+
+      expect(loginResult).toBe(false); // Not fully authenticated
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(result.current.twoFactorPending).toEqual({
+        userId: 'user-123',
+        email: 'test@example.com',
+      });
+    });
+
+    it('should complete login after successful 2FA verification', async () => {
+      const mockUser = createMockUser();
+      
+      // Set up pending 2FA
+      useAuthStore.setState({
+        twoFactorPending: {
+          userId: 'user-123',
+          email: 'test@example.com',
+        },
+      });
+
+      mockTwoFactorApi.verifyLogin.mockResolvedValue({
+        success: true,
+        data: {
+          ...createMockAuthTokens(),
+          user: mockUser,
+        },
+      });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let verifyResult: boolean = false;
+      await act(async () => {
+        verifyResult = await result.current.verify2FA('123456');
+      });
+
+      expect(verifyResult).toBe(true);
+      expect(result.current.isAuthenticated).toBe(true);
+      expect(result.current.twoFactorPending).toBeNull();
+      expect(result.current.user).toEqual(mockUser);
+    });
+
+    it('should handle invalid 2FA code', async () => {
+      useAuthStore.setState({
+        twoFactorPending: {
+          userId: 'user-123',
+          email: 'test@example.com',
+        },
+      });
+
+      mockTwoFactorApi.verifyLogin.mockResolvedValue({
+        success: false,
+        error: 'Invalid code',
+      });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let verifyResult: boolean = false;
+      await act(async () => {
+        verifyResult = await result.current.verify2FA('000000');
+      });
+
+      expect(verifyResult).toBe(false);
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(result.current.error).toBe('Invalid code');
+    });
+
+    it('should cancel 2FA flow', async () => {
+      useAuthStore.setState({
+        twoFactorPending: {
+          userId: 'user-123',
+          email: 'test@example.com',
+        },
+        error: 'Invalid code',
+      });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      act(() => {
+        result.current.cancel2FA();
+      });
+
+      expect(result.current.twoFactorPending).toBeNull();
+      expect(result.current.error).toBeNull();
+    });
+
+    it('should verify with backup code', async () => {
+      const mockUser = createMockUser();
+      
+      useAuthStore.setState({
+        twoFactorPending: {
+          userId: 'user-123',
+          email: 'test@example.com',
+        },
+      });
+
+      mockTwoFactorApi.verifyWithBackupCode.mockResolvedValue({
+        success: true,
+        data: {
+          ...createMockAuthTokens(),
+          user: mockUser,
+        },
+      });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let verifyResult: boolean = false;
+      await act(async () => {
+        verifyResult = await result.current.verify2FABackup('backup-code-123');
+      });
+
+      expect(verifyResult).toBe(true);
+      expect(result.current.isAuthenticated).toBe(true);
+    });
+
+    it('should initiate 2FA setup', async () => {
+      useAuthStore.setState({
+        isAuthenticated: true,
+        user: createMockUser(),
+      });
+
+      mockTwoFactorApi.initiateSetup.mockResolvedValue({
+        success: true,
+        data: {
+          secret: 'JBSWY3DPEHPK3PXP',
+          qrCodeUrl: 'data:image/png;base64,xxx',
+          backupCodes: ['code1', 'code2', 'code3'],
+        },
+      });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let setupResult: boolean = false;
+      await act(async () => {
+        setupResult = await result.current.initiate2FASetup();
+      });
+
+      expect(setupResult).toBe(true);
+      expect(result.current.twoFactorSetup).not.toBeNull();
+      expect(result.current.twoFactorSetup?.secret).toBe('JBSWY3DPEHPK3PXP');
+    });
+
+    it('should enable 2FA with valid code', async () => {
+      useAuthStore.setState({
+        isAuthenticated: true,
+        user: createMockUser(),
+        twoFactorSetup: {
+          secret: 'JBSWY3DPEHPK3PXP',
+          qrCodeUrl: 'data:image/png;base64,xxx',
+          backupCodes: ['code1', 'code2', 'code3'],
+        },
+      });
+
+      mockTwoFactorApi.enableTwoFactor.mockResolvedValue({
+        success: true,
+        data: { backupCodes: ['code1', 'code2', 'code3'] },
+      });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let enableResult: boolean = false;
+      await act(async () => {
+        enableResult = await result.current.enable2FA('123456');
+      });
+
+      expect(enableResult).toBe(true);
+      expect(result.current.twoFactorSetup).toBeNull();
+    });
+
+    it('should disable 2FA', async () => {
+      useAuthStore.setState({
+        isAuthenticated: true,
+        user: createMockUser(),
+        twoFactorStatus: { enabled: true, method: 'totp', backupCodesRemaining: 5 },
+      });
+
+      mockTwoFactorApi.disableTwoFactor.mockResolvedValue({
+        success: true,
+      });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let disableResult: boolean = false;
+      await act(async () => {
+        disableResult = await result.current.disable2FA('password', '123456');
+      });
+
+      expect(disableResult).toBe(true);
+      expect(result.current.twoFactorStatus?.enabled).toBe(false);
+    });
+
+    it('should regenerate backup codes', async () => {
+      useAuthStore.setState({
+        isAuthenticated: true,
+        user: createMockUser(),
+        twoFactorStatus: { enabled: true, method: 'totp', backupCodesRemaining: 2 },
+      });
+
+      const newCodes = ['new-code-1', 'new-code-2', 'new-code-3', 'new-code-4', 'new-code-5'];
+      
+      mockTwoFactorApi.regenerateBackupCodes.mockResolvedValue({
+        success: true,
+        data: { backupCodes: newCodes },
+      });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let codes: string[] | null = null;
+      await act(async () => {
+        codes = await result.current.regenerateBackupCodes('password');
+      });
+
+      expect(codes).toEqual(newCodes);
+      expect(result.current.twoFactorStatus?.backupCodesRemaining).toBe(5);
+    });
+
+    it('should return null if no pending 2FA when verifying', async () => {
+      const { result } = renderHook(() => useAuthStore());
+
+      let verifyResult: boolean = false;
+      await act(async () => {
+        verifyResult = await result.current.verify2FA('123456');
+      });
+
+      expect(verifyResult).toBe(false);
+      expect(result.current.error).toBe('No 2FA verification pending');
+    });
+  });
+
+  // =========================================================================
+  // Biometric Authentication Tests
+  // =========================================================================
+
+  describe('Biometric Authentication', () => {
+    it('should check biometric capabilities', async () => {
+      const { result } = renderHook(() => useAuthStore());
+
+      await act(async () => {
+        await result.current.checkBiometricCapabilities();
+      });
+
+      expect(result.current.biometricCapabilities).not.toBeNull();
+      expect(result.current.biometricCapabilities?.isAvailable).toBe(true);
+      expect(result.current.biometricCapabilities?.biometricTypes).toContain('fingerprint');
+    });
+
+    it('should enable biometric login', async () => {
+      const mockUser = createMockUser();
+      useAuthStore.setState({
+        isAuthenticated: true,
+        user: mockUser,
+      });
+
+      const { biometricService } = require('../../src/services/biometric');
+      biometricService.enableBiometricLogin.mockResolvedValue({ success: true });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let enableResult: boolean = false;
+      await act(async () => {
+        enableResult = await result.current.enableBiometricLogin('password123');
+      });
+
+      expect(enableResult).toBe(true);
+      expect(result.current.isBiometricEnabled).toBe(true);
+    });
+
+    it('should fail to enable biometric login without user', async () => {
+      const { result } = renderHook(() => useAuthStore());
+
+      let enableResult: boolean = false;
+      await act(async () => {
+        enableResult = await result.current.enableBiometricLogin('password123');
+      });
+
+      expect(enableResult).toBe(false);
+      expect(result.current.error).toBe('No user logged in');
+    });
+
+    it('should disable biometric login', async () => {
+      useAuthStore.setState({
+        isBiometricEnabled: true,
+      });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      await act(async () => {
+        await result.current.disableBiometricLogin();
+      });
+
+      expect(result.current.isBiometricEnabled).toBe(false);
+    });
+
+    it('should login with biometric credentials', async () => {
+      const mockUser = createMockUser();
+      const { biometricService } = require('../../src/services/biometric');
+      
+      biometricService.getBiometricCredentials.mockResolvedValue({
+        email: 'biometric@test.com',
+        encryptedPassword: 'stored-password',
+        createdAt: new Date().toISOString(),
+      });
+
+      mockAuthApi.login.mockResolvedValue({
+        success: true,
+        data: {
+          ...createMockAuthTokens(),
+          user: mockUser,
+        },
+      });
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let loginResult: boolean = false;
+      await act(async () => {
+        loginResult = await result.current.loginWithBiometric();
+      });
+
+      expect(loginResult).toBe(true);
+      expect(result.current.isAuthenticated).toBe(true);
+      expect(mockAuthApi.login).toHaveBeenCalledWith('biometric@test.com', 'stored-password');
+    });
+
+    it('should fail biometric login when no credentials stored', async () => {
+      const { biometricService } = require('../../src/services/biometric');
+      biometricService.getBiometricCredentials.mockResolvedValue(null);
+
+      const { result } = renderHook(() => useAuthStore());
+
+      let loginResult: boolean = false;
+      await act(async () => {
+        loginResult = await result.current.loginWithBiometric();
+      });
+
+      expect(loginResult).toBe(false);
+      expect(result.current.error).toBe('Biometric authentication failed');
     });
   });
 });
