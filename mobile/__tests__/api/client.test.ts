@@ -49,6 +49,10 @@ import {
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
+declare global {
+  function clearAllMockStorage(): void;
+}
+
 describe('API Client', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -341,7 +345,7 @@ describe('API Client', () => {
             success: true,
             data: {
               secret: 'JBSWY3DPEHPK3PXP',
-              qrCodeUri: 'otpauth://totp/App:user@example.com?secret=JBSWY3DPEHPK3PXP',
+              qrCodeUrl: 'otpauth://totp/App:user@example.com?secret=JBSWY3DPEHPK3PXP',
             },
           },
         });
@@ -350,7 +354,7 @@ describe('API Client', () => {
 
         expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/setup');
         expect(result.data?.secret).toBeDefined();
-        expect(result.data?.qrCodeUri).toBeDefined();
+        expect(result.data?.qrCodeUrl).toBeDefined();
       });
     });
 

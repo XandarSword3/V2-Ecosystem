@@ -50,8 +50,9 @@ export function Button({
     lg: 'px-8 py-4',
   };
 
-  const textVariants = {
+  const textVariants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary: 'text-primary-foreground font-medium',
+    default: 'text-primary-foreground font-medium',
     secondary: 'text-secondary-foreground font-medium',
     outline: 'text-foreground font-medium',
     ghost: 'text-foreground font-medium',
