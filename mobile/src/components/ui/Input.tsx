@@ -24,23 +24,24 @@ export function Input({
   return (
     <View className={cn('w-full', containerClassName)}>
       {label && (
-        <Text className="text-foreground text-sm font-medium ml-1 mb-2">
+        <Text className="text-white text-sm font-medium ml-1 mb-2">
           {label}
         </Text>
       )}
       <View className={cn(
-        'flex-row items-center w-full rounded-xl border bg-input/50 px-3',
-        error ? 'border-destructive' : 'border-input focus:border-ring',
-        'h-12' // Fixed height for consistency
+        'flex-row items-center w-full rounded-xl border px-3',
+        error ? 'border-destructive bg-red-500/10' : 'border-slate-500 bg-slate-800/80',
+        'h-14' // Fixed height for consistency
       )}>
         {leftIcon && <View className="mr-2">{leftIcon}</View>}
         <TextInput
           className={cn(
-            'flex-1 text-foreground text-base',
+            'flex-1 text-base',
             'h-full', // Take full height of container
             className
           )}
-          placeholderTextColor="#9ca3af"
+          style={{ color: '#ffffff' }}
+          placeholderTextColor="#6b7280"
           {...props}
         />
         {rightIcon && <View className="ml-2">{rightIcon}</View>}
