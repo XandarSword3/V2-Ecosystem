@@ -2,7 +2,7 @@ import { TextInput, View, Text, TextInputProps } from 'react-native';
 import { cn } from '../../lib/utils';
 import { useColorScheme } from 'nativewind';
 
-interface InputProps extends TextInputProps {
+export interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   leftIcon?: React.ReactNode;
