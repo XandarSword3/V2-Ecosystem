@@ -24,10 +24,10 @@ let mockState = {
   supportedTypes: [AuthenticationType.FINGERPRINT],
   securityLevel: SecurityLevel.BIOMETRIC_STRONG,
   authSuccess: true,
-  authError: null as string | null,
+  authError: null,
 };
 
-export const __setMockState = (state: Partial<typeof mockState>) => {
+export const __setMockState = (state) => {
   mockState = { ...mockState, ...state };
 };
 
