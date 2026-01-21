@@ -1,18 +1,29 @@
 import { Text, Pressable, View, ActivityIndicator } from 'react-native';
 import { cn } from '../../lib/utils';
 
-interface ButtonProps {
+export interface ButtonProps {
   onPress?: () => void;
   title?: string;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'glass' | 'destructive';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'glass' | 'destructive' | 'default';
   size?: 'sm' | 'default' | 'lg';
   className?: string;
   textClassName?: string;
   disabled?: boolean;
+  loading?: boolean;
   isLoading?: boolean;
   icon?: React.ReactNode;
   children?: React.ReactNode;
 }
+
+export const buttonVariants = {
+  primary: 'bg-primary active:bg-primary/90 shadow-sm',
+  default: 'bg-primary active:bg-primary/90 shadow-sm',
+  secondary: 'bg-secondary active:bg-secondary/80',
+  outline: 'border border-input bg-transparent active:bg-accent',
+  ghost: 'bg-transparent active:bg-accent',
+  glass: 'bg-black/80 border border-white/20 shadow-sm',
+  destructive: 'bg-destructive active:bg-destructive/90',
+};
 
 export function Button({
   onPress,
@@ -22,21 +33,16 @@ export function Button({
   className,
   textClassName,
   disabled,
+  loading,
   isLoading,
   icon,
   children,
 }: ButtonProps) {
+  const isLoadingState = loading || isLoading;
   
   const baseStyles = 'flex-row items-center justify-center rounded-xl transition-all';
   
-  const variants = {
-    primary: 'bg-primary active:bg-primary/90 shadow-sm',
-    secondary: 'bg-secondary active:bg-secondary/80',
-    outline: 'border border-input bg-transparent active:bg-accent',
-    ghost: 'bg-transparent active:bg-accent',
-    glass: 'bg-black/80 border border-white/20 shadow-sm',
-    destructive: 'bg-destructive active:bg-destructive/90',
-  };
+  const variants = buttonVariants;
 
   const sizes = {
     sm: 'px-3 py-2',
@@ -56,7 +62,7 @@ export function Button({
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled || isLoading}
+      disabled={disabled || isLoadingState}
       className={cn(
         baseStyles,
         variants[variant],
@@ -65,7 +71,7 @@ export function Button({
         className
       )}
     >
-      {isLoading ? (
+      {isLoadingState ? (
         <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? '#0f172a' : '#fff'} />
       ) : (
         <>
