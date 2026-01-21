@@ -350,6 +350,27 @@ export const authApi = {
     }
     return null;
   },
+
+  /**
+   * Request password reset email
+   */
+  async forgotPassword(email: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await apiClient.post<ApiResponse<{ message: string }>>('/auth/forgot-password', {
+      email,
+    });
+    return response.data;
+  },
+
+  /**
+   * Reset password with token
+   */
+  async resetPassword(token: string, password: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await apiClient.post<ApiResponse<{ message: string }>>('/auth/reset-password', {
+      token,
+      password,
+    });
+    return response.data;
+  },
 };
 
 /**
@@ -894,6 +915,99 @@ export const restaurantApi = {
     if (data?.orders) {
       return { ...response.data, data: data.orders };
     }
+    return response.data;
+  },
+};
+
+/**
+ * Snack Bar API methods
+ */
+export const snackApi = {
+  /**
+   * Get snack bar items
+   */
+  async getItems(moduleId?: string): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    category: string;
+    imageUrl?: string;
+    available: boolean;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/snack/items', {
+      params: moduleId ? { moduleId } : undefined,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get snack bar categories
+   */
+  async getCategories(): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    description?: string;
+    imageUrl?: string;
+    itemCount: number;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/snack/categories');
+    return response.data;
+  },
+
+  /**
+   * Place a snack bar order
+   */
+  async createOrder(data: {
+    items: Array<{
+      itemId: string;
+      quantity: number;
+      notes?: string;
+    }>;
+    paymentMethod: 'cash' | 'card';
+    notes?: string;
+    customerName?: string;
+    customerPhone?: string;
+  }): Promise<ApiResponse<{
+    id: string;
+    orderNumber: string;
+    status: string;
+    total: number;
+  }>> {
+    const response = await apiClient.post<ApiResponse<any>>('/snack/orders', data);
+    return response.data;
+  },
+
+  /**
+   * Get user's snack orders
+   */
+  async getOrders(): Promise<ApiResponse<Array<{
+    id: string;
+    orderNumber: string;
+    status: 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
+    items: Array<{ name: string; quantity: number; price: number }>;
+    total: number;
+    paymentMethod: 'cash' | 'card';
+    createdAt: string;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/snack/orders/my');
+    return response.data;
+  },
+
+  /**
+   * Get specific snack order
+   */
+  async getOrder(orderId: string): Promise<ApiResponse<{
+    id: string;
+    orderNumber: string;
+    status: string;
+    items: Array<{ name: string; quantity: number; price: number; notes?: string }>;
+    total: number;
+    paymentMethod: 'cash' | 'card';
+    createdAt: string;
+    updatedAt: string;
+  }>> {
+    const response = await apiClient.get<ApiResponse<any>>(`/snack/orders/${orderId}`);
     return response.data;
   },
 };

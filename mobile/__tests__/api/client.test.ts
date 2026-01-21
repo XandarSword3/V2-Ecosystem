@@ -38,10 +38,12 @@ import {
   loyaltyApi,
   giftCardApi,
   restaurantApi,
+  snackApi,
   poolApi,
   chaletsApi,
   paymentApi,
   couponApi,
+  twoFactorApi,
   STORAGE_KEYS,
 } from '../../src/api/client';
 
@@ -249,6 +251,175 @@ describe('API Client', () => {
         const result = await authApi.getStoredUser();
 
         expect(result).toBeNull();
+      });
+    });
+
+    describe('forgotPassword()', () => {
+      it('should send forgot password request', async () => {
+        (apiClient.post as jest.Mock).mockResolvedValue({
+          data: { success: true, message: 'Password reset email sent' },
+        });
+
+        const result = await authApi.forgotPassword('test@example.com');
+
+        expect(apiClient.post).toHaveBeenCalledWith('/auth/forgot-password', {
+          email: 'test@example.com',
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it('should handle non-existent email gracefully', async () => {
+        (apiClient.post as jest.Mock).mockResolvedValue({
+          data: { success: false, error: 'Email not found' },
+        });
+
+        const result = await authApi.forgotPassword('unknown@example.com');
+
+        expect(result.success).toBe(false);
+      });
+    });
+
+    describe('resetPassword()', () => {
+      it('should reset password with valid token', async () => {
+        (apiClient.post as jest.Mock).mockResolvedValue({
+          data: { success: true, message: 'Password reset successful' },
+        });
+
+        const result = await authApi.resetPassword('valid-reset-token', 'newSecurePassword123');
+
+        expect(apiClient.post).toHaveBeenCalledWith('/auth/reset-password', {
+          token: 'valid-reset-token',
+          password: 'newSecurePassword123',
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it('should handle invalid or expired token', async () => {
+        (apiClient.post as jest.Mock).mockResolvedValue({
+          data: { success: false, error: 'Invalid or expired token' },
+        });
+
+        const result = await authApi.resetPassword('expired-token', 'newPassword123');
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('Invalid or expired token');
+      });
+    });
+  });
+
+  // =========================================================================
+  // Two-Factor Authentication API Tests
+  // =========================================================================
+
+  describe('twoFactorApi', () => {
+    describe('verifyLogin()', () => {
+      it('should verify 2FA code during login', async () => {
+        const mockUser = createMockUser();
+        const mockTokens = createMockAuthTokens();
+
+        (apiClient.post as jest.Mock).mockResolvedValue({
+          data: {
+            success: true,
+            data: { ...mockTokens, user: mockUser },
+          },
+        });
+
+        const result = await twoFactorApi.verifyLogin('user-123', '123456');
+
+        expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/verify', expect.objectContaining({
+          userId: 'user-123',
+          code: '123456',
+        }));
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('initiateSetup()', () => {
+      it('should initiate 2FA setup', async () => {
+        (apiClient.post as jest.Mock).mockResolvedValue({
+          data: {
+            success: true,
+            data: {
+              secret: 'JBSWY3DPEHPK3PXP',
+              qrCodeUri: 'otpauth://totp/App:user@example.com?secret=JBSWY3DPEHPK3PXP',
+            },
+          },
+        });
+
+        const result = await twoFactorApi.initiateSetup();
+
+        expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/setup');
+        expect(result.data?.secret).toBeDefined();
+        expect(result.data?.qrCodeUri).toBeDefined();
+      });
+    });
+
+    describe('enableTwoFactor()', () => {
+      it('should enable 2FA with valid code', async () => {
+        (apiClient.post as jest.Mock).mockResolvedValue({
+          data: {
+            success: true,
+            data: {
+              backupCodes: ['code1', 'code2', 'code3'],
+            },
+          },
+        });
+
+        const result = await twoFactorApi.enableTwoFactor('123456');
+
+        expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/enable', {
+          code: '123456',
+        });
+        expect(result.data?.backupCodes).toHaveLength(3);
+      });
+    });
+
+    describe('disableTwoFactor()', () => {
+      it('should disable 2FA with password', async () => {
+        (apiClient.post as jest.Mock).mockResolvedValue({
+          data: { success: true },
+        });
+
+        const result = await twoFactorApi.disableTwoFactor('password123');
+
+        expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/disable', {
+          password: 'password123',
+          code: undefined,
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it('should disable 2FA with password and code', async () => {
+        (apiClient.post as jest.Mock).mockResolvedValue({
+          data: { success: true },
+        });
+
+        const result = await twoFactorApi.disableTwoFactor('password123', '654321');
+
+        expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/disable', {
+          password: 'password123',
+          code: '654321',
+        });
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('getStatus()', () => {
+      it('should fetch 2FA status', async () => {
+        (apiClient.get as jest.Mock).mockResolvedValue({
+          data: {
+            success: true,
+            data: {
+              enabled: true,
+              lastVerified: '2024-01-01T00:00:00Z',
+            },
+          },
+        });
+
+        const result = await twoFactorApi.getStatus();
+
+        expect(apiClient.get).toHaveBeenCalledWith('/auth/2fa/status');
+        expect(result.data?.enabled).toBe(true);
       });
     });
   });
@@ -625,6 +796,134 @@ describe('API Client', () => {
           params: undefined,
         });
         expect(result.data).toHaveLength(1);
+      });
+    });
+  });
+
+  // =========================================================================
+  // Snack Bar API Tests
+  // =========================================================================
+
+  describe('snackApi', () => {
+    describe('getItems()', () => {
+      it('should fetch snack bar items', async () => {
+        (apiClient.get as jest.Mock).mockResolvedValue({
+          data: {
+            success: true,
+            data: [
+              { id: 'snack-1', name: 'Chips', price: 3.50, available: true },
+              { id: 'snack-2', name: 'Soda', price: 2.00, available: true },
+            ],
+          },
+        });
+
+        const result = await snackApi.getItems();
+
+        expect(apiClient.get).toHaveBeenCalledWith('/snack/items', {
+          params: undefined,
+        });
+        expect(result.success).toBe(true);
+        expect(result.data).toHaveLength(2);
+      });
+
+      it('should fetch snack items filtered by module', async () => {
+        (apiClient.get as jest.Mock).mockResolvedValue({
+          data: {
+            success: true,
+            data: [{ id: 'snack-1', name: 'Chips', price: 3.50 }],
+          },
+        });
+
+        await snackApi.getItems('snack-module-1');
+
+        expect(apiClient.get).toHaveBeenCalledWith('/snack/items', {
+          params: { moduleId: 'snack-module-1' },
+        });
+      });
+    });
+
+    describe('getCategories()', () => {
+      it('should fetch snack categories', async () => {
+        (apiClient.get as jest.Mock).mockResolvedValue({
+          data: {
+            success: true,
+            data: [
+              { id: 'cat-1', name: 'Beverages', itemCount: 5 },
+              { id: 'cat-2', name: 'Snacks', itemCount: 10 },
+            ],
+          },
+        });
+
+        const result = await snackApi.getCategories();
+
+        expect(apiClient.get).toHaveBeenCalledWith('/snack/categories');
+        expect(result.data).toHaveLength(2);
+      });
+    });
+
+    describe('createOrder()', () => {
+      it('should place a snack bar order', async () => {
+        (apiClient.post as jest.Mock).mockResolvedValue({
+          data: {
+            success: true,
+            data: {
+              id: 'order-1',
+              orderNumber: 'SNK-001',
+              status: 'pending',
+              total: 8.50,
+            },
+          },
+        });
+
+        const result = await snackApi.createOrder({
+          items: [{ itemId: 'snack-1', quantity: 2 }],
+          paymentMethod: 'card',
+        });
+
+        expect(apiClient.post).toHaveBeenCalledWith('/snack/orders', {
+          items: [{ itemId: 'snack-1', quantity: 2 }],
+          paymentMethod: 'card',
+        });
+        expect(result.data?.orderNumber).toBe('SNK-001');
+      });
+    });
+
+    describe('getOrders()', () => {
+      it('should fetch user snack orders', async () => {
+        (apiClient.get as jest.Mock).mockResolvedValue({
+          data: {
+            success: true,
+            data: [
+              { id: 'order-1', orderNumber: 'SNK-001', status: 'completed', total: 8.50 },
+            ],
+          },
+        });
+
+        const result = await snackApi.getOrders();
+
+        expect(apiClient.get).toHaveBeenCalledWith('/snack/orders/my');
+        expect(result.data).toHaveLength(1);
+      });
+    });
+
+    describe('getOrder()', () => {
+      it('should fetch a specific snack order', async () => {
+        (apiClient.get as jest.Mock).mockResolvedValue({
+          data: {
+            success: true,
+            data: {
+              id: 'order-1',
+              orderNumber: 'SNK-001',
+              status: 'ready',
+              total: 8.50,
+            },
+          },
+        });
+
+        const result = await snackApi.getOrder('order-1');
+
+        expect(apiClient.get).toHaveBeenCalledWith('/snack/orders/order-1');
+        expect(result.data?.status).toBe('ready');
       });
     });
   });
