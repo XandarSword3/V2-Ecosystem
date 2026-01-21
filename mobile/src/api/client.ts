@@ -965,4 +965,234 @@ export const paymentApi = {
   },
 };
 
+/**
+ * Chalets API methods
+ */
+export const chaletsApi = {
+  /**
+   * Get all chalets
+   */
+  async getChalets(moduleId?: string): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    description?: string;
+    basePrice: number;
+    maxGuests: number;
+    bedrooms: number;
+    bathrooms: number;
+    amenities: string[];
+    images: string[];
+    isAvailable: boolean;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/chalets', { 
+      params: moduleId ? { moduleId } : undefined 
+    });
+    return response.data;
+  },
+
+  /**
+   * Get single chalet details
+   */
+  async getChalet(id: string): Promise<ApiResponse<{
+    id: string;
+    name: string;
+    description?: string;
+    basePrice: number;
+    maxGuests: number;
+    bedrooms: number;
+    bathrooms: number;
+    amenities: string[];
+    images: string[];
+    isAvailable: boolean;
+    rules?: string[];
+  }>> {
+    const response = await apiClient.get<ApiResponse<any>>(`/chalets/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Check availability
+   */
+  async getAvailability(chaletId: string, checkIn: string, checkOut: string): Promise<ApiResponse<{
+    isAvailable: boolean;
+    totalPrice: number;
+    nights: number;
+  }>> {
+    const response = await apiClient.get<ApiResponse<any>>(`/chalets/${chaletId}/availability`, {
+      params: { checkIn, checkOut }
+    });
+    return response.data;
+  },
+
+  /**
+   * Get add-ons for chalets
+   */
+  async getAddOns(): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    description?: string;
+    price: number;
+    category: string;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/chalets/add-ons');
+    return response.data;
+  },
+
+  /**
+   * Create a booking
+   */
+  async createBooking(data: {
+    chaletId: string;
+    checkInDate: string;
+    checkOutDate: string;
+    numberOfGuests: number;
+    customerName: string;
+    customerEmail: string;
+    customerPhone?: string;
+    addOns?: Array<{ addOnId: string; quantity: number }>;
+    specialRequests?: string;
+  }): Promise<ApiResponse<{
+    id: string;
+    bookingNumber: string;
+    status: string;
+    totalPrice: number;
+  }>> {
+    const response = await apiClient.post<ApiResponse<any>>('/chalets/bookings', data);
+    return response.data;
+  },
+
+  /**
+   * Get user's bookings
+   */
+  async getMyBookings(): Promise<ApiResponse<Array<{
+    id: string;
+    bookingNumber: string;
+    chalet: { id: string; name: string; images: string[] };
+    checkInDate: string;
+    checkOutDate: string;
+    numberOfGuests: number;
+    totalPrice: number;
+    status: 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
+    createdAt: string;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/chalets/my-bookings');
+    return response.data;
+  },
+
+  /**
+   * Get booking details
+   */
+  async getBookingDetails(bookingId: string): Promise<ApiResponse<{
+    id: string;
+    bookingNumber: string;
+    chalet: { id: string; name: string; images: string[]; amenities: string[] };
+    checkInDate: string;
+    checkOutDate: string;
+    numberOfGuests: number;
+    totalPrice: number;
+    status: string;
+    addOns: Array<{ name: string; price: number; quantity: number }>;
+    specialRequests?: string;
+  }>> {
+    const response = await apiClient.get<ApiResponse<any>>(`/chalets/bookings/${bookingId}`);
+    return response.data;
+  },
+};
+
+/**
+ * Modules API methods (for dynamic resort modules)
+ */
+export const modulesApi = {
+  /**
+   * Get all modules
+   */
+  async getModules(type?: string): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    slug: string;
+    type: 'restaurant' | 'pool' | 'chalets' | 'snack' | 'spa';
+    description?: string;
+    image?: string;
+    isActive: boolean;
+    settings?: Record<string, any>;
+  }>>> {
+    const response = await apiClient.get<ApiResponse<any>>('/modules', { 
+      params: type ? { type } : undefined 
+    });
+    return response.data;
+  },
+
+  /**
+   * Get single module
+   */
+  async getModule(idOrSlug: string): Promise<ApiResponse<{
+    id: string;
+    name: string;
+    slug: string;
+    type: string;
+    description?: string;
+    image?: string;
+    isActive: boolean;
+    settings?: Record<string, any>;
+  }>> {
+    const response = await apiClient.get<ApiResponse<any>>(`/modules/${idOrSlug}`);
+    return response.data;
+  },
+};
+
+/**
+ * Bookings API methods (unified access to all bookings)
+ */
+export const bookingsApi = {
+  /**
+   * Get all user bookings (chalets, pool, etc.)
+   */
+  async getMyBookings(): Promise<ApiResponse<Array<{
+    id: string;
+    type: 'chalet' | 'pool' | 'spa';
+    bookingNumber: string;
+    date: string;
+    endDate?: string;
+    status: string;
+    details: Record<string, any>;
+  }>>> {
+    // Combine chalet and pool bookings
+    const [chaletRes, poolRes] = await Promise.all([
+      chaletsApi.getMyBookings().catch(() => ({ success: false, data: [] as any })),
+      poolApi.getMyBookings().catch(() => ({ success: false, data: [] as any })),
+    ]);
+
+    const bookings: any[] = [];
+    
+    if (chaletRes.success && chaletRes.data) {
+      chaletRes.data.forEach((b: any) => {
+        bookings.push({
+          id: b.id,
+          type: 'chalet',
+          bookingNumber: b.bookingNumber,
+          date: b.checkInDate,
+          endDate: b.checkOutDate,
+          status: b.status,
+          details: b,
+        });
+      });
+    }
+
+    if (poolRes.success && poolRes.data) {
+      poolRes.data.forEach((b: any) => {
+        bookings.push({
+          id: b.id,
+          type: 'pool',
+          bookingNumber: b.id,
+          date: b.date,
+          status: b.status,
+          details: b,
+        });
+      });
+    }
+
+    return { success: true, data: bookings };
+  },
+};
+
 export default apiClient;

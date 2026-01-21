@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { View, StyleSheet, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '../global.css';
 
 import { useAuthStore } from '../src/store/auth';
@@ -41,6 +42,16 @@ if (Platform.OS !== 'web') {
 
 // Keep splash screen visible while loading
 SplashScreen.preventAutoHideAsync();
+
+// Create a React Query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 2,
+    },
+  },
+});
 
 /**
  * Auth guard - redirect based on auth state
@@ -144,19 +155,21 @@ export default function RootLayout() {
   );
 
   return (
-    <SafeAreaProvider>
-      {Platform.OS !== 'web' && StripeProvider ? (
-        <StripeProvider
-          publishableKey={STRIPE_PUBLISHABLE_KEY}
-          merchantIdentifier={STRIPE_MERCHANT_ID}
-          urlScheme="v2resort"
-        >
-          {AppContent}
-        </StripeProvider>
-      ) : (
-        AppContent
-      )}
-    </SafeAreaProvider>
+    <QueryClientProvider client={queryClient}>
+      <SafeAreaProvider>
+        {Platform.OS !== 'web' && StripeProvider ? (
+          <StripeProvider
+            publishableKey={STRIPE_PUBLISHABLE_KEY}
+            merchantIdentifier={STRIPE_MERCHANT_ID}
+            urlScheme="v2resort"
+          >
+            {AppContent}
+          </StripeProvider>
+        ) : (
+          AppContent
+        )}
+      </SafeAreaProvider>
+    </QueryClientProvider>
   );
 }
 

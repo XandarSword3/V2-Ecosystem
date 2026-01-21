@@ -39,11 +39,15 @@ export default function LoginScreen() {
       <View className="flex-1 bg-slate-950/80 px-4 justify-center">
         <SafeAreaView className="w-full max-w-md mx-auto space-y-8">
           
-          <View className="items-center space-y-2">
-            <Text className="text-white text-4xl font-bold tracking-tight text-center">
+          <View className="items-center space-y-4 mb-4">
+            {/* Logo Container */}
+            <View className="w-24 h-24 rounded-full bg-primary-500 items-center justify-center shadow-lg mb-2">
+              <Text className="text-white text-4xl font-black">V2</Text>
+            </View>
+            <Text className="text-white text-3xl font-bold tracking-tight text-center">
               V2 Resort
             </Text>
-            <Text className="text-slate-400 text-lg text-center">
+            <Text className="text-slate-300 text-base text-center">
               Welcome back to paradise
             </Text>
           </View>

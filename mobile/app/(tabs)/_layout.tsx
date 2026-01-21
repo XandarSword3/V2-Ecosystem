@@ -6,11 +6,12 @@
 import { Tabs } from 'expo-router';
 import { Home, UtensilsCrossed, Waves, BedDouble, User } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
-import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabsLayout() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
 
   // Fallback Palette for TabBar (NativeWind classes don't apply to screenOptions directly in v2 without workarounds)
   // We use the hex codes defined in Strategy/Global CSS
@@ -20,6 +21,9 @@ export default function TabsLayout() {
     bg: isDark ? '#0f172a' : '#ffffff',       // Slate 900 / White
     border: isDark ? '#1e293b' : '#e2e8f0',   // Slate 800 / 200
   };
+
+  // Dynamic tab bar height based on safe area
+  const TAB_BAR_BASE_HEIGHT = 56;
 
   return (
     <Tabs
@@ -31,8 +35,8 @@ export default function TabsLayout() {
           backgroundColor: colors.bg,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 88 : 60,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          height: TAB_BAR_BASE_HEIGHT + insets.bottom,
+          paddingBottom: insets.bottom,
           paddingTop: 8,
         },
         tabBarLabelStyle: {

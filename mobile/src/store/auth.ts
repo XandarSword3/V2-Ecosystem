@@ -9,7 +9,7 @@ import { create } from 'zustand';
 import { authApi, User, AuthTokens } from '../api/client';
 import { unregisterDevice } from '../services/push-notifications';
 
-interface AuthState {
+export interface AuthState {
   // State
   user: User | null;
   isAuthenticated: boolean;
