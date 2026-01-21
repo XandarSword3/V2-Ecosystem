@@ -9,7 +9,7 @@ interface CardProps extends ViewProps {
 export function Card({ variant = 'default', className, children, ...props }: CardProps) {
   const variants = {
     default: 'bg-card border border-border shadow-sm',
-    glass: 'bg-black/80 border border-white/20 shadow-sm',
+    glass: 'bg-slate-900/95 border border-white/30 shadow-lg',
     outline: 'bg-transparent border border-border',
     filled: 'bg-secondary',
   };
