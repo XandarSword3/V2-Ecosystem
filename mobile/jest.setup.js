@@ -387,6 +387,36 @@ beforeEach(() => {
 const originalError = console.error;
 const originalWarn = console.warn;
 
+// Mock @tanstack/react-query
+jest.mock('@tanstack/react-query', () => {
+  const mockQueryClient = {
+    invalidateQueries: jest.fn(),
+    setQueryData: jest.fn(),
+    getQueryData: jest.fn(),
+    clear: jest.fn(),
+  };
+  
+  return {
+    useQuery: jest.fn().mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+      isRefetching: false,
+    }),
+    useMutation: jest.fn().mockReturnValue({
+      mutate: jest.fn(),
+      mutateAsync: jest.fn(),
+      isLoading: false,
+      error: null,
+      data: null,
+    }),
+    useQueryClient: jest.fn().mockReturnValue(mockQueryClient),
+    QueryClient: jest.fn(() => mockQueryClient),
+    QueryClientProvider: ({ children }) => children,
+  };
+});
+
 beforeAll(() => {
   console.error = (...args) => {
     if (
