@@ -46,7 +46,30 @@ export interface User {
   roles: string[];
   phone?: string;
   loyaltyPoints?: number;
+  twoFactorEnabled?: boolean;
 }
+
+// 2FA Types
+export interface TwoFactorRequired {
+  requiresTwoFactor: true;
+  userId: string;
+  email: string;
+}
+
+export interface TwoFactorSetup {
+  secret: string;
+  qrCodeUrl: string;
+  backupCodes: string[];
+}
+
+export interface TwoFactorStatus {
+  enabled: boolean;
+  method: 'totp' | 'sms' | null;
+  backupCodesRemaining: number;
+}
+
+export type LoginResult = (AuthTokens & { user: User }) | TwoFactorRequired;
+
 
 // Token refresh state to prevent multiple refresh calls
 let isRefreshing = false;
@@ -326,6 +349,106 @@ export const authApi = {
       }
     }
     return null;
+  },
+};
+
+/**
+ * Two-Factor Authentication API methods
+ */
+export const twoFactorApi = {
+  /**
+   * Verify 2FA code during login
+   */
+  async verifyLogin(userId: string, code: string): Promise<ApiResponse<AuthTokens & { user: User }>> {
+    const deviceId = await SecureStore.getItemAsync(STORAGE_KEYS.DEVICE_ID);
+    
+    const response = await apiClient.post<ApiResponse<AuthTokens & { user: User }>>('/auth/2fa/verify', {
+      userId,
+      code,
+      deviceId,
+      platform: Platform.OS,
+    });
+
+    if (response.data.success && response.data.data) {
+      const { accessToken, refreshToken, user } = response.data.data;
+      
+      if (accessToken) await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+      if (refreshToken) await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+      if (user) await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+    }
+
+    return response.data;
+  },
+
+  /**
+   * Initiate 2FA setup - get QR code and secret
+   */
+  async initiateSetup(): Promise<ApiResponse<TwoFactorSetup>> {
+    const response = await apiClient.post<ApiResponse<TwoFactorSetup>>('/auth/2fa/setup');
+    return response.data;
+  },
+
+  /**
+   * Enable 2FA with verification code
+   */
+  async enableTwoFactor(code: string): Promise<ApiResponse<{ backupCodes: string[] }>> {
+    const response = await apiClient.post<ApiResponse<{ backupCodes: string[] }>>('/auth/2fa/enable', {
+      code,
+    });
+    return response.data;
+  },
+
+  /**
+   * Disable 2FA
+   */
+  async disableTwoFactor(password: string, code?: string): Promise<ApiResponse<void>> {
+    const response = await apiClient.post<ApiResponse<void>>('/auth/2fa/disable', {
+      password,
+      code,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get 2FA status for current user
+   */
+  async getStatus(): Promise<ApiResponse<TwoFactorStatus>> {
+    const response = await apiClient.get<ApiResponse<TwoFactorStatus>>('/auth/2fa/status');
+    return response.data;
+  },
+
+  /**
+   * Regenerate backup codes
+   */
+  async regenerateBackupCodes(password: string): Promise<ApiResponse<{ backupCodes: string[] }>> {
+    const response = await apiClient.post<ApiResponse<{ backupCodes: string[] }>>('/auth/2fa/backup-codes', {
+      password,
+    });
+    return response.data;
+  },
+
+  /**
+   * Verify with backup code (login flow)
+   */
+  async verifyWithBackupCode(userId: string, backupCode: string): Promise<ApiResponse<AuthTokens & { user: User }>> {
+    const deviceId = await SecureStore.getItemAsync(STORAGE_KEYS.DEVICE_ID);
+    
+    const response = await apiClient.post<ApiResponse<AuthTokens & { user: User }>>('/auth/2fa/verify-backup', {
+      userId,
+      backupCode,
+      deviceId,
+      platform: Platform.OS,
+    });
+
+    if (response.data.success && response.data.data) {
+      const { accessToken, refreshToken, user } = response.data.data;
+      
+      if (accessToken) await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+      if (refreshToken) await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+      if (user) await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+    }
+
+    return response.data;
   },
 };
 
