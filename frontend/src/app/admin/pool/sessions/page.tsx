@@ -406,7 +406,7 @@ export default function PoolSessionsManagementPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4"
             onClick={() => setShowModal(false)}
           >
             <motion.div

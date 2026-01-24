@@ -14,12 +14,14 @@ let useSupabaseClient = false;
 export async function initializeDatabase() {
   // Try direct PostgreSQL connection first
   try {
+    const isLocalConnection = config.database.url.includes('localhost') || config.database.url.includes('127.0.0.1');
+    
     pool = new Pool({
       connectionString: config.database.url,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
-      ssl: {
+      ssl: isLocalConnection ? false : {
         rejectUnauthorized: false,
       },
     });

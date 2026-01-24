@@ -10,10 +10,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { StripePlatformService, getStripePlatformService, PaymentPlatform } from '../../services/stripe-platform.service.js';
-import { requireAuth } from '../../middleware/auth.middleware.js';
+import { authenticate as requireAuth } from '../../middleware/auth.middleware.js';
 import { requirePermission } from '../../middleware/permission.middleware.js';
 import { logger } from '../../utils/logger.js';
-import { rateLimiter } from '../../middleware/rateLimiter.js';
+import { userRateLimit as rateLimiter } from '../../middleware/userRateLimit.middleware.js';
 
 const router = Router();
 

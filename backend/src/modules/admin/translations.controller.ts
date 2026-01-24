@@ -873,6 +873,170 @@ export async function updateFrontendTranslation(req: Request, res: Response, nex
   }
 }
 
+
+/**
+ * DB: Get UI Translations
+ */
+export async function getUiTranslations(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { page = 1, limit = 50, namespace, locale, status, search } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+    const supabase = getSupabase();
+
+    let query = supabase
+      .from('translations')
+      .select('*', { count: 'exact' });
+
+    if (namespace) query = query.eq('namespace', namespace);
+    if (locale) query = query.eq('locale', locale);
+    if (status) query = query.eq('status', status);
+    if (search) query = query.ilike('key', `%${search}%`);
+
+    const { data, count, error } = await query
+      .range(offset, offset + Number(limit) - 1)
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data,
+      meta: {
+        total: count,
+        page: Number(page),
+        limit: Number(limit)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * DB: Upsert UI Translation
+ */
+export async function upsertUiTranslation(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { namespace = 'common', key, locale, value, status = 'draft' } = req.body;
+
+    if (!key || !locale || !value) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+      .from('translations')
+      .upsert({
+        namespace,
+        key,
+        locale,
+        value,
+        status,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'namespace,key,locale'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await logActivity({
+      user_id: req.user?.userId || 'system',
+      action: 'UPSERT_UI_TRANSLATION',
+      resource: 'translations',
+      resource_id: data.id,
+      new_value: { namespace, key, locale, value, status },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent'),
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * DB: Publish Translations (Sync DB -> Files)
+ */
+export async function publishTranslations(req: Request, res: Response, next: NextFunction) {
+  try {
+    const supabase = getSupabase();
+
+    // 1. Fetch all PUBLISHED translations
+    const { data, error } = await supabase
+      .from('translations')
+      .select('*')
+      .in('status', ['published', 'approved']);
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      return res.json({ success: true, message: 'No published translations found to sync.' });
+    }
+
+    // 2. Group by locale
+    const byLocale: Record<string, Record<string, any>> = {};
+    
+    interface TranslationRow {
+        namespace: string;
+        key: string;
+        locale: string;
+        value: string;
+    }
+
+    for (const row of (data as TranslationRow[])) {
+      if (!byLocale[row.locale]) {
+        byLocale[row.locale] = {}; // Root for this locale
+      }
+      
+      if (!byLocale[row.locale][row.namespace]) {
+        byLocale[row.locale][row.namespace] = {};
+      }
+
+      // Handle nested keys within namespace
+      const parts = row.key.split('.');
+      let current = byLocale[row.locale][row.namespace];
+      
+      for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        if (!current[part]) current[part] = {};
+        current = current[part];
+      }
+      
+      current[parts[parts.length - 1]] = row.value;
+    }
+
+    // 3. Write to files
+    const fs = await import('fs').then(m => m.promises);
+    const path = await import('path');
+    const messagesDir = path.resolve(__dirname, '../../../../frontend/messages');
+
+    const results = [];
+    for (const locale of Object.keys(byLocale)) {
+      const filePath = path.join(messagesDir, `${locale}.json`);
+      const content = JSON.stringify(byLocale[locale], null, 2);
+      await fs.writeFile(filePath, content, 'utf-8');
+      results.push(locale);
+    }
+
+    await logActivity({
+      user_id: req.user?.userId || 'system',
+      action: 'PUBLISH_TRANSLATIONS',
+      resource: 'frontend_messages',
+      resource_id: 'batch',
+      new_value: { locales: results },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent'),
+    });
+
+    res.json({ success: true, message: 'Translations synced to frontend files', locales: results });
+  } catch (error) {
+    next(error);
+  }
+}
+
 /**
  * Get the translation service status (which API is configured)
  */
@@ -903,4 +1067,8 @@ export default {
   // Frontend translations
   compareFrontendTranslations,
   updateFrontendTranslation,
+  // Database UI Translations (New Phase 2)
+  getUiTranslations,
+  upsertUiTranslation,
+  publishTranslations
 };

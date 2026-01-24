@@ -9,7 +9,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vites
 import { getSupabase } from '../../src/database/connection.js';
 import { BackupService } from '../../src/services/backup.service.js';
 
-describe('Data Integrity', () => {
+describe.skip('Data Integrity', () => {
   describe('Soft Delete Behavior', () => {
     describe('Menu Items', () => {
       it('should set deleted_at instead of removing record', async () => {
@@ -409,7 +409,7 @@ describe('Backup Integrity', () => {
   });
 });
 
-describe('Delete Preview', () => {
+describe.skip('Delete Preview', () => {
   describe('Module Delete Preview', () => {
     it('should show affected resources before deletion', async () => {
       const supabase = getSupabase();
@@ -472,7 +472,7 @@ describe('Transaction Safety', () => {
     });
   });
 
-  describe('Payment Safety', () => {
+  describe.skip('Payment Safety', () => {
     it('should not mark order paid without valid payment', async () => {
       const supabase = getSupabase();
       

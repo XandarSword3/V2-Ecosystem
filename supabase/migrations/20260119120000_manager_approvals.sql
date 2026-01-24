@@ -22,12 +22,12 @@ CREATE TABLE IF NOT EXISTS manager_approvals (
 );
 
 -- Create indexes for common queries
-CREATE INDEX idx_manager_approvals_status ON manager_approvals(status);
-CREATE INDEX idx_manager_approvals_type ON manager_approvals(type);
-CREATE INDEX idx_manager_approvals_requested_by ON manager_approvals(requested_by);
-CREATE INDEX idx_manager_approvals_reviewed_by ON manager_approvals(reviewed_by);
-CREATE INDEX idx_manager_approvals_created_at ON manager_approvals(created_at DESC);
-CREATE INDEX idx_manager_approvals_pending ON manager_approvals(status, created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_manager_approvals_status ON manager_approvals(status);
+CREATE INDEX IF NOT EXISTS idx_manager_approvals_type ON manager_approvals(type);
+CREATE INDEX IF NOT EXISTS idx_manager_approvals_requested_by ON manager_approvals(requested_by);
+CREATE INDEX IF NOT EXISTS idx_manager_approvals_reviewed_by ON manager_approvals(reviewed_by);
+CREATE INDEX IF NOT EXISTS idx_manager_approvals_created_at ON manager_approvals(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_manager_approvals_pending ON manager_approvals(status, created_at) WHERE status = 'pending';
 
 -- Add trigger to update updated_at
 CREATE OR REPLACE FUNCTION update_manager_approvals_updated_at()

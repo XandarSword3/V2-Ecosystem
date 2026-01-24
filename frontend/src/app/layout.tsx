@@ -3,13 +3,11 @@ import { Inter, Noto_Sans_Arabic } from 'next/font/google';
 import '../styles/globals.css';
 import { Providers } from './providers';
 import { Toaster } from 'sonner';
-import { defaultLocale, getLocaleFromCookie, type Locale } from '@/i18n';
+import { defaultLocale, type Locale } from '@/i18n';
 
 import Header from '@/components/layout/Header';
 import Footer from '@/components/Footer';
 import { PageTransition } from '@/components/effects/PageTransition';
-import { useSiteSettings } from '@/lib/settings-context';
-import { resortThemes } from '@/lib/theme-config';
 import { JsonLd, generateResortSchema } from '@/lib/structured-data';
 
 const inter = Inter({
@@ -73,18 +71,41 @@ export default function RootLayout({
     openingHours: ['10:00-23:00'],
   });
 
-  // Get theme from settings context (client only)
-  let themeClass = '';
-
-  if (typeof window !== 'undefined') {
-    try {
-      // Dynamically import hook to avoid SSR issues
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const { settings } = require('@/lib/settings-context').useSiteSettings();
-      const theme = (settings?.theme || 'beach') as import('@/lib/theme-config').ResortTheme;
-      themeClass = resortThemes[theme]?.background || '';
-    } catch {}
-  }
+  // Theme detection script that runs BEFORE React hydrates
+  // This prevents the "flash of wrong theme" on initial load
+  const themeScript = `
+(function() {
+  try {
+    // Get theme and mode from localStorage (set by previous visits)
+    var theme = localStorage.getItem('v2-resort-theme') || 'beach';
+    var mode = localStorage.getItem('theme') || 'light';
+    
+    // Theme color mappings (must match theme-config.ts)
+    var themes = {
+      beach: { bg: '#f0fdfa', bgDark: '#042f2e', primary: '#0891b2' },
+      mountain: { bg: '#fafaf9', bgDark: '#1c1917', primary: '#78716c' },
+      sunset: { bg: '#fff7ed', bgDark: '#431407', primary: '#ea580c' },
+      forest: { bg: '#f0fdf4', bgDark: '#052e16', primary: '#15803d' },
+      midnight: { bg: '#faf5ff', bgDark: '#2e1065', primary: '#7c3aed' },
+      luxury: { bg: '#fffbeb', bgDark: '#0f172a', primary: '#d97706' }
+    };
+    
+    var t = themes[theme] || themes.beach;
+    var isDark = mode === 'dark';
+    var bgColor = isDark ? t.bgDark : t.bg;
+    
+    // Apply initial background color to prevent flash
+    document.documentElement.style.setProperty('--initial-bg', bgColor);
+    document.documentElement.style.setProperty('--color-primary', t.primary);
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-color-mode', mode);
+    document.documentElement.classList.add(mode);
+    
+    // Set body background immediately
+    document.documentElement.style.backgroundColor = bgColor;
+  } catch (e) {}
+})();
+`;
 
   return (
     <html
@@ -93,13 +114,15 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/* Critical: Theme detection script runs BEFORE React hydrates */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <JsonLd data={resortSchema} />
         <meta name="theme-color" content="#3b82f6" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
-      <body className={`${inter.variable} ${notoArabic.variable} ${isRtl ? 'font-arabic' : 'font-sans'} ${themeClass}`}>
+      <body className={`${inter.variable} ${notoArabic.variable} ${isRtl ? 'font-arabic' : 'font-sans'} bg-cms-background transition-colors duration-300`}>
         <Providers>
           <Header />
           <main>

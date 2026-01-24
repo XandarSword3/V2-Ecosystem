@@ -113,6 +113,13 @@ export const config = {
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET || '',
       callbackUrl: process.env.FACEBOOK_CALLBACK_URL || `http://localhost:${process.env.PORT || 3005}/api/auth/facebook/callback`,
     },
+    apple: {
+      clientId: process.env.APPLE_CLIENT_ID || '', // Service ID (e.g., com.v2resort.web)
+      teamId: process.env.APPLE_TEAM_ID || '',
+      keyId: process.env.APPLE_KEY_ID || '',
+      privateKey: process.env.APPLE_PRIVATE_KEY || '', // Contents of .p8 file (with \n replaced)
+      callbackUrl: process.env.APPLE_CALLBACK_URL || `http://localhost:${process.env.PORT || 3005}/api/auth/apple/callback`,
+    },
   },
 
   // Firebase Configuration (for mobile push notifications)
