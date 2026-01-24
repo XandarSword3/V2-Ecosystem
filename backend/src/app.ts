@@ -43,6 +43,9 @@ if (config.env !== 'test') {
 
 // Health Check
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+// Add /api/health alias for services checking that path
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+
 // Public settings - read from database for themes, contact info, homepage, footer etc
 app.get('/api/settings', async (req, res) => {
   try {
