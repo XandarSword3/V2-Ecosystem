@@ -6,7 +6,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authMiddleware } from '../../middleware/auth.middleware.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 import { roleGuard } from '../../middleware/roleGuard.middleware';
 import { prisma } from '../../config/database.js';
 import { logger } from '../../utils/logger.js';
@@ -35,7 +35,7 @@ const emailConfigSchema = z.object({
  */
 router.get(
   '/',
-  authMiddleware,
+  authenticate,
   roleGuard(['admin', 'super_admin']),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -74,7 +74,7 @@ router.get(
  */
 router.put(
   '/',
-  authMiddleware,
+  authenticate,
   roleGuard(['admin', 'super_admin']),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -133,7 +133,6 @@ router.put(
           where: { key: setting.key },
           update: {
             value: setting.value,
-            encrypted: setting.encrypted || false,
             updatedAt: new Date(),
             updatedBy: userId
           },
@@ -141,7 +140,6 @@ router.put(
             key: setting.key,
             value: setting.value,
             category: 'email',
-            encrypted: setting.encrypted || false,
             createdBy: userId,
             updatedBy: userId
           }
@@ -173,7 +171,7 @@ router.put(
  */
 router.post(
   '/test',
-  authMiddleware,
+  authenticate,
   roleGuard(['admin', 'super_admin']),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -267,7 +265,9 @@ async function reloadEmailService(): Promise<void> {
   const config: Record<string, string> = {};
   for (const setting of settings) {
     const key = setting.key.replace('email.', '');
-    config[key] = setting.encrypted ? decrypt(setting.value) : setting.value;
+    // Encrypted property not in schema currently
+    // config[key] = setting.encrypted ? decrypt(setting.value) : setting.value;
+    config[key] = setting.value;
   }
 
   // This would reload the email service - implementation depends on your email service
