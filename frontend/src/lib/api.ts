@@ -56,6 +56,7 @@ interface CreateModuleData {
   slug?: string;
   description?: string;
   settings?: Record<string, unknown>;
+  settings_version?: number;
 }
 
 // API_URL should NOT include /api - we add it in baseURL
@@ -65,7 +66,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const cleanUrl = API_URL.replace(/\/api\/?$/, '');
 
 // Export the base API URL for use in other files
-export const API_BASE_URL = `${cleanUrl}/api`;
+export const API_BASE_URL = `${cleanUrl}/api/v1`;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

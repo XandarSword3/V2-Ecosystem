@@ -188,6 +188,52 @@ export class InventoryController {
   }
 
   /**
+   * Delete a category (only if empty)
+   */
+  async deleteCategory(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const supabase = getSupabase();
+
+      // Check if category has items
+      const { count, error: countError } = await supabase
+        .from('inventory_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('category_id', id)
+        .eq('is_active', true);
+
+      if (countError) {
+        return res.status(500).json({ success: false, error: 'Failed to check category items' });
+      }
+
+      if (count && count > 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Cannot delete category with ${count} items. Please move or delete items first.`,
+        });
+      }
+
+      const { error } = await supabase
+        .from('inventory_categories')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        return res.status(500).json({ success: false, error: 'Failed to delete category' });
+      }
+
+      res.json({ success: true, message: 'Category deleted successfully' });
+    } catch (error: any) {
+      console.error('Error deleting category:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to delete category',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
    * Get all inventory items
    */
   async getItems(req: Request, res: Response) {

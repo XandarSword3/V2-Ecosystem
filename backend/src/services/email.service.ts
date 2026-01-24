@@ -6,8 +6,11 @@ import { logger } from '../utils/logger.js';
 interface EmailOptions {
   to: string;
   subject: string;
-  html: string;
+  html?: string;
   text?: string;
+  template?: string;
+  context?: any;
+  data?: any;
   attachments?: Array<{
     filename: string;
     content: string | Buffer;
@@ -145,6 +148,30 @@ class EmailService {
     if (!this.isConfigured || !this.transporter) {
       logger.warn('Email not sent - service not configured');
       return false;
+    }
+
+    // Handle template if provided
+    if (options.template && !options.html) {
+      const templateData = await this.getTemplate(options.template);
+      if (templateData) {
+        const variables = { 
+          ...(await this.getSiteSettings()), 
+          ...(options.data || options.context || {}) 
+        };
+        options.html = this.replaceVariables(templateData.html_body, variables as TemplateVariables);
+        
+        // Use template subject if not provided in options
+        if (!options.subject || options.subject === '') {
+          options.subject = this.replaceVariables(templateData.subject, variables as TemplateVariables);
+        }
+      } else {
+        logger.warn(`Template '${options.template}' not found, utilizing provided options`);
+      }
+    }
+    
+    if (!options.html) {
+        logger.error('Email not sent - missing content (HTML or valid template)');
+        return false;
     }
 
     const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@v2resort.com';
@@ -580,6 +607,94 @@ class EmailService {
 
   isReady(): boolean {
     return this.isConfigured;
+  }
+
+  /**
+   * Send gift card to recipient
+   */
+  async sendGiftCard(data: {
+    recipientEmail: string;
+    recipientName: string;
+    senderName?: string;
+    code: string;
+    amount: number;
+    message?: string;
+    expiresAt: string;
+  }): Promise<boolean> {
+    const template = await this.getTemplate('gift_card_delivery');
+    const settings = await this.getSiteSettings();
+    const siteUrl = config.frontendUrl || 'https://v2resort.com';
+
+    // Format the code with dashes for readability (XXXX-XXXX-XXXX-XXXX)
+    const formattedCode = data.code.replace(/(.{4})(?=.)/g, '$1-');
+
+    if (!template) {
+      // Fallback email if template doesn't exist
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; border-radius: 16px;">
+          <div style="background: white; padding: 40px; border-radius: 12px; text-align: center;">
+            <h1 style="color: #764ba2; margin-bottom: 10px;">🎁 You've Received a Gift!</h1>
+            <p style="color: #666; font-size: 18px;">from ${settings.company_name}</p>
+            
+            ${data.senderName ? `<p style="color: #333; font-size: 16px; margin: 20px 0;">${data.senderName} has sent you a gift card!</p>` : ''}
+            
+            ${data.message ? `
+            <div style="background: #f8f4ff; padding: 20px; border-radius: 8px; margin: 20px 0; font-style: italic; color: #555;">
+              "${data.message}"
+            </div>
+            ` : ''}
+            
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; margin: 30px 0;">
+              <p style="font-size: 14px; margin: 0 0 10px 0; opacity: 0.9;">GIFT CARD VALUE</p>
+              <p style="font-size: 48px; font-weight: bold; margin: 0;">$${data.amount.toFixed(2)}</p>
+            </div>
+            
+            <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p style="font-size: 12px; color: #888; margin: 0 0 5px 0;">YOUR GIFT CARD CODE</p>
+              <p style="font-size: 24px; font-weight: bold; color: #333; letter-spacing: 2px; margin: 0; font-family: monospace;">${formattedCode}</p>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">Use this code at checkout to redeem your gift card.</p>
+            
+            <a href="${siteUrl}" style="display: inline-block; background: #764ba2; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 20px 0;">Shop Now</a>
+            
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+            
+            <p style="color: #999; font-size: 12px;">
+              Valid until: ${new Date(data.expiresAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br>
+              This gift card can be used for any purchase at ${settings.company_name}
+            </p>
+          </div>
+        </div>
+      `;
+
+      return this.sendEmail({
+        to: data.recipientEmail,
+        subject: `🎁 You've received a $${data.amount.toFixed(2)} gift card from ${settings.company_name}!`,
+        html,
+      });
+    }
+
+    const variables: TemplateVariables = {
+      companyName: settings.company_name,
+      recipientName: data.recipientName,
+      senderName: data.senderName || 'Someone special',
+      giftCardCode: formattedCode,
+      amount: `$${data.amount.toFixed(2)}`,
+      message: data.message || '',
+      expiresAt: new Date(data.expiresAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+      siteUrl,
+      contactEmail: settings.contact_email,
+    };
+
+    const subject = this.replaceVariables(template.subject, variables);
+    const html = this.replaceVariables(template.html_body, variables);
+
+    return this.sendEmail({
+      to: data.recipientEmail,
+      subject,
+      html,
+    });
   }
 }
 

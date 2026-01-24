@@ -103,6 +103,20 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
     } else if (type === 'grid') {
       defaultProps.columns = '3';
       defaultProps.dataSource = 'menu';
+    } else if (type === 'button') {
+      defaultProps.text = 'Click me';
+      defaultProps.backgroundColor = '#6366f1';
+      defaultProps.variant = 'solid';
+      defaultProps.size = 'md';
+    } else if (type === 'form_container') {
+      defaultProps.formAction = 'contact';
+      defaultProps.submitText = 'Submit';
+    } else if (type === 'text_block') {
+      defaultProps.content = 'Enter your text here...';
+      defaultProps.fontSize = 'base';
+    } else if (type === 'image') {
+      defaultProps.alt = 'Image';
+      defaultProps.objectFit = 'cover';
     }
     
     const newBlock: UIBlock = {

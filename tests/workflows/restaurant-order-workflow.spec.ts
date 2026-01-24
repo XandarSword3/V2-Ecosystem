@@ -438,14 +438,14 @@ test.describe('Phase 4: Verify Data Persistence', () => {
     }
     
     // Call API to get order
-    const response = await request.get(`${API_URL}/api/restaurant/orders/${createdOrderId}`);
+    const response = await request.get(`${API_URL}/api/v1/restaurant/orders/${createdOrderId}`);
     
     // Should exist (or at least return a valid response)
     expect([200, 404]).toContain(response.status());
   });
 
   test('API: Verify order appears in orders list', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/restaurant/orders`);
+    const response = await request.get(`${API_URL}/api/v1/restaurant/orders`);
     // API might return 404 if endpoint doesn't exist or 401 if auth required
     expect([200, 401, 404]).toContain(response.status());
     
@@ -458,7 +458,7 @@ test.describe('Phase 4: Verify Data Persistence', () => {
   });
 
   test('API: Verify today\'s revenue updated', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/admin/stats`);
+    const response = await request.get(`${API_URL}/api/v1/admin/stats`);
     
     // API might require auth, so accept 401 as well
     expect([200, 401, 403]).toContain(response.status());

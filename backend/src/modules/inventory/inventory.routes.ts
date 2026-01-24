@@ -12,6 +12,7 @@ const adminAuth: RequestHandler[] = [authenticate, authorize('admin', 'super_adm
 router.get('/categories', ...staffAuth, inventoryController.getCategories.bind(inventoryController));
 router.post('/categories', ...adminAuth, inventoryController.createCategory.bind(inventoryController));
 router.put('/categories/:id', ...adminAuth, inventoryController.updateCategory.bind(inventoryController));
+router.delete('/categories/:id', ...adminAuth, inventoryController.deleteCategory.bind(inventoryController));
 
 // Items
 router.get('/items', ...staffAuth, inventoryController.getItems.bind(inventoryController));
