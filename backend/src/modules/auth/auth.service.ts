@@ -7,17 +7,17 @@ import { logger } from "../../utils/logger.js";
 import { emailService } from "../../services/email.service.js";
 import { AppError } from "../../utils/AppError.js";
 
-interface RegisterData {
+interface SessionMeta {
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export interface RegisterData {
   email: string;
   password: string;
   fullName: string;
   phone?: string;
   preferredLanguage?: 'en' | 'ar' | 'fr';
-}
-
-interface SessionMeta {
-  ipAddress?: string;
-  userAgent?: string;
 }
 
 export async function register(data: RegisterData) {

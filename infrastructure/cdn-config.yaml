@@ -1,0 +1,203 @@
+# V2 Resort CDN Configuration
+# Cloudflare Configuration for Production
+
+# Domain Configuration
+domain:
+  name: "v2resort.com"
+  aliases:
+    - "www.v2resort.com"
+    - "api.v2resort.com"
+    - "cdn.v2resort.com"
+
+# SSL/TLS Settings
+ssl:
+  mode: "full_strict"
+  min_version: "1.2"
+  ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256"
+  early_hints: true
+  always_use_https: true
+  automatic_https_rewrites: true
+  hsts:
+    enabled: true
+    max_age: 31536000
+    include_subdomains: true
+    preload: true
+
+# Cache Rules
+cache:
+  # Static assets - long cache
+  static_assets:
+    patterns:
+      - "*.js"
+      - "*.css"
+      - "*.png"
+      - "*.jpg"
+      - "*.jpeg"
+      - "*.gif"
+      - "*.webp"
+      - "*.avif"
+      - "*.svg"
+      - "*.ico"
+      - "*.woff"
+      - "*.woff2"
+      - "*.ttf"
+      - "*.eot"
+    ttl: 31536000  # 1 year
+    browser_ttl: 31536000
+    edge_ttl: 604800  # 1 week at edge
+    
+  # Next.js static files
+  next_static:
+    patterns:
+      - "_next/static/*"
+    ttl: 31536000
+    browser_ttl: 31536000
+    immutable: true
+    
+  # API responses - short cache or no cache
+  api_responses:
+    default:
+      ttl: 0
+      cache_control: "no-store, no-cache, must-revalidate"
+    
+    # Public API endpoints can be cached
+    public:
+      patterns:
+        - "/api/v1/menu*"  # Menu items (cached 5 min)
+        - "/api/v1/chalets/public*"  # Public chalet info
+        - "/api/v1/pool/sessions/public*"  # Pool session info
+      ttl: 300  # 5 minutes
+      stale_while_revalidate: 60
+      
+  # HTML pages - short cache
+  html:
+    patterns:
+      - "*.html"
+      - "/"
+      - "/chalets/*"
+      - "/restaurant/*"
+      - "/pool/*"
+    ttl: 60
+    browser_ttl: 0
+    stale_while_revalidate: 30
+
+# Page Rules
+page_rules:
+  - pattern: "*.v2resort.com/api/*"
+    settings:
+      cache_level: "bypass"
+      ssl: "full_strict"
+      
+  - pattern: "*.v2resort.com/admin/*"
+    settings:
+      cache_level: "bypass"
+      security_level: "high"
+      
+  - pattern: "cdn.v2resort.com/*"
+    settings:
+      cache_level: "cache_everything"
+      edge_cache_ttl: 2678400  # 31 days
+      browser_cache_ttl: 2678400
+
+# Security Settings
+security:
+  waf:
+    enabled: true
+    ruleset: "cloudflare_managed"
+    
+  bot_management:
+    enabled: true
+    challenge_bad_bots: true
+    
+  rate_limiting:
+    enabled: true
+    rules:
+      - path: "/api/v1/auth/*"
+        requests_per_minute: 10
+        action: "challenge"
+        
+      - path: "/api/v1/payments/*"
+        requests_per_minute: 20
+        action: "challenge"
+        
+      - path: "/api/*"
+        requests_per_minute: 100
+        action: "challenge"
+        
+  ip_access_rules:
+    # Block known bad actors (example)
+    block: []
+    # Whitelist internal IPs
+    allow: []
+
+# Performance Features
+performance:
+  minify:
+    html: true
+    css: true
+    javascript: true
+    
+  compression:
+    brotli: true
+    gzip: true
+    
+  image_optimization:
+    enabled: true
+    webp: true
+    avif: true
+    lazy_load: true
+    
+  http3:
+    enabled: true
+    
+  early_hints:
+    enabled: true
+    
+  prefetch_urls:
+    enabled: true
+
+# Origin Configuration
+origin:
+  # Frontend (Vercel)
+  frontend:
+    address: "v2-resort-frontend.vercel.app"
+    port: 443
+    protocol: "https"
+    
+  # Backend API (Render)
+  backend:
+    address: "v2-resort-api.onrender.com"
+    port: 443
+    protocol: "https"
+    
+  # Health checks
+  health_checks:
+    interval: 60
+    timeout: 5
+    retries: 2
+    path: "/health"
+
+# Worker Routes (Edge Functions)
+workers:
+  routes:
+    - pattern: "*.v2resort.com/api/v1/public/*"
+      script: "cache-api-response"
+      
+    - pattern: "*.v2resort.com/images/*"
+      script: "optimize-image"
+
+# Analytics
+analytics:
+  web_analytics: true
+  rum: true
+  
+# Notifications
+notifications:
+  email:
+    - admin@v2resort.com
+  webhook:
+    url: "https://api.v2resort.com/webhooks/cloudflare"
+    events:
+      - "ssl_certificate_expiring"
+      - "ddos_attack_detected"
+      - "origin_unreachable"
