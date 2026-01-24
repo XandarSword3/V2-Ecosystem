@@ -86,5 +86,8 @@
     "ts-node": "^1.7.1",
     "tsx": "^4.7.0",
     "vitest": "^4.0.17"
+  },
+  "overrides": {
+    "magicast": "^0.5.1"
   }
 }
