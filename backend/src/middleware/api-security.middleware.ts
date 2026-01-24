@@ -8,7 +8,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import xss from 'xss';
-import { securityAuditLogger } from './security-audit.service';
+import securityAuditLogger from '../services/security-audit.service';
 
 // Security configuration
 const SECURITY_CONFIG = {
@@ -71,15 +71,19 @@ export function requestSizeLimiter(maxSize: string = '10mb') {
     const maxBytes = parseSize(maxSize);
 
     if (contentLength > maxBytes) {
-      securityAuditLogger.log({
-        event_type: 'api_invalid_request',
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-        outcome: 'blocked',
-        details: {
-          reason: 'Request too large',
-          size: contentLength,
-          max: maxBytes,
+      securityAuditLogger.logSecurityEvent({
+        eventType: securityAuditLogger.SecurityEventType.SUSPICIOUS_ACTIVITY,
+        severity: securityAuditLogger.SecurityEventSeverity.WARNING,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        description: 'Request too large',
+        metadata: {
+          outcome: 'blocked',
+          details: {
+            reason: 'Request too large',
+            size: contentLength,
+            max: maxBytes,
+          }
         },
       });
 
@@ -168,15 +172,19 @@ export function sqlInjectionDetector(
     checkObject(req.params || {});
 
   if (suspicious) {
-    securityAuditLogger.log({
-      event_type: 'api_suspicious_pattern',
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent'],
-      outcome: 'blocked',
-      details: {
-        reason: 'Potential SQL injection detected',
-        path: req.path,
-        method: req.method,
+    securityAuditLogger.logSecurityEvent({
+      eventType: securityAuditLogger.SecurityEventType.SUSPICIOUS_ACTIVITY,
+      severity: securityAuditLogger.SecurityEventSeverity.CRITICAL,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      description: 'Potential SQL injection detected',
+      metadata: {
+        outcome: 'blocked',
+        details: {
+          reason: 'Potential SQL injection detected',
+          path: req.path,
+          method: req.method,
+        }
       },
     });
 
@@ -214,14 +222,18 @@ export function pathTraversalProtection(
 
   for (const pattern of DANGEROUS_PATTERNS) {
     if (pattern.test(fullUrl)) {
-      securityAuditLogger.log({
-        event_type: 'api_suspicious_pattern',
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-        outcome: 'blocked',
-        details: {
-          reason: 'Path traversal attempt detected',
-          path: fullUrl,
+      securityAuditLogger.logSecurityEvent({
+        eventType: securityAuditLogger.SecurityEventType.SUSPICIOUS_ACTIVITY,
+        severity: securityAuditLogger.SecurityEventSeverity.WARNING,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        description: 'Path traversal attempt detected',
+        metadata: {
+          outcome: 'blocked',
+          details: {
+            reason: 'Path traversal attempt detected',
+            path: fullUrl,
+          }
         },
       });
 
@@ -256,16 +268,20 @@ export function createRateLimiter(options: {
     skipSuccessfulRequests: options.skipSuccessfulRequests || false,
     keyGenerator: options.keyGenerator || ((req) => req.ip || 'unknown'),
     handler: async (req, res) => {
-      await securityAuditLogger.log({
-        event_type: 'api_rate_limit_exceeded',
-        user_id: (req as any).user?.id,
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-        outcome: 'blocked',
-        details: {
-          path: req.path,
-          method: req.method,
-          limit: options.max || SECURITY_CONFIG.rateLimit.maxRequests,
+      await securityAuditLogger.logSecurityEvent({
+        eventType: securityAuditLogger.SecurityEventType.SUSPICIOUS_ACTIVITY,
+        severity: securityAuditLogger.SecurityEventSeverity.WARNING,
+        userId: (req as any).user?.id,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        description: 'Rate limit exceeded',
+        metadata: {
+          outcome: 'blocked',
+          details: {
+            path: req.path,
+            method: req.method,
+            limit: options.max || SECURITY_CONFIG.rateLimit.maxRequests,
+          }
         },
       });
 

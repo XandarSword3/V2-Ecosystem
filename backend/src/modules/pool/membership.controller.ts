@@ -280,7 +280,7 @@ router.get(
       const visits = await prisma.poolTicket.findMany({
         where: {
           userId,
-          membershipId: id,
+          // membershipId: id, // Removed as not present in schema
         },
         orderBy: { date: 'desc' },
         take: 50,
@@ -481,7 +481,7 @@ router.get(
             },
             members: true,
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { startDate: 'desc' },
           take: Number(limit),
           skip: (Number(page) - 1) * Number(limit),
         }),

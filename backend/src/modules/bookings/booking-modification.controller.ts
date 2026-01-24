@@ -150,7 +150,7 @@ router.get(
 
       const policy = getCancellationPolicy(new Date(booking.checkInDate));
       const refundAmount = Math.round(
-        (booking.totalPrice * policy.refundPercentage) / 100
+        (Number(booking.totalPrice) * policy.refundPercentage) / 100
       );
 
       res.json({
