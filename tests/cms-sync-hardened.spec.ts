@@ -43,7 +43,7 @@ async function loginAsAdmin(page: Page): Promise<string | null> {
 }
 
 async function getApiToken(): Promise<string> {
-  const response = await fetch(`${API_URL}/api/auth/login`, {
+  const response = await fetch(`${API_URL}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD })
@@ -60,14 +60,14 @@ test.describe('Homepage CMS Sync', () => {
 
   test('Hero slide title change reflects on public homepage', async ({ page, request }) => {
     // Get API token
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
     const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
     
     // 1. Get current homepage settings
-    const getRes = await request.get(`${API_URL}/api/admin/settings/homepage`, {
+    const getRes = await request.get(`${API_URL}/api/v1/admin/settings/homepage`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const currentSettings = await getRes.json();
@@ -94,7 +94,7 @@ test.describe('Homepage CMS Sync', () => {
         ]
       };
       
-      const updateRes = await request.put(`${API_URL}/api/admin/settings/homepage`, {
+      const updateRes = await request.put(`${API_URL}/api/v1/admin/settings/homepage`, {
         headers: { Authorization: `Bearer ${token}` },
         data: updatePayload
       });
@@ -104,7 +104,7 @@ test.describe('Homepage CMS Sync', () => {
       
       // Cleanup - restore original
       updatePayload.heroSlides[0].title = originalTitle;
-      await request.put(`${API_URL}/api/admin/settings/homepage`, {
+      await request.put(`${API_URL}/api/v1/admin/settings/homepage`, {
         headers: { Authorization: `Bearer ${token}` },
         data: updatePayload
       });
@@ -119,14 +119,14 @@ test.describe('Homepage CMS Sync', () => {
   });
 
   test('Hero slide background image change reflects on homepage', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
     const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
     
     // Get current settings
-    const getRes = await request.get(`${API_URL}/api/admin/settings/homepage`, {
+    const getRes = await request.get(`${API_URL}/api/v1/admin/settings/homepage`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const currentSettings = await getRes.json();
@@ -150,7 +150,7 @@ test.describe('Homepage CMS Sync', () => {
         ]
       };
       
-      const updateRes = await request.put(`${API_URL}/api/admin/settings/homepage`, {
+      const updateRes = await request.put(`${API_URL}/api/v1/admin/settings/homepage`, {
         headers: { Authorization: `Bearer ${token}` },
         data: updatePayload
       });
@@ -161,7 +161,7 @@ test.describe('Homepage CMS Sync', () => {
       // Cleanup - restore original
       if (originalImage) {
         updatePayload.heroSlides[0].backgroundImage = originalImage;
-        await request.put(`${API_URL}/api/admin/settings/homepage`, {
+        await request.put(`${API_URL}/api/v1/admin/settings/homepage`, {
           headers: { Authorization: `Bearer ${token}` },
           data: updatePayload
         });
@@ -177,7 +177,7 @@ test.describe('Homepage CMS Sync', () => {
   });
 
   test('Homepage sections toggle reflects on public page', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
@@ -242,7 +242,7 @@ test.describe('Appearance/Theme CMS Sync', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('Theme preset change reflects across all public pages', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
@@ -351,7 +351,7 @@ test.describe('Footer CMS Sync', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('Footer description change reflects on all public pages', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
@@ -563,14 +563,14 @@ test.describe('Restaurant Menu CMS Sync', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('Menu item changes reflect on public restaurant page', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
     const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
     
     // Get current menu items
-    const menuRes = await request.get(`${API_URL}/api/restaurant/menu`, {
+    const menuRes = await request.get(`${API_URL}/api/v1/restaurant/menu`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const menuData = await menuRes.json();
@@ -582,7 +582,7 @@ test.describe('Restaurant Menu CMS Sync', () => {
       const testName = `E2E Test Item - ${Date.now()}`;
       
       // Update item name via API
-      await request.put(`${API_URL}/api/admin/restaurant/menu/items/${testItem.id}`, {
+      await request.put(`${API_URL}/api/v1/admin/restaurant/menu/items/${testItem.id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ...testItem, name: testName }
       });
@@ -595,7 +595,7 @@ test.describe('Restaurant Menu CMS Sync', () => {
       const count = await itemElement.count();
       
       // Restore original name
-      await request.put(`${API_URL}/api/admin/restaurant/menu/items/${testItem.id}`, {
+      await request.put(`${API_URL}/api/v1/admin/restaurant/menu/items/${testItem.id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ...testItem, name: originalName }
       });
@@ -606,14 +606,14 @@ test.describe('Restaurant Menu CMS Sync', () => {
   });
 
   test('Menu item availability toggle reflects on public page', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
     const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
     
     // Get menu items
-    const menuRes = await request.get(`${API_URL}/api/restaurant/menu`, {
+    const menuRes = await request.get(`${API_URL}/api/v1/restaurant/menu`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const menuData = await menuRes.json();
@@ -624,7 +624,7 @@ test.describe('Restaurant Menu CMS Sync', () => {
       const originalAvailability = testItem.is_available;
       
       // Toggle availability off
-      await request.put(`${API_URL}/api/admin/restaurant/menu/items/${testItem.id}`, {
+      await request.put(`${API_URL}/api/v1/admin/restaurant/menu/items/${testItem.id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ...testItem, is_available: false }
       });
@@ -633,7 +633,7 @@ test.describe('Restaurant Menu CMS Sync', () => {
       await page.goto(`${FRONTEND_URL}/restaurant`, { waitUntil: 'networkidle' });
       
       // Restore availability
-      await request.put(`${API_URL}/api/admin/restaurant/menu/items/${testItem.id}`, {
+      await request.put(`${API_URL}/api/v1/admin/restaurant/menu/items/${testItem.id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ...testItem, is_available: originalAvailability }
       });
@@ -650,7 +650,7 @@ test.describe('Chalet CMS Sync', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('Chalet details change reflects on public listing', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
@@ -669,7 +669,7 @@ test.describe('Chalet CMS Sync', () => {
       const testDescription = `E2E Test Chalet Description - ${Date.now()}`;
       
       // Update chalet description
-      await request.put(`${API_URL}/api/admin/chalets/${testChalet.id}`, {
+      await request.put(`${API_URL}/api/v1/admin/chalets/${testChalet.id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ...testChalet, description: testDescription }
       });
@@ -678,7 +678,7 @@ test.describe('Chalet CMS Sync', () => {
       await page.goto(`${FRONTEND_URL}/chalets`, { waitUntil: 'networkidle' });
       
       // Restore original
-      await request.put(`${API_URL}/api/admin/chalets/${testChalet.id}`, {
+      await request.put(`${API_URL}/api/v1/admin/chalets/${testChalet.id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ...testChalet, description: originalDescription }
       });
@@ -744,14 +744,14 @@ test.describe('Module Enable/Disable Sync', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('Disabled module shows unavailable message on public page', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
     const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
     
     // Get modules
-    const modulesRes = await request.get(`${API_URL}/api/admin/modules`, {
+    const modulesRes = await request.get(`${API_URL}/api/v1/admin/modules`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const modulesData = await modulesRes.json();
@@ -762,7 +762,7 @@ test.describe('Module Enable/Disable Sync', () => {
     
     if (activeModule) {
       // Disable the module
-      await request.put(`${API_URL}/api/admin/modules/${activeModule.id}`, {
+      await request.put(`${API_URL}/api/v1/admin/modules/${activeModule.id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ...activeModule, is_active: false }
       });
@@ -777,7 +777,7 @@ test.describe('Module Enable/Disable Sync', () => {
                            content?.toLowerCase().includes('inactive');
       
       // Re-enable the module
-      await request.put(`${API_URL}/api/admin/modules/${activeModule.id}`, {
+      await request.put(`${API_URL}/api/v1/admin/modules/${activeModule.id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ...activeModule, is_active: true }
       });
@@ -792,14 +792,14 @@ test.describe('Module Enable/Disable Sync', () => {
   });
 
   test('Module navigation visibility toggles correctly', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
     const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
     
     // Get modules
-    const modulesRes = await request.get(`${API_URL}/api/admin/modules`, {
+    const modulesRes = await request.get(`${API_URL}/api/v1/admin/modules`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const modulesData = await modulesRes.json();
@@ -810,7 +810,7 @@ test.describe('Module Enable/Disable Sync', () => {
     
     if (navModule) {
       // Hide from navigation
-      await request.put(`${API_URL}/api/admin/modules/${navModule.id}`, {
+      await request.put(`${API_URL}/api/v1/admin/modules/${navModule.id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ...navModule, show_in_nav: false }
       });
@@ -823,7 +823,7 @@ test.describe('Module Enable/Disable Sync', () => {
       const isHidden = await moduleLink.count() === 0;
       
       // Restore navigation visibility
-      await request.put(`${API_URL}/api/admin/modules/${navModule.id}`, {
+      await request.put(`${API_URL}/api/v1/admin/modules/${navModule.id}`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { ...navModule, show_in_nav: true }
       });
@@ -843,14 +843,14 @@ test.describe('General Settings CMS Sync', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('Resort name change reflects in header/title', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
     const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
     
     // Get current settings
-    const settingsRes = await request.get(`${API_URL}/api/admin/settings/general`, {
+    const settingsRes = await request.get(`${API_URL}/api/v1/admin/settings/general`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const settingsData = await settingsRes.json();
@@ -858,7 +858,7 @@ test.describe('General Settings CMS Sync', () => {
     
     // Update resort name
     const testName = `E2E Test Resort - ${Date.now()}`;
-    await request.put(`${API_URL}/api/admin/settings/general`, {
+    await request.put(`${API_URL}/api/v1/admin/settings/general`, {
       headers: { Authorization: `Bearer ${token}` },
       data: { ...settingsData.data, resortName: testName }
     });
@@ -873,7 +873,7 @@ test.describe('General Settings CMS Sync', () => {
     const hasNewName = title.includes(testName) || headerText?.includes(testName);
     
     // Restore original name
-    await request.put(`${API_URL}/api/admin/settings/general`, {
+    await request.put(`${API_URL}/api/v1/admin/settings/general`, {
       headers: { Authorization: `Bearer ${token}` },
       data: { ...settingsData.data, resortName: originalName }
     });
