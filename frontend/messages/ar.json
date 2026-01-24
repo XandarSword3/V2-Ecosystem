@@ -553,7 +553,11 @@
       "loginFailed": "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
       "demoCredentials": "بيانات الدخول التجريبية",
       "superAdmin": "المدير الأعلى",
-      "orContinueWith": "أو تابع باستخدام"
+      "orContinueWith": "أو تابع باستخدام",
+      "continueWithGoogle": "المتابعة مع جوجل",
+      "continueWithApple": "المتابعة مع آبل",
+      "continueWithFacebook": "المتابعة مع فيسبوك",
+      "facebookComingSoon": "فيسبوك (قريباً)"
     },
     "register": {
       "title": "إنشاء حساب جديد",
@@ -1372,6 +1376,94 @@
       "loggedOutSuccessfully": "تم تسجيل الخروج بنجاح"
     }
   },
+  "moduleBuilder": {
+    "title": "منشئ الوحدات",
+    "visualEditor": "المحرر المرئي",
+    "backToEdit": "العودة للتحرير",
+    "preview": "معاينة",
+    "save": "حفظ التخطيط",
+    "saving": "جاري الحفظ...",
+    "saveSuccess": "تم حفظ التخطيط بنجاح",
+    "saveFailed": "فشل في حفظ التخطيط",
+    "addComponent": "إضافة مكون:",
+    "noLayout": "لا يوجد تخطيط محدد لهذه الوحدة.",
+    "noSelection": "لم يتم تحديد أي مكون",
+    "selectComponent": "انقر على مكون في اللوحة لتعديل خصائصه",
+    "dragHint": "اسحب المكونات من شريط الأدوات أو انقر للإضافة",
+    "startHint": "ابدأ بإضافة قسم البطل أو الشبكة",
+    "properties": "الخصائص",
+    "general": "عام",
+    "label": "التسمية",
+    "dimensionsSpacing": "الأبعاد والتباعد",
+    "width": "العرض",
+    "height": "الارتفاع",
+    "padding": "الحشوة",
+    "borderRadius": "نصف قطر الحدود",
+    "backgroundColor": "لون الخلفية",
+    "textColor": "لون النص",
+    "components": {
+      "hero": "قسم البطل",
+      "textBlock": "كتلة نصية",
+      "button": "زر",
+      "image": "صورة",
+      "grid": "شبكة / بطاقات",
+      "menuList": "قائمة الطعام",
+      "sessions": "الجلسات",
+      "container": "حاوية",
+      "form": "نموذج",
+      "calendar": "تقويم"
+    },
+    "heroSettings": {
+      "title": "العنوان",
+      "subtitle": "العنوان الفرعي",
+      "backgroundImage": "رابط صورة الخلفية",
+      "textAlign": "محاذاة النص"
+    },
+    "gridSettings": {
+      "dataSource": "مصدر البيانات",
+      "columns": "الأعمدة",
+      "gap": "الفجوة"
+    },
+    "textSettings": {
+      "content": "المحتوى",
+      "fontSize": "حجم الخط"
+    },
+    "imageSettings": {
+      "src": "رابط الصورة",
+      "alt": "النص البديل",
+      "objectFit": "ملاءمة الكائن"
+    },
+    "buttonSettings": {
+      "text": "نص الزر",
+      "link": "رابط URL",
+      "color": "لون الزر",
+      "style": "نمط الزر",
+      "size": "الحجم"
+    },
+    "formSettings": {
+      "title": "حاوية النموذج",
+      "description": "قم بتكوين إعدادات الإرسال أدناه.",
+      "action": "إجراء النموذج",
+      "customEndpoint": "رابط نقطة النهاية المخصصة",
+      "submitText": "نص زر الإرسال"
+    },
+    "menuListInfo": {
+      "title": "مكون قائمة الطعام",
+      "description": "يعرض هذا المكون تلقائياً عناصر القائمة من الوحدة الحالية."
+    },
+    "sessionListInfo": {
+      "title": "مكون قائمة الجلسات",
+      "description": "يعرض هذا المكون الجلسات القابلة للحجز مع منتقي التاريخ."
+    },
+    "calendarInfo": {
+      "title": "مكون تقويم الحجز",
+      "description": "يعرض هذا المكون منتقي تواريخ الوصول/المغادرة."
+    },
+    "containerInfo": {
+      "title": "كتلة الحاوية",
+      "description": "حاوية لتجميع المكونات الأخرى."
+    }
+  },
   "staff": {
     "portal": "بوابة الموظفين",
     "navigation": "التنقل",
@@ -1569,6 +1661,7 @@
     "privacyPolicy": "سياسة الخصوصية",
     "termsOfService": "شروط الخدمة",
     "cancellationPolicy": "سياسة الإلغاء",
+    "giftCards": "بطاقات الهدايا",
     "contact": "تواصل معنا",
     "address": "منتجع V2، لبنان",
     "phone": "+961 XX XXX XXX",
