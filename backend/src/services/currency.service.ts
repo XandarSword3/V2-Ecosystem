@@ -235,7 +235,7 @@ class CurrencyService {
         throw new Error(`API error: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as any;
       const rates = data.rates as Record<string, number>;
 
       // Update each supported currency

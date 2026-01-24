@@ -474,7 +474,7 @@ export async function updateTablePosition(
     throw new Error('Table not found');
   }
 
-  const currentPosition = table.position as TablePosition || {
+  const currentPosition = (table.position as unknown as TablePosition) || {
     x: 0,
     y: 0,
     rotation: 0,

@@ -140,7 +140,7 @@ class ChargebackService {
     let status: ChargebackStatus = chargeback.status;
     let outcome: ChargebackOutcome | null = null;
 
-    switch (dispute.status) {
+    switch (dispute.status as string) {
       case 'needs_response':
         status = 'needs_response';
         break;
@@ -148,7 +148,7 @@ class ChargebackService {
         status = 'under_review';
         break;
       case 'charge_refunded':
-        status = 'charge_refunded';
+        status = 'charge_refunded' as any;
         outcome = 'refunded';
         break;
       case 'won':

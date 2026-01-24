@@ -4,8 +4,45 @@ import { motion, HTMLMotionProps } from 'framer-motion';
 import { cn } from '@/lib/cn';
 import { forwardRef, ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
+import { cva } from 'class-variance-authority';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success' | 'glass' | 'premium';
+export const buttonVariants = cva(
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline:
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+        primary: "bg-primary text-primary-foreground hover:bg-primary/90",
+        danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        success: "bg-green-600 text-white hover:bg-green-700",
+        glass: "bg-white/60",
+        premium: "bg-purple-600 text-white",
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
+        icon: "h-10 w-10",
+        md: "h-10 px-4 py-2",
+        xl: "h-12 px-6",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+);
+
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success' | 'glass' | 'premium' | 'destructive' | 'default';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'xl' | 'icon';
 
 interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
@@ -21,6 +58,20 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
+  default: `
+    bg-gradient-to-r from-primary-500 via-primary-600 to-primary-700 
+    hover:from-primary-600 hover:via-primary-700 hover:to-primary-800 
+    text-white shadow-lg shadow-primary-500/30
+    dark:from-primary-500 dark:via-primary-600 dark:to-primary-700
+    dark:shadow-primary-500/20
+    backdrop-blur-sm
+  `,
+  destructive: `
+    bg-gradient-to-r from-red-500 via-red-600 to-red-700
+    hover:from-red-600 hover:via-red-700 hover:to-red-800
+    text-white shadow-lg shadow-red-500/30
+    backdrop-blur-sm
+  `,
   primary: `
     bg-gradient-to-r from-primary-500 via-primary-600 to-primary-700 
     hover:from-primary-600 hover:via-primary-700 hover:to-primary-800 
