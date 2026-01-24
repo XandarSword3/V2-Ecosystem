@@ -7,6 +7,7 @@ interface AuditLogEntry {
   resource: string;
   resource_id?: string;
   entity_id?: string; // Alias for resource_id
+  details?: unknown;
   old_value?: unknown;
   new_value?: unknown;
   ip_address?: string;

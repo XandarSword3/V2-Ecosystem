@@ -7,11 +7,26 @@ import { Tabs } from 'expo-router';
 import { Home, UtensilsCrossed, Waves, BedDouble, User } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
+import { modulesApi } from '../../src/api/client';
 
 export default function TabsLayout() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+
+  // Fetch modules to determine active tabs
+  const { data: modulesData } = useQuery({
+    queryKey: ['modules-navigation'],
+    queryFn: () => modulesApi.getModules(),
+  });
+
+  const modules = modulesData?.data || [];
+
+  // Check active state for each module type
+  const isRestaurantActive = modules.some(m => m.type === 'restaurant' && m.isActive);
+  const isPoolActive = modules.some(m => m.type === 'pool' && m.isActive);
+  const isChaletsActive = modules.some(m => m.type === 'chalets' && m.isActive);
 
   // Fallback Palette for TabBar (NativeWind classes don't apply to screenOptions directly in v2 without workarounds)
   // We use the hex codes defined in Strategy/Global CSS
@@ -54,40 +69,43 @@ export default function TabsLayout() {
           ),
         }}
       />
-      
+
       {/* Dynamic Module: Dining */}
       <Tabs.Screen
         name="restaurant"
         options={{
           title: 'Dining',
+          href: isRestaurantActive ? '/(tabs)/restaurant' : null,
           tabBarIcon: ({ color, size }) => (
             <UtensilsCrossed size={size} color={color} />
           ),
         }}
       />
-      
+
       {/* Dynamic Module: Pool */}
       <Tabs.Screen
         name="pool"
         options={{
           title: 'Pool',
+          href: isPoolActive ? '/(tabs)/pool' : null,
           tabBarIcon: ({ color, size }) => (
             <Waves size={size} color={color} />
           ),
         }}
       />
-      
+
       {/* Dynamic Module: Chalets */}
       <Tabs.Screen
         name="chalets"
         options={{
           title: 'Chalets',
+          href: isChaletsActive ? '/(tabs)/chalets' : null,
           tabBarIcon: ({ color, size }) => (
             <BedDouble size={size} color={color} />
           ),
         }}
       />
-      
+
       <Tabs.Screen
         name="account"
         options={{

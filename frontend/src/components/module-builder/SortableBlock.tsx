@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { UIBlock } from '@/types/module-builder';
-import { GripVertical, Trash2, Copy, Layout, Type, Image as ImageIcon, Grid, List, Calendar, Clock, Box } from 'lucide-react';
+import { GripVertical, Trash2, Copy, Layout, Type, Image as ImageIcon, Grid, List, Calendar, Clock, Box, MousePointer2, FormInput } from 'lucide-react';
 import { useModuleBuilderStore } from '@/store/module-builder-store';
 
 interface SortableBlockProps {
@@ -17,7 +17,8 @@ const typeIcons: Record<string, any> = {
   session_list: Clock,
   booking_calendar: Calendar,
   container: Box,
-  form_container: Box,
+  form_container: FormInput,
+  button: MousePointer2,
 };
 
 export function SortableBlock({ block }: SortableBlockProps) {
@@ -162,6 +163,18 @@ export function SortableBlock({ block }: SortableBlockProps) {
                     <div className="mt-2 text-xs text-green-600 dark:text-green-500">
                         Check-in / Check-out date selection
                     </div>
+                </div>
+            )}
+            {block.type === 'button' && (
+                <div className="flex justify-center">
+                    <button 
+                        className="px-6 py-2 rounded-lg font-medium text-white transition-colors"
+                        style={{ 
+                            backgroundColor: block.props.backgroundColor || '#6366f1',
+                        }}
+                    >
+                        {block.props.text || 'Button'}
+                    </button>
                 </div>
             )}
             {block.type === 'container' && (

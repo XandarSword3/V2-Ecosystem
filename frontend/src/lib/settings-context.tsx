@@ -60,6 +60,10 @@ export interface SiteSettings {
     textDark?: string;
     textMutedDark?: string;
   };
+
+  // Module Specific Settings
+  moduleSettings?: Record<string, Record<string, string | number | boolean | undefined>>;
+
   animationsEnabled: boolean;
   reducedMotion: boolean;
   soundEnabled: boolean;
@@ -279,9 +283,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
       const settingsData = await settingsRes.json();
       settingsLogger.debug('Received settings data', settingsData);
-      if (settingsData.success && settingsData.data) {
-        setSettings({ ...defaultSettings, ...settingsData.data });
-        settingsLogger.debug('Updated settings state');
+      // Handle both { success, data } format and direct data format
+      const data = settingsData.data || settingsData;
+      if (data && (settingsData.success !== false)) {
+        setSettings({ ...defaultSettings, ...data });
+        settingsLogger.debug('Updated settings state with theme:', data.theme);
       }
       if (modulesRes.ok) {
         const modulesData = await modulesRes.json();

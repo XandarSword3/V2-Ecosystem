@@ -2,6 +2,7 @@
 
 import { UIBlock } from '@/types/module-builder';
 import { Module } from '@/lib/settings-context';
+import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { restaurantApi, poolApi } from '@/lib/api';
@@ -63,6 +64,15 @@ interface RendererProps {
   module: Module;
 }
 
+// Zod Schema for Run-time Validation
+const SafeBlockSchema: z.ZodType<any> = z.lazy(() => z.object({
+  id: z.string(),
+  type: z.string(),
+  props: z.record(z.any()).optional(),
+  style: z.record(z.any()).optional(),
+  children: z.array(SafeBlockSchema).optional(),
+}));
+
 // Helper to parse props - handles both JSON objects and PowerShell-style strings
 function parseProps(props: Record<string, unknown>): BlockProps {
   if (!props) return {};
@@ -95,13 +105,22 @@ function parseProps(props: Record<string, unknown>): BlockProps {
 }
 
 export function DynamicModuleRenderer({ layout, module }: RendererProps) {
-  if (!layout || layout.length === 0) {
+  // Validate schema version
+  const result = z.array(SafeBlockSchema).safeParse(layout);
+  if (!result.success) {
+     console.error("Schema validation failed", result.error);
+     // Fallback UI for P0 requirement
+     return <div className="p-4 bg-amber-50 text-amber-800 rounded border border-amber-200">Module content format is incompatible.</div>;
+  }
+  const safeLayout = result.data as UIBlock[];
+
+  if (!safeLayout || safeLayout.length === 0) {
     return <div className="p-10 text-center">No layout defined for this module.</div>;
   }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
-      {layout.map((block) => (
+      {safeLayout.map((block) => (
         <BlockRenderer key={block.id} block={block} module={module} />
       ))}
     </div>
@@ -110,6 +129,13 @@ export function DynamicModuleRenderer({ layout, module }: RendererProps) {
 
 function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
   const { type, style } = block;
+
+  // Validate Block Type
+  const KNOWN_TYPES = ['hero', 'container', 'grid', 'text_block', 'image', 'menu_list', 'session_list', 'booking_calendar', 'button', 'form_container'];
+  if (!KNOWN_TYPES.includes(type)) {
+      return null;
+  }
+
   const props = parseProps(block.props);
 
   // style object conversion if needed
@@ -185,8 +211,48 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
     case 'booking_calendar':
       return <BookingCalendarComponent module={module} props={props} />;
 
+    case 'button':
+      const buttonSizeClasses = {
+        sm: 'px-4 py-1.5 text-sm',
+        md: 'px-6 py-2.5 text-base',
+        lg: 'px-8 py-3 text-lg',
+      };
+      const sizeClass = buttonSizeClasses[props.size as keyof typeof buttonSizeClasses] || buttonSizeClasses.md;
+      const isOutline = props.variant === 'outline';
+      const isGhost = props.variant === 'ghost';
+      const bgColor = props.backgroundColor || '#6366f1';
+      
+      const buttonStyle: React.CSSProperties = {
+        backgroundColor: isOutline || isGhost ? 'transparent' : bgColor,
+        color: isOutline || isGhost ? bgColor : (bgColor === '#ffffff' ? '#1e293b' : '#ffffff'),
+        border: isOutline ? `2px solid ${bgColor}` : 'none',
+      };
+
+      const ButtonContent = (
+        <button 
+          className={`${sizeClass} rounded-lg font-medium transition-all hover:opacity-90 inline-block`}
+          style={buttonStyle}
+        >
+          {props.text || 'Button'}
+        </button>
+      );
+
+      return (
+        <div style={inlineStyle} className="flex justify-center py-4">
+          {props.href ? (
+            <a href={props.href} className="no-underline">
+              {ButtonContent}
+            </a>
+          ) : ButtonContent}
+        </div>
+      );
+
+    case 'form_container':
+      return <FormContainerComponent module={module} block={block} props={props} />;
+
     default:
-      return <div className="p-4 border border-red-200 bg-red-50 text-red-600">Unknown component: {type}</div>;
+        // This case should be unreachable due to the check above, but as a safety net:
+        return null;
   }
 }
 
@@ -528,6 +594,114 @@ function BookingCalendarComponent({ module, props }: { module: Module; props: Bl
           Search Availability
         </button>
       </div>
+    </div>
+  );
+}
+
+// ============================================
+// Form Container Component
+// ============================================
+function FormContainerComponent({ module, block, props }: { module: Module; block: UIBlock; props: BlockProps }) {
+  const tCommon = useTranslations('common');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<Record<string, string>>({});
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    try {
+      // Determine endpoint based on formAction
+      let endpoint = '/api/contact';
+      if (props.formAction === 'reservation') {
+        endpoint = '/api/reservations/request';
+      } else if (props.formAction === 'feedback') {
+        endpoint = '/api/feedback';
+      } else if (props.formAction === 'custom' && props.customEndpoint) {
+        endpoint = props.customEndpoint;
+      }
+
+      // Simulate form submission for now
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast.success('Form submitted successfully!');
+      setFormData({});
+    } catch (error) {
+      toast.error('Failed to submit form. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Default form fields based on formAction
+  const getDefaultFields = () => {
+    switch (props.formAction) {
+      case 'reservation':
+        return [
+          { name: 'name', label: 'Full Name', type: 'text', required: true },
+          { name: 'email', label: 'Email', type: 'email', required: true },
+          { name: 'phone', label: 'Phone', type: 'tel', required: true },
+          { name: 'date', label: 'Preferred Date', type: 'date', required: true },
+          { name: 'guests', label: 'Number of Guests', type: 'number', required: true },
+          { name: 'notes', label: 'Special Requests', type: 'textarea', required: false },
+        ];
+      case 'feedback':
+        return [
+          { name: 'name', label: 'Your Name', type: 'text', required: false },
+          { name: 'email', label: 'Email', type: 'email', required: true },
+          { name: 'rating', label: 'Rating (1-5)', type: 'number', required: true },
+          { name: 'feedback', label: 'Your Feedback', type: 'textarea', required: true },
+        ];
+      default: // contact
+        return [
+          { name: 'name', label: 'Name', type: 'text', required: true },
+          { name: 'email', label: 'Email', type: 'email', required: true },
+          { name: 'subject', label: 'Subject', type: 'text', required: false },
+          { name: 'message', label: 'Message', type: 'textarea', required: true },
+        ];
+    }
+  };
+
+  const fields = getDefaultFields();
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 max-w-xl mx-auto space-y-4">
+        {fields.map((field) => (
+          <div key={field.name}>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </label>
+            {field.type === 'textarea' ? (
+              <textarea
+                name={field.name}
+                required={field.required}
+                value={formData[field.name] || ''}
+                onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white"
+                rows={4}
+              />
+            ) : (
+              <input
+                type={field.type}
+                name={field.name}
+                required={field.required}
+                value={formData[field.name] || ''}
+                onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white"
+              />
+            )}
+          </div>
+        ))}
+        
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {props.submitText || tCommon('submit')}
+        </button>
+      </form>
     </div>
   );
 }

@@ -116,29 +116,12 @@ export function initializeSocketServer(httpServer: HttpServer) {
     maxHttpBufferSize: 1e6,    // 1MB
   });
 
-  // Authentication middleware
-  io.use(async (socket, next) => {
-    try {
-      const token = socket.handshake.auth.token;
-      if (token) {
-        const payload = verifyToken(token);
-        socket.data.userId = payload.userId;
-        socket.data.email = payload.email;
-        socket.data.roles = payload.roles;
-      }
-      next();
-    } catch (error) {
-      // Allow unauthenticated connections for public updates
-      next();
-    }
-  });
-
-  io.on('connection', (socket: Socket) => {
+  // --- SHARED CONNECTION LOGIC ---
+  const handleConnection = (socket: Socket, namespaceType: 'admin' | 'public') => {
     // Get connection metadata
     const userAgent = socket.handshake.headers['user-agent'];
     const ipAddress = socket.handshake.address;
-    
-    // Track connection with enhanced details
+
     activeConnections.set(socket.id, {
       socketId: socket.id,
       userId: socket.data.userId,
@@ -151,38 +134,52 @@ export function initializeSocketServer(httpServer: HttpServer) {
       userAgent,
       ipAddress,
     });
+
+    logger.info(`Socket connected [${namespaceType}]: ${socket.id} (user: ${socket.data.userId || 'anon'})`);
+
+    // Standard heartbeat
+    socket.on('heartbeat', () => socket.emit('heartbeat:ack', { timestamp: Date.now() }));
+
+    socket.on('disconnect', (reason: string) => {
+      activeConnections.delete(socket.id);
+      logger.info(`Socket disconnected [${namespaceType}]: ${socket.id} - ${reason}`);
+      if (namespaceType === 'admin') setTimeout(() => broadcastOnlineUsersToAdmins(), 100);
+    });
+
+    socket.on('error', (err: Error) => logger.error(`Socket error [${namespaceType}]: ${err.message}`));
+  };
+
+  // --- NAMESPACE: ADMIN (Strict Auth) ---
+  const adminIo = io.of('/admin');
+  adminIo.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth.token;
+      if (token) {
+        const payload = verifyToken(token);
+        socket.data = { ...socket.data, ...payload };
+        next();
+      } else {
+        next(new Error("Authentication required"));
+      }
+    } catch {
+      next(new Error("Authentication failed"));
+    }
+  });
+
+  adminIo.on('connection', (socket) => {
+    handleConnection(socket, 'admin');
     
-    logger.info(`Socket connected: ${socket.id} (Total: ${activeConnections.size}) [userId: ${socket.data.userId || 'unauthenticated'}]`);
+    // Join Role Rooms
+    socket.data.roles?.forEach((r: string) => socket.join(`role:${r}`));
+    if (socket.data.userId) socket.join(`user:${socket.data.userId}`);
 
-    // Join rooms based on user role
-    if (socket.data.roles) {
-      socket.data.roles.forEach((role: string) => {
-        socket.join(`role:${role}`);
-      });
-    }
-
-    // Join user-specific room
-    if (socket.data.userId) {
-      socket.join(`user:${socket.data.userId}`);
-    }
-
-    // Broadcast online count to admins
+    // Admin-specific listeners
     broadcastOnlineUsersToAdmins();
 
-    // Handle heartbeat to keep connection alive
-    socket.on('heartbeat', () => {
-      socket.emit('heartbeat:ack', { timestamp: Date.now() });
-    });
-
-    // Handle request for current online users count
     socket.on('request:online_users', () => {
-      // Return authenticated user count only
-      const count = getAuthenticatedUserCount();
-      logger.debug(`[Socket] request:online_users - returning count: ${count}, authenticated: ${!!socket.data.userId}, activeConnections: ${activeConnections.size}`);
-      socket.emit('stats:online_users', { count });
+       socket.emit('stats:online_users', { count: getAuthenticatedUserCount() });
     });
-
-    // Handle request for detailed online users (admin only)
+    
     socket.on('request:online_users_detailed', () => {
       if (socket.data.roles?.includes('admin') || socket.data.roles?.includes('super_admin')) {
         const users = getOnlineUsersDetailed();
@@ -190,78 +187,26 @@ export function initializeSocketServer(httpServer: HttpServer) {
       }
     });
 
-    // Handle page navigation tracking
-    socket.on('page:navigate', (data: { page: string; title?: string }) => {
-      const connection = activeConnections.get(socket.id);
-      if (connection) {
-        connection.currentPage = data.page;
-        connection.lastActivity = new Date();
-        activeConnections.set(socket.id, connection);
-        // Notify admins of the update
-        broadcastOnlineUsersToAdmins();
-      }
-    });
-
-    // Handle user info update (after login)
-    socket.on('user:update', (data: { userId: string; email: string; fullName: string; roles: string[] }) => {
-      const connection = activeConnections.get(socket.id);
-      if (connection) {
-        connection.userId = data.userId;
-        connection.email = data.email;
-        connection.fullName = data.fullName;
-        connection.roles = data.roles;
-        activeConnections.set(socket.id, connection);
-        
-        // Join role rooms
-        data.roles.forEach(role => {
-          socket.join(`role:${role}`);
-        });
-        socket.join(`user:${data.userId}`);
-        
-        broadcastOnlineUsersToAdmins();
-      }
-    });
-
-    // Staff can join business unit rooms
     socket.on('join:unit', (unit: string) => {
-      if (['restaurant', 'snack_bar', 'chalets', 'pool'].includes(unit)) {
-        socket.join(`unit:${unit}`);
-        logger.debug(`Socket ${socket.id} joined unit:${unit}`);
+        if (['restaurant', 'snack_bar', 'chalets', 'pool'].includes(unit)) socket.join(`unit:${unit}`);
+    });
+  });
+
+  // --- NAMESPACE: PUBLIC (Legacy/Default) ---
+  io.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth.token;
+      if (token) {
+        const payload = verifyToken(token);
+        socket.data = { ...socket.data, ...payload };
       }
-    });
+    } catch { /* Allow anonymous */ }
+    next();
+  });
 
-    // Handle room joining with acknowledgment
-    socket.on('join-room', (room: string, callback?: (success: boolean) => void) => {
-      socket.join(room);
-      logger.debug(`Socket ${socket.id} joined room: ${room}`);
-      if (callback) callback(true);
-    });
-
-    // Handle room leaving
-    socket.on('leave-room', (room: string) => {
-      socket.leave(room);
-      logger.debug(`Socket ${socket.id} left room: ${room}`);
-    });
-
-    // Handle ping for connection testing
-    socket.on('ping', (callback?: () => void) => {
-      if (callback) callback();
-    });
-
-    socket.on('disconnect', (reason: string) => {
-      activeConnections.delete(socket.id);
-      logger.info(`Socket disconnected: ${socket.id} - Reason: ${reason} (Remaining: ${activeConnections.size})`);
-      
-      // Broadcast updated online users to admins (after a small delay to ensure count is updated)
-      setTimeout(() => {
-        broadcastOnlineUsersToAdmins();
-      }, 100);
-    });
-
-    // Handle errors gracefully
-    socket.on('error', (error: Error) => {
-      logger.error(`Socket error for ${socket.id}: ${error.message}`);
-    });
+  io.on('connection', (socket) => {
+    handleConnection(socket, 'public');
+    if (socket.data.userId) socket.join(`user:${socket.data.userId}`);
   });
 
   // Log connection stats periodically
@@ -314,17 +259,24 @@ export async function closeSocketServer(): Promise<void> {
 
 // Emit helpers
 export function emitToUser(userId: string, event: string, data: unknown) {
+  // Emit to both namespaces to ensure delivery
   getIO().to(`user:${userId}`).emit(event, data);
+  getIO().of('/admin').to(`user:${userId}`).emit(event, data);
 }
 
 export function emitToUnit(unit: string, event: string, data: unknown) {
+  // Units are operational (staff), so emit to admin namespace
+  // Also emit to public just in case of mixed usage
+  getIO().of('/admin').to(`unit:${unit}`).emit(event, data);
   getIO().to(`unit:${unit}`).emit(event, data);
 }
 
 export function emitToRole(role: string, event: string, data: unknown) {
-  getIO().to(`role:${role}`).emit(event, data);
+  // Roles are strict admin/staff concept
+  getIO().of('/admin').to(`role:${role}`).emit(event, data);
 }
 
 export function emitToAll(event: string, data: unknown) {
   getIO().emit(event, data);
+  getIO().of('/admin').emit(event, data);
 }

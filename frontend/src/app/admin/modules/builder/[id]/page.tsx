@@ -9,7 +9,7 @@ import { BuilderCanvas } from '@/components/module-builder/BuilderCanvas';
 import { ComponentToolbar } from '@/components/module-builder/ComponentToolbar';
 import { PropertyPanel } from '@/components/module-builder/PropertyPanel';
 import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
-import { Loader2, ArrowLeft, Save, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ArrowLeft, Save, Eye, EyeOff, Undo2, Redo2, ZoomIn, ZoomOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { modulesApi } from '@/lib/api';
@@ -27,7 +27,13 @@ export default function ModuleBuilderPage() {
     setActiveModuleId, 
     selectedBlockId,
     isPreview,
-    togglePreview
+    togglePreview,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    zoom,
+    setZoom,
   } = useModuleBuilderStore();
 
   const { data, isLoading } = useQuery({
@@ -44,7 +50,8 @@ export default function ModuleBuilderPage() {
             settings: {
                 ...currentSettings,
                 layout: newLayout
-            }
+            },
+            settings_version: data?.data?.settings_version
         });
     },
     onSuccess: () => toast.success('Layout saved successfully'),
@@ -78,6 +85,48 @@ export default function ModuleBuilderPage() {
           </div>
         </div>
         <div className="flex gap-2">
+            {/* Undo/Redo */}
+            <div className="flex items-center border border-slate-300 rounded-lg dark:border-slate-600 overflow-hidden">
+                <button
+                    onClick={undo}
+                    disabled={!canUndo()}
+                    className="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Undo (Ctrl+Z)"
+                >
+                    <Undo2 className="h-4 w-4" />
+                </button>
+                <div className="w-px h-6 bg-slate-300 dark:bg-slate-600" />
+                <button
+                    onClick={redo}
+                    disabled={!canRedo()}
+                    className="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Redo (Ctrl+Y)"
+                >
+                    <Redo2 className="h-4 w-4" />
+                </button>
+            </div>
+
+            {/* Zoom */}
+            <div className="flex items-center border border-slate-300 rounded-lg dark:border-slate-600 overflow-hidden">
+                <button
+                    onClick={() => setZoom(zoom - 10)}
+                    disabled={zoom <= 50}
+                    className="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30"
+                    title="Zoom Out"
+                >
+                    <ZoomOut className="h-4 w-4" />
+                </button>
+                <span className="px-2 text-sm font-medium min-w-[50px] text-center">{zoom}%</span>
+                <button
+                    onClick={() => setZoom(zoom + 10)}
+                    disabled={zoom >= 150}
+                    className="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30"
+                    title="Zoom In"
+                >
+                    <ZoomIn className="h-4 w-4" />
+                </button>
+            </div>
+
             <button
                 onClick={togglePreview}
                 className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700"

@@ -92,6 +92,7 @@ export function ThemeInjector() {
 
     // Get colors - use custom colors if available, otherwise use theme preset
     const baseColors = settings.themeColors || theme.colors;
+    const themeColors = theme.colors;
 
     // Apply CSS custom properties to :root
     const root = document.documentElement;
@@ -101,18 +102,39 @@ export function ThemeInjector() {
     root.style.setProperty('--color-secondary', baseColors.secondary);
     root.style.setProperty('--color-accent', baseColors.accent);
     
-    // Mode-specific colors
-    if (isDark && theme.colors.backgroundDark) {
-      root.style.setProperty('--color-background', theme.colors.backgroundDark);
-      root.style.setProperty('--color-surface', theme.colors.surfaceDark);
-      root.style.setProperty('--color-text', theme.colors.textDark);
-      root.style.setProperty('--color-text-muted', theme.colors.textMutedDark);
+    // Mode-specific colors - background, surface, text
+    if (isDark) {
+      root.style.setProperty('--color-background', themeColors.backgroundDark);
+      root.style.setProperty('--color-surface', themeColors.surfaceDark);
+      root.style.setProperty('--color-surface-secondary', themeColors.surfaceSecondaryDark || themeColors.surfaceDark);
+      root.style.setProperty('--color-surface-elevated', themeColors.surfaceElevatedDark || themeColors.surfaceDark);
+      root.style.setProperty('--color-text', themeColors.textDark);
+      root.style.setProperty('--color-text-muted', themeColors.textMutedDark);
+      root.style.setProperty('--color-border', themeColors.borderDark || themeColors.textMutedDark);
+      root.style.setProperty('--color-border-muted', themeColors.borderMutedDark || themeColors.surfaceDark);
     } else {
       root.style.setProperty('--color-background', baseColors.background);
       root.style.setProperty('--color-surface', baseColors.surface);
+      root.style.setProperty('--color-surface-secondary', themeColors.surfaceSecondary || baseColors.background);
+      root.style.setProperty('--color-surface-elevated', themeColors.surfaceElevated || baseColors.surface);
       root.style.setProperty('--color-text', baseColors.text);
       root.style.setProperty('--color-text-muted', baseColors.textMuted);
+      root.style.setProperty('--color-border', themeColors.border || baseColors.textMuted);
+      root.style.setProperty('--color-border-muted', themeColors.borderMuted || baseColors.background);
     }
+
+    // Text on colored backgrounds (guaranteed readability)
+    root.style.setProperty('--color-text-on-primary', themeColors.textOnPrimary || '#ffffff');
+    root.style.setProperty('--color-text-on-secondary', themeColors.textOnSecondary || '#ffffff');
+    root.style.setProperty('--color-text-on-accent', themeColors.textOnAccent || '#ffffff');
+    
+    // Focus ring color
+    root.style.setProperty('--color-focus-ring', themeColors.focusRing || baseColors.primary);
+    
+    // Status colors
+    root.style.setProperty('--color-success', themeColors.success || '#22c55e');
+    root.style.setProperty('--color-warning', themeColors.warning || '#f59e0b');
+    root.style.setProperty('--color-error', themeColors.error || '#ef4444');
 
     // Convert hex to RGB for Tailwind opacity support
     const toRgbString = (hex: string) => {
@@ -124,10 +146,12 @@ export function ThemeInjector() {
     root.style.setProperty('--color-secondary-rgb', toRgbString(baseColors.secondary));
     root.style.setProperty('--color-accent-rgb', toRgbString(baseColors.accent));
     
-    const bgColor = isDark && theme.colors.backgroundDark ? theme.colors.backgroundDark : baseColors.background;
-    const surfaceColor = isDark && theme.colors.surfaceDark ? theme.colors.surfaceDark : baseColors.surface;
+    const bgColor = isDark ? themeColors.backgroundDark : baseColors.background;
+    const surfaceColor = isDark ? themeColors.surfaceDark : baseColors.surface;
+    const textColor = isDark ? themeColors.textDark : baseColors.text;
     root.style.setProperty('--color-background-rgb', toRgbString(bgColor));
     root.style.setProperty('--color-surface-rgb', toRgbString(surfaceColor));
+    root.style.setProperty('--color-text-rgb', toRgbString(textColor));
 
     // Generate and apply color shades
     const primaryShades = generateColorShades(baseColors.primary);
@@ -191,6 +215,14 @@ export function ThemeInjector() {
     // Set theme identifier for conditional styling
     root.setAttribute('data-theme', settings.theme || 'beach');
     root.setAttribute('data-color-mode', isDark ? 'dark' : 'light');
+    
+    // Persist theme to localStorage for the inline script on next page load
+    // This prevents theme flash on subsequent visits
+    try {
+      localStorage.setItem('v2-resort-theme', settings.theme || 'beach');
+    } catch (e) {
+      // localStorage not available (e.g., private browsing)
+    }
 
   }, [settings.theme, settings.themeColors, isDark]);
 

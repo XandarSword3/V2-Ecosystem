@@ -212,3 +212,108 @@ export async function facebookCallback(req: Request, res: Response, next: NextFu
     res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`);
   }
 }
+
+/**
+ * GET /api/auth/apple
+ * Redirects to Apple Sign In consent screen
+ */
+export function appleAuth(req: Request, res: Response): void {
+  try {
+    const { clientId, callbackUrl } = config.oauth.apple;
+
+    if (!clientId) {
+      logger.error('Apple OAuth not configured: missing APPLE_CLIENT_ID');
+      res.redirect(`${FRONTEND_URL}/login?error=oauth_not_configured`);
+      return;
+    }
+
+    // Generate state for CSRF protection
+    const state = oauthService.generateOAuthState();
+
+    res.cookie('oauth_state', state, {
+      httpOnly: true,
+      secure: config.env === 'production',
+      sameSite: 'lax',
+      maxAge: 10 * 60 * 1000,
+      path: '/',
+    });
+
+    // Build Apple OAuth URL
+    const appleAuthUrl = new URL('https://appleid.apple.com/auth/authorize');
+    appleAuthUrl.searchParams.set('client_id', clientId);
+    appleAuthUrl.searchParams.set('redirect_uri', callbackUrl);
+    appleAuthUrl.searchParams.set('response_type', 'code id_token');
+    appleAuthUrl.searchParams.set('response_mode', 'form_post');
+    appleAuthUrl.searchParams.set('scope', 'name email');
+    appleAuthUrl.searchParams.set('state', state);
+
+    res.redirect(appleAuthUrl.toString());
+  } catch (error) {
+    logger.error('Error initiating Apple OAuth:', error);
+    res.redirect(`${FRONTEND_URL}/login?error=oauth_error`);
+  }
+}
+
+/**
+ * POST /api/auth/apple/callback
+ * Handles Apple Sign In callback (form_post)
+ * Apple uses POST with form data for the callback
+ */
+export async function appleCallback(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { code, state, id_token, user: userJson, error: oauthError } = req.body;
+
+    if (oauthError) {
+      logger.warn('Apple OAuth error:', oauthError);
+      res.redirect(`${FRONTEND_URL}/login?error=oauth_denied`);
+      return;
+    }
+
+    const storedState = req.cookies?.oauth_state;
+    if (!state || state !== storedState) {
+      logger.warn('OAuth state mismatch - possible CSRF attack');
+      res.redirect(`${FRONTEND_URL}/login?error=invalid_state`);
+      return;
+    }
+
+    res.clearCookie('oauth_state');
+
+    if (!code || !id_token) {
+      res.redirect(`${FRONTEND_URL}/login?error=missing_code`);
+      return;
+    }
+
+    // Parse user info if provided (Apple only sends this on first sign-in)
+    let userName: { firstName?: string; lastName?: string } | undefined;
+    if (userJson) {
+      try {
+        const userInfo = typeof userJson === 'string' ? JSON.parse(userJson) : userJson;
+        userName = userInfo.name;
+      } catch (e) {
+        logger.warn('Failed to parse Apple user info:', e);
+      }
+    }
+
+    const result = await oauthService.handleAppleCallback(code, id_token, userName);
+
+    // Redirect with tokens
+    const roles = result.user.roles || [];
+    let redirectPath = '/';
+
+    if (roles.includes('super_admin') || roles.includes('admin')) {
+      redirectPath = '/admin';
+    } else if (roles.some((r: string) => r.includes('staff') || r.includes('manager'))) {
+      redirectPath = '/staff';
+    }
+
+    const redirectUrl = new URL(`${FRONTEND_URL}${redirectPath}`);
+    redirectUrl.searchParams.set('oauth', 'success');
+    redirectUrl.searchParams.set('accessToken', result.accessToken);
+    redirectUrl.searchParams.set('refreshToken', result.refreshToken);
+    
+    res.redirect(redirectUrl.toString());
+  } catch (error) {
+    logger.error('Error handling Apple OAuth callback:', error);
+    res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`);
+  }
+}

@@ -200,11 +200,200 @@ export async function handleFacebookCallback(code: string): Promise<OAuthResult>
   });
 }
 
+// ============================================
+// Apple Sign-In Support
+// ============================================
+
+interface AppleTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token: string;
+  id_token: string;
+}
+
+interface AppleIdTokenPayload {
+  iss: string;
+  aud: string;
+  exp: number;
+  iat: number;
+  sub: string; // User ID
+  email?: string;
+  email_verified?: string | boolean;
+  is_private_email?: string | boolean;
+  auth_time: number;
+  nonce_supported: boolean;
+}
+
+/**
+ * Generate Apple client secret JWT
+ * Apple requires a JWT signed with your private key instead of a static secret
+ */
+async function generateAppleClientSecret(): Promise<string> {
+  const { clientId, teamId, keyId, privateKey } = config.oauth.apple;
+  
+  if (!teamId || !keyId || !privateKey) {
+    throw new Error('Apple OAuth not fully configured');
+  }
+
+  // Replace escaped newlines with actual newlines
+  const key = privateKey.replace(/\\n/g, '\n');
+  
+  const now = Math.floor(Date.now() / 1000);
+  const expiresAt = now + (86400 * 180); // 180 days
+
+  // Create JWT header and payload
+  const header = {
+    alg: 'ES256',
+    kid: keyId,
+    typ: 'JWT',
+  };
+
+  const payload = {
+    iss: teamId,
+    iat: now,
+    exp: expiresAt,
+    aud: 'https://appleid.apple.com',
+    sub: clientId,
+  };
+
+  // Use jose library for JWT signing (you'll need to add this dependency)
+  // For now, we'll use a simple implementation
+  const jwt = await signJWT(header, payload, key);
+  return jwt;
+}
+
+/**
+ * Simple JWT signing for Apple (ES256)
+ */
+async function signJWT(header: object, payload: object, privateKey: string): Promise<string> {
+  const crypto = await import('crypto');
+  
+  const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signatureInput = `${encodedHeader}.${encodedPayload}`;
+
+  const sign = crypto.createSign('SHA256');
+  sign.update(signatureInput);
+  sign.end();
+  
+  const signature = sign.sign(privateKey);
+  
+  // Convert DER signature to raw r||s format for ES256
+  const r = signature.subarray(4, 4 + signature[3]);
+  const sOffset = 4 + signature[3] + 2;
+  const s = signature.subarray(sOffset);
+  
+  // Pad to 32 bytes each
+  const rPadded = Buffer.alloc(32);
+  r.copy(rPadded, 32 - r.length);
+  const sPadded = Buffer.alloc(32);
+  s.copy(sPadded, 32 - s.length);
+  
+  const rawSignature = Buffer.concat([rPadded, sPadded]);
+  const encodedSignature = rawSignature.toString('base64url');
+
+  return `${signatureInput}.${encodedSignature}`;
+}
+
+/**
+ * Exchange Apple authorization code for access token
+ */
+async function getAppleAccessToken(code: string): Promise<AppleTokenResponse> {
+  const { clientId, callbackUrl } = config.oauth.apple;
+  const clientSecret = await generateAppleClientSecret();
+
+  const response = await fetch('https://appleid.apple.com/auth/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: callbackUrl,
+      grant_type: 'authorization_code',
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    logger.error('Failed to exchange Apple code for token:', error);
+    throw new Error('Failed to authenticate with Apple');
+  }
+
+  return response.json() as Promise<AppleTokenResponse>;
+}
+
+/**
+ * Decode and verify Apple ID token (simplified - production should verify signature)
+ */
+function decodeAppleIdToken(idToken: string): AppleIdTokenPayload {
+  const parts = idToken.split('.');
+  if (parts.length !== 3) {
+    throw new Error('Invalid Apple ID token');
+  }
+
+  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+  
+  // Verify issuer
+  if (payload.iss !== 'https://appleid.apple.com') {
+    throw new Error('Invalid Apple ID token issuer');
+  }
+
+  // Verify audience (should be your client ID)
+  if (payload.aud !== config.oauth.apple.clientId) {
+    throw new Error('Invalid Apple ID token audience');
+  }
+
+  // Verify expiration
+  if (payload.exp < Math.floor(Date.now() / 1000)) {
+    throw new Error('Apple ID token expired');
+  }
+
+  return payload;
+}
+
+/**
+ * Handle Apple Sign-In callback
+ */
+export async function handleAppleCallback(
+  code: string, 
+  idToken: string,
+  userName?: { firstName?: string; lastName?: string }
+): Promise<OAuthResult> {
+  // Decode the ID token to get user info
+  const tokenPayload = decodeAppleIdToken(idToken);
+  
+  if (!tokenPayload.email && !tokenPayload.sub) {
+    throw new Error('Email not provided by Apple');
+  }
+
+  // Apple sometimes hides the email after first sign-in
+  // The sub (subject) is the unique user identifier
+  const email = tokenPayload.email || `${tokenPayload.sub}@privaterelay.appleid.com`;
+  
+  // Build full name from first sign-in data or default
+  let fullName = 'Apple User';
+  if (userName?.firstName || userName?.lastName) {
+    fullName = [userName.firstName, userName.lastName].filter(Boolean).join(' ');
+  }
+
+  return findOrCreateOAuthUser({
+    provider: 'apple',
+    providerId: tokenPayload.sub,
+    email,
+    fullName,
+    profileImageUrl: undefined, // Apple doesn't provide profile images
+  });
+}
+
 /**
  * Find existing user or create new one from OAuth data
  */
 async function findOrCreateOAuthUser(data: {
-  provider: 'google' | 'facebook';
+  provider: 'google' | 'facebook' | 'apple';
   providerId: string;
   email: string;
   fullName: string;

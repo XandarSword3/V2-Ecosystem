@@ -530,7 +530,7 @@ export function isAdmin(roles: string[]): boolean {
     Roles.ADMIN,
     Roles.SUPER_ADMIN,
   ];
-  return roles.some(role => adminRoles.includes(role as Role));
+  return roles.some(role => (adminRoles as string[]).includes(role));
 }
 
 /**
@@ -553,7 +553,7 @@ export function isStaff(roles: string[]): boolean {
     Roles.ADMIN,
     Roles.SUPER_ADMIN,
   ];
-  return roles.some(role => staffRoles.includes(role as Role));
+  return roles.some(role => (staffRoles as string[]).includes(role));
 }
 
 // ============================================

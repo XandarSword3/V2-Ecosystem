@@ -19,6 +19,8 @@ router.get('/google', oauthController.googleAuth);
 router.get('/google/callback', oauthController.googleCallback);
 router.get('/facebook', oauthController.facebookAuth);
 router.get('/facebook/callback', oauthController.facebookCallback);
+router.get('/apple', oauthController.appleAuth);
+router.post('/apple/callback', oauthController.appleCallback); // Apple uses POST
 
 // 2FA verification (during login flow - semi-public)
 router.post('/2fa/verify', twoFactorController.verifyTwoFactor);

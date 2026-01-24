@@ -95,6 +95,43 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const { referenceType, referenceId } = paymentIntent.metadata;
 
+      // Idempotency check: prevent duplicate processing via Ledger
+      const { data: existingLedgerEntry } = await supabase
+        .from('payment_ledger')
+        .select('id')
+        .eq('webhook_id', event.id)
+        .maybeSingle();
+
+      if (existingLedgerEntry) {
+        logger.info(`Idempotency: Webhook ${event.id} already processed. Skipping.`);
+        return res.json({ received: true });
+      }
+
+      // Record to Ledger First (Audit Trail)
+      await supabase.from('payment_ledger').insert({
+        reference_type: referenceType,
+        reference_id: referenceId,
+        event_type: 'authorized', // or 'captured' depending on intent status
+        amount: paymentIntent.amount / 100,
+        currency: paymentIntent.currency.toUpperCase(),
+        gateway_reference_id: paymentIntent.id,
+        webhook_id: event.id,
+        status: 'success',
+        metadata: { stripe_event_id: event.id }
+      });
+
+      // Check existing payment record (Legacy/Status check)
+      const { data: existingPayment } = await supabase
+        .from('payments')
+        .select('id')
+        .eq('stripe_payment_intent_id', paymentIntent.id)
+        .maybeSingle();
+
+      if (existingPayment) {
+        logger.info(`Payment ${paymentIntent.id} already recorded in status table. Skipping update.`);
+        break;
+      }
+
       // Record payment
       const { error: paymentError } = await supabase
         .from('payments')

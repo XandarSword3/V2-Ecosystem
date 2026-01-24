@@ -424,7 +424,7 @@ test.describe('Phase 3: Admin Monitors Pool', () => {
 test.describe('Phase 4: Verify Data Persistence', () => {
   
   test('API: Verify pool sessions are available', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/pool/sessions`);
+    const response = await request.get(`${API_URL}/api/v1/pool/sessions`);
     expect(response.status()).toBe(200);
     
     const data = await response.json();
@@ -433,7 +433,7 @@ test.describe('Phase 4: Verify Data Persistence', () => {
   });
 
   test('API: Verify pool settings exist', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/pool/settings`);
+    const response = await request.get(`${API_URL}/api/v1/pool/settings`);
     expect(response.status()).toBe(200);
     
     const data = await response.json();
@@ -445,7 +445,7 @@ test.describe('Phase 4: Verify Data Persistence', () => {
       test.skip(true, 'No ticket was created');
     }
     
-    const response = await request.get(`${API_URL}/api/pool/passes/${purchasedTicketId}`);
+    const response = await request.get(`${API_URL}/api/v1/pool/passes/${purchasedTicketId}`);
     expect([200, 404]).toContain(response.status());
   });
 });

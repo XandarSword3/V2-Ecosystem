@@ -6,27 +6,25 @@
  */
 
 export const TEST_CONFIG = {
-  // Database configuration - defaults to live database when TEST_DB_* not set
+  // Database configuration
   database: {
-    // Use the DATABASE_URL env var if no test-specific config is provided
-    url: process.env.DATABASE_URL,
     host: process.env.TEST_DB_HOST || 'localhost',
-    port: parseInt(process.env.TEST_DB_PORT || '5432', 10),
-    user: process.env.TEST_DB_USER || 'postgres',
-    password: process.env.TEST_DB_PASSWORD || '',
-    database: process.env.TEST_DB_NAME || 'postgres',
+    port: parseInt(process.env.TEST_DB_PORT || '5433', 10),
+    user: process.env.TEST_DB_USER || 'v2resort_test',
+    password: process.env.TEST_DB_PASSWORD || 'v2resort_test_secret',
+    database: process.env.TEST_DB_NAME || 'v2resort_test',
   },
 
-  // Redis configuration - optional, tests should work without it
+  // Redis configuration
   redis: {
     host: process.env.TEST_REDIS_HOST || process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.TEST_REDIS_PORT || process.env.REDIS_PORT || '6379', 10),
-    url: process.env.REDIS_URL,
+    port: parseInt(process.env.TEST_REDIS_PORT || '6380', 10),
+    url: process.env.TEST_REDIS_URL,
   },
 
   // API configuration
   api: {
-    baseUrl: process.env.TEST_API_URL || 'http://localhost:3005/api',
+    baseUrl: process.env.TEST_API_URL || 'http://localhost:3005/api/v1',
     timeout: 30000, // 30 seconds for slow operations
   },
 
@@ -62,9 +60,9 @@ export const TEST_CONFIG = {
  * Uses DATABASE_URL env var if available (for live environment testing)
  */
 export function getTestDatabaseUrl(): string {
-  // Prefer explicit DATABASE_URL from environment
-  if (process.env.DATABASE_URL) {
-    return process.env.DATABASE_URL;
+  // Only use env var if specifically set for testing, ignore general DATABASE_URL to avoid prod leaks
+  if (process.env.TEST_DATABASE_URL) {
+    return process.env.TEST_DATABASE_URL;
   }
   const { host, port, user, password, database } = TEST_CONFIG.database;
   return `postgresql://${user}:${password}@${host}:${port}/${database}`;

@@ -169,7 +169,8 @@ export async function deleteCategory(req: Request, res: Response, next: NextFunc
 export async function createMenuItem(req: Request, res: Response, next: NextFunction) {
   try {
     // Accept both camelCase and snake_case field names for flexibility
-    const { name, description, categoryId, category_id, price, module_id, moduleId, ...rest } = req.body;
+    const body = req.body;
+    const { name, description, categoryId, category_id, price, module_id, moduleId } = body;
 
     // Use categoryId or category_id (frontend may send either)
     const resolvedCategoryId = categoryId || category_id;
@@ -196,31 +197,59 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
       });
     }
 
-    // Auto-translate name and description if not provided
-    const translatedData = { ...rest, name, categoryId: resolvedCategoryId, price: Number(price), moduleId: resolvedModuleId };
+    // Build the data object with properly normalized camelCase fields
+    const translatedData: Record<string, any> = {
+      name,
+      categoryId: resolvedCategoryId,
+      price: Number(price),
+      moduleId: resolvedModuleId,
+      description: description,
+    };
 
-    if (name && !req.body.name_ar) {
+    // Map snake_case boolean fields to camelCase
+    if (body.is_vegetarian !== undefined) translatedData.isVegetarian = body.is_vegetarian;
+    if (body.is_vegan !== undefined) translatedData.isVegan = body.is_vegan;
+    if (body.is_gluten_free !== undefined) translatedData.isGlutenFree = body.is_gluten_free;
+    if (body.is_dairy_free !== undefined) translatedData.isDairyFree = body.is_dairy_free;
+    if (body.is_halal !== undefined) translatedData.isHalal = body.is_halal;
+    if (body.is_available !== undefined) translatedData.isAvailable = body.is_available;
+    if (body.is_featured !== undefined) translatedData.isFeatured = body.is_featured;
+    if (body.is_spicy !== undefined) translatedData.isSpicy = body.is_spicy;
+    if (body.discount_price !== undefined) translatedData.discountPrice = body.discount_price;
+    if (body.display_order !== undefined) translatedData.displayOrder = body.display_order;
+    if (body.preparation_time_minutes !== undefined) translatedData.preparationTimeMinutes = body.preparation_time_minutes;
+    if (body.calories !== undefined) translatedData.calories = body.calories;
+    if (body.allergens !== undefined) translatedData.allergens = body.allergens;
+    if (body.image_url !== undefined) translatedData.imageUrl = body.image_url;
+
+    // Auto-translate name and description if not provided
+    if (name && !body.name_ar) {
       try {
         const nameTranslations = await translateText(name, 'en');
-        translatedData.name_ar = nameTranslations.ar;
-        translatedData.name_fr = nameTranslations.fr;
+        translatedData.nameAr = nameTranslations.ar;
+        translatedData.nameFr = nameTranslations.fr;
       } catch (e) {
         // Auto-translation failed, continue without translations
       }
+    } else {
+      if (body.name_ar) translatedData.nameAr = body.name_ar;
+      if (body.name_fr) translatedData.nameFr = body.name_fr;
     }
 
-    if (description && !req.body.description_ar) {
+    if (description && !body.description_ar) {
       try {
         const descTranslations = await translateText(description, 'en');
-        translatedData.description = description;
-        translatedData.description_ar = descTranslations.ar;
-        translatedData.description_fr = descTranslations.fr;
+        translatedData.descriptionAr = descTranslations.ar;
+        translatedData.descriptionFr = descTranslations.fr;
       } catch (e) {
         logger.warn('[MENU] Auto-translation failed for item description');
       }
+    } else {
+      if (body.description_ar) translatedData.descriptionAr = body.description_ar;
+      if (body.description_fr) translatedData.descriptionFr = body.description_fr;
     }
 
-    const item = await menuService.createMenuItem(translatedData);
+    const item = await menuService.createMenuItem(translatedData as Parameters<typeof menuService.createMenuItem>[0]);
     res.status(201).json({ success: true, data: item, autoTranslated: true });
   } catch (error: unknown) {
     const errWithCode = error as { code?: string; message?: string };
@@ -259,6 +288,8 @@ export async function updateMenuItem(req: Request, res: Response, next: NextFunc
     if (body.image_url !== undefined) normalizedData.imageUrl = body.image_url;
     if (body.is_available !== undefined) normalizedData.isAvailable = body.is_available;
     if (body.is_featured !== undefined) normalizedData.isFeatured = body.is_featured;
+    if (body.is_spicy !== undefined) normalizedData.isSpicy = body.is_spicy;
+    if (body.discount_price !== undefined) normalizedData.discountPrice = body.discount_price;
     if (body.display_order !== undefined) normalizedData.displayOrder = body.display_order;
 
     const item = await menuService.updateMenuItem(req.params.id, normalizedData);

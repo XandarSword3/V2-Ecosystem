@@ -69,7 +69,7 @@ function getStripeInstance(env?: StripeEnvironment): Stripe {
   }
   
   return new Stripe(config.secretKey, {
-    apiVersion: '2024-06-20',
+    apiVersion: '2023-10-16',
     typescript: true,
     appInfo: {
       name: 'V2 Resort',

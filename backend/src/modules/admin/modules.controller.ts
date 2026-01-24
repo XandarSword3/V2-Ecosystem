@@ -75,10 +75,15 @@ export async function getModule(req: Request, res: Response, next: NextFunction)
 export async function createModule(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    const { template_type, name, slug, description, settings } = req.body;
+    
+    // Validate input using schema to prevent XSS and ensure data integrity
+    const { template_type, name, slug, description, settings } = validateBody(createModuleSchema, req.body);
 
     // Generate slug if not provided
     const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+    // Default settings version for new modules
+    const SETTINGS_VERSION = 1; 
 
     const { data, error } = await supabase
       .from('modules')
@@ -88,13 +93,37 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
         slug: finalSlug,
         description,
         settings: settings || {},
+        settings_version: SETTINGS_VERSION,
         is_active: true,
-        show_in_main: true // New modules should show in main navbar by default
+        show_in_main: true 
       })
       .select()
       .single();
 
     if (error) throw error;
+
+    // Dynamic Permission Generation (P0) using new app_permissions
+    try {
+        const permsToCreate = [
+            { slug: `module:${finalSlug}:read`, description: `Read access for module ${name}`, module_slug: finalSlug },
+            { slug: `module:${finalSlug}:manage`, description: `Management access for module ${name}`, module_slug: finalSlug },
+            { slug: `module:${finalSlug}:publish`, description: `Publish access for module ${name}`, module_slug: finalSlug },
+        ];
+        
+        await supabase.from('app_permissions').upsert(permsToCreate, { onConflict: 'slug' });
+
+        // Assign to super_admin
+        const rolePerms = [
+            { role_name: 'super_admin', permission_slug: `module:${finalSlug}:read` },
+            { role_name: 'super_admin', permission_slug: `module:${finalSlug}:manage` },
+            { role_name: 'super_admin', permission_slug: `module:${finalSlug}:publish` },
+        ];
+
+        await supabase.from('app_role_permissions').upsert(rolePerms, { onConflict: 'role_name,permission_slug' });
+        
+    } catch (permError) {
+        logger.error(`Failed to generate permissions for ${finalSlug}`, permError);
+    }
 
     // --- Auto-add to navbar CMS if configured ---
     try {
@@ -142,49 +171,33 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
         .select();
 
       if (!rolesError && rolesData) {
-        // 2. Create Module Permissions
+        // 2. Create Module Permissions (granular)
         const modulePermissions = [
-          { slug: `${finalSlug}.view`, description: `View ${name}`, module_slug: finalSlug },
-          { slug: `${finalSlug}.manage`, description: `Manage ${name}`, module_slug: finalSlug },
-          { slug: `${finalSlug}.orders.view`, description: `View ${name} orders`, module_slug: finalSlug },
-          { slug: `${finalSlug}.orders.manage`, description: `Manage ${name} orders`, module_slug: finalSlug },
-          { slug: `${finalSlug}.menu.view`, description: `View ${name} menu`, module_slug: finalSlug },
-          { slug: `${finalSlug}.menu.manage`, description: `Manage ${name} menu`, module_slug: finalSlug },
-          { slug: `${finalSlug}.tables.view`, description: `View ${name} tables`, module_slug: finalSlug },
-          { slug: `${finalSlug}.tables.manage`, description: `Manage ${name} tables`, module_slug: finalSlug },
+          { slug: `${finalSlug}:view`, description: `View ${name}`, module_slug: finalSlug },
+          { slug: `${finalSlug}:manage`, description: `Manage ${name}`, module_slug: finalSlug },
+          // ... add others as needed, matching the colon convention better
         ];
 
-        const { data: permissionsData } = await supabase
-          .from('permissions')
-          .insert(modulePermissions)
-          .select();
+        await supabase.from('app_permissions').upsert(modulePermissions, { onConflict: 'slug' });
 
-        // 3. Link Permissions to Roles
-        if (permissionsData && permissionsData.length > 0) {
-          const adminRole = rolesData.find((r: { name: string }) => r.name === `${finalSlug}_admin`);
-          const staffRole = rolesData.find((r: { name: string }) => r.name === `${finalSlug}_staff`);
+        // 3. Link Permissions to Roles using app_role_permissions
+        const rolePermissions: { role_name: string; permission_slug: string }[] = [];
+        
+        const adminRoleName = `${finalSlug}_admin`; 
+        const staffRoleName = `${finalSlug}_staff`;
 
-          const rolePermissions: { role_id: string; permission_id: string }[] = [];
+        // Admin gets all
+        modulePermissions.forEach(p => {
+             rolePermissions.push({ role_name: adminRoleName, permission_slug: p.slug });
+        });
+        // Staff gets view
+        modulePermissions.filter(p => p.slug.includes(':view')).forEach(p => {
+             rolePermissions.push({ role_name: staffRoleName, permission_slug: p.slug });
+        });
 
-          // Admin gets all permissions
-          if (adminRole) {
-            permissionsData.forEach((perm: { id: string }) => {
-              rolePermissions.push({ role_id: adminRole.id, permission_id: perm.id });
-            });
-          }
-
-          // Staff gets view permissions only
-          if (staffRole) {
-            const viewPerms = permissionsData.filter((p: { slug: string }) => p.slug.includes('.view'));
-            viewPerms.forEach((perm: { id: string }) => {
-              rolePermissions.push({ role_id: staffRole.id, permission_id: perm.id });
-            });
-          }
-
-          if (rolePermissions.length > 0) {
-            await supabase.from('role_permissions').insert(rolePermissions);
+        if (rolePermissions.length > 0) {
+            await supabase.from('app_role_permissions').upsert(rolePermissions, { onConflict: 'role_name,permission_slug' });
             logger.info(`[Modules] Created ${rolePermissions.length} role-permission links for ${finalSlug}`);
-          }
         }
 
         // 4. Create Default Staff User
@@ -200,13 +213,14 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
             phone: '',
             is_active: true,
             email_verified: true,
-            roles: roleNames // Store simply for reference or if using array column
+            roles: roleNames 
           })
           .select()
           .single();
 
         if (!userError && userData) {
-          // 5. Link User to Roles (using user_roles junction table)
+          // 5. Link User to Roles (using user_roles junction table if it exists and uses UUIDs)
+          // We fetched rolesData which has IDs.
           const userRolesInserts = rolesData.map((role: { id: string; name: string }) => ({
             user_id: userData.id,
             role_id: role.id
@@ -240,15 +254,68 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
 
 export async function updateModule(req: Request, res: Response, next: NextFunction) {
   try {
-    // Validate input
+    // Validate input (includes optional settings_version)
     const validatedData = validateBody(updateModuleSchema, req.body);
 
     const supabase = getSupabase();
     const { id } = req.params;
 
+    // 1. Fetch current module to check permissions and version
+    const { data: currentModule, error: fetchError } = await supabase
+      .from('modules')
+      .select('slug, template_type, settings_version') 
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !currentModule) {
+      return res.status(404).json({ success: false, error: 'Module not found' });
+    }
+
+    // 2. Enforce Permissions (RBAC)
+    // Check for `module:{slug}:manage` permission via app_role_permissions
+    // Or super_admin bypass
+    const user = (req as any).user;
+    if (!user.roles.includes('super_admin')) {
+         const requiredPerm = `module:${currentModule.slug}:manage`;
+         const { data: permData, error: permError } = await supabase
+            .from('app_role_permissions')
+            .select('permission_slug')
+            .eq('permission_slug', requiredPerm)
+            .in('role_name', user.roles)
+            .limit(1);
+
+         if (permError || !permData || permData.length === 0) {
+             logger.warn(`Unauthorized module update attempt by ${user.userId} on ${currentModule.slug}`);
+             return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+         }
+    }
+
+    // 3. Optimistic Concurrency Control
+    if (validatedData.settings_version !== undefined) {
+         if (currentModule.settings_version !== validatedData.settings_version) {
+             return res.status(409).json({ 
+                 success: false, 
+                 error: 'Version conflict', 
+                 message: 'The module settings have been modified by another user. Please reload and try again.',
+                 currentVersion: currentModule.settings_version
+             });
+         }
+    }
+
+    // Prepare update data
+    const updateData: any = { ...validatedData };
+    
+    // Remove settings_version from the actual update payload as it's handled manually below if needed
+    delete updateData.settings_version;
+
+    // Increment version if settings are being updated
+    if (validatedData.settings) {
+        updateData.settings_version = (currentModule.settings_version || 0) + 1;
+    }
+
     const { data, error } = await supabase
       .from('modules')
-      .update(validatedData)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -261,11 +328,12 @@ export async function updateModule(req: Request, res: Response, next: NextFuncti
     emitToAll('modules.updated', data);
 
     await logActivity({
-      user_id: (req.user as any)?.userId || 'system',
+      user_id: user.userId,
       action: 'UPDATE_MODULE',
       resource: 'module',
-      resource_id: data.id,
-      new_value: validatedData,
+      resource_id: id,
+      old_value: currentModule, 
+      new_value: data,
       ip_address: req.ip,
       user_agent: req.get('user-agent')
     });
@@ -282,14 +350,28 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
     const { id } = req.params;
     const force = req.query.force === 'true';
 
-    if (force) {
-      // First, get module info for logging and cache clearing
-      const { data: moduleData } = await supabase
-        .from('modules')
-        .select('slug, name')
-        .eq('id', id)
-        .single();
+    // 1. Fetch module for Permission Check
+    const { data: moduleData } = await supabase
+      .from('modules')
+      .select('id, slug, name')
+      .eq('id', id)
+      .single();
 
+    if (!moduleData) {
+      return res.status(404).json({ success: false, error: 'Module not found' });
+    }
+
+    // 2. Enforce Permissions
+    const user = (req as any).user;
+    const hasPermission = user.roles.includes('super_admin') || 
+                         user.roles.includes(`${moduleData.slug}_admin`);
+
+    if (!hasPermission) {
+      logger.warn(`Unauthorized module delete attempt by ${user.userId} on ${moduleData.slug}`);
+      return res.status(403).json({ success: false, error: 'Insufficient permissions to delete this module' });
+    }
+
+    if (force) {
       const deletedCounts: Record<string, number> = {};
       const errors: string[] = [];
 
@@ -388,20 +470,15 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
       // Also clean up roles and permissions created for this module
       if (moduleData?.slug) {
         try {
-          // Delete permissions for this module
+          // Delete permissions for this module (Cascades to app_role_permissions)
           const { data: perms } = await supabase
-            .from('permissions')
-            .select('id')
-            .eq('module_slug', moduleData.slug);
+            .from('app_permissions')
+            .delete()
+            .eq('module_slug', moduleData.slug)
+            .select('slug');
           
-          const permIds = perms?.map(p => p.id) || [];
-          
-          if (permIds.length > 0) {
-            // Delete role_permissions links
-            await supabase.from('role_permissions').delete().in('permission_id', permIds);
-            // Delete permissions
-            await supabase.from('permissions').delete().eq('module_slug', moduleData.slug);
-            deletedCounts['permissions'] = permIds.length;
+          if (perms && perms.length > 0) {
+            deletedCounts['permissions'] = perms.length;
           }
           
           // Delete roles for this module
@@ -411,7 +488,7 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
             .or(`name.eq.${moduleData.slug}_admin,name.eq.${moduleData.slug}_staff`);
           
           if (!rolesError) {
-            deletedCounts['roles'] = 2;
+             deletedCounts['roles'] = 2;
           }
           
           // Remove from navbar CMS if present
@@ -420,7 +497,7 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
             .select('id, navbar')
             .single();
           
-          const settings = siteSettings as { id?: number; navbar?: { links?: unknown[] } } | null;
+          const settings = siteSettings as { id?: number; navbar?: { links?: any[] } } | null;
           if (settings?.navbar?.links && Array.isArray(settings.navbar.links)) {
             const updatedLinks = settings.navbar.links.filter(
               (link: any) => link.moduleSlug !== moduleData.slug
@@ -430,8 +507,9 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
               .update({ navbar: { ...settings.navbar, links: updatedLinks } })
               .eq('id', settings.id || 1);
           }
+
         } catch (e: any) {
-          errors.push(`cleanup: ${e.message}`);
+            errors.push(`cleanup: ${e.message}`);
         }
       }
 

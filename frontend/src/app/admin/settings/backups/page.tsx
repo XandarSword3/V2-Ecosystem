@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -16,7 +16,10 @@ import {
     CheckCircle2,
     XCircle,
     Loader2,
-    HardDrive
+    HardDrive,
+    Upload,
+    RotateCcw,
+    Shield
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -48,6 +51,11 @@ export default function BackupsPage() {
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
     const [downloading, setDownloading] = useState<string | null>(null);
+    const [restoring, setRestoring] = useState(false);
+    const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+    const [pendingRestoreData, setPendingRestoreData] = useState<Record<string, unknown> | null>(null);
+    const [pendingRestoreFilename, setPendingRestoreFilename] = useState<string>('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const fetchBackups = useCallback(async () => {
         try {
@@ -134,6 +142,83 @@ export default function BackupsPage() {
         }
     };
 
+    // Handle file upload for restore
+    const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Reset input for re-selection of same file
+        event.target.value = '';
+
+        // Validate file type
+        if (!file.name.endsWith('.json')) {
+            toast.error('Invalid file type. Please upload a JSON backup file.');
+            return;
+        }
+
+        // Validate file size (max 100MB)
+        if (file.size > 100 * 1024 * 1024) {
+            toast.error('File too large. Maximum size is 100MB.');
+            return;
+        }
+
+        try {
+            const text = await file.text();
+            const backupData = JSON.parse(text);
+
+            // Validate backup structure
+            if (!backupData.tables || typeof backupData.tables !== 'object') {
+                toast.error('Invalid backup format. File does not contain valid backup data.');
+                return;
+            }
+
+            // Store for confirmation
+            setPendingRestoreData(backupData);
+            setPendingRestoreFilename(file.name);
+            setShowRestoreConfirm(true);
+        } catch (error) {
+            console.error('Failed to parse backup file:', error);
+            toast.error('Failed to parse backup file. Ensure it is a valid JSON file.');
+        }
+    };
+
+    // Execute restore after confirmation
+    const handleConfirmRestore = async () => {
+        if (!pendingRestoreData) return;
+
+        try {
+            setRestoring(true);
+            setShowRestoreConfirm(false);
+            toast.loading('Restoring database from backup...', { id: 'restore-backup' });
+
+            const response = await api.post('/admin/backups/restore', pendingRestoreData);
+
+            if (response.data.success) {
+                toast.success('Backup restored successfully! The page will refresh.', { id: 'restore-backup' });
+                // Refresh page after restore to reload all data
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                throw new Error(response.data.error || 'Restore failed');
+            }
+        } catch (error: unknown) {
+            const err = error as { response?: { data?: { error?: string } }; message?: string };
+            console.error('Restore failed:', error);
+            toast.error(err.response?.data?.error || err.message || 'Restore failed', { id: 'restore-backup' });
+        } finally {
+            setRestoring(false);
+            setPendingRestoreData(null);
+            setPendingRestoreFilename('');
+        }
+    };
+
+    const handleCancelRestore = () => {
+        setShowRestoreConfirm(false);
+        setPendingRestoreData(null);
+        setPendingRestoreFilename('');
+    };
+
     const formatSize = (bytes: number) => {
         if (bytes === 0) return '0 B';
         const k = 1024;
@@ -163,18 +248,40 @@ export default function BackupsPage() {
                         {t('backups.subtitle')}
                     </p>
                 </div>
-                <Button
-                    onClick={handleCreateBackup}
-                    disabled={creating}
-                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"
-                >
-                    {creating ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                        <Plus className="w-4 h-4 mr-2" />
-                    )}
-                    {t('backups.createBackup')}
-                </Button>
+                <div className="flex items-center gap-3">
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept=".json"
+                        onChange={handleFileSelect}
+                    />
+                    <Button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={restoring}
+                        variant="outline"
+                        className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                    >
+                        {restoring ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <Upload className="w-4 h-4 mr-2" />
+                        )}
+                        Restore from File
+                    </Button>
+                    <Button
+                        onClick={handleCreateBackup}
+                        disabled={creating}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"
+                    >
+                        {creating ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <Plus className="w-4 h-4 mr-2" />
+                        )}
+                        {t('backups.createBackup')}
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -343,6 +450,79 @@ export default function BackupsPage() {
                     </Card>
                 </div>
             </div>
+
+            {/* Restore Confirmation Modal */}
+            <AnimatePresence>
+                {showRestoreConfirm && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                        onClick={handleCancelRestore}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                                    <Shield className="w-6 h-6 text-amber-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                                        Confirm Database Restore
+                                    </h3>
+                                    <p className="text-sm text-slate-500">
+                                        This action cannot be undone
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg mb-4">
+                                <div className="flex items-start gap-3">
+                                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                                    <div className="text-sm text-amber-800 dark:text-amber-200">
+                                        <p className="font-medium mb-1">Warning: This will replace all current data!</p>
+                                        <p>All existing settings, modules, menus, bookings, and other data will be overwritten with the backup contents.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-slate-100 dark:bg-slate-800 rounded-lg mb-6">
+                                <FileJson className="w-8 h-8 text-blue-500" />
+                                <div>
+                                    <p className="font-medium text-slate-900 dark:text-white text-sm truncate max-w-[250px]">
+                                        {pendingRestoreFilename}
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                        {pendingRestoreData && Object.keys(pendingRestoreData.tables || {}).length} tables to restore
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3">
+                                <Button
+                                    variant="outline"
+                                    onClick={handleCancelRestore}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onClick={handleConfirmRestore}
+                                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                                >
+                                    <RotateCcw className="w-4 h-4 mr-2" />
+                                    Restore Backup
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

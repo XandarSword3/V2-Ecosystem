@@ -106,6 +106,70 @@
     border-color: var(--color-primary);
   }
   
+  /* NEW: Enhanced surface variants for depth and hierarchy */
+  .bg-cms-surface-secondary {
+    background-color: var(--color-surface-secondary);
+  }
+  .bg-cms-surface-elevated {
+    background-color: var(--color-surface-elevated);
+  }
+  
+  /* NEW: Text on colored backgrounds (guaranteed readability) */
+  .text-on-primary {
+    color: var(--color-text-on-primary);
+  }
+  .text-on-secondary {
+    color: var(--color-text-on-secondary);
+  }
+  .text-on-accent {
+    color: var(--color-text-on-accent);
+  }
+  
+  /* NEW: Border colors from CMS */
+  .border-cms {
+    border-color: var(--color-border);
+  }
+  .border-cms-muted {
+    border-color: var(--color-border-muted);
+  }
+  
+  /* NEW: Focus ring from CMS */
+  .focus\:ring-cms:focus {
+    --tw-ring-color: var(--color-focus-ring);
+  }
+  .ring-cms {
+    --tw-ring-color: var(--color-focus-ring);
+  }
+  
+  /* NEW: Status colors from CMS */
+  .text-cms-success {
+    color: var(--color-success);
+  }
+  .text-cms-warning {
+    color: var(--color-warning);
+  }
+  .text-cms-error {
+    color: var(--color-error);
+  }
+  .bg-cms-success {
+    background-color: var(--color-success);
+  }
+  .bg-cms-warning {
+    background-color: var(--color-warning);
+  }
+  .bg-cms-error {
+    background-color: var(--color-error);
+  }
+  .border-cms-success {
+    border-color: var(--color-success);
+  }
+  .border-cms-warning {
+    border-color: var(--color-warning);
+  }
+  .border-cms-error {
+    border-color: var(--color-error);
+  }
+  
   /* Shadow with theme colors */
   .shadow-cms-primary {
     box-shadow: 0 4px 14px 0 color-mix(in srgb, var(--color-primary) 30%, transparent);
@@ -146,13 +210,33 @@
   --color-accent: #f59e0b;
   --color-background: #f0fdfa;
   --color-surface: #ffffff;
+  --color-surface-secondary: #e6fffa;
+  --color-surface-elevated: #ffffff;
   --color-text: #164e63;
   --color-text-muted: #0e7490;
+  
+  /* Text on colored backgrounds */
+  --color-text-on-primary: #ffffff;
+  --color-text-on-secondary: #ffffff;
+  --color-text-on-accent: #1c1917;
+  
+  /* Borders */
+  --color-border: #99f6e4;
+  --color-border-muted: #ccfbf1;
+  
+  /* Focus ring */
+  --color-focus-ring: #22d3ee;
+  
+  /* Status colors */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
   
   /* RGB versions for Tailwind opacity */
   --color-primary-rgb: 8 145 178;
   --color-secondary-rgb: 6 182 212;
   --color-accent-rgb: 245 158 11;
+  --color-text-rgb: 22 78 99;
   
   /* Theme gradients */
   --gradient-hero: linear-gradient(135deg, #0891b2 0%, #06b6d4 50%, #22d3ee 100%);

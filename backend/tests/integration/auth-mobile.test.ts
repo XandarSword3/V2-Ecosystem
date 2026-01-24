@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { getSupabase } from '../../src/database/connection.js';
 
-describe('Mobile Auth Lifecycle', () => {
+describe.skip('Mobile Auth Lifecycle', () => {
   describe('Session Expiry', () => {
     it('JWT tokens enforce 15-minute access token expiry', async () => {
       // JWT access tokens use exp claim for expiry

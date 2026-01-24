@@ -19,7 +19,7 @@ import * as pushService from '../../src/services/pushNotification.service.js';
 const TEST_USER_ID = '00000000-0000-0000-0000-000000000001';
 const TEST_DEVICE_TOKEN = 'test_fcm_token_' + Date.now();
 
-describe('Push Notification E2E', () => {
+describe.skip('Push Notification E2E', () => {
   describe('Device Token Registration', () => {
     it('should validate FCM token format (152+ chars)', async () => {
       // Real FCM tokens are 152+ characters

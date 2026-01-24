@@ -33,6 +33,7 @@ import {
   Calendar,
   Filter,
   Minus,
+  Trash2,
 } from 'lucide-react';
 
 interface InventoryItem {
@@ -115,9 +116,13 @@ export default function InventoryAdminPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
+  const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   
   // Form states
   const [itemForm, setItemForm] = useState({
@@ -324,6 +329,37 @@ export default function InventoryAdminPage() {
     }
   };
 
+  const handleDeleteItem = async () => {
+    if (!deletingItem) return;
+    
+    try {
+      const res = await api.delete(`/inventory/items/${deletingItem.id}`);
+      if (res.data.success) {
+        toast.success('Item deleted successfully');
+        setShowDeleteItemModal(false);
+        setDeletingItem(null);
+        loadData();
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to delete item');
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!deletingCategory) return;
+    
+    try {
+      const res = await api.delete(`/inventory/categories/${deletingCategory.id}`);
+      if (res.data.success) {
+        toast.success('Category deleted successfully');
+        setShowDeleteCategoryModal(false);
+        setDeletingCategory(null);
+        loadData();
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to delete category');
+    }
+  };
   const handleExportReport = async () => {
     try {
       window.open(`${api.defaults.baseURL}/inventory/report?format=csv`, '_blank');
@@ -592,8 +628,18 @@ export default function InventoryAdminPage() {
                               variant="ghost" 
                               size="sm"
                               onClick={() => handleEdit(item)}
+                              title="Edit Item"
                             >
                               <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => { setDeletingItem(item); setShowDeleteItemModal(true); }}
+                              title="Delete Item"
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </td>
@@ -633,13 +679,26 @@ export default function InventoryAdminPage() {
                       <p className="text-2xl font-bold">{Math.round(cat.total_stock)}</p>
                       <p className="text-xs text-slate-500">units</p>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => { setEditingCategory(cat); setShowCategoryModal(true); }}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => { setEditingCategory(cat); setShowCategoryModal(true); }}
+                        title="Edit Category"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => { setDeletingCategory(cat); setShowDeleteCategoryModal(true); }}
+                        title="Delete Category"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        disabled={cat.item_count > 0}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -773,7 +832,7 @@ export default function InventoryAdminPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4"
               onClick={() => { setShowCreateModal(false); setEditingItem(null); }}
             >
               <motion.div
@@ -927,7 +986,7 @@ export default function InventoryAdminPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4"
               onClick={() => { setShowTransactionModal(false); setSelectedItem(null); }}
             >
               <motion.div
@@ -1035,6 +1094,116 @@ export default function InventoryAdminPage() {
           )}
         </AnimatePresence>
       </Portal>
+
+      {/* Delete Item Confirmation Modal */}
+      <Portal>
+        <AnimatePresence>
+          {showDeleteItemModal && deletingItem && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4"
+              onClick={() => { setShowDeleteItemModal(false); setDeletingItem(null); }}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md shadow-2xl"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                    <Trash2 className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-red-600">Delete Item</h3>
+                    <p className="text-slate-500">This action cannot be undone</p>
+                  </div>
+                </div>
+                
+                <p className="mb-6">
+                  Are you sure you want to delete <strong>{deletingItem.name}</strong>?
+                  <br />
+                  <span className="text-sm text-slate-500">
+                    SKU: {deletingItem.sku} | Current stock: {deletingItem.current_stock} {deletingItem.unit}
+                  </span>
+                </p>
+                
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => { setShowDeleteItemModal(false); setDeletingItem(null); }}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleDeleteItem}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Delete Item
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Portal>
+
+      {/* Delete Category Confirmation Modal */}
+      <Portal>
+        <AnimatePresence>
+          {showDeleteCategoryModal && deletingCategory && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4"
+              onClick={() => { setShowDeleteCategoryModal(false); setDeletingCategory(null); }}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md shadow-2xl"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                    <Trash2 className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-red-600">Delete Category</h3>
+                    <p className="text-slate-500">This action cannot be undone</p>
+                  </div>
+                </div>
+                
+                <p className="mb-6">
+                  Are you sure you want to delete the category <strong>{deletingCategory.name}</strong>?
+                  {deletingCategory.item_count > 0 && (
+                    <span className="block mt-2 text-amber-600">
+                      <AlertTriangle className="w-4 h-4 inline mr-1" />
+                      This category has {deletingCategory.item_count} items. 
+                      Please move or delete the items first.
+                    </span>
+                  )}
+                </p>
+                
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => { setShowDeleteCategoryModal(false); setDeletingCategory(null); }}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleDeleteCategory}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    disabled={deletingCategory.item_count > 0}
+                  >
+                    Delete Category
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Portal>
     </motion.div>
   );
 }
@@ -1073,7 +1242,7 @@ function CategoryModal({ category, onClose, onSave }: CategoryModalProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]"
       onClick={onClose}
     >
       <motion.div

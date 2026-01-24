@@ -23,11 +23,11 @@ CREATE TABLE IF NOT EXISTS staff_shifts (
 );
 
 -- Create indexes
-CREATE INDEX idx_staff_shifts_staff_id ON staff_shifts(staff_id);
-CREATE INDEX idx_staff_shifts_date ON staff_shifts(shift_date);
-CREATE INDEX idx_staff_shifts_status ON staff_shifts(status);
-CREATE INDEX idx_staff_shifts_department ON staff_shifts(department);
-CREATE INDEX idx_staff_shifts_upcoming ON staff_shifts(shift_date, start_time) WHERE status = 'scheduled';
+CREATE INDEX IF NOT EXISTS idx_staff_shifts_staff_id ON staff_shifts(staff_id);
+CREATE INDEX IF NOT EXISTS idx_staff_shifts_date ON staff_shifts(shift_date);
+CREATE INDEX IF NOT EXISTS idx_staff_shifts_status ON staff_shifts(status);
+CREATE INDEX IF NOT EXISTS idx_staff_shifts_department ON staff_shifts(department);
+CREATE INDEX IF NOT EXISTS idx_staff_shifts_upcoming ON staff_shifts(shift_date, start_time) WHERE status = 'scheduled';
 
 -- Staff shift swap requests
 CREATE TABLE IF NOT EXISTS shift_swap_requests (
@@ -43,9 +43,9 @@ CREATE TABLE IF NOT EXISTS shift_swap_requests (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_shift_swaps_requesting ON shift_swap_requests(requesting_staff_id);
-CREATE INDEX idx_shift_swaps_target ON shift_swap_requests(target_staff_id);
-CREATE INDEX idx_shift_swaps_status ON shift_swap_requests(status);
+CREATE INDEX IF NOT EXISTS idx_shift_swaps_requesting ON shift_swap_requests(requesting_staff_id);
+CREATE INDEX IF NOT EXISTS idx_shift_swaps_target ON shift_swap_requests(target_staff_id);
+CREATE INDEX IF NOT EXISTS idx_shift_swaps_status ON shift_swap_requests(status);
 
 -- Time clock entries for manual adjustments
 CREATE TABLE IF NOT EXISTS time_clock_adjustments (
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS time_clock_adjustments (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_time_adjustments_shift ON time_clock_adjustments(shift_id);
+CREATE INDEX IF NOT EXISTS idx_time_adjustments_shift ON time_clock_adjustments(shift_id);
 
 -- Add trigger for updated_at
 CREATE OR REPLACE FUNCTION update_staff_shifts_updated_at()

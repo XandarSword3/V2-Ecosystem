@@ -154,6 +154,45 @@ export function PropertyPanel() {
                             <option value="9999px">Pill</option>
                         </select>
                     </div>
+
+                    <div>
+                        <label className="mb-1 block text-sm">Background Color</label>
+                        <div className="flex gap-2 flex-wrap">
+                            {['transparent', '#ffffff', '#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#1e293b', '#0f172a', '#6366f1', '#8b5cf6', '#ec4899', '#f97316', '#22c55e', '#06b6d4'].map((color) => (
+                                <button
+                                    key={color}
+                                    onClick={() => handleStyleChange('backgroundColor', color)}
+                                    className={`w-7 h-7 rounded border-2 ${(selectedBlock.style?.backgroundColor || 'transparent') === color ? 'border-indigo-600 ring-2 ring-indigo-200' : 'border-slate-300 dark:border-slate-600'}`}
+                                    style={{ backgroundColor: color === 'transparent' ? 'transparent' : color, backgroundImage: color === 'transparent' ? 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)' : 'none', backgroundSize: '8px 8px', backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px' }}
+                                    title={color}
+                                />
+                            ))}
+                        </div>
+                        <input
+                            type="text"
+                            className="w-full mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
+                            value={selectedBlock.style?.backgroundColor || ''}
+                            onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
+                            placeholder="Custom: #hex or rgb()"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-sm">Text Color</label>
+                        <div className="flex gap-2 flex-wrap">
+                            {['#0f172a', '#1e293b', '#334155', '#64748b', '#94a3b8', '#ffffff', '#6366f1', '#8b5cf6', '#ec4899', '#f97316', '#22c55e', '#ef4444'].map((color) => (
+                                <button
+                                    key={color}
+                                    onClick={() => handleStyleChange('color', color)}
+                                    className={`w-7 h-7 rounded border-2 flex items-center justify-center ${(selectedBlock.style?.color || '#0f172a') === color ? 'border-indigo-600 ring-2 ring-indigo-200' : 'border-slate-300 dark:border-slate-600'}`}
+                                    style={{ backgroundColor: '#f8fafc' }}
+                                    title={color}
+                                >
+                                    <span style={{ color, fontWeight: 'bold' }}>A</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                   </div>
                 )}
             </div>
@@ -334,6 +373,116 @@ export function PropertyPanel() {
                         <div className="p-3 bg-green-50 rounded text-sm text-green-700 dark:bg-green-900/20 dark:text-green-400">
                             <p className="font-medium">Booking Calendar Component</p>
                             <p className="mt-1 text-xs">This component displays check-in/check-out date pickers for multi-day bookings.</p>
+                        </div>
+                    )}
+
+                    {selectedBlock.type === 'button' && (
+                        <>
+                            <div>
+                                <label className="mb-1 block text-sm">Button Text</label>
+                                <input 
+                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
+                                    value={selectedBlock.props.text || ''}
+                                    onChange={(e) => handleChange('text', e.target.value)}
+                                    placeholder="Click me"
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm">Link URL</label>
+                                <input 
+                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
+                                    value={selectedBlock.props.href || ''}
+                                    onChange={(e) => handleChange('href', e.target.value)}
+                                    placeholder="/path or https://..."
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm">Button Color</label>
+                                <div className="flex gap-2 flex-wrap">
+                                    {['#6366f1', '#8b5cf6', '#ec4899', '#f97316', '#22c55e', '#06b6d4', '#3b82f6', '#ef4444', '#1e293b', '#ffffff'].map((color) => (
+                                        <button
+                                            key={color}
+                                            onClick={() => handleChange('backgroundColor', color)}
+                                            className={`w-7 h-7 rounded border-2 ${(selectedBlock.props.backgroundColor || '#6366f1') === color ? 'border-indigo-600 ring-2 ring-indigo-200' : 'border-slate-300 dark:border-slate-600'}`}
+                                            style={{ backgroundColor: color }}
+                                            title={color}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm">Button Style</label>
+                                <select 
+                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
+                                    value={selectedBlock.props.variant || 'solid'}
+                                    onChange={(e) => handleChange('variant', e.target.value)}
+                                >
+                                    <option value="solid">Solid</option>
+                                    <option value="outline">Outline</option>
+                                    <option value="ghost">Ghost</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm">Size</label>
+                                <select 
+                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
+                                    value={selectedBlock.props.size || 'md'}
+                                    onChange={(e) => handleChange('size', e.target.value)}
+                                >
+                                    <option value="sm">Small</option>
+                                    <option value="md">Medium</option>
+                                    <option value="lg">Large</option>
+                                </select>
+                            </div>
+                        </>
+                    )}
+
+                    {selectedBlock.type === 'form_container' && (
+                        <>
+                            <div className="p-3 bg-purple-50 rounded text-sm text-purple-700 dark:bg-purple-900/20 dark:text-purple-400">
+                                <p className="font-medium">Form Container</p>
+                                <p className="mt-1 text-xs">Configure form submission settings below. Add form fields as children.</p>
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm">Form Action</label>
+                                <select 
+                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
+                                    value={selectedBlock.props.formAction || 'contact'}
+                                    onChange={(e) => handleChange('formAction', e.target.value)}
+                                >
+                                    <option value="contact">Contact Form</option>
+                                    <option value="reservation">Reservation Request</option>
+                                    <option value="feedback">Feedback Form</option>
+                                    <option value="custom">Custom Endpoint</option>
+                                </select>
+                            </div>
+                            {selectedBlock.props.formAction === 'custom' && (
+                                <div>
+                                    <label className="mb-1 block text-sm">Custom Endpoint URL</label>
+                                    <input 
+                                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
+                                        value={selectedBlock.props.customEndpoint || ''}
+                                        onChange={(e) => handleChange('customEndpoint', e.target.value)}
+                                        placeholder="/api/..."
+                                    />
+                                </div>
+                            )}
+                            <div>
+                                <label className="mb-1 block text-sm">Submit Button Text</label>
+                                <input 
+                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
+                                    value={selectedBlock.props.submitText || ''}
+                                    onChange={(e) => handleChange('submitText', e.target.value)}
+                                    placeholder="Submit"
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    {selectedBlock.type === 'container' && (
+                        <div className="p-3 bg-slate-50 rounded text-sm text-slate-600 dark:bg-slate-700/50 dark:text-slate-400">
+                            <p className="font-medium">Container Block</p>
+                            <p className="mt-1 text-xs">A container for grouping other components. Set layout options in the style section above.</p>
                         </div>
                     )}
                   </div>
