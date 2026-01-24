@@ -7,6 +7,7 @@ interface AuditLogEntry {
   resource: string;
   resource_id?: string;
   entity_id?: string; // Alias for resource_id
+  entity_type?: string;
   details?: unknown;
   old_value?: unknown;
   new_value?: unknown;
@@ -36,3 +37,29 @@ export async function logActivity(entry: AuditLogEntry) {
     logger.error('Error logging activity:', err);
   }
 }
+
+export const activityLogger = {
+  log: async (arg1: string | Partial<AuditLogEntry>, arg2?: any) => {
+    let entry: AuditLogEntry;
+    
+    if (typeof arg1 === 'string') {
+      entry = {
+        action: arg1,
+        user_id: arg2?.userId || arg2?.user_id || 'system',
+        resource: arg2?.resource || 'system',
+        details: arg2,
+        ...arg2
+      } as AuditLogEntry;
+    } else {
+      entry = {
+         user_id: 'system',
+         action: 'unknown',
+         resource: 'system',
+         ...arg1
+      } as AuditLogEntry;
+    }
+    
+    return logActivity(entry);
+  }
+};
+
