@@ -164,21 +164,22 @@ describe('Housekeeping Controller', () => {
   describe('createTask', () => {
     it('should create a new task', async () => {
       mockRequest.body = {
-        taskTypeId: 'type-1',
-        chaletId: 'chalet-1',
+        taskTypeId: '00000000-0000-0000-0000-000000000001',
+        chaletId: '00000000-0000-0000-0000-000000000002',
         priority: 'high',
         notes: 'Deep clean needed',
       };
 
       const createdTask = {
         id: 'task-new',
-        task_type_id: 'type-1',
-        chalet_id: 'chalet-1',
+        task_type_id: '00000000-0000-0000-0000-000000000001',
+        chalet_id: '00000000-0000-0000-0000-000000000002',
         status: 'pending',
         priority: 'high',
         notes: 'Deep clean needed',
       };
 
+      mockBuilder.queueResponse({ name: 'Clean' }, null);
       mockBuilder.queueResponse(createdTask, null);
 
       await controller.createTask(
@@ -192,7 +193,7 @@ describe('Housekeeping Controller', () => {
 
     it('should reject invalid priority', async () => {
       mockRequest.body = {
-        taskTypeId: 'type-1',
+        taskTypeId: '00000000-0000-0000-0000-000000000001',
         priority: 'invalid',
       };
 
@@ -209,7 +210,7 @@ describe('Housekeeping Controller', () => {
   describe('assignTask', () => {
     it('should assign task to staff', async () => {
       mockRequest.params = { id: 'task-1' };
-      mockRequest.body = { staffId: 'staff-456' };
+      mockRequest.body = { staffId: '00000000-0000-0000-0000-000000000003' };
 
       const updatedTask = {
         id: 'task-1',
@@ -229,7 +230,7 @@ describe('Housekeeping Controller', () => {
 
     it('should return 404 for non-existent task', async () => {
       mockRequest.params = { id: 'non-existent' };
-      mockRequest.body = { staffId: 'staff-456' };
+      mockRequest.body = { staffId: '00000000-0000-0000-0000-000000000003' };
 
       mockBuilder.queueResponse(null, { code: 'PGRST116' });
 
@@ -279,7 +280,7 @@ describe('Housekeeping Controller', () => {
 
       mockBuilder.queueResponse(mockStaff, null);
 
-      await controller.getStaff(
+      await controller.getAvailableStaff(
         mockRequest as Request,
         mockResponse as Response
       );
@@ -288,7 +289,7 @@ describe('Housekeeping Controller', () => {
     });
   });
 
-  describe('getDashboard', () => {
+  describe('getStats', () => {
     it('should return dashboard summary', async () => {
       // Get pending tasks
       mockBuilder.queueResponse([{ id: 't1' }, { id: 't2' }], null, 5);
@@ -297,7 +298,7 @@ describe('Housekeeping Controller', () => {
       // Get completed today
       mockBuilder.queueResponse([{ id: 't4' }, { id: 't5' }], null, 10);
 
-      await controller.getDashboard(
+      await controller.getStats(
         mockRequest as Request,
         mockResponse as Response
       );

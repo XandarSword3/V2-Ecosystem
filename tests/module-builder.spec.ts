@@ -13,7 +13,7 @@ test.describe('Module Builder V2', () => {
 
   test.beforeEach(async ({ request }) => {
     // 1. Login to get token
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
@@ -21,7 +21,7 @@ test.describe('Module Builder V2', () => {
     
     // 2. Create a test module
     moduleSlug = `test-module-${Date.now()}`;
-    const createRes = await request.post(`${API_URL}/api/admin/modules`, {
+    const createRes = await request.post(`${API_URL}/api/v1/admin/modules`, {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         name: 'Auto Test Module',
@@ -38,7 +38,7 @@ test.describe('Module Builder V2', () => {
         moduleId = mod.data.id;
     } else {
         // Fallback: fetch existing if creation failed
-        const list = await request.get(`${API_URL}/api/admin/modules`, {
+        const list = await request.get(`${API_URL}/api/v1/admin/modules`, {
              headers: { Authorization: `Bearer ${token}` }
         });
         const listData = await list.json();

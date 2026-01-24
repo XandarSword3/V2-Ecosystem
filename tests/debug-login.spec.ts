@@ -3,109 +3,72 @@ import { test, expect } from '@playwright/test';
 const FRONTEND_URL = 'http://localhost:3000';
 const API_URL = 'http://localhost:3005';
 
-test('Debug admin login flow', async ({ page }) => {
-  // First, let's login via API directly
-  const loginResponse = await page.request.post(`${API_URL}/api/auth/login`, {
-    data: {
-      email: 'admin@v2resort.com',
-      password: 'admin123'
-    }
+test('debug login flow', async ({ page, request }) => {
+  // First verify API is working
+  const apiResponse = await request.post(`${API_URL}/api/v1/auth/login`, {
+    data: { email: 'admin@v2resort.com', password: 'admin123' }
   });
+  const apiData = await apiResponse.json();
+  console.log('API Login Response:', JSON.stringify(apiData, null, 2));
+  expect(apiResponse.ok()).toBe(true);
   
-  const loginData = await loginResponse.json();
-  console.log('API Login response:', JSON.stringify(loginData, null, 2));
-  
-  if (loginData.success && loginData.data) {
-    const { tokens, user } = loginData.data;
-    
-    // Navigate to the frontend
-    await page.goto(`${FRONTEND_URL}/login`);
-    
-    // Set localStorage before navigation
-    await page.evaluate(({ accessToken, refreshToken, userData }) => {
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('user', JSON.stringify(userData));
-    }, { 
-      accessToken: tokens.accessToken, 
-      refreshToken: tokens.refreshToken, 
-      userData: user 
-    });
-    
-    // Now navigate to admin
-    await page.goto(`${FRONTEND_URL}/admin`);
-    await page.waitForTimeout(3000);
-    
-    // Take screenshot
-    await page.screenshot({ path: 'test-results/debug-admin-after-localstorage.png' });
-    
-    // Check current URL
-    console.log('Current URL after localStorage set:', page.url());
-    
-    // Check page content
-    const pageContent = await page.content();
-    console.log('Page has dashboard:', pageContent.includes('Dashboard'));
-    console.log('Page has login:', pageContent.includes('Sign in'));
-    
-    // Check if we're on admin page
-    expect(page.url()).toContain('/admin');
-    
-    // Check for admin dashboard content
-    await expect(page.locator('text=/Welcome|Dashboard|Today\'s/i').first()).toBeVisible({ timeout: 10000 });
-  } else {
-    console.log('Login failed:', loginData);
-  }
-});
-
-test('Debug UI login flow', async ({ page }) => {
+  // Now test UI login
   await page.goto(`${FRONTEND_URL}/login`);
   
-  // Wait for form
-  await page.waitForSelector('input[type="email"]');
+  // Take screenshot
+  await page.screenshot({ path: 'test-results/login-page.png' });
   
-  // Fill form
-  await page.locator('input[type="email"]').fill('admin@v2resort.com');
-  await page.locator('input[type="password"]').fill('admin123');
+  // Check what inputs are available
+  const emailInputs = await page.locator('input').all();
+  console.log('Number of inputs found:', emailInputs.length);
   
-  // Setup network logging
-  page.on('response', response => {
-    if (response.url().includes('/api/auth/login')) {
-      console.log('Login API response status:', response.status());
+  for (const input of emailInputs) {
+    const type = await input.getAttribute('type');
+    const name = await input.getAttribute('name');
+    const id = await input.getAttribute('id');
+    console.log(`Input: type=${type}, name=${name}, id=${id}`);
+  }
+  
+  // Fill the form
+  const emailInput = page.locator('input[type="email"], input[name="email"]').first();
+  const passwordInput = page.locator('input[type="password"]').first();
+  
+  await emailInput.fill('admin@v2resort.com');
+  await passwordInput.fill('admin123');
+  
+  // Take screenshot before submit
+  await page.screenshot({ path: 'test-results/before-submit.png' });
+  
+  // Listen for network requests
+  page.on('request', req => {
+    if (req.url().includes('/auth/login')) {
+      console.log('Login request:', req.url(), req.method());
     }
   });
   
-  // Click login and wait
-  await page.locator('button[type="submit"]').click();
-  
-  // Wait for any navigation
-  await page.waitForTimeout(5000);
-  
-  console.log('URL after login:', page.url());
-  
-  // Check localStorage
-  const localStorage = await page.evaluate(() => {
-    return {
-      accessToken: window.localStorage.getItem('accessToken'),
-      user: window.localStorage.getItem('user'),
-    };
+  page.on('response', res => {
+    if (res.url().includes('/auth/login')) {
+      console.log('Login response:', res.status(), res.url());
+    }
   });
-  console.log('LocalStorage after login:', JSON.stringify(localStorage, null, 2));
   
-  // Take screenshot
-  await page.screenshot({ path: 'test-results/debug-ui-login.png' });
+  // Click submit
+  const submitBtn = page.locator('button[type="submit"]');
+  await submitBtn.click();
   
-  // Wait more for page to load
+  // Wait for response
   await page.waitForTimeout(3000);
   
-  // Check page content
-  const hasLogin = await page.locator('text=/Sign in|Login|Welcome Back/i').first().isVisible().catch(() => false);
-  const hasDashboard = await page.locator('text=/Online Users|Today\'s Orders|Today\'s Revenue/i').first().isVisible().catch(() => false);
-  console.log('Has login page:', hasLogin);
-  console.log('Has dashboard:', hasDashboard);
+  // Check for errors
+  const alerts = await page.locator('[role="alert"]').all();
+  for (const alert of alerts) {
+    const text = await alert.textContent();
+    console.log('Alert message:', text);
+  }
   
-  // Take another screenshot
-  await page.screenshot({ path: 'test-results/debug-ui-login-final.png' });
+  // Take screenshot after submit
+  await page.screenshot({ path: 'test-results/after-submit.png' });
   
-  // The test should show dashboard
-  expect(hasDashboard).toBe(true);
+  // Check final URL
+  console.log('Final URL:', page.url());
 });

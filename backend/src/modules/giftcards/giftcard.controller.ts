@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
+import { emailService } from '../../services/email.service.js';
+import { logger } from '../../utils/logger.js';
 
 // Validation schemas
 const createGiftCardSchema = z.object({
@@ -18,9 +20,16 @@ const createGiftCardSchema = z.object({
 const purchaseGiftCardSchema = z.object({
   templateId: z.string().uuid().optional(),
   amount: z.number().positive().min(10).max(1000).optional(),
+  customAmount: z.number().positive().min(10).max(1000).optional(),
   recipientEmail: z.string().email(),
-  recipientName: z.string().max(100),
+  recipientName: z.string().max(100).optional(),
+  senderName: z.string().max(100).optional(),
   message: z.string().max(500).optional(),
+  personalMessage: z.string().max(500).optional(),
+  isGuestPurchase: z.boolean().optional(),
+  senderEmail: z.string().email().optional(),
+}).refine(data => data.templateId || data.amount || data.customAmount, {
+  message: "Either 'templateId', 'amount', or 'customAmount' is required",
 });
 
 const redeemGiftCardSchema = z.object({
@@ -85,12 +94,13 @@ export class GiftCardController {
         });
       }
 
-      const { templateId, amount, recipientEmail, recipientName, message } = validation.data;
+      const { templateId, amount, customAmount, recipientEmail, recipientName, senderName, message, personalMessage } = validation.data;
       const userId = (req as any).user?.id;
       const supabase = getSupabase();
 
-      // Get amount from template or use provided amount
-      let finalAmount = amount;
+      // Get amount from template or use provided amount or customAmount
+      let finalAmount = amount || customAmount;
+      const finalMessage = message || personalMessage;
       if (templateId) {
         const { data: template, error: templateError } = await supabase
           .from('gift_card_templates')
@@ -126,39 +136,67 @@ export class GiftCardController {
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-      // Create gift card
+      // Create gift card - using correct DB column names
       const { data: giftCard, error: insertError } = await supabase
         .from('gift_cards')
         .insert({
           code,
-          initial_balance: finalAmount,
+          initial_value: finalAmount,
           current_balance: finalAmount,
           status: 'active',
-          purchaser_id: userId,
+          purchased_by: userId || null,
           recipient_email: recipientEmail,
-          recipient_name: recipientName,
-          message,
+          recipient_name: recipientName || null,
+          personal_message: finalMessage || null,
+          sender_name: senderName || null,
           expires_at: expiresAt.toISOString(),
-          activated_at: new Date().toISOString(),
         })
         .select()
         .single();
 
       if (insertError) throw insertError;
 
-      // Log purchase transaction
+      // Log purchase transaction - using correct DB column names
       await supabase
         .from('gift_card_transactions')
         .insert({
           gift_card_id: giftCard.id,
-          type: 'purchase',
+          transaction_type: 'purchase',
           amount: finalAmount,
           balance_after: finalAmount,
           notes: 'Gift card purchased',
-          created_by: userId,
+          performed_by: userId,
         });
 
-      // TODO: Send email to recipient with the gift card code
+      // Send email to recipient with the gift card code
+      if (recipientEmail) {
+        // Get purchaser name for the email
+        let senderName: string | undefined;
+        if (userId) {
+          const { data: purchaser } = await supabase
+            .from('users')
+            .select('full_name')
+            .eq('id', userId)
+            .single();
+          senderName = purchaser?.full_name;
+        }
+
+        const emailSent = await emailService.sendGiftCard({
+          recipientEmail,
+          recipientName: recipientName || 'Valued Guest',
+          senderName,
+          code: giftCard.code,
+          amount: finalAmount,
+          message,
+          expiresAt: giftCard.expires_at,
+        });
+
+        if (!emailSent) {
+          logger.warn(`Gift card email failed to send for code ${giftCard.code}`);
+        } else {
+          logger.info(`Gift card email sent to ${recipientEmail}`);
+        }
+      }
 
       res.status(201).json({
         success: true,

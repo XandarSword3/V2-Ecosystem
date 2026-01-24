@@ -531,7 +531,7 @@ export default function LoyaltyAdminPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]"
             onClick={() => setShowAdjustModal(false)}
           >
             <motion.div
@@ -582,6 +582,240 @@ export default function LoyaltyAdminPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Tier Create/Edit Modal */}
+      <AnimatePresence>
+        {showTierModal && (
+          <TierModal
+            tier={editingTier}
+            onClose={() => { setShowTierModal(false); setEditingTier(null); }}
+            onSave={async (tierData) => {
+              try {
+                if (editingTier) {
+                  const res = await api.put(`/loyalty/tiers/${editingTier.id}`, tierData);
+                  if (res.data.success) {
+                    toast.success('Tier updated');
+                  }
+                } else {
+                  const res = await api.post('/loyalty/tiers', tierData);
+                  if (res.data.success) {
+                    toast.success('Tier created');
+                  }
+                }
+                setShowTierModal(false);
+                setEditingTier(null);
+                loadData();
+              } catch (error) {
+                toast.error('Failed to save tier');
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// Tier Modal Component
+interface TierModalProps {
+  tier: LoyaltyTier | null;
+  onClose: () => void;
+  onSave: (data: Partial<LoyaltyTier>) => Promise<void>;
+}
+
+function TierModal({ tier, onClose, onSave }: TierModalProps) {
+  const [form, setForm] = useState({
+    name: tier?.name || '',
+    min_points: tier?.min_points?.toString() || '0',
+    points_multiplier: tier?.points_multiplier?.toString() || '1',
+    color: tier?.color || '#3b82f6',
+    benefits: tier?.benefits || {},
+    is_active: tier?.is_active ?? true,
+  });
+  const [saving, setSaving] = useState(false);
+  const [benefitKey, setBenefitKey] = useState('');
+  const [benefitValue, setBenefitValue] = useState('');
+
+  const handleSubmit = async () => {
+    if (!form.name) {
+      toast.error('Name is required');
+      return;
+    }
+    setSaving(true);
+    await onSave({
+      name: form.name,
+      min_points: parseInt(form.min_points) || 0,
+      points_multiplier: parseFloat(form.points_multiplier) || 1,
+      color: form.color,
+      benefits: form.benefits,
+      is_active: form.is_active,
+    });
+    setSaving(false);
+  };
+
+  const addBenefit = () => {
+    if (benefitKey && benefitValue) {
+      setForm(f => ({
+        ...f,
+        benefits: { ...f.benefits, [benefitKey]: benefitValue }
+      }));
+      setBenefitKey('');
+      setBenefitValue('');
+    }
+  };
+
+  const removeBenefit = (key: string) => {
+    setForm(f => {
+      const newBenefits = { ...f.benefits };
+      delete newBenefits[key];
+      return { ...f, benefits: newBenefits };
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
+      >
+        <h3 className="text-xl font-bold mb-6">{tier ? 'Edit Tier' : 'Create Tier'}</h3>
+        
+        <div className="space-y-4">
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Tier Name *</label>
+            <Input
+              placeholder="e.g., Gold, Platinum, Diamond"
+              value={form.name}
+              onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+            />
+          </div>
+
+          {/* Min Points & Multiplier */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Minimum Points</label>
+              <Input
+                type="number"
+                min="0"
+                value={form.min_points}
+                onChange={(e) => setForm(f => ({ ...f, min_points: e.target.value }))}
+              />
+              <p className="text-xs text-slate-500 mt-1">Points needed to reach this tier</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Points Multiplier</label>
+              <Input
+                type="number"
+                min="1"
+                step="0.1"
+                value={form.points_multiplier}
+                onChange={(e) => setForm(f => ({ ...f, points_multiplier: e.target.value }))}
+              />
+              <p className="text-xs text-slate-500 mt-1">Earning multiplier (e.g., 1.5x)</p>
+            </div>
+          </div>
+
+          {/* Color */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Tier Color</label>
+            <div className="flex gap-3 items-center">
+              <input
+                type="color"
+                value={form.color}
+                onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))}
+                className="w-12 h-10 rounded cursor-pointer"
+              />
+              <Input
+                value={form.color}
+                onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))}
+                placeholder="#3b82f6"
+                className="flex-1"
+              />
+              <div 
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: form.color + '20', color: form.color }}
+              >
+                <Star className="w-5 h-5" />
+              </div>
+            </div>
+          </div>
+
+          {/* Benefits */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Benefits</label>
+            <div className="space-y-2 mb-3">
+              {Object.entries(form.benefits).map(([key, value]) => (
+                <div key={key} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 p-2 rounded">
+                  <span className="font-medium">{key}:</span>
+                  <span className="flex-1">{String(value)}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => removeBenefit(key)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Benefit name"
+                value={benefitKey}
+                onChange={(e) => setBenefitKey(e.target.value)}
+                className="flex-1"
+              />
+              <Input
+                placeholder="Value"
+                value={benefitValue}
+                onChange={(e) => setBenefitValue(e.target.value)}
+                className="flex-1"
+              />
+              <Button variant="outline" onClick={addBenefit}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              e.g., "Free Pool Entry" → "2 per month", "Discount" → "10%"
+            </p>
+          </div>
+
+          {/* Active Status */}
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="tier-active"
+              checked={form.is_active}
+              onChange={(e) => setForm(f => ({ ...f, is_active: e.target.checked }))}
+              className="w-4 h-4 rounded"
+            />
+            <label htmlFor="tier-active" className="text-sm font-medium">
+              Active (visible to customers)
+            </label>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={saving}>
+            {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
+            {tier ? 'Update Tier' : 'Create Tier'}
+          </Button>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }

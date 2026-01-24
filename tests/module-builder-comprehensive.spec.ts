@@ -44,7 +44,7 @@ async function loginAsAdmin(page: Page): Promise<boolean> {
 
 async function createTestModule(request: any): Promise<{ id: string; slug: string }> {
   // Login to get token
-  const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+  const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
     data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
   });
   const loginData = await loginRes.json();
@@ -52,7 +52,7 @@ async function createTestModule(request: any): Promise<{ id: string; slug: strin
   
   // Create a unique test module
   const slug = `e2e-builder-test-${Date.now()}`;
-  const createRes = await request.post(`${API_URL}/api/admin/modules`, {
+  const createRes = await request.post(`${API_URL}/api/v1/admin/modules`, {
     headers: { Authorization: `Bearer ${token}` },
     data: {
       name: 'E2E Builder Test Module',
@@ -70,7 +70,7 @@ async function createTestModule(request: any): Promise<{ id: string; slug: strin
   }
   
   // Fallback: find existing test module
-  const listRes = await request.get(`${API_URL}/api/admin/modules`, {
+  const listRes = await request.get(`${API_URL}/api/v1/admin/modules`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   const listData = await listRes.json();
@@ -84,13 +84,13 @@ async function createTestModule(request: any): Promise<{ id: string; slug: strin
 }
 
 async function deleteTestModule(request: any, moduleId: string): Promise<void> {
-  const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+  const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
     data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
   });
   const loginData = await loginRes.json();
   const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
   
-  await request.delete(`${API_URL}/api/admin/modules/${moduleId}`, {
+  await request.delete(`${API_URL}/api/v1/admin/modules/${moduleId}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 }
@@ -867,14 +867,14 @@ test.describe('Module Builder - Template Types', () => {
   
   test('Menu service template includes menu components', async ({ page, request }) => {
     // Create menu_service module
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
     const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
     
     const slug = `e2e-menu-service-${Date.now()}`;
-    const createRes = await request.post(`${API_URL}/api/admin/modules`, {
+    const createRes = await request.post(`${API_URL}/api/v1/admin/modules`, {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         name: 'E2E Menu Service Test',
@@ -895,21 +895,21 @@ test.describe('Module Builder - Template Types', () => {
       await expect(page.getByRole('button', { name: 'Menu List' })).toBeVisible();
       
       // Cleanup
-      await request.delete(`${API_URL}/api/admin/modules/${mod.data.id}`, {
+      await request.delete(`${API_URL}/api/v1/admin/modules/${mod.data.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
     }
   });
 
   test('Session access template includes session components', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
     const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
     
     const slug = `e2e-session-access-${Date.now()}`;
-    const createRes = await request.post(`${API_URL}/api/admin/modules`, {
+    const createRes = await request.post(`${API_URL}/api/v1/admin/modules`, {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         name: 'E2E Session Access Test',
@@ -930,21 +930,21 @@ test.describe('Module Builder - Template Types', () => {
       await expect(page.getByRole('button', { name: 'Sessions' })).toBeVisible();
       
       // Cleanup
-      await request.delete(`${API_URL}/api/admin/modules/${mod.data.id}`, {
+      await request.delete(`${API_URL}/api/v1/admin/modules/${mod.data.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
     }
   });
 
   test('Multi-day booking template includes calendar components', async ({ page, request }) => {
-    const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+    const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
     const loginData = await loginRes.json();
     const token = loginData.data?.tokens?.accessToken || loginData.data?.accessToken;
     
     const slug = `e2e-multi-day-${Date.now()}`;
-    const createRes = await request.post(`${API_URL}/api/admin/modules`, {
+    const createRes = await request.post(`${API_URL}/api/v1/admin/modules`, {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         name: 'E2E Multi-Day Booking Test',
@@ -965,7 +965,7 @@ test.describe('Module Builder - Template Types', () => {
       await expect(page.getByRole('button', { name: 'Calendar' })).toBeVisible();
       
       // Cleanup
-      await request.delete(`${API_URL}/api/admin/modules/${mod.data.id}`, {
+      await request.delete(`${API_URL}/api/v1/admin/modules/${mod.data.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
     }

@@ -553,7 +553,11 @@
       "loginFailed": "Échec de la connexion. Veuillez réessayer.",
       "demoCredentials": "Identifiants de Démonstration",
       "superAdmin": "Super Administrateur",
-      "orContinueWith": "Ou continuer avec"
+      "orContinueWith": "Ou continuer avec",
+      "continueWithGoogle": "Continuer avec Google",
+      "continueWithApple": "Continuer avec Apple",
+      "continueWithFacebook": "Continuer avec Facebook",
+      "facebookComingSoon": "Facebook (Bientôt disponible)"
     },
     "register": {
       "title": "Créer un Compte",
@@ -1372,6 +1376,94 @@
       "loggedOutSuccessfully": "Déconnexion réussie"
     }
   },
+  "moduleBuilder": {
+    "title": "Constructeur de Modules",
+    "visualEditor": "Éditeur Visuel",
+    "backToEdit": "Retour à l'édition",
+    "preview": "Aperçu",
+    "save": "Enregistrer la mise en page",
+    "saving": "Enregistrement...",
+    "saveSuccess": "Mise en page enregistrée avec succès",
+    "saveFailed": "Échec de l'enregistrement",
+    "addComponent": "Ajouter un composant:",
+    "noLayout": "Aucune mise en page définie pour ce module.",
+    "noSelection": "Aucun composant sélectionné",
+    "selectComponent": "Cliquez sur un composant pour modifier ses propriétés",
+    "dragHint": "Glissez des composants depuis la barre d'outils ou cliquez pour ajouter",
+    "startHint": "Commencez par ajouter une Section Hero ou une Grille",
+    "properties": "Propriétés",
+    "general": "Général",
+    "label": "Libellé",
+    "dimensionsSpacing": "Dimensions et Espacement",
+    "width": "Largeur",
+    "height": "Hauteur",
+    "padding": "Marge intérieure",
+    "borderRadius": "Rayon de bordure",
+    "backgroundColor": "Couleur de fond",
+    "textColor": "Couleur du texte",
+    "components": {
+      "hero": "Section Hero",
+      "textBlock": "Bloc de Texte",
+      "button": "Bouton",
+      "image": "Image",
+      "grid": "Grille / Cartes",
+      "menuList": "Liste de Menu",
+      "sessions": "Sessions",
+      "container": "Conteneur",
+      "form": "Formulaire",
+      "calendar": "Calendrier"
+    },
+    "heroSettings": {
+      "title": "Titre",
+      "subtitle": "Sous-titre",
+      "backgroundImage": "URL de l'image de fond",
+      "textAlign": "Alignement du texte"
+    },
+    "gridSettings": {
+      "dataSource": "Source de données",
+      "columns": "Colonnes",
+      "gap": "Espacement"
+    },
+    "textSettings": {
+      "content": "Contenu",
+      "fontSize": "Taille de police"
+    },
+    "imageSettings": {
+      "src": "URL de l'image",
+      "alt": "Texte alternatif",
+      "objectFit": "Ajustement de l'objet"
+    },
+    "buttonSettings": {
+      "text": "Texte du bouton",
+      "link": "URL du lien",
+      "color": "Couleur du bouton",
+      "style": "Style du bouton",
+      "size": "Taille"
+    },
+    "formSettings": {
+      "title": "Conteneur de Formulaire",
+      "description": "Configurez les paramètres de soumission ci-dessous.",
+      "action": "Action du formulaire",
+      "customEndpoint": "URL du point de terminaison personnalisé",
+      "submitText": "Texte du bouton de soumission"
+    },
+    "menuListInfo": {
+      "title": "Composant Liste de Menu",
+      "description": "Ce composant affiche automatiquement les éléments de menu du module actuel."
+    },
+    "sessionListInfo": {
+      "title": "Composant Liste de Sessions",
+      "description": "Ce composant affiche les sessions réservables avec un sélecteur de date."
+    },
+    "calendarInfo": {
+      "title": "Composant Calendrier de Réservation",
+      "description": "Ce composant affiche les sélecteurs de dates d'arrivée/départ."
+    },
+    "containerInfo": {
+      "title": "Bloc Conteneur",
+      "description": "Un conteneur pour regrouper d'autres composants."
+    }
+  },
   "staff": {
     "portal": "Portail du Personnel",
     "navigation": "Navigation",
@@ -1569,6 +1661,7 @@
     "privacyPolicy": "Politique de Confidentialité",
     "termsOfService": "Conditions d'Utilisation",
     "cancellationPolicy": "Politique d'Annulation",
+    "giftCards": "Cartes Cadeaux",
     "contact": "Contact",
     "address": "V2 Resort, Liban",
     "phone": "+961 XX XXX XXX",

@@ -1,7 +1,0 @@
--- Migration: All Grants
--- Date: 2026-01-17
-
-GRANT EXECUTE ON FUNCTION redeem_giftcard_atomic TO service_role;
-GRANT EXECUTE ON FUNCTION redeem_loyalty_points_atomic TO service_role;
-GRANT EXECUTE ON FUNCTION earn_loyalty_points_atomic TO service_role;
-GRANT EXECUTE ON FUNCTION apply_coupon_atomic TO service_role;

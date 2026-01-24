@@ -155,8 +155,60 @@ export async function waitForServices(
 export async function seedTestDatabase(): Promise<void> {
   const { Pool } = await import('pg');
   const bcrypt = await import('bcryptjs');
+  const { migrate } = await import('../../src/database/migrate');
 
   const pool = new Pool({ connectionString: getTestDatabaseUrl() });
+
+  // Clean database to ensure fresh state
+  try {
+    console.log('Cleaning test database...');
+    await pool.query(`
+      DROP SCHEMA IF EXISTS public CASCADE;
+      CREATE SCHEMA public;
+      DROP SCHEMA IF EXISTS auth CASCADE;
+      CREATE SCHEMA IF NOT EXISTS auth;
+      
+      -- Mock auth.uid() function for RLS policies
+      CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS $$
+      BEGIN
+        RETURN '11111111-1111-1111-1111-111111111111'::uuid;
+      END;
+      $$ LANGUAGE plpgsql STABLE;
+
+      -- Create Supabase roles if they don't exist
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'anon') THEN
+          CREATE ROLE anon;
+        END IF;
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticated') THEN
+          CREATE ROLE authenticated;
+        END IF;
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
+          CREATE ROLE service_role;
+        END IF;
+      END
+      $$;
+
+      GRANT ALL ON SCHEMA public TO public;
+      GRANT ALL ON SCHEMA auth TO public;
+      GRANT ALL ON SCHEMA public TO v2resort_test;
+      GRANT ALL ON SCHEMA auth TO v2resort_test;
+    `);
+  } catch (err) {
+    console.warn('Warning: Database cleanup encountered an issue:', err);
+  }
+
+  // Run migrations first
+  try {
+    console.log('Running migrations for test database...');
+    await migrate();
+    console.log('✅ Test database migrated successfully');
+  } catch (error) {
+    console.error('❌ Test database migration failed:', error);
+    throw error;
+  }
+
 
   try {
     // Create password hashes

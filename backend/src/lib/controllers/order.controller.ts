@@ -104,7 +104,7 @@ export function createOrderController(deps: OrderControllerDeps): OrderControlle
           return;
         }
 
-        const result = await orderService.createOrder(validation.data);
+        const result = await orderService.createOrder(validation.data as any);
 
         res.status(201).json({
           success: true,

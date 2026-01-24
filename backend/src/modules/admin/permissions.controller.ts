@@ -1,37 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from "../../database/connection";
 import { logActivity } from "../../utils/activityLogger";
-import type { PermissionRow } from './types.js';
+// import type { PermissionRow } from './types.js'; // Deprecated
 
 // -- Permissions --
-
-interface NormalizedPermission extends Omit<PermissionRow, 'slug' | 'module_slug'> {
-  slug: string | null;
-  module_slug: string | null;
-}
 
 export async function getAllPermissions(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
-    // Do not rely on DB-side ordering or nullable columns; fetch raw rows and normalize in code
+    // Fetch from new app_permissions table
     const { data, error } = await supabase
-      .from('permissions')
-      .select('*');
+      .from('app_permissions')
+      .select('slug, description, module_slug, created_at')
+      .order('module_slug', { ascending: true })
+      .order('slug', { ascending: true });
 
     if (error) throw error;
 
-    const normalized = (data || []).map((p: PermissionRow): NormalizedPermission => {
-      const slug = p.slug ?? p.name ?? (p.resource && p.action ? `${p.resource}.${p.action}` : null);
-      const module_slug = p.module_slug ?? p.resource ?? (slug ? String(slug).split('.')[0] : null);
-      return { ...p, slug, module_slug };
-    }).sort((a: NormalizedPermission, b: NormalizedPermission) => {
-      const ma = a.module_slug || '';
-      const mb = b.module_slug || '';
-      if (ma === mb) return String(a.slug || '').localeCompare(String(b.slug || ''));
-      return ma.localeCompare(mb);
-    });
-
-    res.json({ success: true, data: normalized });
+    res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
@@ -44,16 +30,27 @@ export async function getRolePermissions(req: Request, res: Response, next: Next
     const supabase = getSupabase();
     const { id } = req.params; // role_id
 
+    // 1. Resolve role name from ID
+    const { data: roleData, error: roleError } = await supabase
+       .from('roles')
+       .select('name')
+       .eq('id', id)
+       .single();
+
+    if (roleError || !roleData) {
+        return res.status(404).json({ success: false, error: 'Role not found' });
+    }
+
     const { data, error } = await supabase
-      .from('role_permissions')
-      .select('permission_id')
-      .eq('role_id', id);
+      .from('app_role_permissions')
+      .select('permission_slug')
+      .eq('role_name', roleData.name);
 
     if (error) throw error;
     
-    // Return array of permission IDs
-    const permissionIds = data.map(d => d.permission_id);
-    res.json({ success: true, data: permissionIds });
+    // Return array of permission slugs
+    const permissionSlugs = data.map(d => d.permission_slug);
+    res.json({ success: true, data: permissionSlugs });
   } catch (error) {
     next(error);
   }
@@ -63,25 +60,37 @@ export async function updateRolePermissions(req: Request, res: Response, next: N
   try {
     const supabase = getSupabase();
     const { id } = req.params; // role_id
-    const { permission_ids } = req.body; // Array of UUIDs
+    const { permission_slugs } = req.body; // Array of strings (slugs)
 
-    // 1. Delete all existing for this role
+    // 1. Resolve role name
+    const { data: roleData, error: roleError } = await supabase
+       .from('roles')
+       .select('name')
+       .eq('id', id)
+       .single();
+
+    if (roleError || !roleData) {
+        return res.status(404).json({ success: false, error: 'Role not found' });
+    }
+    const roleName = roleData.name;
+
+    // 2. Delete all existing for this role
     const { error: delError } = await supabase
-      .from('role_permissions')
+      .from('app_role_permissions')
       .delete()
-      .eq('role_id', id);
+      .eq('role_name', roleName);
     
     if (delError) throw delError;
 
-    // 2. Insert new
-    if (permission_ids && permission_ids.length > 0) {
-      const inserts = permission_ids.map((pid: string) => ({
-        role_id: id,
-        permission_id: pid
+    // 3. Insert new
+    if (permission_slugs && permission_slugs.length > 0) {
+      const inserts = permission_slugs.map((slug: string) => ({
+        role_name: roleName,
+        permission_slug: slug
       }));
       
       const { error: insError } = await supabase
-        .from('role_permissions')
+        .from('app_role_permissions')
         .insert(inserts);
       
       if (insError) throw insError;
@@ -92,7 +101,7 @@ export async function updateRolePermissions(req: Request, res: Response, next: N
       action: 'UPDATE_ROLE_PERMISSIONS',
       resource: 'roles',
       resource_id: id,
-      new_value: { permission_ids }
+      new_value: { permission_slugs, role_name: roleName }
     });
     res.json({ success: true, message: 'Role permissions updated' });
   } catch (error) {
@@ -102,42 +111,7 @@ export async function updateRolePermissions(req: Request, res: Response, next: N
 
 // -- User Overrides --
 
+// DEPRECATED/TODO: Update to use new app_* tables if user overrides are strict requirement
 export async function updateUserPermissions(req: Request, res: Response, next: NextFunction) {
-  try {
-    const supabase = getSupabase();
-    const { id } = req.params; // user_id
-    const { permissions } = req.body; 
-    // Expect body: { permissions: [{ permission_id: '...', is_granted: true }] }
-
-    // 1. Delete all existing overrides
-    const { error: delError } = await supabase
-      .from('user_permissions')
-      .delete()
-      .eq('user_id', id);
-
-    if (delError) throw delError;
-
-    // 2. Insert new
-    if (permissions && permissions.length > 0) {
-        interface PermissionOverride {
-          permission_id: string;
-          is_granted: boolean;
-        }
-        const inserts = permissions.map((p: PermissionOverride) => ({
-            user_id: id,
-            permission_id: p.permission_id,
-            is_granted: p.is_granted
-        }));
-        
-        const { error: insError } = await supabase
-            .from('user_permissions')
-            .insert(inserts);
-        
-        if (insError) throw insError;
-    }
-
-    res.json({ success: true, message: 'User permission overrides updated' });
-  } catch (error) {
-    next(error);
-  }
+   return res.status(501).json({ success: false, error: 'User-specific permission overrides are temporarily disabled during migration to app_permissions.' });
 }

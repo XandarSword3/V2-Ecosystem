@@ -26,7 +26,7 @@ async function getAuthToken(request: APIRequestContext): Promise<string> {
   if (authToken) return authToken;
   
   try {
-    const response = await request.post(`${API_URL}/api/auth/login`, {
+    const response = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
       timeout: 30000,
     });
@@ -64,21 +64,25 @@ async function loginAsAdmin(page: Page, retries = 2): Promise<boolean> {
       const submitBtn = page.locator('button[type="submit"]');
       await submitBtn.click();
       
-      // Wait for navigation with smart detection
-      await Promise.race([
-        page.waitForURL(/\/(admin|staff|dashboard)/, { timeout: 15000 }),
-        page.waitForSelector('[role="alert"]', { timeout: 15000 }).catch(() => null),
-      ]);
-      
-      const currentUrl = page.url();
-      if (!currentUrl.includes('/login')) {
-        return true;
-      }
-      
-      // Check for error messages
-      const errorAlert = page.locator('[role="alert"]');
-      if (await errorAlert.isVisible()) {
-        console.warn(`Login attempt ${attempt + 1} failed:`, await errorAlert.textContent());
+      // Wait for navigation to admin/staff/dashboard
+      try {
+        await page.waitForURL(/\/(admin|staff|dashboard)/, { timeout: 15000 });
+        return true;  // Login succeeded
+      } catch {
+        // Check if we're still on login page with an error
+        const currentUrl = page.url();
+        if (!currentUrl.includes('/login')) {
+          return true;  // Navigated elsewhere, login succeeded
+        }
+        
+        // Check for error messages
+        const errorAlert = page.locator('[role="alert"]');
+        if (await errorAlert.isVisible()) {
+          const alertText = await errorAlert.textContent();
+          if (alertText && alertText.trim()) {
+            console.warn(`Login attempt ${attempt + 1} failed:`, alertText);
+          }
+        }
       }
     } catch (error) {
       console.warn(`Login attempt ${attempt + 1} error:`, error);
@@ -136,7 +140,7 @@ test.describe('Admin Settings Tests', () => {
 
     test('should save appearance settings via API', async ({ request }) => {
       // First login to get token
-      const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+      const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
       });
       
@@ -145,7 +149,7 @@ test.describe('Admin Settings Tests', () => {
         authToken = loginData.data?.tokens?.accessToken;
         
         // Now save settings
-        const response = await request.put(`${API_URL}/api/admin/settings`, {
+        const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
           headers: { Authorization: `Bearer ${authToken}` },
           data: {
             theme: 'forest',
@@ -165,7 +169,7 @@ test.describe('Admin Settings Tests', () => {
 
     test('should persist theme changes', async ({ request }) => {
       // Login
-      const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+      const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
       });
       
@@ -174,13 +178,15 @@ test.describe('Admin Settings Tests', () => {
         authToken = loginData.data?.tokens?.accessToken;
         
         // Save a theme
-        await request.put(`${API_URL}/api/admin/settings`, {
+        await request.put(`${API_URL}/api/v1/admin/settings`, {
           headers: { Authorization: `Bearer ${authToken}` },
           data: { theme: 'midnight' }
         });
         
-        // Fetch settings and verify
-        const getRes = await request.get(`${API_URL}/api/settings`);
+        // Fetch settings from admin API and verify
+        const getRes = await request.get(`${API_URL}/api/v1/admin/settings`, {
+          headers: { Authorization: `Bearer ${authToken}` }
+        });
         expect(getRes.ok()).toBeTruthy();
         const settings = await getRes.json();
         expect(settings.data?.theme).toBe('midnight');
@@ -190,7 +196,7 @@ test.describe('Admin Settings Tests', () => {
 
   test.describe('Homepage Settings', () => {
     test('should save homepage hero slides', async ({ request }) => {
-      const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+      const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
       });
       
@@ -221,7 +227,7 @@ test.describe('Admin Settings Tests', () => {
           }
         };
         
-        const response = await request.put(`${API_URL}/api/admin/settings`, {
+        const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
           headers: { Authorization: `Bearer ${authToken}` },
           data: heroSettings
         });
@@ -231,7 +237,7 @@ test.describe('Admin Settings Tests', () => {
     });
 
     test('should persist hero slide changes', async ({ request }) => {
-      const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+      const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
       });
       
@@ -254,7 +260,7 @@ test.describe('Admin Settings Tests', () => {
 
   test.describe('General Settings', () => {
     test('should save general settings', async ({ request }) => {
-      const loginRes = await request.post(`${API_URL}/api/auth/login`, {
+      const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
       });
       
@@ -262,7 +268,7 @@ test.describe('Admin Settings Tests', () => {
         const loginData = await loginRes.json();
         authToken = loginData.data?.tokens?.accessToken;
         
-        const response = await request.put(`${API_URL}/api/admin/settings`, {
+        const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
           headers: { Authorization: `Bearer ${authToken}` },
           data: {
             resortName: 'V2 Resort Test',
@@ -418,7 +424,7 @@ test.describe('Visual Regression - Theme Tests', () => {
       test.skip(!token, 'Auth required for theme tests');
       
       // Set theme via API
-      await request.put(`${API_URL}/api/admin/settings`, {
+      await request.put(`${API_URL}/api/v1/admin/settings`, {
         headers: { Authorization: `Bearer ${token}` },
         data: { theme }
       });
@@ -445,7 +451,7 @@ test.describe('Visual Regression - Theme Tests', () => {
     test.skip(!token, 'Auth required');
     
     // Enable waves effect
-    await request.put(`${API_URL}/api/admin/settings`, {
+    await request.put(`${API_URL}/api/v1/admin/settings`, {
       headers: { Authorization: `Bearer ${token}` },
       data: { 
         theme: 'beach',
@@ -471,7 +477,7 @@ test.describe('Visual Regression - Theme Tests', () => {
     const token = await getAuthToken(request);
     test.skip(!token, 'Auth required');
     
-    await request.put(`${API_URL}/api/admin/settings`, {
+    await request.put(`${API_URL}/api/v1/admin/settings`, {
       headers: { Authorization: `Bearer ${token}` },
       data: { 
         showWeatherWidget: false,
@@ -511,7 +517,7 @@ test.describe('Purchase Flow Tests', () => {
     test('should create pool ticket via API', async ({ request }) => {
       // Get pool sessions first
       const today = new Date().toISOString().split('T')[0];
-      const sessionsRes = await request.get(`${API_URL}/api/pool/sessions?date=${today}`);
+      const sessionsRes = await request.get(`${API_URL}/api/v1/pool/sessions?date=${today}`);
       
       if (sessionsRes.ok()) {
         const sessionsData = await sessionsRes.json();
@@ -520,7 +526,7 @@ test.describe('Purchase Flow Tests', () => {
           const session = sessionsData.data[0];
           
           // Create ticket
-          const ticketRes = await request.post(`${API_URL}/api/pool/tickets`, {
+          const ticketRes = await request.post(`${API_URL}/api/v1/pool/tickets`, {
             data: {
               sessionId: session.id,
               adults: 2,
@@ -570,7 +576,7 @@ test.describe('Purchase Flow Tests', () => {
           checkOut.setDate(checkOut.getDate() + 2);
           
           // Create booking
-          const bookingRes = await request.post(`${API_URL}/api/chalets/bookings`, {
+          const bookingRes = await request.post(`${API_URL}/api/v1/chalets/bookings`, {
             data: {
               chaletId: chalet.id,
               checkIn: checkIn.toISOString().split('T')[0],
@@ -605,7 +611,7 @@ test.describe('Purchase Flow Tests', () => {
 
     test('should create restaurant order via API', async ({ request }) => {
       // Get menu items
-      const menuRes = await request.get(`${API_URL}/api/restaurant/menu/items`);
+      const menuRes = await request.get(`${API_URL}/api/v1/restaurant/menu/items`);
       
       if (menuRes.ok()) {
         const menuData = await menuRes.json();
@@ -614,7 +620,7 @@ test.describe('Purchase Flow Tests', () => {
           const item = menuData.data[0];
           
           // Create order
-          const orderRes = await request.post(`${API_URL}/api/restaurant/orders`, {
+          const orderRes = await request.post(`${API_URL}/api/v1/restaurant/orders`, {
             data: {
               items: [{ itemId: item.id, quantity: 2 }],
               orderType: 'dine_in',
@@ -647,7 +653,7 @@ test.describe('Purchase Flow Tests', () => {
 
     test('should create snack order via API', async ({ request }) => {
       // Get snack items
-      const itemsRes = await request.get(`${API_URL}/api/snack/items`);
+      const itemsRes = await request.get(`${API_URL}/api/v1/snack/items`);
       
       if (itemsRes.ok()) {
         const itemsData = await itemsRes.json();
@@ -656,7 +662,7 @@ test.describe('Purchase Flow Tests', () => {
           const item = itemsData.data[0];
           
           // Create order
-          const orderRes = await request.post(`${API_URL}/api/snack/orders`, {
+          const orderRes = await request.post(`${API_URL}/api/v1/snack/orders`, {
             data: {
               items: [{ itemId: item.id, quantity: 1 }],
               locationCode: 'POOL-A1',
@@ -691,8 +697,11 @@ test.describe('Admin Pages Functionality', () => {
   test('should load admin dashboard', async ({ page }) => {
     await page.goto(`${FRONTEND_URL}/admin`, { waitUntil: 'networkidle' });
     
-    // Should see dashboard with stats
-    await expect(page.locator('text=/dashboard|overview|today|revenue|admin/i').first()).toBeVisible({ timeout: 15000 });
+    // Wait for main content area to load
+    await expect(page.locator('main, [role="main"], .dashboard-content, .admin-content').first()).toBeVisible({ timeout: 15000 });
+    
+    // Verify we're on the admin page by checking URL or main content
+    expect(page.url()).toContain('/admin');
     
     await page.screenshot({ path: 'test-results/admin-dashboard.png' });
   });

@@ -510,7 +510,7 @@ test.describe('Phase 4: Customer Receives & Views Notifications', () => {
 test.describe('Phase 5: Verify Data Persistence', () => {
   
   test('API: Verify notifications endpoint works', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/admin/notifications`);
+    const response = await request.get(`${API_URL}/api/v1/admin/notifications`);
     
     // May require auth
     expect([200, 401, 403]).toContain(response.status());
@@ -522,14 +522,14 @@ test.describe('Phase 5: Verify Data Persistence', () => {
   });
 
   test('API: Verify templates endpoint works', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/admin/notifications/templates`);
+    const response = await request.get(`${API_URL}/api/v1/admin/notifications/templates`);
     
     // May require auth
     expect([200, 401, 403]).toContain(response.status());
   });
 
   test('API: Verify broadcasts endpoint works', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/admin/notifications/broadcasts`);
+    const response = await request.get(`${API_URL}/api/v1/admin/notifications/broadcasts`);
     
     // May require auth  
     expect([200, 401, 403]).toContain(response.status());

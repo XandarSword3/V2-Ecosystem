@@ -222,7 +222,7 @@ export default function RolesPage() {
 
       {/* Create Role Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]">
           <div className="bg-background rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Create New Role</h2>
@@ -268,7 +268,7 @@ export default function RolesPage() {
 
       {/* Permissions Editor Modal */}
       {showPermissionsModal && selectedRole && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto py-8">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] overflow-y-auto py-8">
           <div className="bg-background rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center p-6 border-b">
               <div>

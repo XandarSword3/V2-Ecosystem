@@ -17,6 +17,27 @@ export interface ThemeColors {
   surfaceDark: string;
   textDark: string;
   textMutedDark: string;
+  // NEW: Enhanced color system for better UI
+  // Surface variants for depth and hierarchy
+  surfaceSecondary: string;
+  surfaceElevated: string;
+  surfaceSecondaryDark: string;
+  surfaceElevatedDark: string;
+  // Text on colored backgrounds (guaranteed readability)
+  textOnPrimary: string;
+  textOnSecondary: string;
+  textOnAccent: string;
+  // Border and divider colors
+  border: string;
+  borderMuted: string;
+  borderDark: string;
+  borderMutedDark: string;
+  // Focus ring color
+  focusRing: string;
+  // Success, warning, error for status indicators
+  success: string;
+  warning: string;
+  error: string;
 }
 
 export interface ThemeGradients {
@@ -73,6 +94,26 @@ export const resortThemes: Record<ResortTheme, ThemeConfig> = {
       surfaceDark: '#134e4a',
       textDark: '#ccfbf1',
       textMutedDark: '#5eead4',
+      // Surface variants for depth
+      surfaceSecondary: '#e6fffa',
+      surfaceElevated: '#ffffff',
+      surfaceSecondaryDark: '#0d3d3a',
+      surfaceElevatedDark: '#1a5c56',
+      // Text on colored backgrounds
+      textOnPrimary: '#ffffff',
+      textOnSecondary: '#ffffff',
+      textOnAccent: '#1c1917',
+      // Borders
+      border: '#99f6e4',
+      borderMuted: '#ccfbf1',
+      borderDark: '#2dd4bf',
+      borderMutedDark: '#134e4a',
+      // Focus
+      focusRing: '#22d3ee',
+      // Status colors
+      success: '#10b981',
+      warning: '#f59e0b',
+      error: '#ef4444',
     },
     gradients: {
       hero: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 50%, #22d3ee 100%)',
@@ -109,6 +150,26 @@ export const resortThemes: Record<ResortTheme, ThemeConfig> = {
       surfaceDark: '#292524',
       textDark: '#fafaf9',
       textMutedDark: '#a8a29e',
+      // Surface variants for depth
+      surfaceSecondary: '#f5f5f4',
+      surfaceElevated: '#ffffff',
+      surfaceSecondaryDark: '#1c1917',
+      surfaceElevatedDark: '#44403c',
+      // Text on colored backgrounds
+      textOnPrimary: '#ffffff',
+      textOnSecondary: '#ffffff',
+      textOnAccent: '#ffffff',
+      // Borders
+      border: '#d6d3d1',
+      borderMuted: '#e7e5e4',
+      borderDark: '#57534e',
+      borderMutedDark: '#44403c',
+      // Focus
+      focusRing: '#78716c',
+      // Status colors
+      success: '#16a34a',
+      warning: '#f59e0b',
+      error: '#dc2626',
     },
     gradients: {
       hero: 'linear-gradient(135deg, #57534e 0%, #78716c 50%, #a8a29e 100%)',
@@ -145,6 +206,26 @@ export const resortThemes: Record<ResortTheme, ThemeConfig> = {
       surfaceDark: '#7c2d12',
       textDark: '#ffedd5',
       textMutedDark: '#fdba74',
+      // Surface variants for depth
+      surfaceSecondary: '#ffedd5',
+      surfaceElevated: '#ffffff',
+      surfaceSecondaryDark: '#5c1d0a',
+      surfaceElevatedDark: '#9a3412',
+      // Text on colored backgrounds
+      textOnPrimary: '#ffffff',
+      textOnSecondary: '#ffffff',
+      textOnAccent: '#ffffff',
+      // Borders
+      border: '#fed7aa',
+      borderMuted: '#ffedd5',
+      borderDark: '#ea580c',
+      borderMutedDark: '#9a3412',
+      // Focus
+      focusRing: '#f97316',
+      // Status colors
+      success: '#22c55e',
+      warning: '#fbbf24',
+      error: '#dc2626',
     },
     gradients: {
       hero: 'linear-gradient(135deg, #ea580c 0%, #f97316 30%, #fb923c 60%, #fbbf24 100%)',
@@ -181,6 +262,26 @@ export const resortThemes: Record<ResortTheme, ThemeConfig> = {
       surfaceDark: '#14532d',
       textDark: '#dcfce7',
       textMutedDark: '#86efac',
+      // Surface variants for depth
+      surfaceSecondary: '#dcfce7',
+      surfaceElevated: '#ffffff',
+      surfaceSecondaryDark: '#0a3d1f',
+      surfaceElevatedDark: '#1a6b3a',
+      // Text on colored backgrounds
+      textOnPrimary: '#ffffff',
+      textOnSecondary: '#ffffff',
+      textOnAccent: '#1c1917',
+      // Borders
+      border: '#86efac',
+      borderMuted: '#bbf7d0',
+      borderDark: '#22c55e',
+      borderMutedDark: '#166534',
+      // Focus
+      focusRing: '#22c55e',
+      // Status colors
+      success: '#22c55e',
+      warning: '#f59e0b',
+      error: '#dc2626',
     },
     gradients: {
       hero: 'linear-gradient(135deg, #14532d 0%, #15803d 50%, #22c55e 100%)',
@@ -217,6 +318,26 @@ export const resortThemes: Record<ResortTheme, ThemeConfig> = {
       surfaceDark: '#4c1d95',
       textDark: '#f5f3ff',
       textMutedDark: '#c4b5fd',
+      // Surface variants for depth
+      surfaceSecondary: '#f3e8ff',
+      surfaceElevated: '#ffffff',
+      surfaceSecondaryDark: '#3b1079',
+      surfaceElevatedDark: '#5b21b6',
+      // Text on colored backgrounds
+      textOnPrimary: '#ffffff',
+      textOnSecondary: '#ffffff',
+      textOnAccent: '#ffffff',
+      // Borders
+      border: '#ddd6fe',
+      borderMuted: '#ede9fe',
+      borderDark: '#a78bfa',
+      borderMutedDark: '#6d28d9',
+      // Focus
+      focusRing: '#a78bfa',
+      // Status colors
+      success: '#10b981',
+      warning: '#f59e0b',
+      error: '#f43f5e',
     },
     gradients: {
       hero: 'linear-gradient(135deg, #4c1d95 0%, #7c3aed 50%, #a78bfa 100%)',
@@ -253,6 +374,26 @@ export const resortThemes: Record<ResortTheme, ThemeConfig> = {
       surfaceDark: '#1e293b',
       textDark: '#fef3c7',
       textMutedDark: '#fcd34d',
+      // Surface variants for depth
+      surfaceSecondary: '#fef3c7',
+      surfaceElevated: '#ffffff',
+      surfaceSecondaryDark: '#172135',
+      surfaceElevatedDark: '#334155',
+      // Text on colored backgrounds
+      textOnPrimary: '#ffffff',
+      textOnSecondary: '#1c1917',
+      textOnAccent: '#ffffff',
+      // Borders
+      border: '#fde68a',
+      borderMuted: '#fef3c7',
+      borderDark: '#f59e0b',
+      borderMutedDark: '#475569',
+      // Focus
+      focusRing: '#fbbf24',
+      // Status colors
+      success: '#22c55e',
+      warning: '#f59e0b',
+      error: '#dc2626',
     },
     gradients: {
       hero: 'linear-gradient(135deg, #92400e 0%, #d97706 50%, #fbbf24 100%)',

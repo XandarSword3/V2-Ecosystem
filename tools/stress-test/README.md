@@ -2,6 +2,29 @@
 
 A comprehensive behavioral stress testing system for the V2 Resort platform with realistic customer, staff, and admin bots.
 
+## Quick Start - Load Tests
+
+For quick validation of system performance under load:
+
+```bash
+# Run all load tests
+npx tsx run-load-tests.ts
+
+# Individual load tests
+npx tsx load-test-bookings.ts --concurrent=100  # 100 concurrent bookings
+npx tsx load-test-orders.ts --concurrent=50      # 50 simultaneous orders
+
+# Custom target
+npx tsx run-load-tests.ts --target=https://api.v2resort.com
+```
+
+### Load Test Results
+
+| Test | Concurrent | Target | Acceptance Criteria |
+|------|------------|--------|---------------------|
+| Chalet Bookings | 100 | 100% unique bookings | No duplicate bookings, <5s P99 |
+| Restaurant Orders | 50 | >95% success rate | Unique order numbers, <2s P99 |
+
 ## Overview
 
 This stress test framework simulates realistic user behavior across all roles:

@@ -264,7 +264,7 @@ export default function LoginPage() {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                     {t('password')}
                   </label>
-                  <Link href="#" className="text-xs text-primary-600 hover:text-primary-700">
+                  <Link href="/forgot-password" className="text-xs text-primary-600 hover:text-primary-700">
                     {t('forgotPassword')}
                   </Link>
                 </div>
@@ -311,7 +311,7 @@ export default function LoginPage() {
                 </div>
                 <div className="relative flex justify-center text-sm">
                   <span className="px-2 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                    Or continue with
+                    {t('orContinueWith')}
                   </span>
                 </div>
               </div>
@@ -340,7 +340,7 @@ export default function LoginPage() {
                       d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                     />
                   </svg>
-                  <span className="text-slate-700 dark:text-slate-200 font-medium">Continue with Google</span>
+                  <span className="text-slate-700 dark:text-slate-200 font-medium">{t('continueWithGoogle')}</span>
                 </a>
                 
                 {/* Facebook - placeholder for now */}
@@ -352,18 +352,29 @@ export default function LoginPage() {
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#1877F2">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                   </svg>
-                  <span className="text-slate-500 dark:text-slate-400 font-medium">Facebook (Coming Soon)</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">{t('facebookComingSoon')}</span>
                 </button>
+                
+                {/* Apple Sign In */}
+                <a
+                  href={`${API_URL}/api/auth/apple`}
+                  className="w-full py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-black hover:bg-gray-900 transition-all flex items-center justify-center gap-3"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="white">
+                    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                  </svg>
+                  <span className="text-white font-medium">{t('continueWithApple')}</span>
+                </a>
               </div>
             </form>
           )}
 
           {/* Quick Login Hints */}
           <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700">
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold uppercase tracking-wider">Demo Credentials</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold uppercase tracking-wider">{t('demoCredentials')}</p>
             <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2">
               <div className="flex justify-between items-center group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 p-1 rounded" onClick={() => { setEmail('admin@v2resort.com'); setPassword('admin123'); }}>
-                <span className="font-medium text-primary-600">Super Admin:</span>
+                <span className="font-medium text-primary-600">{t('superAdmin')}:</span>
                 <span className="font-mono">admin@v2resort.com / admin123</span>
               </div>
             </div>

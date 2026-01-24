@@ -281,6 +281,7 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 export interface AuthenticatedUser {
   userId: string;
+  id: string; // Alias for userId
   email: string;
   roles: string[];
   permissions?: string[];

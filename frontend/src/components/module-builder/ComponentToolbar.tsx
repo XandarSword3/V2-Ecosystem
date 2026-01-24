@@ -1,15 +1,17 @@
 import { useModuleBuilderStore } from '@/store/module-builder-store';
-import { Layout, Type, Image as ImageIcon, Grid, List, Box, Calendar, Clock, LucideIcon } from 'lucide-react';
+import { Layout, Type, Image as ImageIcon, Grid, List, Box, Calendar, Clock, MousePointer2, FormInput, LucideIcon } from 'lucide-react';
 import { UIComponentType } from '@/types/module-builder';
 
 const COMPONENTS: { type: UIComponentType; label: string; icon: LucideIcon }[] = [
   { type: 'hero', label: 'Hero Section', icon: Layout },
   { type: 'text_block', label: 'Text Block', icon: Type },
+  { type: 'button', label: 'Button', icon: MousePointer2 },
   { type: 'image', label: 'Image', icon: ImageIcon },
   { type: 'grid', label: 'Grid / Cards', icon: Grid },
   { type: 'menu_list', label: 'Menu List', icon: List },
   { type: 'session_list', label: 'Sessions', icon: Clock },
   { type: 'container', label: 'Container', icon: Box },
+  { type: 'form_container', label: 'Form', icon: FormInput },
   { type: 'booking_calendar', label: 'Calendar', icon: Calendar },
 ];
 

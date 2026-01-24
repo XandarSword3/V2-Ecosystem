@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
+import { Portal } from '@/components/ui/Portal';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import {
   Package,
@@ -32,6 +33,7 @@ import {
   Calendar,
   Filter,
   Minus,
+  Trash2,
 } from 'lucide-react';
 
 interface InventoryItem {
@@ -113,8 +115,14 @@ export default function InventoryAdminPage() {
   const [stockFilter, setStockFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
+  const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   
   // Form states
   const [itemForm, setItemForm] = useState({
@@ -321,6 +329,37 @@ export default function InventoryAdminPage() {
     }
   };
 
+  const handleDeleteItem = async () => {
+    if (!deletingItem) return;
+    
+    try {
+      const res = await api.delete(`/inventory/items/${deletingItem.id}`);
+      if (res.data.success) {
+        toast.success('Item deleted successfully');
+        setShowDeleteItemModal(false);
+        setDeletingItem(null);
+        loadData();
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to delete item');
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!deletingCategory) return;
+    
+    try {
+      const res = await api.delete(`/inventory/categories/${deletingCategory.id}`);
+      if (res.data.success) {
+        toast.success('Category deleted successfully');
+        setShowDeleteCategoryModal(false);
+        setDeletingCategory(null);
+        loadData();
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to delete category');
+    }
+  };
   const handleExportReport = async () => {
     try {
       window.open(`${api.defaults.baseURL}/inventory/report?format=csv`, '_blank');
@@ -589,8 +628,18 @@ export default function InventoryAdminPage() {
                               variant="ghost" 
                               size="sm"
                               onClick={() => handleEdit(item)}
+                              title="Edit Item"
                             >
                               <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => { setDeletingItem(item); setShowDeleteItemModal(true); }}
+                              title="Delete Item"
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </td>
@@ -605,6 +654,12 @@ export default function InventoryAdminPage() {
 
         {/* Categories Tab */}
         <TabsContent value="categories" className="space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={() => { setEditingCategory(null); setShowCategoryModal(true); }}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Category
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {categories.map((cat) => (
               <Card key={cat.id}>
@@ -623,6 +678,26 @@ export default function InventoryAdminPage() {
                     <div className="text-right">
                       <p className="text-2xl font-bold">{Math.round(cat.total_stock)}</p>
                       <p className="text-xs text-slate-500">units</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => { setEditingCategory(cat); setShowCategoryModal(true); }}
+                        title="Edit Category"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => { setDeletingCategory(cat); setShowDeleteCategoryModal(true); }}
+                        title="Delete Category"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        disabled={cat.item_count > 0}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -750,28 +825,29 @@ export default function InventoryAdminPage() {
       </Tabs>
 
       {/* Create/Edit Item Modal */}
-      <AnimatePresence>
-        {showCreateModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => { setShowCreateModal(false); setEditingItem(null); }}
-          >
+      <Portal>
+        <AnimatePresence>
+          {showCreateModal && (
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4"
+              onClick={() => { setShowCreateModal(false); setEditingItem(null); }}
             >
-              <h3 className="text-xl font-bold mb-4">
-                {editingItem ? 'Edit Item' : 'Add Inventory Item'}
-              </h3>
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+              >
+                <h3 className="text-xl font-bold mb-4">
+                  {editingItem ? 'Edit Item' : 'Add Inventory Item'}
+                </h3>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
                   <label className="block text-sm font-medium mb-2">Name *</label>
                   <Input
                     placeholder="Item name"
@@ -896,31 +972,33 @@ export default function InventoryAdminPage() {
                   {editingItem ? 'Update Item' : 'Add Item'}
                 </Button>
               </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </Portal>
 
       {/* Transaction Modal */}
-      <AnimatePresence>
-        {showTransactionModal && selectedItem && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => { setShowTransactionModal(false); setSelectedItem(null); }}
-          >
+      <Portal>
+        <AnimatePresence>
+          {showTransactionModal && selectedItem && (
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md shadow-2xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4"
+              onClick={() => { setShowTransactionModal(false); setSelectedItem(null); }}
             >
-              <h3 className="text-xl font-bold mb-4">Record Transaction</h3>
-              <p className="text-slate-500 mb-4">
-                <strong>{selectedItem.name}</strong>
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md shadow-2xl"
+              >
+                <h3 className="text-xl font-bold mb-4">Record Transaction</h3>
+                <p className="text-slate-500 mb-4">
+                  <strong>{selectedItem.name}</strong>
                 <br />
                 Current stock: <strong>{selectedItem.current_stock} {selectedItem.unit}</strong>
               </p>
@@ -979,10 +1057,261 @@ export default function InventoryAdminPage() {
                   Record Transaction
                 </Button>
               </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </Portal>
+
+      {/* Category Create/Edit Modal */}
+      <Portal>
+        <AnimatePresence>
+          {showCategoryModal && (
+            <CategoryModal
+              category={editingCategory}
+              onClose={() => { setShowCategoryModal(false); setEditingCategory(null); }}
+              onSave={async (data) => {
+                try {
+                  if (editingCategory) {
+                    const res = await api.put(`/inventory/categories/${editingCategory.id}`, data);
+                    if (res.data.success) {
+                      toast.success('Category updated');
+                    }
+                  } else {
+                    const res = await api.post('/inventory/categories', data);
+                    if (res.data.success) {
+                      toast.success('Category created');
+                    }
+                  }
+                  setShowCategoryModal(false);
+                  setEditingCategory(null);
+                  loadData();
+                } catch (error: any) {
+                  toast.error(error.response?.data?.error || 'Failed to save category');
+                }
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </Portal>
+
+      {/* Delete Item Confirmation Modal */}
+      <Portal>
+        <AnimatePresence>
+          {showDeleteItemModal && deletingItem && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4"
+              onClick={() => { setShowDeleteItemModal(false); setDeletingItem(null); }}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md shadow-2xl"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                    <Trash2 className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-red-600">Delete Item</h3>
+                    <p className="text-slate-500">This action cannot be undone</p>
+                  </div>
+                </div>
+                
+                <p className="mb-6">
+                  Are you sure you want to delete <strong>{deletingItem.name}</strong>?
+                  <br />
+                  <span className="text-sm text-slate-500">
+                    SKU: {deletingItem.sku} | Current stock: {deletingItem.current_stock} {deletingItem.unit}
+                  </span>
+                </p>
+                
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => { setShowDeleteItemModal(false); setDeletingItem(null); }}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleDeleteItem}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Delete Item
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Portal>
+
+      {/* Delete Category Confirmation Modal */}
+      <Portal>
+        <AnimatePresence>
+          {showDeleteCategoryModal && deletingCategory && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4"
+              onClick={() => { setShowDeleteCategoryModal(false); setDeletingCategory(null); }}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md shadow-2xl"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                    <Trash2 className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-red-600">Delete Category</h3>
+                    <p className="text-slate-500">This action cannot be undone</p>
+                  </div>
+                </div>
+                
+                <p className="mb-6">
+                  Are you sure you want to delete the category <strong>{deletingCategory.name}</strong>?
+                  {deletingCategory.item_count > 0 && (
+                    <span className="block mt-2 text-amber-600">
+                      <AlertTriangle className="w-4 h-4 inline mr-1" />
+                      This category has {deletingCategory.item_count} items. 
+                      Please move or delete the items first.
+                    </span>
+                  )}
+                </p>
+                
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => { setShowDeleteCategoryModal(false); setDeletingCategory(null); }}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleDeleteCategory}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    disabled={deletingCategory.item_count > 0}
+                  >
+                    Delete Category
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Portal>
+    </motion.div>
+  );
+}
+
+// Category Modal Component
+interface CategoryModalProps {
+  category: Category | null;
+  onClose: () => void;
+  onSave: (data: { name: string; color?: string; description?: string }) => Promise<void>;
+}
+
+function CategoryModal({ category, onClose, onSave }: CategoryModalProps) {
+  const [form, setForm] = useState({
+    name: category?.name || '',
+    color: category?.color || '#6b7280',
+    description: '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!form.name.trim()) {
+      toast.error('Category name is required');
+      return;
+    }
+    setSaving(true);
+    await onSave({
+      name: form.name.trim(),
+      color: form.color,
+      description: form.description.trim() || undefined,
+    });
+    setSaving(false);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md shadow-2xl"
+      >
+        <h3 className="text-xl font-bold mb-6">
+          {category ? 'Edit Category' : 'Create Category'}
+        </h3>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Category Name *</label>
+            <Input
+              placeholder="e.g., Beverages, Cleaning Supplies"
+              value={form.name}
+              onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Color</label>
+            <div className="flex gap-3 items-center">
+              <input
+                type="color"
+                value={form.color}
+                onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))}
+                className="w-12 h-10 rounded cursor-pointer"
+              />
+              <Input
+                value={form.color}
+                onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))}
+                placeholder="#6b7280"
+                className="flex-1"
+              />
+              <div 
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: form.color + '20', color: form.color }}
+              >
+                <Package className="w-5 h-5" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Description (optional)</label>
+            <textarea
+              className="w-full p-3 border rounded-lg dark:bg-slate-700 dark:border-slate-600"
+              rows={2}
+              placeholder="Brief description of this category..."
+              value={form.description}
+              onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={saving}>
+            {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
+            {category ? 'Update Category' : 'Create Category'}
+          </Button>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }

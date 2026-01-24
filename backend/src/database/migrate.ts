@@ -1,9 +1,16 @@
 import { getPool, initializeDatabase, closeDatabase } from './connection';
 import { logger } from '../utils/logger';
+import * as fs from 'fs';
+import * as path from 'path';
 
-async function migrate() {
+export async function migrate() {
   try {
-    await initializeDatabase();
+    // Only initialize if not already initialized
+    try {
+      await initializeDatabase();
+    } catch (e) {
+      // Ignore if already initialized
+    }
     const pool = getPool();
 
     logger.info('Running migrations...');
@@ -550,16 +557,53 @@ async function migrate() {
       END $$;
     `);
 
+    // Apply SQL file migrations from supabase/migrations
+    logger.info('Applying SQL file migrations...');
+    const migrationsDir = path.join(__dirname, '../../../supabase/migrations');
+    
+    if (fs.existsSync(migrationsDir)) {
+      const files = fs.readdirSync(migrationsDir)
+        .filter(f => f.endsWith('.sql'))
+        .sort(); // Run in order
+
+      for (const file of files) {
+        logger.info(`Processing migration file: ${file}`);
+        const filePath = path.join(migrationsDir, file);
+        const sql = fs.readFileSync(filePath, 'utf8');
+        try {
+           await pool.query(sql); 
+           logger.info(`Applied: ${file}`);
+        } catch (e: any) {
+           logger.warn(`Error applying ${file}: ${e.message}`);
+           // Continue if error is likely harmless (e.g. object exists), otherwise throw
+           if (!e.message.includes('already exists')) {
+             throw e;
+           }
+        }
+      }
+    } else {
+       logger.warn(`Migrations directory not found at ${migrationsDir}`);
+    }
+
     logger.info('Migrations completed successfully');
-    await closeDatabase();
-    process.exit(0);
+    // await closeDatabase(); // Don't close if imported
   } catch (error) {
     // Print full error to stdout for debugging (temporary)
     console.error(error);
     logger.error('Migration failed:', error);
-    await closeDatabase();
-    process.exit(1);
+    throw error;
   }
 }
 
-migrate();
+// Run if called directly
+if (require.main === module) {
+  migrate()
+    .then(async () => {
+      await closeDatabase();
+      process.exit(0);
+    })
+    .catch(async () => {
+      await closeDatabase();
+      process.exit(1);
+    });
+}

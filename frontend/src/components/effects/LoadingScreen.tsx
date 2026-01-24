@@ -442,6 +442,8 @@ export function LoadingScreen({ minDuration = 2500 }: LoadingScreenProps) {
  * 
  * Wraps children and blocks them from rendering until loading is complete.
  * This prevents the hydration issue and ensures proper loading sequence.
+ * 
+ * NOW: Waits for settings/modules to actually load from backend before revealing content.
  */
 interface LoadingScreenWrapperProps {
   children: React.ReactNode;
@@ -452,12 +454,26 @@ export function LoadingScreenWrapper({ children, minDuration = 2500 }: LoadingSc
   const [mounted, setMounted] = useState(false);
   const [showContent, setShowContent] = useState(false);
   const [isAnimating, setIsAnimating] = useState(true);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const enableLoadingAnimation = useSettingsStore((s) => s.enableLoadingAnimation);
+  const { loading: settingsLoading } = useSiteSettings();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Track minimum duration elapsed
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const timer = setTimeout(() => {
+      setMinTimeElapsed(true);
+    }, minDuration);
+
+    return () => clearTimeout(timer);
+  }, [mounted, minDuration]);
+
+  // Main logic: wait for BOTH minDuration AND settings to load
   useEffect(() => {
     if (!mounted) return;
 
@@ -470,23 +486,27 @@ export function LoadingScreenWrapper({ children, minDuration = 2500 }: LoadingSc
 
     const hasVisited = sessionStorage.getItem('v2resort_visited');
     if (hasVisited) {
-      setShowContent(true);
-      setIsAnimating(false);
+      // For returning visitors, show content immediately but wait for settings
+      // to ensure theme is applied correctly
+      if (!settingsLoading) {
+        setShowContent(true);
+        setIsAnimating(false);
+      }
       return;
     }
 
-    // Show loading screen for minDuration, then reveal content
-    const timer = setTimeout(() => {
+    // For first-time visitors: wait for BOTH conditions
+    // 1. Minimum time elapsed (for smooth animation)
+    // 2. Settings loaded (so theme/branding is ready)
+    if (minTimeElapsed && !settingsLoading) {
       setIsAnimating(false);
       sessionStorage.setItem('v2resort_visited', 'true');
       // Small delay to let exit animation start before showing content
       setTimeout(() => {
         setShowContent(true);
       }, 100);
-    }, minDuration);
-
-    return () => clearTimeout(timer);
-  }, [mounted, minDuration, enableLoadingAnimation]);
+    }
+  }, [mounted, minTimeElapsed, settingsLoading, enableLoadingAnimation]);
 
   // IMPORTANT: For SEO/Bots, we MUST render children on the server.
   // We use CSS to hide/reveal the content visually for users, 

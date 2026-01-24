@@ -65,7 +65,8 @@ export default function AdminChaletAddonsPage() {
 
   const fetchAddons = useCallback(async () => {
     try {
-      const response = await api.get('/chalets/add-ons');
+      // Use admin endpoint to get ALL add-ons (including inactive)
+      const response = await api.get('/chalets/admin/add-ons');
       setAddons(response.data.data || []);
     } catch (error) {
       toast.error(tc('errors.failedToLoad'));
@@ -397,7 +398,7 @@ export default function AdminChaletAddonsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4"
             onClick={() => setShowModal(false)}
           >
             <motion.div

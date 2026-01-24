@@ -266,7 +266,7 @@ test.describe('Checkout Flow', () => {
 // ============================================
 test.describe('Customer API Endpoints', () => {
   test('GET /api/restaurant/menu - should return menu items', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/restaurant/menu`);
+    const response = await request.get(`${API_URL}/api/v1/restaurant/menu`);
     expect(response.status()).toBe(200);
     
     const data = await response.json();
@@ -276,14 +276,14 @@ test.describe('Customer API Endpoints', () => {
 
   test('GET /api/restaurant/menu/items - should support dietary filters', async ({ request }) => {
     // Test vegetarian filter
-    const vegResponse = await request.get(`${API_URL}/api/restaurant/menu/items?vegetarian=true`);
+    const vegResponse = await request.get(`${API_URL}/api/v1/restaurant/menu/items?vegetarian=true`);
     expect(vegResponse.status()).toBe(200);
     
     const vegData = await vegResponse.json();
     expect(vegData.success).toBe(true);
     
     // Test multiple filters
-    const multiResponse = await request.get(`${API_URL}/api/restaurant/menu/items?vegan=true&glutenFree=true`);
+    const multiResponse = await request.get(`${API_URL}/api/v1/restaurant/menu/items?vegan=true&glutenFree=true`);
     expect(multiResponse.status()).toBe(200);
   });
 
@@ -300,7 +300,7 @@ test.describe('Customer API Endpoints', () => {
     const today = new Date().toISOString().split('T')[0];
     const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    const response = await request.get(`${API_URL}/api/chalets/availability?startDate=${today}&endDate=${nextWeek}`);
+    const response = await request.get(`${API_URL}/api/v1/chalets/availability?startDate=${today}&endDate=${nextWeek}`);
     expect(response.status()).toBe(200);
     
     const data = await response.json();
@@ -308,7 +308,7 @@ test.describe('Customer API Endpoints', () => {
   });
 
   test('GET /api/pool/sessions - should return pool sessions', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/pool/sessions`);
+    const response = await request.get(`${API_URL}/api/v1/pool/sessions`);
     expect(response.status()).toBe(200);
     
     const data = await response.json();
@@ -317,7 +317,7 @@ test.describe('Customer API Endpoints', () => {
   });
 
   test('GET /api/pool/settings - should return pool settings', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/pool/settings`);
+    const response = await request.get(`${API_URL}/api/v1/pool/settings`);
     expect(response.status()).toBe(200);
     
     const data = await response.json();

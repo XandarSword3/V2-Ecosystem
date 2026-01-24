@@ -553,7 +553,11 @@
       "loginFailed": "Login failed. Please try again.",
       "demoCredentials": "Demo Credentials",
       "superAdmin": "Super Admin",
-      "orContinueWith": "Or continue with"
+      "orContinueWith": "Or continue with",
+      "continueWithGoogle": "Continue with Google",
+      "continueWithApple": "Continue with Apple",
+      "continueWithFacebook": "Continue with Facebook",
+      "facebookComingSoon": "Facebook (Coming Soon)"
     },
     "register": {
       "title": "Create Account",
@@ -1374,6 +1378,94 @@
       "loggedOutSuccessfully": "Logged out successfully"
     }
   },
+  "moduleBuilder": {
+    "title": "Module Builder",
+    "visualEditor": "Visual Editor",
+    "backToEdit": "Back to Edit",
+    "preview": "Preview",
+    "save": "Save Layout",
+    "saving": "Saving...",
+    "saveSuccess": "Layout saved successfully",
+    "saveFailed": "Failed to save layout",
+    "addComponent": "Add Component:",
+    "noLayout": "No layout defined for this module.",
+    "noSelection": "No component selected",
+    "selectComponent": "Click a component on the canvas to edit its properties",
+    "dragHint": "Drag components from the toolbar or click to add",
+    "startHint": "Start by adding a Hero Section or Grid",
+    "properties": "Properties",
+    "general": "General",
+    "label": "Label",
+    "dimensionsSpacing": "Dimensions & Spacing",
+    "width": "Width",
+    "height": "Height",
+    "padding": "Padding",
+    "borderRadius": "Border Radius",
+    "backgroundColor": "Background Color",
+    "textColor": "Text Color",
+    "components": {
+      "hero": "Hero Section",
+      "textBlock": "Text Block",
+      "button": "Button",
+      "image": "Image",
+      "grid": "Grid / Cards",
+      "menuList": "Menu List",
+      "sessions": "Sessions",
+      "container": "Container",
+      "form": "Form",
+      "calendar": "Calendar"
+    },
+    "heroSettings": {
+      "title": "Title",
+      "subtitle": "Subtitle",
+      "backgroundImage": "Background Image URL",
+      "textAlign": "Text Alignment"
+    },
+    "gridSettings": {
+      "dataSource": "Data Source",
+      "columns": "Columns",
+      "gap": "Gap"
+    },
+    "textSettings": {
+      "content": "Content",
+      "fontSize": "Font Size"
+    },
+    "imageSettings": {
+      "src": "Image URL",
+      "alt": "Alt Text",
+      "objectFit": "Object Fit"
+    },
+    "buttonSettings": {
+      "text": "Button Text",
+      "link": "Link URL",
+      "color": "Button Color",
+      "style": "Button Style",
+      "size": "Size"
+    },
+    "formSettings": {
+      "title": "Form Container",
+      "description": "Configure form submission settings below. Add form fields as children.",
+      "action": "Form Action",
+      "customEndpoint": "Custom Endpoint URL",
+      "submitText": "Submit Button Text"
+    },
+    "menuListInfo": {
+      "title": "Menu List Component",
+      "description": "This component automatically displays menu items from the current module."
+    },
+    "sessionListInfo": {
+      "title": "Session List Component",
+      "description": "This component automatically displays bookable sessions with a date picker."
+    },
+    "calendarInfo": {
+      "title": "Booking Calendar Component",
+      "description": "This component displays check-in/check-out date pickers for multi-day bookings."
+    },
+    "containerInfo": {
+      "title": "Container Block",
+      "description": "A container for grouping other components. Set layout options in the style section above."
+    }
+  },
   "staff": {
     "portal": "Staff Portal",
     "navigation": "Navigation",
@@ -1571,6 +1663,7 @@
     "privacyPolicy": "Privacy Policy",
     "termsOfService": "Terms of Service",
     "cancellationPolicy": "Cancellation Policy",
+    "giftCards": "Gift Cards",
     "contact": "Contact",
     "address": "123 Resort Boulevard, Global City",
     "phone": "+1 234 567 8900",

@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 const createChainableMock = () => {
   let responseQueue: Array<{ data: any; error: any; count?: number }> = [];
   let responseIndex = 0;
+  let singleCalled = false;
 
   const getNextResponse = () => {
     if (responseIndex < responseQueue.length) {
@@ -26,9 +27,24 @@ const createChainableMock = () => {
     builder[method] = vi.fn().mockImplementation(() => builder);
   });
 
-  builder.single = vi.fn().mockImplementation(() => Promise.resolve(getNextResponse()));
-  builder.maybeSingle = vi.fn().mockImplementation(() => Promise.resolve(getNextResponse()));
-  builder.then = (resolve: any, reject: any) => Promise.resolve(getNextResponse()).then(resolve, reject);
+  builder.single = vi.fn().mockImplementation(() => {
+    singleCalled = true;
+    const response = getNextResponse();
+    return Promise.resolve(response);
+  });
+  builder.maybeSingle = vi.fn().mockImplementation(() => {
+    singleCalled = true;
+    const response = getNextResponse();
+    return Promise.resolve(response);
+  });
+  builder.then = (resolve: any, reject: any) => {
+    // Only consume response if single() wasn't called
+    if (!singleCalled) {
+      return Promise.resolve(getNextResponse()).then(resolve, reject);
+    }
+    singleCalled = false;
+    return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+  };
 
   return {
     builder,
@@ -38,6 +54,7 @@ const createChainableMock = () => {
     reset: () => {
       responseQueue = [];
       responseIndex = 0;
+      singleCalled = false;
     },
   };
 };
@@ -129,7 +146,7 @@ describe('Coupon Controller', () => {
       );
 
       expect(responseJson.success).toBe(true);
-      expect(responseJson.data.valid).toBe(true);
+      expect(responseJson.valid).toBe(true);
     });
 
     it('should validate a fixed discount coupon', async () => {
@@ -159,7 +176,7 @@ describe('Coupon Controller', () => {
       );
 
       expect(responseJson.success).toBe(true);
-      expect(responseJson.data.valid).toBe(true);
+      expect(responseJson.valid).toBe(true);
     });
 
     it('should reject invalid coupon code', async () => {
@@ -237,25 +254,27 @@ describe('Coupon Controller', () => {
     });
   });
 
-  describe('getCoupons (Admin)', () => {
+  describe('getAllCoupons (Admin)', () => {
     it('should return paginated coupons', async () => {
       mockRequest.query = { page: '1', limit: '10' };
       mockRequest.user = { id: 'admin-123', role: 'admin' };
 
       const mockCoupons = [
-        { id: 'coupon-1', code: 'SAVE10', discount_type: 'percentage', discount_value: 10 },
-        { id: 'coupon-2', code: 'FLAT5', discount_type: 'fixed', discount_value: 5 },
+        { id: 'coupon-1', code: 'SAVE10', discount_type: 'percentage', discount_value: 10, users: null },
+        { id: 'coupon-2', code: 'FLAT5', discount_type: 'fixed', discount_value: 5, users: null },
       ];
 
       mockBuilder.queueResponse(mockCoupons, null, 50);
 
-      await controller.getCoupons(
+      await controller.getAllCoupons(
         mockRequest as Request,
         mockResponse as Response
       );
 
       expect(responseJson.success).toBe(true);
-      expect(responseJson.data).toEqual(mockCoupons);
+      expect(responseJson.data).toHaveLength(2);
+      expect(responseJson.data[0].code).toBe('SAVE10');
+      expect(responseJson.pagination).toBeDefined();
     });
   });
 

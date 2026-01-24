@@ -133,18 +133,10 @@ describe('OAuth Controller', () => {
       );
 
       expect(oauthService.handleGoogleCallback).toHaveBeenCalledWith('auth-code-123');
-      expect(mockResponse.cookie).toHaveBeenCalledWith(
-        'accessToken',
-        'access-token-123',
-        expect.any(Object)
+      // Controller now passes tokens via URL params, not cookies
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        'http://localhost:3000/?oauth=success&accessToken=access-token-123&refreshToken=refresh-token-456'
       );
-      expect(mockResponse.cookie).toHaveBeenCalledWith(
-        'refreshToken',
-        'refresh-token-456',
-        expect.any(Object)
-      );
-      expect(mockResponse.clearCookie).toHaveBeenCalledWith('oauth_state');
-      expect(mockResponse.redirect).toHaveBeenCalledWith('http://localhost:3000/?oauth=success');
     });
 
     it('should redirect admin users to /admin', async () => {
@@ -170,7 +162,9 @@ describe('OAuth Controller', () => {
         mockResponse as Response
       );
 
-      expect(mockResponse.redirect).toHaveBeenCalledWith('http://localhost:3000/admin?oauth=success');
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        'http://localhost:3000/admin?oauth=success&accessToken=admin-access-token&refreshToken=admin-refresh-token'
+      );
     });
 
     it('should redirect staff users to /staff', async () => {
@@ -196,7 +190,9 @@ describe('OAuth Controller', () => {
         mockResponse as Response
       );
 
-      expect(mockResponse.redirect).toHaveBeenCalledWith('http://localhost:3000/staff?oauth=success');
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        'http://localhost:3000/staff?oauth=success&accessToken=staff-access-token&refreshToken=staff-refresh-token'
+      );
     });
 
     it('should reject callback with missing authorization code', async () => {

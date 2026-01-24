@@ -400,8 +400,21 @@ export async function updateUserRoles(req: Request, res: Response, next: NextFun
   try {
     const validatedData = validateBody(assignUserRolesSchema, req.body);
     const supabase = getSupabase();
-    const { roleIds } = validatedData;
+    let { roleIds, roles } = validatedData;
     const userId = req.params.id;
+
+    // If roles (names) provided instead of roleIds, look them up
+    if (!roleIds || roleIds.length === 0) {
+      if (roles && roles.length > 0) {
+        const { data: roleData, error: lookupError } = await supabase
+          .from('roles')
+          .select('id, name')
+          .in('name', roles);
+        
+        if (lookupError) throw lookupError;
+        roleIds = (roleData || []).map(r => r.id);
+      }
+    }
 
     // Remove existing roles
     const { error: deleteError } = await supabase
