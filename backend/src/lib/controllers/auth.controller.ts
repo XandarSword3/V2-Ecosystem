@@ -7,7 +7,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import type { AuthService, AuthServiceError } from '../services/auth.service.js';
+import type { AuthService, AuthServiceError, RegisterData } from '../services/auth.service.js';
 import type { ActivityLoggerService } from '../container/types.js';
 
 // ============================================
@@ -80,7 +80,7 @@ export function createAuthController(deps: AuthControllerDependencies): AuthCont
   return {
     async register(req: Request, res: Response, next: NextFunction) {
       try {
-        const data = registerSchema.parse(req.body);
+        const data = registerSchema.parse(req.body) as RegisterData;
         const result = await authService.register(data);
 
         res.status(201).json({
