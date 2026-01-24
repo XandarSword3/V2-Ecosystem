@@ -3,17 +3,55 @@
  * 
  * Provides biometric authentication using device Face ID, Touch ID, or fingerprint.
  * Uses expo-local-authentication for native biometric capabilities.
+ * 
+ * IMPORTANT: This service gracefully handles the case where the native module
+ * is not available (e.g., in Expo Go). All methods will return safe fallback
+ * values instead of crashing the app.
  */
 
-import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+
+// Import the module - it will be bundled, but native calls may fail at runtime
+import * as LocalAuthentication from 'expo-local-authentication';
 
 // Storage keys for biometric settings
 const BIOMETRIC_KEYS = {
   ENABLED: 'v2_biometric_enabled',
   CREDENTIALS: 'v2_biometric_credentials',
 } as const;
+
+// Flag to track if native module is available (checked lazily)
+let nativeModuleAvailable: boolean | null = null;
+
+/**
+ * Check if the native biometric module is available
+ * This is checked lazily on first use
+ */
+async function isNativeModuleAvailable(): Promise<boolean> {
+  if (nativeModuleAvailable !== null) {
+    return nativeModuleAvailable;
+  }
+  
+  try {
+    // Try to call a simple method to see if native module works
+    await LocalAuthentication.hasHardwareAsync();
+    nativeModuleAvailable = true;
+    return true;
+  } catch (error: any) {
+    // Native module not available (likely running in Expo Go)
+    if (error?.message?.includes('Cannot find native module') || 
+        error?.message?.includes('ExpoLocalAuthentication')) {
+      console.warn('Biometric authentication not available: Native module missing (Expo Go mode)');
+      nativeModuleAvailable = false;
+      return false;
+    }
+    // Some other error - still try to use the module
+    console.warn('Biometric check error:', error?.message);
+    nativeModuleAvailable = true;
+    return true;
+  }
+}
 
 // Types
 export type BiometricType = 'fingerprint' | 'facial' | 'iris' | 'none';
@@ -38,6 +76,14 @@ export interface BiometricAuthResult {
   errorCode?: string;
 }
 
+// Default capabilities when biometrics are unavailable
+const UNAVAILABLE_CAPABILITIES: BiometricCapabilities = {
+  isAvailable: false,
+  biometricTypes: [],
+  isEnrolled: false,
+  securityLevel: 'none',
+};
+
 /**
  * Biometric Authentication Service
  */
@@ -47,11 +93,17 @@ export const biometricService = {
    */
   async checkCapabilities(): Promise<BiometricCapabilities> {
     try {
+      // Check if native module is available first
+      const moduleAvailable = await isNativeModuleAvailable();
+      if (!moduleAvailable) {
+        return UNAVAILABLE_CAPABILITIES;
+      }
+
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
       const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
       
-      const biometricTypes: BiometricType[] = supportedTypes.map(type => {
+      const biometricTypes: BiometricType[] = supportedTypes.map((type) => {
         switch (type) {
           case LocalAuthentication.AuthenticationType.FINGERPRINT:
             return 'fingerprint';
@@ -62,7 +114,7 @@ export const biometricService = {
           default:
             return 'none';
         }
-      }).filter(t => t !== 'none');
+      }).filter((t): t is BiometricType => t !== 'none');
 
       const securityLevel = await LocalAuthentication.getEnrolledLevelAsync();
       
@@ -80,14 +132,14 @@ export const biometricService = {
         isEnrolled,
         securityLevel: securityLevelString,
       };
-    } catch (error) {
+    } catch (error: any) {
+      // Handle native module errors gracefully
+      if (error?.message?.includes('Cannot find native module')) {
+        nativeModuleAvailable = false;
+        return UNAVAILABLE_CAPABILITIES;
+      }
       console.error('Failed to check biometric capabilities:', error);
-      return {
-        isAvailable: false,
-        biometricTypes: [],
-        isEnrolled: false,
-        securityLevel: 'none',
-      };
+      return UNAVAILABLE_CAPABILITIES;
     }
   },
 
@@ -117,6 +169,16 @@ export const biometricService = {
     disableDeviceFallback?: boolean;
   }): Promise<BiometricAuthResult> {
     try {
+      // Check if native module is available
+      const moduleAvailable = await isNativeModuleAvailable();
+      if (!moduleAvailable) {
+        return {
+          success: false,
+          error: 'Biometric authentication not available (native module missing)',
+          errorCode: 'not_available',
+        };
+      }
+
       const capabilities = await this.checkCapabilities();
       
       if (!capabilities.isAvailable) {
@@ -173,6 +235,15 @@ export const biometricService = {
         errorCode,
       };
     } catch (error: any) {
+      // Handle native module errors gracefully
+      if (error?.message?.includes('Cannot find native module')) {
+        nativeModuleAvailable = false;
+        return {
+          success: false,
+          error: 'Biometric authentication not available',
+          errorCode: 'not_available',
+        };
+      }
       console.error('Biometric authentication error:', error);
       return {
         success: false,

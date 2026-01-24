@@ -30,7 +30,7 @@ export async function getAuthToken(
   password: string
 ): Promise<string | null> {
   try {
-    const response = await request.post(`${CONFIG.API_URL}/api/auth/login`, {
+    const response = await request.post(`${CONFIG.API_URL}/api/v1/auth/login`, {
       data: { email, password },
       timeout: 30000,
     });

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useTranslations, useLocale } from 'next-intl';
+import { useMemo } from 'react';
 import {
     MapPin,
     Phone,
@@ -22,7 +23,7 @@ export default function Footer() {
     useLocale();
     const tNav = useTranslations('nav');
     const tFooter = useTranslations('footer');
-    const { settings } = useSiteSettings();
+    const { settings, modules } = useSiteSettings();
 
     // Don't show footer on admin or staff pages
     if (pathname?.startsWith('/admin') || pathname?.startsWith('/staff')) {
@@ -41,6 +42,40 @@ export default function Footer() {
         return navMap[slug.toLowerCase()] || slug;
     };
 
+    // Get active modules for Quick Links - memoized
+    const activeModules = useMemo(() => {
+        if (!modules || modules.length === 0) return [];
+        return modules
+            .filter(m => m.is_active && m.show_in_main)
+            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    }, [modules]);
+
+    // Build dynamic Quick Links from active modules
+    const dynamicQuickLinks = useMemo(() => {
+        if (activeModules.length === 0) {
+            // Fallback to defaults when no modules configured
+            return [
+                { label: tNav('restaurant'), href: '/restaurant' },
+                { label: tNav('snackBar'), href: '/snack-bar' },
+                { label: tNav('chalets'), href: '/chalets' },
+                { label: tNav('pool'), href: '/pool' },
+                { label: tFooter('giftCards') || 'Gift Cards', href: '/giftcards' }
+            ];
+        }
+        
+        // Build links from active modules
+        const moduleLinks = activeModules.map(m => ({
+            label: getNavTranslation(m.slug) || m.name,
+            href: `/${m.slug}`,
+            moduleSlug: m.slug
+        }));
+        
+        // Add gift cards link
+        moduleLinks.push({ label: tFooter('giftCards') || 'Gift Cards', href: '/giftcards', moduleSlug: '' });
+        
+        return moduleLinks;
+    }, [activeModules, tNav, tFooter]);
+
     // Build footer with translations - always use translated defaults
     const defaultFooterConfig = {
         logo: { text: settings.resortName || 'V2 Resort', showIcon: true },
@@ -48,13 +83,7 @@ export default function Footer() {
         columns: [
             {
                 title: tFooter('quickLinks'),
-                links: [
-                    { label: tNav('restaurant'), href: '/restaurant' },
-                    { label: tNav('snackBar'), href: '/snack-bar' },
-                    { label: tNav('chalets'), href: '/chalets' },
-                    { label: tNav('pool'), href: '/pool' },
-                    { label: tFooter('giftCards') || 'Gift Cards', href: '/giftcards' }
-                ]
+                links: dynamicQuickLinks
             },
             {
                 title: tFooter('legal'),

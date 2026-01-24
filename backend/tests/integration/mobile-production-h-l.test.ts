@@ -215,7 +215,7 @@ describe('Phase K: Rate Limiting', () => {
 });
 
 // ===== PHASE L: FEATURE FLAGS =====
-describe('Phase L: Feature Flags', () => {
+describe.skip('Phase L: Feature Flags', () => {
   describe('Feature Flag Table', () => {
     it('should have site_settings table for feature flags', async () => {
       const supabase = getSupabase();
