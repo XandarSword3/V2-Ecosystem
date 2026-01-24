@@ -264,7 +264,7 @@ export const createPermissionSchema = z.object({
 });
 
 export const assignRolePermissionsSchema = z.object({
-  permissionIds: z.array(uuidSchema),
+  permissionSlugs: z.array(z.string().min(1)),
 });
 
 // ============ REVIEW SCHEMAS ============
@@ -297,6 +297,8 @@ export const updateModuleSchema = z.object({
   is_active: z.boolean().optional(),
   settings: z.record(z.any()).optional(),
   sort_order: z.number().int().min(0).optional(),
+  // For optimistic locking
+  settings_version: z.number().int().positive().optional(), 
 });
 
 // ============ UTILITY FUNCTIONS ============

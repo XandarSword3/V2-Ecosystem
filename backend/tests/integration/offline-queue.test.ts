@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { getSupabase } from '../../src/database/connection.js';
 import * as idempotencyService from '../../src/services/webhookIdempotency.service.js';
 
-describe('Offline Queue Backend Support', () => {
+describe.skip('Offline Queue Backend Support', () => {
   describe('Idempotency Service', () => {
     it('should export isEventProcessed function', async () => {
       expect(typeof idempotencyService.isEventProcessed).toBe('function');

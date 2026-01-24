@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useTranslations } from 'next-intl';
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
 import {
   UtensilsCrossed,
   Home,
@@ -25,6 +25,7 @@ import { fadeInUp, staggerContainer, scaleIn } from '@/lib/animations/presets';
 import { Button } from '@/components/ui/Button';
 import dynamic from 'next/dynamic';
 import { useSiteSettings } from '@/lib/settings-context';
+import { getModuleIcon, getMainPageModules, getModuleDefaultDescription, getModuleStatLabel, getModuleStatPlaceholder, type Module } from '@/lib/module-utils';
 
 // Premium effects
 import { AuroraBackground, AuroraSection } from '@/components/effects/AuroraBackground';
@@ -45,7 +46,7 @@ export default function HomePage() {
   const tNav = useTranslations('nav');
   const tCommon = useTranslations('common');
   const tFooter = useTranslations('footer');
-  const { settings } = useSiteSettings();
+  const { settings, modules } = useSiteSettings();
   const heroRef = useRef<HTMLDivElement>(null);
   
   // Parallax effect for hero
@@ -56,43 +57,80 @@ export default function HomePage() {
   const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '50%']);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
-  const services = [
-    {
-      icon: <UtensilsCrossed className="w-8 h-8" />,
-      title: tHome('services.restaurant.title'),
-      description: tHome('services.restaurant.description'),
-      href: '/restaurant',
-      image: '/images/restaurant-bg.jpg',
-    },
-    {
-      icon: <Cookie className="w-8 h-8" />,
-      title: tHome('services.snackBar.title'),
-      description: tHome('services.snackBar.description'),
-      href: '/snack-bar',
-      image: '/images/snack-bg.jpg',
-    },
-    {
-      icon: <Home className="w-8 h-8" />,
-      title: tHome('services.chalets.title'),
-      description: tHome('services.chalets.description'),
-      href: '/chalets',
-      image: '/images/chalet-bg.jpg',
-    },
-    {
-      icon: <Waves className="w-8 h-8" />,
-      title: tHome('services.pool.title'),
-      description: tHome('services.pool.description'),
-      href: '/pool',
-      image: '/images/pool-bg.jpg',
-    },
-  ];
+  // Get active modules for dynamic display
+  const activeModules = useMemo(() => getMainPageModules(modules as Module[]), [modules]);
+  
+  // Generate services from active modules
+  const services = useMemo(() => {
+    if (activeModules.length === 0) {
+      // Fallback to default services if no modules configured
+      return [
+        {
+          icon: <UtensilsCrossed className="w-8 h-8" />,
+          title: tHome('services.restaurant.title'),
+          description: tHome('services.restaurant.description'),
+          href: '/restaurant',
+          image: '/images/restaurant-bg.jpg',
+        },
+        {
+          icon: <Cookie className="w-8 h-8" />,
+          title: tHome('services.snackBar.title'),
+          description: tHome('services.snackBar.description'),
+          href: '/snack-bar',
+          image: '/images/snack-bg.jpg',
+        },
+        {
+          icon: <Home className="w-8 h-8" />,
+          title: tHome('services.chalets.title'),
+          description: tHome('services.chalets.description'),
+          href: '/chalets',
+          image: '/images/chalet-bg.jpg',
+        },
+        {
+          icon: <Waves className="w-8 h-8" />,
+          title: tHome('services.pool.title'),
+          description: tHome('services.pool.description'),
+          href: '/pool',
+          image: '/images/pool-bg.jpg',
+        },
+      ];
+    }
+    
+    return activeModules.map(module => {
+      const IconComponent = getModuleIcon(module);
+      return {
+        icon: <IconComponent className="w-8 h-8" />,
+        title: module.name,
+        description: module.description || getModuleDefaultDescription(module),
+        href: `/${module.slug}`,
+        image: `/images/${module.slug}-bg.jpg`,
+        module, // Keep reference for rendering
+      };
+    });
+  }, [activeModules, tHome]);
 
-  const stats = [
-    { value: 50, label: tHome('stats.restaurant'), suffix: '+', icon: <UtensilsCrossed className="w-6 h-6" /> },
-    { value: 4, label: tHome('stats.chalets'), icon: <Home className="w-6 h-6" /> },
-    { value: 3, label: tHome('stats.pool'), icon: <Waves className="w-6 h-6" /> },
-    { value: 1000, label: tHome('stats.snackBar'), suffix: '+', icon: <Users className="w-6 h-6" /> },
-  ];
+  // Generate stats from active modules
+  const stats = useMemo(() => {
+    if (activeModules.length === 0) {
+      // Fallback to default stats
+      return [
+        { value: 50, label: tHome('stats.restaurant'), suffix: '+', icon: <UtensilsCrossed className="w-6 h-6" /> },
+        { value: 4, label: tHome('stats.chalets'), icon: <Home className="w-6 h-6" /> },
+        { value: 3, label: tHome('stats.pool'), icon: <Waves className="w-6 h-6" /> },
+        { value: 1000, label: tHome('stats.snackBar'), suffix: '+', icon: <Users className="w-6 h-6" /> },
+      ];
+    }
+    
+    return activeModules.slice(0, 4).map(module => {
+      const IconComponent = getModuleIcon(module);
+      return {
+        value: getModuleStatPlaceholder(module),
+        label: module.name,
+        suffix: module.template_type === 'menu_service' ? '+' : '',
+        icon: <IconComponent className="w-6 h-6" />,
+      };
+    });
+  }, [activeModules, tHome]);
 
   const features = [
     { title: tHome('features.primeLocation.title'), description: tHome('features.primeLocation.description'), icon: <MapPin className="w-5 h-5" /> },
@@ -281,140 +319,125 @@ export default function HomePage() {
             </BlurReveal>
           </motion.div>
 
-          {/* Bento Grid Layout */}
+          {/* Dynamic Bento Grid Layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[280px]">
-            {/* Restaurant - Large card */}
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0 }}
-              className="md:col-span-2 md:row-span-2"
-            >
-              <Link href="/restaurant" className="block h-full">
-                <Card3D className="h-full" intensity={8}>
-                  <SpotlightCard className="h-full p-8 flex flex-col justify-between group">
-                    <div>
-                      <motion.div
-                        className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center mb-6 shadow-lg"
-                        whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        <UtensilsCrossed className="w-8 h-8 text-white" />
-                      </motion.div>
-                      <h3 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-3">
-                        {tHome('services.restaurant.title')}
-                      </h3>
-                      <p className="text-slate-600 dark:text-slate-400 text-lg">
-                        {tHome('services.restaurant.description')}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 text-primary-500 font-medium mt-4">
-                      <span>{tCommon('learnMore')}</span>
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
-                    </div>
-                  </SpotlightCard>
-                </Card3D>
-              </Link>
-            </motion.div>
-
-            {/* Snack Bar */}
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="lg:col-span-1"
-            >
-              <Link href="/snack-bar" className="block h-full">
-                <TiltCard className="h-full" tiltAmount={10}>
-                  <SpotlightCard className="h-full p-6 flex flex-col group">
-                    <motion.div
-                      className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mb-4 shadow-lg"
-                      whileHover={{ rotate: [0, -10, 10, 0] }}
-                    >
-                      <Cookie className="w-6 h-6 text-white" />
-                    </motion.div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-                      {tHome('services.snackBar.title')}
-                    </h3>
-                    <p className="text-slate-600 dark:text-slate-400 text-sm flex-1">
-                      {tHome('services.snackBar.description')}
-                    </p>
-                    <div className="flex items-center gap-2 text-primary-500 font-medium mt-3 text-sm">
-                      <span>{tCommon('learnMore')}</span>
-                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </SpotlightCard>
-                </TiltCard>
-              </Link>
-            </motion.div>
-
-            {/* Pool */}
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="lg:col-span-1"
-            >
-              <Link href="/pool" className="block h-full">
-                <TiltCard className="h-full" tiltAmount={10}>
-                  <SpotlightCard className="h-full p-6 flex flex-col group">
-                    <motion.div
-                      className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center mb-4 shadow-lg"
-                      whileHover={{ rotate: [0, -10, 10, 0] }}
-                    >
-                      <Waves className="w-6 h-6 text-white" />
-                    </motion.div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-                      {tHome('services.pool.title')}
-                    </h3>
-                    <p className="text-slate-600 dark:text-slate-400 text-sm flex-1">
-                      {tHome('services.pool.description')}
-                    </p>
-                    <div className="flex items-center gap-2 text-primary-500 font-medium mt-3 text-sm">
-                      <span>{tCommon('learnMore')}</span>
-                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </SpotlightCard>
-                </TiltCard>
-              </Link>
-            </motion.div>
-
-            {/* Chalets - Wide card */}
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3 }}
-              className="md:col-span-2"
-            >
-              <Link href="/chalets" className="block h-full">
-                <FloatingCard className="h-full">
-                  <SpotlightCard className="h-full p-6 flex flex-col md:flex-row md:items-center gap-6 group">
-                    <motion.div
-                      className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg flex-shrink-0"
-                      whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
-                    >
-                      <Home className="w-8 h-8 text-white" />
-                    </motion.div>
-                    <div className="flex-1">
-                      <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                        {tHome('services.chalets.title')}
-                      </h3>
-                      <p className="text-slate-600 dark:text-slate-400">
-                        {tHome('services.chalets.description')}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 text-primary-500 font-medium">
-                      <span>{tHome('cta.bookChalet')}</span>
-                      <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
-                    </div>
-                  </SpotlightCard>
-                </FloatingCard>
-              </Link>
-            </motion.div>
+            {services.map((service, index) => {
+              // First service gets the large card treatment
+              if (index === 0) {
+                return (
+                  <motion.div
+                    key={service.href}
+                    initial={{ opacity: 0, y: 40 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0 }}
+                    className="md:col-span-2 md:row-span-2"
+                  >
+                    <Link href={service.href} className="block h-full">
+                      <Card3D className="h-full" intensity={8}>
+                        <SpotlightCard className="h-full p-8 flex flex-col justify-between group">
+                          <div>
+                            <motion.div
+                              className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center mb-6 shadow-lg"
+                              whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
+                              transition={{ duration: 0.5 }}
+                            >
+                              <div className="text-white">{service.icon}</div>
+                            </motion.div>
+                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-3">
+                              {service.title}
+                            </h3>
+                            <p className="text-slate-600 dark:text-slate-400 text-lg">
+                              {service.description}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 text-primary-500 font-medium mt-4">
+                            <span>{tCommon('learnMore')}</span>
+                            <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                          </div>
+                        </SpotlightCard>
+                      </Card3D>
+                    </Link>
+                  </motion.div>
+                );
+              }
+              
+              // Services 2-3 get regular cards
+              if (index === 1 || index === 2) {
+                return (
+                  <motion.div
+                    key={service.href}
+                    initial={{ opacity: 0, y: 40 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.1 }}
+                    className="lg:col-span-1"
+                  >
+                    <Link href={service.href} className="block h-full">
+                      <TiltCard className="h-full" tiltAmount={10}>
+                        <SpotlightCard className="h-full p-6 flex flex-col group">
+                          <motion.div
+                            className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center mb-4 shadow-lg"
+                            whileHover={{ rotate: [0, -10, 10, 0] }}
+                          >
+                            <div className="text-white w-6 h-6 flex items-center justify-center">
+                              {service.icon}
+                            </div>
+                          </motion.div>
+                          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                            {service.title}
+                          </h3>
+                          <p className="text-slate-600 dark:text-slate-400 text-sm flex-1">
+                            {service.description}
+                          </p>
+                          <div className="flex items-center gap-2 text-primary-500 font-medium mt-3 text-sm">
+                            <span>{tCommon('learnMore')}</span>
+                            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                          </div>
+                        </SpotlightCard>
+                      </TiltCard>
+                    </Link>
+                  </motion.div>
+                );
+              }
+              
+              // Service 4 (and onwards) gets wide cards
+              return (
+                <motion.div
+                  key={service.href}
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  className="md:col-span-2"
+                >
+                  <Link href={service.href} className="block h-full">
+                    <FloatingCard className="h-full">
+                      <SpotlightCard className="h-full p-6 flex flex-col md:flex-row md:items-center gap-6 group">
+                        <motion.div
+                          className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg flex-shrink-0"
+                          whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
+                        >
+                          <div className="text-white">{service.icon}</div>
+                        </motion.div>
+                        <div className="flex-1">
+                          <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+                            {service.title}
+                          </h3>
+                          <p className="text-slate-600 dark:text-slate-400">
+                            {service.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-primary-500 font-medium">
+                          <span>{tCommon('learnMore')}</span>
+                          <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
+                        </div>
+                      </SpotlightCard>
+                    </FloatingCard>
+                  </Link>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -521,18 +544,13 @@ export default function HomePage() {
                       className="text-center mb-8"
                     >
                       <div className="text-7xl font-black">
-                        <GradientText>4</GradientText>
+                        <GradientText>{services.length.toString()}</GradientText>
                       </div>
                       <div className="text-slate-300 text-lg">{tHome('stats.businessUnits')}</div>
                     </motion.div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      {[
-                        { icon: <UtensilsCrossed className="w-5 h-5" />, label: tHome('stats.restaurant'), value: '50+' },
-                        { icon: <Home className="w-5 h-5" />, label: tHome('stats.chalets'), value: '4' },
-                        { icon: <Waves className="w-5 h-5" />, label: tHome('stats.pool'), value: '3' },
-                        { icon: <Cookie className="w-5 h-5" />, label: tHome('stats.snackBar'), value: '⚡' },
-                      ].map((item, index) => (
+                      {stats.map((item, index) => (
                         <motion.div
                           key={item.label}
                           initial={{ opacity: 0, scale: 0.8 }}
@@ -698,26 +716,24 @@ export default function HomePage() {
       {/* SEO Content for Bots/Audits - Visually Hidden but Accessible */}
       <div className="sr-only">
         <section itemScope itemType="https://schema.org/Resort">
-          <h2>About V2 Resort</h2>
+          <h2>About {settings.resortName || 'V2 Resort'}</h2>
           <p>
-            V2 Resort is a premier destination located in Global City. We offer a unique combination of luxury chalets,
-            a fine dining restaurant, and a family-friendly swimming pool.
+            {settings.description || `${settings.resortName || 'V2 Resort'} is a premier destination offering exceptional services and amenities.`}
           </p>
           
           <h3>Our Pricing</h3>
           <ul>
             <li><strong>Restaurant:</strong> Main courses start from $15. Average meal cost $30-$50 per person.</li>
             <li><strong>Chalets:</strong> Nightly rates start from $150. Weekly discounts available.</li>
-            <li><strong>Pool Entrance:</strong> Adults $20, Children $10. Weekend rates may vary.</li>
+            <li><strong>Pool Entrance:</strong> Adults ${settings.adultPrice || 20}, Children ${settings.childPrice || 10}. Weekend rates may vary.</li>
           </ul>
 
           <h3>Location & Contact</h3>
           <address>
-            V2 Resort<br />
-            123 Resort Boulevard<br />
-            Global City<br />
-            Phone: +1 234 567 8900<br />
-            Email: bookings@v2resort.com
+            {settings.resortName || 'V2 Resort'}<br />
+            {settings.address || '123 Resort Boulevard, Global City'}<br />
+            Phone: {settings.phone || '+1 234 567 8900'}<br />
+            Email: {settings.email || 'bookings@v2resort.com'}
           </address>
         </section>
       </div>

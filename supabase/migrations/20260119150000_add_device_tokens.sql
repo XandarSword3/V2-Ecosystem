@@ -100,37 +100,49 @@ ALTER TABLE device_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_logs ENABLE ROW LEVEL SECURITY;
 
 -- Users can manage their own device tokens
-CREATE POLICY device_tokens_user_policy ON device_tokens
-  FOR ALL
-  USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS device_tokens_user_policy ON device_tokens;
+  CREATE POLICY device_tokens_user_policy ON device_tokens
+    FOR ALL
+    USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+END $$;
 
 -- Admins can view all device tokens
-CREATE POLICY device_tokens_admin_policy ON device_tokens
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles ur
-      JOIN roles r ON ur.role_id = r.id
-      WHERE ur.user_id = auth.uid() AND r.name = 'admin'
-    )
-  );
+DO $$ BEGIN
+  DROP POLICY IF EXISTS device_tokens_admin_policy ON device_tokens;
+  CREATE POLICY device_tokens_admin_policy ON device_tokens
+    FOR SELECT
+    USING (
+      EXISTS (
+        SELECT 1 FROM user_roles ur
+        JOIN roles r ON ur.role_id = r.id
+        WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+      )
+    );
+END $$;
 
 -- Users can view their own notification logs
-CREATE POLICY notification_logs_user_policy ON notification_logs
-  FOR SELECT
-  USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS notification_logs_user_policy ON notification_logs;
+  CREATE POLICY notification_logs_user_policy ON notification_logs
+    FOR SELECT
+    USING (user_id = auth.uid());
+END $$;
 
 -- Admins can view all notification logs
-CREATE POLICY notification_logs_admin_policy ON notification_logs
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles ur
-      JOIN roles r ON ur.role_id = r.id
-      WHERE ur.user_id = auth.uid() AND r.name = 'admin'
-    )
-  );
+DO $$ BEGIN
+  DROP POLICY IF EXISTS notification_logs_admin_policy ON notification_logs;
+  CREATE POLICY notification_logs_admin_policy ON notification_logs
+    FOR SELECT
+    USING (
+      EXISTS (
+        SELECT 1 FROM user_roles ur
+        JOIN roles r ON ur.role_id = r.id
+        WHERE ur.user_id = auth.uid() AND r.name = 'admin'
+      )
+    );
+END $$;
 
 -- Add comment for documentation
 COMMENT ON TABLE device_tokens IS 'Stores FCM/APNS device tokens for mobile push notifications';

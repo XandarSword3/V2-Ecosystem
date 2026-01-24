@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
+import { useSiteSettings } from '@/lib/settings-context';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { StatCardSkeleton, CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import { useSocket } from '@/lib/socket';
+import { getModuleIcon } from '@/lib/module-utils';
 import {
   Users,
   UtensilsCrossed,
@@ -44,12 +46,8 @@ interface DashboardStats {
   todayBookings: number;
   todayTickets: number;
   recentOrders: RecentOrder[];
-  revenueByUnit: {
-    restaurant: number;
-    snackBar: number;
-    chalets: number;
-    pool: number;
-  };
+  // Dynamic revenue by module - keyed by module slug
+  revenueByUnit: Record<string, number>;
   trends?: {
     orders: number;
     revenue: number;
@@ -140,7 +138,7 @@ function RevenueBar({
   color,
   delay,
 }: {
-  name: string;
+  name: React.ReactNode;
   value: number;
   percentage: number;
   color: string;
@@ -192,11 +190,32 @@ function OrderStatus({ status }: { status: string }) {
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const { modules } = useSiteSettings();
   const { socket } = useSocket();
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Get active modules for dynamic revenue display
+  const activeModules = useMemo(() => {
+    if (!modules || modules.length === 0) return [];
+    return modules
+      .filter(m => m.is_active)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  }, [modules]);
+
+  // Map colors to module indices for variety
+  const moduleColors = [
+    'bg-gradient-to-r from-orange-400 to-rose-500',
+    'bg-gradient-to-r from-amber-400 to-orange-500',
+    'bg-gradient-to-r from-emerald-400 to-teal-500',
+    'bg-gradient-to-r from-primary-400 to-secondary-500',
+    'bg-gradient-to-r from-purple-400 to-indigo-500',
+    'bg-gradient-to-r from-pink-400 to-rose-500',
+    'bg-gradient-to-r from-cyan-400 to-blue-500',
+    'bg-gradient-to-r from-lime-400 to-green-500',
+  ];
 
   useEffect(() => {
     loadStats();
@@ -359,7 +378,7 @@ export default function AdminDashboard() {
 
       {/* Two Column Layout */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Revenue by Unit */}
+        {/* Revenue by Unit - Dynamic based on active modules */}
         <motion.div variants={fadeInUp}>
           <Card variant="glass">
             <CardHeader>
@@ -370,34 +389,64 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-5">
-                <RevenueBar
-                  name="🍽️ Restaurant"
-                  value={stats?.revenueByUnit?.restaurant || 0}
-                  percentage={getPercentage(stats?.revenueByUnit?.restaurant || 0)}
-                  color="bg-gradient-to-r from-orange-400 to-rose-500"
-                  delay={0.4}
-                />
-                <RevenueBar
-                  name="🍿 Snack Bar"
-                  value={stats?.revenueByUnit?.snackBar || 0}
-                  percentage={getPercentage(stats?.revenueByUnit?.snackBar || 0)}
-                  color="bg-gradient-to-r from-amber-400 to-orange-500"
-                  delay={0.5}
-                />
-                <RevenueBar
-                  name="🏠 Chalets"
-                  value={stats?.revenueByUnit?.chalets || 0}
-                  percentage={getPercentage(stats?.revenueByUnit?.chalets || 0)}
-                  color="bg-gradient-to-r from-emerald-400 to-teal-500"
-                  delay={0.6}
-                />
-                <RevenueBar
-                  name="🏊 Pool"
-                  value={stats?.revenueByUnit?.pool || 0}
-                  percentage={getPercentage(stats?.revenueByUnit?.pool || 0)}
-                  color="bg-gradient-to-r from-primary-400 to-secondary-500"
-                  delay={0.7}
-                />
+                {activeModules.length > 0 ? (
+                  activeModules.map((module, index) => {
+                    // Get revenue for this module - support both slug formats
+                    const slugKey = module.slug;
+                    const camelKey = module.slug.replace(/-([a-z])/g, (_, l) => l.toUpperCase());
+                    const revenue = stats?.revenueByUnit?.[slugKey] || stats?.revenueByUnit?.[camelKey] || 0;
+                    
+                    const ModuleIcon = getModuleIcon(module);
+
+                    return (
+                      <RevenueBar
+                        key={module.id}
+                        name={
+                          <div className="flex items-center gap-2">
+                            <ModuleIcon className="w-4 h-4" />
+                            <span>{module.name}</span>
+                          </div>
+                        }
+                        value={revenue}
+                        percentage={getPercentage(revenue)}
+                        color={moduleColors[index % moduleColors.length]}
+                        delay={0.4 + index * 0.1}
+                      />
+                    );
+                  })
+                ) : (
+                  // Fallback to hardcoded modules if none configured
+                  <>
+                    <RevenueBar
+                      name="🍽️ Restaurant"
+                      value={stats?.revenueByUnit?.restaurant || 0}
+                      percentage={getPercentage(stats?.revenueByUnit?.restaurant || 0)}
+                      color="bg-gradient-to-r from-orange-400 to-rose-500"
+                      delay={0.4}
+                    />
+                    <RevenueBar
+                      name="🍿 Snack Bar"
+                      value={stats?.revenueByUnit?.snackBar || 0}
+                      percentage={getPercentage(stats?.revenueByUnit?.snackBar || 0)}
+                      color="bg-gradient-to-r from-amber-400 to-orange-500"
+                      delay={0.5}
+                    />
+                    <RevenueBar
+                      name="🏠 Chalets"
+                      value={stats?.revenueByUnit?.chalets || 0}
+                      percentage={getPercentage(stats?.revenueByUnit?.chalets || 0)}
+                      color="bg-gradient-to-r from-emerald-400 to-teal-500"
+                      delay={0.6}
+                    />
+                    <RevenueBar
+                      name="🏊 Pool"
+                      value={stats?.revenueByUnit?.pool || 0}
+                      percentage={getPercentage(stats?.revenueByUnit?.pool || 0)}
+                      color="bg-gradient-to-r from-primary-400 to-secondary-500"
+                      delay={0.7}
+                    />
+                  </>
+                )}
               </div>
 
               <motion.div

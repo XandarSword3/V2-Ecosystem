@@ -3,9 +3,14 @@ import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 
-async function migrate() {
+export async function migrate() {
   try {
-    await initializeDatabase();
+    // Only initialize if not already initialized
+    try {
+      await initializeDatabase();
+    } catch (e) {
+      // Ignore if already initialized
+    }
     const pool = getPool();
 
     logger.info('Running migrations...');
@@ -581,15 +586,24 @@ async function migrate() {
     }
 
     logger.info('Migrations completed successfully');
-    await closeDatabase();
-    process.exit(0);
+    // await closeDatabase(); // Don't close if imported
   } catch (error) {
     // Print full error to stdout for debugging (temporary)
     console.error(error);
     logger.error('Migration failed:', error);
-    await closeDatabase();
-    process.exit(1);
+    throw error;
   }
 }
 
-migrate();
+// Run if called directly
+if (require.main === module) {
+  migrate()
+    .then(async () => {
+      await closeDatabase();
+      process.exit(0);
+    })
+    .catch(async () => {
+      await closeDatabase();
+      process.exit(1);
+    });
+}

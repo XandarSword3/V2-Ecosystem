@@ -18,6 +18,7 @@ export default defineConfig({
     hookTimeout: 60000, // 60 seconds for setup/teardown
 
     // Run tests sequentially to avoid database conflicts
+    fileParallelism: false,
     sequence: {
       shuffle: false,
     },
@@ -37,6 +38,12 @@ export default defineConfig({
     // Environment variables for integration tests
     env: {
       RUN_INTEGRATION_TESTS: 'true',
+      NODE_ENV: 'test',
+      DATABASE_URL: '',
+      SUPABASE_URL: '',
+      SUPABASE_SERVICE_KEY: '',
+      SUPABASE_ANON_KEY: '',
+      JWT_SECRET: '',
     },
 
     // Setup file
