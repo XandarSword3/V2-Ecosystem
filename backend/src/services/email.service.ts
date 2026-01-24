@@ -6,8 +6,11 @@ import { logger } from '../utils/logger.js';
 interface EmailOptions {
   to: string;
   subject: string;
-  html: string;
+  html?: string;
   text?: string;
+  template?: string;
+  context?: any;
+  data?: any;
   attachments?: Array<{
     filename: string;
     content: string | Buffer;
@@ -145,6 +148,30 @@ class EmailService {
     if (!this.isConfigured || !this.transporter) {
       logger.warn('Email not sent - service not configured');
       return false;
+    }
+
+    // Handle template if provided
+    if (options.template && !options.html) {
+      const templateData = await this.getTemplate(options.template);
+      if (templateData) {
+        const variables = { 
+          ...(await this.getSiteSettings()), 
+          ...(options.data || options.context || {}) 
+        };
+        options.html = this.replaceVariables(templateData.html_body, variables as TemplateVariables);
+        
+        // Use template subject if not provided in options
+        if (!options.subject || options.subject === '') {
+          options.subject = this.replaceVariables(templateData.subject, variables as TemplateVariables);
+        }
+      } else {
+        logger.warn(`Template '${options.template}' not found, utilizing provided options`);
+      }
+    }
+    
+    if (!options.html) {
+        logger.error('Email not sent - missing content (HTML or valid template)');
+        return false;
     }
 
     const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@v2resort.com';

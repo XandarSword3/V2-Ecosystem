@@ -12,14 +12,15 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
 
     const token = authHeader.replace('Bearer ', '');
     const payload = verifyToken(token);
-    req.user = payload;
+    req.user = { ...payload, id: payload.userId };
     next();
   } catch (error) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 }
 
-export function authorize(...allowedRoles: string[]) {
+export function authorize(...args: (string | string[])[]) {
+  const allowedRoles = args.flat();
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
@@ -85,7 +86,7 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
       const payload = verifyToken(token);
-      req.user = payload;
+      req.user = { ...payload, id: payload.userId };
     }
   } catch {
     // Token invalid, continue without user

@@ -120,10 +120,11 @@ export function createBookingController(deps: BookingControllerDeps): BookingCon
         const userId = req.user?.userId;
         const input = {
           ...validation.data,
-          customerId: userId || validation.data.customerId,
+          chaletId: validation.data.chaletId,
+          customerId: userId || validation.data.customerId!,
         };
 
-        const result = await bookingService.createBooking(input);
+        const result = await bookingService.createBooking(input as any);
 
         res.status(201).json({
           success: true,

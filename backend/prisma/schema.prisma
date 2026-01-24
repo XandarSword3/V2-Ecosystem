@@ -1,0 +1,208 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Users {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  firstName        String?
+  lastName         String?
+  stripeCustomerId String?
+  memberships      PoolMembership[]
+  poolTickets      PoolTicket[]
+  userCredits      UserCredit[]
+  chaletBookings   ChaletBooking[]
+}
+
+model RestaurantTable {
+  id                 String   @id @default(uuid())
+  number             Int
+  name               String
+  capacity           Int
+  minCapacity        Int      @default(1)
+  status             String
+  position           Json?
+  section            String?
+  features           Json?
+  lastStatusChange   DateTime?
+  lastStatusChangedBy String?
+  currentReservation TableReservation[]
+  currentOrder       TableOrder[]
+}
+
+model TableReservation {
+  id                 String   @id @default(uuid())
+  tableId            String
+  table              RestaurantTable @relation(fields: [tableId], references: [id])
+  date               DateTime
+  time               String
+  endTime            String?
+  status             String
+  userId             String?
+  partySize          Int
+  guestName          String
+  guestEmail         String?
+  guestPhone         String?
+  seatedAt           DateTime?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  noShowMarkedAt     DateTime?
+  confirmedAt        DateTime?
+  specialRequests    String?
+  seatedBy           String? // Staff ID
+  noShowMarkedBy     String? // Staff ID
+  confirmedBy        String? // Staff ID
+}
+
+model TableOrder {
+  id        String   @id @default(uuid())
+  tableId   String
+  table     RestaurantTable @relation(fields: [tableId], references: [id])
+  status    String
+  createdAt DateTime @default(now())
+}
+
+model ChaletBooking {
+  id                 String    @id @default(uuid())
+  userId             String
+  user               Users     @relation(fields: [userId], references: [id])
+  chaletId           String
+  chalet             Chalet    @relation(fields: [chaletId], references: [id])
+  status             String
+  totalPrice         Decimal?
+  startDate          DateTime?
+  endDate            DateTime?
+  checkInDate        DateTime?
+  checkOutDate       DateTime?
+  cancellationReason String?
+  cancelledAt        DateTime?
+  modifiedAt         DateTime? @updatedAt
+  refundAmount       Decimal?
+  nights             Int?
+  payments           Payment[]
+}
+
+model UserCredit {
+  id              String   @id @default(uuid())
+  amount          Decimal
+  type            String?
+  userId          String
+  user            Users    @relation(fields: [userId], references: [id])
+  sourceBookingId String?
+  usedAt          DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+}
+
+model PoolTicket {
+  id                 String   @id @default(uuid())
+  status             String
+  date               DateTime?
+  userId             String
+  user               Users    @relation(fields: [userId], references: [id])
+  type               String?
+  quantity           Int       @default(1)
+  totalPrice         Decimal?
+  payment            Payment?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  cancelledAt        DateTime?
+  modifiedAt         DateTime?
+  cancellationReason String?
+}
+
+model SystemSettings {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  category  String?
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+  createdAt DateTime @default(now())
+  createdBy String?
+}
+
+model PoolMembership {
+  id                   String   @id @default(uuid())
+  status               String
+  userId               String
+  stripeSubscriptionId String?
+  cancelledAt          DateTime?
+  cancellationReason   String?
+  remainingGuestPasses Int
+  discountPercentage   Decimal?
+  type                 String
+  price                Decimal?
+  billingCycle         String
+  startDate            DateTime?
+  endDate              DateTime?
+  renewedAt            DateTime?
+  autoRenew            Boolean?
+  corporateName        String?
+  maxMembers           Int       @default(1)
+  members              MembershipMember[]
+  user                 Users    @relation(fields: [userId], references: [id])
+}
+
+model MembershipMember {
+  id            String   @id @default(uuid())
+  membershipId  String
+  membership    PoolMembership @relation(fields: [membershipId], references: [id])
+  email         String?
+  status        String
+  userId        String?
+}
+
+model SecurityAuditLog {
+  id           String   @id @default(uuid())
+  action       String
+  resource     String
+  userId       String?
+  targetUserId String?
+  eventType    String?
+  severity     String?
+  description  String?
+  details      Json?
+  metadata     Json?
+  success      Boolean?
+  ipAddress    String?
+  userAgent    String?
+  timestamp    DateTime @default(now())
+  createdAt    DateTime @default(now())
+}
+
+model GuestPassUsage {
+  id           String   @id @default(uuid())
+  membershipId String
+  guestName    String?
+  guestEmail   String?
+  usedAt       DateTime @default(now())
+}
+
+model Chalet {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal?
+  bookings    ChaletBooking[]
+}
+
+model Payment {
+  id                    String         @id @default(uuid())
+  amount                Decimal
+  currency              String         @default("USD")
+  status                String
+  stripePaymentIntentId String?
+  createdAt             DateTime       @default(now())
+  
+  chaletBookingId       String?
+  chaletBooking         ChaletBooking? @relation(fields: [chaletBookingId], references: [id])
+
+  poolTicketId          String?        @unique
+  poolTicket            PoolTicket?    @relation(fields: [poolTicketId], references: [id])
+}
