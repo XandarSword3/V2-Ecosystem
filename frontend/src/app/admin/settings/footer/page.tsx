@@ -66,7 +66,16 @@ const DEFAULT_CONFIG: FooterConfig = {
       links: [
         { label: 'Restaurant', href: '/restaurant' },
         { label: 'Chalets', href: '/chalets' },
-        { label: 'Pool', href: '/pool' }
+        { label: 'Pool', href: '/pool' },
+        { label: 'Gift Cards', href: '/giftcards' }
+      ]
+    },
+    {
+      title: 'Legal',
+      links: [
+        { label: 'Privacy Policy', href: '/privacy' },
+        { label: 'Terms of Service', href: '/terms' },
+        { label: 'Cancellation Policy', href: '/cancellation' }
       ]
     }
   ],

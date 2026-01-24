@@ -25,6 +25,8 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  Shield,
+  Search,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -72,6 +74,20 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
 
 // Dynamic modules only to avoid duplicates
   const navigation: NavItem[] = [
+    // Manager Dashboard - for managers only
+    {
+      name: 'Manager Dashboard',
+      href: '/staff/manager',
+      icon: Shield,
+      roles: ['super_admin', 'admin', 'restaurant_manager', 'chalet_manager', 'pool_manager', 'manager']
+    },
+    // Customer Lookup
+    {
+      name: 'Customer Lookup',
+      href: '/staff/customers',
+      icon: Search,
+      roles: ['super_admin', 'admin', 'restaurant_staff', 'restaurant_admin', 'restaurant_manager', 'chalet_staff', 'chalet_admin', 'pool_staff', 'pool_admin']
+    },
     ...modules.map(module => ({
       name: module.name,
       href: `/staff/modules/${module.slug}`,
