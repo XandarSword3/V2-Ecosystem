@@ -11,7 +11,7 @@ const isProduction = config.env === 'production';
 
 export async function register(req: Request, res: Response, next: NextFunction) {
   try {
-    const data = registerSchema.parse(req.body);
+    const data = registerSchema.parse(req.body) as authService.RegisterData;
     const result = await authService.register(data);
 
     await logActivity({

@@ -1,0 +1,314 @@
+{
+  "common": {
+    "loading": "Caricamento...",
+    "error": "Si è verificato un errore",
+    "retry": "Riprova",
+    "cancel": "Annulla",
+    "save": "Salva",
+    "delete": "Elimina",
+    "edit": "Modifica",
+    "close": "Chiudi",
+    "back": "Indietro",
+    "next": "Avanti",
+    "previous": "Precedente",
+    "submit": "Invia",
+    "confirm": "Conferma",
+    "search": "Cerca",
+    "filter": "Filtra",
+    "sort": "Ordina",
+    "clear": "Cancella",
+    "select": "Seleziona",
+    "all": "Tutti",
+    "none": "Nessuno",
+    "yes": "Sì",
+    "no": "No",
+    "ok": "OK",
+    "done": "Fatto",
+    "required": "Obbligatorio",
+    "optional": "Facoltativo"
+  },
+  "navigation": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "bookings": "Prenotazioni",
+    "menu": "Menu",
+    "pool": "Piscina",
+    "orders": "Ordini",
+    "profile": "Profilo",
+    "settings": "Impostazioni",
+    "help": "Aiuto",
+    "logout": "Esci",
+    "login": "Accedi",
+    "signup": "Registrati"
+  },
+  "auth": {
+    "login": {
+      "title": "Bentornato",
+      "subtitle": "Accedi al tuo account",
+      "email": "Indirizzo email",
+      "password": "Password",
+      "rememberMe": "Ricordami",
+      "forgotPassword": "Password dimenticata?",
+      "noAccount": "Non hai un account?",
+      "signUp": "Registrati",
+      "loginButton": "Accedi",
+      "loginWithGoogle": "Continua con Google",
+      "loginWithApple": "Continua con Apple",
+      "or": "oppure"
+    },
+    "register": {
+      "title": "Crea un account",
+      "subtitle": "Unisciti a V2 Resort oggi",
+      "firstName": "Nome",
+      "lastName": "Cognome",
+      "email": "Indirizzo email",
+      "phone": "Numero di telefono",
+      "password": "Password",
+      "confirmPassword": "Conferma password",
+      "terms": "Accetto i {termsLink} e la {privacyLink}",
+      "termsOfService": "Termini di servizio",
+      "privacyPolicy": "Informativa sulla privacy",
+      "hasAccount": "Hai già un account?",
+      "signIn": "Accedi",
+      "createButton": "Crea account"
+    },
+    "forgotPassword": {
+      "title": "Reimposta password",
+      "subtitle": "Inserisci la tua email per ricevere un link di reimpostazione",
+      "email": "Indirizzo email",
+      "sendButton": "Invia link",
+      "backToLogin": "Torna al login",
+      "checkEmail": "Controlla la tua email",
+      "emailSent": "Abbiamo inviato un link di reimpostazione a {email}"
+    },
+    "resetPassword": {
+      "title": "Imposta nuova password",
+      "subtitle": "Crea una nuova password per il tuo account",
+      "newPassword": "Nuova password",
+      "confirmPassword": "Conferma nuova password",
+      "resetButton": "Reimposta password",
+      "passwordUpdated": "Password aggiornata con successo"
+    },
+    "errors": {
+      "invalidCredentials": "Email o password non validi",
+      "emailInUse": "Questa email è già registrata",
+      "weakPassword": "La password deve essere di almeno 8 caratteri",
+      "passwordMismatch": "Le password non corrispondono",
+      "invalidEmail": "Inserisci un indirizzo email valido",
+      "accountLocked": "Il tuo account è stato bloccato. Riprova più tardi.",
+      "networkError": "Errore di connessione. Controlla la tua connessione internet."
+    }
+  },
+  "booking": {
+    "title": "Prenota il tuo soggiorno",
+    "checkIn": "Check-in",
+    "checkOut": "Check-out",
+    "guests": "Ospiti",
+    "adults": "Adulti",
+    "children": "Bambini",
+    "rooms": "Camere",
+    "searchRooms": "Cerca camere disponibili",
+    "noRoomsAvailable": "Nessuna camera disponibile per le date selezionate",
+    "roomType": "Tipo di camera",
+    "pricePerNight": "{price} a notte",
+    "totalPrice": "Totale: {price}",
+    "taxes": "Tasse e commissioni incluse",
+    "bookNow": "Prenota ora",
+    "reviewBooking": "Verifica la tua prenotazione",
+    "confirmBooking": "Conferma prenotazione",
+    "bookingConfirmed": "Prenotazione confermata!",
+    "bookingNumber": "Prenotazione #{number}",
+    "specialRequests": "Richieste speciali",
+    "specialRequestsPlaceholder": "Hai richieste o preferenze particolari?",
+    "status": {
+      "pending": "In attesa",
+      "confirmed": "Confermata",
+      "checkedIn": "Check-in effettuato",
+      "checkedOut": "Check-out effettuato",
+      "cancelled": "Cancellata"
+    },
+    "cancellation": {
+      "title": "Cancella prenotazione",
+      "confirm": "Sei sicuro di voler cancellare questa prenotazione?",
+      "policy": "Politica di cancellazione: {policy}",
+      "refund": "Importo del rimborso: {amount}",
+      "cancelled": "Prenotazione cancellata"
+    }
+  },
+  "menu": {
+    "title": "Il nostro menu",
+    "categories": "Categorie",
+    "allItems": "Tutti i piatti",
+    "popular": "Popolari",
+    "new": "Novità",
+    "vegetarian": "Vegetariano",
+    "vegan": "Vegano",
+    "glutenFree": "Senza glutine",
+    "addToCart": "Aggiungi al carrello",
+    "customize": "Personalizza",
+    "quantity": "Quantità",
+    "specialInstructions": "Istruzioni speciali",
+    "allergies": "Allergeni: {allergens}",
+    "outOfStock": "Esaurito",
+    "nutrition": {
+      "calories": "{value} cal",
+      "protein": "{value}g proteine",
+      "carbs": "{value}g carboidrati",
+      "fat": "{value}g grassi"
+    }
+  },
+  "cart": {
+    "title": "Il tuo carrello",
+    "empty": "Il carrello è vuoto",
+    "startOrdering": "Inizia a ordinare",
+    "subtotal": "Subtotale",
+    "tax": "IVA",
+    "total": "Totale",
+    "checkout": "Procedi al pagamento",
+    "clearCart": "Svuota carrello",
+    "removeItem": "Rimuovi",
+    "updateQuantity": "Aggiorna quantità"
+  },
+  "order": {
+    "title": "Il tuo ordine",
+    "status": "Stato dell'ordine",
+    "orderNumber": "Ordine #{number}",
+    "placedAt": "Effettuato alle {time}",
+    "estimatedTime": "Stima: {time}",
+    "deliveryTo": "Consegna a: {location}",
+    "pickup": "Ritiro",
+    "trackOrder": "Traccia ordine",
+    "reorder": "Ordina di nuovo",
+    "statuses": {
+      "pending": "Ordine ricevuto",
+      "preparing": "In preparazione",
+      "ready": "Pronto per il ritiro",
+      "delivered": "Consegnato",
+      "cancelled": "Cancellato"
+    },
+    "history": "Storico ordini",
+    "noOrders": "Nessun ordine ancora"
+  },
+  "pool": {
+    "title": "Accesso piscina",
+    "bookTicket": "Prenota biglietto piscina",
+    "selectDate": "Seleziona data",
+    "selectTime": "Seleziona fascia oraria",
+    "availableSlots": "{count} posti disponibili",
+    "soldOut": "Esaurito",
+    "ticketType": "Tipo di biglietto",
+    "adult": "Adulto",
+    "child": "Bambino (3-12 anni)",
+    "infant": "Neonato (0-2 anni)",
+    "ticketPrice": "{price} a persona",
+    "yourTickets": "I tuoi biglietti",
+    "showQR": "Mostra codice QR",
+    "scanToEnter": "Scansiona per entrare",
+    "validUntil": "Valido fino alle {time}",
+    "rules": {
+      "title": "Regole della piscina",
+      "noFood": "Vietato cibo e contenitori in vetro",
+      "shower": "Doccia obbligatoria prima dell'ingresso",
+      "supervision": "I bambini devono essere sorvegliati",
+      "hours": "Orari di apertura: {hours}"
+    }
+  },
+  "payment": {
+    "title": "Pagamento",
+    "method": "Metodo di pagamento",
+    "card": "Carta di credito/debito",
+    "roomCharge": "Addebita sulla camera",
+    "cash": "Contanti",
+    "processing": "Elaborazione pagamento...",
+    "success": "Pagamento riuscito",
+    "failed": "Pagamento fallito",
+    "retry": "Riprova",
+    "receipt": "Ricevuta",
+    "downloadReceipt": "Scarica ricevuta"
+  },
+  "profile": {
+    "title": "Il mio profilo",
+    "personalInfo": "Informazioni personali",
+    "firstName": "Nome",
+    "lastName": "Cognome",
+    "email": "Email",
+    "phone": "Numero di telefono",
+    "dateOfBirth": "Data di nascita",
+    "nationality": "Nazionalità",
+    "saveChanges": "Salva modifiche",
+    "changePassword": "Cambia password",
+    "notifications": "Preferenze notifiche",
+    "language": "Lingua",
+    "deleteAccount": "Elimina account"
+  },
+  "notifications": {
+    "title": "Notifiche",
+    "markAllRead": "Segna tutto come letto",
+    "noNotifications": "Nessuna notifica",
+    "settings": "Impostazioni notifiche",
+    "email": "Notifiche email",
+    "push": "Notifiche push",
+    "sms": "Notifiche SMS"
+  },
+  "errors": {
+    "pageNotFound": {
+      "title": "Pagina non trovata",
+      "description": "La pagina che stai cercando non esiste o è stata spostata.",
+      "goHome": "Vai alla home"
+    },
+    "serverError": {
+      "title": "Qualcosa è andato storto",
+      "description": "Stiamo avendo problemi a elaborare la tua richiesta. Riprova.",
+      "retry": "Riprova"
+    },
+    "offline": {
+      "title": "Sei offline",
+      "description": "Controlla la tua connessione internet.",
+      "retry": "Riprova connessione"
+    },
+    "sessionExpired": {
+      "title": "Sessione scaduta",
+      "description": "La tua sessione è scaduta. Accedi di nuovo.",
+      "login": "Accedi"
+    }
+  },
+  "accessibility": {
+    "skipToContent": "Salta al contenuto principale",
+    "menuToggle": "Attiva/disattiva menu",
+    "closeMenu": "Chiudi menu",
+    "openMenu": "Apri menu",
+    "loading": "Caricamento contenuto",
+    "required": "Campo obbligatorio",
+    "newWindow": "Si apre in una nuova finestra",
+    "externalLink": "Link esterno"
+  },
+  "footer": {
+    "about": "Chi siamo",
+    "contact": "Contattaci",
+    "terms": "Termini di servizio",
+    "privacy": "Informativa sulla privacy",
+    "faq": "FAQ",
+    "careers": "Lavora con noi",
+    "copyright": "© {year} V2 Resort. Tutti i diritti riservati."
+  },
+  "dates": {
+    "today": "Oggi",
+    "tomorrow": "Domani",
+    "yesterday": "Ieri",
+    "thisWeek": "Questa settimana",
+    "lastWeek": "Settimana scorsa",
+    "thisMonth": "Questo mese"
+  },
+  "time": {
+    "morning": "Mattina",
+    "afternoon": "Pomeriggio",
+    "evening": "Sera",
+    "night": "Notte"
+  },
+  "units": {
+    "currency": "€{value}",
+    "minutes": "{value} min",
+    "hours": "{value} ore",
+    "days": "{value} giorni"
+  }
+}

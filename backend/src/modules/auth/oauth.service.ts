@@ -501,7 +501,7 @@ async function findOrCreateOAuthUser(data: {
   interface UserRoleRow {
     roles: { name: string } | null;
   }
-  const roles = (userRoles as UserRoleRow[] | null)?.map((ur) => ur.roles?.name).filter(Boolean) as string[] || ['customer'];
+  const roles = (userRoles as unknown as UserRoleRow[] | null)?.map((ur) => ur.roles?.name).filter(Boolean) as string[] || ['customer'];
 
   // Generate JWT tokens
   const { accessToken, refreshToken } = generateTokens({
