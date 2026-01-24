@@ -232,7 +232,7 @@ export const axiosCorrelationInterceptor = (config: any) => {
 export const correlatedFetch = async (
   url: string,
   options: RequestInit = {}
-): Promise<Response> => {
+): Promise<any> => {
   const correlationId = getCorrelationId();
   const requestId = getRequestId();
   
