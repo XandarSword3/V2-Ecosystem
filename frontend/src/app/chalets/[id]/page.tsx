@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api, chaletsApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useContentTranslation } from '@/lib/translate';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
@@ -81,11 +81,15 @@ const amenityIcons: Record<string, React.ElementType> = {
 export default function ChaletDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const t = useTranslations('chalets');
   const tCommon = useTranslations('common');
   const currency = useSettingsStore((s) => s.currency);
   const { translateContent, isRTL } = useContentTranslation();
+  
+  // Get moduleId from query params for add-ons filtering
+  const moduleId = searchParams.get('module') || undefined;
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [checkInDate, setCheckInDate] = useState('');
@@ -105,10 +109,10 @@ export default function ChaletDetailPage() {
     queryFn: () => chaletsApi.getChalet(params.id as string),
   });
 
-  // Fetch add-ons
+  // Fetch add-ons (filtered by module if moduleId is provided)
   const { data: addOnsData } = useQuery({
-    queryKey: ['chalet-addons'],
-    queryFn: () => chaletsApi.getAddOns(),
+    queryKey: ['chalet-addons', moduleId],
+    queryFn: () => chaletsApi.getAddOns(moduleId),
   });
 
   const chalet: Chalet | null = chaletData?.data?.data || null;

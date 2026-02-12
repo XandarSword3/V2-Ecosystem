@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react'; // FIX Iter-10: added useCallback
 import { loadStripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -139,6 +139,8 @@ export default function StripePayment({
   onError,
   onCancel,
 }: StripePaymentProps) {
+  // FIX Iter-10: memoize onError to prevent infinite useEffect re-runs
+  const stableOnError = useCallback(onError, []);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,14 +164,14 @@ export default function StripePayment({
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
         setError(errorMessage);
-        onError(errorMessage);
+        stableOnError(errorMessage); // FIX Iter-10: use stable ref
       } finally {
         setLoading(false);
       }
     }
 
     createIntent();
-  }, [amount, referenceType, referenceId, onError]);
+  }, [amount, referenceType, referenceId, stableOnError]); // FIX Iter-10: use stableOnError
 
   if (loading) {
     return (

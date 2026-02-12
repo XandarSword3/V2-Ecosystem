@@ -1,0 +1,15 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.17 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/frontend[39m
+
+ [32m✓[39m tests/stores/module-builder-store.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/stores/authStore.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts [2m([22m[2m39 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[32m 58[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Skeleton.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+Terminate batch job (Y/N)? Terminate batch job (Y/N)? 
+^C

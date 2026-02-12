@@ -349,3 +349,20 @@ export interface PaginationParams {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
+
+// ----- Domain Module Re-exports -----
+export * from './giftcards';
+export * from './coupons';
+export * from './housekeeping';
+export * from './loyalty';
+export * from './inventory';
+export * from './staff';
+export * from './channels';
+export * from './reviews';
+export * from './gdpr';
+export * from './marketing';
+export * from './messaging';
+export * from './modules';
+export * from './property';
+export * from './kiosk';
+export * from './finance';

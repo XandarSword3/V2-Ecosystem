@@ -1,4 +1,4 @@
-export type UIComponentType = 
+export type UIComponentType =
   | 'container'
   | 'hero'
   | 'text_block'
@@ -8,7 +8,9 @@ export type UIComponentType =
   | 'menu_list'
   | 'session_list'
   | 'booking_calendar'
-  | 'form_container';
+  | 'form_container'
+  | 'testimonials'
+  | 'pricing_table';
 
 export interface UIBlockStyle {
   backgroundColor?: string;

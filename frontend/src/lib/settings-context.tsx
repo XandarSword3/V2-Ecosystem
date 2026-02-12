@@ -15,6 +15,9 @@ export interface SiteSettings {
   description: string;
   currency: string;
   taxRate: number;
+  // FIX: Iteration 7 - Add service charge and delivery fee to settings
+  serviceChargeRate: number; // e.g. 0.10 for 10%
+  deliveryFee: number; // Flat fee in currency units
   timezone: string;
 
   // Contact
@@ -54,11 +57,20 @@ export interface SiteSettings {
     surface: string;
     text: string;
     textMuted: string;
+    // Extended colors (optional)
+    surfaceSecondary?: string;
+    surfaceElevated?: string;
+    border?: string;
+    borderMuted?: string;
     // Dark mode variants (optional)
     backgroundDark?: string;
     surfaceDark?: string;
+    surfaceSecondaryDark?: string;
+    surfaceElevatedDark?: string;
     textDark?: string;
     textMutedDark?: string;
+    borderDark?: string;
+    borderMutedDark?: string;
   };
 
   // Module Specific Settings
@@ -67,7 +79,7 @@ export interface SiteSettings {
   animationsEnabled: boolean;
   reducedMotion: boolean;
   soundEnabled: boolean;
-  
+
   // Weather Widget
   showWeatherWidget?: boolean;
   weatherLocation?: string;
@@ -101,10 +113,19 @@ export interface HomepageSection {
 export interface HomepageConfig {
   heroSlides?: HeroSlide[];
   sections?: HomepageSection[];
+  hero?: {
+    title?: string;
+    subtitle?: string;
+    ctaText?: string;
+    ctaLink?: string;
+    secondaryCtaText?: string;
+    secondaryCtaLink?: string;
+  };
   ctaTitle?: string;
   ctaSubtitle?: string;
   ctaButtonText?: string;
   ctaButtonLink?: string;
+  stats?: { value: string; label: string }[];
 }
 
 export interface FooterLogo {
@@ -180,14 +201,18 @@ export interface NavbarLink {
 }
 
 const defaultSettings: SiteSettings = {
-  resortName: 'V2 Resort',
-  restaurantName: 'V2 Restaurant',
-  snackBarName: 'V2 Snack Bar',
-  poolName: 'V2 Pool',
+  resortName: '', // Will be loaded from database
+  restaurantName: '',
+  snackBarName: '',
+  poolName: '',
   tagline: '',
   description: '',
   currency: 'USD',
-  taxRate: 0.10,
+  // FIX: Iteration 4 - Align default taxRate to 0.11 (Lebanon VAT) to match backend DEFAULT_TAX_RATE
+  taxRate: 0.11,
+  // FIX: Iteration 7 - Add service charge and delivery fee defaults
+  serviceChargeRate: 0.10,
+  deliveryFee: 5,
   timezone: 'UTC',
   phone: '',
   email: '',
@@ -265,13 +290,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const broadcastSettingsUpdate = () => {
     try {
       localStorage.setItem('v2-settings-updated', Date.now().toString());
-    } catch {}
+    } catch { }
   };
 
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
       const apiUrl = baseUrl.replace(/\/api\/?$/, '');
       settingsLogger.debug('Fetching settings from', `${apiUrl}/api/settings`);
       const [settingsRes, modulesRes] = await Promise.all([

@@ -1,5 +1,5 @@
 
-import { getSupabase } from "./connection";
+import { getSupabase } from "./connection.js";
 import fs from 'fs';
 import path from 'path';
 

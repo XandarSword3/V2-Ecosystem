@@ -2,7 +2,7 @@
 export const CONFIG = {
   // API Configuration
   BASE_URL: process.env.STRESS_TEST_URL || 'http://localhost:3005',
-  API_BASE_URL: process.env.API_URL || 'http://localhost:3005/api',
+  API_BASE_URL: process.env.API_URL || 'http://localhost:3005/api/v1',
   SOCKET_URL: process.env.SOCKET_URL || 'http://localhost:3005',
 
   // Bot Counts

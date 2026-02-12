@@ -103,24 +103,28 @@ export function ThemeInjector() {
     root.style.setProperty('--color-accent', baseColors.accent);
     
     // Mode-specific colors - background, surface, text
+    // When custom colors are set, use them in both light and dark modes (with dark fallbacks)
+    const hasCustomColors = !!settings.themeColors;
+    
     if (isDark) {
-      root.style.setProperty('--color-background', themeColors.backgroundDark);
-      root.style.setProperty('--color-surface', themeColors.surfaceDark);
-      root.style.setProperty('--color-surface-secondary', themeColors.surfaceSecondaryDark || themeColors.surfaceDark);
-      root.style.setProperty('--color-surface-elevated', themeColors.surfaceElevatedDark || themeColors.surfaceDark);
-      root.style.setProperty('--color-text', themeColors.textDark);
-      root.style.setProperty('--color-text-muted', themeColors.textMutedDark);
-      root.style.setProperty('--color-border', themeColors.borderDark || themeColors.textMutedDark);
-      root.style.setProperty('--color-border-muted', themeColors.borderMutedDark || themeColors.surfaceDark);
+      // In dark mode: use custom colors if set, otherwise use theme dark preset
+      root.style.setProperty('--color-background', hasCustomColors && baseColors.backgroundDark ? baseColors.backgroundDark : themeColors.backgroundDark);
+      root.style.setProperty('--color-surface', hasCustomColors && baseColors.surfaceDark ? baseColors.surfaceDark : themeColors.surfaceDark);
+      root.style.setProperty('--color-surface-secondary', hasCustomColors && baseColors.surfaceSecondaryDark ? baseColors.surfaceSecondaryDark : (themeColors.surfaceSecondaryDark || themeColors.surfaceDark));
+      root.style.setProperty('--color-surface-elevated', hasCustomColors && baseColors.surfaceElevatedDark ? baseColors.surfaceElevatedDark : (themeColors.surfaceElevatedDark || themeColors.surfaceDark));
+      root.style.setProperty('--color-text', hasCustomColors && baseColors.textDark ? baseColors.textDark : themeColors.textDark);
+      root.style.setProperty('--color-text-muted', hasCustomColors && baseColors.textMutedDark ? baseColors.textMutedDark : themeColors.textMutedDark);
+      root.style.setProperty('--color-border', hasCustomColors && baseColors.borderDark ? baseColors.borderDark : (themeColors.borderDark || themeColors.textMutedDark));
+      root.style.setProperty('--color-border-muted', hasCustomColors && baseColors.borderMutedDark ? baseColors.borderMutedDark : (themeColors.borderMutedDark || themeColors.surfaceDark));
     } else {
       root.style.setProperty('--color-background', baseColors.background);
       root.style.setProperty('--color-surface', baseColors.surface);
-      root.style.setProperty('--color-surface-secondary', themeColors.surfaceSecondary || baseColors.background);
-      root.style.setProperty('--color-surface-elevated', themeColors.surfaceElevated || baseColors.surface);
+      root.style.setProperty('--color-surface-secondary', baseColors.surfaceSecondary || baseColors.background);
+      root.style.setProperty('--color-surface-elevated', baseColors.surfaceElevated || baseColors.surface);
       root.style.setProperty('--color-text', baseColors.text);
       root.style.setProperty('--color-text-muted', baseColors.textMuted);
-      root.style.setProperty('--color-border', themeColors.border || baseColors.textMuted);
-      root.style.setProperty('--color-border-muted', themeColors.borderMuted || baseColors.background);
+      root.style.setProperty('--color-border', baseColors.border || baseColors.textMuted);
+      root.style.setProperty('--color-border-muted', baseColors.borderMuted || baseColors.background);
     }
 
     // Text on colored backgrounds (guaranteed readability)

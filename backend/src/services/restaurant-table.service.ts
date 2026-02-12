@@ -4,7 +4,7 @@
  * Handles table reservations, visual floor plan, and kitchen display integration.
  */
 
-import { prisma } from '../config/database.js';
+import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
 import { io } from '../config/socket.js';
 
@@ -56,7 +56,7 @@ interface TableInfo {
   minCapacity: number;
   status: TableStatus;
   position: TablePosition;
-  section: string;
+  section: string | null;
   features: string[];
   currentReservation?: TableReservation;
   currentOrder?: TableOrder;
@@ -92,10 +92,10 @@ interface RestaurantTable {
   number: number;
   name: string;
   capacity: number;
-  minCapacity: number;
+  min_capacity: number;
   status: string;
   position: TablePosition | unknown;
-  section: string;
+  section: string | null;
   features: unknown;
   currentReservation?: TableReservation[];
   currentOrder?: TableOrder[];
@@ -107,7 +107,7 @@ interface SystemSetting {
 }
 
 interface ReservationRecord {
-  tableId: string;
+  table_id: string;
 }
 
 /**
@@ -116,43 +116,57 @@ interface ReservationRecord {
 export async function getAllTables(
   includeOutOfService: boolean = false
 ): Promise<TableInfo[]> {
-  const where: TableFilterOptions = {};
+  const supabase = getSupabase();
+  const today = new Date().toISOString().split('T')[0];
+
+  let query = supabase
+    .from('restaurant_tables')
+    .select('*')
+    .order('number', { ascending: true });
+
   if (!includeOutOfService) {
-    where.status = { not: TableStatus.OUT_OF_SERVICE };
+    query = query.neq('status', TableStatus.OUT_OF_SERVICE);
   }
 
-  const tables = await prisma.restaurantTable.findMany({
-    where,
-    include: {
-      currentReservation: {
-        where: {
-          status: { in: [ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
-          date: { equals: new Date().toISOString().split('T')[0] },
-        },
-      },
-      currentOrder: {
-        where: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
-      },
-    },
-    orderBy: { number: 'asc' },
-  });
+  const { data: tables, error } = await query;
+  if (error) throw error;
 
-  return tables.map((table: any) => ({
-    id: table.id,
-    number: table.number,
-    name: table.name,
-    capacity: table.capacity,
-    minCapacity: table.minCapacity,
-    status: table.status as TableStatus,
-    position: (table.position as unknown as TablePosition) || { x: 0, y: 0, rotation: 0, width: 60, height: 60, shape: 'rectangle' },
-    section: table.section || 'main',
-    features: (table.features as unknown as string[]) || [],
-    currentReservation: table.currentReservation?.[0] ? {
-        ...table.currentReservation[0],
-        status: table.currentReservation[0].status as ReservationStatus
-    } : undefined,
-    currentOrder: table.currentOrder?.[0],
-  }));
+  // Fetch current reservations for today
+  const tableIds = (tables || []).map((t: any) => t.id);
+  const { data: reservations } = await supabase
+    .from('table_reservations')
+    .select('*')
+    .in('table_id', tableIds)
+    .in('status', [ReservationStatus.CONFIRMED, ReservationStatus.SEATED])
+    .eq('date', today);
+
+  // Fetch current orders
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('*')
+    .in('table_id', tableIds)
+    .in('status', ['PENDING', 'IN_PROGRESS']);
+
+  return (tables || []).map((table: any) => {
+    const tableReservations = (reservations || []).filter((r: any) => r.table_id === table.id);
+    const tableOrders = (orders || []).filter((o: any) => o.table_id === table.id);
+    return {
+      id: table.id,
+      number: table.number,
+      name: table.name,
+      capacity: table.capacity,
+      minCapacity: table.min_capacity,
+      status: table.status as TableStatus,
+      position: (table.position as unknown as TablePosition) || { x: 0, y: 0, rotation: 0, width: 60, height: 60, shape: 'rectangle' },
+      section: table.section || 'main',
+      features: (table.features as unknown as string[]) || [],
+      currentReservation: tableReservations[0] ? {
+          ...tableReservations[0],
+          status: tableReservations[0].status as ReservationStatus
+      } : undefined,
+      currentOrder: tableOrders[0],
+    };
+  });
 }
 
 /**
@@ -163,44 +177,41 @@ export async function getAvailableTables(
   time: string,
   partySize: number
 ): Promise<TableInfo[]> {
+  const supabase = getSupabase();
+
   // Get all tables that can accommodate the party
-  const tables = await prisma.restaurantTable.findMany({
-    where: {
-      status: { not: TableStatus.OUT_OF_SERVICE },
-      capacity: { gte: partySize },
-      minCapacity: { lte: partySize },
-    },
-  });
+  const { data: tables, error: tablesError } = await supabase
+    .from('restaurant_tables')
+    .select('*')
+    .neq('status', TableStatus.OUT_OF_SERVICE)
+    .gte('capacity', partySize)
+    .lte('min_capacity', partySize);
+  if (tablesError) throw tablesError;
 
   // Calculate time window (2 hours for reservation)
   const reservationStart = new Date(`${date}T${time}`);
   const reservationEnd = new Date(reservationStart.getTime() + 2 * 60 * 60 * 1000);
 
   // Find tables with conflicting reservations
-  const conflictingReservations = await prisma.tableReservation.findMany({
-    where: {
-      date,
-      status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
-      OR: [
-        {
-          time: { gte: time },
-          endTime: { lte: new Date(reservationEnd).toTimeString().slice(0, 5) },
-        },
-      ],
-    },
-    select: { tableId: true },
-  });
+  const { data: conflictingReservations, error: conflictError } = await supabase
+    .from('table_reservations')
+    .select('table_id')
+    .eq('date', date)
+    .in('status', [ReservationStatus.PENDING, ReservationStatus.CONFIRMED])
+    .gte('time', time)
+    .lte('end_time', new Date(reservationEnd).toTimeString().slice(0, 5));
+  if (conflictError) throw conflictError;
 
-  const bookedTableIds = new Set(conflictingReservations.map((r: ReservationRecord) => r.tableId));
+  const bookedTableIds = new Set((conflictingReservations || []).map((r: ReservationRecord) => r.table_id));
 
-  return tables
+  return (tables || [])
     .filter((table: RestaurantTable) => !bookedTableIds.has(table.id))
     .map((table: RestaurantTable) => ({
       id: table.id,
       number: table.number,
       name: table.name,
       capacity: table.capacity,
-      minCapacity: table.minCapacity,
+      minCapacity: table.min_capacity,
       status: TableStatus.AVAILABLE,
       position: table.position as TablePosition,
       section: table.section,
@@ -238,14 +249,17 @@ export async function createReservation(
     }
 
     // Verify table availability
-    const existingReservation = await prisma.tableReservation.findFirst({
-      where: {
-        tableId,
-        date: input.date.toISOString().split('T')[0],
-        time: input.time,
-        status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
-      },
-    });
+    const supabase = getSupabase();
+    const { data: existingReservation, error: existingError } = await supabase
+      .from('table_reservations')
+      .select('id')
+      .eq('table_id', tableId)
+      .eq('date', input.date.toISOString().split('T')[0])
+      .eq('time', input.time)
+      .in('status', [ReservationStatus.PENDING, ReservationStatus.CONFIRMED])
+      .limit(1)
+      .maybeSingle();
+    if (existingError) throw existingError;
 
     if (existingReservation) {
       return {
@@ -259,32 +273,32 @@ export async function createReservation(
     const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000);
 
     // Create reservation
-    const reservation = await prisma.tableReservation.create({
-      data: {
-        tableId,
+    const { data: reservation, error: createError } = await supabase
+      .from('table_reservations')
+      .insert({
+        table_id: tableId,
         date: input.date.toISOString().split('T')[0],
         time: input.time,
-        endTime: endTime.toTimeString().slice(0, 5),
-        partySize: input.partySize,
-        guestName: input.guestName,
-        guestPhone: input.guestPhone,
-        guestEmail: input.guestEmail,
-        specialRequests: input.specialRequests,
-        userId: input.userId,
+        end_time: endTime.toTimeString().slice(0, 5),
+        party_size: input.partySize,
+        guest_name: input.guestName,
+        guest_phone: input.guestPhone,
+        guest_email: input.guestEmail,
+        special_requests: input.specialRequests,
+        user_id: input.userId,
         status: ReservationStatus.PENDING,
-      },
-      include: {
-        table: true,
-      },
-    });
+      })
+      .select('*, table:restaurant_tables(*)')
+      .single();
+    if (createError) throw createError;
 
     // Notify staff via WebSocket
     io.to('restaurant-staff').emit('new-reservation', {
       id: reservation.id,
       table: reservation.table.name,
       time: reservation.time,
-      partySize: reservation.partySize,
-      guestName: reservation.guestName,
+      partySize: reservation.party_size,
+      guestName: reservation.guest_name,
     });
 
     logger.info('Reservation created', {
@@ -316,14 +330,16 @@ export async function updateTableStatus(
   status: TableStatus,
   staffId?: string
 ): Promise<void> {
-  await prisma.restaurantTable.update({
-    where: { id: tableId },
-    data: {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('restaurant_tables')
+    .update({
       status,
-      lastStatusChange: new Date(),
-      lastStatusChangedBy: staffId,
-    },
-  });
+      last_status_change: new Date().toISOString(),
+      last_status_changed_by: staffId,
+    })
+    .eq('id', tableId);
+  if (error) throw error;
 
   // Notify via WebSocket
   io.to('restaurant-staff').emit('table-status-changed', {
@@ -342,10 +358,13 @@ export async function seatGuests(
   reservationId: string,
   staffId: string
 ): Promise<ReservationResult> {
-  const reservation = await prisma.tableReservation.findUnique({
-    where: { id: reservationId },
-    include: { table: true },
-  });
+  const supabase = getSupabase();
+  const { data: reservation, error: reservationError } = await supabase
+    .from('table_reservations')
+    .select('*, table:restaurant_tables(*)')
+    .eq('id', reservationId)
+    .maybeSingle();
+  if (reservationError) throw reservationError;
 
   if (!reservation) {
     return { success: false, message: 'Reservation not found' };
@@ -355,30 +374,31 @@ export async function seatGuests(
     return { success: false, message: 'Reservation is not confirmed' };
   }
 
-  // Update reservation and table
-  await prisma.$transaction([
-    prisma.tableReservation.update({
-      where: { id: reservationId },
-      data: {
-        status: ReservationStatus.SEATED,
-        seatedAt: new Date(),
-        seatedBy: staffId,
-      },
-    }),
-    prisma.restaurantTable.update({
-      where: { id: reservation.tableId },
-      data: { status: TableStatus.OCCUPIED },
-    }),
-  ]);
+  // Update reservation and table (sequential calls replacing $transaction)
+  const { error: updateReservationError } = await supabase
+    .from('table_reservations')
+    .update({
+      status: ReservationStatus.SEATED,
+      seated_at: new Date().toISOString(),
+      seated_by: staffId,
+    })
+    .eq('id', reservationId);
+  if (updateReservationError) throw updateReservationError;
+
+  const { error: updateTableError } = await supabase
+    .from('restaurant_tables')
+    .update({ status: TableStatus.OCCUPIED })
+    .eq('id', reservation.table_id);
+  if (updateTableError) throw updateTableError;
 
   // Notify kitchen
   io.to('kitchen').emit('table-seated', {
-    tableId: reservation.tableId,
+    tableId: reservation.table_id,
     tableName: reservation.table.name,
-    partySize: reservation.partySize,
+    partySize: reservation.party_size,
   });
 
-  logger.info('Guests seated', { reservationId, tableId: reservation.tableId });
+  logger.info('Guests seated', { reservationId, tableId: reservation.table_id });
 
   return { success: true, message: 'Guests seated successfully' };
 }
@@ -390,38 +410,44 @@ export async function completeTable(
   tableId: string,
   staffId: string
 ): Promise<void> {
-  const table = await prisma.restaurantTable.findUnique({
-    where: { id: tableId },
-    include: {
-      currentReservation: {
-        where: { status: ReservationStatus.SEATED },
-      },
-    },
-  });
+  const supabase = getSupabase();
+  const { data: table, error: tableError } = await supabase
+    .from('restaurant_tables')
+    .select('*')
+    .eq('id', tableId)
+    .maybeSingle();
+  if (tableError) throw tableError;
 
   if (!table) {
     throw new Error('Table not found');
   }
 
-  await prisma.$transaction([
-    // Complete reservation if exists
-    ...(table.currentReservation.length > 0
-      ? [
-          prisma.tableReservation.update({
-            where: { id: table.currentReservation[0].id },
-            data: {
-              status: ReservationStatus.COMPLETED,
-              completedAt: new Date(),
-            },
-          }),
-        ]
-      : []),
-    // Set table to cleaning
-    prisma.restaurantTable.update({
-      where: { id: tableId },
-      data: { status: TableStatus.CLEANING },
-    }),
-  ]);
+  // Get seated reservations for this table
+  const { data: seatedReservations, error: resError } = await supabase
+    .from('table_reservations')
+    .select('*')
+    .eq('table_id', tableId)
+    .eq('status', ReservationStatus.SEATED);
+  if (resError) throw resError;
+
+  // Complete reservation if exists (sequential calls replacing $transaction)
+  if (seatedReservations && seatedReservations.length > 0) {
+    const { error: completeResError } = await supabase
+      .from('table_reservations')
+      .update({
+        status: ReservationStatus.COMPLETED,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', seatedReservations[0].id);
+    if (completeResError) throw completeResError;
+  }
+
+  // Set table to cleaning
+  const { error: updateTableError } = await supabase
+    .from('restaurant_tables')
+    .update({ status: TableStatus.CLEANING })
+    .eq('id', tableId);
+  if (updateTableError) throw updateTableError;
 
   // Notify staff
   io.to('restaurant-staff').emit('table-needs-cleaning', {
@@ -441,18 +467,19 @@ export async function getFloorPlan(): Promise<{
   dimensions: { width: number; height: number };
 }> {
   const tables = await getAllTables(true);
-  const sections = [...new Set(tables.map(t => t.section))];
+  const sections = [...new Set(tables.map(t => t.section))].filter((s): s is string => s !== null);
   
   // Get floor plan dimensions from settings
-  const settings = await prisma.systemSettings.findMany({
-    where: {
-      key: { startsWith: 'restaurant.floorPlan.' },
-    },
-  });
+  const supabase = getSupabase();
+  const { data: settings, error } = await supabase
+    .from('system_settings')
+    .select('*')
+    .like('key', 'restaurant.floorPlan.%');
+  if (error) throw error;
 
   const dimensions = {
-    width: parseInt(settings.find((s: SystemSetting) => s.key === 'restaurant.floorPlan.width')?.value || '800'),
-    height: parseInt(settings.find((s: SystemSetting) => s.key === 'restaurant.floorPlan.height')?.value || '600'),
+    width: parseInt((settings || []).find((s: SystemSetting) => s.key === 'restaurant.floorPlan.width')?.value || '800'),
+    height: parseInt((settings || []).find((s: SystemSetting) => s.key === 'restaurant.floorPlan.height')?.value || '600'),
   };
 
   return { tables, sections, dimensions };
@@ -466,9 +493,13 @@ export async function updateTablePosition(
   position: Partial<TablePosition>,
   staffId: string
 ): Promise<void> {
-  const table = await prisma.restaurantTable.findUnique({
-    where: { id: tableId },
-  });
+  const supabase = getSupabase();
+  const { data: table, error: tableError } = await supabase
+    .from('restaurant_tables')
+    .select('*')
+    .eq('id', tableId)
+    .maybeSingle();
+  if (tableError) throw tableError;
 
   if (!table) {
     throw new Error('Table not found');
@@ -483,12 +514,13 @@ export async function updateTablePosition(
     shape: 'rectangle',
   };
 
-  await prisma.restaurantTable.update({
-    where: { id: tableId },
-    data: {
+  const { error: updateError } = await supabase
+    .from('restaurant_tables')
+    .update({
       position: { ...currentPosition, ...position },
-    },
-  });
+    })
+    .eq('id', tableId);
+  if (updateError) throw updateError;
 
   // Broadcast update
   io.to('restaurant-staff').emit('table-position-updated', {
@@ -504,21 +536,17 @@ export async function updateTablePosition(
  */
 export async function getTodaysReservations(): Promise<any[]> {
   const today = new Date().toISOString().split('T')[0];
+  const supabase = getSupabase();
 
-  return prisma.tableReservation.findMany({
-    where: {
-      date: today,
-      status: {
-        notIn: [ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW],
-      },
-    },
-    include: {
-      table: {
-        select: { id: true, name: true, number: true },
-      },
-    },
-    orderBy: { time: 'asc' },
-  });
+  const { data, error } = await supabase
+    .from('table_reservations')
+    .select('*, table:restaurant_tables(id, name, number)')
+    .eq('date', today)
+    .not('status', 'in', `(${ReservationStatus.CANCELLED},${ReservationStatus.NO_SHOW})`)
+    .order('time', { ascending: true });
+  if (error) throw error;
+
+  return data || [];
 }
 
 /**
@@ -528,9 +556,13 @@ export async function cancelReservation(
   reservationId: string,
   reason?: string
 ): Promise<ReservationResult> {
-  const reservation = await prisma.tableReservation.findUnique({
-    where: { id: reservationId },
-  });
+  const supabase = getSupabase();
+  const { data: reservation, error: resError } = await supabase
+    .from('table_reservations')
+    .select('*')
+    .eq('id', reservationId)
+    .maybeSingle();
+  if (resError) throw resError;
 
   if (!reservation) {
     return { success: false, message: 'Reservation not found' };
@@ -540,14 +572,15 @@ export async function cancelReservation(
     return { success: false, message: 'Reservation is already cancelled' };
   }
 
-  await prisma.tableReservation.update({
-    where: { id: reservationId },
-    data: {
+  const { error: updateError } = await supabase
+    .from('table_reservations')
+    .update({
       status: ReservationStatus.CANCELLED,
-      cancelledAt: new Date(),
-      cancellationReason: reason,
-    },
-  });
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: reason,
+    })
+    .eq('id', reservationId);
+  if (updateError) throw updateError;
 
   logger.info('Reservation cancelled', { reservationId, reason });
 
@@ -561,14 +594,16 @@ export async function markNoShow(
   reservationId: string,
   staffId: string
 ): Promise<void> {
-  await prisma.tableReservation.update({
-    where: { id: reservationId },
-    data: {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('table_reservations')
+    .update({
       status: ReservationStatus.NO_SHOW,
-      noShowMarkedAt: new Date(),
-      noShowMarkedBy: staffId,
-    },
-  });
+      no_show_marked_at: new Date().toISOString(),
+      no_show_marked_by: staffId,
+    })
+    .eq('id', reservationId);
+  if (error) throw error;
 
   logger.info('Reservation marked as no-show', { reservationId, staffId });
 }
@@ -580,9 +615,13 @@ export async function confirmReservation(
   reservationId: string,
   staffId: string
 ): Promise<ReservationResult> {
-  const reservation = await prisma.tableReservation.findUnique({
-    where: { id: reservationId },
-  });
+  const supabase = getSupabase();
+  const { data: reservation, error: resError } = await supabase
+    .from('table_reservations')
+    .select('*')
+    .eq('id', reservationId)
+    .maybeSingle();
+  if (resError) throw resError;
 
   if (!reservation) {
     return { success: false, message: 'Reservation not found' };
@@ -592,14 +631,15 @@ export async function confirmReservation(
     return { success: false, message: 'Reservation is not pending' };
   }
 
-  await prisma.tableReservation.update({
-    where: { id: reservationId },
-    data: {
+  const { error: updateError } = await supabase
+    .from('table_reservations')
+    .update({
       status: ReservationStatus.CONFIRMED,
-      confirmedAt: new Date(),
-      confirmedBy: staffId,
-    },
-  });
+      confirmed_at: new Date().toISOString(),
+      confirmed_by: staffId,
+    })
+    .eq('id', reservationId);
+  if (updateError) throw updateError;
 
   logger.info('Reservation confirmed', { reservationId, staffId });
 

@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 import { poolApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { useAuth } from '@/lib/auth-context';
@@ -37,6 +37,8 @@ interface PoolSession {
   adult_price: number | string;
   child_price: number | string;
   isActive?: boolean;
+  available?: number;
+  isSoldOut?: boolean;
   availability?: {
     remaining?: number;
   };
@@ -61,10 +63,7 @@ interface ApiError {
   };
 }
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
-};
+// IMPROVE Iter-2: Removed duplicate module-level cardVariants (shadowed by component-level version)
 
 export default function PoolPage() {
           // ...existing code...
@@ -122,10 +121,11 @@ export default function PoolPage() {
       visible: { opacity: 1, y: 0 }
     };
 
+    // FIX: Iteration 6 - Use availability endpoint instead of sessions to get live sold/available counts
     const { data, isLoading, error, refetch } = useQuery({
-      queryKey: ['pool-sessions', selectedDate, poolModule?.id],
-      queryFn: () => poolApi.getSessions(selectedDate, poolModule?.id),
-      enabled: !!poolModule,
+      queryKey: ['pool-availability', selectedDate, poolModule?.id],
+      queryFn: () => poolApi.getAvailability(selectedDate, poolModule?.id),
+      enabled: !!selectedDate, // FIX Iter-2: Removed poolModule guard — fires immediately, refetches when module loads
     });
       const sessions = data?.data?.data || [];
   
@@ -151,18 +151,7 @@ export default function PoolPage() {
   
     const { socket } = useSocket();
   
-    if (isLoading) {
-      return (
-        <div className="min-h-screen bg-gradient-to-b from-blue-50 to-cyan-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-slate-600 dark:text-slate-400">{tCommon('loading')}</p>
-          </div>
-        </div>
-      );
-    }
-
-
+    // FIX Iter-2: Removed duplicate isLoading block (dead code — first block returned early, second was unreachable)
 
   if (isLoading) {
     return (
@@ -215,7 +204,7 @@ export default function PoolPage() {
         <div className="absolute bottom-0 left-0 right-0">
           <svg className="w-full h-32 fill-cyan-50/50 dark:fill-slate-900" viewBox="0 0 1440 120" preserveAspectRatio="none">
             <motion.path
-              d="M0,0 C360,80 720,40 1080,80 C1260,100 1380,60 1440,80 L1440,120 L0,120 Z"
+              initial={{ d: "M0,40 C360,80 720,40 1080,80 C1260,100 1380,60 1440,80 L1440,120 L0,120 Z" }}
               animate={{
                 d: [
                   "M0,40 C360,80 720,40 1080,80 C1260,100 1380,60 1440,80 L1440,120 L0,120 Z",
@@ -328,8 +317,9 @@ export default function PoolPage() {
                 animate="visible"
               >
                 {sessions.map((session: PoolSession, index: number) => {
-                  const remaining = session.availability?.remaining ?? session.maxCapacity ?? 50;
-                  const isSoldOut = remaining === 0;
+                  // FIX: Iteration 6 - Use live availability data (sold, available, isSoldOut) from /pool/availability
+                  const remaining = session.available ?? session.availability?.remaining ?? session.maxCapacity ?? 50;
+                  const isSoldOut = session.isSoldOut ?? remaining === 0;
                   const isSelected = selectedSession?.id === session.id;
 
                   return (
@@ -395,7 +385,8 @@ export default function PoolPage() {
                                 'bg-gradient-to-r from-green-500 to-emerald-400'
                               }`}
                               initial={{ width: 0 }}
-                              animate={{ width: `${(remaining / (session.maxCapacity ?? 50)) * 100}%` }}
+                              // FIX Iter-2: Inverted capacity bar — show fill as spots are TAKEN, not remaining
+                              animate={{ width: `${(((session.maxCapacity ?? 50) - remaining) / (session.maxCapacity ?? 50)) * 100}%` }}
                               transition={{ duration: 0.8, delay: index * 0.1 }}
                             />
                           </div>
@@ -659,7 +650,7 @@ export default function PoolPage() {
               {
                 icon: Umbrella,
                 title: t('poolInfo.whatToBring'),
-                content: 'Swimwear, towel, sunscreen. Lockers available for valuables',
+                content: t('poolInfo.whatToBringList'), // FIX Iter-2: Use i18n key instead of hardcoded English
                 gradientFrom: 'rgba(6, 182, 212, 0.15)',
                 iconBg: 'bg-primary-100 dark:bg-primary-900/50',
                 iconColor: 'text-primary-600 dark:text-primary-400'
@@ -667,7 +658,7 @@ export default function PoolPage() {
               {
                 icon: Droplets,
                 title: t('poolInfo.amenitiesTitle'),
-                content: 'Changing rooms, showers. Snack bar nearby, loungers included',
+                content: t('poolInfo.amenitiesList'), // FIX Iter-2: Use i18n key instead of hardcoded English
                 gradientFrom: 'rgba(20, 184, 166, 0.15)',
                 iconBg: 'bg-teal-100 dark:bg-teal-900/50',
                 iconColor: 'text-teal-600 dark:text-teal-400'

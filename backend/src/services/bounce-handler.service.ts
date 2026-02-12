@@ -3,9 +3,9 @@
  * Manages email bounces, complaints, and suppression list
  */
 
-import { supabase } from '../lib/supabase';
-import { activityLogger } from '../utils/activityLogger';
-import { logger } from '../utils/logger';
+import { supabase } from "../lib/supabase.js";
+import { activityLogger } from "../utils/activityLogger.js";
+import { logger } from "../utils/logger.js";
 
 export interface EmailBounce {
   id: string;

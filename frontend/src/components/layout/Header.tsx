@@ -22,23 +22,25 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { useCartStore } from '@/lib/stores/cartStore';
+import { useCartStore } from '@/stores/cartStore';
 import { cn } from '@/lib/cn';
+import { useTerminology } from '@/hooks/useTerminology';
 import { useSiteSettings } from '@/lib/settings-context';
 
+// ... inside Header component
 export default function Header() {
-    const { settings, modules } = useSiteSettings();
-    const locale = useLocale(); // Track locale to force re-render on language change
-    // ...existing code...
-    const pathname = usePathname();
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [scrolled, setScrolled] = useState(false);
-    const [preferencesOpen, setPreferencesOpen] = useState(false);
-    const [mounted, setMounted] = useState(false);
-    const { user, isAuthenticated } = useAuth();
-    const cartCount = useCartStore((s) => s.getCount());
+  const { settings, modules } = useSiteSettings();
+  const { terms } = useTerminology();
+  const locale = useLocale();
+  const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  const cartCount = useCartStore((s) => s.getCount());
 
-    const t = useTranslations('nav');
+  const t = useTranslations('nav');
   const tCommon = useTranslations('common');
 
   // Prevent hydration mismatch by only rendering client-specific content after mount
@@ -97,10 +99,15 @@ export default function Header() {
 
   // Get translated name for module - dynamic lookup with fallback
   const getModuleTranslatedName = (slug: string, fallbackName: string) => {
+    // Dynamic Terminology Overrides
+    if (slug === 'chalets' && terms?.unit_plural) return terms.unit_plural;
+    if (slug === 'pool' && terms?.facility_singular) return terms.facility_singular;
+    if (slug === 'restaurant' && terms?.dining_singular) return terms.dining_singular;
+
     // Known translation keys mapping
     const knownKeys: Record<string, string> = {
       'restaurant': 'restaurant',
-      'chalets': 'chalets', 
+      'chalets': 'chalets',
       'pool': 'pool',
       'snack-bar': 'snackBar',
       'snackbar': 'snackBar',
@@ -111,7 +118,7 @@ export default function Header() {
       'chocolate box': 'chocolateBox',
       'chocolatebox': 'chocolateBox',
     };
-    
+
     const translationKey = knownKeys[slug.toLowerCase()];
     if (translationKey) {
       try {
@@ -123,7 +130,7 @@ export default function Header() {
         // Ignore translation errors
       }
     }
-    
+
     // Final fallback: use the module name from database (properly formatted)
     return fallbackName;
   };
@@ -143,45 +150,49 @@ export default function Header() {
   }
 
   // Build navigation from CMS or Fallback - recalculate when locale changes
-  const navigation: NavigationItem[] = useMemo(() => {
-    return settings.navbar?.links?.map((link: NavLink) => {
-      if (link.type === 'module') {
-        // Case-insensitive module lookup
-        const module = modules.find(m => m.slug.toLowerCase() === link.moduleSlug?.toLowerCase());
-        if (module) {
+  // IMPORTANT: Only show modules that are ACTIVE and have show_in_main enabled
+  const navigation = useMemo((): NavigationItem[] => {
+    // Get list of active modules that should be shown in customer nav
+    const activeModules = modules.filter(m => m.is_active && m.show_in_main);
+    
+    if (settings.navbar?.links && settings.navbar.links.length > 0) {
+      // CMS mode: filter links to only include valid, active modules
+      const mappedItems = settings.navbar.links
+        .map((link: NavLink): NavigationItem | null => {
+          if (link.type === 'module') {
+            // Case-insensitive module lookup - ONLY show if module is active AND show_in_main
+            const module = activeModules.find(m => m.slug.toLowerCase() === link.moduleSlug?.toLowerCase());
+            if (module) {
+              return {
+                name: getModuleTranslatedName(module.slug, module.name),
+                href: `/${module.slug}`,
+                icon: getIconForModule(module)
+              };
+            }
+            // Module not found or inactive - SKIP this link entirely
+            return null;
+          }
+          // Non-module links (internal/external) - keep as-is
           return {
-            name: getModuleTranslatedName(module.slug, module.name),
-            href: `/${module.slug}`,
-            icon: getIconForModule(module)
+            name: link.label,
+            href: link.href,
+            icon: getIconByName(link.icon || 'Home')
           };
-        }
-        // Module not found - skip this link or show label
-        // Use the stored label but don't try to translate it (it might be a bad translation key)
-        const fallbackName = link.label.startsWith('nav.') 
-          ? link.label.split('.').pop()?.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || link.label 
-          : link.label;
-        return {
-          name: fallbackName,
-          href: link.href,
-          icon: getIconByName(link.icon || 'Home')
-        };
-      }
-      return {
-        name: link.label,
-        href: link.href,
-        icon: getIconByName(link.icon || 'Home')
-      };
-    }) || [
-        { name: t('home'), href: '/', icon: Home },
-        ...modules
-          .filter(m => m.show_in_main)
-          .sort((a, b) => a.sort_order - b.sort_order)
-          .map(m => ({
-            name: getModuleTranslatedName(m.slug, m.name),
-            href: `/${m.slug}`,
-            icon: getIconForModule(m)
-          }))
-      ];
+        });
+      return mappedItems.filter((item): item is NavigationItem => item !== null);
+    }
+    
+    // Fallback: Auto-generate from active modules
+    return [
+      { name: t('home'), href: '/', icon: Home },
+      ...activeModules
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+        .map(m => ({
+          name: getModuleTranslatedName(m.slug, m.name),
+          href: `/${m.slug}`,
+          icon: getIconForModule(m)
+        }))
+    ];
   }, [settings.navbar?.links, modules, locale, t]);
 
   // ...existing code...
@@ -213,31 +224,40 @@ export default function Header() {
           : 'bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl',
         'border-b border-white/30 dark:border-slate-800/30'
       )}
+      role="banner"
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group">
+          <Link href="/" className="flex items-center gap-2.5 group" aria-label={`${settings.resortName || t('home')} Home`}>
             <motion.div
               whileHover={{ scale: 1.05, rotate: -3 }}
               whileTap={{ scale: 0.95 }}
               className="bg-gradient-to-br from-primary-500 via-primary-600 to-secondary-500 text-white font-bold text-xl px-3.5 py-2 rounded-xl shadow-lg shadow-primary-500/30 backdrop-blur-sm"
+              aria-hidden="true"
             >
-              {settings.resortName ? settings.resortName.substring(0, 2) : 'V2'}
+              {/* Generate initials from resort name or use first word */}
+              {settings.resortName 
+                ? settings.resortName.split(' ').map(word => word[0]).slice(0, 2).join('').toUpperCase()
+                : 'V2'}
             </motion.div>
             <span className="font-bold text-xl text-slate-900 dark:text-white hidden sm:inline group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-300">
-              {settings.resortName ? settings.resortName.substring(2) : 'Resort'}
+              {settings.resortName || 'Resort'}
             </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1" aria-label="Main navigation">
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
 
               return (
-                <Link key={item.href} href={item.href}>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                >
                   <motion.div
                     whileHover={{ scale: 1.02, y: -1 }}
                     whileTap={{ scale: 0.98 }}
@@ -248,7 +268,7 @@ export default function Header() {
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60 hover:backdrop-blur-sm'
                     )}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4" aria-hidden="true" />
                     <span className="text-sm">{item.name}</span>
                   </motion.div>
                 </Link>
@@ -398,9 +418,9 @@ export default function Header() {
                       key={item.href}
                       variants={{
                         hidden: { opacity: 0, x: -30, filter: 'blur(4px)' },
-                        visible: { 
-                          opacity: 1, 
-                          x: 0, 
+                        visible: {
+                          opacity: 1,
+                          x: 0,
                           filter: 'blur(0px)',
                           transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] }
                         },
@@ -430,46 +450,46 @@ export default function Header() {
 
                 {/* Mobile Auth - only render after mount */}
                 {mounted && (
-                <motion.div
-                  variants={{
-                    hidden: { opacity: 0, x: -30, filter: 'blur(4px)' },
-                    visible: { 
-                      opacity: 1, 
-                      x: 0, 
-                      filter: 'blur(0px)',
-                      transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] }
-                    },
-                  }}
-                  className="pt-4 mt-4 mx-2 border-t border-white/20 dark:border-slate-700/30"
-                >
-                  {isAuthenticated ? (
-                    <Link
-                      href="/profile"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60 transition-all duration-300"
-                    >
-                      <User className="h-5 w-5" />
-                      <span>{t('myProfile')}</span>
-                    </Link>
-                  ) : (
-                    <div className="flex gap-2 px-2">
+                  <motion.div
+                    variants={{
+                      hidden: { opacity: 0, x: -30, filter: 'blur(4px)' },
+                      visible: {
+                        opacity: 1,
+                        x: 0,
+                        filter: 'blur(0px)',
+                        transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] }
+                      },
+                    }}
+                    className="pt-4 mt-4 mx-2 border-t border-white/20 dark:border-slate-700/30"
+                  >
+                    {isAuthenticated ? (
                       <Link
-                        href="/login"
+                        href="/profile"
                         onClick={() => setMobileMenuOpen(false)}
-                        className="flex-1 py-2.5 text-center text-sm font-medium bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg border border-white/40 dark:border-slate-700/40 text-slate-700 dark:text-slate-300 rounded-xl transition-all duration-300 hover:bg-white/80 dark:hover:bg-slate-700/80"
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60 transition-all duration-300"
                       >
-                        {t('signIn')}
+                        <User className="h-5 w-5" />
+                        <span>{t('myProfile')}</span>
                       </Link>
-                      <Link
-                        href="/register"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="flex-1 py-2.5 text-center text-sm font-semibold bg-gradient-to-r from-primary-500 via-primary-600 to-primary-700 text-white rounded-xl shadow-lg shadow-primary-500/30"
-                      >
-                        {tCommon('register')}
-                      </Link>
-                    </div>
-                  )}
-                </motion.div>
+                    ) : (
+                      <div className="flex gap-2 px-2">
+                        <Link
+                          href="/login"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex-1 py-2.5 text-center text-sm font-medium bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg border border-white/40 dark:border-slate-700/40 text-slate-700 dark:text-slate-300 rounded-xl transition-all duration-300 hover:bg-white/80 dark:hover:bg-slate-700/80"
+                        >
+                          {t('signIn')}
+                        </Link>
+                        <Link
+                          href="/register"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex-1 py-2.5 text-center text-sm font-semibold bg-gradient-to-r from-primary-500 via-primary-600 to-primary-700 text-white rounded-xl shadow-lg shadow-primary-500/30"
+                        >
+                          {tCommon('register')}
+                        </Link>
+                      </div>
+                    )}
+                  </motion.div>
                 )}
               </motion.div>
             </motion.nav>

@@ -3,9 +3,9 @@
  * Handles failed webhook processing with exponential backoff
  */
 
-import { supabase } from '../lib/supabase';
-import { activityLogger } from '../utils/activityLogger';
-import { logger } from '../utils/logger';
+import { supabase } from '../lib/supabase.js';
+import { activityLogger } from '../utils/activityLogger.js';
+import { logger } from '../utils/logger.js';
 
 export interface WebhookFailure {
   id: string;
@@ -24,7 +24,7 @@ export interface WebhookFailure {
   updated_at: string;
 }
 
-export type WebhookStatus = 
+export type WebhookStatus =
   | 'pending'
   | 'retrying'
   | 'resolved'
@@ -162,7 +162,7 @@ class WebhookRetryService {
       logger.error(`[WebhookRetry] Retry failed: ${failure.id} - ${error.message}`);
 
       const newRetryCount = failure.retry_count + 1;
-      
+
       if (newRetryCount >= failure.max_retries) {
         // Max retries exceeded
         await this.markAsFailed(failure.id, error.message);
@@ -172,7 +172,7 @@ class WebhookRetryService {
 
       // Schedule next retry
       const nextDelay = RETRY_DELAYS[newRetryCount] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
-      
+
       await supabase
         .from('webhook_failures')
         .update({
@@ -365,7 +365,7 @@ class WebhookRetryService {
 
       // Count by event type (only for non-resolved)
       if (failure.status !== 'resolved') {
-        stats.by_event_type[failure.event_type] = 
+        stats.by_event_type[failure.event_type] =
           (stats.by_event_type[failure.event_type] || 0) + 1;
       }
     }
@@ -433,7 +433,7 @@ class WebhookRetryService {
     }
 
     logger.info('[WebhookRetry] Starting background processing');
-    
+
     // Initial run
     this.processPendingRetries();
 

@@ -21,6 +21,7 @@ const staffRoles = ['snack_bar_staff', 'snack_bar_admin', 'super_admin'];
 router.get('/staff/orders', authenticate, authorize(...staffRoles), snackController.getStaffOrders);
 router.get('/staff/orders/live', authenticate, authorize(...staffRoles), snackController.getLiveOrders);
 router.patch('/staff/orders/:id/status', authenticate, authorize(...staffRoles), snackController.updateOrderStatus);
+router.put('/staff/orders/:id/status', authenticate, authorize(...staffRoles), snackController.updateOrderStatus);
 
 // Admin routes
 const adminRoles = ['snack_bar_admin', 'super_admin'];

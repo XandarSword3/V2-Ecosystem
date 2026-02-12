@@ -14,7 +14,7 @@ async function main() {
   try {
     // Create HTTP server first (so health check works immediately)
     const server = http.createServer(app);
-    
+
     // Initialize Sentry for error tracking (must be early)
     initSentry(app);
 
@@ -76,7 +76,7 @@ async function main() {
         }
 
         clearTimeout(forceExitTimeout);
-        logger.info('Graceful shutdown completed');
+        logger.info(`Graceful shutdown completed for signal: ${signal}`);
         process.exit(0);
       } catch (error) {
         logger.error('Error during shutdown:', error);
@@ -91,13 +91,13 @@ async function main() {
     // Handle uncaught exceptions and unhandled rejections
     process.on('uncaughtException', (error) => {
       logger.error('Uncaught exception:', error);
-      
+
       // Don't shutdown for "headers already sent" errors - these are recoverable
-      if (error.message?.includes('Cannot set headers after they are sent')) {
+      if (error && (error as any).message?.includes('Cannot set headers after they are sent')) {
         logger.warn('Ignoring "headers already sent" error - not triggering shutdown');
         return;
       }
-      
+
       shutdown('uncaughtException');
     });
 

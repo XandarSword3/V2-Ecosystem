@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection";
 import { logActivity } from "../../utils/activityLogger";
 // import type { PermissionRow } from './types.js'; // Deprecated
 
 // -- Permissions --
 
-export async function getAllPermissions(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getAllPermissions = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     // Fetch from new app_permissions table
     const { data, error } = await supabase
@@ -18,15 +18,11 @@ export async function getAllPermissions(req: Request, res: Response, next: NextF
     if (error) throw error;
 
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // -- Roles --
 
-export async function getRolePermissions(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getRolePermissions = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params; // role_id
 
@@ -51,13 +47,9 @@ export async function getRolePermissions(req: Request, res: Response, next: Next
     // Return array of permission slugs
     const permissionSlugs = data.map(d => d.permission_slug);
     res.json({ success: true, data: permissionSlugs });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateRolePermissions(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateRolePermissions = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params; // role_id
     const { permission_slugs } = req.body; // Array of strings (slugs)
@@ -104,10 +96,7 @@ export async function updateRolePermissions(req: Request, res: Response, next: N
       new_value: { permission_slugs, role_name: roleName }
     });
     res.json({ success: true, message: 'Role permissions updated' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // -- User Overrides --
 

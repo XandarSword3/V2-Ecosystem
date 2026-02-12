@@ -8,8 +8,10 @@ import { useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { restaurantApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { useCartStore } from '@/lib/stores/cartStore';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useCartStore } from '@/stores/cartStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+// FIX: Iteration 4 - Import useSiteSettings for dynamic tax rate
+import { useSiteSettings } from '@/lib/settings-context';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import {
@@ -43,6 +45,8 @@ export default function RestaurantCartPage() {
   const tCommon = useTranslations('common');
   const router = useRouter();
   const currency = useSettingsStore((s) => s.currency);
+  // FIX: Iteration 4 - Get dynamic tax rate from settings
+  const { settings } = useSiteSettings();
 
   const restaurantItems = useCartStore((s) => s.items.filter(i => i.moduleId === 'restaurant'));
   const addToRestaurant = useCartStore((s) => s.addToRestaurant);
@@ -67,11 +71,16 @@ export default function RestaurantCartPage() {
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
   const subtotal = getRestaurantTotal();
-  const tax = subtotal * 0.11;
-  const serviceCharge = orderType === 'dine_in' ? subtotal * 0.10 : 0; // 10% service charge for dine-in
-  const deliveryFee = orderType === 'delivery' ? 5 : 0; // $5 flat delivery fee
+  // FIX: Iteration 4 - Use dynamic tax rate from settings instead of hardcoded 0.11
+  const taxRate = settings.taxRate || 0.11;
+  const tax = subtotal * taxRate;
+  // FIX: Iteration 7 - Use dynamic service charge and delivery fee from settings instead of hardcoded
+  const serviceChargeRate = settings.serviceChargeRate ?? 0.10;
+  const serviceCharge = orderType === 'dine_in' ? subtotal * serviceChargeRate : 0;
+  const deliveryFee = orderType === 'delivery' ? (settings.deliveryFee ?? 5) : 0;
   const preDiscountTotal = subtotal + tax + serviceCharge + deliveryFee;
-  const total = finalTotal > 0 ? finalTotal : preDiscountTotal;
+  // FIX Iter-6: Use appliedDiscounts check instead of > 0 so a 100% discount (finalTotal === 0) is honored
+  const total = appliedDiscounts.length > 0 ? finalTotal : preDiscountTotal;
 
   interface CreateOrderData {
     customerName: string;
@@ -101,7 +110,7 @@ export default function RestaurantCartPage() {
       if (paymentMethod === 'card' && total > 0) {
         setPendingOrderId(orderId);
         setShowStripePayment(true);
-        toast.info('Please complete your card payment');
+        toast.info(t('completeCardPayment')); // IMPROVE Iter-7: i18n
       } else {
         // For cash payments or zero total, redirect directly
         clearRestaurantCart();
@@ -151,6 +160,9 @@ export default function RestaurantCartPage() {
         menuItemId: item.id,
         quantity: item.quantity,
         notes: item.specialInstructions,
+        // Include modifiers for inventory deduction and pricing
+        selectedModifiers: item.selectedModifiers,
+        modifierTotal: item.modifierTotal,
       })),
       // Include discount information in backend-expected format
       couponCode: couponDiscount?.code,
@@ -170,13 +182,13 @@ export default function RestaurantCartPage() {
   };
 
   const handleStripePaymentError = (error: string) => {
-    toast.error(`Payment failed: ${error}`);
+    toast.error(t('paymentFailed', { error })); // IMPROVE Iter-7: i18n
     // Keep the order but show error - user can retry
   };
 
   const handleStripePaymentCancel = () => {
     setShowStripePayment(false);
-    toast.info('Payment cancelled. Your order is saved - you can pay when ready.');
+    toast.info(t('paymentCancelled')); // IMPROVE Iter-7: i18n
   };
 
   // Empty cart state
@@ -357,6 +369,26 @@ export default function RestaurantCartPage() {
                             <p className="text-orange-600 dark:text-orange-400 font-medium">
                               {formatCurrency(item.price, currency)} {tCommon('items') === 'items' ? 'each' : 'each'}
                             </p>
+                            {/* Display selected modifiers */}
+                            {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                              <div className="mt-1 space-y-0.5">
+                                {item.selectedModifiers.map((mod, idx) => (
+                                  <p key={idx} className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                      mod.modifierType === 'add' ? 'bg-green-500' : 
+                                      mod.modifierType === 'remove' ? 'bg-red-500' : 'bg-blue-500'
+                                    }`} />
+                                    {mod.modifierType === 'add' ? '+' : mod.modifierType === 'remove' ? '-' : '↔'} {mod.optionName}
+                                    {mod.quantity > 1 && ` (×${mod.quantity})`}
+                                    {mod.priceAdjustment !== 0 && (
+                                      <span className={mod.priceAdjustment > 0 ? 'text-green-600' : 'text-red-600'}>
+                                        {mod.priceAdjustment > 0 ? '+' : ''}{formatCurrency(mod.priceAdjustment * mod.quantity, currency)}
+                                      </span>
+                                    )}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
                             {item.specialInstructions && (
                               <p className="text-sm text-slate-500 mt-1 flex items-center gap-1 truncate">
                                 <MessageSquare className="w-3 h-3 flex-shrink-0" />
@@ -386,11 +418,16 @@ export default function RestaurantCartPage() {
                             </motion.button>
                           </div>
 
-                          {/* Line Total */}
+                          {/* Line Total (includes modifiers) */}
                           <div className="hidden sm:block text-right pl-4 border-l border-slate-200 dark:border-slate-700">
                             <p className="text-xl font-bold text-slate-900 dark:text-white">
-                              {formatCurrency(item.price * item.quantity, currency)}
+                              {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, currency)}
                             </p>
+                            {item.modifierTotal && item.modifierTotal > 0 && (
+                              <p className="text-xs text-slate-500">
+                                incl. +{formatCurrency(item.modifierTotal * item.quantity, currency)} extras
+                              </p>
+                            )}
                           </div>
                         </div>
                       </motion.div>
@@ -713,7 +750,8 @@ export default function RestaurantCartPage() {
                           <span className="text-slate-700 dark:text-slate-300 line-clamp-1">{item.name}</span>
                         </div>
                         <span className="font-medium text-slate-900 dark:text-white flex-shrink-0 ml-2">
-                          {formatCurrency(item.price * item.quantity, currency)}
+                          {/* FIX Iter-6: Include modifier costs in summary line total (was missing modifierTotal) */}
+                          {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, currency)}
                         </span>
                       </div>
                     ))}
@@ -729,12 +767,14 @@ export default function RestaurantCartPage() {
                       <span className="text-slate-700 dark:text-slate-300">{formatCurrency(subtotal, currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Tax (11%)</span>
+                      {/* FIX: Iteration 4 - Dynamic tax rate label */}
+                      <span className="text-slate-500">Tax ({Math.round(taxRate * 100)}%)</span>
                       <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, currency)}</span>
                     </div>
                     {serviceCharge > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Service Charge (10%)</span>
+                        {/* FIX: Iteration 7 - Dynamic service charge rate label */}
+                        <span className="text-slate-500">Service Charge ({Math.round(serviceChargeRate * 100)}%)</span>
                         <span className="text-slate-700 dark:text-slate-300">{formatCurrency(serviceCharge, currency)}</span>
                       </div>
                     )}
@@ -844,6 +884,10 @@ export default function RestaurantCartPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            role="dialog" // FIX Iter-22: payment modal a11y
+            aria-modal="true"
+            aria-labelledby="cart-payment-modal-title"
+            onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Escape') handleStripePaymentCancel(); }} // FIX Iter-22: Escape to close
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
             <motion.div
@@ -856,7 +900,7 @@ export default function RestaurantCartPage() {
                 <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-full flex items-center justify-center">
                   <CreditCard className="w-8 h-8 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                <h3 id="cart-payment-modal-title" className="text-xl font-bold text-slate-900 dark:text-white">
                   Complete Payment
                 </h3>
                 <p className="text-slate-500 dark:text-slate-400 mt-1">

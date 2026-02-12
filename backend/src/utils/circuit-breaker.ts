@@ -3,7 +3,7 @@
  * Prevents cascading failures when external services are unavailable
  */
 
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 type CircuitState = 'closed' | 'open' | 'half-open';
 
@@ -39,14 +39,14 @@ export class CircuitBreaker {
   private totalRequests: number = 0;
   private totalFailures: number = 0;
   private totalSuccesses: number = 0;
-  
+
   private readonly name: string;
   private readonly failureThreshold: number;
   private readonly successThreshold: number;
   private readonly timeout: number;
   private readonly resetTimeout: number;
   private readonly fallback?: () => Promise<any>;
-  
+
   private nextAttemptTime: number = 0;
   private monitorInterval: NodeJS.Timeout | null = null;
 
@@ -57,7 +57,7 @@ export class CircuitBreaker {
     this.timeout = options.timeout ?? 30000;
     this.resetTimeout = options.resetTimeout ?? 5000;
     this.fallback = options.fallback;
-    
+
     // Start monitoring
     if (options.monitorInterval !== 0) {
       this.startMonitoring(options.monitorInterval ?? 60000);
@@ -69,7 +69,7 @@ export class CircuitBreaker {
    */
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     this.totalRequests++;
-    
+
     // Check if circuit is open
     if (this.state === 'open') {
       if (Date.now() < this.nextAttemptTime) {
@@ -131,7 +131,7 @@ export class CircuitBreaker {
     this.nextAttemptTime = Date.now() + this.timeout;
     this.successes = 0;
     logger.warn(`[CircuitBreaker:${this.name}] Circuit OPENED after ${this.failures} failures`);
-    
+
     // Emit event for monitoring
     circuitBreakerEvents.emit('open', {
       name: this.name,
@@ -145,7 +145,7 @@ export class CircuitBreaker {
     this.failures = 0;
     this.successes = 0;
     logger.info(`[CircuitBreaker:${this.name}] Circuit CLOSED, service recovered`);
-    
+
     // Emit event for monitoring
     circuitBreakerEvents.emit('close', {
       name: this.name,
@@ -262,8 +262,8 @@ export const circuitBreakers = {
     failureThreshold: 3,
     timeout: 300000, // 5 minutes (weather data is not critical)
     fallback: async () => {
-      return { 
-        available: false, 
+      return {
+        available: false,
         message: 'Weather data temporarily unavailable',
         cached: true,
       };

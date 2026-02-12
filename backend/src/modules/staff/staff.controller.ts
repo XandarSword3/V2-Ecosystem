@@ -1,4 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { logActivity } from '../../utils/activityLogger.js';
@@ -42,9 +43,8 @@ const assignmentSchema = z.object({
  * GET /api/staff/shifts/me
  * Get my upcoming and recent shifts
  */
-export async function getMyShifts(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const userId = (req as any).user?.userId;
+export const getMyShifts = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
     const { startDate, endDate } = req.query;
     const supabase = getSupabase();
 
@@ -69,18 +69,13 @@ export async function getMyShifts(req: Request, res: Response, next: NextFunctio
     if (error) throw error;
 
     res.json({ success: true, data: data || [] });
-  } catch (error: any) {
-    logger.error('Error fetching my shifts', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * GET /api/staff/shifts
  * Get all shifts (filtered by date range, department, staff)
  */
-export async function getAllShifts(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const getAllShifts = asyncHandler(async (req: Request, res: Response) => {
     const { startDate, endDate, department, staffId, status } = req.query;
     const supabase = getSupabase();
 
@@ -100,18 +95,13 @@ export async function getAllShifts(req: Request, res: Response, next: NextFuncti
     if (error) throw error;
 
     res.json({ success: true, data: data || [] });
-  } catch (error: any) {
-    logger.error('Error fetching all shifts', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * GET /api/staff/shifts/staff/:staffId
  * Get shifts for a specific staff member
  */
-export async function getStaffShifts(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const getStaffShifts = asyncHandler(async (req: Request, res: Response) => {
     const { staffId } = req.params;
     const { startDate, endDate } = req.query;
     const supabase = getSupabase();
@@ -129,25 +119,21 @@ export async function getStaffShifts(req: Request, res: Response, next: NextFunc
     if (error) throw error;
 
     res.json({ success: true, data: data || [] });
-  } catch (error: any) {
-    logger.error('Error fetching staff shifts', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * POST /api/staff/shifts
  * Create a new shift
  */
-export async function createShift(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const createShift = asyncHandler(async (req: Request, res: Response) => {
     const validation = createShiftSchema.safeParse(req.body);
     if (!validation.success) {
       res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
       return;
     }
 
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
     const data = validation.data;
 
@@ -177,18 +163,13 @@ export async function createShift(req: Request, res: Response, next: NextFunctio
     });
 
     res.status(201).json({ success: true, data: shift });
-  } catch (error: any) {
-    logger.error('Error creating shift', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * PUT /api/staff/shifts/:id
  * Update a shift
  */
-export async function updateShift(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const updateShift = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const validation = updateShiftSchema.safeParse(req.body);
     if (!validation.success) {
@@ -196,7 +177,8 @@ export async function updateShift(req: Request, res: Response, next: NextFunctio
       return;
     }
 
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
     const data = validation.data;
 
@@ -221,18 +203,13 @@ export async function updateShift(req: Request, res: Response, next: NextFunctio
     if (error) throw error;
 
     res.json({ success: true, data: shift });
-  } catch (error: any) {
-    logger.error('Error updating shift', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * DELETE /api/staff/shifts/:id
  * Delete a shift
  */
-export async function deleteShift(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const deleteShift = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const supabase = getSupabase();
 
@@ -240,20 +217,16 @@ export async function deleteShift(req: Request, res: Response, next: NextFunctio
     if (error) throw error;
 
     res.json({ success: true, message: 'Shift deleted' });
-  } catch (error: any) {
-    logger.error('Error deleting shift', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * POST /api/staff/shifts/:id/clock-in
  * Clock in to a shift
  */
-export async function clockIn(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const clockIn = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
 
     // Verify the shift belongs to this user
@@ -299,21 +272,17 @@ export async function clockIn(req: Request, res: Response, next: NextFunction): 
       lateMinutes: lateMinutes > 0 ? lateMinutes : 0,
       message: lateMinutes > 0 ? `Clocked in ${lateMinutes} minutes late` : 'Clocked in on time',
     });
-  } catch (error: any) {
-    logger.error('Error clocking in', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * POST /api/staff/shifts/:id/clock-out
  * Clock out of a shift
  */
-export async function clockOut(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const clockOut = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const { breakMinutes } = req.body;
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
 
     const { data: shift, error: fetchError } = await supabase
@@ -368,11 +337,7 @@ export async function clockOut(req: Request, res: Response, next: NextFunction):
       workedHours,
       message: `Clocked out. Total worked: ${workedHours} hours`,
     });
-  } catch (error: any) {
-    logger.error('Error clocking out', { error: error.message });
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Staff Assignments
@@ -382,8 +347,7 @@ export async function clockOut(req: Request, res: Response, next: NextFunction):
  * GET /api/staff/assignments
  * Get all staff assignments
  */
-export async function getAssignments(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const getAssignments = asyncHandler(async (req: Request, res: Response) => {
     const { department, date } = req.query;
     const supabase = getSupabase();
 
@@ -417,19 +381,15 @@ export async function getAssignments(req: Request, res: Response, next: NextFunc
     }, {});
 
     res.json({ success: true, data: grouped });
-  } catch (error: any) {
-    logger.error('Error fetching assignments', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * GET /api/staff/assignments/me
  * Get my current assignment
  */
-export async function getMyAssignment(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const userId = (req as any).user?.userId;
+export const getMyAssignment = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
     const today = new Date().toISOString().split('T')[0];
 
@@ -446,18 +406,13 @@ export async function getMyAssignment(req: Request, res: Response, next: NextFun
     if (error && error.code !== 'PGRST116') throw error;
 
     res.json({ success: true, data: data || null });
-  } catch (error: any) {
-    logger.error('Error fetching my assignment', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * PUT /api/staff/staff/:staffId/assignments
  * Update staff member's assignments/department
  */
-export async function updateStaffAssignments(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const updateStaffAssignments = asyncHandler(async (req: Request, res: Response) => {
     const { staffId } = req.params;
     const validation = assignmentSchema.safeParse(req.body);
     if (!validation.success) {
@@ -465,7 +420,8 @@ export async function updateStaffAssignments(req: Request, res: Response, next: 
       return;
     }
 
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
     const data = validation.data;
 
@@ -498,18 +454,13 @@ export async function updateStaffAssignments(req: Request, res: Response, next: 
       message: `Updated ${updated?.length || 0} shifts`,
       data: updated,
     });
-  } catch (error: any) {
-    logger.error('Error updating staff assignment', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * POST /api/staff/assignments/bulk
  * Bulk assign multiple staff members
  */
-export async function bulkAssignStaff(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const bulkAssignStaff = asyncHandler(async (req: Request, res: Response) => {
     const { assignments } = req.body; // Array of { staffId, department, date, startTime, endTime }
     
     if (!Array.isArray(assignments) || assignments.length === 0) {
@@ -517,7 +468,7 @@ export async function bulkAssignStaff(req: Request, res: Response, next: NextFun
       return;
     }
 
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
     const supabase = getSupabase();
 
     const shifts = assignments.map((a: any) => ({
@@ -541,11 +492,7 @@ export async function bulkAssignStaff(req: Request, res: Response, next: NextFun
       message: `Created ${data?.length || 0} shifts`,
       data,
     });
-  } catch (error: any) {
-    logger.error('Error bulk assigning staff', { error: error.message });
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Shift Swap Workflow
@@ -555,15 +502,14 @@ export async function bulkAssignStaff(req: Request, res: Response, next: NextFun
  * POST /api/staff/shifts/swap
  * Request a shift swap
  */
-export async function requestShiftSwap(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const requestShiftSwap = asyncHandler(async (req: Request, res: Response) => {
     const validation = swapRequestSchema.safeParse(req.body);
     if (!validation.success) {
       res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
       return;
     }
 
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
     const supabase = getSupabase();
     const data = validation.data;
 
@@ -600,19 +546,14 @@ export async function requestShiftSwap(req: Request, res: Response, next: NextFu
     if (error) throw error;
 
     res.status(201).json({ success: true, data: swapRequest });
-  } catch (error: any) {
-    logger.error('Error requesting shift swap', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * GET /api/staff/shifts/swap/me
  * Get my swap requests
  */
-export async function getMySwapRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const userId = (req as any).user?.userId;
+export const getMySwapRequests = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
     const supabase = getSupabase();
 
     const { data, error } = await supabase
@@ -628,18 +569,13 @@ export async function getMySwapRequests(req: Request, res: Response, next: NextF
     if (error) throw error;
 
     res.json({ success: true, data: data || [] });
-  } catch (error: any) {
-    logger.error('Error fetching my swap requests', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * GET /api/staff/shifts/swap
  * Get all swap requests (managers)
  */
-export async function getAllSwapRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const getAllSwapRequests = asyncHandler(async (req: Request, res: Response) => {
     const { status } = req.query;
     const supabase = getSupabase();
 
@@ -659,21 +595,16 @@ export async function getAllSwapRequests(req: Request, res: Response, next: Next
     if (error) throw error;
 
     res.json({ success: true, data: data || [] });
-  } catch (error: any) {
-    logger.error('Error fetching all swap requests', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * PUT /api/staff/shifts/swap/:id/respond
  * Accept or decline a swap request (target staff)
  */
-export async function respondToSwapRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const respondToSwapRequest = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const { accept } = req.body;
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
     const supabase = getSupabase();
 
     // Get the swap request
@@ -711,21 +642,16 @@ export async function respondToSwapRequest(req: Request, res: Response, next: Ne
       data,
       message: accept ? 'Swap request accepted - pending manager approval' : 'Swap request declined',
     });
-  } catch (error: any) {
-    logger.error('Error responding to swap request', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * PUT /api/staff/shifts/swap/:id/approve
  * Approve or reject a swap request (managers only)
  */
-export async function approveSwapRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const approveSwapRequest = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const { approve } = req.body;
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
     const supabase = getSupabase();
 
     // Get the swap request
@@ -770,20 +696,15 @@ export async function approveSwapRequest(req: Request, res: Response, next: Next
       data,
       message: approve ? 'Shift swap approved and completed' : 'Shift swap rejected by manager',
     });
-  } catch (error: any) {
-    logger.error('Error approving swap request', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * DELETE /api/staff/shifts/swap/:id
  * Cancel a swap request
  */
-export async function cancelSwapRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const cancelSwapRequest = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
     const supabase = getSupabase();
 
     // Verify ownership
@@ -816,11 +737,7 @@ export async function cancelSwapRequest(req: Request, res: Response, next: NextF
     if (error) throw error;
 
     res.json({ success: true, message: 'Swap request cancelled' });
-  } catch (error: any) {
-    logger.error('Error cancelling swap request', { error: error.message });
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Time Tracking
@@ -830,8 +747,7 @@ export async function cancelSwapRequest(req: Request, res: Response, next: NextF
  * GET /api/staff/time-tracking
  * Get time tracking report
  */
-export async function getTimeTrackingReport(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const getTimeTrackingReport = asyncHandler(async (req: Request, res: Response) => {
     const { staffId, startDate, endDate, department } = req.query;
     const supabase = getSupabase();
 
@@ -867,7 +783,11 @@ export async function getTimeTrackingReport(req: Request, res: Response, next: N
 
       // Calculate scheduled vs actual
       const scheduledStart = new Date(`${shift.shift_date}T${shift.start_time}`);
-      const scheduledEnd = new Date(`${shift.shift_date}T${shift.end_time}`);
+      let scheduledEnd = new Date(`${shift.shift_date}T${shift.end_time}`);
+      // FIX: Iteration 15 - Handle overnight shifts where end_time < start_time (e.g., 22:00→06:00)
+      if (scheduledEnd <= scheduledStart) {
+        scheduledEnd = new Date(scheduledEnd.getTime() + 24 * 60 * 60 * 1000);
+      }
       const actualStart = new Date(shift.actual_start);
       const actualEnd = new Date(shift.actual_end);
 
@@ -896,21 +816,16 @@ export async function getTimeTrackingReport(req: Request, res: Response, next: N
         summary: Object.values(summary),
       },
     });
-  } catch (error: any) {
-    logger.error('Error fetching time tracking report', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * POST /api/staff/shifts/:shiftId/adjustments
  * Add a time adjustment to a shift
  */
-export async function addTimeAdjustment(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const addTimeAdjustment = asyncHandler(async (req: Request, res: Response) => {
     const { shiftId } = req.params;
     const { adjustmentType, originalTime, adjustedTime, reason } = req.body;
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
     const supabase = getSupabase();
 
     if (!adjustmentType || !adjustedTime || !reason) {
@@ -943,8 +858,4 @@ export async function addTimeAdjustment(req: Request, res: Response, next: NextF
     }
 
     res.status(201).json({ success: true, data });
-  } catch (error: any) {
-    logger.error('Error adding time adjustment', { error: error.message });
-    next(error);
-  }
-}
+});

@@ -2,12 +2,12 @@ import { Metadata } from 'next';
 import { JsonLd, generatePoolSchema, generateBreadcrumbSchema } from '@/lib/structured-data';
 
 export const metadata: Metadata = {
-  title: 'Swimming Pool | V2 Resort',
-  description: 'Refreshing swimming pool experience at V2 Resort. Multiple daily sessions, family-friendly environment, competitive pricing for adults and children.',
-  keywords: ['swimming pool', 'resort', 'V2 Resort', 'pool sessions', 'family pool', 'pool tickets'],
+  title: 'Swimming Pool | Iron Paradise Gym',
+  description: 'Refreshing swimming pool experience at Iron Paradise Gym. Multiple daily sessions, family-friendly environment, competitive pricing for adults and children.',
+  keywords: ['swimming pool', 'resort', 'Iron Paradise Gym', 'pool sessions', 'family pool', 'pool tickets'],
   openGraph: {
-    title: 'Swimming Pool | V2 Resort',
-    description: 'Refreshing swimming pool experience at V2 Resort. Book your pool session today!',
+    title: 'Swimming Pool | Iron Paradise Gym',
+    description: 'Refreshing swimming pool experience at Iron Paradise Gym. Book your pool session today!',
     type: 'website',
     url: 'https://v2-ecosystem.vercel.app/pool',
   },
@@ -19,8 +19,8 @@ export default function PoolLayout({
   children: React.ReactNode;
 }) {
   const poolSchema = generatePoolSchema({
-    name: 'V2 Resort Swimming Pool',
-    description: 'Refreshing swimming pool experience at V2 Resort. Multiple daily sessions available with family-friendly options.',
+    name: 'Iron Paradise Gym Swimming Pool',
+    description: 'Refreshing swimming pool experience at Iron Paradise Gym. Multiple daily sessions available with family-friendly options.',
     url: 'https://v2-ecosystem.vercel.app/pool',
     priceRange: '$$',
     openingHours: 'Mo-Su 09:00-20:00',
@@ -38,8 +38,8 @@ export default function PoolLayout({
       
       {/* Static content for bots/LLMs - hidden when JS runs, visible in raw HTML */}
       <div id="static-pool-content" className="sr-only">
-        <h1>V2 Resort Swimming Pool</h1>
-        <p>Experience our refreshing swimming pool at V2 Resort. We offer multiple daily pool sessions suitable for all ages.</p>
+        <h1>Iron Paradise Gym Swimming Pool</h1>
+        <p>Experience our refreshing swimming pool at Iron Paradise Gym. We offer multiple daily pool sessions suitable for all ages.</p>
         
         <h2>Pool Features</h2>
         <ul>
@@ -76,7 +76,7 @@ export default function PoolLayout({
         
         <h2>Contact</h2>
         <p>For pool reservations or inquiries:</p>
-        <p>Email: bookings@v2resort.com</p>
+        <p>Email: bookings@ironparadisegym.com</p>
         <p>Phone: +1 234 567 8900</p>
         <p>Address: 123 Resort Boulevard, Global City</p>
         

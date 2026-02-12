@@ -1,4 +1,4 @@
-import { Invoice, InvoiceStatus, InvoicePayment, InvoiceRepository } from '../container/types';
+import { Invoice, InvoiceStatus, InvoicePayment, InvoiceRepository } from "../container/types.js";
 
 export class InMemoryInvoiceRepository implements InvoiceRepository {
   private invoices: Map<string, Invoice> = new Map();

@@ -535,7 +535,7 @@ class BetaTestingService {
       dynamicTemplateData: {
         name,
         inviteLink,
-        appName: 'V2 Resort'
+        appName: 'Iron Paradise Gym'
       }
     });
   }

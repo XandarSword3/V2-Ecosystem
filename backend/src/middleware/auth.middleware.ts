@@ -1,12 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken } from "../modules/auth/auth.utils";
-import { getSupabase } from "../database/supabase";
+import { verifyToken } from "../modules/auth/auth.utils.js";
+import { getSupabase } from "../database/supabase.js";
+import { logger } from "../utils/logger.js";
 // Express Request type extension is defined in src/types/index.ts
 
 export function authenticate(req: Request, res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
+      logger.warn('Auth failure: No token provided', {
+        path: req.path,
+        method: req.method,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
       return res.status(401).json({ success: false, error: 'No token provided' });
     }
 
@@ -15,6 +22,13 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
     req.user = { ...payload, id: payload.userId };
     next();
   } catch (error) {
+    logger.warn('Auth failure: Invalid or expired token', {
+      path: req.path,
+      method: req.method,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 }
@@ -23,14 +37,27 @@ export function authorize(...args: (string | string[])[]) {
   const allowedRoles = args.flat();
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
+      logger.warn('Authorization failure: Not authenticated', {
+        path: req.path,
+        method: req.method,
+        ip: req.ip,
+        requiredRoles: allowedRoles,
+      });
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
 
-    const hasRole = req.user.roles.some(role => 
+    const hasRole = req.user.roles.some(role =>
       allowedRoles.includes(role) || role === 'super_admin'
     );
 
     if (!hasRole) {
+      logger.warn('Authorization failure: Insufficient permissions', {
+        path: req.path,
+        method: req.method,
+        userId: req.user.userId,
+        userRoles: req.user.roles,
+        requiredRoles: allowedRoles,
+      });
       return res.status(403).json({ success: false, error: 'Insufficient permissions' });
     }
 
@@ -51,7 +78,7 @@ export function requirePermission(permissionSlug: string) {
 
     try {
       const supabase = getSupabase();
-      
+
       // Check if any of the user's roles has the permission in app_role_permissions
       // We use .in() for roles to check all user roles at once
       const { data, error } = await supabase
@@ -60,11 +87,11 @@ export function requirePermission(permissionSlug: string) {
         .eq('permission_slug', permissionSlug)
         .in('role_name', req.user.roles)
         .limit(1);
-      
+
       if (error) {
-         console.error('Permission check failed:', error);
-         // Fail closed
-         return res.status(500).json({ success: false, error: 'Internal permission check failed' });
+        console.error('Permission check failed:', error);
+        // Fail closed
+        return res.status(500).json({ success: false, error: 'Internal permission check failed' });
       }
 
       if (data && data.length > 0) {

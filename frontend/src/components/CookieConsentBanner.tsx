@@ -165,7 +165,12 @@ export function CookieConsentBanner() {
       version: CONSENT_VERSION,
     };
     
-    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(updatedConsent));
+    // FIX Iter-13: Guard localStorage.setItem — throws in Safari private browsing or when quota exceeded
+    try {
+      localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(updatedConsent));
+    } catch {
+      // localStorage unavailable or full — continue with in-memory consent
+    }
     setConsent(updatedConsent);
     applyConsent(updatedConsent);
     setIsOpen(false);

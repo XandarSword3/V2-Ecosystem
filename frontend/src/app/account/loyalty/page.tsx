@@ -71,33 +71,38 @@ export default function CustomerLoyaltyPage() {
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // FIX Iter-18: AbortController to prevent state updates on unmounted component
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login?redirect=/account/loyalty');
       return;
     }
     if (isAuthenticated) {
-      loadData();
+      const controller = new AbortController();
+      const load = async () => {
+        try {
+          // FIX: Iteration 3 - Use correct backend routes: /me not /account, /me/transactions not /transactions
+          const [accountRes, transactionsRes, tiersRes] = await Promise.all([
+            api.get('/loyalty/me', { signal: controller.signal }),
+            api.get('/loyalty/me/transactions', { signal: controller.signal }),
+            api.get('/loyalty/tiers', { signal: controller.signal }),
+          ]);
+
+          if (controller.signal.aborted) return;
+          if (accountRes.data.success) setAccount(accountRes.data.data);
+          if (transactionsRes.data.success) setTransactions(transactionsRes.data.data.slice(0, 10));
+          if (tiersRes.data.success) setTiers(tiersRes.data.data);
+        } catch (err: any) {
+          if (err?.name === 'CanceledError' || controller.signal.aborted) return;
+          // User might not have a loyalty account yet
+        } finally {
+          if (!controller.signal.aborted) setLoading(false);
+        }
+      };
+      load();
+      return () => controller.abort();
     }
   }, [isAuthenticated, isLoading]);
-
-  const loadData = async () => {
-    try {
-      const [accountRes, transactionsRes, tiersRes] = await Promise.all([
-        api.get('/loyalty/account'),
-        api.get('/loyalty/transactions'),
-        api.get('/loyalty/tiers'),
-      ]);
-
-      if (accountRes.data.success) setAccount(accountRes.data.data);
-      if (transactionsRes.data.success) setTransactions(transactionsRes.data.data.slice(0, 10));
-      if (tiersRes.data.success) setTiers(tiersRes.data.data);
-    } catch {
-      // User might not have a loyalty account yet
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (isLoading || loading) {
     return (
@@ -116,7 +121,8 @@ export default function CustomerLoyaltyPage() {
           <p className="text-slate-500 mb-6">
             Start earning points on every purchase and unlock exclusive rewards!
           </p>
-          <Button onClick={() => api.post('/loyalty/enroll').then(() => loadData())}>
+          {/* FIX: Iteration 3 - /loyalty/enroll route now exists in backend */}
+          <Button onClick={() => api.post('/loyalty/enroll').then(() => window.location.reload())}>
             Enroll Now
           </Button>
         </Card>

@@ -22,18 +22,35 @@ import {
   Timer,
 } from 'lucide-react';
 
+interface SelectedModifier {
+  optionId: string;
+  optionName: string;
+  groupId: string;
+  groupName: string;
+  modifierType?: 'add' | 'remove' | 'swap'; // Optional for unified customizations
+  customizationType?: 'add' | 'remove' | 'swap' | 'upgrade' | 'replace' | 'select'; // Unified system field
+  priceAdjustment: number;
+  quantity: number;
+}
+
+interface OrderItem {
+  id: string;
+  name: string;
+  quantity: number;
+  specialInstructions?: string;
+  selected_modifiers?: SelectedModifier[];
+  selectedModifiers?: SelectedModifier[];
+  modifier_total?: string | number;
+  modifierTotal?: number;
+}
+
 interface Order {
   id: string;
   orderNumber: string;
   customerName: string;
   orderType: 'dine_in' | 'takeaway' | 'delivery';
   status: string;
-  items: {
-    id: string;
-    name: string;
-    quantity: number;
-    specialInstructions?: string;
-  }[];
+  items: OrderItem[];
   totalAmount: number;
   createdAt: string;
   tableNumber?: string;
@@ -205,16 +222,41 @@ export default function RestaurantKitchenPage() {
                   </div>
 
                   <div className="border-t pt-2 mb-3">
-                    {order.items.map((item, idx) => (
-                      <div key={idx} className="text-sm py-1">
-                        <span className="font-medium">{item.quantity}×</span> {item.name}
-                        {item.specialInstructions && (
-                          <p className="text-xs text-orange-600 italic ml-4">
-                            {item.specialInstructions}
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                    {order.items.map((item, idx) => {
+                      const modifiers = item.selected_modifiers || item.selectedModifiers || [];
+                      return (
+                        <div key={idx} className="text-sm py-1">
+                          <span className="font-medium">{item.quantity}×</span> {item.name}
+                          {modifiers.length > 0 && (
+                            <div className="ml-4 text-xs space-y-0.5">
+                              {modifiers.map((mod, modIdx) => {
+                                // Support both legacy modifierType and unified customizationType
+                                const type = mod.modifierType || (mod as any).customizationType || 'add';
+                                const isRemove = type === 'remove';
+                                const isSwap = ['swap', 'replace', 'upgrade'].includes(type);
+                                return (
+                                  <div key={modIdx} className={`${
+                                    isRemove 
+                                      ? 'text-red-600' 
+                                      : isSwap
+                                      ? 'text-blue-600'
+                                      : 'text-green-600'
+                                  }`}>
+                                    {isRemove ? '−' : isSwap ? '↔' : '+'} {mod.optionName}
+                                    {mod.quantity > 1 && <span className="opacity-70"> ×{mod.quantity}</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {item.specialInstructions && (
+                            <p className="text-xs text-orange-600 italic ml-4 mt-1">
+                              "{item.specialInstructions}"
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <div className="flex justify-between items-center">
@@ -247,10 +289,12 @@ export default function RestaurantKitchenPage() {
       </div>
 
       {/* Order Details Modal */}
+      {/* FIX Iter-21: order detail modal a11y — role, aria-modal, aria-labelledby, Escape handler */}
       {selectedOrder && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
           onClick={() => setSelectedOrder(null)}
+          role="dialog" aria-modal="true" aria-labelledby="restaurant-order-detail-title" onKeyDown={(e) => { if (e.key === 'Escape') setSelectedOrder(null); }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -258,7 +302,7 @@ export default function RestaurantKitchenPage() {
           >
             <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white" id="restaurant-order-detail-title">
                   Order #{selectedOrder.orderNumber}
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -267,8 +311,9 @@ export default function RestaurantKitchenPage() {
               </div>
               <button
                 onClick={() => setSelectedOrder(null)}
+                aria-label="Close order details"
                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
-              >
+              >{/* FIX Iter-21: close button a11y */}
                 <XCircle className="w-6 h-6 text-slate-500" />
               </button>
             </div>
@@ -306,21 +351,58 @@ export default function RestaurantKitchenPage() {
               <div>
                 <h3 className="font-semibold text-slate-900 dark:text-white mb-3">{tr('orderItems')}</h3>
                 <div className="space-y-3">
-                  {selectedOrder.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-start p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-white">{item.quantity}x</span>
-                          <span className="font-medium text-slate-900 dark:text-white">{item.name}</span>
+                  {selectedOrder.items.map((item, idx) => {
+                    const modifiers = item.selected_modifiers || item.selectedModifiers || [];
+                    return (
+                      <div key={idx} className="flex justify-between items-start p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 dark:text-white">{item.quantity}x</span>
+                            <span className="font-medium text-slate-900 dark:text-white">{item.name}</span>
+                          </div>
+                          {modifiers.length > 0 && (
+                            <div className="mt-2 ml-6 space-y-1">
+                              <div className="text-xs font-medium text-slate-600 dark:text-slate-400">Customizations:</div>
+                              {modifiers.map((mod, modIdx) => {
+                                // Support both legacy modifierType and unified customizationType
+                                const type = mod.modifierType || (mod as any).customizationType || 'add';
+                                const isRemove = type === 'remove';
+                                const isSwap = ['swap', 'replace', 'upgrade'].includes(type);
+                                return (
+                                  <div key={modIdx} className="flex items-center gap-2 text-sm">
+                                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                      isRemove 
+                                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
+                                        : isSwap
+                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                        : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                    }`}>
+                                      {isRemove ? '−' : isSwap ? '↔' : '+'}
+                                    </span>
+                                    <span className="text-slate-700 dark:text-slate-300">
+                                      {mod.optionName}
+                                      {mod.quantity > 1 && <span className="opacity-70"> ×{mod.quantity}</span>}
+                                      {mod.priceAdjustment !== 0 && (
+                                        <span className="ml-1 text-xs text-slate-500">
+                                          ({mod.priceAdjustment > 0 ? '+' : ''}{formatCurrency(mod.priceAdjustment)})
+                                        </span>
+                                      )}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {item.specialInstructions && (
+                            <div className="mt-2 ml-6 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded text-sm">
+                              <span className="font-medium text-amber-800 dark:text-amber-400">Special Instructions:</span>
+                              <p className="text-amber-700 dark:text-amber-300 italic">"{item.specialInstructions}"</p>
+                            </div>
+                          )}
                         </div>
-                        {item.specialInstructions && (
-                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 italic">
-                            Note: {item.specialInstructions}
-                          </p>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

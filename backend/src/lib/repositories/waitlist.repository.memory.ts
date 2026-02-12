@@ -5,7 +5,7 @@
  */
 
 import { randomUUID } from 'crypto';
-import type { WaitlistEntry, WaitlistFilters, WaitlistRepository } from '../container/types';
+import type { WaitlistEntry, WaitlistFilters, WaitlistRepository } from "../container/types.js";
 
 export class InMemoryWaitlistRepository implements WaitlistRepository {
   private entries: Map<string, WaitlistEntry> = new Map();

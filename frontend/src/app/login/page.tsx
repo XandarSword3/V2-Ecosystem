@@ -191,6 +191,7 @@ export default function LoginPage() {
                     maxLength={9}
                     required
                     autoFocus
+                    autoComplete="off" // FIX Iter-5: Add autocomplete attribute for backup code
                   />
                 ) : (
                   <input
@@ -202,6 +203,7 @@ export default function LoginPage() {
                     maxLength={6}
                     required
                     autoFocus
+                    autoComplete="one-time-code" // FIX Iter-5: Add autocomplete attribute for 2FA code
                   />
                 )}
               </div>
@@ -242,18 +244,20 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   {t('email')}
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
+                    id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     placeholder="admin@v2resort.com"
                     required
+                    autoComplete="email" // FIX Iter-5: Add autocomplete attribute for email
                   />
                 </div>
               </div>
@@ -261,7 +265,7 @@ export default function LoginPage() {
               {/* Password */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                     {t('password')}
                   </label>
                   <Link href="/forgot-password" className="text-xs text-primary-600 hover:text-primary-700">
@@ -271,12 +275,14 @@ export default function LoginPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
+                    id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full pl-10 pr-12 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     placeholder="••••••••"
                     required
+                    autoComplete="current-password" // FIX Iter-5: Add autocomplete attribute for password
                   />
                   <button
                     type="button"
@@ -373,10 +379,11 @@ export default function LoginPage() {
           <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700">
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold uppercase tracking-wider">{t('demoCredentials')}</p>
             <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2">
-              <div className="flex justify-between items-center group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 p-1 rounded" onClick={() => { setEmail('admin@v2resort.com'); setPassword('admin123'); }}>
+              {/* FIX Iter-13: Changed clickable div to button for keyboard accessibility */}
+              <button type="button" className="flex w-full justify-between items-center group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 p-1 rounded" onClick={() => { setEmail('admin@v2resort.com'); setPassword('admin123'); }}>
                 <span className="font-medium text-primary-600">{t('superAdmin')}:</span>
                 <span className="font-mono">admin@v2resort.com / admin123</span>
-              </div>
+              </button>
             </div>
           </div>
 

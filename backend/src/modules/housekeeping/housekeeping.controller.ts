@@ -187,7 +187,7 @@ export class HousekeepingController {
    */
   async getMyTasks(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const { status = 'active' } = req.query;
       const supabase = getSupabase();
 
@@ -332,7 +332,7 @@ export class HousekeepingController {
       }
 
       const data = validation.data;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       // Get task type name for title
@@ -398,7 +398,7 @@ export class HousekeepingController {
       }
 
       const data = validation.data;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       const updates: Record<string, any> = {
@@ -474,7 +474,7 @@ export class HousekeepingController {
       }
 
       const { staffId } = validation.data;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       const { data: result, error } = await supabase
@@ -525,8 +525,8 @@ export class HousekeepingController {
   async startTask(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const userId = (req as any).user?.id;
-      const isAdmin = (req as any).user?.roles?.includes('admin') || (req as any).user?.roles?.includes('super_admin');
+      const userId = req.user?.id;
+      const isAdmin = req.user?.roles?.includes('admin') || req.user?.roles?.includes('super_admin');
       const supabase = getSupabase();
 
       // First check if the task exists and is assigned to this user
@@ -595,8 +595,8 @@ export class HousekeepingController {
       }
 
       const data = validation.data;
-      const userId = (req as any).user?.id;
-      const isAdmin = (req as any).user?.roles?.includes('admin') || (req as any).user?.roles?.includes('super_admin');
+      const userId = req.user?.id;
+      const isAdmin = req.user?.roles?.includes('admin') || req.user?.roles?.includes('super_admin');
       const supabase = getSupabase();
 
       // First check if the task exists and is assigned to this user
@@ -643,6 +643,19 @@ export class HousekeepingController {
         notes: data.notes || 'Task completed',
       });
 
+      // FIX: Iteration 19 - Update chalet cleaning status when task is completed
+      // Previously only the advanced controller did this; basic controller left chalet stale
+      if (result.chalet_id) {
+        await supabase
+          .from('chalets')
+          .update({
+            cleaning_status: 'clean',
+            last_cleaned: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', result.chalet_id);
+      }
+
       res.json({
         success: true,
         data: result,
@@ -664,7 +677,7 @@ export class HousekeepingController {
     try {
       const { id } = req.params;
       const { issueType, notes, photosUrls } = req.body;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       // Update task to on_hold
@@ -786,7 +799,7 @@ export class HousekeepingController {
       }
 
       const data = validation.data;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       const { data: result, error } = await supabase
@@ -826,7 +839,12 @@ export class HousekeepingController {
   async updateSchedule(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const data = req.body;
+      // FIX: Iteration 11 - Validate input (was missing, unlike createSchedule)
+      const validation = createScheduleSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ success: false, error: validation.error.errors });
+      }
+      const data = validation.data;
       const supabase = getSupabase();
 
       const updates: Record<string, any> = {

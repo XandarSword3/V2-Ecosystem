@@ -89,7 +89,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
  * Logs detailed error information including stack traces
  */
 export function errorLogger(err: Error, req: Request, res: Response, next: NextFunction) {
-  const requestId = (req as any).requestId || 'unknown';
+  const requestId = req.requestId || 'unknown';
   
   logger.error(`[${requestId}] 💥 Error in ${req.method} ${req.originalUrl}`);
   logger.error(`[${requestId}] Message: ${err.message}`);

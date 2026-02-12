@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection";
 import { translateText, getTranslationStatus } from "../../services/translation.service";
 import { logActivity } from "../../utils/activityLogger";
@@ -79,8 +80,7 @@ interface MissingTranslation {
 /**
  * Get all items across all translatable tables that have missing translations
  */
-export async function getMissingTranslations(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getMissingTranslations = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const missing: MissingTranslation[] = [];
 
@@ -152,16 +152,12 @@ export async function getMissingTranslations(req: Request, res: Response, next: 
         items: missing,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get translation summary stats
  */
-export async function getTranslationStats(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTranslationStats = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const stats: Record<string, { total: number; translated: number; missing: number }> = {};
 
@@ -213,16 +209,12 @@ export async function getTranslationStats(req: Request, res: Response, next: Nex
         percentage: overall.total > 0 ? Math.round((overall.translated / overall.total) * 100) : 100,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Update a translation for a specific item
  */
-export async function updateTranslation(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateTranslation = asyncHandler(async (req: Request, res: Response) => {
     const { table, id, field, language, value } = req.body;
 
     // Validate input
@@ -286,16 +278,12 @@ export async function updateTranslation(req: Request, res: Response, next: NextF
     });
 
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Auto-translate missing translations for an item
  */
-export async function autoTranslate(req: Request, res: Response, next: NextFunction) {
-  try {
+export const autoTranslate = asyncHandler(async (req: Request, res: Response) => {
     const { table, id } = req.body;
 
     // Validate input
@@ -395,16 +383,12 @@ export async function autoTranslate(req: Request, res: Response, next: NextFunct
       data: updatedItem,
       translations,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Batch auto-translate all missing translations for a table
  */
-export async function batchAutoTranslate(req: Request, res: Response, next: NextFunction) {
-  try {
+export const batchAutoTranslate = asyncHandler(async (req: Request, res: Response) => {
     const { table } = req.body;
 
     // Validate input
@@ -500,18 +484,14 @@ export async function batchAutoTranslate(req: Request, res: Response, next: Next
       translated: translatedCount,
       errors: errors.length > 0 ? errors : undefined,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============== LANGUAGE MANAGEMENT ==============
 
 /**
  * Get all supported languages from database
  */
-export async function getSupportedLanguages(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getSupportedLanguages = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     
     // Check if languages table exists, if not return defaults
@@ -533,16 +513,12 @@ export async function getSupportedLanguages(req: Request, res: Response, next: N
     }
 
     res.json({ success: true, data: data || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Add a new supported language
  */
-export async function addLanguage(req: Request, res: Response, next: NextFunction) {
-  try {
+export const addLanguage = asyncHandler(async (req: Request, res: Response) => {
     const { code, name, native_name, direction = 'ltr' } = req.body;
 
     if (!code || !name) {
@@ -603,16 +579,12 @@ export async function addLanguage(req: Request, res: Response, next: NextFunctio
     });
 
     res.status(201).json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Update a supported language
  */
-export async function updateLanguage(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateLanguage = asyncHandler(async (req: Request, res: Response) => {
     const { code } = req.params;
     const { name, native_name, direction, is_active, is_default, sort_order } = req.body;
 
@@ -654,16 +626,12 @@ export async function updateLanguage(req: Request, res: Response, next: NextFunc
     });
 
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Delete a supported language
  */
-export async function deleteLanguage(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteLanguage = asyncHandler(async (req: Request, res: Response) => {
     const { code } = req.params;
 
     // Prevent deleting default language
@@ -693,10 +661,7 @@ export async function deleteLanguage(req: Request, res: Response, next: NextFunc
     });
 
     res.json({ success: true, message: `Language '${code}' deleted` });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============== FRONTEND TRANSLATION KEY ANALYSIS ==============
 
@@ -704,8 +669,7 @@ export async function deleteLanguage(req: Request, res: Response, next: NextFunc
  * Compare frontend translation JSON files and find missing keys
  * This analyzes the actual translation files used by next-intl
  */
-export async function compareFrontendTranslations(req: Request, res: Response, next: NextFunction) {
-  try {
+export const compareFrontendTranslations = asyncHandler(async (req: Request, res: Response) => {
     const fs = await import('fs').then(m => m.promises);
     const path = await import('path');
     
@@ -815,16 +779,12 @@ export async function compareFrontendTranslations(req: Request, res: Response, n
         allKeys: Array.from(allKeys).sort(),
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Update a specific frontend translation key
  */
-export async function updateFrontendTranslation(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateFrontendTranslation = asyncHandler(async (req: Request, res: Response) => {
     const { language, key, value } = req.body;
     
     if (!language || !key || value === undefined) {
@@ -868,17 +828,13 @@ export async function updateFrontendTranslation(req: Request, res: Response, nex
     });
     
     res.json({ success: true, message: 'Translation updated' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 
 /**
  * DB: Get UI Translations
  */
-export async function getUiTranslations(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getUiTranslations = asyncHandler(async (req: Request, res: Response) => {
     const { page = 1, limit = 50, namespace, locale, status, search } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
     const supabase = getSupabase();
@@ -907,16 +863,12 @@ export async function getUiTranslations(req: Request, res: Response, next: NextF
         limit: Number(limit)
       }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * DB: Upsert UI Translation
  */
-export async function upsertUiTranslation(req: Request, res: Response, next: NextFunction) {
-  try {
+export const upsertUiTranslation = asyncHandler(async (req: Request, res: Response) => {
     const { namespace = 'common', key, locale, value, status = 'draft' } = req.body;
 
     if (!key || !locale || !value) {
@@ -953,16 +905,12 @@ export async function upsertUiTranslation(req: Request, res: Response, next: Nex
     });
 
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * DB: Publish Translations (Sync DB -> Files)
  */
-export async function publishTranslations(req: Request, res: Response, next: NextFunction) {
-  try {
+export const publishTranslations = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
     // 1. Fetch all PUBLISHED translations
@@ -1032,25 +980,18 @@ export async function publishTranslations(req: Request, res: Response, next: Nex
     });
 
     res.json({ success: true, message: 'Translations synced to frontend files', locales: results });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get the translation service status (which API is configured)
  */
-export async function getTranslationServiceStatus(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTranslationServiceStatus = asyncHandler(async (req: Request, res: Response) => {
     const status = getTranslationStatus();
     res.json({
       success: true,
       ...status,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 export default {
   getMissingTranslations,

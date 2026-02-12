@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { chaletsApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { Loader2, Home, Users, Bed, Bath, Wifi, Wind, UtensilsCrossed, Car, AlertCircle, Star, MapPin, ChevronRight, Sparkles } from 'lucide-react';
@@ -82,10 +82,10 @@ export default function ChaletsPage() {
 
   const depositPercent = settings.depositPercent || 30;
 
+  // FIX Iter-2: Removed enabled guard — fires immediately, refetches when module loads
   const { data, isLoading, error } = useQuery({
     queryKey: ['chalets', chaletsModule?.id],
     queryFn: () => chaletsApi.getChalets(chaletsModule?.id),
-    enabled: !!chaletsModule,
   });
 
   const chalets: Chalet[] = data?.data?.data || [];
@@ -346,7 +346,7 @@ export default function ChaletsPage() {
                         <Star className="w-4 h-4 mr-2 text-amber-500" />
                         <span className="font-semibold mr-2">{t('weekendRate')}:</span> 
                         <span className="font-bold">{formatCurrency(chalet.weekendPrice ?? chalet.weekend_price ?? 0, currency)}</span>
-                        <span className="ml-1 opacity-80">{tCommon('perNight')} (Fri-Sat)</span>
+                        <span className="ml-1 opacity-80">{tCommon('perNight')} ({t('weekendDays')})</span> {/* IMPROVE Iter-8: i18n */}
                       </p>
                     </div>
 

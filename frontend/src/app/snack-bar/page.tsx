@@ -8,8 +8,8 @@ import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { snackApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { useCartStore } from '@/lib/stores/cartStore';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useCartStore } from '@/stores/cartStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useContentTranslation } from '@/lib/translate';
 import { Loader2, Cookie, ShoppingCart, AlertCircle, Plus, Minus, Sparkles, UtensilsCrossed } from 'lucide-react';
@@ -518,7 +518,7 @@ export default function SnackBarPage() {
                       </motion.div>
                     </div>
                     <div className="text-white">
-                      <p className="text-sm text-white/80">{cartCount} {tCommon('items')}</p>
+                      <p className="text-sm text-white/80">{cartCount} {tCommon('items', { count: cartCount })}</p> {/* IMPROVE Iter-2: Added count param for proper pluralization */}
                       <p className="text-xl font-bold">{formatCurrency(cartTotal, currency)}</p>
                     </div>
                   </div>

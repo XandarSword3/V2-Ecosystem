@@ -1,7 +1,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { getSupabase } from './connection';
+import { getSupabase } from "./connection.js";
 import dotenv from 'dotenv';
 
 dotenv.config();

@@ -163,7 +163,7 @@ export class ApprovalsController {
       }
 
       const data = validation.data;
-      const userId = (req as any).user?.userId || (req as any).user?.id;
+      const userId = req.user?.userId || req.user?.id;
       const supabase = getSupabase();
 
       const { data: approval, error } = await supabase
@@ -233,7 +233,7 @@ export class ApprovalsController {
       }
 
       const { status, notes } = validation.data;
-      const userId = (req as any).user?.userId || (req as any).user?.id;
+      const userId = req.user?.userId || req.user?.id;
       const supabase = getSupabase();
 
       // Check if approval exists and is pending

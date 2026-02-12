@@ -218,7 +218,7 @@ export default function InteractiveResortMap() {
         </div>
         <div className="p-4 text-center border-r border-slate-200 dark:border-slate-700">
           <Mail className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
-          <p className="text-xs text-slate-600 dark:text-slate-400">{settings.email || 'info@v2resort.com'}</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">{settings.email || 'info@ironparadisegym.com'}</p>
         </div>
         <div className="p-4 text-center">
           <Clock className="w-5 h-5 text-emerald-600 mx-auto mb-1" />

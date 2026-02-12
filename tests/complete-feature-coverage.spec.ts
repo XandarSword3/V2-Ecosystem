@@ -311,7 +311,7 @@ test.describe('Admin Reviews Management', () => {
     await navigateToPage(page, '/admin/reviews');
     
     // Should have approve/reject buttons or filters
-    const moderationContent = page.locator('text=/approve|reject|pending|filter/i, button:has-text("Approve"), button:has-text("Reject")');
+    const moderationContent = page.locator(':text("approve"), :text("reject"), :text("pending"), :text("filter"), button:has-text("Approve"), button:has-text("Reject")');
     await expect(moderationContent.first()).toBeVisible({ timeout: 10000 });
   });
 });

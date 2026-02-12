@@ -95,7 +95,7 @@ export default function EmailConfigurationPage() {
       smtpPassword: '',
       apiKey: '',
       fromEmail: '',
-      fromName: 'V2 Resort',
+      fromName: 'Iron Paradise Gym',
       replyToEmail: '',
     },
   });
@@ -384,7 +384,7 @@ export default function EmailConfigurationPage() {
                     <FormItem>
                       <FormLabel>From Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="V2 Resort" {...field} />
+                        <Input placeholder="Iron Paradise Gym" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

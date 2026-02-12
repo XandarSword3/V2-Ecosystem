@@ -12,7 +12,7 @@ export async function GET() {
   };
 
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
     const res = await fetch(`${apiUrl.replace(/\/api\/?$/, '')}/api/settings`, {
       // Forward cookies if needed for SSR auth, but for public settings usually not needed
       next: { revalidate: 60 }, // ISR: cache for 60s

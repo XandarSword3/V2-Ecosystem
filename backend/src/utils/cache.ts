@@ -184,6 +184,38 @@ class RedisCache {
   }
 
   /**
+   * Acquire a distributed lock
+   * @param key Lock key
+   * @param ttlSeconds Lock duration in seconds
+   * @returns true if lock acquired, false otherwise
+   */
+  async acquireLock(key: string, ttlSeconds: number = 10): Promise<boolean> {
+    if (!this.client || !this.isConnected) return true; // Fail open if no Redis (risk, but keeps system alive)
+
+    try {
+      // Correct argument order: key, value, 'EX', ttl, 'NX'
+      const result = await this.client.set(key, 'locked', 'EX', ttlSeconds, 'NX');
+      return result === 'OK';
+    } catch (error) {
+      logger.error('Redis lock error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Release a distributed lock
+   * @param key Lock key
+   */
+  async releaseLock(key: string): Promise<void> {
+    if (!this.client || !this.isConnected) return;
+    try {
+      await this.client.del(key);
+    } catch (error) {
+      logger.error('Redis unlock error:', error);
+    }
+  }
+
+  /**
    * Increment a counter (useful for rate limiting)
    */
   async incr(key: string, ttlSeconds?: number): Promise<number> {

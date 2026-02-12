@@ -30,7 +30,7 @@ export default function AdminSettingsPage() {
   const { settings, modules, refetch, loading } = useSiteSettings();
   const [formSettings, setFormSettings] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'modules' | 'contact' | 'hours' | 'chalets' | 'pool' | 'legal'>('general');
+  const [activeTab, setActiveTab] = useState<string>('general');
 
   // Get active modules for the modules tab
   const activeModules = useMemo(() => {
@@ -71,13 +71,40 @@ export default function AdminSettingsPage() {
     });
   };
 
+  // Dynamically generate module-specific tabs based on active modules
+  const moduleSpecificTabs = useMemo(() => {
+    const tabs: { id: string; label: string; icon: typeof Building2; moduleSlug: string; templateType: string }[] = [];
+    
+    activeModules.forEach(module => {
+      // Add settings tab for modules that have configurable settings
+      if (module.template_type === 'multi_day_booking') {
+        tabs.push({
+          id: `module-${module.slug}` as const,
+          label: module.name,
+          icon: Building2,
+          moduleSlug: module.slug,
+          templateType: module.template_type
+        });
+      } else if (module.template_type === 'session_access') {
+        tabs.push({
+          id: `module-${module.slug}` as const,
+          label: module.name,
+          icon: Globe,
+          moduleSlug: module.slug,
+          templateType: module.template_type
+        });
+      }
+    });
+    
+    return tabs;
+  }, [activeModules]);
+
   const tabs = [
     { id: 'general' as const, label: 'General', icon: Building2 },
     ...(activeModules.length > 0 ? [{ id: 'modules' as const, label: 'Modules', icon: Package }] : []),
     { id: 'contact' as const, label: 'Contact', icon: Phone },
     { id: 'hours' as const, label: 'Business Hours', icon: Clock },
-    { id: 'chalets' as const, label: 'Chalets', icon: Building2 },
-    { id: 'pool' as const, label: 'Pool', icon: Globe },
+    ...moduleSpecificTabs,
     { id: 'legal' as const, label: 'Legal Pages', icon: FileText },
   ];
 
@@ -97,7 +124,7 @@ export default function AdminSettingsPage() {
               />
               {!formSettings.resortName && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Using default: V2 Resort
+                  Using default: Iron Paradise Gym
                 </p>
               )}
             </div>
@@ -232,7 +259,7 @@ export default function AdminSettingsPage() {
                 />
                 {!formSettings.email && (
                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                    Using default: support@v2resort.com
+                    Using default: support@ironparadisegym.com
                   </p>
                 )}
               </div>
@@ -311,184 +338,12 @@ export default function AdminSettingsPage() {
           </div>
         );
 
-      case 'chalets':
-        return (
-          <div className="space-y-8">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Check-in & Check-out</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Check-in Time
-                  </label>
-                  <input
-                    type="text"
-                    value={formSettings.checkIn || ''}
-                    onChange={(e) => setFormSettings({ ...formSettings, checkIn: e.target.value })}
-                    placeholder="e.g., 3:00 PM"
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                  {!formSettings.checkIn && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      Default: 3:00 PM
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Check-out Time
-                  </label>
-                  <input
-                    type="text"
-                    value={formSettings.checkOut || ''}
-                    onChange={(e) => setFormSettings({ ...formSettings, checkOut: e.target.value })}
-                    placeholder="e.g., 12:00 PM"
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                  {!formSettings.checkOut && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      Default: 12:00 PM
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl p-6 border border-emerald-100 dark:border-emerald-800">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-emerald-600" />
-                Deposit Configuration
-              </h3>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                  Deposit Percentage
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={formSettings.depositPercent || 0}
-                    onChange={(e) => setFormSettings({ ...formSettings, depositPercent: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })}
-                    placeholder="30"
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">%</span>
-                </div>
-                {!formSettings.depositPercent && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                    Default: 30% deposit required
-                  </p>
-                )}
-              </div>
-            </div>
-
-
-
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Cancellation Policy</h3>
-              <textarea
-                rows={4}
-                value={formSettings.cancellationPolicy || ''}
-                onChange={(e) => setFormSettings({ ...formSettings, cancellationPolicy: e.target.value })}
-                placeholder="Describe your cancellation policy. Example: Free cancellation up to 48 hours before check-in. 50% refund for cancellations within 48 hours. No refund for no-shows."
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                This will be displayed to customers during the booking process.
-              </p>
-            </div>
-          </div>
-        );
-
-      case 'pool':
-        return (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl p-4 border border-blue-100 dark:border-blue-800 mb-4">
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Configure pricing and capacity for pool sessions.
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Adult Price ($)
-                </label>
-                <input
-                  type="number"
-                  value={formSettings.adultPrice || ''}
-                  onChange={(e) => setFormSettings({ ...formSettings, adultPrice: parseFloat(e.target.value) || 0 })}
-                  placeholder="25.00"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                {!formSettings.adultPrice && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                    Price not set
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Child Price ($)
-                </label>
-                <input
-                  type="number"
-                  value={formSettings.childPrice || ''}
-                  onChange={(e) => setFormSettings({ ...formSettings, childPrice: parseFloat(e.target.value) || 0 })}
-                  placeholder="15.00"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                {!formSettings.childPrice && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                    Price not set
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Infant Price ($)
-                </label>
-                <input
-                  type="number"
-                  value={formSettings.infantPrice || ''}
-                  onChange={(e) => setFormSettings({ ...formSettings, infantPrice: parseFloat(e.target.value) || 0 })}
-                  placeholder="0.00"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Max Capacity
-                </label>
-                <input
-                  type="number"
-                  value={formSettings.capacity || ''}
-                  onChange={(e) => setFormSettings({ ...formSettings, capacity: parseInt(e.target.value) || 0 })}
-                  placeholder="100"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                {!formSettings.capacity && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                    No capacity limit set
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-
       case 'legal':
         return (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-2xl p-4 border border-purple-100 dark:border-purple-800 mb-4">
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                Enter the legal content for your resort. These pages are accessible via the footer links.
+                Enter the legal content for your business. These pages are accessible via the footer links.
               </p>
             </div>
             
@@ -500,7 +355,7 @@ export default function AdminSettingsPage() {
                 rows={6}
                 value={formSettings.privacyPolicy || ''}
                 onChange={(e) => setFormSettings({ ...formSettings, privacyPolicy: e.target.value })}
-                placeholder="Enter your privacy policy content. Explain how you collect, use, and protect guest data..."
+                placeholder="Enter your privacy policy content. Explain how you collect, use, and protect customer data..."
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
               {!formSettings.privacyPolicy && (
@@ -518,7 +373,7 @@ export default function AdminSettingsPage() {
                 rows={6}
                 value={formSettings.termsOfService || ''}
                 onChange={(e) => setFormSettings({ ...formSettings, termsOfService: e.target.value })}
-                placeholder="Enter your terms of service. Include booking conditions, guest responsibilities, liability limitations..."
+                placeholder="Enter your terms of service. Include booking conditions, responsibilities, liability limitations..."
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
               {!formSettings.termsOfService && (
@@ -549,6 +404,160 @@ export default function AdminSettingsPage() {
         );
 
       default:
+        // Handle dynamic module tabs
+        if (activeTab.startsWith('module-')) {
+          const moduleSlug = activeTab.replace('module-', '');
+          const module = activeModules.find(m => m.slug === moduleSlug);
+          
+          if (!module) return null;
+          
+          const moduleSettings = (formSettings.moduleSettings as Record<string, Record<string, string | number>> || {})[moduleSlug] || {};
+          
+          if (module.template_type === 'multi_day_booking') {
+            // Multi-day booking settings (like chalets/rooms)
+            return (
+              <div className="space-y-8">
+                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl p-4 border border-emerald-100 dark:border-emerald-800 mb-4">
+                  <h3 className="font-medium text-slate-900 dark:text-white mb-2">{module.name} Settings</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Configure check-in/out times, deposit requirements, and policies for {module.name.toLowerCase()}.
+                  </p>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Check-in & Check-out</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Check-in Time
+                      </label>
+                      <input
+                        type="text"
+                        value={moduleSettings.checkIn as string || ''}
+                        onChange={(e) => updateModuleSetting(moduleSlug, 'checkIn', e.target.value)}
+                        placeholder="e.g., 3:00 PM"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Check-out Time
+                      </label>
+                      <input
+                        type="text"
+                        value={moduleSettings.checkOut as string || ''}
+                        onChange={(e) => updateModuleSetting(moduleSlug, 'checkOut', e.target.value)}
+                        placeholder="e.g., 12:00 PM"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl p-6 border border-emerald-100 dark:border-emerald-800">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-emerald-600" />
+                    Deposit Configuration
+                  </h3>
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                      Deposit Percentage
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={moduleSettings.depositPercent as number || 0}
+                        onChange={(e) => updateModuleSetting(moduleSlug, 'depositPercent', Math.max(0, Math.min(100, parseInt(e.target.value) || 0)).toString())}
+                        placeholder="30"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Cancellation Policy</h3>
+                  <textarea
+                    rows={4}
+                    value={moduleSettings.cancellationPolicy as string || ''}
+                    onChange={(e) => updateModuleSetting(moduleSlug, 'cancellationPolicy', e.target.value)}
+                    placeholder="Describe your cancellation policy..."
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            );
+          } else if (module.template_type === 'session_access') {
+            // Session-based access settings (like pool, gym, spa)
+            return (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl p-4 border border-blue-100 dark:border-blue-800 mb-4">
+                  <h3 className="font-medium text-slate-900 dark:text-white mb-2">{module.name} Settings</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Configure pricing and capacity for {module.name.toLowerCase()} sessions.
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Adult Price ($)
+                    </label>
+                    <input
+                      type="number"
+                      value={moduleSettings.adultPrice as number || ''}
+                      onChange={(e) => updateModuleSetting(moduleSlug, 'adultPrice', e.target.value)}
+                      placeholder="25.00"
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Child Price ($)
+                    </label>
+                    <input
+                      type="number"
+                      value={moduleSettings.childPrice as number || ''}
+                      onChange={(e) => updateModuleSetting(moduleSlug, 'childPrice', e.target.value)}
+                      placeholder="15.00"
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Infant Price ($)
+                    </label>
+                    <input
+                      type="number"
+                      value={moduleSettings.infantPrice as number || ''}
+                      onChange={(e) => updateModuleSetting(moduleSlug, 'infantPrice', e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Max Capacity
+                    </label>
+                    <input
+                      type="number"
+                      value={moduleSettings.capacity as number || ''}
+                      onChange={(e) => updateModuleSetting(moduleSlug, 'capacity', e.target.value)}
+                      placeholder="100"
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          }
+        }
         return null;
     }
   };

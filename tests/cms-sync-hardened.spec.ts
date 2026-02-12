@@ -230,8 +230,8 @@ test.describe('Homepage CMS Sync', () => {
       }
     }
     
-    // Test passes if we got this far without errors
-    expect(true).toBe(true);
+    // Verify page is still in a valid state
+    await expect(page.locator('main').first()).toBeVisible();
   });
 });
 
@@ -287,8 +287,8 @@ test.describe('Appearance/Theme CMS Sync', () => {
         );
       });
       
-      // Page should have theme styling applied
-      expect(await page.locator('body').isVisible()).toBe(true);
+      // Page should have theme styling applied - verify actual content loaded
+      await expect(page.locator('main, header').first()).toBeVisible({ timeout: 10000 });
     }
   });
 
@@ -340,7 +340,8 @@ test.describe('Appearance/Theme CMS Sync', () => {
       }
     }
     
-    expect(true).toBe(true);
+    // Verify the appearance settings page is still functional
+    await expect(page.locator('main').first()).toBeVisible();
   });
 });
 
@@ -453,7 +454,8 @@ test.describe('Footer CMS Sync', () => {
       }
     }
     
-    expect(true).toBe(true);
+    // Verify footer is visible on the public page
+    await expect(page.locator('footer').first()).toBeVisible();
   });
 });
 
@@ -497,7 +499,8 @@ test.describe('Navbar CMS Sync', () => {
       }
     }
     
-    expect(true).toBe(true);
+    // Verify the navigation is visible on the page
+    await expect(page.locator('nav, header').first()).toBeVisible();
   });
 });
 
@@ -552,7 +555,8 @@ test.describe('Translations CMS Sync', () => {
       }
     }
     
-    expect(true).toBe(true);
+    // Verify the page loaded successfully after language operations
+    await expect(page.locator('main').first()).toBeVisible();
   });
 });
 
@@ -600,8 +604,8 @@ test.describe('Restaurant Menu CMS Sync', () => {
         data: { ...testItem, name: originalName }
       });
       
-      // Item should appear on public page (or at least API update should succeed)
-      expect(count >= 0).toBe(true);
+      // Item should appear on public page after CMS update
+      expect(count).toBeGreaterThan(0);
     }
   });
 
@@ -639,7 +643,8 @@ test.describe('Restaurant Menu CMS Sync', () => {
       });
     }
     
-    expect(true).toBe(true);
+    // Verify the restaurant page loaded successfully
+    await expect(page.locator('main').first()).toBeVisible();
   });
 });
 
@@ -684,7 +689,8 @@ test.describe('Chalet CMS Sync', () => {
       });
     }
     
-    expect(true).toBe(true);
+    // Verify the chalets page loaded successfully
+    await expect(page.locator('main').first()).toBeVisible();
   });
 });
 
@@ -733,7 +739,8 @@ test.describe('Pool CMS Sync', () => {
       }
     }
     
-    expect(true).toBe(true);
+    // Verify the pool page loaded successfully
+    await expect(page.locator('main').first()).toBeVisible();
   });
 });
 
@@ -832,7 +839,8 @@ test.describe('Module Enable/Disable Sync', () => {
       await page.goto(FRONTEND_URL, { waitUntil: 'networkidle' });
     }
     
-    expect(true).toBe(true);
+    // Verify navigation is visible on the public page
+    await expect(page.locator('nav, header').first()).toBeVisible();
   });
 });
 
@@ -878,7 +886,7 @@ test.describe('General Settings CMS Sync', () => {
       data: { ...settingsData.data, resortName: originalName }
     });
     
-    // Test passes if update didn't error
-    expect(true).toBe(true);
+    // Verify the public page loaded successfully after settings change
+    await expect(page.locator('main').first()).toBeVisible();
   });
 });

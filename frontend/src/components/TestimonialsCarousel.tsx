@@ -83,9 +83,9 @@ export default function TestimonialsCarousel() {
   useEffect(() => {
     const fetchReviews = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/reviews`);
-        if (response.ok) {
-          const data: ReviewsResponse = await response.json();
+        const response = await api.get('/reviews');
+        if (response.status === 200) {
+          const data: ReviewsResponse = response.data;
           
           // Handle new API format (success/data wrapper)
           const reviewsData = data.data?.reviews || data.reviews || [];
@@ -222,21 +222,24 @@ export default function TestimonialsCarousel() {
         setShowReviewForm(false);
         setReviewData({ rating: 5, text: '', service_type: 'general' });
         // Refresh reviews
-        const fetchResponse = await fetch(`${API_BASE_URL}/reviews`);
-        if (fetchResponse.ok) {
-          const data: ReviewsResponse = await fetchResponse.json();
-          if (data.reviews && data.reviews.length > 0) {
-            const mappedTestimonials: Testimonial[] = data.reviews.map((review) => ({
+        const fetchResponse = await api.get('/reviews');
+        if (fetchResponse.status === 200) {
+          const data: ReviewsResponse = fetchResponse.data;
+          // FIX Iter-11: use same format handling as initial fetch (data.data?.reviews || data.reviews)
+          const reviewsData = data.data?.reviews || data.reviews || [];
+          if (reviewsData.length > 0) {
+            const mappedTestimonials: Testimonial[] = reviewsData.map((review) => ({
               id: review.id,
-              name: `${review.user.first_name} ${review.user.last_name}`,
+              name: (review as any).users?.full_name || 
+                ((review as any).user ? `${(review as any).user.first_name} ${(review as any).user.last_name}` : 'Guest'),
               role: serviceTypeLabels[review.service_type] || 'Guest',
               rating: review.rating,
               text: review.text,
               date: review.created_at.split('T')[0],
             }));
             setTestimonials(mappedTestimonials);
-            if (data.stats) {
-              setStats(data.stats);
+            if (data.data?.stats || data.stats) { // FIX Iter-11: handle both API formats for stats
+              setStats((data.data?.stats || data.stats) as any);
             }
           }
         }
@@ -260,7 +263,11 @@ export default function TestimonialsCarousel() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          role="dialog" // FIX Iter-12: a11y — modal semantics
+          aria-modal="true" // FIX Iter-12: a11y
+          aria-label="Write a review" // FIX Iter-12: a11y
           onClick={() => setShowReviewForm(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowReviewForm(false); }} // FIX Iter-12: a11y — Escape to close
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -275,6 +282,7 @@ export default function TestimonialsCarousel() {
               </h3>
               <button
                 onClick={() => setShowReviewForm(false)}
+                aria-label="Close review form" // FIX Iter-12: a11y
                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
               >
                 <X className="w-5 h-5 text-slate-500" />

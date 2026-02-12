@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl'; // IMPROVE Iter-25: i18n for pool page
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -57,14 +58,18 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType }> =
   cancelled: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: XCircle },
 };
 
-const ticketTypeConfig: Record<string, { color: string; label: string }> = {
-  adult: { color: 'bg-blue-500', label: 'Adult' },
-  child: { color: 'bg-green-500', label: 'Child' },
-  family: { color: 'bg-purple-500', label: 'Family' },
-  vip: { color: 'bg-amber-500', label: 'VIP' },
+// IMPROVE Iter-25: split ticketTypeConfig — base (colors) outside, labels (i18n) inside component
+const ticketTypeConfigBase: Record<string, { color: string }> = {
+  adult: { color: 'bg-blue-500' },
+  child: { color: 'bg-green-500' },
+  family: { color: 'bg-purple-500' },
+  vip: { color: 'bg-amber-500' },
 };
 
 export default function StaffPoolPage() {
+  // IMPROVE Iter-25: i18n hooks for pool page
+  const tp = useTranslations('staff.pool');
+  const tst = useTranslations('staff.statuses');
   const [tickets, setTickets] = useState<PoolTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanMode, setScanMode] = useState(false);
@@ -76,26 +81,40 @@ export default function StaffPoolPage() {
   const { socket } = useSocket();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const fetchTickets = useCallback(async () => {
+  // IMPROVE Iter-25: ticketTypeConfig with i18n labels inside component
+  const ticketTypeConfig: Record<string, { color: string; label: string }> = Object.fromEntries(
+    Object.entries(ticketTypeConfigBase).map(([key, value]) => [
+      key,
+      { ...value, label: tp(key as 'adult' | 'child' | 'family' | 'vip') },
+    ])
+  );
+
+  const fetchTickets = useCallback(async (signal?: AbortSignal) => {
     try {
       const response = await api.get('/pool/staff/tickets/today', {
         params: { date: new Date().toISOString().split('T')[0] },
+        signal,
       });
+      if (signal?.aborted) return;
       setTickets(response.data.data || []);
       setCurrentlyInPool(
         response.data.data?.filter((t: PoolTicket) => t.status === 'active' && t.entry_time && !t.exit_time).length || 0
       );
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'CanceledError' || signal?.aborted) return;
       toast.error('Failed to load tickets');
       setTickets([]);
       setCurrentlyInPool(0);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
+  // FIX Iter-17: AbortController to prevent state updates on unmounted component
   useEffect(() => {
-    fetchTickets();
+    const controller = new AbortController();
+    fetchTickets(controller.signal);
+    return () => controller.abort();
   }, [fetchTickets]);
 
   // Real-time updates
@@ -160,18 +179,8 @@ export default function StaffPoolPage() {
       toast.success('Entry recorded!', { icon: '🏊' });
       playSound('entry');
     } catch (error) {
-      // Mock for demo
-      const now = new Date().toTimeString().split(' ')[0];
-      setTickets((prev) =>
-        prev.map((t) =>
-          t.id === ticketId
-            ? { ...t, status: 'active' as const, entry_time: now }
-            : t
-        )
-      );
-      setCurrentlyInPool((prev) => prev + 1);
-      toast.success('Entry recorded!', { icon: '🏊' });
-      playSound('entry');
+      // FIX Iter-15: Show error instead of silently succeeding with mock data
+      toast.error('Failed to record entry. Please try again.');
     }
   };
 
@@ -190,18 +199,8 @@ export default function StaffPoolPage() {
       toast.success('Exit recorded!', { icon: '👋' });
       playSound('exit');
     } catch (error) {
-      // Mock for demo
-      const now = new Date().toTimeString().split(' ')[0];
-      setTickets((prev) =>
-        prev.map((t) =>
-          t.id === ticketId
-            ? { ...t, status: 'used' as const, exit_time: now }
-            : t
-        )
-      );
-      setCurrentlyInPool((prev) => Math.max(0, prev - 1));
-      toast.success('Exit recorded!', { icon: '👋' });
-      playSound('exit');
+      // FIX Iter-15: Show error instead of silently succeeding with mock data
+      toast.error('Failed to record exit. Please try again.');
     }
   };
 
@@ -257,10 +256,10 @@ export default function StaffPoolPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Waves className="w-7 h-7 text-blue-500" />
-            Pool Management
+            {tp('title')}
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Validate tickets and track pool usage
+            {tp('subtitle')}
           </p>
         </div>
         <div className="flex gap-2">
@@ -272,11 +271,11 @@ export default function StaffPoolPage() {
             }}
           >
             <QrCode className="w-4 h-4 mr-2" />
-            {scanMode ? 'Scanning...' : 'Scan Mode (F2)'}
+            {scanMode ? tp('scanning') : tp('scanModeF2')}
           </Button>
-          <Button variant="outline" onClick={fetchTickets}>
+          <Button variant="outline" onClick={() => fetchTickets()}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {tp('refresh')}
           </Button>
         </div>
       </div>
@@ -288,14 +287,14 @@ export default function StaffPoolPage() {
           className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'tickets' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
         >
-          Tickets
+          {tp('tickets')}
         </button>
         <button
           onClick={() => setActiveTab('maintenance')}
           className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'maintenance' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
         >
-          Maintenance Logs
+          {tp('maintenanceLogs')}
         </button>
       </div>
 
@@ -317,8 +316,8 @@ export default function StaffPoolPage() {
                           <QrCode className="w-6 h-6" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-lg">Scan Mode Active</h3>
-                          <p className="text-blue-100 text-sm">Scan or enter ticket code</p>
+                          <h3 className="font-semibold text-lg">{tp('scanModeActive')}</h3>
+                          <p className="text-blue-100 text-sm">{tp('scanModeInstructions')}</p>
                         </div>
                       </div>
                       <div className="flex-1">
@@ -332,7 +331,7 @@ export default function StaffPoolPage() {
                               validateTicket(manualCode);
                             }
                           }}
-                          placeholder="Enter ticket code (e.g., PT-001)"
+                          placeholder={tp('enterTicketCode')}
                           className="w-full px-4 py-3 rounded-lg bg-white/20 placeholder-white/60 text-white focus:bg-white/30 focus:outline-none text-center text-lg font-mono"
                           autoFocus
                         />
@@ -341,7 +340,7 @@ export default function StaffPoolPage() {
                         onClick={() => validateTicket(manualCode)}
                         className="bg-white text-blue-600 hover:bg-blue-50"
                       >
-                        Validate
+                        {tp('validate')}
                       </Button>
                     </div>
                   </CardContent>
@@ -357,7 +356,7 @@ export default function StaffPoolPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Total Today</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">{tp('totalToday')}</p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
                     </div>
                     <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
@@ -373,7 +372,7 @@ export default function StaffPoolPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Pending</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">{tp('pending')}</p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.pending}</p>
                     </div>
                     <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
@@ -389,7 +388,7 @@ export default function StaffPoolPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">In Pool Now</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">{tp('inPoolNow')}</p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">
                         {currentlyInPool}
                         <span className="text-sm font-normal text-slate-400">/{poolCapacity}</span>
@@ -422,7 +421,7 @@ export default function StaffPoolPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Completed</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">{tp('completed')}</p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.used}</p>
                     </div>
                     <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
@@ -443,9 +442,9 @@ export default function StaffPoolPage() {
             >
               <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
               <div>
-                <p className="font-medium text-red-800 dark:text-red-200">Pool Near Capacity</p>
+                <p className="font-medium text-red-800 dark:text-red-200">{tp('poolNearCapacity')}</p>
                 <p className="text-sm text-red-600 dark:text-red-300">
-                  Currently at {Math.round(capacityPercentage)}% capacity. Consider limiting new entries.
+                  {tp('capacityWarning', { percent: Math.round(capacityPercentage) })}
                 </p>
               </div>
             </motion.div>
@@ -469,6 +468,10 @@ export default function StaffPoolPage() {
                     transition={{ delay: index * 0.05 }}
                     layout
                     onClick={() => setSelectedTicket(ticket)}
+                    // FIX Iter-16: keyboard a11y for clickable ticket card
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicket(ticket); } }}
                     className="cursor-pointer"
                   >
                     <Card className={`hover:shadow-lg transition-all ${isInPool ? 'ring-2 ring-green-400 bg-green-50/50 dark:bg-green-900/10' : ''}`}>
@@ -489,7 +492,7 @@ export default function StaffPoolPage() {
                         <div className="space-y-2 text-sm">
                           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                             <Ticket className="w-4 h-4" />
-                            <span>{typeConfig?.label} Ticket</span>
+                            <span>{typeConfig?.label} {tp('ticketSuffix')}</span>
                           </div>
 
                           {ticket.users && (
@@ -507,22 +510,25 @@ export default function StaffPoolPage() {
                           {ticket.entry_time && (
                             <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                               <Timer className="w-4 h-4" />
-                              <span>In: {ticket.entry_time}</span>
-                              {ticket.exit_time && <span>→ Out: {ticket.exit_time}</span>}
+                              <span>{tp('entryTime')}: {ticket.entry_time}</span>
+                              {ticket.exit_time && <span>→ {tp('exitTime')}: {ticket.exit_time}</span>}
                             </div>
                           )}
                         </div>
 
                         {/* Quick Actions */}
                         <div className="mt-4 flex gap-2">
-                          {ticket.status === 'pending' && (
+                          {(ticket.status === 'pending' || ticket.status === 'valid') && (
                             <Button
                               size="sm"
                               className="w-full"
-                              onClick={() => recordEntry(ticket.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                recordEntry(ticket.id);
+                              }}
                             >
                               <TrendingUp className="w-4 h-4 mr-1" />
-                              Record Entry
+                              {tp('recordEntry')}
                             </Button>
                           )}
                           {isInPool && (
@@ -530,10 +536,13 @@ export default function StaffPoolPage() {
                               size="sm"
                               variant="outline"
                               className="w-full"
-                              onClick={() => recordExit(ticket.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                recordExit(ticket.id);
+                              }}
                             >
                               <TrendingUp className="w-4 h-4 mr-1 rotate-180" />
-                              Record Exit
+                              {tp('recordExit')}
                             </Button>
                           )}
                         </div>
@@ -548,7 +557,7 @@ export default function StaffPoolPage() {
           {tickets.length === 0 && (
             <div className="text-center py-12">
               <Waves className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">No tickets for today</p>
+              <p className="text-slate-500 dark:text-slate-400">{tp('noTicketsToday')}</p>
             </div>
           )}
         </>
@@ -562,6 +571,11 @@ export default function StaffPoolPage() {
           <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
             onClick={() => setSelectedTicket(null)}
+            // FIX Iter-16: modal a11y — role, aria-modal, Escape handler
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${tp('ticketDetails')} ${selectedTicket.ticket_number}`}
+            onKeyDown={(e) => { if (e.key === 'Escape') setSelectedTicket(null); }}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -573,14 +587,15 @@ export default function StaffPoolPage() {
               <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                    Ticket Details
+                    {tp('ticketDetails')}
                   </h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Ticket Number: {selectedTicket.ticket_number}
+                    {tp('ticketNumber')}: {selectedTicket.ticket_number}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedTicket(null)}
+                  aria-label="Close ticket details"
                   className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
                 >
                   <XCircle className="w-6 h-6 text-slate-500" />
@@ -596,15 +611,15 @@ export default function StaffPoolPage() {
                 {/* Status & Info */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Status</h3>
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{tp('status')}</h3>
                     <div className="flex items-center gap-2">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-medium ${statusConfig[selectedTicket.status]?.color}`}>
-                        {selectedTicket.status}
+                        {tst(selectedTicket.status)}
                       </span>
                     </div>
                   </div>
                   <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Guests</h3>
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{tp('guests')}</h3>
                     <p className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <Users className="w-5 h-5 text-slate-400" />
                       {selectedTicket.number_of_guests || 1}
@@ -614,14 +629,14 @@ export default function StaffPoolPage() {
 
                 {/* Customer Info */}
                 <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                  <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Guest Information</h3>
+                  <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{tp('guestInfo')}</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <span className="text-xs text-slate-400">Name</span>
+                      <span className="text-xs text-slate-400">{tp('guestName')}</span>
                       <p className="font-medium">{selectedTicket.customer_name || selectedTicket.users?.full_name}</p>
                     </div>
                     <div>
-                      <span className="text-xs text-slate-400">Phone / Email</span>
+                      <span className="text-xs text-slate-400">{tp('guestPhoneEmail')}</span>
                       <p className="font-medium">{selectedTicket.customer_phone || selectedTicket.users?.email}</p>
                     </div>
                   </div>
@@ -629,28 +644,28 @@ export default function StaffPoolPage() {
 
                 {/* Timing & Price */}
                 <div className="space-y-2">
-                  <h3 className="font-semibold text-slate-900 dark:text-white">Details</h3>
+                  <h3 className="font-semibold text-slate-900 dark:text-white">{tp('details')}</h3>
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Ticket Date</span>
+                    <span className="text-slate-500">{tp('ticketDate')}</span>
                     <span>{new Date(selectedTicket.ticket_date || Date.now()).toLocaleDateString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Created At</span>
+                    <span className="text-slate-500">{tp('createdAt')}</span>
                     <span>{new Date().toLocaleDateString()}</span>
                   </div>
                   <div className="flex justify-between font-bold text-lg pt-2 border-t border-slate-200 dark:border-slate-700">
-                    <span>Price</span>
+                    <span>{tp('price')}</span>
                     {/* Use simple number formatting since formatCurrency might not be imported or available in this scope, wait it is imported in page.tsx */}
                     {/* Checking imports... yes formatCurrency is imported */}
                     <span>{formatCurrency(Number(selectedTicket.total_amount) || 0)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-slate-500">
-                    <span>Payment Status</span>
-                    <span className="capitalize">{selectedTicket.payment_status || 'Pending'}</span>
+                    <span>{tp('paymentStatus')}</span>
+                    <span className="capitalize">{selectedTicket.payment_status || tp('paymentPending')}</span>
                   </div>
                   <div className="flex justify-between text-sm text-slate-500">
-                    <span>Payment Method</span>
-                    <span className="capitalize">{selectedTicket.payment_method || 'cash'}</span>
+                    <span>{tp('paymentMethod')}</span>
+                    <span className="capitalize">{selectedTicket.payment_method || tp('paymentCash')}</span>
                   </div>
                 </div>
 
@@ -658,7 +673,7 @@ export default function StaffPoolPage() {
 
               <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setSelectedTicket(null)}>
-                  Close
+                  {tp('close')}
                 </Button>
               </div>
             </motion.div>

@@ -6,6 +6,7 @@ import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
 import { emailService } from "../../services/email.service.js";
 import { AppError } from "../../utils/AppError.js";
+import { validatePassword } from "../../services/password-policy.service.js"; // FIX: Iteration 20 - enforce password policy
 
 interface SessionMeta {
   ipAddress?: string;
@@ -452,6 +453,12 @@ export async function changePassword(userId: string, currentPassword: string, ne
     throw new AppError('Current password is incorrect', 400);
   }
 
+  // FIX: Iteration 20 - Enforce password policy on password change
+  const policyResult = await validatePassword(newPassword);
+  if (!policyResult.valid) {
+    throw new AppError(`Password does not meet policy: ${policyResult.errors.join(', ')}`, 400);
+  }
+
   // Hash new password
   const newPasswordHash = await bcrypt.hash(newPassword, 12);
 
@@ -509,13 +516,21 @@ export async function sendPasswordResetEmail(email: string) {
   const resetToken = uuidv4();
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-  // Delete any existing reset tokens for this user
-  await supabase
+  // FIX: Iteration 20 - Only delete existing reset tokens, not all active sessions
+  // Reset tokens have token === refresh_token; normal login sessions have different values
+  const { data: existingSessions } = await supabase
     .from('sessions')
-    .delete()
+    .select('id, token, refresh_token')
     .eq('user_id', user.id)
-    .eq('is_active', true)
-    .not('refresh_token', 'is', null);
+    .eq('is_active', true);
+
+  const resetSessionIds = (existingSessions || [])
+    .filter(s => s.token === s.refresh_token)
+    .map(s => s.id);
+
+  if (resetSessionIds.length > 0) {
+    await supabase.from('sessions').delete().in('id', resetSessionIds);
+  }
 
   // Store token in sessions table
   const { error: insertError } = await supabase
@@ -578,6 +593,12 @@ export async function resetPassword(token: string, newPassword: string) {
   if (expiresAtDate < now) {
     await supabase.from('sessions').delete().eq('id', session.id);
     throw new Error('Reset token has expired');
+  }
+
+  // FIX: Iteration 20 - Enforce password policy on password reset
+  const policyResult = await validatePassword(newPassword);
+  if (!policyResult.valid) {
+    throw new Error(`Password does not meet policy: ${policyResult.errors.join(', ')}`);
   }
 
   // Hash new password

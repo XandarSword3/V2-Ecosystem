@@ -1,14 +1,23 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import Link from 'next/link';
 import { poolApi } from '@/lib/api';
-import { Loader2, AlertCircle, Clock, Users, Info } from 'lucide-react';
+import { Loader2, AlertCircle, Clock, Users, X, Calendar, Ticket, Waves, Sparkles, ChevronRight, Sun, Umbrella, Droplets } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useContentTranslation } from '@/lib/translate';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Module } from '@/lib/settings-context';
-import { formatCurrency } from '@/lib/utils';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useAuth } from '@/lib/auth-context';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { SpotlightCard } from '@/components/effects/GlowingBorder';
+import { FloatingCard } from '@/components/effects/Card3D';
+import { GradientText, RevealHeading } from '@/components/effects/TextEffects';
+import { AnimatedCounter } from '@/components/effects/AnimatedCounter';
 
 interface SessionServiceProps {
   module: Module;
@@ -20,30 +29,157 @@ interface PoolSession {
   name_ar?: string;
   name_fr?: string;
   description?: string;
-  start_time: string;
-  end_time: string;
-  gender: 'mixed' | 'male' | 'female';
-  capacity: number;
-  price: number;
+  start_time?: string;
+  end_time?: string;
+  startTime?: string;
+  endTime?: string;
+  gender?: 'mixed' | 'male' | 'female';
+  genderRestriction?: 'mixed' | 'male' | 'female';
+  capacity?: number;
+  max_capacity?: number;
+  maxCapacity?: number;
+  price: number | string;
+  adult_price?: number | string;
+  child_price?: number | string;
+  available?: number;
+  isSoldOut?: boolean;
+  availability?: {
+    remaining?: number;
+  };
 }
+
+interface PurchaseTicketData {
+  sessionId: string;
+  ticketDate: string;
+  customerName: string;
+  customerPhone: string;
+  numberOfAdults: number;
+  numberOfChildren: number;
+  numberOfGuests: number;
+  paymentMethod: 'cash' | 'card' | 'online';
+}
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } }
+};
 
 export function SessionService({ module }: SessionServiceProps) {
   const t = useTranslations('pool');
   const tCommon = useTranslations('common');
   const { translateContent } = useContentTranslation();
   const currency = useSettingsStore((s) => s.currency);
+  const router = useRouter();
+  const { user } = useAuth();
 
+  // Booking state
+  const [selectedSession, setSelectedSession] = useState<PoolSession | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [adultCount, setAdultCount] = useState(1);
+  const [childCount, setChildCount] = useState(0);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Reset guest counts when session changes
+  useEffect(() => {
+    setAdultCount(1);
+    setChildCount(0);
+  }, [selectedSession]);
+
+  // Use availability endpoint to get live ticket counts
   const { data, isLoading, error } = useQuery({
-    queryKey: ['pool-sessions', module.id],
-    queryFn: () => poolApi.getSessions(module.id),
+    queryKey: ['pool-availability', module.id, selectedDate],
+    queryFn: () => poolApi.getAvailability(selectedDate, module.id),
   });
+
+  // Fetch user's tickets if logged in
+  const { data: myTicketsData } = useQuery({
+    queryKey: ['my-pool-tickets'],
+    queryFn: () => poolApi.getMyTickets(),
+    enabled: !!user,
+  });
+
+  const myTickets = myTicketsData?.data?.data || [];
+
+  const purchaseMutation = useMutation({
+    mutationFn: (ticketData: PurchaseTicketData) => poolApi.purchaseTicket(ticketData),
+    onSuccess: (response) => {
+      toast.success(t('ticketPurchased'));
+      const ticket = response.data.data;
+      setSelectedSession(null);
+      setCustomerName('');
+      setCustomerPhone('');
+      setAdultCount(1);
+      setChildCount(0);
+      router.push(`/${module.slug}/confirmation?id=${ticket.id}`);
+    },
+    onError: (err: { response?: { data?: { error?: string } } }) => {
+      toast.error(err.response?.data?.error || t('purchaseFailed'));
+    },
+  });
+
+  const handleConfirmBooking = () => {
+    if (!selectedSession) return;
+    if (!customerName.trim() || !customerPhone.trim()) {
+      toast.error(t('fillContactInfo'));
+      return;
+    }
+    purchaseMutation.mutate({
+      sessionId: selectedSession.id,
+      ticketDate: selectedDate,
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      numberOfAdults: adultCount,
+      numberOfChildren: childCount,
+      numberOfGuests: adultCount + childCount,
+      paymentMethod: 'cash',
+    });
+  };
+
+  const getSessionPrice = (session: PoolSession) => {
+    const adultPrice = Number(session.adult_price) || Number(session.price) || 0;
+    const childPrice = Number(session.child_price) || 0;
+    return { adultPrice, childPrice };
+  };
+
+  const calculateTotal = (session: PoolSession) => {
+    const { adultPrice, childPrice } = getSessionPrice(session);
+    return adultPrice * adultCount + childPrice * childCount;
+  };
+
+  const getStartTime = (s: PoolSession) => s.start_time || s.startTime || '';
+  const getEndTime = (s: PoolSession) => s.end_time || s.endTime || '';
+  const getMaxCapacity = (s: PoolSession) => s.capacity || s.max_capacity || s.maxCapacity || 50;
 
   const sessions: PoolSession[] = data?.data?.data || [];
 
+  // Get module-specific colors or use defaults
+  const headerColor = module.settings?.header_color || '#0891b2';
+  const accentColor = module.settings?.accent_color || '#1d4ed8';
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-12 h-12 animate-spin text-primary-600" />
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-cyan-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full blur-xl opacity-30 animate-pulse" />
+            <Loader2 className="w-12 h-12 animate-spin text-blue-600 relative" />
+          </div>
+          <p className="mt-4 text-slate-600 dark:text-slate-400 font-medium">{tCommon('loading')}</p>
+        </motion.div>
       </div>
     );
   }
@@ -59,88 +195,534 @@ export function SessionService({ module }: SessionServiceProps) {
     );
   }
 
-  // Get module-specific colors or use defaults
-  const headerColor = module.settings?.header_color || '#0891b2';
-  const accentColor = module.settings?.accent_color || '#1d4ed8';
-
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <div 
-        className="relative overflow-hidden pt-24 pb-20"
-        style={{ background: `linear-gradient(to right, ${headerColor}, ${accentColor})` }}
-      >
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <div className="min-h-screen bg-gradient-to-b from-primary-50/50 via-white to-secondary-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      {/* Hero Section with Aurora Effect */}
+      <div className="relative min-h-[45vh] overflow-hidden">
+        {/* Aurora Background */}
+        <div
+          className="absolute inset-0"
+          style={{ background: `linear-gradient(135deg, ${headerColor}, ${accentColor})` }}
+        >
+          {/* Animated Blobs */}
           <motion.div
-            initial={{ opacity: 0, y: -30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-40"
+            style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.6) 0%, transparent 70%)' }}
+            animate={{ x: [0, 50, 0], y: [0, 30, 0], scale: [1, 1.2, 1] }}
+            transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            className="absolute top-1/2 right-1/4 w-80 h-80 rounded-full opacity-40"
+            style={{ background: 'radial-gradient(circle, rgba(6, 182, 212, 0.6) 0%, transparent 70%)' }}
+            animate={{ x: [0, -40, 0], y: [0, -50, 0], scale: [1, 1.3, 1] }}
+            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+          />
+          <motion.div
+            className="absolute bottom-1/4 left-1/2 w-72 h-72 rounded-full opacity-30"
+            style={{ background: 'radial-gradient(circle, rgba(20, 184, 166, 0.6) 0%, transparent 70%)' }}
+            animate={{ x: [0, 60, 0], y: [0, 40, 0], scale: [1, 1.15, 1] }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+          />
+        </div>
+
+        {/* Animated waves at bottom */}
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg className="w-full h-32 fill-white/20 dark:fill-slate-900/50" viewBox="0 0 1440 120" preserveAspectRatio="none">
+            <motion.path
+              initial={{ d: "M0,40 C360,80 720,40 1080,80 C1260,100 1380,60 1440,80 L1440,120 L0,120 Z" }}
+              animate={{
+                d: [
+                  "M0,40 C360,80 720,40 1080,80 C1260,100 1380,60 1440,80 L1440,120 L0,120 Z",
+                  "M0,60 C360,40 720,80 1080,40 C1260,60 1380,100 1440,60 L1440,120 L0,120 Z",
+                  "M0,40 C360,80 720,40 1080,80 C1260,100 1380,60 1440,80 L1440,120 L0,120 Z"
+                ]
+              }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </svg>
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-[45vh] px-4 text-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+            className="mb-6"
           >
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
-              {module.name}
-            </h1>
-            <p className="text-white/90 text-lg max-w-2xl mx-auto">
-              {module.description}
-            </p>
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/30">
+              <Sparkles className="w-5 h-5 text-yellow-300" />
+              <span className="text-white font-medium">{module.name}</span>
+            </div>
           </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="flex items-center justify-center mb-4"
+          >
+            <motion.div
+              animate={{ y: [0, -8, 0], rotate: [0, 5, 0] }}
+              transition={{ duration: 3, repeat: Infinity }}
+            >
+              <Waves className="w-14 h-14 text-white drop-shadow-lg" />
+            </motion.div>
+          </motion.div>
+
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 drop-shadow-lg">
+            {module.name}
+          </h1>
+          <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto mb-8">
+            {module.description || t('subtitle')}
+          </p>
+
+          {/* Stats */}
+          <div className="flex flex-wrap justify-center gap-4 md:gap-6">
+            {[
+              { value: sessions.length, label: t('sessionsToday') || 'Sessions Today', icon: <Clock className="w-5 h-5" /> },
+              { value: sessions.reduce((sum: number, s: PoolSession) => sum + (s.available ?? s.availability?.remaining ?? getMaxCapacity(s)), 0), label: t('availableSpots') || 'Available Spots', icon: <Users className="w-5 h-5" /> },
+            ].map((stat, index) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 + index * 0.1 }}
+                whileHover={{ y: -4, scale: 1.05 }}
+                className="bg-white/20 backdrop-blur-xl rounded-2xl px-8 py-4 border border-white/30 text-white"
+              >
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  {stat.icon}
+                  <span className="text-3xl font-bold">
+                    <AnimatedCounter value={stat.value} duration={2} />
+                  </span>
+                </div>
+                <div className="text-sm text-white/80">{stat.label}</div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sessions.map((session: PoolSession) => (
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-6 relative z-10">
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Sessions */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Date Picker - Glass Card */}
             <motion.div
-              key={session.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden border border-slate-100 dark:border-slate-700"
+              className="p-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-white/30 dark:border-slate-700/50 rounded-2xl shadow-xl"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
             >
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                    {translateContent(session, 'name')}
+              <label className="flex items-center text-slate-900 dark:text-white text-lg font-semibold mb-3">
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-xl flex items-center justify-center mr-3">
+                  <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                {t('selectDate') || 'Select Date'}
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full text-lg py-3 px-4 bg-slate-50/80 dark:bg-slate-700/80 backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all"
+              />
+            </motion.div>
+
+            <RevealHeading className="text-xl font-semibold text-slate-900 dark:text-white flex items-center">
+              <Sun className="w-6 h-6 mr-2 text-yellow-500" />
+              <GradientText from="from-blue-500" via="via-cyan-500" to="to-teal-500">
+                {t('availableSessions', { date: formatDate(selectedDate) }) || `Available Sessions`}
+              </GradientText>
+            </RevealHeading>
+
+            {sessions.length > 0 ? (
+              <motion.div
+                className="space-y-5"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                {sessions.map((session: PoolSession, index: number) => {
+                  const remaining = session.available ?? session.availability?.remaining ?? getMaxCapacity(session);
+                  const maxCap = getMaxCapacity(session);
+                  const isSoldOut = session.isSoldOut ?? remaining === 0;
+                  const isSelected = selectedSession?.id === session.id;
+                  const fillPercent = ((maxCap - remaining) / maxCap) * 100;
+
+                  return (
+                    <SpotlightCard
+                      key={session.id}
+                      spotlightColor={isSelected ? "rgba(59, 130, 246, 0.25)" : "rgba(6, 182, 212, 0.15)"}
+                      className="h-full"
+                    >
+                      <motion.div
+                        variants={cardVariants}
+                        className={`p-6 cursor-pointer transition-all duration-300 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-2 rounded-2xl ${
+                          isSelected
+                            ? 'border-blue-500 shadow-xl shadow-blue-200/50 dark:shadow-blue-900/30'
+                            : isSoldOut
+                              ? 'border-slate-200/50 dark:border-slate-700/50 opacity-60 cursor-not-allowed'
+                              : 'border-white/30 dark:border-slate-700/50 hover:border-blue-300/50'
+                        }`}
+                        onClick={() => !isSoldOut && setSelectedSession(session)}
+                        whileHover={!isSoldOut ? { y: -4 } : {}}
+                        whileTap={!isSoldOut ? { scale: 0.98 } : {}}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              {translateContent(session, 'name')}
+                            </h3>
+                            <div className="flex items-center gap-3 mt-3 flex-wrap">
+                              <span className="flex items-center bg-blue-50/80 dark:bg-blue-900/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm font-medium text-blue-700 dark:text-blue-300">
+                                <Clock className="w-4 h-4 mr-1.5" />
+                                {getStartTime(session)} - {getEndTime(session)}
+                              </span>
+                              <span className={`flex items-center px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm ${
+                                remaining < 10 ? 'bg-red-50/80 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+                                remaining < 20 ? 'bg-yellow-50/80 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' :
+                                'bg-green-50/80 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                              }`}>
+                                <Users className="w-4 h-4 mr-1.5" />
+                                {remaining} spots left
+                              </span>
+                              {(session.gender || session.genderRestriction) && (session.gender || session.genderRestriction) !== 'mixed' && (
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                  (session.gender || session.genderRestriction) === 'female'
+                                    ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300'
+                                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                }`}>
+                                  {t(`gender.${session.gender || session.genderRestriction || 'mixed'}`)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                              {formatCurrency(Number(session.adult_price) || Number(session.price) || 0, currency)}
+                            </p>
+                            {Number(session.child_price) > 0 && (
+                              <p className="text-sm font-semibold text-secondary-600 dark:text-secondary-400">
+                                {t('child')}: {formatCurrency(session.child_price, currency)}
+                              </p>
+                            )}
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{tCommon('perPerson') || 'per person'}</p>
+                          </div>
+                        </div>
+
+                        {/* Capacity Progress Bar */}
+                        <div className="mt-5">
+                          <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
+                            <span>{t('capacity') || 'Capacity'}</span>
+                            <span>{remaining}/{maxCap}</span>
+                          </div>
+                          <div className="w-full bg-slate-200/50 dark:bg-slate-700/50 rounded-full h-3 overflow-hidden backdrop-blur-sm">
+                            <motion.div
+                              className={`h-3 rounded-full ${
+                                remaining < 10 ? 'bg-gradient-to-r from-red-500 to-red-400' :
+                                remaining < 20 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                                'bg-gradient-to-r from-green-500 to-emerald-400'
+                              }`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${fillPercent}%` }}
+                              transition={{ duration: 0.8, delay: index * 0.1 }}
+                            />
+                          </div>
+                        </div>
+
+                        {isSoldOut && (
+                          <div className="mt-4">
+                            <span className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm font-medium px-4 py-1.5 rounded-full">
+                              {tCommon('soldOut') || 'Sold Out'}
+                            </span>
+                          </div>
+                        )}
+                      </motion.div>
+                    </SpotlightCard>
+                  );
+                })}
+              </motion.div>
+            ) : (
+              <FloatingCard className="w-full">
+                <div className="p-12 text-center bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-white/30 dark:border-slate-700/50 rounded-2xl">
+                  <motion.div animate={{ y: [0, -10, 0], rotate: [0, 5, 0] }} transition={{ duration: 3, repeat: Infinity }}>
+                    <Waves className="w-20 h-20 text-blue-300 mx-auto mb-6" />
+                  </motion.div>
+                  <GradientText from="from-blue-500" via="via-cyan-500" to="to-teal-500" className="text-xl font-bold mb-2 block">
+                    {t('noSessionsAvailable') || 'No sessions available'}
+                  </GradientText>
+                  <p className="text-slate-600 dark:text-slate-400">{t('selectDifferentDate') || 'Try selecting a different date'}</p>
+                </div>
+              </FloatingCard>
+            )}
+          </div>
+
+          {/* Booking Sidebar - Glass Card */}
+          <div className="lg:col-span-1">
+            <motion.div
+              className="sticky top-24 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-white/30 dark:border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              {/* Header with gradient */}
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0" style={{ background: `linear-gradient(to right, ${headerColor}, ${accentColor})` }} />
+                <motion.div
+                  className="absolute inset-0 opacity-30"
+                  style={{ background: 'radial-gradient(circle at 30% 50%, rgba(255,255,255,0.3) 0%, transparent 50%)' }}
+                  animate={{ x: ['-50%', '150%'] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                />
+                <div className="relative p-5">
+                  <h3 className="font-bold text-white flex items-center text-lg">
+                    <Ticket className="w-6 h-6 mr-2" />
+                    {t('yourBooking') || 'Your Booking'}
                   </h3>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    session.gender === 'mixed' 
-                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                      : session.gender === 'female'
-                      ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300'
-                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                  }`}>
-                    {t(`gender.${session.gender}`)}
-                  </span>
-                </div>
-
-                <p className="text-slate-600 dark:text-slate-400 mb-6 text-sm">
-                  {translateContent(session, 'description')}
-                </p>
-
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center text-slate-600 dark:text-slate-400">
-                    <Clock className="w-4 h-4 mr-3 text-primary-600" />
-                    <span className="text-sm">
-                      {session.start_time} - {session.end_time}
-                    </span>
-                  </div>
-                  <div className="flex items-center text-slate-600 dark:text-slate-400">
-                    <Users className="w-4 h-4 mr-3 text-primary-600" />
-                    <span className="text-sm">
-                      Max {session.capacity} {t('guests')}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-700">
-                  <span className="text-2xl font-bold text-primary-600">
-                    {formatCurrency(session.price, currency)}
-                  </span>
-                  <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors text-sm">
-                    {t('bookNow')}
-                  </button>
                 </div>
               </div>
+
+              <div className="p-6 space-y-5">
+                {selectedSession ? (
+                  <>
+                    <div className="p-4 bg-gradient-to-br from-blue-50/80 to-cyan-50/80 dark:from-blue-900/20 dark:to-cyan-900/20 backdrop-blur-sm rounded-xl border border-blue-100/50 dark:border-blue-800/50">
+                      <p className="font-bold text-slate-900 dark:text-white text-lg">{translateContent(selectedSession, 'name')}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        {formatDate(selectedDate)} &bull; {getStartTime(selectedSession)} - {getEndTime(selectedSession)}
+                      </p>
+                    </div>
+
+                    {/* Contact Info */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">{t('customerName') || 'Your Name'}</label>
+                        <input
+                          type="text"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          placeholder={t('enterName') || 'Enter your name'}
+                          className="w-full px-4 py-3 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">{t('phoneNumber')}</label>
+                        <input
+                          type="tel"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(e.target.value)}
+                          placeholder={t('enterPhone') || 'Enter phone number'}
+                          className="w-full px-4 py-3 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="border-t border-slate-200/50 dark:border-slate-700/50 pt-5">
+                      <div className="flex gap-4 items-center mb-5">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium mb-2 text-slate-900 dark:text-white">{t('adults')}</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={adultCount}
+                            onChange={(e) => setAdultCount(Math.max(1, Number(e.target.value)))}
+                            className="w-full px-4 py-3 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 rounded-xl text-center font-bold text-lg"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium mb-2 text-slate-900 dark:text-white">{t('children')}</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={childCount}
+                            onChange={(e) => setChildCount(Math.max(0, Number(e.target.value)))}
+                            className="w-full px-4 py-3 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 rounded-xl text-center font-bold text-lg"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-between mb-3 text-sm">
+                        <span className="text-slate-600 dark:text-slate-400">
+                          {adultCount} x {formatCurrency(getSessionPrice(selectedSession).adultPrice, currency)} {t('adult')}
+                          {childCount > 0 && (
+                            <>
+                              {' + '}
+                              {childCount} x {formatCurrency(getSessionPrice(selectedSession).childPrice, currency)} {t('child')}
+                            </>
+                          )}
+                        </span>
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          {formatCurrency(calculateTotal(selectedSession), currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xl font-bold p-4 bg-gradient-to-r from-blue-50/80 to-cyan-50/80 dark:from-blue-900/20 dark:to-cyan-900/20 backdrop-blur-sm rounded-xl">
+                        <span className="text-slate-900 dark:text-white">{tCommon('total') || 'Total'}</span>
+                        <GradientText from="from-blue-600" via="via-cyan-500" to="to-teal-500">
+                          {formatCurrency(calculateTotal(selectedSession), currency)}
+                        </GradientText>
+                      </div>
+                    </div>
+
+                    <motion.button
+                      whileHover={{ scale: 1.02, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleConfirmBooking}
+                      disabled={purchaseMutation.isPending}
+                      className="w-full py-4 text-white font-bold rounded-xl shadow-lg transition-all disabled:opacity-60"
+                      style={{ background: `linear-gradient(to right, ${headerColor}, ${accentColor})` }}
+                    >
+                      {purchaseMutation.isPending ? (
+                        <span className="flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 animate-spin mr-2" />{tCommon('processing') || 'Processing...'}
+                        </span>
+                      ) : (
+                        t('purchaseTickets') || t('confirmBooking') || 'Purchase Tickets'
+                      )}
+                    </motion.button>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity }}>
+                      <Waves className="w-12 h-12 text-blue-300 mx-auto mb-4" />
+                    </motion.div>
+                    <p className="text-slate-500 dark:text-slate-400">{t('selectSessionToContinue') || 'Select a session to continue'}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-slate-200/50 dark:border-slate-700/50 p-4 bg-slate-50/50 dark:bg-slate-800/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
+                  {t('nonRefundable') || 'Tickets are non-refundable'}
+                </p>
+              </div>
             </motion.div>
-          ))}
+          </div>
         </div>
+
+        {/* Your Tickets Section - Only show if user is logged in and has tickets */}
+        {user && myTickets.length > 0 && (
+          <motion.div
+            className="mt-12 bg-white dark:bg-slate-800 rounded-xl p-6 border dark:border-slate-700 shadow-lg"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center">
+              <Ticket className="w-6 h-6 mr-2 text-blue-500" />
+              {t('yourTickets') || 'Your Tickets'}
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {myTickets.slice(0, 6).map((ticket: { id: string; ticket_number: string; status: string; ticket_date: string; number_of_guests: number; total_amount: number }) => (
+                <Link
+                  key={ticket.id}
+                  href={`/${module.slug}/confirmation?id=${ticket.id}`}
+                  className="block p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg border border-blue-100 dark:border-blue-800 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-mono text-sm text-blue-600 dark:text-blue-400">
+                      #{ticket.ticket_number}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${ticket.status === 'valid'
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : ticket.status === 'used'
+                          ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      }`}>
+                      {ticket.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <p className="font-medium text-slate-900 dark:text-white mb-1">
+                    {formatDate(ticket.ticket_date)}
+                  </p>
+                  <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
+                    <span className="flex items-center">
+                      <Users className="w-4 h-4 mr-1" />
+                      {ticket.number_of_guests} {ticket.number_of_guests > 1 ? 'guests' : 'guest'}
+                    </span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">
+                      {formatCurrency(ticket.total_amount, currency)}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center text-xs text-blue-600 dark:text-blue-400">
+                    <span>View ticket</span>
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {myTickets.length > 6 && (
+              <div className="mt-4 text-center">
+                <Link href="/profile" className="text-blue-600 dark:text-blue-400 hover:underline">
+                  {t('viewAllTickets') || 'View All Tickets'} ({myTickets.length})
+                </Link>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Info Section with Spotlight Cards */}
+        <motion.div
+          className="mt-16"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+        >
+          <RevealHeading className="text-3xl font-bold text-center mb-10">
+            <GradientText from="from-blue-500" via="via-cyan-500" to="to-teal-500">
+              {`${module.name} Info`}
+            </GradientText>
+          </RevealHeading>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                icon: Clock,
+                title: t('poolInfo.hoursTitle') || 'Operating Hours',
+                content: t('poolInfo.hours') || 'Multiple sessions available daily from morning to evening.',
+                gradientFrom: 'rgba(59, 130, 246, 0.15)',
+                iconBg: 'bg-blue-100 dark:bg-blue-900/50',
+                iconColor: 'text-blue-600 dark:text-blue-400'
+              },
+              {
+                icon: Umbrella,
+                title: t('poolInfo.whatToBring') || 'What to Bring',
+                content: t('poolInfo.whatToBringList') || 'Appropriate attire, towel, sunscreen, and personal items.',
+                gradientFrom: 'rgba(6, 182, 212, 0.15)',
+                iconBg: 'bg-primary-100 dark:bg-primary-900/50',
+                iconColor: 'text-primary-600 dark:text-primary-400'
+              },
+              {
+                icon: Droplets,
+                title: t('poolInfo.amenitiesTitle') || 'Amenities',
+                content: t('poolInfo.amenitiesList') || 'Changing rooms, showers, lounge area, and refreshment service.',
+                gradientFrom: 'rgba(20, 184, 166, 0.15)',
+                iconBg: 'bg-teal-100 dark:bg-teal-900/50',
+                iconColor: 'text-teal-600 dark:text-teal-400'
+              }
+            ].map((item, index) => (
+              <SpotlightCard
+                key={index}
+                spotlightColor={item.gradientFrom}
+                className="h-full"
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  className="p-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl border border-white/30 dark:border-slate-700/50 h-full"
+                >
+                  <motion.div
+                    whileHover={{ scale: 1.1, rotate: 5 }}
+                    className={`w-14 h-14 ${item.iconBg} rounded-2xl flex items-center justify-center mb-5`}
+                  >
+                    <item.icon className={`w-7 h-7 ${item.iconColor}`} />
+                  </motion.div>
+                  <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-3">{item.title}</h3>
+                  <p className="text-slate-600 dark:text-slate-400">{item.content}</p>
+                </motion.div>
+              </SpotlightCard>
+            ))}
+          </div>
+        </motion.div>
       </main>
     </div>
   );

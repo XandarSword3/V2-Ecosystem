@@ -299,7 +299,7 @@ export class PerformanceMonitoringService extends EventEmitter {
    * Get dashboard summary
    */
   getDashboardSummary(): {
-    responseTime: ReturnType<typeof this.getMetricStats>;
+    responseTime: { count: number; min: number; max: number; avg: number; p50: number; p95: number; p99: number } | null;
     errorRate: number;
     throughput: number;
     systemHealth: Record<string, number>;

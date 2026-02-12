@@ -6,6 +6,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection';
 import { logger } from '../../../utils/logger.js';
 import dayjs from 'dayjs';
@@ -35,8 +36,7 @@ interface RecentOrderQuery {
  * GET /api/admin/dashboard
  * Get comprehensive dashboard statistics
  */
-export async function getDashboard(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
@@ -198,18 +198,13 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
         }
       },
     });
-  } catch (error) {
-    logger.error('[ADMIN] Dashboard error:', error);
-    next(error);
-  }
-}
+});
 
 /**
  * GET /api/admin/revenue-stats
  * Get revenue statistics for a date range
  */
-export async function getRevenueStats(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getRevenueStats = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { startDate, endDate } = req.query;
     
@@ -293,7 +288,4 @@ export async function getRevenueStats(req: Request, res: Response, next: NextFun
         dateRange: { start, end }
       }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});

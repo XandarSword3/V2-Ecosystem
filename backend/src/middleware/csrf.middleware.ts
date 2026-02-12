@@ -26,12 +26,18 @@ const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
 // Paths that are exempt from CSRF protection
 const EXEMPT_PATHS = [
-  '/api/auth/login',
-  '/api/auth/register',
-  '/api/auth/refresh',
-  '/api/auth/forgot-password',
-  '/api/auth/reset-password',
-  '/api/payments/webhook', // Stripe webhooks have their own signature verification
+  '/api/v1/auth/login',
+  '/api/v1/auth/register',
+  '/api/v1/auth/refresh',
+  '/api/v1/auth/forgot-password',
+  '/api/v1/auth/reset-password',
+  '/api/v1/payments/webhook', // Stripe webhooks have their own signature verification
+  '/api/v1/pool/tickets', // Anonymous ticket purchases (protected by rate limiting instead)
+  '/api/v1/restaurant/orders', // Anonymous restaurant orders (protected by rate limiting instead)
+  '/api/v1/restaurant/reservations', // Anonymous table reservations
+  '/api/v1/restaurant/waitlist', // Anonymous waitlist join
+  '/api/v1/booking', // Anonymous booking requests
+  '/api/v1/kiosk', // Kiosk self-service (protected by device authentication)
   '/health',
   '/healthz',
   '/api/health',
@@ -51,7 +57,7 @@ export function setCsrfCookie(res: Response, token: string): void {
   res.cookie(CSRF_COOKIE_NAME, token, {
     httpOnly: false, // Must be readable by JavaScript to include in header
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax', // Allow cross-origin cookies (frontend on :3000, backend on :3005)
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
   });
@@ -135,9 +141,9 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
   // Compare tokens using timing-safe comparison
   const cookieBuffer = Buffer.from(cookieToken);
   const headerBuffer = Buffer.from(headerToken);
-  
-  if (cookieBuffer.length !== headerBuffer.length || 
-      !crypto.timingSafeEqual(cookieBuffer, headerBuffer)) {
+
+  if (cookieBuffer.length !== headerBuffer.length ||
+    !crypto.timingSafeEqual(cookieBuffer, headerBuffer)) {
     logger.warn(`CSRF: Token mismatch for ${req.method} ${req.path} from ${req.ip}`);
     res.status(403).json({
       success: false,

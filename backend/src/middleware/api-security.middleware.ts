@@ -8,7 +8,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import xss from 'xss';
-import securityAuditLogger from '../services/security-audit.service';
+import securityAuditLogger from "../services/security-audit.service.js";
 
 // Security configuration
 const SECURITY_CONFIG = {
@@ -271,7 +271,7 @@ export function createRateLimiter(options: {
       await securityAuditLogger.logSecurityEvent({
         eventType: securityAuditLogger.SecurityEventType.SUSPICIOUS_ACTIVITY,
         severity: securityAuditLogger.SecurityEventSeverity.WARNING,
-        userId: (req as any).user?.id,
+        userId: req.user?.id,
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
         description: 'Rate limit exceeded',
@@ -325,7 +325,7 @@ export function apiKeyValidator(
 
   if (!apiKey) {
     // Allow if user is authenticated via JWT
-    if ((req as any).user) {
+    if (req.user) {
       return next();
     }
 
@@ -359,7 +359,7 @@ export function requestIdInjector(
   const requestId = req.headers['x-request-id'] as string ||
     `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-  (req as any).requestId = requestId;
+  req.requestId = requestId;
   res.setHeader('X-Request-ID', requestId);
 
   next();

@@ -108,7 +108,7 @@ router.put(
   authorize(['admin']),
   asyncHandler(async (req: Request, res: Response) => {
     const branding: BrandingSettings = req.body;
-    const userId = (req as any).user.id;
+    const userId = req.user?.id;
 
     // Validate required fields
     if (!branding.businessName) {

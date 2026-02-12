@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection.js";
 import { emailService } from "../../services/email.service.js";
 import { purchasePoolTicketSchema, validateBody } from "../../validation/schemas.js";
@@ -26,8 +27,7 @@ interface PoolSessionWithPrices extends PoolSessionRow {
 // Public Routes
 // ============================================
 
-export async function getSessions(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getSessions = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { moduleId, gender } = req.query;
 
@@ -55,13 +55,9 @@ export async function getSessions(req: Request, res: Response, next: NextFunctio
           genderRestriction: (s as unknown as Record<string, unknown>).gender_restriction || 'mixed',
         }));
         res.json({ success: true, data: sessionsWithPrices });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getSession(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getSession = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: session, error } = await supabase
       .from('pool_sessions')
@@ -83,13 +79,9 @@ export async function getSession(req: Request, res: Response, next: NextFunction
       genderRestriction: session.gender_restriction || 'mixed',
     } : null;
     res.json({ success: true, data: sessionWithPrices });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getAvailability(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getAvailability = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { date, sessionId, moduleId, gender } = req.query;
 
@@ -157,17 +149,13 @@ export async function getAvailability(req: Request, res: Response, next: NextFun
     }
 
     res.json({ success: true, data: availability });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Customer Routes
 // ============================================
 
-export async function purchaseTicket(req: Request, res: Response, next: NextFunction) {
-  try {
+export const purchaseTicket = asyncHandler(async (req: Request, res: Response) => {
     // Validate input
     const validatedData = validateBody(purchasePoolTicketSchema, req.body);
 
@@ -303,13 +291,9 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
     }
 
     res.status(201).json({ success: true, data: ticket });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getTicket(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTicket = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: ticket, error: ticketError } = await supabase
       .from('pool_tickets')
@@ -354,13 +338,9 @@ export async function getTicket(req: Request, res: Response, next: NextFunction)
     if (sessionError) throw sessionError;
 
     res.json({ success: true, data: { ...ticket, session } });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getMyTickets(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getMyTickets = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: tickets, error } = await supabase
       .from('pool_tickets')
@@ -371,13 +351,9 @@ export async function getMyTickets(req: Request, res: Response, next: NextFuncti
     if (error) throw error;
 
     res.json({ success: true, data: tickets || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function cancelTicket(req: Request, res: Response, next: NextFunction) {
-  try {
+export const cancelTicket = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
     const { reason } = req.body;
@@ -467,17 +443,13 @@ export async function cancelTicket(req: Request, res: Response, next: NextFuncti
       data: cancelledTicket,
       message: 'Ticket cancelled successfully',
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Staff Routes
 // ============================================
 
-export async function validateTicket(req: Request, res: Response, next: NextFunction) {
-  try {
+export const validateTicket = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { ticketNumber, qrData } = req.body;
 
@@ -584,13 +556,9 @@ export async function validateTicket(req: Request, res: Response, next: NextFunc
       data: updatedTicket,
       message: `Valid! ${ticket.number_of_guests} guest(s) admitted.`,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function recordEntry(req: Request, res: Response, next: NextFunction) {
-  try {
+export const recordEntry = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
 
@@ -625,13 +593,9 @@ export async function recordEntry(req: Request, res: Response, next: NextFunctio
     emitToUnit('pool', 'pool:ticket:updated', updatedTicket);
 
     res.json({ success: true, data: updatedTicket });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function recordExit(req: Request, res: Response, next: NextFunction) {
-  try {
+export const recordExit = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
 
@@ -662,13 +626,9 @@ export async function recordExit(req: Request, res: Response, next: NextFunction
     emitToUnit('pool', 'pool:ticket:updated', updatedTicket);
 
     res.json({ success: true, data: updatedTicket });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getCurrentCapacity(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getCurrentCapacity = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
@@ -722,13 +682,9 @@ export async function getCurrentCapacity(req: Request, res: Response, next: Next
         totalAdmitted,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getTodayTickets(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTodayTickets = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
@@ -743,27 +699,22 @@ export async function getTodayTickets(req: Request, res: Response, next: NextFun
     if (error) throw error;
 
     res.json({ success: true, data: tickets || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Admin Routes
 // ============================================
 
-export async function createSession(req: Request, res: Response, next: NextFunction) {
-  try {
-    const { name, startTime, endTime, maxCapacity, moduleId, adult_price, child_price, genderRestriction } = req.body as {
-      name: string;
-      startTime: string;
-      endTime: string;
-      maxCapacity: number;
-      moduleId: string;
-      adult_price: string | number;
-      child_price: string | number;
-      genderRestriction?: 'mixed' | 'male' | 'female';
-    };
+export const createSession = asyncHandler(async (req: Request, res: Response) => {
+    // Support both camelCase and snake_case field names from frontend
+    const name = req.body.name;
+    const startTime = req.body.startTime || req.body.start_time;
+    const endTime = req.body.endTime || req.body.end_time;
+    const maxCapacity = req.body.maxCapacity ?? req.body.max_capacity;
+    const moduleId = req.body.moduleId || req.body.module_id;
+    const adult_price = req.body.adult_price;
+    const child_price = req.body.child_price;
+    const genderRestriction = req.body.genderRestriction || req.body.gender_restriction;
 
     // Validate required fields
     if (!name || !startTime || !endTime || maxCapacity === undefined || adult_price === undefined || child_price === undefined) {
@@ -782,35 +733,28 @@ export async function createSession(req: Request, res: Response, next: NextFunct
     }
 
     const supabase = getSupabase();
-    const { data: session, error } = await supabase
-      .from('pool_sessions')
-      .insert({
-        name,
-        module_id: moduleId,
-        start_time: startTime,
-        end_time: endTime,
-        max_capacity: Number(maxCapacity),
-        price: String(adult_price), // Legacy field - use adult_price for backwards compatibility
-        adult_price: String(adult_price),
-        child_price: String(child_price),
-        gender_restriction: genderRestriction || 'mixed',
-      })
-      .select()
-      .single();
+    
+    // Use RPC function to bypass PostgREST schema cache issues
+    const { data: session, error: rpcError } = await supabase.rpc('insert_pool_session', {
+      p_name: name,
+      p_start_time: startTime,
+      p_end_time: endTime,
+      p_max_capacity: Number(maxCapacity),
+      p_adult_price: Number(adult_price),
+      p_child_price: Number(child_price),
+      p_gender_restriction: genderRestriction || 'mixed',
+      p_module_id: moduleId || null,
+    });
 
-    if (error) {
-      logger.error('Pool session creation error:', error);
-      throw error;
+    if (rpcError) {
+      logger.error('Pool session creation error:', JSON.stringify(rpcError));
+      return res.status(500).json({ success: false, message: rpcError.message, details: rpcError.details, hint: rpcError.hint, code: rpcError.code });
     }
 
     res.status(201).json({ success: true, data: session });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateSession(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateSession = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString()
@@ -844,13 +788,9 @@ export async function updateSession(req: Request, res: Response, next: NextFunct
     if (error) throw error;
 
     res.json({ success: true, data: session });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteSession(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteSession = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { error } = await supabase
       .from('pool_sessions')
@@ -863,13 +803,9 @@ export async function deleteSession(req: Request, res: Response, next: NextFunct
     if (error) throw error;
 
     res.json({ success: true, message: 'Session deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getDailyReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getDailyReport = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { date } = req.query;
     const targetDate = date ? dayjs(date as string) : dayjs();
@@ -903,17 +839,13 @@ export async function getDailyReport(req: Request, res: Response, next: NextFunc
         },
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Pool Settings
 // ============================================
 
-export async function getPoolSettings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getPoolSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
     // Get settings from site_settings table with pool category
@@ -941,13 +873,9 @@ export async function getPoolSettings(req: Request, res: Response, next: NextFun
     };
 
     res.json({ success: true, data: defaultSettings });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updatePoolSettings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updatePoolSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const settings = req.body;
 
@@ -967,13 +895,9 @@ export async function updatePoolSettings(req: Request, res: Response, next: Next
     }
 
     res.json({ success: true, message: 'Pool settings updated' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function resetOccupancy(req: Request, res: Response, next: NextFunction) {
-  try {
+export const resetOccupancy = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
     // Reset current occupancy to 0
@@ -990,17 +914,13 @@ export async function resetOccupancy(req: Request, res: Response, next: NextFunc
       );
 
     res.json({ success: true, message: 'Occupancy reset to 0' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Maintenance Logs
 // ============================================
 
-export async function getMaintenanceLogs(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getMaintenanceLogs = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { moduleId } = req.query;
 
@@ -1016,11 +936,9 @@ export async function getMaintenanceLogs(req: Request, res: Response, next: Next
     const { data: logs, error } = await query;
     if (error) throw error;
     res.json({ success: true, data: logs || [] });
-  } catch (error) { next(error); }
-}
+});
 
-export async function createMaintenanceLog(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createMaintenanceLog = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { type, readings, notes, moduleId } = req.body;
 
@@ -1038,8 +956,7 @@ export async function createMaintenanceLog(req: Request, res: Response, next: Ne
 
     if (error) throw error;
     res.status(201).json({ success: true, data: log });
-  } catch (error) { next(error); }
-}
+});
 
 // ============================================
 // Bracelet Management
@@ -1048,8 +965,7 @@ export async function createMaintenanceLog(req: Request, res: Response, next: Ne
 /**
  * Assign a bracelet to a ticket
  */
-export async function assignBracelet(req: Request, res: Response, next: NextFunction) {
-  try {
+export const assignBracelet = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
     const { braceletNumber, braceletColor } = req.body;
@@ -1121,16 +1037,12 @@ export async function assignBracelet(req: Request, res: Response, next: NextFunc
 
     logger.info(`Bracelet ${braceletNumber} assigned to ticket ${ticket.ticket_number}`);
     res.json({ success: true, data: updatedTicket });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Return a bracelet (mark as returned)
  */
-export async function returnBracelet(req: Request, res: Response, next: NextFunction) {
-  try {
+export const returnBracelet = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
 
@@ -1176,16 +1088,12 @@ export async function returnBracelet(req: Request, res: Response, next: NextFunc
 
     logger.info(`Bracelet ${ticket.bracelet_number} returned for ticket ${ticket.ticket_number}`);
     res.json({ success: true, data: updatedTicket });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get all active bracelets (assigned but not returned) for today
  */
-export async function getActiveBracelets(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getActiveBracelets = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
@@ -1215,16 +1123,12 @@ export async function getActiveBracelets(req: Request, res: Response, next: Next
       data: bracelets,
       count: bracelets?.length || 0
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Search for a ticket by bracelet number
  */
-export async function searchByBracelet(req: Request, res: Response, next: NextFunction) {
-  try {
+export const searchByBracelet = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { braceletNumber } = req.query;
 
@@ -1254,7 +1158,4 @@ export async function searchByBracelet(req: Request, res: Response, next: NextFu
     }
 
     res.json({ success: true, data: ticket });
-  } catch (error) {
-    next(error);
-  }
-}
+});

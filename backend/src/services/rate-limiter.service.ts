@@ -113,9 +113,9 @@ export class RateLimiterService {
    * Get user tier from request
    */
   private getUserTier(req: Request): string {
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) return 'anonymous';
-    return user.role || 'customer';
+    return user.roles?.[0] || 'customer';
   }
 
   /**
@@ -128,7 +128,7 @@ export class RateLimiterService {
 
     // Default: IP + user ID (if authenticated)
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const userId = (req as any).user?.id || 'anon';
+    const userId = req.user?.id || 'anon';
     const path = this.normalizePath(req.path);
 
     return `ratelimit:${ip}:${userId}:${path}`;

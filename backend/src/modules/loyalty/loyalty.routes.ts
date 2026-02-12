@@ -10,9 +10,11 @@ router.post('/calculate', loyaltyController.calculatePoints.bind(loyaltyControll
 // Customer routes (requires authentication)
 router.get('/me', authenticate, loyaltyController.getMyAccount.bind(loyaltyController));
 router.get('/me/transactions', authenticate, (req, res) => {
-  req.params.userId = (req as any).user?.id;
+  req.params.userId = req.user?.id ?? '';
   return loyaltyController.getTransactions(req, res);
 });
+// FIX: Iteration 3 - Add POST /enroll route (frontend calls this to join loyalty program)
+router.post('/enroll', authenticate, loyaltyController.enrollUser.bind(loyaltyController));
 
 // Settings and tiers (public read)
 router.get('/settings', loyaltyController.getSettings.bind(loyaltyController));
@@ -34,5 +36,8 @@ router.post('/accounts/:accountId/adjust', authenticate, authorize('admin', 'sup
 // Admin settings management
 router.put('/settings', authenticate, authorize('admin', 'super_admin'), loyaltyController.updateSettings.bind(loyaltyController));
 router.put('/tiers/:tierId', authenticate, authorize('admin', 'super_admin'), loyaltyController.updateTier.bind(loyaltyController));
+// FIX: Iteration 3 - Add POST /tiers and DELETE /tiers/:tierId (frontend admin panel needs full tier CRUD)
+router.post('/tiers', authenticate, authorize('admin', 'super_admin'), loyaltyController.createTier.bind(loyaltyController));
+router.delete('/tiers/:tierId', authenticate, authorize('admin', 'super_admin'), loyaltyController.deleteTier.bind(loyaltyController));
 
 export default router;

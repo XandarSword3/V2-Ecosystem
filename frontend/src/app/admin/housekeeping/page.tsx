@@ -267,7 +267,7 @@ export default function HousekeepingAdminPage() {
           <p className="text-slate-500 dark:text-slate-400">Task management and scheduling</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={loadData} variant="outline" className="gap-2">
+          <Button onClick={() => loadData()} variant="outline" className="gap-2">
             <RefreshCw className="w-4 h-4" />
             Refresh
           </Button>

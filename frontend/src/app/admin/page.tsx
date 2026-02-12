@@ -190,12 +190,15 @@ function OrderStatus({ status }: { status: string }) {
 
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const { modules } = useSiteSettings();
+  const { modules, settings } = useSiteSettings();
   const { socket } = useSocket();
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Get business name from settings
+  const businessName = settings?.resortName || 'Your Business';
 
   // Get active modules for dynamic revenue display
   const activeModules = useMemo(() => {
@@ -313,7 +316,7 @@ export default function AdminDashboard() {
             </motion.span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Here&apos;s what&apos;s happening at V2 Resort today, <span className="font-medium text-slate-700 dark:text-slate-300">{user?.fullName}</span>
+            Here&apos;s what&apos;s happening at {businessName} today, <span className="font-medium text-slate-700 dark:text-slate-300">{user?.fullName}</span>
           </p>
         </div>
         <Button
@@ -327,7 +330,7 @@ export default function AdminDashboard() {
         </Button>
       </motion.div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Always shows core stats, plus dynamic module stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Online Users"
@@ -364,15 +367,6 @@ export default function AdminDashboard() {
           trendValue={stats?.trends?.bookings !== undefined ? `${stats.trends.bookings >= 0 ? '+' : ''}${stats.trends.bookings}% from last week` : 'No data'}
           gradient="bg-gradient-to-br from-blue-400 to-indigo-500"
           delay={0.2}
-        />
-        <StatCard
-          title="Pool Tickets"
-          value={stats?.todayTickets || 0}
-          icon={Waves}
-          trend={stats?.trends?.tickets !== undefined ? (stats.trends.tickets >= 0 ? 'up' : 'down') : 'neutral'}
-          trendValue={stats?.trends?.tickets !== undefined ? `${stats.trends.tickets >= 0 ? '+' : ''}${stats.trends.tickets}% from yesterday` : 'No data'}
-          gradient="bg-gradient-to-br from-primary-400 to-secondary-500"
-          delay={0.3}
         />
       </div>
 
@@ -415,37 +409,11 @@ export default function AdminDashboard() {
                     );
                   })
                 ) : (
-                  // Fallback to hardcoded modules if none configured
-                  <>
-                    <RevenueBar
-                      name="🍽️ Restaurant"
-                      value={stats?.revenueByUnit?.restaurant || 0}
-                      percentage={getPercentage(stats?.revenueByUnit?.restaurant || 0)}
-                      color="bg-gradient-to-r from-orange-400 to-rose-500"
-                      delay={0.4}
-                    />
-                    <RevenueBar
-                      name="🍿 Snack Bar"
-                      value={stats?.revenueByUnit?.snackBar || 0}
-                      percentage={getPercentage(stats?.revenueByUnit?.snackBar || 0)}
-                      color="bg-gradient-to-r from-amber-400 to-orange-500"
-                      delay={0.5}
-                    />
-                    <RevenueBar
-                      name="🏠 Chalets"
-                      value={stats?.revenueByUnit?.chalets || 0}
-                      percentage={getPercentage(stats?.revenueByUnit?.chalets || 0)}
-                      color="bg-gradient-to-r from-emerald-400 to-teal-500"
-                      delay={0.6}
-                    />
-                    <RevenueBar
-                      name="🏊 Pool"
-                      value={stats?.revenueByUnit?.pool || 0}
-                      percentage={getPercentage(stats?.revenueByUnit?.pool || 0)}
-                      color="bg-gradient-to-r from-primary-400 to-secondary-500"
-                      delay={0.7}
-                    />
-                  </>
+                  // No modules configured - show empty state
+                  <div className="text-center py-4 text-slate-500 dark:text-slate-400">
+                    <p>No modules configured</p>
+                    <p className="text-sm">Add modules in the Modules section to see revenue data</p>
+                  </div>
                 )}
               </div>
 
@@ -522,7 +490,7 @@ export default function AdminDashboard() {
         </motion.div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Dynamic based on active modules */}
       <motion.div variants={fadeInUp}>
         <Card>
           <CardHeader>
@@ -533,32 +501,66 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { href: '/admin/restaurant/menu', icon: UtensilsCrossed, label: 'Manage Menu', color: 'from-orange-400 to-rose-500' },
-                { href: '/admin/chalets', icon: Home, label: 'Manage Chalets', color: 'from-emerald-400 to-teal-500' },
-                { href: '/admin/pool', icon: Waves, label: 'Pool Sessions', color: 'from-primary-400 to-secondary-500' },
-                { href: '/admin/reports', icon: TrendingUp, label: 'View Reports', color: 'from-purple-400 to-indigo-500' },
-              ].map((action, index) => (
-                <motion.div
-                  key={action.href}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.8 + index * 0.1 }}
-                >
-                  <Link href={action.href}>
-                    <motion.div
-                      whileHover={{ scale: 1.05, y: -4 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="flex flex-col items-center gap-3 p-6 bg-slate-50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 rounded-xl border border-slate-100 dark:border-slate-600 hover:border-slate-200 dark:hover:border-slate-500 hover:shadow-lg transition-all cursor-pointer"
-                    >
-                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg`}>
-                        <action.icon className="w-7 h-7 text-white" />
-                      </div>
-                      <span className="font-medium text-slate-700 dark:text-slate-200">{action.label}</span>
-                    </motion.div>
-                  </Link>
-                </motion.div>
-              ))}
+              {/* Dynamic module-based actions */}
+              {activeModules.slice(0, 3).map((module, index) => {
+                const ModuleIcon = getModuleIcon(module);
+                // Determine the admin link based on template type
+                // Routes use dynamic [slug] routes, not /admin/modules/
+                let href = `/admin/${module.slug}`;
+                let label = `Manage ${module.name}`;
+                
+                if (module.template_type === 'menu_service') {
+                  href = `/admin/${module.slug}/menu`;
+                  label = `${module.name} Menu`;
+                } else if (module.template_type === 'multi_day_booking') {
+                  href = `/admin/${module.slug}/bookings`;
+                  label = `${module.name} Bookings`;
+                } else if (module.template_type === 'session_access') {
+                  href = `/admin/${module.slug}/sessions`;
+                  label = `${module.name} Sessions`;
+                }
+                
+                return (
+                  <motion.div
+                    key={module.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.8 + index * 0.1 }}
+                  >
+                    <Link href={href}>
+                      <motion.div
+                        whileHover={{ scale: 1.05, y: -4 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex flex-col items-center gap-3 p-6 bg-slate-50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 rounded-xl border border-slate-100 dark:border-slate-600 hover:border-slate-200 dark:hover:border-slate-500 hover:shadow-lg transition-all cursor-pointer"
+                      >
+                        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${moduleColors[index % moduleColors.length]} flex items-center justify-center shadow-lg`}>
+                          <ModuleIcon className="w-7 h-7 text-white" />
+                        </div>
+                        <span className="font-medium text-slate-700 dark:text-slate-200 text-center">{label}</span>
+                      </motion.div>
+                    </Link>
+                  </motion.div>
+                );
+              })}
+              {/* Always show Reports */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 + Math.min(activeModules.length, 3) * 0.1 }}
+              >
+                <Link href="/admin/reports">
+                  <motion.div
+                    whileHover={{ scale: 1.05, y: -4 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex flex-col items-center gap-3 p-6 bg-slate-50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 rounded-xl border border-slate-100 dark:border-slate-600 hover:border-slate-200 dark:hover:border-slate-500 hover:shadow-lg transition-all cursor-pointer"
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center shadow-lg">
+                      <TrendingUp className="w-7 h-7 text-white" />
+                    </div>
+                    <span className="font-medium text-slate-700 dark:text-slate-200">View Reports</span>
+                  </motion.div>
+                </Link>
+              </motion.div>
             </div>
           </CardContent>
         </Card>

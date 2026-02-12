@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { BackupService } from '../../services/backup.service';
 import { getSupabase } from '../../database/connection';
 import { logActivity } from '../../utils/activityLogger';
 
-export async function createBackup(req: Request, res: Response, next: NextFunction) {
-    try {
+export const createBackup = asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.userId;
         const result = await BackupService.createBackup(userId);
 
@@ -16,22 +16,14 @@ export async function createBackup(req: Request, res: Response, next: NextFuncti
         });
 
         res.status(201).json({ success: true, data: result });
-    } catch (error) {
-        next(error);
-    }
-}
+});
 
-export async function getBackups(req: Request, res: Response, next: NextFunction) {
-    try {
+export const getBackups = asyncHandler(async (req: Request, res: Response) => {
         const backups = await BackupService.listBackups();
         res.json({ success: true, data: backups });
-    } catch (error) {
-        next(error);
-    }
-}
+});
 
-export async function deleteBackup(req: Request, res: Response, next: NextFunction) {
-    try {
+export const deleteBackup = asyncHandler(async (req: Request, res: Response) => {
         const { id } = req.params;
         await BackupService.deleteBackup(id);
 
@@ -43,13 +35,9 @@ export async function deleteBackup(req: Request, res: Response, next: NextFuncti
         });
 
         res.json({ success: true, message: 'Backup deleted successfully' });
-    } catch (error) {
-        next(error);
-    }
-}
+});
 
-export async function getDownloadUrl(req: Request, res: Response, next: NextFunction) {
-    try {
+export const getDownloadUrl = asyncHandler(async (req: Request, res: Response) => {
         const { id } = req.params;
         const supabase = getSupabase();
 
@@ -71,13 +59,9 @@ export async function getDownloadUrl(req: Request, res: Response, next: NextFunc
         if (error) throw error;
 
         res.json({ success: true, data: { downloadUrl: data.signedUrl } });
-    } catch (error) {
-        next(error);
-    }
-}
+});
 
-export async function restoreBackup(req: Request, res: Response, next: NextFunction) {
-    try {
+export const restoreBackup = asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.userId;
         const backupData = req.body;
         
@@ -96,7 +80,4 @@ export async function restoreBackup(req: Request, res: Response, next: NextFunct
         });
 
         res.json({ success: true, data: result });
-    } catch (error) {
-        next(error);
-    }
-}
+});

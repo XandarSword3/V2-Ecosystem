@@ -4,6 +4,9 @@ import { logger } from '../utils/logger.js';
 import { expirePoolTickets } from '../scripts/expire-pool-tickets.js';
 import { getSupabase } from '../database/connection.js';
 import { bookingRemindersService } from './booking-reminders.service.js';
+import { reportingService } from '../modules/reporting/reporting.service.js';
+import { businessMetricsService } from './business-metrics.service.js';
+import { emitToRole } from '../socket/index.js';
 
 export class SchedulerService {
   /**
@@ -23,6 +26,12 @@ export class SchedulerService {
     
     // Pre-arrival booking reminders at 9:00 AM
     this.scheduleBookingReminders();
+    
+    // Scheduled report delivery (every 5 minutes)
+    reportingService.startScheduler();
+    
+    // Real-time dashboard metric push to admins (every 30 seconds)
+    this.scheduleDashboardMetricPush();
     
     logger.info('Scheduler service initialized.');
   }
@@ -146,5 +155,21 @@ export class SchedulerService {
     });
     
     logger.info('Scheduled booking reminders job (0 9 * * *)');
+  }
+
+  /**
+   * Push real-time dashboard KPIs to admin clients via Socket.IO
+   * Runs every 30 seconds so admin dashboard stays live
+   */
+  private static scheduleDashboardMetricPush() {
+    setInterval(async () => {
+      try {
+        const metrics = await businessMetricsService.getDashboardMetrics();
+        emitToRole('admin', 'dashboard:metrics', metrics);
+      } catch {
+        // Silently ignore — dashboard is best-effort
+      }
+    }, 30_000);
+    logger.info('Dashboard real-time metric push started (every 30s)');
   }
 }

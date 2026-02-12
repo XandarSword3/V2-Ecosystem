@@ -99,7 +99,8 @@ function TableOrderContent() {
       }
     } catch (error) {
       console.error('Failed to load menu:', error);
-      toast.error('Failed to load menu');
+      // FIX Iter-3: i18n
+      toast.error(t('order.failedToLoadMenu'));
     } finally {
       setLoading(false);
     }
@@ -107,7 +108,8 @@ function TableOrderContent() {
 
   useEffect(() => {
     if (!tableNumber) {
-      toast.error('Invalid table. Please scan the QR code again.');
+      // FIX Iter-3: i18n
+      toast.error(t('order.invalidTableScanAgain'));
       return;
     }
     fetchMenu();
@@ -121,7 +123,8 @@ function TableOrderContent() {
       }
       return [...prev, { ...item, quantity: 1 }];
     });
-    toast.success(`${item.name} added to cart`);
+    // FIX Iter-3: i18n
+    toast.success(t('addedToCart', { item: item.name }));
   };
 
   const removeFromCart = (itemId: string) => {
@@ -149,7 +152,8 @@ function TableOrderContent() {
 
   const submitOrder = async () => {
     if (cart.length === 0) {
-      toast.error('Your cart is empty');
+      // FIX Iter-3: i18n
+      toast.error(t('order.empty'));
       return;
     }
 
@@ -157,7 +161,8 @@ function TableOrderContent() {
     try {
       const orderData = {
         table_number: parseInt(tableNumber!),
-        customer_name: customerName || `Table ${tableNumber}`,
+        // FIX Iter-3: i18n fallback
+      customer_name: customerName || `${tc('table')} ${tableNumber}`,
         items: cart.map(item => ({
           menu_item_id: item.id,
           quantity: item.quantity,
@@ -168,13 +173,15 @@ function TableOrderContent() {
       };
 
       await api.post('/restaurant/orders', orderData);
-      toast.success('Order submitted successfully! A server will bring your food shortly.');
+      // FIX Iter-3: i18n
+      toast.success(t('order.submittedSuccessfully'));
       setCart([]);
       setShowCart(false);
       setCustomerName('');
     } catch (error: any) {
       console.error('Order submission failed:', error);
-      toast.error(error.response?.data?.message || 'Failed to submit order');
+      // FIX Iter-3: i18n
+      toast.error(error.response?.data?.message || t('order.failedToSubmit'));
     } finally {
       setSubmitting(false);
     }
@@ -187,13 +194,14 @@ function TableOrderContent() {
           <CardContent className="p-8 text-center">
             <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Invalid Table
+              {/* FIX Iter-3: i18n */}
+              {t('order.invalidTable')}
             </h1>
             <p className="text-slate-600 dark:text-slate-400 mb-6">
-              Please scan the QR code on your table to place an order.
+              {t('order.scanQRToOrder')}
             </p>
             <Button onClick={() => router.push('/restaurant')}>
-              Go to Restaurant
+              {t('order.goToRestaurant')}
             </Button>
           </CardContent>
         </Card>
@@ -227,10 +235,11 @@ function TableOrderContent() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-                  {settings.resortName || 'V2 Resort'} Restaurant
+                  {/* FIX Iter-3: i18n */}
+                  {t('order.headerTitle', { name: settings.resortName || t('title') })}
                 </h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Table {tableNumber}
+                  {tc('table')} {tableNumber}
                 </p>
               </div>
             </div>
@@ -292,7 +301,7 @@ function TableOrderContent() {
                     />
                     {item.is_featured && (
                       <span className="absolute top-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-                        <Star className="w-3 h-3" /> Featured
+                        <Star className="w-3 h-3" /> {t('featured')}
                       </span>
                     )}
                   </div>
@@ -330,17 +339,17 @@ function TableOrderContent() {
                   <div className="flex flex-wrap gap-1 mb-3">
                     {item.is_spicy && (
                       <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Flame className="w-3 h-3" /> Spicy
+                        <Flame className="w-3 h-3" /> {t('spicy')}
                       </span>
                     )}
                     {item.is_vegetarian && (
                       <span className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Leaf className="w-3 h-3" /> Vegetarian
+                        <Leaf className="w-3 h-3" /> {t('vegetarian')}
                       </span>
                     )}
                     {item.preparation_time_minutes && (
                       <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> {item.preparation_time_minutes} min
+                        <Clock className="w-3 h-3" /> {item.preparation_time_minutes} {t('minutes')}
                       </span>
                     )}
                   </div>
@@ -351,7 +360,7 @@ function TableOrderContent() {
                     size="sm"
                   >
                     <Plus className="w-4 h-4 mr-1" />
-                    Add to Order
+                    {t('order.addToOrder')}
                   </Button>
                 </div>
               </motion.div>
@@ -362,7 +371,8 @@ function TableOrderContent() {
           <div className="text-center py-12">
             <ChefHat className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
             <p className="text-slate-500 dark:text-slate-400">
-              No items available in this category
+              {/* FIX Iter-3: i18n */}
+              {t('order.noItemsInCategory')}
             </p>
           </div>
         )}
@@ -388,7 +398,7 @@ function TableOrderContent() {
             >
               <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  Your Order
+                  {t('order.title')}
                 </h2>
                 <button
                   onClick={() => setShowCart(false)}
@@ -403,7 +413,7 @@ function TableOrderContent() {
                   <div className="text-center py-12">
                     <ShoppingCart className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
                     <p className="text-slate-500 dark:text-slate-400">
-                      Your cart is empty
+                      {t('order.empty')}
                     </p>
                   </div>
                 ) : (
@@ -450,13 +460,14 @@ function TableOrderContent() {
                     {/* Customer Name */}
                     <div className="pt-4">
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Your Name (optional)
+                        {/* FIX Iter-3: i18n */}
+                        {t('yourName')} ({tc('optional')})
                       </label>
                       <input
                         type="text"
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder="Enter your name"
+                        placeholder={t('enterName')}
                         className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                       />
                     </div>
@@ -467,7 +478,7 @@ function TableOrderContent() {
               {cart.length > 0 && (
                 <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-slate-600 dark:text-slate-400">Total</span>
+                    <span className="text-slate-600 dark:text-slate-400">{t('order.total')}</span>
                     <span className="text-2xl font-bold text-slate-900 dark:text-white">
                       {formatCurrency(getCartTotal())}
                     </span>
@@ -485,10 +496,10 @@ function TableOrderContent() {
                           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                           className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"
                         />
-                        Submitting...
+                        {t('order.submitting')}
                       </>
                     ) : (
-                      'Submit Order'
+                      t('order.submitOrder')
                     )}
                   </Button>
                 </div>

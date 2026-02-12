@@ -111,11 +111,11 @@ export default function PrivacyPage() {
               {t('contactUs')}
             </p>
             <a 
-              href="mailto:privacy@v2resort.com"
+              href="mailto:privacy@ironparadisegym.com"
               className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition-colors font-medium"
             >
               <Mail className="w-5 h-5" />
-              privacy@v2resort.com
+              privacy@ironparadisegym.com
             </a>
           </motion.div>
         </div>

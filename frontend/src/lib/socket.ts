@@ -26,7 +26,7 @@ type OrderUpdateCallback = (data: OrderStatusUpdate) => void;
 type NewOrderCallback = (data: NewOrderNotification) => void;
 
 // SOCKET_URL should NOT include /api
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3005';
 
 // Ensure we don't have /api suffix for socket connection
 const cleanSocketUrl = SOCKET_URL.replace(/\/api\/?$/, '');

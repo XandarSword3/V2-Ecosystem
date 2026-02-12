@@ -425,7 +425,7 @@ export default function InventoryAdminPage() {
             <Download className="w-4 h-4" />
             Export
           </Button>
-          <Button onClick={loadData} variant="outline" className="gap-2">
+          <Button onClick={() => loadData()} variant="outline" className="gap-2">
             <RefreshCw className="w-4 h-4" />
             Refresh
           </Button>
@@ -887,8 +887,11 @@ export default function InventoryAdminPage() {
                     className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600"
                   >
                     <option value="piece">Piece</option>
+                    <option value="unit">Unit</option>
                     <option value="kg">Kilogram</option>
+                    <option value="gram">Gram</option>
                     <option value="liter">Liter</option>
+                    <option value="ml">Milliliter</option>
                     <option value="box">Box</option>
                     <option value="pack">Pack</option>
                     <option value="bottle">Bottle</option>

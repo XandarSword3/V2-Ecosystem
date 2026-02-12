@@ -17,6 +17,8 @@ export class ApiClient {
   private baseUrl: string;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
+  private csrfToken: string | null = null;
+  private cookies: Map<string, string> = new Map();
   public userId: string | null = null;
   public userRoles: string[] = [];
 
@@ -26,6 +28,66 @@ export class ApiClient {
 
   get isAuthenticated(): boolean {
     return this.accessToken !== null;
+  }
+
+  // Parse Set-Cookie headers and store cookies
+  private parseCookies(setCookieHeaders: string | string[] | null): void {
+    if (!setCookieHeaders) return;
+    
+    const headers = Array.isArray(setCookieHeaders) ? setCookieHeaders : [setCookieHeaders];
+    for (const header of headers) {
+      const parts = header.split(';')[0]; // Get name=value part only
+      const [name, ...valueParts] = parts.split('=');
+      if (name && valueParts.length > 0) {
+        this.cookies.set(name.trim(), valueParts.join('=').trim());
+      }
+    }
+  }
+
+  // Get cookies string for request header
+  private getCookieString(): string {
+    return Array.from(this.cookies.entries())
+      .map(([name, value]) => `${name}=${value}`)
+      .join('; ');
+  }
+
+  // Fetch CSRF token from the server
+  async fetchCsrfToken(): Promise<boolean> {
+    try {
+      // Use the non-versioned endpoint for CSRF token
+      const baseWithoutV1 = this.baseUrl.replace('/api/v1', '/api');
+      const headers: Record<string, string> = {};
+      
+      const cookieStr = this.getCookieString();
+      if (cookieStr) {
+        headers['Cookie'] = cookieStr;
+      }
+      
+      const response = await fetch(`${baseWithoutV1}/csrf-token`, {
+        method: 'GET',
+        headers,
+      });
+      
+      if (response.ok) {
+        // Parse and store cookies from response
+        const setCookie = response.headers.get('set-cookie');
+        this.parseCookies(setCookie);
+        
+        const data = await response.json() as { csrfToken?: string };
+        this.csrfToken = data.csrfToken || null;
+        
+        // Also store the token in cookies if returned in body
+        if (this.csrfToken) {
+          this.cookies.set('csrf-token', this.csrfToken);
+        }
+        
+        return true;
+      }
+      return false;
+    } catch (error) {
+      // CSRF token fetch failed - will proceed without it
+      return false;
+    }
   }
 
   private async request<T>(
@@ -42,12 +104,27 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
 
+    // Include CSRF token for mutating requests
+    if (this.csrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) {
+      headers['x-csrf-token'] = this.csrfToken;
+    }
+    
+    // Include cookies
+    const cookieStr = this.getCookieString();
+    if (cookieStr) {
+      headers['Cookie'] = cookieStr;
+    }
+
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
       });
+
+      // Parse and store cookies from response
+      const setCookie = response.headers.get('set-cookie');
+      this.parseCookies(setCookie);
 
       const data: any = await response.json();
       
@@ -63,6 +140,9 @@ export class ApiClient {
 
   // ============ AUTH ============
   async register(email: string, password: string, fullName: string, phone?: string): Promise<boolean> {
+    // Fetch CSRF token before registration
+    await this.fetchCsrfToken();
+    
     const result = await this.request<AuthResponse>('/auth/register', 'POST', {
       email,
       password,
@@ -75,11 +155,17 @@ export class ApiClient {
       this.refreshToken = result.data.refreshToken || result.data.tokens?.refreshToken || null;
       this.userId = result.data.user?.id || null;
       this.userRoles = result.data.user?.roles || [];
+      
+      // Fetch new CSRF token after successful registration
+      await this.fetchCsrfToken();
     }
     return result.success;
   }
 
   async login(email: string, password: string): Promise<boolean> {
+    // Fetch CSRF token before login
+    await this.fetchCsrfToken();
+    
     const result = await this.request<AuthResponse>('/auth/login', 'POST', { email, password }, false);
     
     if (result.success && result.data) {
@@ -87,6 +173,9 @@ export class ApiClient {
       this.refreshToken = result.data.refreshToken || result.data.tokens?.refreshToken || null;
       this.userId = result.data.user?.id || null;
       this.userRoles = result.data.user?.roles || [];
+      
+      // Fetch new CSRF token after successful login (might change with session)
+      await this.fetchCsrfToken();
     }
     return result.success;
   }
@@ -172,7 +261,7 @@ export class ApiClient {
   }
 
   async getChaletAddons(): Promise<ApiResponse> {
-    return this.request('/chalets/addons', 'GET', null, false);
+    return this.request('/chalets/add-ons', 'GET', null, false);
   }
 
   async createChaletBooking(booking: {
@@ -191,7 +280,7 @@ export class ApiClient {
   }
 
   async getMyChaletBookings(): Promise<ApiResponse> {
-    return this.request('/chalets/bookings/my', 'GET');
+    return this.request('/chalets/my-bookings', 'GET');
   }
 
   async cancelBooking(id: string): Promise<ApiResponse> {

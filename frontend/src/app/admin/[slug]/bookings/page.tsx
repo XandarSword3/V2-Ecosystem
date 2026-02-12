@@ -153,7 +153,7 @@ export default function DynamicBookingsPage() {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentModule.name} {tc('bookings.title')}</h1>
           <p className="text-slate-500 dark:text-slate-400">{tc('bookings.manageReservations')}</p>
         </div>
-        <Button variant="outline" onClick={fetchBookings}>
+        <Button variant="outline" onClick={() => fetchBookings()}>
           <RefreshCw className="w-4 h-4 mr-2" />
           {tc('refresh')}
         </Button>

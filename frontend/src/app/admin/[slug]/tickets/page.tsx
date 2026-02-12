@@ -97,7 +97,7 @@ export default function DynamicTicketsPage() {
   const cancelTicket = async (id: string) => {
     if (!confirm(tc('tickets.confirmCancel'))) return;
     try {
-      await api.put(`/pool/tickets/${id}/cancel`);
+      await api.delete(`/pool/tickets/${id}`);
       toast.success(tc('tickets.ticketCancelled'));
       fetchTickets();
     } catch (error) {

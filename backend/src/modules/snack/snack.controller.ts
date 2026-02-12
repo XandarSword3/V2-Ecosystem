@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection.js";
 import { emitToUnit } from "../../socket/index.js";
 import { createSnackOrderSchema, validateBody } from "../../validation/schemas.js";
@@ -45,8 +46,7 @@ function generateOrderNumber(): string {
   return `S-${date}-${random}${suffix}`;
 }
 
-export async function getItems(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getItems = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { category, available, moduleId } = req.query;
     
@@ -71,13 +71,9 @@ export async function getItems(req: Request, res: Response, next: NextFunction) 
     if (error) throw error;
 
     res.json({ success: true, data: data || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getItem(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getItem = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('snack_items')
@@ -92,13 +88,9 @@ export async function getItem(req: Request, res: Response, next: NextFunction) {
       throw error;
     }
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function createOrder(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createOrder = asyncHandler(async (req: Request, res: Response) => {
     // Validate request body with Zod schema
     const validatedData = validateBody(createSnackOrderSchema, req.body);
     const { customerName, customerPhone, items, paymentMethod, notes } = validatedData;
@@ -175,13 +167,9 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
     });
 
     res.status(201).json({ success: true, data: order });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getOrder(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getOrder = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: order, error: orderError } = await supabase
       .from('snack_orders')
@@ -230,13 +218,9 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     if (itemsError) throw itemsError;
 
     res.json({ success: true, data: { ...order, items: items || [] } });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getOrderStatus(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getOrderStatus = asyncHandler(async (req: Request, res: Response) => {
     // Return full order details for confirmation page
     const supabase = getSupabase();
     const { data: order, error: orderError } = await supabase
@@ -271,13 +255,9 @@ export async function getOrderStatus(req: Request, res: Response, next: NextFunc
     if (itemsError) throw itemsError;
 
     res.json({ success: true, data: { ...order, items: items || [] } });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getMyOrders(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getMyOrders = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = req.user?.userId;
 
@@ -315,13 +295,9 @@ export async function getMyOrders(req: Request, res: Response, next: NextFunctio
     if (error) throw error;
 
     res.json({ success: true, data: orders || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getStaffOrders(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getStaffOrders = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: orders, error } = await supabase
       .from('snack_orders')
@@ -358,13 +334,9 @@ export async function getStaffOrders(req: Request, res: Response, next: NextFunc
     }));
 
     res.json({ success: true, data: transformedOrders });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getLiveOrders(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getLiveOrders = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const activeStatuses = ['pending', 'preparing', 'ready'];
     
@@ -402,13 +374,9 @@ export async function getLiveOrders(req: Request, res: Response, next: NextFunct
     }));
 
     res.json({ success: true, data: transformedOrders });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateOrderStatus(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateOrderStatus = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { status } = req.body;
 
@@ -438,13 +406,9 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
     });
 
     res.json({ success: true, data: order });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function createItem(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createItem = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const body = req.body;
     
@@ -477,13 +441,9 @@ export async function createItem(req: Request, res: Response, next: NextFunction
     if (error) throw error;
 
     res.status(201).json({ success: true, data: item });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateItem(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateItem = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const body = req.body;
     const updateData: Record<string, unknown> = { 
@@ -513,13 +473,9 @@ export async function updateItem(req: Request, res: Response, next: NextFunction
     if (error) throw error;
 
     res.json({ success: true, data: item });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteItem(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteItem = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { error } = await supabase
       .from('snack_items')
@@ -529,13 +485,9 @@ export async function deleteItem(req: Request, res: Response, next: NextFunction
     if (error) throw error;
 
     res.json({ success: true, message: 'Item deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function toggleAvailability(req: Request, res: Response, next: NextFunction) {
-  try {
+export const toggleAvailability = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { isAvailable } = req.body;
 
@@ -552,10 +504,7 @@ export async function toggleAvailability(req: Request, res: Response, next: Next
     if (error) throw error;
 
     res.json({ success: true, data: item });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Categories
@@ -568,14 +517,10 @@ const STATIC_CATEGORIES = [
   { id: 'ice_cream', name: 'Ice Cream', display_order: 4 },
 ];
 
-export async function getCategories(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getCategories = asyncHandler(async (req: Request, res: Response) => {
     // Return static categories that match the database ENUM
     res.json({ success: true, data: STATIC_CATEGORIES });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 export async function createCategory(req: Request, res: Response, next: NextFunction) {
   // Categories are static for now due to ENUM constraint

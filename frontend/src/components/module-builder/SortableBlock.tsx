@@ -2,7 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { UIBlock } from '@/types/module-builder';
 import { GripVertical, Trash2, Copy, Layout, Type, Image as ImageIcon, Grid, List, Calendar, Clock, Box, MousePointer2, FormInput } from 'lucide-react';
-import { useModuleBuilderStore } from '@/store/module-builder-store';
+import { useModuleBuilderStore } from '@/stores/module-builder-store';
 
 interface SortableBlockProps {
   block: UIBlock;
