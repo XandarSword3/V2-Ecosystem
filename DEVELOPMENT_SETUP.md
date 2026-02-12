@@ -119,6 +119,7 @@ JWT_SECRET=your-super-secret-jwt-key-min-32-chars
 JWT_ACCESS_EXPIRY=15m
 JWT_REFRESH_EXPIRY=7d
 BCRYPT_ROUNDS=12
+SESSION_SECRET=your-session-secret-key-min-32-chars
 
 # Redis (Optional - for caching)
 REDIS_URL=redis://localhost:6379
