@@ -265,7 +265,7 @@ For hotels/resorts with rooms to clean:
 | Feature | V2 | Cloudbeds | Mews | Little Hotelier |
 |---------|:--:|:---------:|:----:|:---------------:|
 | Room Booking | ✅ | ✅ | ✅ | ✅ |
-| Channel Manager (OTAs) | ✅ Via SiteMinder | ✅ Excellent | ✅ Excellent | ✅ Good |
+| Channel Manager (OTAs) | ✅ Custom Module | ✅ Excellent | ✅ Excellent | ✅ Good |
 | **Restaurant POS** | ✅ Full | ❌ | ⚠️ Basic | ❌ |
 | **Activity Booking** | ✅ | ⚠️ Via partners | ⚠️ Via partners | ❌ |
 | Guest Profiles | ✅ Unified | ✅ Rooms only | ✅ Rooms only | ✅ Rooms only |
@@ -293,7 +293,7 @@ For hotels/resorts with rooms to clean:
 
 **V2 is NOT best for:**
 - Large hotel chains (100+ rooms) → Use Opera or Mews
-- Native OTA API integration → Use Cloudbeds (V2 uses SiteMinder as middleware)
+- Native OTA API integration → Use Cloudbeds (deeper native integrations)
 - Restaurant-only, simple needs → Use Square (cheaper)
 - Need heavy hardware integration (bump bars, cash drawers) → Use Toast
 
@@ -392,7 +392,7 @@ For hotels/resorts with rooms to clean:
 **Yes.** Rename "Chalets" to "Villas" or "Cabins." Rename "Pool" to "Beach Club." Full white-label support including logo, colors, and domain.
 
 ### "Does it connect to Booking.com and Expedia?"
-**Yes, via SiteMinder integration.** V2 includes a channel manager that connects to Booking.com, Expedia, Airbnb, Agoda, VRBO, TripAdvisor, and Google Hotels through the SiteMinder API. This requires a SiteMinder account and API credentials. For properties with heavy OTA reliance, dedicated channel managers like Cloudbeds may offer deeper features.
+**Yes, via the built-in channel manager module.** V2 includes a channel management system for connecting to OTA platforms. For properties with heavy OTA reliance, dedicated channel managers like Cloudbeds may offer deeper native integrations.
 
 ### "What about hardware?"
 | Hardware | Status | Notes |
@@ -474,28 +474,31 @@ If you need to know what's under the hood before buying:
 ### Core Stack
 - **Backend:** Node.js/Express with TypeScript
 - **Frontend:** Next.js 14 (App Router), React, Tailwind CSS
-- **Database:** PostgreSQL via Supabase (with Row-Level Security)
+- **Database:** PostgreSQL via Supabase (with Row-Level Security), Drizzle ORM + Prisma Client
 - **Payments:** Stripe (including Terminal for in-person)
 - **Real-time:** Socket.IO for live updates (KDS, waitlist, orders)
 - **Auth:** JWT + Supabase Auth
+- **Email:** Nodemailer
+- **Observability:** OpenTelemetry tracing, Sentry error tracking
 
-### Backend Modules (37 modules total)
+### Backend Modules (38 modules total)
 | Category | Modules |
 |----------|---------|
 | **Core Business** | Restaurant, Pool, Chalets, Snack Bar |
-| **Booking** | Accommodations, Channels, Groups |
-| **POS** | POS Hardware, Payments, Kiosk |
-| **Operations** | Housekeeping, Inventory, Staff |
-| **Customer** | Users, Loyalty, Gift Cards, Coupons, Reviews |
+| **Booking** | Accommodations, Bookings, Channels, Groups |
+| **POS** | POS Hardware, Payments, Kiosk, Devices |
+| **Operations** | Housekeeping, Inventory, Staff, Parity |
+| **Customer** | Users, Loyalty, Gift Cards, Coupons, Reviews, Customization |
 | **Marketing** | Promotions, Marketing, Messaging |
-| **Enterprise** | Multi-Property, Revenue, Reporting, Reports |
-| **Compliance** | GDPR, Audit Logs, Backups |
-| **Admin** | Admin, Permissions, Translations (i18n) |
+| **Enterprise** | Multi-Property, Revenue, Reporting, Reports, Finance |
+| **Compliance** | GDPR, Support |
+| **Admin** | Admin, Manager, Translations (i18n) |
+| **Integrations** | QuickBooks, Mobile Check-in |
 
 ### Security Implementation
 | Feature | Implementation |
 |---------|----------------|
-| Authentication | JWT (15-min access, 7-day refresh) via Supabase Auth |
+| Authentication | JWT (15-min access, 7-day refresh) via Supabase Auth, otplib TOTP 2FA |
 | Authorization | Custom RBAC with roles, permissions, module access |
 | Database Security | Supabase RLS policies (row-level security) |
 | Input Validation | Zod schemas on all endpoints |
@@ -514,14 +517,13 @@ If you need to know what's under the hood before buying:
 
 ### Frontend Architecture
 - Mobile-responsive (works on all devices)
-- Offline support via IndexedDB
-- PWA-capable
+- Offline support via IndexedDB (order queuing, menu caching)
 - Multi-language (EN, AR, FR, DE, IT) via next-intl with RTL support
 
 ### Known Limitations (Honesty Matters)
 | Area | Limitation |
 |------|------------|
-| **OTA Integration** | Via SiteMinder (requires SiteMinder account) |
+| **OTA Integration** | Custom channel module (not a deep native OTA API) |
 | **Delivery Apps** | No UberEats/DoorDash integration |
 | **Hardware** | Limited native hardware support (basic receipt printing) |
 | **Void/Comp** | Basic cancellation only, no full void workflow |
