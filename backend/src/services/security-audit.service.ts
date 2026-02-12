@@ -4,7 +4,7 @@
  * Comprehensive logging for security-related events.
  */
 
-import { prisma } from '../config/database.js';
+import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
 
 export enum SecurityEventType {
@@ -96,21 +96,23 @@ interface SecurityAuditLogEntry {
  */
 export async function logSecurityEvent(data: SecurityEventData): Promise<void> {
   try {
-    await prisma.securityAuditLog.create({
-      data: {
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from('security_audit_log')
+      .insert({
         action: 'SECURITY_EVENT',
         resource: 'SECURITY',
-        eventType: data.eventType,
+        event_type: data.eventType,
         severity: data.severity,
-        userId: data.userId || null,
-        targetUserId: data.targetUserId || null,
-        ipAddress: data.ipAddress || null,
-        userAgent: data.userAgent || null,
+        user_id: data.userId || null,
+        target_user_id: data.targetUserId || null,
+        ip_address: data.ipAddress || null,
+        user_agent: data.userAgent || null,
         description: data.description,
-        metadata: data.metadata ? JSON.stringify(data.metadata) : null,
+        metadata: data.metadata ? JSON.stringify(data.metadata) : undefined,
         success: data.success ?? true,
-      }
-    });
+      });
+    if (error) throw error;
 
     // Also log to application logger for real-time monitoring
     const logMethod = 
@@ -326,40 +328,55 @@ export async function querySecurityLogs(params: {
   limit?: number;
   offset?: number;
 }): Promise<{ logs: SecurityAuditLogEntry[]; total: number }> {
-  const where: any = {};
+  const supabase = getSupabase();
 
+  // Build query for logs
+  let logsQuery = supabase
+    .from('security_audit_log')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .range(params.offset || 0, (params.offset || 0) + (params.limit || 100) - 1);
+
+  // Build query for count
+  let countQuery = supabase
+    .from('security_audit_log')
+    .select('*', { count: 'exact', head: true });
+
+  // Apply filters to both queries
   if (params.eventTypes?.length) {
-    where.eventType = { in: params.eventTypes };
+    logsQuery = logsQuery.in('event_type', params.eventTypes);
+    countQuery = countQuery.in('event_type', params.eventTypes);
   }
   if (params.severity) {
-    where.severity = params.severity;
+    logsQuery = logsQuery.eq('severity', params.severity);
+    countQuery = countQuery.eq('severity', params.severity);
   }
   if (params.userId) {
-    where.OR = [
-      { userId: params.userId },
-      { targetUserId: params.userId }
-    ];
+    logsQuery = logsQuery.or(`user_id.eq.${params.userId},target_user_id.eq.${params.userId}`);
+    countQuery = countQuery.or(`user_id.eq.${params.userId},target_user_id.eq.${params.userId}`);
   }
   if (params.ipAddress) {
-    where.ipAddress = params.ipAddress;
+    logsQuery = logsQuery.eq('ip_address', params.ipAddress);
+    countQuery = countQuery.eq('ip_address', params.ipAddress);
   }
-  if (params.startDate || params.endDate) {
-    where.createdAt = {};
-    if (params.startDate) where.createdAt.gte = params.startDate;
-    if (params.endDate) where.createdAt.lte = params.endDate;
+  if (params.startDate) {
+    logsQuery = logsQuery.gte('created_at', params.startDate.toISOString());
+    countQuery = countQuery.gte('created_at', params.startDate.toISOString());
+  }
+  if (params.endDate) {
+    logsQuery = logsQuery.lte('created_at', params.endDate.toISOString());
+    countQuery = countQuery.lte('created_at', params.endDate.toISOString());
   }
 
-  const [logs, total] = await Promise.all([
-    prisma.securityAuditLog.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: params.limit || 100,
-      skip: params.offset || 0,
-    }),
-    prisma.securityAuditLog.count({ where })
+  const [{ data: logs, error: logsError }, { count, error: countError }] = await Promise.all([
+    logsQuery,
+    countQuery,
   ]);
 
-  return { logs, total };
+  if (logsError) throw logsError;
+  if (countError) throw countError;
+
+  return { logs: (logs || []) as SecurityAuditLogEntry[], total: count || 0 };
 }
 
 /**
@@ -374,49 +391,37 @@ export async function getSecuritySummary(days: number = 7): Promise<{
 }> {
   const since = new Date();
   since.setDate(since.getDate() - days);
+  const sinceIso = since.toISOString();
+  const supabase = getSupabase();
+
+  const baseQuery = () => supabase
+    .from('security_audit_log')
+    .select('*', { count: 'exact', head: true })
+    .gte('created_at', sinceIso);
 
   const [
-    totalEvents,
-    criticalEvents,
-    failedLogins,
-    accountLockouts,
-    suspiciousActivities
+    { count: totalEvents, error: e1 },
+    { count: criticalEvents, error: e2 },
+    { count: failedLogins, error: e3 },
+    { count: accountLockouts, error: e4 },
+    { count: suspiciousActivities, error: e5 }
   ] = await Promise.all([
-    prisma.securityAuditLog.count({
-      where: { createdAt: { gte: since } }
-    }),
-    prisma.securityAuditLog.count({
-      where: { 
-        createdAt: { gte: since },
-        severity: SecurityEventSeverity.CRITICAL
-      }
-    }),
-    prisma.securityAuditLog.count({
-      where: { 
-        createdAt: { gte: since },
-        eventType: SecurityEventType.LOGIN_FAILURE
-      }
-    }),
-    prisma.securityAuditLog.count({
-      where: { 
-        createdAt: { gte: since },
-        eventType: SecurityEventType.ACCOUNT_LOCKED
-      }
-    }),
-    prisma.securityAuditLog.count({
-      where: { 
-        createdAt: { gte: since },
-        eventType: SecurityEventType.SUSPICIOUS_ACTIVITY
-      }
-    })
+    baseQuery(),
+    baseQuery().eq('severity', SecurityEventSeverity.CRITICAL),
+    baseQuery().eq('event_type', SecurityEventType.LOGIN_FAILURE),
+    baseQuery().eq('event_type', SecurityEventType.ACCOUNT_LOCKED),
+    baseQuery().eq('event_type', SecurityEventType.SUSPICIOUS_ACTIVITY),
   ]);
 
+  const err = e1 || e2 || e3 || e4 || e5;
+  if (err) throw err;
+
   return {
-    totalEvents,
-    criticalEvents,
-    failedLogins,
-    accountLockouts,
-    suspiciousActivities
+    totalEvents: totalEvents || 0,
+    criticalEvents: criticalEvents || 0,
+    failedLogins: failedLogins || 0,
+    accountLockouts: accountLockouts || 0,
+    suspiciousActivities: suspiciousActivities || 0,
   };
 }
 

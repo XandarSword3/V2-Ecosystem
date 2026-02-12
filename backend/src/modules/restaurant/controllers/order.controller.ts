@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import * as orderService from "../services/order.service.js";
 import { logActivity } from "../../../utils/activityLogger.js";
 
@@ -9,12 +10,17 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
   try {
     const validatedData = validateBody(createRestaurantOrderSchema, req.body);
 
+    // FIX: Iteration 1 - Pass selectedModifiers and modifierTotal through to service.
+    // Previously these fields were dropped here, causing all modifier pricing to be lost.
     const formattedItems = validatedData.items.map(item => ({
       menuItemId: item.menuItemId,
       quantity: item.quantity,
       specialInstructions: item.notes,
+      selectedModifiers: item.selectedModifiers,
+      modifierTotal: item.modifierTotal,
     }));
 
+    // FIX: Iteration 1 - Use validated discount fields instead of raw req.body
     const order = await orderService.createOrder({
       customerName: validatedData.customerName || 'Guest',
       customerPhone: validatedData.customerPhone ?? undefined,
@@ -24,11 +30,10 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       paymentMethod: validatedData.paymentMethod,
       specialInstructions: validatedData.specialInstructions,
       customerId: req.user?.userId,
-      // Pass discount fields from request body
-      couponCode: req.body.couponCode,
-      giftCardRedemptions: req.body.giftCardRedemptions,
-      loyaltyPointsToRedeem: req.body.loyaltyPointsToRedeem,
-      loyaltyPointsDollarValue: req.body.loyaltyPointsDollarValue,
+      couponCode: validatedData.couponCode,
+      giftCardRedemptions: validatedData.giftCardRedemptions,
+      loyaltyPointsToRedeem: validatedData.loyaltyPointsToRedeem,
+      loyaltyPointsDollarValue: validatedData.loyaltyPointsDollarValue,
     });
     
     // Audit log for order creation
@@ -51,8 +56,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function getOrder(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getOrder = asyncHandler(async (req: Request, res: Response) => {
     const order = await orderService.getOrderById(req.params.id);
     if (!order) {
       return res.status(404).json({ success: false, error: 'Order not found' });
@@ -82,28 +86,17 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     }
 
     res.json({ success: true, data: order });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getOrderStatus(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getOrderStatus = asyncHandler(async (req: Request, res: Response) => {
     const status = await orderService.getOrderStatus(req.params.id);
     res.json({ success: true, data: status });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getMyOrders(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getMyOrders = asyncHandler(async (req: Request, res: Response) => {
     const orders = await orderService.getOrdersByCustomer(req.user!.userId);
     res.json({ success: true, data: orders });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // Helper function to transform order data for frontend
 interface OrderWithItems extends RestaurantOrderRow {
@@ -138,8 +131,7 @@ function transformOrderForFrontend(order: OrderWithItems) {
   };
 }
 
-export async function getStaffOrders(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getStaffOrders = asyncHandler(async (req: Request, res: Response) => {
     const { status, date, moduleId } = req.query;
     const orders = await orderService.getOrders({
       status: status as string,
@@ -149,25 +141,17 @@ export async function getStaffOrders(req: Request, res: Response, next: NextFunc
     // Transform to camelCase format for frontend
     const transformedOrders = orders.map(transformOrderForFrontend);
     res.json({ success: true, data: transformedOrders });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getLiveOrders(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getLiveOrders = asyncHandler(async (req: Request, res: Response) => {
     const { moduleId } = req.query;
     const orders = await orderService.getLiveOrders(moduleId as string);
     // Transform to camelCase format for frontend
     const transformedOrders = orders.map(transformOrderForFrontend);
     res.json({ success: true, data: transformedOrders });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateOrderStatus(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateOrderStatus = asyncHandler(async (req: Request, res: Response) => {
     const { status, notes } = validateBody(updateOrderStatusSchema, req.body);
     const order = await orderService.updateOrderStatus(
       req.params.id,
@@ -187,23 +171,15 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
     });
     
     res.json({ success: true, data: order });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getDailyReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getDailyReport = asyncHandler(async (req: Request, res: Response) => {
     const { date, moduleId } = req.query;
     const report = await orderService.getDailyReport(date as string, moduleId as string);
     res.json({ success: true, data: report });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getSalesReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getSalesReport = asyncHandler(async (req: Request, res: Response) => {
     const { startDate, endDate, moduleId } = req.query;
     const report = await orderService.getSalesReport(
       startDate as string,
@@ -211,7 +187,4 @@ export async function getSalesReport(req: Request, res: Response, next: NextFunc
       moduleId as string
     );
     res.json({ success: true, data: report });
-  } catch (error) {
-    next(error);
-  }
-}
+});

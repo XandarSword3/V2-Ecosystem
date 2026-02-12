@@ -4,7 +4,7 @@
  * Bots and crawlers (GPTBot, Claude, Perplexity, Google) get fully rendered HTML
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
 const cleanUrl = API_URL.replace(/\/api\/?$/, '');
 const API_BASE_URL = `${cleanUrl}/api`;
 

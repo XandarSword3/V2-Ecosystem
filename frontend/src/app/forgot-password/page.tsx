@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Mail, Loader2, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+import { authApi } from '@/lib/api'; // FIX Iter-12: use api client instead of raw fetch
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('auth');
@@ -23,13 +22,9 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
+      // FIX Iter-12: use authApi instead of raw fetch (correct URL, retry, CSRF)
+      const response = await authApi.forgotPassword(email);
+      const data = response.data;
 
       if (data.success) {
         setSuccess(true);

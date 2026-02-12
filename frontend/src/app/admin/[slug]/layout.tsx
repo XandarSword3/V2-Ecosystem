@@ -11,26 +11,45 @@ export default function DynamicModuleLayout({ children }: { children: React.Reac
   const router = useRouter();
   const { modules, loading } = useSiteSettings();
   const [currentModule, setCurrentModule] = useState<any>(null);
+  const [moduleNotFound, setModuleNotFound] = useState(false);
 
   useEffect(() => {
-    if (!loading && modules.length > 0 && params?.slug) {
+    // Only check module after loading is complete AND we have modules
+    if (!loading && params?.slug) {
       const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
       const decodedSlug = slug ? decodeURIComponent(slug).toLowerCase() : '';
       const foundModule = modules.find(m => m.slug.toLowerCase() === decodedSlug);
       
       if (foundModule) {
         setCurrentModule(foundModule);
-      } else {
-        // Module not found
-        router.push('/admin');
+        setModuleNotFound(false);
+      } else if (modules.length > 0) {
+        // Only redirect if we have modules loaded but this one doesn't exist
+        // This prevents redirect loops during initial load
+        setModuleNotFound(true);
+        console.warn(`Module not found: ${decodedSlug}, available: ${modules.map(m => m.slug).join(', ')}`);
+        router.replace('/admin');
       }
+      // If modules.length === 0, we're still loading, don't redirect
     }
   }, [loading, modules, params, router]);
 
-  if (loading || !currentModule) {
+  // Show loading while settings are loading or module is being resolved
+  if (loading || (!currentModule && !moduleNotFound)) {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+      </div>
+    );
+  }
+
+  // If module not found after loading, show error (redirect will happen)
+  if (moduleNotFound) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center">
+          <p className="text-muted-foreground">Module not found. Redirecting...</p>
+        </div>
       </div>
     );
   }

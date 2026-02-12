@@ -202,7 +202,7 @@ export default function AdminOrdersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={fetchOrders}>
+          <Button variant="outline" onClick={() => fetchOrders()}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>

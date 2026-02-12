@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import * as menuService from "../services/menu.service";
 import { translateText } from '../../../services/translation.service.js';
 import { MenuCategoryRow, MenuItemRow, getErrorMessage } from '../../../types/index.js';
 import { logger } from '../../../utils/logger.js';
 
 // Get full menu with categories and items
-export async function getFullMenu(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getFullMenu = asyncHandler(async (req: Request, res: Response) => {
     const { moduleId } = req.query;
     const [categories, items] = await Promise.all([
       menuService.getAllCategories(moduleId as string),
@@ -27,23 +27,15 @@ export async function getFullMenu(req: Request, res: Response, next: NextFunctio
         menuByCategory,
       }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getCategories(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getCategories = asyncHandler(async (req: Request, res: Response) => {
     const { moduleId } = req.query;
     const categories = await menuService.getAllCategories(moduleId as string);
     res.json({ success: true, data: categories });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getMenuItems(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getMenuItems = asyncHandler(async (req: Request, res: Response) => {
     const { 
       categoryId, 
       available, 
@@ -72,35 +64,23 @@ export async function getMenuItems(req: Request, res: Response, next: NextFuncti
       search: search as string,
     });
     res.json({ success: true, data: items });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getMenuItem(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getMenuItem = asyncHandler(async (req: Request, res: Response) => {
     const item = await menuService.getMenuItemById(req.params.id);
     if (!item) {
       return res.status(404).json({ success: false, error: 'Item not found' });
     }
     res.json({ success: true, data: item });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getFeaturedItems(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getFeaturedItems = asyncHandler(async (req: Request, res: Response) => {
     const { moduleId } = req.query;
     const items = await menuService.getFeaturedItems(moduleId as string);
     res.json({ success: true, data: items });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function createCategory(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createCategory = asyncHandler(async (req: Request, res: Response) => {
     const { name, description, moduleId, module_id, ...rest } = req.body;
     const resolvedModuleId = moduleId || module_id;
 
@@ -143,28 +123,17 @@ export async function createCategory(req: Request, res: Response, next: NextFunc
 
     const category = await menuService.createCategory(translatedData as Parameters<typeof menuService.createCategory>[0]);
     res.status(201).json({ success: true, data: category });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateCategory(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateCategory = asyncHandler(async (req: Request, res: Response) => {
     const category = await menuService.updateCategory(req.params.id, req.body);
     res.json({ success: true, data: category });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteCategory(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteCategory = asyncHandler(async (req: Request, res: Response) => {
     await menuService.deleteCategory(req.params.id);
     res.json({ success: true, message: 'Category deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 export async function createMenuItem(req: Request, res: Response, next: NextFunction) {
   try {
@@ -263,8 +232,7 @@ export async function createMenuItem(req: Request, res: Response, next: NextFunc
   }
 }
 
-export async function updateMenuItem(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateMenuItem = asyncHandler(async (req: Request, res: Response) => {
     // Convert snake_case to camelCase for service compatibility
     const body = req.body;
     const normalizedData: Record<string, any> = {};
@@ -294,27 +262,16 @@ export async function updateMenuItem(req: Request, res: Response, next: NextFunc
 
     const item = await menuService.updateMenuItem(req.params.id, normalizedData);
     res.json({ success: true, data: item });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteMenuItem(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteMenuItem = asyncHandler(async (req: Request, res: Response) => {
     await menuService.deleteMenuItem(req.params.id);
     res.json({ success: true, message: 'Item deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function toggleAvailability(req: Request, res: Response, next: NextFunction) {
-  try {
+export const toggleAvailability = asyncHandler(async (req: Request, res: Response) => {
     const { isAvailable } = req.body;
     const item = await menuService.setItemAvailability(req.params.id, isAvailable);
     res.json({ success: true, data: item });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 

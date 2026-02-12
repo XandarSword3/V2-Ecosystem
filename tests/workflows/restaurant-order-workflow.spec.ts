@@ -161,9 +161,8 @@ test.describe('Phase 1: Customer Places Order', () => {
       await cartButton.click();
       await customerPage.waitForTimeout(1000);
       
-      // Cart drawer or page should be visible - use soft assertion
-      const cartVisible = await customerPage.locator('main').first().isVisible().catch(() => false);
-      expect(cartVisible || true).toBeTruthy();
+      // Cart drawer or page should be visible
+      await expect(customerPage.locator('main').first()).toBeVisible();
       
       // Get total
       const totalElement = customerPage.locator('text=/Total|Subtotal/i');
@@ -201,10 +200,7 @@ test.describe('Phase 1: Customer Places Order', () => {
       
       // Should see confirmation or be redirected
       const confirmation = customerPage.locator('text=/order.*placed|order.*confirmed|thank you|success/i');
-      // Soft check - might not always show confirmation text
-      if (await confirmation.isVisible({ timeout: 3000 }).catch(() => false)) {
-        expect(true).toBe(true);
-      }
+      await expect(confirmation).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -215,8 +211,7 @@ test.describe('Phase 1: Customer Places Order', () => {
     await customerPage.waitForTimeout(1000);
     
     // Check for any order content or main page
-    const pageContent = await customerPage.locator('main').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    await expect(customerPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -252,15 +247,15 @@ test.describe('Phase 2: Staff Processes Order', () => {
     // Should see orders page - check for page content
     await expect(staffPage.locator('main').first()).toBeVisible({ timeout: 10000 });
     // Page should show orders-related content
-    const pageLoaded = await staffPage.locator('text=/Orders|No orders|Recent|Pending/i').first().isVisible().catch(() => false);
-    expect(pageLoaded || true).toBeTruthy();
+    const pageLoaded = staffPage.locator('text=/Orders|No orders|Recent|Pending/i').first();
+    await expect(pageLoaded).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 2.3: Staff sees pending orders', async () => {
     await staffPage.waitForTimeout(1000);
     // Look for pending/new orders or any content
-    const pageContent = await staffPage.locator('text=/pending|new|processing|no orders|order|empty/i').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    const pageContent = staffPage.locator('text=/pending|new|processing|no orders|order|empty/i').first();
+    await expect(pageContent).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 2.4: Staff updates order status to preparing', async () => {
@@ -280,9 +275,7 @@ test.describe('Phase 2: Staff Processes Order', () => {
       
       // Verify status changed
       const preparingIndicator = staffPage.locator('text=/preparing|in progress/i');
-      if (await preparingIndicator.isVisible({ timeout: 3000 }).catch(() => false)) {
-        expect(true).toBe(true);
-      }
+      await expect(preparingIndicator).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -356,8 +349,8 @@ test.describe('Phase 3: Admin Reviews Order', () => {
     await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
     
     // Should see orders-related content or empty state
-    const pageContent = await adminPage.locator('text=/Orders|No orders|Empty|Recent/i').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    const pageContent = adminPage.locator('text=/Orders|No orders|Empty|Recent/i').first();
+    await expect(pageContent).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 3.4: Admin filters by date/status', async () => {
@@ -384,8 +377,8 @@ test.describe('Phase 3: Admin Reviews Order', () => {
     await adminPage.waitForTimeout(1000);
     
     // Check for any report-related content
-    const pageContent = await adminPage.locator('text=/Report|Analytics|Revenue|Data|Overview/i').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    const pageContent = adminPage.locator('text=/Report|Analytics|Revenue|Data|Overview/i').first();
+    await expect(pageContent).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 3.6: Admin exports report data', async () => {
@@ -423,7 +416,7 @@ test.describe('Phase 3: Admin Reviews Order', () => {
         }
       }
     }
-    expect(true).toBeTruthy();
+    await expect(adminPage.locator('main').first()).toBeVisible();
   });
 });
 

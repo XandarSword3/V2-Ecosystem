@@ -8,10 +8,11 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { roleGuard } from '../../middleware/roleGuard.middleware';
-import { prisma } from '../../config/database.js';
+import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { emailService } from '../../services/email.service.js';
 import { encrypt, decrypt } from '../../utils/encryption.js';
+import { asyncHandler } from '../../middleware/async-handler.js';
 
 const router = Router();
 
@@ -37,17 +38,17 @@ router.get(
   '/',
   authenticate,
   roleGuard(['admin', 'super_admin']),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const settings = await prisma.systemSettings.findMany({
-        where: {
-          category: 'email'
-        }
-      });
+  asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { data: settings, error: settingsError } = await supabase
+        .from('system_settings')
+        .select('*')
+        .eq('category', 'email');
+      if (settingsError) throw settingsError;
 
       // Convert to object and mask sensitive fields
       const config: Record<string, any> = {};
-      for (const setting of settings) {
+      for (const setting of (settings || [])) {
         const key = setting.key.replace('email.', '');
         
         // Mask sensitive values
@@ -62,10 +63,7 @@ router.get(
         success: true,
         data: config
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -76,9 +74,8 @@ router.put(
   '/',
   authenticate,
   roleGuard(['admin', 'super_admin']),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const validation = emailConfigSchema.safeParse(req.body);
+  asyncHandler(async (req: Request, res: Response) => {
+    const validation = emailConfigSchema.safeParse(req.body);
       
       if (!validation.success) {
         return res.status(400).json({
@@ -128,22 +125,19 @@ router.put(
       }
 
       // Upsert all settings
+      const supabase = getSupabase();
       for (const setting of settingsToSave) {
-        await prisma.systemSettings.upsert({
-          where: { key: setting.key },
-          update: {
-            value: setting.value,
-            updatedAt: new Date(),
-            updatedBy: userId
-          },
-          create: {
+        const { error: upsertError } = await supabase
+          .from('system_settings')
+          .upsert({
             key: setting.key,
             value: setting.value,
             category: 'email',
-            createdBy: userId,
-            updatedBy: userId
-          }
-        });
+            updated_at: new Date().toISOString(),
+            updated_by: userId,
+            created_by: userId,
+          }, { onConflict: 'key' });
+        if (upsertError) throw upsertError;
       }
 
       // Reload email service with new configuration
@@ -159,10 +153,7 @@ router.put(
         success: true,
         message: 'Email configuration saved successfully'
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -258,12 +249,15 @@ async function buildTransportConfig(config: z.infer<typeof emailConfigSchema>) {
  * Reload email service with updated configuration
  */
 async function reloadEmailService(): Promise<void> {
-  const settings = await prisma.systemSettings.findMany({
-    where: { category: 'email' }
-  });
+  const supabase = getSupabase();
+  const { data: settings, error } = await supabase
+    .from('system_settings')
+    .select('*')
+    .eq('category', 'email');
+  if (error) throw error;
 
   const config: Record<string, string> = {};
-  for (const setting of settings) {
+  for (const setting of (settings || [])) {
     const key = setting.key.replace('email.', '');
     // Encrypted property not in schema currently
     // config[key] = setting.encrypted ? decrypt(setting.value) : setting.value;

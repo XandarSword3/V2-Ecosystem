@@ -20,46 +20,74 @@ const notoArabic = Noto_Sans_Arabic({
   variable: '--font-arabic',
 });
 
-export const metadata: Metadata = {
-  title: 'V2 Resort | Restaurant, Chalets & Pool',
-  description: 'Welcome to V2 Resort - Your premium destination for dining, chalets, and pool experiences. Featuring luxury chalets, fine dining restaurant, and family pool.',
-  keywords: 'resort, restaurant, chalets, pool, vacation, dining, getaway, luxury',
-  manifest: '/manifest.json',
-  icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-    apple: '/icons/icon-192x192.png',
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'V2 Resort',
-  },
-  openGraph: {
-    title: 'V2 Resort | Luxury Getaway',
-    description: 'Experience the perfect blend of relaxation and entertainment. Luxury chalets, exquisite dining, and refreshing pool sessions.',
-    type: 'website',
-  },
-  other: {
-    'mobile-web-app-capable': 'yes',
-  },
+const getBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  return 'http://localhost:3005';
 };
 
-export default function RootLayout({
+async function getSiteSettings() {
+  try {
+    const res = await fetch(`${getBaseUrl()}/api/settings`, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error('Failed to fetch settings');
+    const data = await res.json();
+    return data.data || data;
+  } catch (error) {
+    console.error('Metadata fetch error:', error);
+    return {
+      resortName: 'Iron Paradise Gym',
+      description: 'Premier resort platform.'
+    };
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+  const title = settings.resortName || 'Iron Paradise Gym';
+  const description = settings.description || 'Experience the perfect blend of relaxation and entertainment.';
+
+  return {
+    title: `${title} | Luxury Experience`,
+    description,
+    keywords: 'resort, luxury, dining, experience, vacation',
+    manifest: '/manifest.json',
+    icons: {
+      icon: '/favicon.svg',
+      shortcut: '/favicon.svg',
+      apple: '/icons/icon-192x192.png',
+    },
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'black-translucent',
+      title: title,
+    },
+    openGraph: {
+      title: `${title} | Luxury Experience`,
+      description,
+      type: 'website',
+    },
+    other: {
+      'mobile-web-app-capable': 'yes',
+    },
+  };
+}
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Use default locale on server, client will handle language switching
+  // Use default locale on server
   const locale = defaultLocale;
   const isRtl = locale === 'ar';
 
+  const settings = await getSiteSettings();
+
   const resortSchema = generateResortSchema({
-    name: 'V2 Resort',
-    description: 'Premier resort offering luxury chalets, fine dining, and pool experiences.',
+    name: settings.resortName || 'Iron Paradise Gym',
+    description: settings.description || 'Premier resort experience.',
     url: 'https://v2-ecosystem.vercel.app',
     telephone: '+1 234 567 8900',
-    email: 'bookings@v2resort.com',
+    email: 'bookings@ironparadisegym.com',
     address: {
       street: '123 Resort Boulevard',
       city: 'Global City',

@@ -1,0 +1,557 @@
+﻿
+> @v2-resort/backend@1.0.0 test
+> vitest run --passWithNoTests
+
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+ [32mΓ£ô[39m tests/unit/reviews.controller.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 81[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/middleware/requestLogger.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 142[2mms[22m[39m
+[90mstdout[2m | tests/unit/restaurant/table.controller.test.ts[2m > [22m[2mTable Controller[2m > [22m[2mcreateTable[2m > [22m[2mshould create a new table
+[22m[39m[Table Controller] Request body: {"tableNumber":"3","capacity":6}
+[Table Controller] Parsed values: { tableNumber: [32m'3'[39m, capacity: [33m6[39m, location: [90mundefined[39m }
+[Table Controller] Normalized data: { tableNumber: [32m'3'[39m, capacity: [33m6[39m, location: [1mnull[22m }
+
+[90mstdout[2m | tests/unit/restaurant/table.controller.test.ts[2m > [22m[2mTable Controller[2m > [22m[2mcreateTable[2m > [22m[2mshould create a new table
+[22m[39m[Table Controller] Table created: {
+  id: [32m'3'[39m,
+  number: [33m3[39m,
+  capacity: [33m6[39m,
+  status: [32m'available'[39m,
+  is_active: [33mtrue[39m,
+  table_number: [33m3[39m
+}
+
+ [32mΓ£ô[39m tests/unit/restaurant/table.controller.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 159[2mms[22m[39m
+node.exe : [90mstderr[2m | 
+tests/security-patches.test.ts[2m > [22m[2mSecurity 
+Hardening Migration Checks[2m > [22m[2mshould allow 
+creating dynamic application permissions in 
+app_permissions
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([90mstderr 
+   [2m...app_permissions:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[22m[39mPermission Insert Error: {
+  message: [32m'TypeError: fetch failed'[39m,
+  details: [32m'TypeError: fetch failed\n'[39m +
+    [32m'\n'[39m +
+    [32m'Caused by: Error: connect ECONNREFUSED 
+127.0.0.1:54321 (ECONNREFUSED)\n'[39m +
+    [32m'Error: connect ECONNREFUSED 
+127.0.0.1:54321\n'[39m +
+    [32m'    at TCPConnectWrap.afterConnect [as 
+oncomplete] (node:net:1637:16)'[39m,
+  hint: [32m''[39m,
+  code: [32m''[39m
+}
+
+ [31mΓ¥»[39m tests/security-patches.test.ts [2m([22m[2m2 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 23[2mms[22m[39m
+[31m     [31m├ù[31m should allow creating dynamic application permissions in app_permissions[39m[32m 19[2mms[22m[39m
+[31m     [31m├ù[31m should prevent modification of payment_ledger financial fields[39m[32m 3[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/user.controller.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 184[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/snack.controller.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 183[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/admin.services.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 192[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/chalet.controller.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 217[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/payment.controller.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 236[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/pool.controller.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 244[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/restaurant/order.controller.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 217[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth.module.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 251[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth.controller.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 284[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/admin.controller.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 268[2mms[22m[39m
+[90mstdout[2m | tests/unit/giftcard.controller.test.ts
+[22m[39m2026-01-31 18:00:57 [33mwarn[39m: [33mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS environment variables.[39m
+
+[90mstderr[2m | 
+tests/unit/giftcard.controller.test.ts[2m > 
+[22m[2mGift Card Controller[2m > 
+[22m[2mgetTemplates[2m > [22m[2mshould handle 
+database errors
+[22m[39mError fetching templates: { message: 
+[32m'Database error'[39m }
+
+[90mstdout[2m | tests/unit/giftcard.controller.test.ts[2m > [22m[2mGift Card Controller[2m > [22m[2mpurchaseGiftCard[2m > [22m[2mshould purchase a gift card from template
+[22m[39m2026-01-31 18:00:57 [33mwarn[39m: [33mEmail not sent - service not configured[39m
+
+[90mstdout[2m | tests/unit/giftcard.controller.test.ts[2m > [22m[2mGift Card Controller[2m > [22m[2mpurchaseGiftCard[2m > [22m[2mshould purchase a gift card from template
+[22m[39m2026-01-31 18:00:57 [33mwarn[39m: [33mGift card email failed to send for code GIFT-ABCD1234[39m
+
+ [32mΓ£ô[39m tests/unit/giftcard.controller.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/support.routes.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 181[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/chalet.pricing.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/support.service.test.ts [2m([22m[2m52 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/monitoring.middleware.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 63[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/reports.controller.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/payment.service.test.ts [2m([22m[2m98 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/order.table.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/invoice.service.test.ts [2m([22m[2m61 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/loyalty.service.test.ts [2m([22m[2m98 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/amenity.service.test.ts [2m([22m[2m68 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/notification.service.test.ts [2m([22m[2m79 tests[22m[2m)[22m[32m 41[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/analytics.service.test.ts [2m([22m[2m69 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/inventory.service.test.ts [2m([22m[2m99 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/dashboard.controller.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/menu.service.test.ts [2m([22m[2m66 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/reservation.service.test.ts [2m([22m[2m73 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/reporting.service.test.ts [2m([22m[2m78 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/modules/snack.controller.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 41[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/users.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 1046[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should require current password to change password [33m 781[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/pool.service.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/booking.service.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/shift.service.test.ts [2m([22m[2m77 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/coupon.service.test.ts [2m([22m[2m92 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/order.service.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/currency.service.test.ts [2m([22m[2m69 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth-lifecycle.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/audit.service.test.ts [2m([22m[2m71 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/document.service.test.ts [2m([22m[2m77 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/settings.service.test.ts [2m([22m[2m78 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/upload.controller.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/lib.order.controller.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/notifications.controller.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/waitlist.service.test.ts [2m([22m[2m96 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/lib.pool.controller.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/task.service.test.ts [2m([22m[2m72 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/pool.controller.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/snack.service.test.ts [2m([22m[2m44 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/event.service.test.ts [2m([22m[2m66 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/lib.auth.controller.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/weather.service.test.ts [2m([22m[2m97 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/housekeeping.service.test.ts [2m([22m[2m47 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+[90mstderr[2m | 
+tests/unit/inventory.controller.test.ts[2m > 
+[22m[2mInventory Controller[2m > 
+[22m[2mgetCategories[2m > [22m[2mshould handle 
+database errors
+[22m[39mError fetching categories: { message: 
+[32m'Database error'[39m }
+
+ [32mΓ£ô[39m tests/unit/user.module.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/inventory.controller.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/user.service.test.ts [2m([22m[2m46 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/feedback.service.test.ts [2m([22m[2m52 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/guest.service.test.ts [2m([22m[2m68 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/maintenance.service.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/lib.booking.controller.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/rate.service.test.ts [2m([22m[2m59 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/channel.service.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/membership.service.test.ts [2m([22m[2m67 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/promotion.service.test.ts [2m([22m[2m54 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/giftcard.service.test.ts [2m([22m[2m62 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+[90mstdout[2m | tests/unit/sentry.source.test.ts[2m > [22m[2mSentry Utils (Source)[2m > [22m[2mcaptureException[2m > [22m[2mshould accept error parameter
+[22m[39m2026-01-31 18:00:58 [31merror[39m: [31mError captured (Sentry disabled): Test error[39m
+
+[90mstdout[2m | tests/unit/sentry.source.test.ts[2m > [22m[2mSentry Utils (Source)[2m > [22m[2mcaptureException[2m > [22m[2mshould accept error with context
+[22m[39m2026-01-31 18:00:58 [31merror[39m: [31mError captured (Sentry disabled): Test error[39m
+
+ [32mΓ£ô[39m tests/unit/sentry.source.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/review.service.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/package.service.test.ts [2m([22m[2m44 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+[90mstderr[2m | 
+tests/unit/housekeeping.controller.test.ts[2m > 
+[22m[2mHousekeeping Controller[2m > 
+[22m[2mgetTaskTypes[2m > [22m[2mshould handle 
+database errors
+[22m[39mError fetching task types: { message: 
+[32m'Database error'[39m }
+
+ [32mΓ£ô[39m tests/unit/housekeeping.controller.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/order-utils.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/settings.controller.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/webhookIdempotency.service.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth/auth.utils.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/audit.controller.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/validation.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/schemas.source.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/loyalty.controller.test.ts [2m([22m[2m10 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth.utils.source.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+[90mstdout[2m | tests/unit/oauth.controller.test.ts[2m > [22m[2mOAuth Controller[2m > [22m[2mgoogleCallback[2m > [22m[2mshould reject callback with invalid state (CSRF protection)
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mOAuth state mismatch - possible CSRF attack[39m
+
+ [32mΓ£ô[39m tests/contract/openapi-lint.test.ts [2m([22m[2m125 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+[90mstdout[2m | tests/unit/oauth.controller.test.ts[2m > [22m[2mOAuth Controller[2m > [22m[2mgoogleCallback[2m > [22m[2mshould handle OAuth service error
+[22m[39m2026-01-31 18:00:59 [31merror[39m: [31mError handling Google OAuth callback: Failed to authenticate[39m
+
+[90mstdout[2m | tests/unit/oauth.controller.test.ts[2m > [22m[2mOAuth Controller[2m > [22m[2mfacebookCallback[2m > [22m[2mshould reject Facebook callback with state mismatch
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mOAuth state mismatch - possible CSRF attack[39m
+
+ [32mΓ£ô[39m tests/unit/oauth.controller.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/email.service.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+[90mstdout[2m | tests/unit/middleware/auth.middleware.test.ts[2m > [22m[2mAuth Middleware[2m > [22m[2mauthenticate[2m > [22m[2mshould reject request without auth header
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mAuth failure: No token provided[39m
+
+[90mstdout[2m | tests/unit/middleware/auth.middleware.test.ts[2m > [22m[2mAuth Middleware[2m > [22m[2mauthenticate[2m > [22m[2mshould reject request without Bearer prefix
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mAuth failure: No token provided[39m
+
+[90mstdout[2m | tests/unit/middleware/auth.middleware.test.ts[2m > [22m[2mAuth Middleware[2m > [22m[2mauthenticate[2m > [22m[2mshould reject invalid token
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mAuth failure: Invalid or expired token[39m
+
+[90mstdout[2m | tests/unit/middleware/auth.middleware.test.ts[2m > [22m[2mAuth Middleware[2m > [22m[2mauthorize[2m > [22m[2mshould reject user without required role
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mAuthorization failure: Insufficient permissions[39m
+
+[90mstdout[2m | tests/unit/middleware/auth.middleware.test.ts[2m > [22m[2mAuth Middleware[2m > [22m[2mauthorize[2m > [22m[2mshould reject unauthenticated request
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mAuthorization failure: Not authenticated[39m
+
+ [32mΓ£ô[39m tests/unit/middleware/auth.middleware.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/two-factor.service.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/roles.controller.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/validation.schemas.test.ts [2m([22m[2m47 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+[90mstdout[2m | tests/unit/auth.middleware.test.ts[2m > [22m[2mAuth Middleware (Source)[2m > [22m[2mauthenticate[2m > [22m[2mshould return 401 when no authorization header
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mAuth failure: No token provided[39m
+
+[90mstdout[2m | tests/unit/auth.middleware.test.ts[2m > [22m[2mAuth Middleware (Source)[2m > [22m[2mauthenticate[2m > [22m[2mshould return 401 when authorization header does not start with Bearer
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mAuth failure: No token provided[39m
+
+[90mstdout[2m | tests/unit/auth.middleware.test.ts[2m > [22m[2mAuth Middleware (Source)[2m > [22m[2mauthenticate[2m > [22m[2mshould return 401 when token is invalid
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mAuth failure: Invalid or expired token[39m
+
+ [32mΓ£ô[39m tests/unit/coupon.controller.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+[90mstdout[2m | tests/unit/auth.middleware.test.ts[2m > [22m[2mAuth Middleware (Source)[2m > [22m[2mauthorize[2m > [22m[2mshould return 401 when no user attached to request
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mAuthorization failure: Not authenticated[39m
+
+[90mstdout[2m | tests/unit/auth.middleware.test.ts[2m > [22m[2mAuth Middleware (Source)[2m > [22m[2mauthorize[2m > [22m[2mshould return 403 when user does not have required role
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mAuthorization failure: Insufficient permissions[39m
+
+ [32mΓ£ô[39m tests/unit/auth.middleware.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/scheduled-reports.controller.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/security.service.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/backup.service.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/socket.events.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+[90mstdout[2m | tests/unit/logger.source.test.ts[2m > [22m[2mLogger (Source)[2m > [22m[2mlogging operations[2m > [22m[2mshould not throw when logging error
+[22m[39m2026-01-31 18:00:59 [31merror[39m: [31mTest error message[39m
+
+[90mstdout[2m | tests/unit/logger.source.test.ts[2m > [22m[2mLogger (Source)[2m > [22m[2mlogging operations[2m > [22m[2mshould not throw when logging warn
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mTest warning message[39m
+
+[90mstdout[2m | tests/unit/logger.source.test.ts[2m > [22m[2mLogger (Source)[2m > [22m[2mlogging operations[2m > [22m[2mshould not throw when logging error with stack trace
+[22m[39m2026-01-31 18:00:59 [31merror[39m: [31mAn error occurred[39m
+
+ [32mΓ£ô[39m tests/unit/logger.source.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/security.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/bookings.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/email.service.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+[90mstdout[2m | tests/seasonal-pricing.service.test.ts[2m > [22m[2mSeasonalPricingService[2m > [22m[2mgetSeasonalRules[2m > [22m[2mshould throw error when fetch fails
+[22m[39m2026-01-31 18:00:59 [31merror[39m: [31mFailed to fetch seasonal pricing rules DB error[39m
+
+ [32mΓ£ô[39m tests/seasonal-pricing.service.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/middleware/userRateLimit.middleware.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/middleware/moduleGuard.middleware.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/AppError.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/security.middleware.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/support.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/translation.service.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth/auth.validation.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+[90mstdout[2m | tests/unit/csrf.middleware.test.ts[2m > [22m[2mCSRF Protection Middleware[2m > [22m[2mshould reject POST without cookie token
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mCSRF: No token cookie present for POST /api/some-endpoint[39m
+
+[90mstdout[2m | tests/unit/csrf.middleware.test.ts[2m > [22m[2mCSRF Protection Middleware[2m > [22m[2mshould reject POST without header token
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mCSRF: No token header for POST /api/some-endpoint from 127.0.0.1[39m
+
+[90mstdout[2m | tests/unit/csrf.middleware.test.ts[2m > [22m[2mCSRF Protection Middleware[2m > [22m[2mshould reject POST with mismatched tokens
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mCSRF: Token mismatch for POST /api/some-endpoint from 127.0.0.1[39m
+
+[90mstdout[2m | tests/unit/csrf.middleware.test.ts[2m > [22m[2mTiming-Safe Comparison[2m > [22m[2mshould use timing-safe comparison to prevent timing attacks
+[22m[39m2026-01-31 18:00:59 [33mwarn[39m: [33mCSRF: Token mismatch for POST /api/some-endpoint from 127.0.0.1[39m
+
+ [32mΓ£ô[39m tests/unit/csrf.middleware.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/middleware.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/socket/socket.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/two-factor.service.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/orders.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/push-notification.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+Sourcemap for "C:/Alessandro/Work/Attempts to Code/V2 Ecos
+ystem/v2-resort/backend/node_modules/node-cron/dist/esm/no
+de-cron.js" points to missing source files
+ [32mΓ£ô[39m tests/unit/AppError.source.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/branding.controller.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/transaction.utils.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/pool.validation.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m tests/pricing.controller.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/config.source.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/reviews.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/scheduler.service.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/payment.webhook.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/fieldNormalizer.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/reviews.module.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/scheduler.service.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/translation.service.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/fieldNormalizer.source.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/types.source.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/delete-preview.controller.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/database/connection.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/cache.source.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/socket.source.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/cache.utils.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+[90mstdout[2m | tests/ai-agent.integration.test.ts
+[22m[39m2026-01-31 18:01:00 [33mwarn[39m: [33mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS environment variables.[39m
+
+ [32mΓ£ô[39m tests/unit/payment.module.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/oauth.service.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+[90mstdout[2m | tests/ai-agent.integration.test.ts[2m > [22m[2mAI Agent Interaction Tests[2m > [22m[2mshould allow an agent to discover the API terminology
+[22m[39m2026-01-31 18:01:01 [31merror[39m: [31mError fetching terminology: TypeError: fetch failed[39m
+
+[90mstdout[2m | tests/ai-agent.integration.test.ts[2m > [22m[2mAI Agent Interaction Tests[2m > [22m[2mshould allow an agent to use generic unit endpoints
+[22m[39m2026-01-31 18:01:01 [31merror[39m: [31mError checking module status for 'chalets': TypeError: fetch failed[39m
+
+[90mstderr[2m | tests/ai-agent.integration.test.ts[2m 
+> [22m[2mAI Agent Interaction Tests[2m > 
+[22m[2mshould allow an agent to use generic unit 
+endpoints
+[22m[39mAPI Error: {
+  message: [32m'TypeError: fetch failed'[39m,
+  details: [32m'TypeError: fetch failed\n'[39m +
+    [32m'\n'[39m +
+    [32m'Caused by: Error: connect ECONNREFUSED 
+127.0.0.1:54321 (ECONNREFUSED)\n'[39m +
+    [32m'Error: connect ECONNREFUSED 
+127.0.0.1:54321\n'[39m +
+    [32m'    at TCPConnectWrap.afterConnect [as 
+oncomplete] (node:net:1637:16)'[39m,
+  hint: [32m''[39m,
+  code: [32m''[39m
+}
+
+[90mstderr[2m | tests/ai-agent.integration.test.ts[2m 
+> [22m[2mAI Agent Interaction Tests[2m > 
+[22m[2mshould handle legacy routes correctly for agents 
+using old paths
+[22m[39mAPI Error: {
+  message: [32m'TypeError: fetch failed'[39m,
+  details: [32m'TypeError: fetch failed\n'[39m +
+    [32m'\n'[39m +
+    [32m'Caused by: Error: connect ECONNREFUSED 
+127.0.0.1:54321 (ECONNREFUSED)\n'[39m +
+    [32m'Error: connect ECONNREFUSED 
+127.0.0.1:54321\n'[39m +
+    [32m'    at TCPConnectWrap.afterConnect [as 
+oncomplete] (node:net:1637:16)'[39m,
+  hint: [32m''[39m,
+  code: [32m''[39m
+}
+
+ [31mΓ¥»[39m tests/ai-agent.integration.test.ts [2m([22m[2m4 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 36[2mms[22m[39m
+[31m     [31m├ù[31m should allow an agent to discover the API terminology[39m[32m 22[2mms[22m[39m
+     [32mΓ£ô[39m should allow an agent to fetch the OpenAPI specification[32m 3[2mms[22m[39m
+[31m     [31m├ù[31m should allow an agent to use generic unit endpoints[39m[32m 6[2mms[22m[39m
+[31m     [31m├ù[31m should handle legacy routes correctly for agents using old paths[39m[32m 4[2mms[22m[39m
+[90mstdout[2m | tests/comprehensive-verification.test.ts
+[22m[39m2026-01-31 18:01:02 [33mwarn[39m: [33mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS environment variables.[39m
+
+ [2m[90mΓåô[39m[22m tests/comprehensive-verification.test.ts [2m([22m[2m6 tests[22m[2m | [22m[33m6 skipped[39m[2m)[22m
+ [32mΓ£ô[39m tests/unit/auth.service.test.ts [2m([22m[2m37 tests[22m[2m)[22m[33m 10772[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should login with valid credentials [33m 534[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should return user roles [33m 530[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should create a session on login [33m 497[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should update last_login_at [33m 444[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should throw for invalid password [33m 435[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should log activity on login [33m 431[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should refresh tokens with valid refresh token [33m 424[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should throw for inactive session [33m 419[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should invalidate session on logout [33m 403[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should change password with correct current password [33m 827[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should throw for incorrect current password [33m 425[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should invalidate all sessions after password change [33m 832[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should log activity after password change [33m 613[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should reset password with valid token [33m 628[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should delete reset token after use [33m 418[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should log activity after password reset [33m 417[2mms[22m[39m
+
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 5 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m 
+tests/ai-agent.integration.test.ts[2m > [22mAI Agent 
+Interaction Tests[2m > [22mshould allow an agent to 
+discover the API terminology
+[31m[1mAssertionError[22m: expected undefined to be 
+'Room' // Object.is equality[39m
+
+[32m- Expected:[39m 
+"Room"
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2mΓ¥»[22m 
+tests/ai-agent.integration.test.ts:[2m15:50[22m[39m
+    [90m 13| [39m
+    [90m 14| [39m        [34mexpect[39m(response[33m.
+[39mbody[33m.[39msuccess)[33m.[39m[34mtoBe[39m([35
+mtrue[39m)[33m;[39m
+    [90m 15| [39m        [34mexpect[39m(response[33m.
+[39mbody[33m.[39mdata[33m.[39munit_singular)[33m.[3
+9m[34mtoBe[39m([32m'Room'[39m)[33m;[39m
+    [90m   | [39m                                       
+          [31m^[39m
+    [90m 16| [39m    })[33m;[39m
+    [90m 17| [39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»Γ
+Ä»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/5]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/ai-agent.integration.test.ts[2m > [22mAI Agent 
+Interaction Tests[2m > [22mshould allow an agent to use 
+generic unit endpoints
+[31m[1mError[22m: expected 200 "OK", got 500 "Internal 
+Server Error"[39m
+[36m [2mΓ¥»[22m 
+tests/ai-agent.integration.test.ts:[2m31:14[22m[39m
+    [90m 29| [39m        [35mconst[39m response 
+[33m=[39m [35mawait[39m [34mrequest[39m(app)
+    [90m 30| [39m            [33m.[39m[35mget[39m([
+32m`[39m[36m${[39m[33mAPI_V1[39m[36m}[39m[32m/unit
+s`[39m)
+    [90m 31| [39m            
+[33m.[39m[34mexpect[39m([34m200[39m)[33m;[39m
+    [90m   | [39m             [31m^[39m
+    [90m 32| [39m
+    [90m 33| [39m        [34mexpect[39m(response[33m.
+[39mbody[33m.[39msuccess)[33m.[39m[34mtoBe[39m([35
+mtrue[39m)[33m;[39m
+[90m [2mΓ¥»[22m Test._assertStatus 
+node_modules/supertest/lib/test.js:[2m309:14[22m[39m
+[90m [2mΓ¥»[22m 
+node_modules/supertest/lib/test.js:[2m365:13[22m[39m
+[90m [2mΓ¥»[22m Test._assertFunction 
+node_modules/supertest/lib/test.js:[2m342:13[22m[39m
+[90m [2mΓ¥»[22m Test.assert 
+node_modules/supertest/lib/test.js:[2m195:23[22m[39m
+[90m [2mΓ¥»[22m localAssert 
+node_modules/supertest/lib/test.js:[2m138:14[22m[39m
+[90m [2mΓ¥»[22m Server.<anonymous> 
+node_modules/supertest/lib/test.js:[2m152:11[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»Γ
+Ä»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/5]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/ai-agent.integration.test.ts[2m > [22mAI Agent 
+Interaction Tests[2m > [22mshould handle legacy routes 
+correctly for agents using old paths
+[31m[1mError[22m: expected 200 "OK", got 500 "Internal 
+Server Error"[39m
+[36m [2mΓ¥»[22m 
+tests/ai-agent.integration.test.ts:[2m41:14[22m[39m
+    [90m 39| [39m        [35mconst[39m response 
+[33m=[39m [35mawait[39m [34mrequest[39m(app)
+    [90m 40| [39m            [33m.[39m[35mget[39m([
+32m`[39m[36m${[39m[33mAPI_V1[39m[36m}[39m[32m/chal
+ets`[39m)
+    [90m 41| [39m            
+[33m.[39m[34mexpect[39m([34m200[39m)[33m;[39m 
+[90m// Middleware handles it[39m
+    [90m   | [39m             [31m^[39m
+    [90m 42| [39m
+    [90m 43| [39m        [34mexpect[39m(response[33m.
+[39mbody[33m.[39msuccess)[33m.[39m[34mtoBe[39m([35
+mtrue[39m)[33m;[39m
+[90m [2mΓ¥»[22m Test._assertStatus 
+node_modules/supertest/lib/test.js:[2m309:14[22m[39m
+[90m [2mΓ¥»[22m 
+node_modules/supertest/lib/test.js:[2m365:13[22m[39m
+[90m [2mΓ¥»[22m Test._assertFunction 
+node_modules/supertest/lib/test.js:[2m342:13[22m[39m
+[90m [2mΓ¥»[22m Test.assert 
+node_modules/supertest/lib/test.js:[2m195:23[22m[39m
+[90m [2mΓ¥»[22m localAssert 
+node_modules/supertest/lib/test.js:[2m138:14[22m[39m
+[90m [2mΓ¥»[22m Server.<anonymous> 
+node_modules/supertest/lib/test.js:[2m152:11[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»Γ
+Ä»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[3/5]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/security-patches.test.ts[2m > [22mSecurity 
+Hardening Migration Checks[2m > [22mshould allow 
+creating dynamic application permissions in 
+app_permissions
+[31m[1mAssertionError[22m: expected { ΓÇª(4) } to be 
+null[39m
+
+[32m- Expected:[39m 
+null
+
+[31m+ Received:[39m 
+{
+  "code": "",
+  "details": "TypeError: fetch failed
+
+Caused by: Error: connect ECONNREFUSED 127.0.0.1:54321 
+(ECONNREFUSED)
+Error: connect ECONNREFUSED 127.0.0.1:54321
+    at TCPConnectWrap.afterConnect [as oncomplete] 
+(node:net:1637:16)",
+  "hint": "",
+  "message": "TypeError: fetch failed",
+}
+
+[36m [2mΓ¥»[22m 
+tests/security-patches.test.ts:[2m22:23[22m[39m
+    [90m 20| [39m
+    [90m 21| [39m        [35mif[39m (error) 
+console[33m.[39m[34merror[39m([32m'Permission Insert 
+Error:'[39m[33m,[39m error)[33m;[39m
+    [90m 22| [39m        [34mexpect[39m(error)[33m.[
+39m[34mtoBeNull[39m()[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m 23| [39m        [34mexpect[39m(data)[33m.[3
+9m[34mtoHaveProperty[39m([32m'slug'[39m[33m,[39m 
+testPermissionSlug)[33m;[39m
+    [90m 24| [39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»Γ
+Ä»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[4/5]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/security-patches.test.ts[2m > [22mSecurity 
+Hardening Migration Checks[2m > [22mshould prevent 
+modification of payment_ledger financial fields
+[31m[1mAssertionError[22m: expected { ΓÇª(4) } to be 
+null[39m
+
+[32m- Expected:[39m 
+null
+
+[31m+ Received:[39m 
+{
+  "code": "",
+  "details": "TypeError: fetch failed
+
+Caused by: Error: connect ECONNREFUSED 127.0.0.1:54321 
+(ECONNREFUSED)
+Error: connect ECONNREFUSED 127.0.0.1:54321
+    at TCPConnectWrap.afterConnect [as oncomplete] 
+(node:net:1637:16)",
+  "hint": "",
+  "message": "TypeError: fetch failed",
+}
+
+[36m [2mΓ¥»[22m 
+tests/security-patches.test.ts:[2m45:29[22m[39m
+    [90m 43| [39m            
+[33m.[39m[34msingle[39m()[33m;[39m
+    [90m 44| [39m        
+    [90m 45| [39m        [34mexpect[39m(insertError)[
+33m.[39m[34mtoBeNull[39m()[33m;[39m
+    [90m   | [39m                            [31m^[39m
+    [90m 46| [39m        [34mexpect[39m(ledgerEntry)[
+33m.[39m[34mtoBeDefined[39m()[33m;[39m
+    [90m 47| [39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»Γ
+Ä»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[5/5]ΓÄ»[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m134 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (137)[39m
+[2m      Tests [22m [1m[31m5 failed[39m[22m[2m | [22m[1m[32m4131 passed[39m[22m[2m | [22m[33m7 skipped[39m[90m (4143)[39m
+[2m   Start at [22m 18:00:56
+[2m   Duration [22m 11.60s[2m (transform 15.70s, setup 0ms, import 32.41s, tests 17.22s, environment 20ms)[22m
+

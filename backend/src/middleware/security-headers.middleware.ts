@@ -142,7 +142,7 @@ export function securityHeaders(customConfig?: Partial<SecurityHeadersConfig>) {
   return (req: Request, res: Response, next: NextFunction) => {
     // Generate nonce for CSP
     const nonce = crypto.randomBytes(16).toString('base64');
-    (req as any).cspNonce = nonce;
+    req.cspNonce = nonce;
 
     // Content-Security-Policy
     if (config.contentSecurityPolicy) {

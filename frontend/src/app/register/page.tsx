@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Mail, Lock, User, Phone, Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { API_BASE_URL } from '@/lib/api';
+import { api } from '@/lib/api';
 
 export default function RegisterPage() {
   const t = useTranslations('auth.register');
@@ -38,20 +38,16 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          fullName: `${formData.firstName} ${formData.lastName}`.trim(),
-          phone: formData.phone || undefined,
-        }),
+      const response = await api.post('/auth/register', {
+        email: formData.email,
+        password: formData.password,
+        fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+        phone: formData.phone || undefined,
       });
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (!response.ok) {
+      if (!data.success) {
         throw new Error(data.error || data.message || 'Registration failed');
       }
 
@@ -119,6 +115,7 @@ export default function RegisterPage() {
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     required
+                    autoComplete="given-name" // FIX Iter-6: Add autocomplete for first name
                   />
                 </div>
               </div>
@@ -132,23 +129,26 @@ export default function RegisterPage() {
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                   className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
+                  autoComplete="family-name" // FIX Iter-6: Add autocomplete for last name
                 />
               </div>
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              <label htmlFor="reg-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {t('email')}
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
+                  id="reg-email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
+                  autoComplete="email" // FIX Iter-6: Add autocomplete for email
                 />
               </div>
             </div>
@@ -165,6 +165,7 @@ export default function RegisterPage() {
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  autoComplete="tel" // FIX Iter-6: Add autocomplete for phone
                 />
               </div>
             </div>
@@ -183,6 +184,7 @@ export default function RegisterPage() {
                   className="w-full pl-10 pr-12 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                   minLength={6}
+                  autoComplete="new-password" // FIX Iter-6: Add autocomplete for password
                 />
                 <button
                   type="button"
@@ -207,6 +209,7 @@ export default function RegisterPage() {
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
+                  autoComplete="new-password" // FIX Iter-6: Add autocomplete for confirm password
                 />
               </div>
             </div>

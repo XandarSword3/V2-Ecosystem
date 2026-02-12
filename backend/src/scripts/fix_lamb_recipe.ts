@@ -1,6 +1,6 @@
 
-import { getSupabase } from "../database/connection";
-import { logger } from "../utils/logger";
+import { getSupabase } from "../database/connection.js";
+import { logger } from "../utils/logger.js";
 
 async function fixRecipe() {
   const supabase = getSupabase();

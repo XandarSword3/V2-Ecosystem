@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection.js";
 import { emailService } from "../../services/email.service.js";
 import { createChaletBookingSchema, validateBody, uuidSchema } from "../../validation/schemas.js";
@@ -17,8 +18,7 @@ function generateBookingNumber(): string {
 // Public Routes
 // ============================================
 
-export async function getChalets(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getChalets = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { moduleId } = req.query;
 
@@ -36,13 +36,9 @@ export async function getChalets(req: Request, res: Response, next: NextFunction
 
     if (error) throw error;
     res.json({ success: true, data: data || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getChalet(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getChalet = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('chalets')
@@ -55,13 +51,9 @@ export async function getChalet(req: Request, res: Response, next: NextFunction)
     }
     if (error) throw error;
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getAvailability(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getAvailability = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { startDate, endDate } = req.query;
     const chaletId = req.params.id;
@@ -96,13 +88,9 @@ export async function getAvailability(req: Request, res: Response, next: NextFun
       });
 
     res.json({ success: true, data: { blockedDates } });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getAddOns(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getAddOns = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('chalet_add_ons')
@@ -111,16 +99,12 @@ export async function getAddOns(req: Request, res: Response, next: NextFunction)
 
     if (error) throw error;
     res.json({ success: true, data: data || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get ALL add-ons for admin management (including inactive)
  */
-export async function getAdminAddOns(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getAdminAddOns = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('chalet_add_ons')
@@ -129,17 +113,13 @@ export async function getAdminAddOns(req: Request, res: Response, next: NextFunc
 
     if (error) throw error;
     res.json({ success: true, data: data || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Booking Routes
 // ============================================
 
-export async function createBooking(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createBooking = asyncHandler(async (req: Request, res: Response) => {
     // Validate input
     const validatedData = validateBody(createChaletBookingSchema, req.body);
 
@@ -440,13 +420,9 @@ export async function createBooking(req: Request, res: Response, next: NextFunct
       data: booking,
       message: 'Booking created successfully',
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getBooking(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getBooking = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: booking, error } = await supabase
       .from('chalet_bookings')
@@ -464,13 +440,9 @@ export async function getBooking(req: Request, res: Response, next: NextFunction
     if (error) throw error;
 
     res.json({ success: true, data: booking });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function cancelBooking(req: Request, res: Response, next: NextFunction) {
-  try {
+export const cancelBooking = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { reason } = req.body;
     const userId = req.user?.userId;
@@ -525,13 +497,9 @@ export async function cancelBooking(req: Request, res: Response, next: NextFunct
     }
 
     res.json({ success: true, data, message: 'Booking cancelled' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getMyBookings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getMyBookings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = req.user?.userId;
 
@@ -544,17 +512,13 @@ export async function getMyBookings(req: Request, res: Response, next: NextFunct
 
     if (error) throw error;
     res.json({ success: true, data: data || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Staff Routes
 // ============================================
 
-export async function getStaffBookings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getStaffBookings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { status, chaletId, startDate, endDate } = req.query;
 
@@ -573,13 +537,9 @@ export async function getStaffBookings(req: Request, res: Response, next: NextFu
     if (error) throw error;
 
     res.json({ success: true, data: data || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getTodayBookings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTodayBookings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const today = dayjs().format('YYYY-MM-DD');
 
@@ -604,13 +564,9 @@ export async function getTodayBookings(req: Request, res: Response, next: NextFu
         checkOuts: checkOuts || [],
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function checkIn(req: Request, res: Response, next: NextFunction) {
-  try {
+export const checkIn = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('chalet_bookings')
@@ -625,13 +581,9 @@ export async function checkIn(req: Request, res: Response, next: NextFunction) {
 
     if (error) throw error;
     res.json({ success: true, data, message: 'Guest checked in' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function checkOut(req: Request, res: Response, next: NextFunction) {
-  try {
+export const checkOut = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('chalet_bookings')
@@ -646,13 +598,9 @@ export async function checkOut(req: Request, res: Response, next: NextFunction) 
 
     if (error) throw error;
     res.json({ success: true, data, message: 'Guest checked out' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateBookingStatus(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateBookingStatus = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { status } = req.body;
 
@@ -682,10 +630,7 @@ export async function updateBookingStatus(req: Request, res: Response, next: Nex
     });
 
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Admin Routes
@@ -704,7 +649,7 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
     }
 
     // Ensure all required fields have proper values
-    const chaletData = {
+    const chaletData: Record<string, unknown> = {
       name: req.body.name,
       name_ar: req.body.name_ar || null,
       name_fr: req.body.name_fr || null,
@@ -720,6 +665,11 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
       amenities: req.body.amenities || [],
       images: req.body.images || [],
     };
+
+    // Support module_id for dynamic module units (hotel-rooms, villas, etc.)
+    if (req.body.module_id || req.body.moduleId) {
+      chaletData.module_id = req.body.module_id || req.body.moduleId;
+    }
 
     const { data, error } = await supabase
       .from('chalets')
@@ -745,8 +695,7 @@ export async function createChalet(req: Request, res: Response, next: NextFuncti
   }
 }
 
-export async function updateChalet(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateChalet = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     
     // Extract only valid snake_case fields for the chalets table
@@ -772,13 +721,9 @@ export async function updateChalet(req: Request, res: Response, next: NextFuncti
 
     if (error) throw error;
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteChalet(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteChalet = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { error } = await supabase
       .from('chalets')
@@ -787,13 +732,9 @@ export async function deleteChalet(req: Request, res: Response, next: NextFuncti
 
     if (error) throw error;
     res.json({ success: true, message: 'Chalet deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function createAddOn(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createAddOn = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     
     // Extract only valid snake_case fields for the chalet_add_ons table
@@ -822,13 +763,9 @@ export async function createAddOn(req: Request, res: Response, next: NextFunctio
 
     if (error) throw error;
     res.status(201).json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateAddOn(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateAddOn = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     
     // Extract only valid snake_case fields for the chalet_add_ons table
@@ -858,13 +795,9 @@ export async function updateAddOn(req: Request, res: Response, next: NextFunctio
 
     if (error) throw error;
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteAddOn(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteAddOn = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { error } = await supabase
       .from('chalet_add_ons')
@@ -873,13 +806,9 @@ export async function deleteAddOn(req: Request, res: Response, next: NextFunctio
 
     if (error) throw error;
     res.json({ success: true, message: 'Add-on deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getPriceRules(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getPriceRules = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('chalet_price_rules')
@@ -888,13 +817,9 @@ export async function getPriceRules(req: Request, res: Response, next: NextFunct
 
     if (error) throw error;
     res.json({ success: true, data: data || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function createPriceRule(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createPriceRule = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     
     // Extract only valid snake_case fields for the chalet_price_rules table
@@ -923,13 +848,9 @@ export async function createPriceRule(req: Request, res: Response, next: NextFun
 
     if (error) throw error;
     res.status(201).json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updatePriceRule(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updatePriceRule = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     
     // Extract only valid snake_case fields for the chalet_price_rules table
@@ -959,13 +880,9 @@ export async function updatePriceRule(req: Request, res: Response, next: NextFun
 
     if (error) throw error;
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deletePriceRule(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deletePriceRule = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { error } = await supabase
       .from('chalet_price_rules')
@@ -974,17 +891,13 @@ export async function deletePriceRule(req: Request, res: Response, next: NextFun
 
     if (error) throw error;
     res.json({ success: true, message: 'Price rule deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Settings
 // ============================================
 
-export async function getChaletSettings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getChaletSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const settingsObj: Record<string, any> = {
       deposit_percentage: 30, // Default
@@ -1022,13 +935,9 @@ export async function getChaletSettings(req: Request, res: Response, next: NextF
     }
 
     res.json({ success: true, data: settingsObj });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateChaletSettings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateChaletSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const settings = req.body;
 
@@ -1048,7 +957,4 @@ export async function updateChaletSettings(req: Request, res: Response, next: Ne
     }
 
     res.json({ success: true, message: 'Settings updated' });
-  } catch (error) {
-    next(error);
-  }
-}
+});

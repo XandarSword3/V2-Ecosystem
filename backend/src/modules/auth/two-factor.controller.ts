@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { twoFactorService } from '../../services/two-factor.service.js';
 import { logActivity } from '../../utils/activityLogger.js';
 import { logger } from '../../utils/logger.js';
@@ -12,8 +13,7 @@ import { completeLoginAfter2FA } from './auth.service.js';
 /**
  * Get 2FA status for current user
  */
-export async function getTwoFactorStatus(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTwoFactorStatus = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -25,16 +25,12 @@ export async function getTwoFactorStatus(req: Request, res: Response, next: Next
       success: true,
       data: status,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Initialize 2FA setup - generates secret and QR code
  */
-export async function initializeTwoFactor(req: Request, res: Response, next: NextFunction) {
-  try {
+export const initializeTwoFactor = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const userEmail = req.user?.email;
     
@@ -68,16 +64,12 @@ export async function initializeTwoFactor(req: Request, res: Response, next: Nex
       },
       message: 'Scan the QR code with your authenticator app, then verify with a code to complete setup.',
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Verify code and enable 2FA
  */
-export async function enableTwoFactor(req: Request, res: Response, next: NextFunction) {
-  try {
+export const enableTwoFactor = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -110,16 +102,12 @@ export async function enableTwoFactor(req: Request, res: Response, next: NextFun
       success: true,
       message: 'Two-factor authentication has been enabled successfully.',
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Disable 2FA
  */
-export async function disableTwoFactor(req: Request, res: Response, next: NextFunction) {
-  try {
+export const disableTwoFactor = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -152,16 +140,12 @@ export async function disableTwoFactor(req: Request, res: Response, next: NextFu
       success: true,
       message: 'Two-factor authentication has been disabled.',
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Verify 2FA code during login
  */
-export async function verifyTwoFactor(req: Request, res: Response, next: NextFunction) {
-  try {
+export const verifyTwoFactor = asyncHandler(async (req: Request, res: Response) => {
     const { userId, code } = req.body;
     
     if (!userId || !code) {
@@ -207,16 +191,12 @@ export async function verifyTwoFactor(req: Request, res: Response, next: NextFun
       data: loginResult,
       message: 'Verification successful',
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Regenerate backup codes
  */
-export async function regenerateBackupCodes(req: Request, res: Response, next: NextFunction) {
-  try {
+export const regenerateBackupCodes = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -252,7 +232,4 @@ export async function regenerateBackupCodes(req: Request, res: Response, next: N
       },
       message: 'New backup codes generated. Save these securely - they will not be shown again.',
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});

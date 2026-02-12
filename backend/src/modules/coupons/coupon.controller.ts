@@ -115,10 +115,11 @@ export class CouponController {
       }
 
       // Check minimum items
-      if (itemCount < c.requires_min_items) {
+      // FIX: Iteration 10 - Column is 'min_items' not 'requires_min_items' (schema drift)
+      if (itemCount < c.min_items) {
         return res.json({
           success: false,
-          error: `Minimum ${c.requires_min_items} items required`,
+          error: `Minimum ${c.min_items} items required`,
           valid: false,
         });
       }
@@ -551,7 +552,7 @@ export class CouponController {
       }
 
       const data = validation.data;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       // Check if code exists
@@ -599,6 +600,8 @@ export class CouponController {
           per_user_limit: data.perUserLimit,
           valid_from: data.validFrom,
           valid_until: data.validUntil,
+          min_items: data.requiresMinItems, // FIX: Iteration 10 - Was missing from insert
+          first_order_only: data.firstOrderOnly, // FIX: Iteration 10 - Was missing from insert
           created_by: userId,
         })
         .select()
@@ -659,7 +662,7 @@ export class CouponController {
         perUserLimit: 'per_user_limit',
         validFrom: 'valid_from',
         validUntil: 'valid_until',
-        requiresMinItems: 'requires_min_items',
+        requiresMinItems: 'min_items', // FIX: Iteration 10 - Correct column name (was 'requires_min_items')
         firstOrderOnly: 'first_order_only',
         isActive: 'is_active',
       };

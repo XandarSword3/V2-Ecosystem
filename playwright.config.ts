@@ -22,6 +22,7 @@ const API_URL = process.env.API_URL || 'http://localhost:3005';
 
 export default defineConfig({
   testDir: './tests',
+  testIgnore: ['**/simulation/**', '**/node_modules/**'],
   timeout: 120000,
   expect: {
     timeout: 15000

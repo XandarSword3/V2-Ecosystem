@@ -32,14 +32,16 @@ export function createMockReqRes(options: {
   query?: Record<string, any>; 
   body?: Record<string, any>;
   user?: { id: string; role: string; userId: string };
+  headers?: Record<string, string>;
 } = {}) {
   const req = {
     params: options.params || {},
     query: options.query || {},
     body: options.body || {},
     user: options.user || { id: 'admin-1', role: 'admin', userId: 'admin-1' },
-    get: vi.fn(),
-    header: vi.fn(),
+    headers: options.headers || {},
+    get: vi.fn((name: string) => (options.headers || {})[name?.toLowerCase()]),
+    header: vi.fn((name: string) => (options.headers || {})[name?.toLowerCase()]),
     cookies: {},
   } as unknown as Request;
 
@@ -50,6 +52,8 @@ export function createMockReqRes(options: {
     setHeader: vi.fn(),
     cookie: vi.fn().mockReturnThis(),
     clearCookie: vi.fn().mockReturnThis(),
+    redirect: vi.fn().mockReturnThis(),
+    end: vi.fn().mockReturnThis(),
   } as unknown as Response;
 
   const next = vi.fn() as NextFunction;

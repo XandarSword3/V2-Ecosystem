@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { z } from 'zod';
 import * as authService from "./auth.service";
 import { loginSchema, registerSchema, changePasswordSchema } from "./auth.validation";
@@ -101,30 +102,21 @@ export async function login(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-export async function refreshToken(req: Request, res: Response, next: NextFunction) {
-  try {
+export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
     const { refreshToken } = req.body;
     if (!refreshToken) {
       return res.status(400).json({ success: false, error: 'Refresh token required' });
     }
     const result = await authService.refreshAccessToken(refreshToken);
     res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getCurrentUser(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getCurrentUser = asyncHandler(async (req: Request, res: Response) => {
     const user = await authService.getUserById(req.user!.userId);
     res.json({ success: true, data: user });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function logout(req: Request, res: Response, next: NextFunction) {
-  try {
+export const logout = asyncHandler(async (req: Request, res: Response) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (token) {
       await authService.logout(token);
@@ -138,13 +130,9 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
       });
     }
     res.json({ success: true, message: 'Logged out successfully' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function changePassword(req: Request, res: Response, next: NextFunction) {
-  try {
+export const changePassword = asyncHandler(async (req: Request, res: Response) => {
     const data = changePasswordSchema.parse(req.body);
     await authService.changePassword(req.user!.userId, data.currentPassword, data.newPassword);
 
@@ -157,10 +145,7 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     });
 
     res.json({ success: true, message: 'Password changed successfully' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 export async function forgotPassword(req: Request, res: Response, next: NextFunction) {
   try {
@@ -174,8 +159,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
   }
 }
 
-export async function resetPassword(req: Request, res: Response, next: NextFunction) {
-  try {
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
     const { token, newPassword } = req.body;
     const result = await authService.resetPassword(token, newPassword);
 
@@ -188,7 +172,4 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
     });
 
     res.json({ success: true, message: 'Password reset successfully' });
-  } catch (error) {
-    next(error);
-  }
-}
+});

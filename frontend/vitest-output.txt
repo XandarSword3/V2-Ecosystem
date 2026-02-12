@@ -1,0 +1,177 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.17 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/frontend[39m
+
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mbasic state[2m > [22mstarts with empty layout[32m 2[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mbasic state[2m > [22mstarts with zoom at 100[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mbasic state[2m > [22mstarts not in preview mode[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22msetActiveModuleId[2m > [22msets the active module ID[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mselectBlock[2m > [22mselects a block by id[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mselectBlock[2m > [22mdeselects with null[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mtogglePreview[2m > [22mtoggles preview mode on[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mtogglePreview[2m > [22mclears selection when entering preview[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mtogglePreview[2m > [22mtoggles back off[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22msetZoom[2m > [22msets zoom level[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22msetZoom[2m > [22mclamps zoom to minimum of 50[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22msetZoom[2m > [22mclamps zoom to maximum of 150[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22msetLayout with history[2m > [22msets the layout[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22msetLayout with history[2m > [22mpushes previous layout to history[32m 1[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22msetLayout with history[2m > [22mskips history when skipHistory=true[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22msetLayout with history[2m > [22mclears future states on new change[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mundo/redo[2m > [22mcanUndo returns false for empty history[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mundo/redo[2m > [22mcanUndo returns true after layout change[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mundo/redo[2m > [22mundo restores previous layout[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mundo/redo[2m > [22mcanRedo returns false initially[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mundo/redo[2m > [22mcanRedo returns true after undo[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mundo/redo[2m > [22mredo restores undone layout[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mundo/redo[2m > [22mundo on empty history does nothing[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mundo/redo[2m > [22mredo on empty future does nothing[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22maddBlock[2m > [22madds a block to layout[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22maddBlock[2m > [22madds multiple blocks[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22maddBlock[2m > [22mgenerates unique IDs[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/module-builder-store.test.ts[2m > [22mmodule-builder-store[2m > [22mremoveBlock[2m > [22mremoves a block by id[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22maddItem[2m > [22madds a new item to cart[32m 2[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22maddItem[2m > [22mincrements quantity for existing item[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22maddItem[2m > [22mtreats items with different modifiers as separate[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22maddItem[2m > [22mdefaults quantity to 1[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mremoveItem[2m > [22mremoves item by id[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mremoveItem[2m > [22mremoves item by uniqueKey[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mremoveItem[2m > [22mdoes nothing for non-existent id[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mupdateQuantity[2m > [22mupdates quantity for existing item[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mupdateQuantity[2m > [22mremoves item when quantity is 0[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mupdateQuantity[2m > [22mremoves item when quantity is negative[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mupdateInstructions[2m > [22mupdates special instructions[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mclearCart[2m > [22mremoves all items[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mgetTotal[2m > [22mreturns 0 for empty cart[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mgetTotal[2m > [22mcalculates total for single item[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mgetTotal[2m > [22mincludes modifier total in calculation[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mgetTotal[2m > [22msums multiple items[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mgetCount[2m > [22mreturns 0 for empty cart[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mgetCount[2m > [22msums quantities across items[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mrestaurant cart[2m > [22maddToRestaurant adds with restaurant metadata[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mrestaurant cart[2m > [22mclearRestaurantCart only removes restaurant items[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mrestaurant cart[2m > [22mgetRestaurantTotal only sums restaurant items[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22mrestaurant cart[2m > [22mgetRestaurantCount only counts restaurant items[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22msnack cart[2m > [22maddToSnack adds with snack metadata[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22msnack cart[2m > [22mclearSnackCart only removes snack items[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22msnack cart[2m > [22mgetSnackTotal only sums snack items[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/cartStore.test.ts[2m > [22mcartStore[2m > [22msnack cart[2m > [22mgetSnackCount only counts snack items[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts[2m > [22mcn utility[2m > [22mreturns empty string for no arguments[32m 7[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts[2m > [22mcn utility[2m > [22mpasses through a single class[32m 1[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts[2m > [22mcn utility[2m > [22mmerges multiple class strings[32m 1[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts[2m > [22mcn utility[2m > [22mresolves Tailwind conflicts (last wins)[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts[2m > [22mcn utility[2m > [22mresolves color conflicts[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts[2m > [22mcn utility[2m > [22mhandles conditional classes via clsx[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts[2m > [22mcn utility[2m > [22mfilters out falsy values[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts[2m > [22mcn utility[2m > [22mhandles object syntax[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts[2m > [22mcn utility[2m > [22mhandles array syntax[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/cn.test.ts[2m > [22mcn utility[2m > [22mmerges padding conflicts correctly[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/authStore.test.ts[2m > [22mauthStore[2m > [22mstarts with unauthenticated state[32m 2[2mms[22m[39m
+ [32m✓[39m tests/stores/authStore.test.ts[2m > [22mauthStore[2m > [22mlogin sets user and token[32m 1[2mms[22m[39m
+ [32m✓[39m tests/stores/authStore.test.ts[2m > [22mauthStore[2m > [22mlogout clears user and token[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/authStore.test.ts[2m > [22mauthStore[2m > [22mlogin overrides previous user[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22msettingsStore[2m > [22mstarts with default values[32m 2[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22msettingsStore[2m > [22msetAnimationsEnabled toggles animations[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22msettingsStore[2m > [22msetReducedMotion toggles reduced motion[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22msettingsStore[2m > [22msetSoundEnabled toggles sound[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22msettingsStore[2m > [22msetNotificationSound toggles notification sound[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22msettingsStore[2m > [22msetCurrency changes currency[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22msettingsStore[2m > [22msetEnableTransitions toggles transitions[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22msettingsStore[2m > [22msetTransitionStyle changes transition style[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22msettingsStore[2m > [22msetEnableLoadingAnimation toggles loading animation[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22mcurrency constants[2m > [22mexchangeRates has USD as 1[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22mcurrency constants[2m > [22mexchangeRates has EUR < 1[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22mcurrency constants[2m > [22mexchangeRates has LBP > 1[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22mcurrency constants[2m > [22mcurrencySymbols has correct symbols[32m 0[2mms[22m[39m
+ [32m✓[39m tests/stores/settingsStore.test.ts[2m > [22mcurrency constants[2m > [22mcurrencyNames has correct names[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mgetTranslatedField[2m > [22mreturns English value for "en" locale (no suffix)[32m 1[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mgetTranslatedField[2m > [22mreturns Arabic value for "ar" locale[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mgetTranslatedField[2m > [22mreturns French value for "fr" locale[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mgetTranslatedField[2m > [22mfalls back to English when translation is missing[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mgetTranslatedField[2m > [22mreturns empty string for null/undefined item[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mgetTranslatedField[2m > [22mreturns empty string for missing field[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mgetTranslatedField[2m > [22mreturns empty string for empty translated field[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mgetTranslatedField[2m > [22mfalls back to English for unknown locale suffix[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mtranslateItems[2m > [22madds translated_ prefixed fields to each item[32m 1[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mtranslateItems[2m > [22mpreserves original items[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mtranslateItems[2m > [22mhandles multiple fields[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mtranslateItems[2m > [22mdoes not modify original array[32m 1[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mformatLocalizedPrice[2m > [22mformats USD price with $ symbol before[32m 22[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mformatLocalizedPrice[2m > [22mformats EUR price with € symbol after[32m 0[2mms[22m[39m
+ [31m×[39m tests/lib/translate.test.ts[2m > [22mformatLocalizedPrice[2m > [22mformats LBP price without decimals[32m 11[2mms[22m[39m
+[31m   → expected '1,000 ل.ل' not to contain '.'[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mformatLocalizedPrice[2m > [22mformats zero correctly[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mformatLocalizedPrice[2m > [22muses Arabic locale for ar[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mcreateTranslatableItem[2m > [22mcreates item with English field[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mcreateTranslatableItem[2m > [22mcreates item with Arabic translation[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/translate.test.ts[2m > [22mcreateTranslatableItem[2m > [22mcreates item with multiple languages[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatCurrency[2m > [22mformats USD correctly[32m 2[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatCurrency[2m > [22mformats EUR correctly[32m 2[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatCurrency[2m > [22mformats LBP without decimals[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatCurrency[2m > [22mhandles undefined amount[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatCurrency[2m > [22mhandles null amount[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatCurrency[2m > [22mhandles string amount[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatCurrency[2m > [22mhandles NaN amount[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatCurrency[2m > [22mdefaults to USD when no currency specified[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatDate[2m > [22mformats a date string[32m 5[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatDate[2m > [22mformats a Date object[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatDate[2m > [22maccepts custom options[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatTime[2m > [22mformats time from date string[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mgetOrderStatusColor[2m > [22mreturns correct color for known statuses[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mgetOrderStatusColor[2m > [22mreturns default for unknown status[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mgetPaymentStatusColor[2m > [22mreturns correct color for known statuses[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mgetPaymentStatusColor[2m > [22mreturns default for unknown status[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mgetBookingStatusColor[2m > [22mreturns correct color for known statuses[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mgetBookingStatusColor[2m > [22mreturns default for unknown status[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mcalculateNights[2m > [22mcalculates 1 night for consecutive days[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mcalculateNights[2m > [22mcalculates multiple nights[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mcalculateNights[2m > [22mhandles reversed dates (absolute diff)[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22misWeekend[2m > [22mreturns true for Friday[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22misWeekend[2m > [22mreturns true for Saturday[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22misWeekend[2m > [22mreturns false for Sunday[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22misWeekend[2m > [22mreturns false for Monday[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mgenerateOrderNumber[2m > [22mreturns a string starting with ORD-[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mgenerateOrderNumber[2m > [22mgenerates unique numbers[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mgenerateOrderNumber[2m > [22mcontains uppercase characters[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatNumber[2m > [22mformats large numbers with commas[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatNumber[2m > [22mreturns "0" for undefined[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatNumber[2m > [22mreturns "0" for null[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mformatNumber[2m > [22mformats small numbers without commas[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mtruncateText[2m > [22mreturns original text if shorter than max[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mtruncateText[2m > [22mreturns original text if equal to max[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mtruncateText[2m > [22mtruncates and adds ellipsis if longer[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mtruncateText[2m > [22mhandles empty string[32m 0[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mdebounce[2m > [22mdelays execution[32m 2[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mdebounce[2m > [22mresets timer on subsequent calls[32m 1[2mms[22m[39m
+ [32m✓[39m tests/lib/utils.test.ts[2m > [22mdebounce[2m > [22mpasses arguments to the original function[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mrenders children[32m 42[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mrenders with default variant[32m 2[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mapplies destructive variant classes[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mapplies success variant classes[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mapplies warning variant classes[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mapplies info variant classes[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mapplies small size[32m 2[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mapplies medium size by default[32m 2[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mapplies large size[32m 2[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mpasses additional className[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Badge.test.tsx[2m > [22mBadge[2m > [22mpasses through HTML attributes[32m 2[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mrenders an input element[32m 45[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mrenders with correct type[32m 3[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mrenders with placeholder[32m 3[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mrenders with default variant styling[32m 2[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mshows helper text[32m 3[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mshows error styling when error prop is true[32m 2[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mhandles value changes[32m 7[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mcan be disabled[32m 3[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22maccepts additional className[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mforwards ref[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mrenders glass variant[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Input.test.tsx[2m > [22mInput[2m > [22mrenders filled variant[32m 2[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Skeleton.test.tsx[2m > [22mSkeleton[2m > [22mrenders a div element[32m 13[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Skeleton.test.tsx[2m > [22mSkeleton[2m > [22mapplies shimmer by default[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Skeleton.test.tsx[2m > [22mSkeleton[2m > [22mcan disable shimmer[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Skeleton.test.tsx[2m > [22mSkeleton[2m > [22maccepts custom className[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Skeleton.test.tsx[2m > [22mSkeleton[2m > [22mincludes base background classes[32m 1[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Skeleton.test.tsx[2m > [22mCardSkeleton[2m > [22mrenders without errors[32m 2[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Skeleton.test.tsx[2m > [22mCardSkeleton[2m > [22mcontains multiple skeleton elements[32m 4[2mms[22m[39m
+ [32m✓[39m tests/components/ui/Skeleton.test.tsx[2m > [22mMenuItemSkeleton[2m > [22mrenders without errors[32m 1[2mms[22m[39m
+Terminate batch job (Y/N)? 

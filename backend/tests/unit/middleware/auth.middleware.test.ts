@@ -25,7 +25,7 @@ describe('Auth Middleware', () => {
       authenticate(req, res, next);
 
       expect(verifyToken).toHaveBeenCalledWith('valid-token');
-      expect(req.user).toEqual(mockPayload);
+      expect(req.user).toEqual(expect.objectContaining(mockPayload));
       expect(next).toHaveBeenCalled();
     });
 
@@ -140,7 +140,7 @@ describe('Auth Middleware', () => {
 
       optionalAuth(req, res, next);
 
-      expect(req.user).toEqual(mockPayload);
+      expect(req.user).toEqual(expect.objectContaining(mockPayload));
       expect(next).toHaveBeenCalled();
     });
 

@@ -12,14 +12,15 @@ interface FontSelectorProps {
 
 export const FontSelector: React.FC<FontSelectorProps> = ({ name, label, options, defaultValue }) => {
   const { register, watch, setValue } = useFormContext();
-  const currentFont = watch(name, defaultValue);
+  const formValue = watch(name);
+  const currentFont = formValue || defaultValue;
 
   React.useEffect(() => {
     // Set the initial value if it's not already set
-    if (defaultValue && !currentFont) {
+    if (defaultValue && !formValue) {
       setValue(name, defaultValue);
     }
-  }, [defaultValue, currentFont, name, setValue]);
+  }, [defaultValue, formValue, name, setValue]);
 
   return (
     <div>

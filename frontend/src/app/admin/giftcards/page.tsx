@@ -205,7 +205,7 @@ export default function GiftCardsAdminPage() {
           <p className="text-slate-500 dark:text-slate-400">Manage gift cards and templates</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={loadData} variant="outline" className="gap-2">
+          <Button onClick={() => loadData()} variant="outline" className="gap-2">
             <RefreshCw className="w-4 h-4" />
             Refresh
           </Button>

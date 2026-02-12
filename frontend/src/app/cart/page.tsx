@@ -1,7 +1,7 @@
 'use client';
 
-import { useCartStore } from '@/lib/stores/cartStore';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useCartStore } from '@/stores/cartStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { formatCurrency } from '@/lib/utils';
 import { useTranslations } from 'next-intl';

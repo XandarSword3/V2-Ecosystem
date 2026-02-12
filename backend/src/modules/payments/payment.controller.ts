@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import Stripe from 'stripe';
 import { getSupabase } from "../../database/connection.js";
 import { config } from "../../config/index.js";
@@ -36,8 +37,7 @@ const getStripeWebhookSecret = async () => {
   return settings?.value?.stripeWebhookSecret || config.stripe.webhookSecret;
 };
 
-export async function createPaymentIntent(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createPaymentIntent = asyncHandler(async (req: Request, res: Response) => {
     // Validate input
     const validatedData = validateBody(createPaymentIntentSchema, req.body);
     const { amount, currency = 'usd', referenceType, referenceId } = validatedData;
@@ -64,13 +64,12 @@ export async function createPaymentIntent(req: Request, res: Response, next: Nex
         paymentIntentId: paymentIntent.id,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 export async function handleStripeWebhook(req: Request, res: Response) {
   const sig = req.headers['stripe-signature'] as string;
+
+  if (!req.rawBody) { res.status(400).json({ error: 'Missing raw body' }); return; }
 
   let event: Stripe.Event;
 
@@ -78,7 +77,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     const stripe = await getStripeInstance();
     const webhookSecret = await getStripeWebhookSecret();
     event = stripe.webhooks.constructEvent(
-      (req as any).rawBody,
+      req.rawBody,
       sig,
       webhookSecret
     );
@@ -186,6 +185,47 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       logger.warn(`Payment failed for ${referenceType}:${referenceId}`);
       break;
     }
+
+    // FIX: Iteration 13 - Handle refunds issued from Stripe Dashboard
+    case 'charge.refunded': {
+      const charge = event.data.object as Stripe.Charge;
+      const paymentIntentId = charge.payment_intent as string;
+
+      if (paymentIntentId) {
+        // Update payment record to refunded
+        await supabase
+          .from('payments')
+          .update({ status: 'refunded', notes: `Refunded via Stripe (${event.id})` })
+          .eq('stripe_payment_intent_id', paymentIntentId);
+
+        // Update reference status (booking/order)
+        const { data: payment } = await supabase
+          .from('payments')
+          .select('reference_type, reference_id')
+          .eq('stripe_payment_intent_id', paymentIntentId)
+          .maybeSingle();
+
+        if (payment?.reference_type && payment?.reference_id) {
+          await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, 'refunded');
+        }
+
+        // Record to ledger
+        await supabase.from('payment_ledger').insert({
+          reference_type: payment?.reference_type || 'unknown',
+          reference_id: payment?.reference_id || 'unknown',
+          event_type: 'refund',
+          amount: (charge.amount_refunded || 0) / 100,
+          currency: charge.currency.toUpperCase(),
+          gateway_reference_id: paymentIntentId,
+          webhook_id: event.id,
+          status: 'success',
+          metadata: { stripe_event_id: event.id, refund_reason: charge.refunds?.data?.[0]?.reason }
+        });
+
+        logger.info(`Charge refunded for PI:${paymentIntentId}`);
+      }
+      break;
+    }
   }
 
   res.json({ received: true });
@@ -226,13 +266,16 @@ async function updateReferencePaymentStatus(
   }
 }
 
-export async function recordCashPayment(req: Request, res: Response, next: NextFunction) {
-  try {
+export const recordCashPayment = asyncHandler(async (req: Request, res: Response) => {
     // Validate input
     const validatedData = validateBody(recordCashPaymentSchema, req.body);
     const { referenceType, referenceId, amount, notes } = validatedData;
 
     const supabase = getSupabase();
+
+    // FIX: Iteration 13 - Fetch configured currency instead of hardcoding 'USD'
+    const { data: paymentSettings } = await supabase.from('site_settings').select('value').eq('key', 'payments').single();
+    const defaultCurrency = paymentSettings?.value?.currency?.toUpperCase() || 'USD';
 
     const { data: payment, error } = await supabase
       .from('payments')
@@ -240,7 +283,7 @@ export async function recordCashPayment(req: Request, res: Response, next: NextF
         reference_type: referenceType,
         reference_id: referenceId,
         amount: amount.toFixed(2),
-        currency: 'USD',
+        currency: defaultCurrency,
         method: 'cash',
         status: 'completed',
         processed_by: req.user!.userId,
@@ -256,17 +299,17 @@ export async function recordCashPayment(req: Request, res: Response, next: NextF
     await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
 
     res.status(201).json({ success: true, data: payment });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function recordManualPayment(req: Request, res: Response, next: NextFunction) {
-  try {
+export const recordManualPayment = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(recordManualPaymentSchema, req.body);
     const { referenceType, referenceId, amount, method, notes } = validatedData;
 
     const supabase = getSupabase();
+
+    // FIX: Iteration 13 - Fetch configured currency instead of hardcoding 'USD'
+    const { data: paymentSettings } = await supabase.from('site_settings').select('value').eq('key', 'payments').single();
+    const manualCurrency = paymentSettings?.value?.currency?.toUpperCase() || 'USD';
 
     const { data: payment, error } = await supabase
       .from('payments')
@@ -274,7 +317,7 @@ export async function recordManualPayment(req: Request, res: Response, next: Nex
         reference_type: referenceType,
         reference_id: referenceId,
         amount: amount.toFixed(2),
-        currency: 'USD',
+        currency: manualCurrency,
         method: method,
         status: 'completed',
         processed_by: req.user!.userId,
@@ -289,13 +332,9 @@ export async function recordManualPayment(req: Request, res: Response, next: Nex
     await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
 
     res.status(201).json({ success: true, data: payment });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getPaymentMethods(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getPaymentMethods = asyncHandler(async (req: Request, res: Response) => {
     // For now, return supported methods
     res.json({
       success: true,
@@ -306,13 +345,9 @@ export async function getPaymentMethods(req: Request, res: Response, next: NextF
         { id: 'omt', name: 'OMT Money Transfer', enabled: true },
       ],
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getTransactions(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTransactions = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { limit = 50, offset = 0 } = req.query;
 
@@ -325,13 +360,9 @@ export async function getTransactions(req: Request, res: Response, next: NextFun
     if (error) throw error;
 
     res.json({ success: true, data: transactions || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getTransaction(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTransaction = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: payment, error } = await supabase
       .from('payments')
@@ -347,13 +378,9 @@ export async function getTransaction(req: Request, res: Response, next: NextFunc
     }
 
     res.json({ success: true, data: payment });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function refundPayment(req: Request, res: Response, next: NextFunction) {
-  try {
+export const refundPayment = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
     const { reason, amount } = req.body; // amount is optional, if not provided, full refund
@@ -426,7 +453,4 @@ export async function refundPayment(req: Request, res: Response, next: NextFunct
     await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, 'refunded');
 
     res.json({ success: true, message: 'Payment refunded successfully' });
-  } catch (error) {
-    next(error);
-  }
-}
+});

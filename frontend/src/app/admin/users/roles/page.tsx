@@ -16,7 +16,6 @@ interface Role {
 }
 
 interface Permission {
-  id: string;
   slug: string;
   name?: string;
   description?: string;
@@ -116,11 +115,11 @@ export default function RolesPage() {
     }
   };
 
-  const togglePermission = (permissionId: string) => {
+  const togglePermission = (permissionSlug: string) => {
     setRolePermissions(prev => 
-      prev.includes(permissionId)
-        ? prev.filter(id => id !== permissionId)
-        : [...prev, permissionId]
+      prev.includes(permissionSlug)
+        ? prev.filter(slug => slug !== permissionSlug)
+        : [...prev, permissionSlug]
     );
   };
 
@@ -130,7 +129,7 @@ export default function RolesPage() {
     setSaving(true);
     try {
       await api.put(`/admin/roles/${selectedRole.id}/permissions`, {
-        permission_ids: rolePermissions
+        permission_slugs: rolePermissions
       });
       toast.success('Permissions updated successfully');
       setShowPermissionsModal(false);
@@ -268,7 +267,7 @@ export default function RolesPage() {
 
       {/* Permissions Editor Modal */}
       {showPermissionsModal && selectedRole && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] overflow-y-auto py-8">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]">
           <div className="bg-background rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center p-6 border-b">
               <div>
@@ -293,12 +292,12 @@ export default function RolesPage() {
                   </h3>
                   <div className="space-y-2">
                     {perms.map(perm => {
-                      const isSelected = rolePermissions.includes(perm.id);
+                      const isSelected = rolePermissions.includes(perm.slug);
                       return (
                         <div 
-                          key={perm.id}
+                          key={perm.slug}
                           className="flex items-center justify-between py-2 px-3 rounded hover:bg-muted/50 cursor-pointer transition-colors"
-                          onClick={() => togglePermission(perm.id)}
+                          onClick={() => togglePermission(perm.slug)}
                         >
                           <div>
                             <div className="font-medium text-sm">{perm.slug}</div>

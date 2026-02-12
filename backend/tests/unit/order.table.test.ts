@@ -28,6 +28,7 @@ vi.mock('../../src/utils/activityLogger.js', () => ({
 
 vi.mock('../../src/socket/index.js', () => ({
     emitToUnit: vi.fn(),
+    emitToRole: vi.fn(),
 }));
 
 

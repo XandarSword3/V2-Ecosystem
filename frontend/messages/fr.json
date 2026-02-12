@@ -1,6 +1,6 @@
 {
   "common": {
-    "welcome": "Bienvenue à V2 Resort",
+    "welcome": "Bienvenue à Iron Paradise Gym",
     "loading": "Chargement...",
     "error": "Une erreur s'est produite",
     "retry": "Réessayer",
@@ -54,7 +54,7 @@
     "exploreResort": "Explorez notre complexe",
     "checkBackLater": "Revenez plus tard pour les mises à jour",
     "andMore": "+{count} de plus",
-    "items": "articles",
+    "items": "{count, plural, one {article} other {articles}}",
     "total": "Total",
     "discount": "Réduction",
     "optional": "(Optionnel)",
@@ -139,15 +139,15 @@
   },
   "home": {
     "hero": {
-      "title": "Bienvenue à V2 Resort",
-      "titleHighlight": "V2 Resort",
+      "title": "Bienvenue à Iron Paradise Gym",
+      "titleHighlight": "Iron Paradise Gym",
       "subtitle": "Votre destination premium pour une gastronomie exceptionnelle, des chalets confortables et des expériences de piscine rafraîchissantes au cœur du Liban.",
       "cta": "Explorer Maintenant",
       "badge": "L'Expérience Resort Premium du Liban"
     },
     "services": {
       "title": "Nos Services",
-      "subtitle": "Découvrez tout ce que V2 Resort a à offrir pour une expérience inoubliable",
+      "subtitle": "Découvrez tout ce que Iron Paradise Gym a à offrir pour une expérience inoubliable",
       "whatWeOffer": "Ce Que Nous Offrons",
       "restaurant": {
         "title": "Restaurant",
@@ -167,7 +167,7 @@
       }
     },
     "features": {
-      "title": "Pourquoi Choisir V2 Resort?",
+      "title": "Pourquoi Choisir Iron Paradise Gym?",
       "subtitle": "Pourquoi Nous Choisir",
       "primeLocation": {
         "title": "Emplacement Privilégié",
@@ -218,7 +218,7 @@
       "bookChalet": "Réserver un Chalet",
       "bookNow": "Réserver Maintenant",
       "readyGetaway": "Prêt pour Votre Escapade Parfaite?",
-      "bookStayNow": "Réservez votre séjour maintenant et découvrez le meilleur de l'hospitalité libanaise à V2 Resort",
+      "bookStayNow": "Réservez votre séjour maintenant et découvrez le meilleur de l'hospitalité libanaise à Iron Paradise Gym",
       "bookYourChaletNow": "Réservez Votre Chalet Maintenant"
     }
   },
@@ -240,11 +240,12 @@
     "vegetarian": "Végétarien",
     "vegan": "Végan",
     "glutenFree": "Sans Gluten",
+    "spicy": "Épicé",
     "addToCart": "Ajouter au Panier",
     "addedToCart": "{item} ajouté au panier",
     "unavailable": "Indisponible",
     "proceedToCheckout": "Paiement",
-    "itemsInCart": "{count} articles dans le panier",
+    "itemsInCart": "{count, plural, one {# article dans le panier} other {# articles dans le panier}}",
     "tryDifferentCategory": "Essayez de sélectionner une autre catégorie",
     "cartEmpty": "Votre panier est vide",
     "addSomeItems": "Ajoutez de délicieux plats pour commencer!",
@@ -271,6 +272,9 @@
     "placeOrder": "Passer la Commande",
     "orderPlaced": "Commande passée avec succès!",
     "orderFailed": "Échec de la commande",
+    "completeCardPayment": "Veuillez compléter votre paiement par carte",
+    "paymentFailed": "Échec du paiement : {error}",
+    "paymentCancelled": "Paiement annulé. Votre commande est enregistrée — vous pouvez payer plus tard.",
     "orderConfirmed": "Commande Confirmée!",
     "orderConfirmationMessage": "Votre commande a été confirmée. Nous allons commencer la préparation.",
     "orderDetails": "Détails de la Commande",
@@ -299,7 +303,19 @@
       "placeOrder": "Passer la Commande",
       "orderPlaced": "Commande passée avec succès!",
       "tableNumber": "Numéro de Table",
-      "scanQR": "Scannez le QR code pour commander"
+      "scanQR": "Scannez le QR code pour commander",
+      "failedToLoadMenu": "Impossible de charger le menu",
+      "invalidTable": "Table Invalide",
+      "invalidTableScanAgain": "Table invalide. Veuillez scanner le QR code à nouveau.",
+      "scanQRToOrder": "Veuillez scanner le QR code sur votre table pour passer une commande.",
+      "goToRestaurant": "Aller au Restaurant",
+      "submittedSuccessfully": "Commande envoyée avec succès ! Un serveur vous apportera votre repas sous peu.",
+      "failedToSubmit": "Impossible d'envoyer la commande",
+      "noItemsInCategory": "Aucun article disponible dans cette catégorie",
+      "addToOrder": "Ajouter à la commande",
+      "submitting": "Envoi en cours...",
+      "submitOrder": "Envoyer la commande",
+      "headerTitle": "Restaurant {name}"
     },
     "cart": {
       "title": "Panier",
@@ -335,6 +351,7 @@
     "perNight": "/nuit",
     "weekdayRate": "Tarif Semaine",
     "weekendRate": "Tarif Week-end",
+    "weekendDays": "Ven-Sam",
     "bookNow": "Réserver Maintenant",
     "submitBooking": "Soumettre la Réservation",
     "viewDetailsBook": "Voir les Détails et Réserver",
@@ -475,7 +492,21 @@
       "buyTickets": "Acheter des Billets",
       "success": "Billets achetés!",
       "qrCode": "Présentez ce QR code à l'entrée"
-    }
+    },
+    "bookNow": "Book Now",
+    "guests": "guests",
+    "gender": {
+      "mixed": "Mixed",
+      "male": "Men Only",
+      "female": "Women Only"
+    },
+    "bookSession": "Book Session",
+    "customerName": "Your Name",
+    "enterName": "Enter your name",
+    "enterPhone": "Enter your phone number",
+    "total": "Total",
+    "processing": "Processing...",
+    "confirmBooking": "Confirm Booking"
   },
   "snackBar": {
     "title": "Snack-Bar",
@@ -580,7 +611,7 @@
   },
   "adminDashboard": {
     "welcomeBack": "Bon retour",
-    "subtitle": "Voici ce qui se passe à V2 Resort aujourd'hui, {name}",
+    "subtitle": "Voici ce qui se passe à Iron Paradise Gym aujourd'hui, {name}",
     "refresh": "Actualiser",
     "refreshed": "Tableau de bord actualisé",
     "errors": {
@@ -599,6 +630,10 @@
     },
     "statuses": {
       "pending": "En attente",
+      "confirmed": "Confirmé",
+      "checked_in": "Enregistré",
+      "checked_out": "Libéré",
+      "no_show": "Absent",
       "preparing": "En préparation",
       "ready": "Prêt",
       "completed": "Terminé",
@@ -1370,7 +1405,8 @@
       "coupons": "Coupons",
       "housekeeping": "Entretien",
       "inventory": "Inventaire",
-      "logout": "Déconnexion"
+      "logout": "Déconnexion",
+      "navbar": "Navigation"
     },
     "messages": {
       "loggedOutSuccessfully": "Déconnexion réussie"
@@ -1501,7 +1537,7 @@
       "table": "Table {number}"
     },
     "dashboard": {
-      "welcomeSubtitle": "Voici ce qui se passe aujourd'hui au V2 Resort",
+      "welcomeSubtitle": "Voici ce qui se passe aujourd'hui au Iron Paradise Gym",
       "quickActions": "Actions Rapides",
       "recentActivity": "Activité Récente",
       "noActivity": "Aucune activité récente",
@@ -1577,7 +1613,22 @@
       "checkOutBtn": "Enregistrer Départ",
       "confirm": "Confirmer",
       "cancel": "Annuler",
-      "notes": "Notes"
+      "notes": "Notes",
+      "modalStatus": "Statut",
+      "modalDates": "Dates",
+      "modalNights": "{count} Nuits",
+      "customerInfo": "Informations Client",
+      "customerName": "Nom",
+      "customerEmail": "E-mail",
+      "customerPhone": "Téléphone",
+      "billing": "Facturation",
+      "baseAmount": "Montant de Base",
+      "addOns": "Suppléments",
+      "total": "Total",
+      "paymentStatus": "Statut du Paiement",
+      "paymentPending": "En attente",
+      "specialRequests": "Demandes Spéciales",
+      "unknownChalet": "Chalet Inconnu"
     },
     "pool": {
       "title": "Gestion Piscine",
@@ -1598,7 +1649,31 @@
       "adult": "Adulte",
       "child": "Enfant",
       "family": "Famille",
-      "vip": "VIP"
+      "vip": "VIP",
+      "pending": "En attente",
+      "completed": "Terminé",
+      "ticketSuffix": "Billet",
+      "entryTime": "Entrée",
+      "exitTime": "Sortie",
+      "recordEntry": "Enregistrer entrée",
+      "recordExit": "Enregistrer sortie",
+      "noTicketsToday": "Aucun billet aujourd'hui",
+      "ticketDetails": "Détails du billet",
+      "ticketNumber": "Numéro de billet",
+      "status": "Statut",
+      "guests": "Invités",
+      "guestInfo": "Informations client",
+      "guestName": "Nom",
+      "guestPhoneEmail": "Téléphone / Email",
+      "details": "Détails",
+      "ticketDate": "Date du billet",
+      "createdAt": "Créé le",
+      "price": "Prix",
+      "paymentStatus": "Statut de paiement",
+      "paymentPending": "En attente",
+      "paymentMethod": "Mode de paiement",
+      "paymentCash": "Espèces",
+      "close": "Fermer"
     },
     "scanner": {
       "title": "Scanner de Billets",
@@ -1663,11 +1738,11 @@
     "cancellationPolicy": "Politique d'Annulation",
     "giftCards": "Cartes Cadeaux",
     "contact": "Contact",
-    "address": "V2 Resort, Liban",
+    "address": "Iron Paradise Gym, Liban",
     "phone": "+961 XX XXX XXX",
     "email": "info@v2resort.com",
     "followUs": "Suivez-nous",
-    "copyright": "© {year} V2 Resort. Tous droits réservés."
+    "copyright": "© {year} Iron Paradise Gym. Tous droits réservés."
   },
   "contact": {
     "title": "Contactez-nous",
@@ -1735,7 +1810,7 @@
   "testimonials": {
     "badge": "Avis des Clients",
     "title": "Ce Que Disent Nos Clients",
-    "subtitle": "Lisez les avis authentiques de clients ayant séjourné au V2 Resort",
+    "subtitle": "Lisez les avis authentiques de clients ayant séjourné au Iron Paradise Gym",
     "averageRating": "Note Moyenne",
     "happyGuests": "Clients Satisfaits",
     "recommend": "Recommandent",
@@ -1758,7 +1833,7 @@
     "pleaseWriteReview": "Veuillez écrire un avis"
   },
   "weather": {
-    "location": "V2 Resort, Liban",
+    "location": "Iron Paradise Gym, Liban",
     "goodMorning": "Bonjour",
     "goodAfternoon": "Bon Après-midi",
     "goodEvening": "Bonsoir",
@@ -1911,11 +1986,11 @@
       "contactUs": "Contactez notre équipe juridique pour clarification",
       "acceptance": {
         "title": "Acceptation des conditions",
-        "content": "En utilisant les services de V2 Resort, vous acceptez d'être lié par ces Conditions d'utilisation. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser nos services."
+        "content": "En utilisant les services de Iron Paradise Gym, vous acceptez d'être lié par ces Conditions d'utilisation. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser nos services."
       },
       "services": {
         "title": "Nos services",
-        "content": "V2 Resort propose:\n• Restauration et commandes de repas\n• Hébergement en chalets et réservations\n• Accès à la piscine et billetterie\n• Services de buffet"
+        "content": "Iron Paradise Gym propose:\n• Restauration et commandes de repas\n• Hébergement en chalets et réservations\n• Accès à la piscine et billetterie\n• Services de buffet"
       },
       "bookings": {
         "title": "Réservations",
@@ -1927,7 +2002,7 @@
       },
       "liability": {
         "title": "Limitation de responsabilité",
-        "content": "V2 Resort n'est pas responsable de:\n• Effets personnels laissés dans les locaux\n• Blessures résultant du non-respect des règles de sécurité\n• Interruptions de service dues aux conditions météorologiques"
+        "content": "Iron Paradise Gym n'est pas responsable de:\n• Effets personnels laissés dans les locaux\n• Blessures résultant du non-respect des règles de sécurité\n• Interruptions de service dues aux conditions météorologiques"
       },
       "changes": {
         "title": "Modifications des conditions",
@@ -1965,5 +2040,31 @@
         "content": "Des exceptions peuvent être faites pour:\n• Les urgences médicales (documentation requise)\n• Les conditions météorologiques extrêmes\n• La discrétion de la direction dans des circonstances spéciales"
       }
     }
+  },
+  "staffScanner": {
+    "title": "Scanner de Billets",
+    "subtitle": "Scanner les billets piscine pour valider l'entrée",
+    "clearHistory": "Effacer l'historique",
+    "scanOrEnterCode": "Scanner ou entrer le code",
+    "enterTicketCode": "Entrez le code du billet ou scannez le QR...",
+    "validating": "Validation en cours...",
+    "validateTicket": "Valider le billet",
+    "validTicket": "Billet valide",
+    "invalidTicket": "Billet invalide",
+    "recordEntry": "Enregistrer l'entrée",
+    "recordExit": "Enregistrer la sortie",
+    "recentScans": "Scans récents",
+    "noScansYet": "Aucun scan pour le moment",
+    "scannedTicketsWillAppear": "Les billets scannés apparaîtront ici",
+    "ticketValidated": "Billet validé avec succès",
+    "invalidOrExpired": "Billet invalide ou expiré",
+    "entryRecorded": "Entrée enregistrée avec succès",
+    "failedRecordEntry": "Échec de l'enregistrement de l'entrée",
+    "exitRecorded": "Sortie enregistrée avec succès",
+    "failedRecordExit": "Échec de l'enregistrement de la sortie",
+    "adult": "Adulte",
+    "child": "Enfant",
+    "family": "Famille",
+    "vip": "VIP"
   }
 }

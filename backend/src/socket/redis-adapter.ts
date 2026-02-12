@@ -7,7 +7,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient, RedisClientType } from 'redis';
 import { Server as HttpServer } from 'http';
-import { logger } from '../utils/logger';
+import { logger } from "../utils/logger.js";
 
 // Environment variables
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';

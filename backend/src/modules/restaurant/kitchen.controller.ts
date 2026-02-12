@@ -8,7 +8,9 @@ import { logger } from '../../utils/logger';
 
 export function createKitchenController(io: Server): Router {
   const router = Router();
-  const kitchenNamespace = io.of('/kitchen');
+  // FIX: Iteration 14 - Use room-based emit on default namespace instead of separate /kitchen namespace
+  // Frontend connects to default namespace and joins 'kitchen' room via redis-adapter
+  const kitchenEmit = (event: string, data: any) => io.to('kitchen').emit(event, data);
 
   // Get all active orders for kitchen display
   router.get(
@@ -144,7 +146,7 @@ export function createKitchenController(io: Server): Router {
     authorize(['kitchen_staff', 'chef', 'admin']),
     asyncHandler(async (req: Request, res: Response) => {
       const { orderId } = req.params;
-      const userId = (req as any).user.id;
+      const userId = req.user!.id;
 
       // Check current status
       const { data: order, error: fetchError } = await supabase
@@ -182,7 +184,7 @@ export function createKitchenController(io: Server): Router {
         .eq('order_id', orderId);
 
       // Emit socket event
-      kitchenNamespace.emit('kitchen:order-updated', {
+      kitchenEmit('kitchen:order-updated', {
         id: orderId,
         status: 'IN_PROGRESS',
         startedAt: new Date().toISOString(),
@@ -230,7 +232,7 @@ export function createKitchenController(io: Server): Router {
 
       if (order) {
         // Emit update
-        kitchenNamespace.emit('kitchen:order-updated', {
+        kitchenEmit('kitchen:order-updated', {
           id: orderId,
           items: order.items,
         });
@@ -251,7 +253,7 @@ export function createKitchenController(io: Server): Router {
     asyncHandler(async (req: Request, res: Response) => {
       const { orderId } = req.params;
       const { notes } = req.body;
-      const userId = (req as any).user.id;
+      const userId = req.user!.id;
 
       // Check current status
       const { data: order, error: fetchError } = await supabase
@@ -301,7 +303,7 @@ export function createKitchenController(io: Server): Router {
         .single();
 
       // Emit socket events
-      kitchenNamespace.emit('kitchen:order-updated', {
+      kitchenEmit('kitchen:order-updated', {
         id: orderId,
         status: 'READY',
         readyAt: new Date().toISOString(),
@@ -332,7 +334,7 @@ export function createKitchenController(io: Server): Router {
     authorize(['server', 'kitchen_staff', 'chef', 'admin']),
     asyncHandler(async (req: Request, res: Response) => {
       const { orderId } = req.params;
-      const userId = (req as any).user.id;
+      const userId = req.user!.id;
 
       // Check current status
       const { data: order, error: fetchError } = await supabase
@@ -370,7 +372,7 @@ export function createKitchenController(io: Server): Router {
         .eq('order_id', orderId);
 
       // Emit socket event
-      kitchenNamespace.emit('kitchen:order-updated', {
+      kitchenEmit('kitchen:order-updated', {
         id: orderId,
         status: 'COMPLETED',
         completedAt: new Date().toISOString(),
@@ -392,7 +394,7 @@ export function createKitchenController(io: Server): Router {
     authorize(['server', 'admin']),
     asyncHandler(async (req: Request, res: Response) => {
       const { tableId, items, priority = 'NORMAL', notes } = req.body;
-      const serverId = (req as any).user.id;
+      const serverId = req.user!.id;
 
       if (!tableId || !items || !Array.isArray(items) || items.length === 0) {
         throw new AppError('Table ID and items are required', 400);
@@ -468,12 +470,12 @@ export function createKitchenController(io: Server): Router {
         .single();
 
       // Emit new order to kitchen
-      kitchenNamespace.emit('kitchen:new-order', {
+      kitchenEmit('kitchen:new-order', {
         id: order.id,
         orderNumber,
         tableNumber: table.number,
         tableName: table.name,
-        serverName: (req as any).user.fullName,
+        serverName: req.user!.email,
         items: completeOrder?.items || [],
         priority,
         status: 'PENDING',
@@ -502,7 +504,7 @@ export function createKitchenController(io: Server): Router {
     asyncHandler(async (req: Request, res: Response) => {
       const { orderId } = req.params;
       const { reason } = req.body;
-      const userId = (req as any).user.id;
+      const userId = req.user!.id;
 
       const { data: order, error: fetchError } = await supabase
         .from('kitchen_orders')
@@ -533,7 +535,7 @@ export function createKitchenController(io: Server): Router {
       }
 
       // Emit socket event
-      kitchenNamespace.emit('kitchen:order-cancelled', { orderId });
+      kitchenEmit('kitchen:order-cancelled', { orderId });
 
       logger.info(`Order ${order.order_number} cancelled by user ${userId}: ${reason}`);
 

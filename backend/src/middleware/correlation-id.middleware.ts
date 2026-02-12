@@ -81,7 +81,7 @@ export const correlationIdMiddleware = (
   const requestId = uuidv4();
   
   // Extract user information if available
-  const userId = (req as any).user?.id;
+  const userId = req.user?.id;
   const sessionId = req.sessionID;
   
   // Extract client information

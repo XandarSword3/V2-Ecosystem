@@ -4,11 +4,12 @@
  * API endpoints for managing pool memberships.
  */
 
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { z } from 'zod';
 import { authenticate as authMiddleware } from '../../middleware/auth.middleware';
 import { roleGuard } from '../../middleware/roleGuard.middleware';
-import { prisma } from '../../lib/prisma';
+import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger';
 import {
   getAllMembershipPlans,
@@ -48,8 +49,7 @@ const useGuestPassSchema = z.object({
  */
 router.get(
   '/plans',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const plans = getAllMembershipPlans();
       
       res.json({
@@ -64,10 +64,7 @@ router.get(
           discountPercentage: plan.discountPercentage,
         })),
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -77,8 +74,7 @@ router.get(
 router.get(
   '/my-membership',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const userId = req.user!.id;
       const { hasAccess, membership, remainingGuestPasses, discountPercentage } = 
         await validateMembershipAccess(userId);
@@ -109,10 +105,7 @@ router.get(
           autoRenew: membership.autoRenew,
         },
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -122,8 +115,7 @@ router.get(
 router.post(
   '/',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const userId = req.user!.id;
       
       const validation = createMembershipSchema.safeParse(req.body);
@@ -138,8 +130,6 @@ router.post(
 
       const result = await createMembership({
         userId,
-        type: validation.data.type,
-        billingCycle: validation.data.billingCycle,
         ...validation.data,
       });
 
@@ -159,10 +149,7 @@ router.post(
           clientSecret: result.clientSecret,
         },
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -172,8 +159,7 @@ router.post(
 router.delete(
   '/:id',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const userId = req.user!.id;
       
@@ -195,10 +181,7 @@ router.delete(
         success: true,
         message: result.message,
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -208,8 +191,7 @@ router.delete(
 router.post(
   '/:id/guest-pass',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       
       const validation = useGuestPassSchema.safeParse(req.body);
@@ -239,10 +221,7 @@ router.post(
           remainingPasses: result.remainingPasses,
         },
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -252,15 +231,20 @@ router.post(
 router.get(
   '/:id/usage',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const userId = req.user!.id;
 
       // Verify ownership
-      const membership = await prisma.poolMembership.findFirst({
-        where: { id, userId },
-      });
+      const supabase = getSupabase();
+      const { data: membership, error: membershipError } = await supabase
+        .from('pool_memberships')
+        .select('id')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (membershipError) throw membershipError;
 
       if (!membership) {
         return res.status(404).json({
@@ -270,46 +254,38 @@ router.get(
       }
 
       // Get guest pass usage
-      const guestPassUsage = await prisma.guestPassUsage.findMany({
-        where: { membershipId: id },
-        orderBy: { usedAt: 'desc' },
-        take: 50,
-      });
+      const { data: guestPassUsage, error: guestError } = await supabase
+        .from('guest_pass_usage')
+        .select('*')
+        .eq('membership_id', id)
+        .order('used_at', { ascending: false })
+        .limit(50);
+      if (guestError) throw guestError;
 
       // Get pool visits by membership holder
-      const visits = await prisma.poolTicket.findMany({
-        where: {
-          userId,
-          // membershipId: id, // Removed as not present in schema
-        },
-        orderBy: { date: 'desc' },
-        take: 50,
-        select: {
-          id: true,
-          date: true,
-          quantity: true,
-          status: true,
-        },
-      });
+      const { data: visits, error: visitsError } = await supabase
+        .from('pool_tickets')
+        .select('id, date, quantity, status')
+        .eq('user_id', userId)
+        .order('date', { ascending: false })
+        .limit(50);
+      if (visitsError) throw visitsError;
 
       res.json({
         success: true,
         data: {
-          guestPasses: guestPassUsage.map(g => ({
-            guestName: g.guestName,
-            usedAt: g.usedAt,
+          guestPasses: (guestPassUsage || []).map((g: any) => ({
+            guestName: g.guest_name,
+            usedAt: g.used_at,
           })),
-          visits: visits.map(v => ({
+          visits: (visits || []).map((v: any) => ({
             date: v.date,
             quantity: v.quantity,
             status: v.status,
           })),
         },
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -319,15 +295,20 @@ router.get(
 router.put(
   '/:id/auto-renew',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const userId = req.user!.id;
       const { enabled } = req.body;
 
-      const membership = await prisma.poolMembership.findFirst({
-        where: { id, userId },
-      });
+      const supabase = getSupabase();
+      const { data: membership, error: membershipError } = await supabase
+        .from('pool_memberships')
+        .select('id')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (membershipError) throw membershipError;
 
       if (!membership) {
         return res.status(404).json({
@@ -336,19 +317,17 @@ router.put(
         });
       }
 
-      await prisma.poolMembership.update({
-        where: { id },
-        data: { autoRenew: enabled },
-      });
+      const { error: updateError } = await supabase
+        .from('pool_memberships')
+        .update({ auto_renew: enabled })
+        .eq('id', id);
+      if (updateError) throw updateError;
 
       res.json({
         success: true,
         message: `Auto-renewal ${enabled ? 'enabled' : 'disabled'}`,
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -358,8 +337,7 @@ router.put(
 router.post(
   '/:id/members',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const userId = req.user!.id;
       const { email } = req.body;
@@ -371,10 +349,15 @@ router.post(
         });
       }
 
-      const membership = await prisma.poolMembership.findFirst({
-        where: { id, userId },
-        include: { members: true },
-      });
+      const supabase = getSupabase();
+      const { data: membership, error: membershipError } = await supabase
+        .from('pool_memberships')
+        .select('*, members:membership_members(*)')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (membershipError) throw membershipError;
 
       if (!membership) {
         return res.status(404).json({
@@ -384,7 +367,7 @@ router.post(
       }
 
       // Check member limit
-      if (membership.members.length >= membership.maxMembers - 1) {
+      if (membership.members.length >= membership.max_members - 1) {
         return res.status(400).json({
           success: false,
           error: 'Maximum members reached',
@@ -392,7 +375,7 @@ router.post(
       }
 
       // Check if already a member
-      const existingMember = membership.members.find(m => m.email === email);
+      const existingMember = membership.members.find((m: any) => m.email === email);
       if (existingMember) {
         return res.status(400).json({
           success: false,
@@ -400,22 +383,20 @@ router.post(
         });
       }
 
-      await prisma.membershipMember.create({
-        data: {
-          membershipId: id,
+      const { error: insertError } = await supabase
+        .from('membership_members')
+        .insert({
+          membership_id: id,
           email,
           status: 'PENDING_INVITATION',
-        },
-      });
+        });
+      if (insertError) throw insertError;
 
       res.status(201).json({
         success: true,
         message: 'Member invitation sent',
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -425,14 +406,19 @@ router.post(
 router.delete(
   '/:id/members/:memberId',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id, memberId } = req.params;
       const userId = req.user!.id;
 
-      const membership = await prisma.poolMembership.findFirst({
-        where: { id, userId },
-      });
+      const supabase = getSupabase();
+      const { data: membership, error: membershipError } = await supabase
+        .from('pool_memberships')
+        .select('id')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (membershipError) throw membershipError;
 
       if (!membership) {
         return res.status(404).json({
@@ -441,18 +427,18 @@ router.delete(
         });
       }
 
-      await prisma.membershipMember.delete({
-        where: { id: memberId, membershipId: id },
-      });
+      const { error: deleteError } = await supabase
+        .from('membership_members')
+        .delete()
+        .eq('id', memberId)
+        .eq('membership_id', id);
+      if (deleteError) throw deleteError;
 
       res.json({
         success: true,
         message: 'Member removed',
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 // Admin endpoints
@@ -464,46 +450,53 @@ router.get(
   '/admin/all',
   authMiddleware,
   roleGuard(['admin', 'super_admin']),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { status, type, page = 1, limit = 20 } = req.query;
 
       const where: any = {};
       if (status) where.status = status;
       if (type) where.type = type;
 
-      const [memberships, total] = await Promise.all([
-        prisma.poolMembership.findMany({
-          where,
-          include: {
-            user: {
-              select: { id: true, email: true, firstName: true, lastName: true },
-            },
-            members: true,
-          },
-          orderBy: { startDate: 'desc' },
-          take: Number(limit),
-          skip: (Number(page) - 1) * Number(limit),
-        }),
-        prisma.poolMembership.count({ where }),
+      const supabase = getSupabase();
+      let membershipsQuery = supabase
+        .from('pool_memberships')
+        .select('*, user:users(id, email, first_name, last_name), members:membership_members(*)')
+        .order('start_date', { ascending: false })
+        .range((Number(page) - 1) * Number(limit), Number(page) * Number(limit) - 1);
+
+      let countQuery = supabase
+        .from('pool_memberships')
+        .select('*', { count: 'exact', head: true });
+
+      if (status) {
+        membershipsQuery = membershipsQuery.eq('status', status);
+        countQuery = countQuery.eq('status', status);
+      }
+      if (type) {
+        membershipsQuery = membershipsQuery.eq('type', type);
+        countQuery = countQuery.eq('type', type);
+      }
+
+      const [{ data: memberships, error: membershipsError }, { count: total, error: countError }] = await Promise.all([
+        membershipsQuery,
+        countQuery,
       ]);
+      if (membershipsError) throw membershipsError;
+      if (countError) throw countError;
 
       res.json({
         success: true,
         data: {
-          memberships,
+          memberships: memberships || [],
           pagination: {
             page: Number(page),
             limit: Number(limit),
-            total,
-            totalPages: Math.ceil(total / Number(limit)),
+            total: total || 0,
+            totalPages: Math.ceil((total || 0) / Number(limit)),
           },
         },
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 export default router;

@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase';
-import { logger } from '../utils/logger';
+import { supabase } from '../lib/supabase.js';
+import { logger } from '../utils/logger.js';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -289,7 +289,7 @@ class SeasonalPricingService {
       const occupancy = await this.getCurrentOccupancy(itemType, checkInDate);
       if (occupancy !== null) {
         let occupancyMultiplier = 1;
-        
+
         if (occupancy >= dynamicConfig.maxOccupancyThreshold) {
           // High demand - increase prices
           occupancyMultiplier = dynamicConfig.maxPriceMultiplier;
@@ -300,7 +300,7 @@ class SeasonalPricingService {
           // Linear interpolation between thresholds
           const range = dynamicConfig.maxOccupancyThreshold - dynamicConfig.minOccupancyThreshold;
           const position = (occupancy - dynamicConfig.minOccupancyThreshold) / range;
-          occupancyMultiplier = dynamicConfig.minPriceMultiplier + 
+          occupancyMultiplier = dynamicConfig.minPriceMultiplier +
             position * (dynamicConfig.maxPriceMultiplier - dynamicConfig.minPriceMultiplier);
         }
 

@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from "../../../database/connection.js";
 import { logger } from "../../../utils/logger.js";
 import { logActivity } from "../../../utils/activityLogger.js";
@@ -30,8 +31,7 @@ function normalizeSession(session: PoolSessionWithPrices) {
 /**
  * Get all active pool sessions
  */
-export async function getSessions(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getSessions = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { moduleId, gender } = req.query;
 
@@ -54,16 +54,12 @@ export async function getSessions(req: Request, res: Response, next: NextFunctio
 
     const sessionsWithPrices = (sessions || []).map(normalizeSession);
     res.json({ success: true, data: sessionsWithPrices });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get a single session by ID
  */
-export async function getSession(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getSession = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: session, error } = await supabase
       .from('pool_sessions')
@@ -79,16 +75,12 @@ export async function getSession(req: Request, res: Response, next: NextFunction
     }
 
     res.json({ success: true, data: session ? normalizeSession(session) : null });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get session availability for a specific date
  */
-export async function getAvailability(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getAvailability = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { date, sessionId, moduleId, gender } = req.query;
 
@@ -124,12 +116,13 @@ export async function getAvailability(req: Request, res: Response, next: NextFun
       return res.json({ success: true, data: [] });
     }
 
+    // FIX: Iteration 2 - Use correct column names: ticket_date (not visit_date), number_of_guests (not adult_count/child_count)
     const { data: tickets, error: tickErr } = await supabase
       .from('pool_tickets')
-      .select('session_id, adult_count, child_count')
+      .select('session_id, number_of_guests')
       .in('session_id', sessionIds)
-      .gte('visit_date', targetDate)
-      .lt('visit_date', endDate)
+      .gte('ticket_date', targetDate)
+      .lt('ticket_date', endDate)
       .neq('status', 'cancelled');
 
     if (tickErr) throw tickErr;
@@ -137,8 +130,9 @@ export async function getAvailability(req: Request, res: Response, next: NextFun
     // Calculate availability
     const availability = (sessions || []).map((session: PoolSessionWithPrices) => {
       const sessionTickets = (tickets || []).filter((t) => t.session_id === session.id);
+      // FIX: Iteration 2 - Sum number_of_guests (matches actual pool_tickets schema)
       const soldTotal = sessionTickets.reduce(
-        (sum, t) => sum + (t.adult_count || 0) + (t.child_count || 0),
+        (sum, t) => sum + (t.number_of_guests || 0),
         0
       );
       const capacity = session.max_capacity ?? 100;
@@ -154,16 +148,12 @@ export async function getAvailability(req: Request, res: Response, next: NextFun
     });
 
     res.json({ success: true, data: availability });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Create a new pool session (admin)
  */
-export async function createSession(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createSession = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = (req.user as any)?.userId;
     const { 
@@ -185,22 +175,17 @@ export async function createSession(req: Request, res: Response, next: NextFunct
       });
     }
 
-    const { data: session, error } = await supabase
-      .from('pool_sessions')
-      .insert({
-        name,
-        start_time,
-        end_time,
-        capacity: capacity ?? 100,
-        price: price ?? adult_price ?? 0,
-        adult_price: adult_price ?? price ?? 0,
-        child_price: child_price ?? price ?? 0,
-        module_id: module_id || null,
-        gender_restriction,
-        is_active: true,
-      })
-      .select()
-      .single();
+    // Use RPC function to bypass PostgREST schema cache issues (PGRST204)
+    const { data: session, error } = await supabase.rpc('insert_pool_session', {
+      p_name: name,
+      p_start_time: start_time,
+      p_end_time: end_time,
+      p_max_capacity: Number(capacity ?? 100),
+      p_adult_price: Number(adult_price ?? price ?? 0),
+      p_child_price: Number(child_price ?? price ?? 0),
+      p_gender_restriction: gender_restriction || 'mixed',
+      p_module_id: module_id || null,
+    });
 
     if (error) throw error;
 
@@ -214,16 +199,12 @@ export async function createSession(req: Request, res: Response, next: NextFunct
     emitToUnit('pool', 'pool.sessions.created', session);
 
     res.status(201).json({ success: true, data: normalizeSession(session) });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Update a pool session (admin)
  */
-export async function updateSession(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateSession = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = (req.user as any)?.userId;
     const { id } = req.params;
@@ -235,12 +216,22 @@ export async function updateSession(req: Request, res: Response, next: NextFunct
       delete updates.genderRestriction;
     }
 
-    const { data: session, error } = await supabase
-      .from('pool_sessions')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+    // Strip read-only and non-updatable fields
+    delete updates.id;
+    delete updates.created_at;
+    delete updates.updated_at;
+    delete updates.genderRestriction;
+
+    // Keep price in sync with adult_price
+    if (updates.adult_price !== undefined) {
+      updates.price = updates.adult_price;
+    }
+
+    // Use RPC function to bypass PostgREST schema cache issues (PGRST204)
+    const { data: session, error } = await supabase.rpc('update_pool_session', {
+      p_id: id,
+      p_data: updates,
+    });
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -259,16 +250,12 @@ export async function updateSession(req: Request, res: Response, next: NextFunct
     emitToUnit('pool', 'pool.sessions.updated', session);
 
     res.json({ success: true, data: normalizeSession(session) });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Delete a pool session (admin)
  */
-export async function deleteSession(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteSession = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = (req.user as any)?.userId;
     const { id } = req.params;
@@ -290,7 +277,4 @@ export async function deleteSession(req: Request, res: Response, next: NextFunct
     emitToUnit('pool', 'pool.sessions.deleted', { id });
 
     res.json({ success: true, message: 'Session deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});

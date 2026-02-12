@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection";
 import { emitToAll } from "../../socket";
 import bcrypt from 'bcryptjs';
@@ -36,8 +37,7 @@ export async function getModules(req: Request, res: Response, next: NextFunction
   }
 }
 
-export async function getModule(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getModule = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
 
@@ -66,14 +66,10 @@ export async function getModule(req: Request, res: Response, next: NextFunction)
     }
 
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 
-export async function createModule(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createModule = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     
     // Validate input using schema to prevent XSS and ensure data integrity
@@ -247,13 +243,9 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
     });
 
     res.status(201).json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateModule(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateModule = asyncHandler(async (req: Request, res: Response) => {
     // Validate input (includes optional settings_version)
     const validatedData = validateBody(updateModuleSchema, req.body);
 
@@ -274,7 +266,8 @@ export async function updateModule(req: Request, res: Response, next: NextFuncti
     // 2. Enforce Permissions (RBAC)
     // Check for `module:{slug}:manage` permission via app_role_permissions
     // Or super_admin bypass
-    const user = (req as any).user;
+    const user = req.user;
+    if (!user) throw new Error('Authentication required');
     if (!user.roles.includes('super_admin')) {
          const requiredPerm = `module:${currentModule.slug}:manage`;
          const { data: permData, error: permError } = await supabase
@@ -339,13 +332,9 @@ export async function updateModule(req: Request, res: Response, next: NextFuncti
     });
 
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteModule(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteModule = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
     const force = req.query.force === 'true';
@@ -362,7 +351,8 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
     }
 
     // 2. Enforce Permissions
-    const user = (req as any).user;
+    const user = req.user;
+    if (!user) throw new Error('Authentication required');
     const hasPermission = user.roles.includes('super_admin') || 
                          user.roles.includes(`${moduleData.slug}_admin`);
 
@@ -578,7 +568,4 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
     });
 
     res.json({ success: true, message: 'Module deactivated (soft-deleted)', data });
-  } catch (error) {
-    next(error);
-  }
-}
+});

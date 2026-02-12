@@ -82,7 +82,7 @@ export default function NavbarSettingsPage() {
     const [navbar, setNavbar] = useState<NavbarConfig>(DEFAULT_CONFIG);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const { modules } = useSiteSettings();
+    const { modules, refetch: refetchSettings } = useSiteSettings();
 
     useEffect(() => {
         fetchSettings();
@@ -105,8 +105,11 @@ export default function NavbarSettingsPage() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            await api.put('/admin/settings', { key: 'navbar', value: navbar });
+            // Send navbar directly in the body (backend expects settings.navbar)
+            await api.put('/admin/settings', { navbar });
             toast.success('Navbar configuration saved successfully');
+            // Refetch settings to update the header immediately
+            await refetchSettings();
         } catch (error: unknown) {
             const axiosError = error as { response?: { data?: { error?: string } } };
             toast.error(axiosError.response?.data?.error || 'Failed to save settings');

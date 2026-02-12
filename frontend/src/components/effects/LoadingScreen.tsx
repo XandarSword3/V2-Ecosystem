@@ -11,7 +11,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 
 interface LoadingScreenProps {
@@ -75,7 +75,7 @@ export function LoadingScreen({ minDuration = 2500 }: LoadingScreenProps) {
   const enableLoadingAnimation = useSettingsStore((s) => s.enableLoadingAnimation);
   
   // Dynamic branding from CMS
-  const resortName = settings.resortName || 'V2 Resort';
+  const resortName = settings.resortName || 'Iron Paradise Gym';
   const tagline = settings.tagline || 'Experience Luxury';
   const logoText = resortName.substring(0, 2).toUpperCase();
   
@@ -407,7 +407,7 @@ export function LoadingScreen({ minDuration = 2500 }: LoadingScreenProps) {
             >
               <motion.path
                 fill="rgba(255,255,255,0.05)"
-                d="M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z"
+                initial={{ d: "M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z" }}
                 animate={{
                   d: [
                     "M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z",
@@ -419,7 +419,7 @@ export function LoadingScreen({ minDuration = 2500 }: LoadingScreenProps) {
               />
               <motion.path
                 fill="rgba(255,255,255,0.08)"
-                d="M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z"
+                initial={{ d: "M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z" }}
                 animate={{
                   d: [
                     "M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z",
@@ -550,7 +550,7 @@ function LoadingScreenContent() {
     y: string;
   }>>([]);
   
-  const resortName = settings.resortName || 'V2 Resort';
+  const resortName = settings.resortName || 'Iron Paradise Gym';
   const tagline = settings.tagline || 'Experience Luxury';
   const logoText = resortName.substring(0, 2).toUpperCase();
   const nameLetters = resortName.split('');
@@ -804,7 +804,7 @@ function LoadingScreenContent() {
         >
           <motion.path
             fill="rgba(255,255,255,0.05)"
-            d="M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z"
+            initial={{ d: "M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z" }}
             animate={{
               d: [
                 "M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z",
@@ -816,7 +816,7 @@ function LoadingScreenContent() {
           />
           <motion.path
             fill="rgba(255,255,255,0.08)"
-            d="M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z"
+            initial={{ d: "M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z" }}
             animate={{
               d: [
                 "M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z",

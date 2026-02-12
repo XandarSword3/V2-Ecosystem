@@ -42,11 +42,23 @@ const updateSettingsSchema = z.object({
 
 const updateTierSchema = z.object({
   name: z.string().max(50).optional(),
-  minPoints: z.number().int().min(0).optional(),
-  pointsMultiplier: z.number().positive().optional(),
-  benefits: z.array(z.string()).optional(),
+  min_points: z.number().int().min(0).optional(),
+  points_multiplier: z.number().positive().optional(),
+  benefits: z.union([z.record(z.string(), z.any()), z.array(z.string())]).optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
+  is_active: z.boolean().optional(),
+});
+
+// FIX: Iteration 3 - Add createTierSchema for POST /tiers
+const createTierSchema = z.object({
+  name: z.string().max(50),
+  min_points: z.number().int().min(0),
+  points_multiplier: z.number().positive().optional().default(1),
+  benefits: z.union([z.record(z.string(), z.any()), z.array(z.string())]).optional().default({}),
+  color: z.string().optional().default('#6B7280'),
+  icon: z.string().optional(),
+  is_active: z.boolean().optional().default(true),
 });
 
 export class LoyaltyController {
@@ -106,7 +118,7 @@ export class LoyaltyController {
         // Log signup bonus if any
         if (signupBonus > 0) {
           await supabase.from('loyalty_transactions').insert({
-            account_id: newAccount.id,
+            member_id: newAccount.id,
             type: 'bonus',
             points: signupBonus,
             balance_after: signupBonus,
@@ -140,7 +152,7 @@ export class LoyaltyController {
   async getMyAccount(req: Request, res: Response) {
     try {
       // JWT payload uses 'userId', not 'id'
-      const userId = (req as any).user?.userId || (req as any).user?.id;
+      const userId = req.user?.userId || req.user?.id;
       if (!userId) {
         return res.status(401).json({ success: false, error: 'Not authenticated' });
       }
@@ -232,14 +244,14 @@ export class LoyaltyController {
 
       // Log transaction
       await supabase.from('loyalty_transactions').insert({
-        account_id: account.id,
+        member_id: account.id,
         type: 'earn',
         points: earnedPoints,
         balance_after: newBalance,
         description: description || 'Points earned',
         reference_type: referenceType,
         reference_id: referenceId,
-        created_by: (req as any).user?.id,
+        created_by: req.user?.id,
       });
 
       // Check for tier upgrade
@@ -347,14 +359,14 @@ export class LoyaltyController {
 
       // Log transaction
       await supabase.from('loyalty_transactions').insert({
-        account_id: account.id,
+        member_id: account.id,
         type: 'redeem',
         points: -points,
         balance_after: newBalance,
         description: description || 'Points redeemed',
         reference_type: referenceType,
         reference_id: referenceId,
-        created_by: (req as any).user?.id,
+        created_by: req.user?.id,
       });
 
       res.json({
@@ -415,13 +427,34 @@ export class LoyaltyController {
         .eq('id', account.id);
 
       await supabase.from('loyalty_transactions').insert({
-        account_id: account.id,
+        member_id: account.id,
         type: 'adjust',
         points: points,
         balance_after: newBalance,
         description: reason,
-        created_by: (req as any).user?.id,
+        created_by: req.user?.id,
       });
+
+      // FIX: Iteration 18 - Check tier upgrade after positive point adjustment
+      // Previously adjustPoints skipped this, so admin bonus grants never triggered tier promotions
+      let tierChange = null;
+      if (points > 0) {
+        const { data: newTier } = await supabase
+          .from('loyalty_tiers')
+          .select('*')
+          .lte('min_points', newLifetime)
+          .order('min_points', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (newTier && newTier.id !== account.tier_id) {
+          await supabase
+            .from('loyalty_accounts')
+            .update({ tier_id: newTier.id })
+            .eq('id', account.id);
+          tierChange = newTier.name;
+        }
+      }
 
       res.json({
         success: true,
@@ -429,6 +462,7 @@ export class LoyaltyController {
           adjustment: points,
           newBalance,
           reason,
+          newTier: tierChange,
         },
       });
     } catch (error: any) {
@@ -483,13 +517,33 @@ export class LoyaltyController {
         .eq('id', account.id);
 
       await supabase.from('loyalty_transactions').insert({
-        account_id: account.id,
+        member_id: account.id,
         type: 'adjust',
         points: points,
         balance_after: newBalance,
         description: reason,
-        created_by: (req as any).user?.id,
+        created_by: req.user?.id,
       });
+
+      // FIX: Iteration 18 - Check tier upgrade after positive adjustment (same as adjustPoints)
+      let tierChange = null;
+      if (points > 0) {
+        const { data: newTier } = await supabase
+          .from('loyalty_tiers')
+          .select('*')
+          .lte('min_points', newLifetime)
+          .order('min_points', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (newTier && newTier.id !== account.tier_id) {
+          await supabase
+            .from('loyalty_accounts')
+            .update({ tier_id: newTier.id })
+            .eq('id', account.id);
+          tierChange = newTier.name;
+        }
+      }
 
       res.json({
         success: true,
@@ -497,6 +551,7 @@ export class LoyaltyController {
           adjustment: points,
           newBalance,
           reason,
+          newTier: tierChange,
         },
       });
     } catch (error: any) {
@@ -536,7 +591,7 @@ export class LoyaltyController {
       let query = supabase
         .from('loyalty_transactions')
         .select('*', { count: 'exact' })
-        .eq('account_id', account.id)
+        .eq('member_id', account.id)
         .order('created_at', { ascending: false })
         .range(offset, offset + limitNum - 1);
 
@@ -616,11 +671,12 @@ export class LoyaltyController {
 
       const updates: Record<string, any> = {};
       if (data.name !== undefined) updates.name = data.name;
-      if (data.minPoints !== undefined) updates.min_points = data.minPoints;
-      if (data.pointsMultiplier !== undefined) updates.points_multiplier = data.pointsMultiplier;
+      if (data.min_points !== undefined) updates.min_points = data.min_points;
+      if (data.points_multiplier !== undefined) updates.points_multiplier = data.points_multiplier;
       if (data.benefits !== undefined) updates.benefits = data.benefits;
       if (data.color !== undefined) updates.color = data.color;
       if (data.icon !== undefined) updates.icon = data.icon;
+      if (data.is_active !== undefined) updates.is_active = data.is_active;
 
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ success: false, error: 'No fields to update' });
@@ -940,6 +996,113 @@ export class LoyaltyController {
       res.status(500).json({
         success: false,
         error: 'Failed to calculate points',
+        message: error.message,
+      });
+    }
+  }
+
+  // FIX: Iteration 3 - Add enrollUser method (POST /enroll)
+  // Delegates to getMyAccount which auto-creates accounts with signup bonus
+  async enrollUser(req: Request, res: Response) {
+    try {
+      const userId = req.user?.userId || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, error: 'Not authenticated' });
+      }
+
+      req.params.userId = userId;
+      return this.getAccount(req, res);
+    } catch (error: any) {
+      console.error('Error enrolling in loyalty program:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to enroll in loyalty program',
+        message: error.message,
+      });
+    }
+  }
+
+  // FIX: Iteration 3 - Add createTier method (POST /tiers)
+  async createTier(req: Request, res: Response) {
+    try {
+      const validation = createTierSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: validation.error.errors,
+        });
+      }
+
+      const data = validation.data;
+      const supabase = getSupabase();
+
+      const { data: tier, error } = await supabase
+        .from('loyalty_tiers')
+        .insert({
+          name: data.name,
+          min_points: data.min_points,
+          points_multiplier: data.points_multiplier,
+          benefits: data.benefits,
+          color: data.color,
+          icon: data.icon,
+          is_active: data.is_active,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      res.status(201).json({
+        success: true,
+        data: tier,
+      });
+    } catch (error: any) {
+      console.error('Error creating tier:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to create tier',
+        message: error.message,
+      });
+    }
+  }
+
+  // FIX: Iteration 3 - Add deleteTier method (DELETE /tiers/:tierId)
+  async deleteTier(req: Request, res: Response) {
+    try {
+      const { tierId } = req.params;
+      const supabase = getSupabase();
+
+      // Check tier isn't in use by any accounts
+      const { data: accountsUsingTier } = await supabase
+        .from('loyalty_accounts')
+        .select('id')
+        .eq('tier_id', tierId)
+        .limit(1);
+
+      if (accountsUsingTier && accountsUsingTier.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot delete tier: it is currently assigned to loyalty accounts. Reassign accounts first.',
+        });
+      }
+
+      const { error } = await supabase
+        .from('loyalty_tiers')
+        .delete()
+        .eq('id', tierId);
+
+      if (error) throw error;
+
+      res.json({
+        success: true,
+        message: 'Tier deleted successfully',
+      });
+    } catch (error: any) {
+      console.error('Error deleting tier:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to delete tier',
         message: error.message,
       });
     }

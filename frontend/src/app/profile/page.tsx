@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth-context';
 import { api, restaurantApi, poolApi, chaletsApi, snackApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -251,7 +251,7 @@ export default function ProfilePage() {
                       <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
                         {user.fullName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
                       </div>
-                      <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white dark:bg-slate-800 shadow-lg flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                      <button aria-label="Change profile photo" className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white dark:bg-slate-800 shadow-lg flex items-center justify-center border border-slate-200 dark:border-slate-700"> {/* FIX Iter-8: aria-label */}
                         <Camera className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                       </button>
                     </div>
@@ -267,6 +267,8 @@ export default function ProfilePage() {
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <Input
                           type="text"
+                          name="fullName"
+                          autoComplete="name"
                           value={formData.fullName}
                           onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                           className="pl-10"
@@ -282,6 +284,8 @@ export default function ProfilePage() {
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <Input
                           type="email"
+                          name="email"
+                          autoComplete="email"
                           value={formData.email}
                           disabled
                           className="pl-10 bg-slate-50 dark:bg-slate-800"
@@ -297,6 +301,8 @@ export default function ProfilePage() {
                         <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <Input
                           type="tel"
+                          name="phone"
+                          autoComplete="tel"
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                           className="pl-10"
@@ -509,7 +515,10 @@ export default function ProfilePage() {
                       {bookings.map((booking: BookingRecord) => (
                         <div
                           key={booking.id}
+                          role="button"
+                          tabIndex={0}
                           onClick={() => setSelectedBooking(booking)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBooking(booking); } }}
                           className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
                         >
                           <div className="flex items-center justify-between mb-2">

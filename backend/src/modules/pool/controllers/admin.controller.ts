@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from "../../../database/connection.js";
 import { logger } from "../../../utils/logger.js";
 import dayjs from 'dayjs';
@@ -12,8 +13,7 @@ import { emitToUnit } from "../../../socket/index.js";
 /**
  * Get current pool capacity
  */
-export async function getCurrentCapacity(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getCurrentCapacity = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { sessionId, moduleId } = req.query;
     const today = dayjs().startOf('day').toISOString();
@@ -60,16 +60,12 @@ export async function getCurrentCapacity(req: Request, res: Response, next: Next
         percentFull: Math.round((currentOccupancy / maxCapacity) * 100),
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get daily report
  */
-export async function getDailyReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getDailyReport = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { date } = req.query;
     const targetDate = date ? dayjs(date as string) : dayjs();
@@ -103,16 +99,12 @@ export async function getDailyReport(req: Request, res: Response, next: NextFunc
         },
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get pool settings
  */
-export async function getPoolSettings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getPoolSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
     const { data: settings, error } = await supabase
@@ -137,16 +129,12 @@ export async function getPoolSettings(req: Request, res: Response, next: NextFun
     };
 
     res.json({ success: true, data: defaultSettings });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Update pool settings
  */
-export async function updatePoolSettings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updatePoolSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const settings = req.body;
 
@@ -165,16 +153,12 @@ export async function updatePoolSettings(req: Request, res: Response, next: Next
     }
 
     res.json({ success: true, message: 'Pool settings updated' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Reset occupancy counter
  */
-export async function resetOccupancy(req: Request, res: Response, next: NextFunction) {
-  try {
+export const resetOccupancy = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
     await supabase
@@ -192,16 +176,12 @@ export async function resetOccupancy(req: Request, res: Response, next: NextFunc
     emitToUnit('pool', 'pool:occupancy:reset', { currentOccupancy: 0 });
 
     res.json({ success: true, message: 'Occupancy reset to 0' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get maintenance logs
  */
-export async function getMaintenanceLogs(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getMaintenanceLogs = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { moduleId } = req.query;
 
@@ -217,16 +197,12 @@ export async function getMaintenanceLogs(req: Request, res: Response, next: Next
     const { data: logs, error } = await query;
     if (error) throw error;
     res.json({ success: true, data: logs || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Create maintenance log
  */
-export async function createMaintenanceLog(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createMaintenanceLog = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { type, readings, notes, moduleId } = req.body;
 
@@ -244,7 +220,4 @@ export async function createMaintenanceLog(req: Request, res: Response, next: Ne
 
     if (error) throw error;
     res.status(201).json({ success: true, data: log });
-  } catch (error) {
-    next(error);
-  }
-}
+});

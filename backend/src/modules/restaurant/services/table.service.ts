@@ -8,7 +8,7 @@ export async function getAllTables() {
     .from('restaurant_tables')
     .select('*')
     .eq('is_active', true)
-    .order('table_number', { ascending: true });
+    .order('number', { ascending: true });
 
   if (error) throw error;
   return data || [];
@@ -40,10 +40,10 @@ export async function createTable(data: {
   const { data: table, error } = await supabase
     .from('restaurant_tables')
     .insert({
-      table_number: data.tableNumber,
+      number: parseInt(data.tableNumber) || 0,
+      name: `Table ${data.tableNumber}`,
       capacity: data.capacity,
-      location: data.location,
-      qr_code: qrCode,
+      section: data.location || 'Main',
       is_active: true,
     })
     .select()
@@ -62,9 +62,9 @@ export async function updateTable(id: string, data: Partial<{
   const supabase = getSupabase();
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
   
-  if (data.tableNumber !== undefined) updateData.table_number = data.tableNumber;
+  if (data.tableNumber !== undefined) updateData.number = parseInt(data.tableNumber) || 0;
   if (data.capacity !== undefined) updateData.capacity = data.capacity;
-  if (data.location !== undefined) updateData.location = data.location;
+  if (data.location !== undefined) updateData.section = data.location;
   if (data.isActive !== undefined) updateData.is_active = data.isActive;
 
   const { data: table, error } = await supabase

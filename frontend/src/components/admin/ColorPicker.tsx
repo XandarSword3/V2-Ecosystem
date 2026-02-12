@@ -11,14 +11,15 @@ interface ColorPickerProps {
 
 export const ColorPicker: React.FC<ColorPickerProps> = ({ name, label, defaultValue }) => {
   const { register, watch, setValue } = useFormContext();
-  const currentColor = watch(name, defaultValue);
+  const formValue = watch(name);
+  const currentColor = formValue || defaultValue;
 
   useEffect(() => {
     // Set the initial value if it's not already set
-    if (defaultValue && !currentColor) {
+    if (defaultValue && !formValue) {
       setValue(name, defaultValue);
     }
-  }, [defaultValue, currentColor, name, setValue]);
+  }, [defaultValue, formValue, name, setValue]);
 
   return (
     <div>

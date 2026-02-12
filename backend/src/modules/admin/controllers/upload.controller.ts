@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection.js';
 import { logActivity } from '../../../utils/activityLogger.js';
 import { logger } from '../../../utils/logger.js';
@@ -63,8 +64,7 @@ async function ensureBucket() {
  * - type: 'logo' | 'favicon' | 'image'
  * - filename: Original filename
  */
-export async function uploadFile(req: Request, res: Response, next: NextFunction) {
-  try {
+export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = req.user?.userId;
     
@@ -209,16 +209,12 @@ export async function uploadFile(req: Request, res: Response, next: NextFunction
         size: fileBuffer.length,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Delete an uploaded file
  */
-export async function deleteFile(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteFile = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = req.user?.userId;
     const { path } = req.params;
@@ -254,16 +250,12 @@ export async function deleteFile(req: Request, res: Response, next: NextFunction
       success: true,
       message: 'File deleted successfully',
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * List uploaded files by type
  */
-export async function listFiles(req: Request, res: Response, next: NextFunction) {
-  try {
+export const listFiles = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { type } = req.query;
     
@@ -300,16 +292,12 @@ export async function listFiles(req: Request, res: Response, next: NextFunction)
       success: true,
       data: files,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get current branding (logo/favicon URLs)
  */
-export async function getBranding(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getBranding = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     
     const { data, error } = await supabase
@@ -331,7 +319,4 @@ export async function getBranding(req: Request, res: Response, next: NextFunctio
       success: true,
       data: branding,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});

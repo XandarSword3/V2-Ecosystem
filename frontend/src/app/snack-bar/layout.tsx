@@ -2,12 +2,12 @@ import { Metadata } from 'next';
 import { JsonLd, generateSnackBarSchema, generateBreadcrumbSchema } from '@/lib/structured-data';
 
 export const metadata: Metadata = {
-  title: 'Snack Bar | V2 Resort',
-  description: 'Quick bites and refreshing beverages at V2 Resort. Sandwiches, drinks, snacks, and ice cream available poolside.',
-  keywords: ['snack bar', 'resort', 'V2 Resort', 'poolside snacks', 'drinks', 'ice cream', 'sandwiches'],
+  title: 'Snack Bar | Iron Paradise Gym',
+  description: 'Quick bites and refreshing beverages at Iron Paradise Gym. Sandwiches, drinks, snacks, and ice cream available poolside.',
+  keywords: ['snack bar', 'resort', 'Iron Paradise Gym', 'poolside snacks', 'drinks', 'ice cream', 'sandwiches'],
   openGraph: {
-    title: 'Snack Bar | V2 Resort',
-    description: 'Quick bites and refreshing beverages at V2 Resort. Perfect for a poolside snack!',
+    title: 'Snack Bar | Iron Paradise Gym',
+    description: 'Quick bites and refreshing beverages at Iron Paradise Gym. Perfect for a poolside snack!',
     type: 'website',
     url: 'https://v2-ecosystem.vercel.app/snack-bar',
   },
@@ -19,8 +19,8 @@ export default function SnackBarLayout({
   children: React.ReactNode;
 }) {
   const snackBarSchema = generateSnackBarSchema({
-    name: 'V2 Resort Snack Bar',
-    description: 'Quick bites and refreshing beverages at V2 Resort. Sandwiches, drinks, snacks, and ice cream available poolside.',
+    name: 'Iron Paradise Gym Snack Bar',
+    description: 'Quick bites and refreshing beverages at Iron Paradise Gym. Sandwiches, drinks, snacks, and ice cream available poolside.',
     url: 'https://v2-ecosystem.vercel.app/snack-bar',
     priceRange: '$',
   });
@@ -37,8 +37,8 @@ export default function SnackBarLayout({
       
       {/* Static content for bots/LLMs - hidden when JS runs, visible in raw HTML */}
       <div id="static-snackbar-content" className="sr-only">
-        <h1>V2 Resort Snack Bar</h1>
-        <p>Quick bites and refreshing beverages at V2 Resort. Perfect for a poolside snack or light meal.</p>
+        <h1>Iron Paradise Gym Snack Bar</h1>
+        <p>Quick bites and refreshing beverages at Iron Paradise Gym. Perfect for a poolside snack or light meal.</p>
         
         <h2>Menu Categories</h2>
         
@@ -55,7 +55,7 @@ export default function SnackBarLayout({
         <p>Cool treats for hot days. Various flavors of ice cream and frozen desserts to satisfy your sweet tooth.</p>
         
         <h2>About Our Snack Bar</h2>
-        <p>Located poolside at V2 Resort for your convenience. Our snack bar offers quick service so you can get back to enjoying the pool. All items are prepared fresh and available for immediate pickup or poolside delivery.</p>
+        <p>Located poolside at Iron Paradise Gym for your convenience. Our snack bar offers quick service so you can get back to enjoying the pool. All items are prepared fresh and available for immediate pickup or poolside delivery.</p>
         
         <h2>Hours</h2>
         <p>Open during pool hours for your convenience.</p>
@@ -65,7 +65,7 @@ export default function SnackBarLayout({
         
         <h2>Contact</h2>
         <p>For snack bar inquiries:</p>
-        <p>Email: bookings@v2resort.com</p>
+        <p>Email: bookings@ironparadisegym.com</p>
         <p>Phone: +1 234 567 8900</p>
         <p>Address: 123 Resort Boulevard, Global City</p>
         

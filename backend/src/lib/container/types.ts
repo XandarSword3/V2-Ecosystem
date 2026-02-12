@@ -189,12 +189,25 @@ export interface RestaurantOrder {
   delivery_fee: string;
   discount_amount: string;
   total_amount: string;
+  modifiers_total?: string;  // NEW: Total price of all modifiers
   special_instructions?: string;
   estimated_ready_time?: string;
   payment_status: 'pending' | 'paid' | 'refunded';
   payment_method?: 'cash' | 'card' | 'whish' | 'online' | 'room_charge';
   created_at: string;
   updated_at: string;
+}
+
+export interface SelectedModifier {
+  optionId: string;
+  optionName: string;
+  groupId: string;
+  groupName: string;
+  modifierType: 'add' | 'remove' | 'swap';
+  priceAdjustment: number;
+  quantity: number;
+  inventoryItemId?: string;
+  inventoryQuantity?: number;
 }
 
 export interface RestaurantOrderItem {
@@ -205,6 +218,8 @@ export interface RestaurantOrderItem {
   unit_price: string;
   subtotal: string;
   special_instructions?: string;
+  selected_modifiers?: SelectedModifier[];  // NEW: Modifiers for this item
+  modifier_total?: string;  // NEW: Total price of modifiers for this item
   created_at: string;
 }
 

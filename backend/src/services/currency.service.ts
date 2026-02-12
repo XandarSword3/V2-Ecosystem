@@ -3,9 +3,9 @@
  * Handles currency conversion and management
  */
 
-import { supabase } from '../lib/supabase';
+import { supabase } from "../lib/supabase.js";
 import Stripe from 'stripe';
-import { logger } from '../utils/logger';
+import { logger } from "../utils/logger.js";
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {

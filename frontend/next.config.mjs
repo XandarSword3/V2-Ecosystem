@@ -27,6 +27,18 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-resort-backend.onrender.com' : 'http://localhost:3005'),
     NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-resort-backend.onrender.com' : 'http://localhost:3005'),
   },
+
+  // URL redirects for deprecated routes (point old hardcoded paths to dynamic routes)
+  async redirects() {
+    return [
+      // Snack Bar redirects (from old /admin/snack/* to new /admin/snack-bar/*)
+      { source: '/admin/snack/menu', destination: '/admin/snack-bar/menu', permanent: true },
+      { source: '/admin/snack/categories', destination: '/admin/snack-bar/categories', permanent: true },
+      { source: '/admin/snack/orders', destination: '/admin/snack-bar/orders', permanent: true },
+      // Note: /admin/pool/*, /admin/restaurant/*, and /admin/chalets/* routes 
+      // now handled by [slug] dynamic routes - no redirects needed
+    ];
+  },
 };
 
 // Sentry configuration options

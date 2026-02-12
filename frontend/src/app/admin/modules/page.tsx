@@ -17,6 +17,7 @@ interface ModuleFormData {
   description: string;
   template_type: string;
   is_active: boolean;
+  show_in_main: boolean;
   settings: ModuleSettings;
 }
 
@@ -114,7 +115,8 @@ export default function ModulesPage() {
       )}
 
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-hidden border border-slate-200 dark:border-slate-700">
-        <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
           <thead className="bg-slate-50 dark:bg-slate-900/50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -163,37 +165,43 @@ export default function ModulesPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => router.push(`/admin/modules/builder/${module.id}`)}
-                    className="text-indigo-600 hover:text-indigo-900 dark:hover:text-indigo-400 mr-4"
-                    title="Edit User Interface"
-                  >
-                    <LayoutTemplate className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setEditingModule(module)}
-                    className="text-primary-600 hover:text-primary-900 dark:hover:text-primary-400 mr-4"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      const input = prompt('Type "Delete" to confirm hard deletion of this module. This action is irreversible.');
-                      if (input === 'Delete') {
-                        deleteMutation.mutate({ id: module.id, force: true });
-                      } else if (input !== null) {
-                        toast.error('You must type "Delete" exactly to confirm.');
-                      }
-                    }}
-                    className="text-red-600 hover:text-red-900 dark:hover:text-red-400"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-3">
+                    <button
+                      onClick={() => router.push(`/admin/modules/builder/${module.id}`)}
+                      className="flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-xs font-medium"
+                      title="Customize Module Interface"
+                    >
+                      <LayoutTemplate className="w-4 h-4 mr-1.5" />
+                      Builder
+                    </button>
+                    <button
+                      onClick={() => setEditingModule(module)}
+                      className="p-1.5 text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded transition-colors"
+                      title="Edit Module Settings"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        const input = prompt('Type "Delete" to confirm hard deletion of this module. This action is irreversible.');
+                        if (input === 'Delete') {
+                          deleteMutation.mutate({ id: module.id, force: true });
+                        } else if (input !== null) {
+                          toast.error('You must type "Delete" exactly to confirm.');
+                        }
+                      }}
+                      className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                      title="Delete Module"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -213,6 +221,7 @@ function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: ModuleFormPr
     description: initialData?.description || '',
     template_type: initialData?.template_type || 'menu_service',
     is_active: initialData?.is_active ?? true,
+    show_in_main: initialData?.show_in_main ?? true,
     settings: initialData?.settings || {
       header_color: '#0ea5e9',
       accent_color: '#6366f1',
@@ -324,7 +333,7 @@ function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: ModuleFormPr
               <option value="session_access">Session Access (Pool/Gym/Spa)</option>
             </select>
           </div>
-          <div className="flex items-center pt-6">
+          <div className="flex flex-col gap-2 pt-6">
             <label className="flex items-center cursor-pointer">
               <input
                 type="checkbox"
@@ -333,7 +342,18 @@ function ModuleForm({ initialData, onSubmit, onCancel, isLoading }: ModuleFormPr
                 className="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
               />
               <span className="ml-2 text-sm text-slate-700 dark:text-slate-300">
-                Active (Visible to users)
+                Active (Module enabled)
+              </span>
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.show_in_main}
+                onChange={(e) => setFormData({ ...formData, show_in_main: e.target.checked })}
+                className="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
+              />
+              <span className="ml-2 text-sm text-slate-700 dark:text-slate-300">
+                Show on Homepage (Visible to customers)
               </span>
             </label>
           </div>

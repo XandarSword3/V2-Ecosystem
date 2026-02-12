@@ -124,15 +124,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<User | TwoFactorRequired> => {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+    const response = await api.post('/auth/login', { email, password });
+    const data = response.data;
 
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
+    if (!data.success) {
       throw new Error(data.error || 'Login failed');
     }
 
@@ -161,15 +156,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const verify2FA = async (userId: string, code: string): Promise<User> => {
-    const response = await fetch(`${API_BASE_URL}/auth/2fa/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, code }),
-    });
+    const response = await api.post('/auth/2fa/verify', { userId, code });
+    const data = response.data;
 
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
+    if (!data.success) {
       throw new Error(data.error || '2FA verification failed');
     }
 

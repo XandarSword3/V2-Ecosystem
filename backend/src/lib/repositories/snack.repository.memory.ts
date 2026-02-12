@@ -156,7 +156,7 @@ export function createInMemorySnackRepository(): InMemorySnackRepository {
         ...order,
         items: items.map(oi => ({
           ...oi,
-          item: this.getAllItems().find(i => i.id === oi.snack_item_id),
+          item: this.getAllItems().find((i: SnackItem) => i.id === oi.snack_item_id),
         })),
       } as SnackOrderWithItems;
     },
@@ -185,7 +185,7 @@ export function createInMemorySnackRepository(): InMemorySnackRepository {
         ...order,
         items: (orderItems.get(order.id) || []).map(oi => ({
           ...oi,
-          item: this.getAllItems().find(i => i.id === oi.snack_item_id),
+          item: this.getAllItems().find((i: SnackItem) => i.id === oi.snack_item_id),
         })),
       })) as SnackOrderWithItems[];
     },

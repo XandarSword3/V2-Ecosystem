@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection.js";
 import { emitToAll } from "../../socket/index";
 import { logActivity } from "../../utils/activityLogger";
@@ -38,8 +39,7 @@ function deriveSlugFromPerm(perm: PermissionRow | null | undefined): string | nu
 // Dashboard
 // ============================================
 
-export async function getDashboard(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
@@ -226,14 +226,9 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
         }
       },
     });
-  } catch (error) {
-    logger.error('[ADMIN] Dashboard error:', error);
-    next(error);
-  }
-}
+});
 
-export async function getRevenueStats(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getRevenueStats = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { startDate, endDate } = req.query;
 
@@ -272,17 +267,13 @@ export async function getRevenueStats(req: Request, res: Response, next: NextFun
         transactionCount: payments.length,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Users
 // ============================================
 
-export async function getUsers(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getUsers = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { page = 1, limit = 20, search } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -329,13 +320,9 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
     );
 
     res.json({ success: true, data: usersWithRoles });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function createUser(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createUser = asyncHandler(async (req: Request, res: Response) => {
     // Validate input with strong password requirements
     const validatedData = validateBody(createUserSchema, req.body);
     const { email, password, full_name, phone, roles } = validatedData;
@@ -399,13 +386,9 @@ export async function createUser(req: Request, res: Response, next: NextFunction
     });
 
     res.status(201).json({ success: true, data: { ...user, roles } });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getUser(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getUser = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
 
@@ -601,13 +584,9 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
 
       return res.json({ success: true, data: detailedUser });
     }
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateUser(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(adminUpdateUserSchema, req.body);
     const supabase = getSupabase();
     const updateData: Record<string, unknown> = {
@@ -637,13 +616,9 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
     });
 
     res.json({ success: true, data: user });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateUserRoles(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateUserRoles = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(assignUserRolesSchema, req.body);
     const supabase = getSupabase();
     const { roleIds } = validatedData;
@@ -681,13 +656,9 @@ export async function updateUserRoles(req: Request, res: Response, next: NextFun
     });
 
     res.json({ success: true, message: 'Roles updated' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteUser(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { error } = await supabase
       .from('users')
@@ -707,17 +678,13 @@ export async function deleteUser(req: Request, res: Response, next: NextFunction
     });
 
     res.json({ success: true, message: 'User deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Roles
 // ============================================
 
-export async function getRoles(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getRoles = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: rolesList, error } = await supabase
       .from('roles')
@@ -764,13 +731,9 @@ export async function getRoles(req: Request, res: Response, next: NextFunction) 
     }));
 
     res.json({ success: true, data: enriched });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function createRole(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createRole = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(createRoleSchema, req.body);
     const supabase = getSupabase();
     const { data: role, error } = await supabase
@@ -795,13 +758,9 @@ export async function createRole(req: Request, res: Response, next: NextFunction
     });
 
     res.status(201).json({ success: true, data: role });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateRole(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateRole = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(updateRoleSchema, req.body);
     const supabase = getSupabase();
     const updateData: Record<string, unknown> = {
@@ -830,17 +789,13 @@ export async function updateRole(req: Request, res: Response, next: NextFunction
     });
 
     res.json({ success: true, data: role });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Settings & Audit
 // ============================================
 
-export async function getSettings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
     // Get all settings from database (existing schema uses 'key' and 'value' columns)
@@ -912,13 +867,9 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
     }
 
     res.json({ success: true, data: combinedSettings });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateSettings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const settings = req.body;
     const userId = req.user?.userId;
@@ -1073,13 +1024,9 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
     });
 
     res.json({ success: true, message: 'Settings saved successfully' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getAuditLogs(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getAuditLogs = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { limit = 50, offset = 0 } = req.query;
 
@@ -1120,17 +1067,13 @@ export async function getAuditLogs(req: Request, res: Response, next: NextFuncti
     }));
 
     res.json({ success: true, data: mappedLogs });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Reports
 // ============================================
 
-export async function getOverviewReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getOverviewReport = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { range = 'month' } = req.query;
 
@@ -1282,13 +1225,9 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
         topItems,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function exportReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const exportReport = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { type, format = 'csv', range = 'month' } = req.query;
 
@@ -1456,17 +1395,13 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
     return res.send(csv);
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // Notifications
 // ============================================
 
-export async function getNotifications(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getNotifications = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = req.user?.userId;
 
@@ -1553,13 +1488,9 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
     });
 
     res.json({ success: true, data: notifications.slice(0, 10) });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getOccupancyReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getOccupancyReport = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { range = 'month' } = req.query;
 
@@ -1623,13 +1554,9 @@ export async function getOccupancyReport(req: Request, res: Response, next: Next
         }
       }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getCustomerAnalytics(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getCustomerAnalytics = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { range = 'month' } = req.query;
 
@@ -1710,7 +1637,4 @@ export async function getCustomerAnalytics(req: Request, res: Response, next: Ne
         }
       }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});

@@ -1,5 +1,5 @@
-import { getPool, initializeDatabase, closeDatabase } from './connection';
-import { logger } from '../utils/logger';
+import { getPool, initializeDatabase, closeDatabase } from "./connection.js";
+import { logger } from "../utils/logger.js";
 import * as fs from 'fs';
 import * as path from 'path';
 

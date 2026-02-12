@@ -58,7 +58,7 @@ interface FooterConfig {
 }
 
 const DEFAULT_CONFIG: FooterConfig = {
-  logo: { text: 'V2 Resort', showIcon: true },
+  logo: { text: 'Iron Paradise Gym', showIcon: true },
   description: 'Premium resort experience in the heart of Lebanon.',
   columns: [
     {
@@ -88,7 +88,7 @@ const DEFAULT_CONFIG: FooterConfig = {
     showPhone: true,
     showEmail: true
   },
-  copyright: '© {year} V2 Resort. All rights reserved.'
+  copyright: '© {year} Iron Paradise Gym. All rights reserved.'
 };
 
 export default function FooterSettingsPage() {
@@ -104,7 +104,22 @@ export default function FooterSettingsPage() {
     try {
       const { data } = await api.get('/admin/settings');
       if (data?.data?.footer) {
-        setConfig(data.data.footer);
+        // deeply merge with default config to ensure all properties exist
+        setConfig(prev => ({
+          ...DEFAULT_CONFIG,
+          ...data.data.footer,
+          logo: {
+            ...DEFAULT_CONFIG.logo,
+            ...(data.data.footer.logo || {})
+          },
+          contact: {
+            ...DEFAULT_CONFIG.contact,
+            ...(data.data.footer.contact || {})
+          },
+          // Ensure arrays are arrays
+          columns: data.data.footer.columns || DEFAULT_CONFIG.columns,
+          socials: data.data.footer.socials || DEFAULT_CONFIG.socials,
+        }));
       }
     } catch (error) {
       console.error('Failed to fetch footer settings:', error);
@@ -117,7 +132,7 @@ export default function FooterSettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.put('/admin/settings', { key: 'footer', value: config });
+      await api.put('/admin/settings', { footer: config });
       toast.success('Footer configuration saved successfully');
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { error?: string } } };
@@ -233,7 +248,7 @@ export default function FooterSettingsPage() {
                   <Input
                     value={config.logo.text}
                     onChange={(e) => setConfig({ ...config, logo: { ...config.logo, text: e.target.value } })}
-                    placeholder="V2 Resort"
+                    placeholder="Iron Paradise Gym"
                   />
                   <Button
                     variant={config.logo.showIcon ? 'primary' : 'outline'}
@@ -336,7 +351,7 @@ export default function FooterSettingsPage() {
               <Input
                 value={config.copyright}
                 onChange={(e) => setConfig({ ...config, copyright: e.target.value })}
-                placeholder="© {year} V2 Resort. All rights reserved."
+                placeholder="© {year} Iron Paradise Gym. All rights reserved."
               />
               <p className="text-xs text-slate-500 mt-2">Use {'{year}'} to insert the current year.</p>
             </CardContent>

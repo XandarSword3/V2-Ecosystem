@@ -128,7 +128,7 @@ export default function AdminReviewsPage() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
-        r.text.toLowerCase().includes(query) ||
+        (r.text || '').toLowerCase().includes(query) ||
         r.users?.full_name?.toLowerCase().includes(query) ||
         r.users?.email?.toLowerCase().includes(query)
       );
@@ -338,7 +338,7 @@ export default function AdminReviewsPage() {
                             </span>
                             <span className={`flex items-center gap-1 text-sm ${serviceColor}`}>
                               <ServiceIcon className="w-4 h-4" />
-                              {review.service_type.replace('_', ' ')}
+                              {(review.service_type || 'general').replace('_', ' ')}
                             </span>
                           </div>
 

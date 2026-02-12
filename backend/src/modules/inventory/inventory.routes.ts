@@ -1,5 +1,6 @@
 import { Router, RequestHandler } from 'express';
 import { inventoryController } from './inventory.controller.js';
+import { inventoryAdvancedController } from './inventory-advanced.controller.js';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 
 const router = Router();
@@ -7,6 +8,12 @@ const router = Router();
 // All routes require staff/admin authentication
 const staffAuth: RequestHandler[] = [authenticate, authorize('staff', 'admin', 'super_admin')];
 const adminAuth: RequestHandler[] = [authenticate, authorize('admin', 'super_admin')];
+
+// Recipe / BOM routes (must be before /items/:id to avoid matching)
+router.get('/items/recipe/:menuItemId', ...staffAuth, inventoryAdvancedController.getRecipe.bind(inventoryAdvancedController));
+router.post('/items/recipe/:menuItemId', ...adminAuth, inventoryAdvancedController.createRecipe.bind(inventoryAdvancedController));
+router.get('/sessions/recipe/:sessionId', ...staffAuth, inventoryAdvancedController.getRecipe.bind(inventoryAdvancedController));
+router.post('/sessions/recipe/:sessionId', ...adminAuth, inventoryAdvancedController.createRecipe.bind(inventoryAdvancedController));
 
 // Categories
 router.get('/categories', ...staffAuth, inventoryController.getCategories.bind(inventoryController));

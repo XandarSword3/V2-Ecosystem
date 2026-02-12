@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from '../../database/connection';
 import { emailService } from '../../services/email.service';
@@ -65,7 +66,7 @@ router.post('/contact', async (req: Request, res: Response, next: NextFunction) 
     try {
       await emailService.sendEmail({
         to: validated.email,
-        subject: 'Thank you for contacting V2 Resort',
+        subject: 'Thank you for contacting Iron Paradise Gym',
         html: `
           <h2>Thank you for reaching out!</h2>
           <p>Dear ${validated.name},</p>
@@ -76,7 +77,7 @@ router.post('/contact', async (req: Request, res: Response, next: NextFunction) 
           <p><strong>Message:</strong></p>
           <p>${validated.message.replace(/\n/g, '<br>')}</p>
           <hr>
-          <p>Best regards,<br>V2 Resort Team</p>
+          <p>Best regards,<br>Iron Paradise Gym Team</p>
         `,
       });
     } catch (emailError) {
@@ -102,8 +103,7 @@ router.post('/contact', async (req: Request, res: Response, next: NextFunction) 
 });
 
 // Get FAQs
-router.get('/faq', async (req: Request, res: Response, next: NextFunction) => {
-  try {
+router.get('/faq', asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
     const { data: faqs, error } = await supabase
@@ -115,9 +115,6 @@ router.get('/faq', async (req: Request, res: Response, next: NextFunction) => {
     if (error) throw error;
 
     res.json({ success: true, data: faqs || [] });
-  } catch (error) {
-    next(error);
-  }
-});
+}));
 
 export default router;

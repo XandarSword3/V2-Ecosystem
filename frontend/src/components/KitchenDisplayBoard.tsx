@@ -92,9 +92,9 @@ const ITEM_STATUS_COLORS = {
 
 export function KitchenDisplayBoard() {
   const t = useTranslations('kitchen');
-  const socket = useSocket();
+  const { socket } = useSocket();
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  
+
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [stats, setStats] = useState<KitchenStats>({
     pendingOrders: 0,
@@ -118,7 +118,7 @@ export function KitchenDisplayBoard() {
   const playNotification = useCallback(() => {
     if (soundEnabled && audioRef.current) {
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch(() => { });
     }
   }, [soundEnabled]);
 
@@ -129,7 +129,7 @@ export function KitchenDisplayBoard() {
         api.get('/restaurant/kitchen/orders'),
         api.get('/restaurant/kitchen/stats'),
       ]);
-      
+
       setOrders(ordersRes.data.data);
       setStats(statsRes.data.data);
     } catch (error) {
@@ -149,6 +149,9 @@ export function KitchenDisplayBoard() {
   useEffect(() => {
     if (!socket) return;
 
+    // FIX: Iteration 14 - Join kitchen room so we receive room-based emits from backend
+    socket.emit('join:kitchen');
+
     const handleNewOrder = (order: KitchenOrder) => {
       setOrders(prev => [order, ...prev]);
       setStats(prev => ({
@@ -162,10 +165,12 @@ export function KitchenDisplayBoard() {
       });
     };
 
-    const handleOrderUpdated = (updatedOrder: KitchenOrder) => {
+    // FIX: Iteration 14 - Merge partial order updates instead of full replacement
+    // Backend may emit partial order data (e.g., only status change), so spread preserves existing fields
+    const handleOrderUpdated = (updatedOrder: Partial<KitchenOrder> & { id: string }) => {
       setOrders(prev =>
         prev.map(order =>
-          order.id === updatedOrder.id ? updatedOrder : order
+          order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
         )
       );
     };
@@ -300,6 +305,7 @@ export function KitchenDisplayBoard() {
             variant="ghost"
             size="icon"
             onClick={() => setSoundEnabled(!soundEnabled)}
+            aria-label={soundEnabled ? 'Mute sound' : 'Enable sound'} // FIX Iter-8: aria-label
           >
             {soundEnabled ? (
               <Volume2 className="h-5 w-5" />
@@ -307,10 +313,10 @@ export function KitchenDisplayBoard() {
               <VolumeX className="h-5 w-5" />
             )}
           </Button>
-          <Button variant="ghost" size="icon" onClick={toggleFullscreen}>
+          <Button variant="ghost" size="icon" onClick={toggleFullscreen} aria-label="Toggle fullscreen"> {/* FIX Iter-8: aria-label */}
             <Maximize2 className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={fetchOrders}>
+          <Button variant="ghost" size="icon" onClick={() => fetchOrders()} aria-label="Refresh orders"> {/* FIX Iter-8: aria-label */}
             <RefreshCw className="h-5 w-5" />
           </Button>
         </div>

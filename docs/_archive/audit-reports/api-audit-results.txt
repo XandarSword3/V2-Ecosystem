@@ -1,0 +1,47 @@
+﻿=== PUBLIC ENDPOINTS ===
+OK	200	/health	Health Check
+OK	200	/api/health	API Health
+OK	200	/api/settings	Site Settings
+OK	200	/api/modules	Module List
+OK	200	/api/weather	Weather
+OK	200	/api/v1/units	Generic Units
+OK	200	/api/v1/facilities/sessions	Facility Sessions
+OK	200	/api/v1/dining/menu	Dining Menu
+OK	200	/api/v1/terminology	Terminology
+OK	200	/api/v1/restaurant/menu	Restaurant Menu
+OK	200	/api/v1/restaurant/menu/categories	Menu Categories
+OK	200	/api/v1/pool/sessions	Pool Sessions
+OK	200	/api/v1/chalets	Chalets
+OK	200	/api/v1/loyalty/settings	Loyalty Settings
+OK	200	/api/v1/loyalty/tiers	Loyalty Tiers
+OK	200	/api/v1/reviews	Public Reviews
+
+=== PROTECTED ENDPOINTS ===
+OK	200	/api/v1/auth/me	Current User
+FAIL	500	/api/v1/users	User List
+OK	200	/api/v1/admin/settings	Admin Settings
+OK	200	/api/v1/admin/modules	Admin Modules
+OK	200	/api/v1/manager/approvals	Manager Approvals
+OK	200	/api/v1/manager/approvals/pending	Pending Approvals
+OK	200	/api/v1/manager/approvals/stats	Approval Stats
+OK	200	/api/v1/manager/shifts	Manager Shifts
+OK	200	/api/v1/inventory/categories	Inventory Categories
+OK	200	/api/v1/inventory/items	Inventory Items
+OK	200	/api/v1/inventory/transactions	Inventory Transactions
+OK	200	/api/v1/inventory/alerts	Stock Alerts
+OK	200	/api/v1/coupons	Coupons
+OK	200	/api/v1/giftcards	Gift Cards
+OK	200	/api/v1/loyalty/accounts	Loyalty Accounts
+OK	200	/api/v1/loyalty/stats	Loyalty Stats
+OK	200	/api/v1/reviews/admin	Admin Reviews
+OK	200	/api/v1/housekeeping/tasks	Housekeeping Tasks
+OK	200	/api/v1/payments/methods	Payment Methods
+FAIL	500	/api/v1/devices	Devices
+FAIL	404	/api/v1/promotions	Promotions
+FAIL	404	/api/v1/reports	Reports
+FAIL	404	/api/v1/restaurant/orders	Restaurant Orders
+OK	200	/api/v1/restaurant/waitlist	Waitlist
+FAIL	404	/api/v1/pool/tickets	Pool Tickets
+FAIL	404	/api/v1/pool/bookings	Pool Bookings
+FAIL	404	/api/v1/snack/menu	Snack Menu
+FAIL	404	/api/v1/snack/orders	Snack Orders

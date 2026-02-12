@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency } from '@/lib/utils';
+import { currencySymbols } from '@/stores/settingsStore'; // FIX Iter-15: Import for currency-aware symbol
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -64,28 +65,32 @@ export default function PublicGiftCardsPage() {
     senderEmail: '', // For guests
   });
 
+  // FIX Iter-16: AbortController to prevent state updates on unmounted component
   useEffect(() => {
-    loadTemplates();
-  }, []);
-
-  const loadTemplates = async () => {
-    try {
-      const res = await api.get('/giftcards/templates');
-      if (res.data.success) {
-        setTemplates(res.data.data.filter((t: GiftCardTemplate) => t.isActive));
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const res = await api.get('/giftcards/templates', { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        if (res.data.success) {
+          setTemplates(res.data.data.filter((t: GiftCardTemplate) => t.isActive));
+        }
+      } catch (err: any) {
+        if (err?.name === 'CanceledError' || controller.signal.aborted) return;
+        // Use defaults if API fails
+        setTemplates([
+          { id: '1', name: 'Classic', amount: 25, design: { background: 'linear-gradient(135deg, #3b82f6, #6366f1)' }, isActive: true },
+          { id: '2', name: 'Premium', amount: 50, design: { background: 'linear-gradient(135deg, #8b5cf6, #a855f7)' }, isActive: true },
+          { id: '3', name: 'Deluxe', amount: 100, design: { background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }, isActive: true },
+          { id: '4', name: 'Ultimate', amount: 200, design: { background: 'linear-gradient(135deg, #10b981, #14b8a6)' }, isActive: true },
+        ]);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
       }
-    } catch {
-      // Use defaults if API fails
-      setTemplates([
-        { id: '1', name: 'Classic', amount: 25, design: { background: 'linear-gradient(135deg, #3b82f6, #6366f1)' }, isActive: true },
-        { id: '2', name: 'Premium', amount: 50, design: { background: 'linear-gradient(135deg, #8b5cf6, #a855f7)' }, isActive: true },
-        { id: '3', name: 'Deluxe', amount: 100, design: { background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }, isActive: true },
-        { id: '4', name: 'Ultimate', amount: 200, design: { background: 'linear-gradient(135deg, #10b981, #14b8a6)' }, isActive: true },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    load();
+    return () => controller.abort();
+  }, []);
 
   const handleSelectAmount = (template: GiftCardTemplate | null, amount?: number) => {
     if (template) {
@@ -106,7 +111,7 @@ export default function PublicGiftCardsPage() {
 
     const amount = selectedTemplate?.amount || parseFloat(customAmount);
     if (!amount || amount < 10) {
-      toast.error('Minimum gift card amount is $10');
+      toast.error(`Minimum gift card amount is ${formatCurrency(10)}`);
       return;
     }
 
@@ -199,7 +204,7 @@ export default function PublicGiftCardsPage() {
             Give the Gift of Experience
           </h1>
           <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-            V2 Resort gift cards are the perfect present for any occasion. 
+            Iron Paradise Gym gift cards are the perfect present for any occasion. 
             Redeemable for pool access, chalets, dining, and more.
           </p>
           
@@ -284,11 +289,11 @@ export default function PublicGiftCardsPage() {
 
                           <div className="border-t dark:border-slate-700 pt-6">
                             <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                              Or enter a custom amount ($10 - $1,000)
+                              Or enter a custom amount ({formatCurrency(10)} - {formatCurrency(1000)})
                             </p>
                             <div className="flex gap-3">
                               <div className="relative flex-1">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">{currencySymbols.USD}</span>
                                 <Input
                                   type="number"
                                   placeholder="50"
@@ -394,7 +399,7 @@ export default function PublicGiftCardsPage() {
                           <textarea
                             className="w-full p-3 border rounded-lg dark:bg-slate-700 dark:border-slate-600 resize-none"
                             rows={3}
-                            placeholder="Happy Birthday! Hope you enjoy a relaxing day at V2 Resort..."
+                            placeholder="Happy Birthday! Hope you enjoy a relaxing day at Iron Paradise Gym..."
                             value={giftDetails.message}
                             onChange={(e) => setGiftDetails(d => ({ ...d, message: e.target.value }))}
                           />

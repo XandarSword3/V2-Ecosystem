@@ -12,7 +12,7 @@ import {
   Check,
   Palette
 } from 'lucide-react';
-import { useSettingsStore, type TransitionStyle } from '@/lib/stores/settingsStore';
+import { useSettingsStore, type TransitionStyle } from '@/stores/settingsStore';
 
 interface UserPreferencesModalProps {
   isOpen: boolean;
@@ -56,7 +56,8 @@ export function UserPreferencesModal({ isOpen, onClose }: UserPreferencesModalPr
           exit={{ opacity: 0 }}
           onClick={handleBackdropClick}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        >
+          role="dialog" aria-modal="true" aria-label="User Preferences" onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Escape') onClose(); }}
+        >{/* FIX Iter-21: modal a11y — role, aria-modal, aria-label, Escape handler */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -80,8 +81,9 @@ export function UserPreferencesModal({ isOpen, onClose }: UserPreferencesModalPr
                   whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={onClose}
+                  aria-label="Close preferences"
                   className="p-2 rounded-xl bg-white/20 hover:bg-white/30 transition-colors"
-                >
+                >{/* FIX Iter-21: close button a11y */}
                   <X className="w-5 h-5" />
                 </motion.button>
               </div>

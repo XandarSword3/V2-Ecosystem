@@ -5,10 +5,11 @@
  * Supports both chalet and pool ticket modifications.
  */
 
-import { prisma } from '../config/database.js';
+import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
 import { stripeClient } from '../config/stripe.js';
 import { emailService } from './email.service.js';
+import { logActivity } from '../utils/activityLogger.js'; // FIX: Iteration 9 - Audit trail for cancellations
 
 export enum BookingStatus {
   PENDING = 'PENDING',
@@ -107,14 +108,13 @@ export async function cancelChaletBooking(
   reason?: string
 ): Promise<CancellationResult> {
   try {
-    const booking = await prisma.chaletBooking.findUnique({
-      where: { id: bookingId },
-      include: {
-        chalet: true,
-        user: true,
-        payments: true,
-      },
-    });
+    const supabase = getSupabase();
+    const { data: booking, error: bookingError } = await supabase
+      .from('chalet_bookings')
+      .select('*, chalet:chalets(*), user:users(*), payments(*)')
+      .eq('id', bookingId)
+      .maybeSingle();
+    if (bookingError) throw bookingError;
 
     if (!booking) {
       return {
@@ -126,7 +126,7 @@ export async function cancelChaletBooking(
     }
 
     // Verify ownership
-    if (booking.userId !== userId) {
+    if (booking.user_id !== userId) {
       return {
         success: false,
         message: 'Unauthorized to cancel this booking',
@@ -155,22 +155,24 @@ export async function cancelChaletBooking(
     }
 
     // Get cancellation policy
-    const policy = getCancellationPolicy(new Date(booking.checkInDate));
+    const policy = getCancellationPolicy(new Date(booking.check_in_date || new Date()));
     const { refundAmount, creditAmount } = calculateRefund(
-      Number(booking.totalPrice || 0),
+      Number(booking.total_price || 0),
       policy
     );
 
     // Process refund through Stripe if applicable
+    let stripeRefundId: string | null = null;
     if (refundAmount > 0 && booking.payments.length > 0) {
       const payment = booking.payments[0];
-      if (payment.stripePaymentIntentId) {
+      if (payment.stripe_payment_intent_id) {
         try {
-          await stripeClient.refunds.create({
-            payment_intent: payment.stripePaymentIntentId,
+          const refund = await stripeClient.refunds.create({
+            payment_intent: payment.stripe_payment_intent_id,
             amount: Math.round(refundAmount * 100), // Convert to cents
             reason: 'requested_by_customer',
           });
+          stripeRefundId = refund.id;
         } catch (stripeError: any) {
           logger.error('Stripe refund failed', { 
             bookingId, 
@@ -181,29 +183,53 @@ export async function cancelChaletBooking(
       }
     }
 
-    // Update booking status
-    await prisma.chaletBooking.update({
-      where: { id: bookingId },
-      data: {
-        status: BookingStatus.CANCELLED,
-        cancellationReason: reason,
-        cancelledAt: new Date(),
-        refundAmount,
-      },
-    });
-
-    // Add credit to user account if applicable
+    // FIX: Iteration 9 - Ordered DB operations with compensation for atomicity
+    // Step 1: Insert credit FIRST (additive, easily reversible)
+    let creditInsertId: string | null = null;
     if (creditAmount > 0) {
-      await prisma.userCredit.create({
-        data: {
-          userId,
+      const { data: creditData, error: creditError } = await supabase
+        .from('user_credits')
+        .insert({
+          user_id: userId,
           amount: creditAmount,
           type: 'CANCELLATION_CREDIT',
-          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
-          sourceBookingId: bookingId,
-        },
-      });
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
+          source_booking_id: bookingId,
+        })
+        .select('id')
+        .single();
+      if (creditError) {
+        // Log for reconciliation but don't block cancellation
+        logger.error('Credit insert failed during cancellation', { bookingId, userId, creditAmount, error: creditError.message });
+        await logActivity({ user_id: userId, action: 'CANCELLATION_CREDIT_FAILED', resource: 'chalet_bookings', resource_id: bookingId, details: { creditAmount, error: creditError.message, stripeRefundId } });
+      } else {
+        creditInsertId = creditData?.id;
+      }
     }
+
+    // Step 2: Update booking status (critical state change)
+    const { error: updateError } = await supabase
+      .from('chalet_bookings')
+      .update({
+        status: BookingStatus.CANCELLED,
+        cancellation_reason: reason,
+        cancelled_at: new Date().toISOString(),
+        refund_amount: refundAmount,
+      })
+      .eq('id', bookingId);
+    if (updateError) {
+      // Compensate: reverse the credit insert if booking update failed
+      if (creditInsertId) {
+        await supabase.from('user_credits').delete().eq('id', creditInsertId);
+        logger.warn('Rolled back credit insert after booking update failure', { bookingId, creditInsertId });
+      }
+      // Log for reconciliation — Stripe refund may have already occurred
+      await logActivity({ user_id: userId, action: 'CANCELLATION_DB_FAILED', resource: 'chalet_bookings', resource_id: bookingId, details: { error: updateError.message, stripeRefundId, creditRolledBack: !!creditInsertId } });
+      throw updateError;
+    }
+
+    // Audit log: successful cancellation
+    await logActivity({ user_id: userId, action: 'BOOKING_CANCELLED', resource: 'chalet_bookings', resource_id: bookingId, details: { refundAmount, creditAmount, stripeRefundId } });
 
     // Send cancellation email
     await emailService.sendEmail({
@@ -242,20 +268,19 @@ export async function modifyChaletBookingDates(
   newCheckOut: Date
 ): Promise<ModificationResult> {
   try {
-    const booking = await prisma.chaletBooking.findUnique({
-      where: { id: bookingId },
-      include: {
-        chalet: true,
-        user: true,
-        payments: true,
-      },
-    });
+    const supabase = getSupabase();
+    const { data: booking, error: bookingError } = await supabase
+      .from('chalet_bookings')
+      .select('*, chalet:chalets(*), user:users(*), payments(*)')
+      .eq('id', bookingId)
+      .maybeSingle();
+    if (bookingError) throw bookingError;
 
     if (!booking) {
       return { success: false, message: 'Booking not found' };
     }
 
-    if (booking.userId !== userId) {
+    if (booking.user_id !== userId) {
       return { success: false, message: 'Unauthorized to modify this booking' };
     }
 
@@ -265,21 +290,18 @@ export async function modifyChaletBookingDates(
     }
 
     // Check availability for new dates
-    const conflictingBooking = await prisma.chaletBooking.findFirst({
-      where: {
-        chaletId: booking.chaletId,
-        id: { not: bookingId },
-        status: { in: [BookingStatus.CONFIRMED, BookingStatus.PENDING] },
-        OR: [
-          {
-            checkInDate: { lte: newCheckOut },
-            checkOutDate: { gte: newCheckIn },
-          },
-        ],
-      },
-    });
+    const { data: conflictingBookings, error: conflictError } = await supabase
+      .from('chalet_bookings')
+      .select('id')
+      .eq('chalet_id', booking.chalet_id)
+      .neq('id', bookingId)
+      .in('status', [BookingStatus.CONFIRMED, BookingStatus.PENDING])
+      .lte('check_in_date', newCheckOut.toISOString())
+      .gte('check_out_date', newCheckIn.toISOString())
+      .limit(1);
+    if (conflictError) throw conflictError;
 
-    if (conflictingBooking) {
+    if (conflictingBookings && conflictingBookings.length > 0) {
       return { 
         success: false, 
         message: 'Selected dates are not available' 
@@ -297,23 +319,23 @@ export async function modifyChaletBookingDates(
       nights
     );
 
-    const priceDifference = newTotalPrice - Number(booking.totalPrice || 0);
+    const priceDifference = newTotalPrice - Number(booking.total_price || 0);
 
     // Update booking
-    await prisma.chaletBooking.update({
-      where: { id: bookingId },
-      data: {
-        checkInDate: newCheckIn,
-        checkOutDate: newCheckOut,
+    const { error: updateError } = await supabase
+      .from('chalet_bookings')
+      .update({
+        check_in_date: newCheckIn.toISOString(),
+        check_out_date: newCheckOut.toISOString(),
         nights,
-        totalPrice: newTotalPrice,
-        modifiedAt: new Date(),
-      },
-    });
+        total_price: newTotalPrice,
+        modified_at: new Date().toISOString(),
+      })
+      .eq('id', bookingId);
+    if (updateError) throw updateError;
 
     // Handle price difference
     if (priceDifference > 0) {
-      // Additional payment required
       return {
         success: true,
         message: 'Booking dates updated. Additional payment required.',
@@ -321,11 +343,10 @@ export async function modifyChaletBookingDates(
         newPaymentRequired: true,
       };
     } else if (priceDifference < 0) {
-      // Refund difference
       const refundAmount = Math.abs(priceDifference);
-      if (booking.payments[0]?.stripePaymentIntentId) {
+      if (booking.payments[0]?.stripe_payment_intent_id) {
         await stripeClient.refunds.create({
-          payment_intent: booking.payments[0].stripePaymentIntentId,
+          payment_intent: booking.payments[0].stripe_payment_intent_id,
           amount: Math.round(refundAmount * 100),
           reason: 'requested_by_customer',
         });
@@ -356,13 +377,13 @@ export async function cancelPoolTicket(
   reason?: string
 ): Promise<CancellationResult> {
   try {
-    const ticket = await prisma.poolTicket.findUnique({
-      where: { id: ticketId },
-      include: {
-        user: true,
-        payment: true,
-      },
-    });
+    const supabase = getSupabase();
+    const { data: ticket, error: ticketError } = await supabase
+      .from('pool_tickets')
+      .select('*, user:users(*), payment:payments(*)')
+      .eq('id', ticketId)
+      .maybeSingle();
+    if (ticketError) throw ticketError;
 
     if (!ticket) {
       return {
@@ -373,7 +394,7 @@ export async function cancelPoolTicket(
       };
     }
 
-    if (ticket.userId !== userId) {
+    if (ticket.user_id !== userId) {
       return {
         success: false,
         message: 'Unauthorized to cancel this ticket',
@@ -392,7 +413,7 @@ export async function cancelPoolTicket(
     }
 
     // Check if ticket date has passed
-    const ticketDate = new Date(ticket.date);
+    const ticketDate = new Date(ticket.date || new Date());
     const now = new Date();
     
     if (ticketDate < now) {
@@ -407,40 +428,68 @@ export async function cancelPoolTicket(
     // Full refund if more than 24 hours before, otherwise credit
     const hoursUntil = (ticketDate.getTime() - now.getTime()) / (1000 * 60 * 60);
     const refundType = hoursUntil >= 24 ? RefundType.FULL : RefundType.CREDIT;
-    const totalPrice = Number(ticket.totalPrice || 0);
+    const totalPrice = Number(ticket.total_price || 0);
     const refundAmount = refundType === RefundType.FULL ? totalPrice : 0;
     const creditAmount = refundType === RefundType.CREDIT ? totalPrice : 0;
 
     // Process refund
-    if (refundAmount > 0 && ticket.payment?.stripePaymentIntentId) {
-      await stripeClient.refunds.create({
-        payment_intent: ticket.payment.stripePaymentIntentId,
-        amount: Math.round(refundAmount * 100),
-        reason: 'requested_by_customer',
-      });
+    let stripeRefundId: string | null = null;
+    if (refundAmount > 0 && ticket.payment?.stripe_payment_intent_id) {
+      try {
+        const refund = await stripeClient.refunds.create({
+          payment_intent: ticket.payment.stripe_payment_intent_id,
+          amount: Math.round(refundAmount * 100),
+          reason: 'requested_by_customer',
+        });
+        stripeRefundId = refund.id;
+      } catch (stripeError: any) {
+        logger.error('Stripe refund failed for pool ticket', { ticketId, error: stripeError.message });
+      }
     }
 
-    // Add credit if applicable
+    // FIX: Iteration 9 - Ordered DB operations with compensation for atomicity
+    // Step 1: Insert credit FIRST (additive, easily reversible)
+    let creditInsertId: string | null = null;
     if (creditAmount > 0) {
-      await prisma.userCredit.create({
-        data: {
-          userId,
+      const { data: creditData, error: creditError } = await supabase
+        .from('user_credits')
+        .insert({
+          user_id: userId,
           amount: creditAmount,
           type: 'POOL_TICKET_CREDIT',
-          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days
-        },
-      });
+          expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days
+        })
+        .select('id')
+        .single();
+      if (creditError) {
+        logger.error('Credit insert failed during pool ticket cancellation', { ticketId, userId, creditAmount, error: creditError.message });
+        await logActivity({ user_id: userId, action: 'POOL_CREDIT_FAILED', resource: 'pool_tickets', resource_id: ticketId, details: { creditAmount, error: creditError.message, stripeRefundId } });
+      } else {
+        creditInsertId = creditData?.id;
+      }
     }
 
-    // Update ticket status
-    await prisma.poolTicket.update({
-      where: { id: ticketId },
-      data: {
+    // Step 2: Update ticket status (critical state change)
+    const { error: updateError } = await supabase
+      .from('pool_tickets')
+      .update({
         status: 'CANCELLED',
-        cancelledAt: new Date(),
-        cancellationReason: reason,
-      },
-    });
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: reason,
+      })
+      .eq('id', ticketId);
+    if (updateError) {
+      // Compensate: reverse credit if ticket update failed
+      if (creditInsertId) {
+        await supabase.from('user_credits').delete().eq('id', creditInsertId);
+        logger.warn('Rolled back pool credit after ticket update failure', { ticketId, creditInsertId });
+      }
+      await logActivity({ user_id: userId, action: 'POOL_CANCEL_DB_FAILED', resource: 'pool_tickets', resource_id: ticketId, details: { error: updateError.message, stripeRefundId, creditRolledBack: !!creditInsertId } });
+      throw updateError;
+    }
+
+    // Audit log: successful cancellation
+    await logActivity({ user_id: userId, action: 'POOL_TICKET_CANCELLED', resource: 'pool_tickets', resource_id: ticketId, details: { refundAmount, creditAmount, stripeRefundId } });
 
     // Send confirmation email
     await emailService.sendEmail({
@@ -475,16 +524,19 @@ export async function reschedulePoolTicket(
   newDate: Date
 ): Promise<ModificationResult> {
   try {
-    const ticket = await prisma.poolTicket.findUnique({
-      where: { id: ticketId },
-      include: { user: true },
-    });
+    const supabase = getSupabase();
+    const { data: ticket, error: ticketError } = await supabase
+      .from('pool_tickets')
+      .select('*, user:users(*)')
+      .eq('id', ticketId)
+      .maybeSingle();
+    if (ticketError) throw ticketError;
 
     if (!ticket) {
       return { success: false, message: 'Ticket not found' };
     }
 
-    if (ticket.userId !== userId) {
+    if (ticket.user_id !== userId) {
       return { success: false, message: 'Unauthorized to modify this ticket' };
     }
 
@@ -493,20 +545,22 @@ export async function reschedulePoolTicket(
     }
 
     // Check capacity for new date
-    const existingTicketsCount = await prisma.poolTicket.count({
-      where: {
-        date: newDate,
-        status: 'ACTIVE',
-      },
-    });
+    const { count: existingTicketsCount, error: countError } = await supabase
+      .from('pool_tickets')
+      .select('*', { count: 'exact', head: true })
+      .eq('date', newDate.toISOString())
+      .eq('status', 'ACTIVE');
+    if (countError) throw countError;
 
     // Get pool capacity setting
-    const capacitySetting = await prisma.systemSettings.findUnique({
-      where: { key: 'pool.dailyCapacity' },
-    });
+    const { data: capacitySetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'pool.dailyCapacity')
+      .maybeSingle();
     const dailyCapacity = capacitySetting ? parseInt(capacitySetting.value) : 100;
 
-    if (existingTicketsCount >= dailyCapacity) {
+    if ((existingTicketsCount || 0) >= dailyCapacity) {
       return { 
         success: false, 
         message: 'Selected date is fully booked' 
@@ -514,13 +568,14 @@ export async function reschedulePoolTicket(
     }
 
     // Update ticket date
-    await prisma.poolTicket.update({
-      where: { id: ticketId },
-      data: {
-        date: newDate,
-        modifiedAt: new Date(),
-      },
-    });
+    const { error: updateError } = await supabase
+      .from('pool_tickets')
+      .update({
+        date: newDate.toISOString(),
+        modified_at: new Date().toISOString(),
+      })
+      .eq('id', ticketId);
+    if (updateError) throw updateError;
 
     // Send confirmation email
     await emailService.sendEmail({
@@ -549,19 +604,20 @@ export async function getUserCredits(userId: string): Promise<{
   credits: any[];
 }> {
   const now = new Date();
-  
-  const credits = await prisma.userCredit.findMany({
-    where: {
-      userId,
-      usedAt: null,
-      expiresAt: { gt: now },
-    },
-    orderBy: { expiresAt: 'asc' },
-  });
+  const supabase = getSupabase();
 
-  const totalCredits = credits.reduce((sum, credit) => sum + Number(credit.amount), 0);
+  const { data: credits, error } = await supabase
+    .from('user_credits')
+    .select('*')
+    .eq('user_id', userId)
+    .is('used_at', null)
+    .gt('expires_at', now.toISOString())
+    .order('expires_at', { ascending: true });
+  if (error) throw error;
 
-  return { totalCredits, credits };
+  const totalCredits = (credits || []).reduce((sum: number, credit: any) => sum + Number(credit.amount), 0);
+
+  return { totalCredits, credits: credits || [] };
 }
 
 /**
@@ -582,22 +638,44 @@ export async function applyCreditToBooking(
 
   let remainingToApply = amountToApply;
   const now = new Date();
+  const supabase = getSupabase();
+
+  // FIX: Iteration 9 - Track successful updates for rollback on partial failure
+  const successfulUpdates: Array<{ creditId: string; originalAmount: number; usedAmount: number }> = [];
 
   // Use credits in order of expiration (FIFO)
-  for (const credit of credits) {
-    if (remainingToApply <= 0) break;
+  try {
+    for (const credit of credits) {
+      if (remainingToApply <= 0) break;
 
-    const useAmount = Math.min(credit.amount, remainingToApply);
-    
-    await prisma.userCredit.update({
-      where: { id: credit.id },
-      data: {
-        amount: credit.amount - useAmount,
-        usedAt: credit.amount - useAmount === 0 ? now : null,
-      },
-    });
+      const useAmount = Math.min(credit.amount, remainingToApply);
+      
+      const { error: updateError } = await supabase
+        .from('user_credits')
+        .update({
+          amount: credit.amount - useAmount,
+          used_at: credit.amount - useAmount === 0 ? now.toISOString() : null,
+        })
+        .eq('id', credit.id);
+      
+      if (updateError) {
+        // Rollback all successful credit deductions
+        for (const prev of successfulUpdates) {
+          await supabase.from('user_credits').update({
+            amount: prev.originalAmount,
+            used_at: null,
+          }).eq('id', prev.creditId);
+        }
+        logger.error('Credit application failed, rolled back previous deductions', { bookingId, updateError: updateError.message, rolledBack: successfulUpdates.length });
+        await logActivity({ user_id: userId, action: 'CREDIT_APPLICATION_FAILED', resource: bookingType === 'chalet' ? 'chalet_bookings' : 'pool_tickets', resource_id: bookingId, details: { error: updateError.message, rolledBack: successfulUpdates.length } });
+        throw updateError;
+      }
 
-    remainingToApply -= useAmount;
+      successfulUpdates.push({ creditId: credit.id, originalAmount: credit.amount, usedAmount: useAmount });
+      remainingToApply -= useAmount;
+    }
+  } catch (error) {
+    throw error;
   }
 
   logger.info('Credit applied to booking', {
@@ -657,9 +735,9 @@ function generateCancellationEmail(
     <h3>Booking Details</h3>
     <ul>
       <li><strong>Property:</strong> ${booking.chalet.name}</li>
-      <li><strong>Check-in:</strong> ${new Date(booking.checkInDate).toLocaleDateString()}</li>
-      <li><strong>Check-out:</strong> ${new Date(booking.checkOutDate).toLocaleDateString()}</li>
-      <li><strong>Original Amount:</strong> $${booking.totalPrice.toFixed(2)}</li>
+      <li><strong>Check-in:</strong> ${new Date(booking.check_in_date).toLocaleDateString()}</li>
+      <li><strong>Check-out:</strong> ${new Date(booking.check_out_date).toLocaleDateString()}</li>
+      <li><strong>Original Amount:</strong> $${booking.total_price.toFixed(2)}</li>
     </ul>
     
     ${refundAmount > 0 ? `

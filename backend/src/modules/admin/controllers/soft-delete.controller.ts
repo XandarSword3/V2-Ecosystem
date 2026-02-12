@@ -1,4 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection.js';
 import { logger } from '../../../utils/logger.js';
 import { logActivity } from '../../../utils/activityLogger.js';
@@ -21,8 +22,7 @@ interface SoftDeletedRecord {
  * GET /api/admin/deleted/:entityType
  * Returns list of soft-deleted records for an entity type
  */
-export async function getDeletedRecords(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const getDeletedRecords = asyncHandler(async (req: Request, res: Response) => {
     const { entityType } = req.params;
     const { limit = 50, offset = 0 } = req.query;
     const supabase = getSupabase();
@@ -99,20 +99,16 @@ export async function getDeletedRecords(req: Request, res: Response, next: NextF
       data: records,
       pagination: { total: count, limit: Number(limit), offset: Number(offset) },
     });
-  } catch (error: any) {
-    logger.error('Error fetching deleted records', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * POST /api/admin/deleted/:entityType/:entityId/restore
  * Restores a soft-deleted record
  */
-export async function restoreRecord(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const restoreRecord = asyncHandler(async (req: Request, res: Response) => {
     const { entityType, entityId } = req.params;
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
 
     // Validate entity type
@@ -171,21 +167,17 @@ export async function restoreRecord(req: Request, res: Response, next: NextFunct
       message: 'Record restored successfully',
       data,
     });
-  } catch (error: any) {
-    logger.error('Error restoring record', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * DELETE /api/admin/deleted/:entityType/:entityId/permanent
  * Permanently deletes a soft-deleted record (requires force=true query param)
  */
-export async function permanentDelete(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const permanentDelete = asyncHandler(async (req: Request, res: Response) => {
     const { entityType, entityId } = req.params;
     const { force } = req.query;
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
 
     if (force !== 'true') {
@@ -248,20 +240,16 @@ export async function permanentDelete(req: Request, res: Response, next: NextFun
       success: true,
       message: 'Record permanently deleted',
     });
-  } catch (error: any) {
-    logger.error('Error permanently deleting record', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * POST /api/admin/soft-delete/:entityType/:entityId
  * Soft deletes a record
  */
-export async function softDelete(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const softDelete = asyncHandler(async (req: Request, res: Response) => {
     const { entityType, entityId } = req.params;
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
 
     // Validate entity type
@@ -320,8 +308,4 @@ export async function softDelete(req: Request, res: Response, next: NextFunction
       message: 'Record soft deleted successfully',
       data,
     });
-  } catch (error: any) {
-    logger.error('Error soft deleting record', { error: error.message });
-    next(error);
-  }
-}
+});
