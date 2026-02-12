@@ -95,7 +95,7 @@ export class GiftCardController {
       }
 
       const { templateId, amount, customAmount, recipientEmail, recipientName, senderName, message, personalMessage } = validation.data;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       // Get amount from template or use provided amount or customAmount
@@ -382,7 +382,7 @@ export class GiftCardController {
           balance_after: newBalance,
           reference_type: referenceType,
           reference_id: referenceId,
-          created_by: (req as any).user?.id,
+          created_by: req.user?.id,
         });
 
       res.json({
@@ -408,15 +408,15 @@ export class GiftCardController {
    */
   async getMyGiftCards(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.id;
-      const userEmail = (req as any).user?.email;
+      const userId = req.user?.id;
+      const userEmail = req.user?.email;
       const supabase = getSupabase();
 
       // Get purchased cards
       const { data: purchased, error: purchasedError } = await supabase
         .from('gift_cards')
         .select('*')
-        .eq('purchaser_id', userId)
+        .eq('purchased_by', userId)
         .order('created_at', { ascending: false });
 
       if (purchasedError) throw purchasedError;
@@ -426,7 +426,7 @@ export class GiftCardController {
         .from('gift_cards')
         .select('*')
         .eq('recipient_email', userEmail)
-        .neq('purchaser_id', userId)
+        .neq('purchased_by', userId)
         .order('created_at', { ascending: false });
 
       if (receivedError) throw receivedError;
@@ -472,11 +472,11 @@ export class GiftCardController {
 
       // Get purchaser info if exists
       let purchaserInfo = null;
-      if (giftCard.purchaser_id) {
+      if (giftCard.purchased_by) {
         const { data: purchaser } = await supabase
           .from('users')
           .select('name, email')
-          .eq('id', giftCard.purchaser_id)
+          .eq('id', giftCard.purchased_by)
           .single();
         purchaserInfo = purchaser;
       }
@@ -595,7 +595,7 @@ export class GiftCardController {
       const { amount, initialValue, recipientEmail, recipientName, message, personalMessage, expiresInDays } = validation.data;
       const finalAmount = amount || initialValue!;
       const finalMessage = personalMessage || message;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       // Generate unique code
@@ -646,6 +646,36 @@ export class GiftCardController {
           performed_by: userId,
         });
 
+      // FIX: Iteration 14 - Send email to recipient when recipientEmail is provided
+      // Previously admin-created gift cards never sent notification emails
+      if (recipientEmail) {
+        let senderName: string | undefined;
+        if (userId) {
+          const { data: creator } = await supabase
+            .from('users')
+            .select('full_name')
+            .eq('id', userId)
+            .single();
+          senderName = creator?.full_name || 'Resort Admin';
+        }
+
+        const emailSent = await emailService.sendGiftCard({
+          recipientEmail,
+          recipientName: recipientName || 'Valued Guest',
+          senderName,
+          code: giftCard.code,
+          amount: finalAmount,
+          message: finalMessage,
+          expiresAt: giftCard.expires_at,
+        });
+
+        if (!emailSent) {
+          logger.warn(`[Admin] Gift card email failed for code ${giftCard.code}`);
+        } else {
+          logger.info(`[Admin] Gift card email sent to ${recipientEmail}`);
+        }
+      }
+
       res.status(201).json({
         success: true,
         data: giftCard,
@@ -692,7 +722,7 @@ export class GiftCardController {
           amount: 0,
           balance_after: result.current_balance,
           notes: reason || 'Gift card disabled by admin',
-          created_by: (req as any).user?.id,
+          created_by: req.user?.id,
         });
 
       res.json({

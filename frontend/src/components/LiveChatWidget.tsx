@@ -203,13 +203,14 @@ export default function LiveChatWidget() {
               {/* Quick Contact Info */}
               <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <a href={`tel:${settings.phone || ''}`} className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-primary-600">
+                  {/* FIX Iter-4: Use same fallback for href as display text */}
+                  <a href={`tel:${settings.phone || 'contact'}`} className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-primary-600">
                     <Phone className="w-3 h-3" />
                     {settings.phone || 'Contact us'}
                   </a>
-                  <a href={`mailto:${settings.email || 'info@v2resort.com'}`} className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-primary-600">
+                  <a href={`mailto:${settings.email || 'support'}`} className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-primary-600">
                     <Mail className="w-3 h-3" />
-                    {settings.email || 'info@v2resort.com'}
+                    {settings.email || 'Email us'}
                   </a>
                 </div>
               </div>

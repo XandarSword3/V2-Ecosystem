@@ -62,7 +62,7 @@ export default function DynamicAddonsPage() {
   const fetchAddons = useCallback(async () => {
     if (!currentModule) return;
     try {
-      const response = await api.get('/chalets/addons', { params: { moduleId: currentModule.id } });
+      const response = await api.get('/chalets/add-ons', { params: { moduleId: currentModule.id } });
       setAddons(response.data.data || []);
     } catch (error) {
       toast.error(tc('errors.failedToLoad'));
@@ -86,10 +86,10 @@ export default function DynamicAddonsPage() {
       setSaving(true);
       const payload = { ...formData, module_id: currentModule.id };
       if (editing) {
-        await api.put(`/chalets/admin/addons/${editing.id}`, payload);
+        await api.put(`/chalets/admin/add-ons/${editing.id}`, payload);
         toast.success(tc('success.updated'));
       } else {
-        await api.post('/chalets/admin/addons', payload);
+        await api.post('/chalets/admin/add-ons', payload);
         toast.success(tc('success.created'));
       }
       setShowModal(false);
@@ -118,7 +118,7 @@ export default function DynamicAddonsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm(tc('addons.confirmDelete'))) return;
     try {
-      await api.delete(`/chalets/admin/addons/${id}`);
+      await api.delete(`/chalets/admin/add-ons/${id}`);
       setAddons((prev) => prev.filter((a) => a.id !== id));
       toast.success(tc('success.deleted'));
     } catch (error) {
@@ -128,7 +128,7 @@ export default function DynamicAddonsPage() {
 
   const toggleAvailability = async (addon: Addon) => {
     try {
-      await api.put(`/chalets/admin/addons/${addon.id}`, { is_available: !addon.is_available });
+      await api.put(`/chalets/admin/add-ons/${addon.id}`, { is_available: !addon.is_available });
       setAddons((prev) => prev.map((a) => (a.id === addon.id ? { ...a, is_available: !a.is_available } : a)));
       toast.success(addon.is_available ? tc('addons.hidden') : tc('addons.shown'));
     } catch (error) {

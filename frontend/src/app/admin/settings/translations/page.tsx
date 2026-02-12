@@ -215,9 +215,7 @@ export default function TranslationsPage() {
     if (!editingItem) return;
 
     try {
-      await api.post('/admin/translations/update', {
-        table: editingItem.table,
-        id: editingItem.id,
+      await api.put(`/admin/translations/${editingItem.table}/${editingItem.id}`, {
         field: editingItem.field,
         language: editingItem.lang,
         value: editValue,
@@ -250,7 +248,7 @@ export default function TranslationsPage() {
   const batchAutoTranslate = async (table: string) => {
     setBatchTranslating(table);
     try {
-      const res = await api.post('/admin/translations/batch-auto-translate', { table });
+      const res = await api.post('/admin/translations/batch-translate', { table });
       if (res.data?.success) {
         const { translated, errors } = res.data;
         toast.success(`Translated ${translated} items${errors?.length ? ` (${errors.length} errors)` : ''}`);

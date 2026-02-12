@@ -6,7 +6,7 @@ import { Heart, Trash2, ShoppingBag, X, AlertCircle } from 'lucide-react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { formatCurrency } from '@/lib/utils';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
@@ -149,7 +149,8 @@ export function WishlistPanel({
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-          />
+            aria-hidden="true"
+          />{/* FIX Iter-21: backdrop aria-hidden for a11y */}
           
           {/* Panel */}
           <motion.div
@@ -158,7 +159,8 @@ export function WishlistPanel({
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl z-50 flex flex-col"
-          >
+            role="dialog" aria-modal="true" aria-label={t('title')} onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Escape') onClose(); }}
+          >{/* FIX Iter-21: panel a11y — role, aria-modal, aria-label, Escape handler */}
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-3">
@@ -176,8 +178,9 @@ export function WishlistPanel({
               </div>
               <button
                 onClick={onClose}
+                aria-label="Close wishlist"
                 className="w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
-              >
+              >{/* FIX Iter-21: close button a11y */}
                 <X className="w-5 h-5 text-slate-600 dark:text-slate-300" />
               </button>
             </div>

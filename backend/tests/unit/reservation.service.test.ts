@@ -31,8 +31,8 @@ describe('ReservationService', () => {
     guestPhone: '+1234567890',
     resourceId: 'room-101',
     resourceName: 'Deluxe Suite 101',
-    checkIn: '2026-02-01T14:00:00Z',
-    checkOut: '2026-02-05T11:00:00Z',
+    checkIn: '2026-02-10T14:00:00Z',
+    checkOut: '2026-02-14T11:00:00Z',
     guestCount: 2,
     specialRequests: 'Late check-in',
     notes: 'VIP guest',
@@ -103,8 +103,8 @@ describe('ReservationService', () => {
       await expect(service.createReservation({
         ...validReservationInput,
         guestId: 'guest-456',
-        checkIn: '2026-02-03T14:00:00Z',
-        checkOut: '2026-02-06T11:00:00Z'
+        checkIn: '2026-02-12T14:00:00Z',
+        checkOut: '2026-02-16T11:00:00Z'
       })).rejects.toThrow('Resource is not available');
     });
 
@@ -240,8 +240,8 @@ describe('ReservationService', () => {
         ...validReservationInput,
         type: 'spa',
         resourceId: 'spa-1',
-        checkIn: '2026-02-01T10:00:00Z',
-        checkOut: '2026-02-01T12:00:00Z'
+        checkIn: '2026-02-10T10:00:00Z',
+        checkOut: '2026-02-10T12:00:00Z'
       });
 
       const roomReservations = await service.getReservationsByType('room');
@@ -262,7 +262,7 @@ describe('ReservationService', () => {
         checkOut: '2026-03-05T11:00:00Z'
       });
 
-      const reservations = await service.getReservationsForDateRange('2026-01-01', '2026-02-28');
+      const reservations = await service.getReservationsForDateRange('2026-02-01', '2026-02-28');
       expect(reservations).toHaveLength(1);
     });
   });
@@ -309,13 +309,14 @@ describe('ReservationService', () => {
       const res1 = await service.createReservation(validReservationInput);
       const res2 = await service.createReservation({
         ...validReservationInput,
-        checkIn: '2026-02-10T14:00:00Z',
-        checkOut: '2026-02-15T11:00:00Z'
+        resourceId: 'room-101',
+        checkIn: '2026-02-20T14:00:00Z',
+        checkOut: '2026-02-25T11:00:00Z'
       });
 
       await expect(service.updateReservation(res2.id, {
-        checkIn: '2026-02-03T14:00:00Z',
-        checkOut: '2026-02-06T11:00:00Z'
+        checkIn: '2026-02-12T14:00:00Z',
+        checkOut: '2026-02-16T11:00:00Z'
       })).rejects.toThrow('Resource is not available');
     });
 
@@ -369,7 +370,8 @@ describe('ReservationService', () => {
     it('should check in guest for confirmed reservation', async () => {
       const created = await service.createReservation({
         ...validReservationInput,
-        checkIn: new Date(Date.now() - 86400000).toISOString() // yesterday
+        checkIn: new Date(Date.now() - 86400000).toISOString(), // yesterday
+        checkOut: new Date(Date.now() + 3 * 86400000).toISOString() // 3 days from now
       });
       await service.confirmReservation(created.id);
 
@@ -409,7 +411,8 @@ describe('ReservationService', () => {
     it('should check out checked-in guest', async () => {
       const created = await service.createReservation({
         ...validReservationInput,
-        checkIn: new Date(Date.now() - 86400000).toISOString()
+        checkIn: new Date(Date.now() - 86400000).toISOString(), // yesterday
+        checkOut: new Date(Date.now() + 3 * 86400000).toISOString() // 3 days from now
       });
       await service.confirmReservation(created.id);
       await service.checkIn(created.id, 'staff-1');
@@ -457,7 +460,8 @@ describe('ReservationService', () => {
     it('should reject cancelling checked-in reservation', async () => {
       const created = await service.createReservation({
         ...validReservationInput,
-        checkIn: new Date(Date.now() - 86400000).toISOString()
+        checkIn: new Date(Date.now() - 86400000).toISOString(), // yesterday
+        checkOut: new Date(Date.now() + 3 * 86400000).toISOString() // 3 days from now
       });
       await service.confirmReservation(created.id);
       await service.checkIn(created.id, 'staff-1');
@@ -532,8 +536,8 @@ describe('ReservationService', () => {
     it('should return true when resource is available', async () => {
       const available = await service.checkAvailability(
         'room-101',
-        '2026-02-01T14:00:00Z',
-        '2026-02-05T11:00:00Z'
+        '2026-02-20T14:00:00Z',
+        '2026-02-25T11:00:00Z'
       );
       expect(available).toBe(true);
     });
@@ -543,8 +547,8 @@ describe('ReservationService', () => {
 
       const available = await service.checkAvailability(
         'room-101',
-        '2026-02-03T14:00:00Z',
-        '2026-02-06T11:00:00Z'
+        '2026-02-12T14:00:00Z',
+        '2026-02-16T11:00:00Z'
       );
       expect(available).toBe(false);
     });
@@ -554,8 +558,8 @@ describe('ReservationService', () => {
 
       const available = await service.checkAvailability(
         'room-101',
-        '2026-02-05T14:00:00Z',
-        '2026-02-10T11:00:00Z'
+        '2026-02-14T14:00:00Z',
+        '2026-02-20T11:00:00Z'
       );
       expect(available).toBe(true);
     });
@@ -567,8 +571,8 @@ describe('ReservationService', () => {
 
       const conflicts = await service.findConflicts(
         'room-101',
-        '2026-02-03T14:00:00Z',
-        '2026-02-06T11:00:00Z'
+        '2026-02-12T14:00:00Z',
+        '2026-02-16T11:00:00Z'
       );
 
       expect(conflicts).toHaveLength(1);
@@ -581,8 +585,8 @@ describe('ReservationService', () => {
 
       const conflicts = await service.findConflicts(
         'room-101',
-        '2026-02-03T14:00:00Z',
-        '2026-02-06T11:00:00Z',
+        '2026-02-12T14:00:00Z',
+        '2026-02-16T11:00:00Z',
         created.id
       );
 
@@ -689,7 +693,8 @@ describe('ReservationService', () => {
       it('should return false for checked-in reservation', async () => {
         const res = await service.createReservation({
           ...validReservationInput,
-          checkIn: new Date(Date.now() - 86400000).toISOString()
+          checkIn: new Date(Date.now() - 86400000).toISOString(), // yesterday
+          checkOut: new Date(Date.now() + 3 * 86400000).toISOString() // 3 days from now
         });
         await service.confirmReservation(res.id);
         const checkedIn = await service.checkIn(res.id, 'staff-1');
@@ -714,7 +719,8 @@ describe('ReservationService', () => {
       it('should return true for checked-in reservation', async () => {
         const res = await service.createReservation({
           ...validReservationInput,
-          checkIn: new Date(Date.now() - 86400000).toISOString()
+          checkIn: new Date(Date.now() - 86400000).toISOString(), // yesterday
+          checkOut: new Date(Date.now() + 3 * 86400000).toISOString() // 3 days from now
         });
         await service.confirmReservation(res.id);
         const checkedIn = await service.checkIn(res.id, 'staff-1');

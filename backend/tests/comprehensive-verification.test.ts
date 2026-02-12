@@ -6,14 +6,17 @@ import { getSupabase } from '../src/database/connection';
 import { generateTokens } from '../src/modules/auth/auth.utils';
 import { v4 as uuidv4 } from 'uuid';
 
+// Skip these tests in unit test mode - they require a live database connection
+const shouldRunIntegrationTests = process.env.RUN_INTEGRATION_TESTS === 'true';
+
 // Mock Socket.io and other side effects
 vi.mock('../src/socket', () => ({
     emitToAll: vi.fn(),
     emitToUser: vi.fn(),
-    getIO: () => ({ 
+    getIO: () => ({
         emit: vi.fn(),
         to: vi.fn().mockReturnThis(),
-        of: vi.fn().mockReturnThis() 
+        of: vi.fn().mockReturnThis()
     })
 }));
 
@@ -31,7 +34,8 @@ vi.mock('../src/utils/activityLogger', () => ({
 
 const supabase = getSupabase();
 
-describe('Comprehensive Verification: Security & Modules', () => {
+describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Security & Modules', () => {
+
     const testId = uuidv4().substring(0, 8);
     const moduleSlug = `test-module-${testId}`;
     const testRoleName = `test_role_${testId}`;
@@ -79,7 +83,7 @@ describe('Comprehensive Verification: Security & Modules', () => {
                 description: 'A test module for verification',
                 settings: { color: 'blue' }
             });
-        
+
         expect(res.status).toBe(201);
         expect(res.body.data.slug).toBe(moduleSlug);
         expect(res.body.data.settings_version).toBe(1);
@@ -91,7 +95,7 @@ describe('Comprehensive Verification: Security & Modules', () => {
             .from('app_permissions')
             .select('slug')
             .eq('module_slug', moduleSlug);
-        
+
         expect(perms).toBeDefined();
         expect(perms?.map(p => p.slug)).toContain(`module:${moduleSlug}:manage`);
     });
@@ -104,7 +108,7 @@ describe('Comprehensive Verification: Security & Modules', () => {
             .send({
                 description: 'Hacker Update'
             });
-        
+
         expect(res.status).toBe(403);
     });
 
@@ -121,7 +125,7 @@ describe('Comprehensive Verification: Security & Modules', () => {
             .send({
                 description: 'Authorized Update'
             });
-        
+
         expect(res.status).toBe(200);
         expect(res.body.data.description).toBe('Authorized Update');
     });
@@ -169,7 +173,7 @@ describe('Comprehensive Verification: Security & Modules', () => {
                 settings: { color: 'purple' },
                 settings_version: ver - 1 // Stale version
             });
-        
+
         expect(res.status).toBe(409);
         expect(res.body.error).toBe('Version conflict');
     });
@@ -195,6 +199,6 @@ describe('Comprehensive Verification: Security & Modules', () => {
         const { error: err2 } = await supabase.from('payment_ledger').insert(entry);
         expect(err2).toBeDefined();
         // Postgres error 23505 is unique_violation
-        expect(err2?.code).toBe('23505'); 
+        expect(err2?.code).toBe('23505');
     });
 });

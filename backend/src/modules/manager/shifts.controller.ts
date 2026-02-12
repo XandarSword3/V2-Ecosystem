@@ -98,7 +98,7 @@ export class ShiftsController {
    */
   async getMyShifts(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId || (req as any).user?.id;
+      const userId = req.user?.userId || req.user?.id;
       const { startDate, endDate, status } = req.query;
       const supabase = getSupabase();
 
@@ -146,7 +146,7 @@ export class ShiftsController {
       }
 
       const data = validation.data;
-      const userId = (req as any).user?.userId || (req as any).user?.id;
+      const userId = req.user?.userId || req.user?.id;
       const supabase = getSupabase();
 
       // Check for overlapping shifts
@@ -282,7 +282,7 @@ export class ShiftsController {
   async clockIn(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const userId = (req as any).user?.userId || (req as any).user?.id;
+      const userId = req.user?.userId || req.user?.id;
       const supabase = getSupabase();
 
       // Get the shift
@@ -353,7 +353,7 @@ export class ShiftsController {
   async clockOut(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const userId = (req as any).user?.userId || (req as any).user?.id;
+      const userId = req.user?.userId || req.user?.id;
       const supabase = getSupabase();
 
       // Get the shift
@@ -489,7 +489,7 @@ export class ShiftsController {
    */
   async getCurrentShift(req: Request, res: Response) {
     try {
-      const userId = (req as any).user?.userId || (req as any).user?.id;
+      const userId = req.user?.userId || req.user?.id;
       const supabase = getSupabase();
       const today = new Date().toISOString().split('T')[0];
 

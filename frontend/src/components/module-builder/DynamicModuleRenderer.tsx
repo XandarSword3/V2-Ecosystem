@@ -5,13 +5,13 @@ import { Module } from '@/lib/settings-context';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { restaurantApi, poolApi } from '@/lib/api';
+import { restaurantApi, poolApi, supportApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import { useContentTranslation } from '@/lib/translate';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
-import { useCartStore } from '@/lib/stores/cartStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useCartStore } from '@/stores/cartStore';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Clock, Users, ShoppingCart, Plus, Minus, Calendar } from 'lucide-react';
+import { Loader2, Clock, Users, ShoppingCart, Plus, Minus, Calendar, Star, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState } from 'react';
 
@@ -76,7 +76,7 @@ const SafeBlockSchema: z.ZodType<any> = z.lazy(() => z.object({
 // Helper to parse props - handles both JSON objects and PowerShell-style strings
 function parseProps(props: Record<string, unknown>): BlockProps {
   if (!props) return {};
-  
+
   // If props is already a proper object, return it
   if (typeof props === 'object' && !Array.isArray(props)) {
     // Check if any value looks like a PowerShell object string
@@ -100,7 +100,7 @@ function parseProps(props: Record<string, unknown>): BlockProps {
     }
     return parsed;
   }
-  
+
   return props as BlockProps;
 }
 
@@ -108,9 +108,9 @@ export function DynamicModuleRenderer({ layout, module }: RendererProps) {
   // Validate schema version
   const result = z.array(SafeBlockSchema).safeParse(layout);
   if (!result.success) {
-     console.error("Schema validation failed", result.error);
-     // Fallback UI for P0 requirement
-     return <div className="p-4 bg-amber-50 text-amber-800 rounded border border-amber-200">Module content format is incompatible.</div>;
+    console.error("Schema validation failed", result.error);
+    // Fallback UI for P0 requirement
+    return <div className="p-4 bg-amber-50 text-amber-800 rounded border border-amber-200">Module content format is incompatible.</div>;
   }
   const safeLayout = result.data as UIBlock[];
 
@@ -131,9 +131,9 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
   const { type, style } = block;
 
   // Validate Block Type
-  const KNOWN_TYPES = ['hero', 'container', 'grid', 'text_block', 'image', 'menu_list', 'session_list', 'booking_calendar', 'button', 'form_container'];
+  const KNOWN_TYPES = ['hero', 'container', 'grid', 'text_block', 'image', 'menu_list', 'session_list', 'booking_calendar', 'button', 'form_container', 'testimonials', 'pricing_table'];
   if (!KNOWN_TYPES.includes(type)) {
-      return null;
+    return null;
   }
 
   const props = parseProps(block.props);
@@ -150,13 +150,13 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
   switch (type) {
     case 'hero':
       return (
-        <section 
-            style={inlineStyle}
-            className="w-full flex items-center justify-center relative overflow-hidden text-white min-h-[300px]" 
+        <section
+          style={inlineStyle}
+          className="w-full flex items-center justify-center relative overflow-hidden text-white min-h-[300px]"
         >
           {/* Overlay if image exists */}
           {props.backgroundImage && <div className="absolute inset-0 bg-black/40 z-0" />}
-          
+
           <div className="container relative z-10 px-4 py-20 text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">{props.title || module.name}</h1>
             <p className="text-xl md:text-2xl opacity-90">{props.subtitle || module.description}</p>
@@ -167,40 +167,40 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
     case 'container':
       return (
         <div style={inlineStyle} className="container mx-auto px-4 py-8">
-            {block.children?.map(child => (
-                <BlockRenderer key={child.id} block={child} module={module} />
-            ))}
+          {block.children?.map(child => (
+            <BlockRenderer key={child.id} block={child} module={module} />
+          ))}
         </div>
       );
 
     case 'grid':
-        const gridCols = props.columns || 3;
-        return (
-            <div className={`grid grid-cols-1 md:grid-cols-${gridCols} gap-6 container mx-auto px-4 py-8`} style={inlineStyle}>
-                 {block.children && block.children.length > 0 
-                    ? block.children.map(child => <BlockRenderer key={child.id} block={child} module={module}/>)
-                    : <div className="col-span-full text-center p-8 bg-slate-100 dark:bg-slate-800 rounded text-slate-500">Grid - Add content in the builder</div>
-                 }
-            </div>
-        );
+      const gridCols = props.columns || 3;
+      return (
+        <div className={`grid grid-cols-1 md:grid-cols-${gridCols} gap-6 container mx-auto px-4 py-8`} style={inlineStyle}>
+          {block.children && block.children.length > 0
+            ? block.children.map(child => <BlockRenderer key={child.id} block={child} module={module} />)
+            : <div className="col-span-full text-center p-8 bg-slate-100 dark:bg-slate-800 rounded text-slate-500">Grid - Add content in the builder</div>
+          }
+        </div>
+      );
 
     case 'text_block':
-        return (
-            <div style={inlineStyle} className="prose dark:prose-invert max-w-none container mx-auto px-4 py-8">
-                {props.content || 'Empty Text Block'}
-            </div>
-        );
-    
+      return (
+        <div style={inlineStyle} className="prose dark:prose-invert max-w-none container mx-auto px-4 py-8">
+          {props.content || 'Empty Text Block'}
+        </div>
+      );
+
     case 'image':
-        return (
-            <div style={inlineStyle} className="w-full container mx-auto px-4 py-4">
-                <img 
-                    src={props.src || '/placeholder-image.jpg'} 
-                    alt={props.alt || 'Module Image'}
-                    className="w-full h-auto rounded-lg shadow-md"
-                />
-            </div>
-        );
+      return (
+        <div style={inlineStyle} className="w-full container mx-auto px-4 py-4">
+          <img
+            src={props.src || '/placeholder-image.jpg'}
+            alt={props.alt || 'Module Image'}
+            className="w-full h-auto rounded-lg shadow-md"
+          />
+        </div>
+      );
 
     case 'menu_list':
       return <MenuListComponent module={module} props={props} />;
@@ -221,7 +221,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
       const isOutline = props.variant === 'outline';
       const isGhost = props.variant === 'ghost';
       const bgColor = props.backgroundColor || '#6366f1';
-      
+
       const buttonStyle: React.CSSProperties = {
         backgroundColor: isOutline || isGhost ? 'transparent' : bgColor,
         color: isOutline || isGhost ? bgColor : (bgColor === '#ffffff' ? '#1e293b' : '#ffffff'),
@@ -229,7 +229,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
       };
 
       const ButtonContent = (
-        <button 
+        <button
           className={`${sizeClass} rounded-lg font-medium transition-all hover:opacity-90 inline-block`}
           style={buttonStyle}
         >
@@ -250,9 +250,15 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
     case 'form_container':
       return <FormContainerComponent module={module} block={block} props={props} />;
 
+    case 'testimonials':
+      return <TestimonialsComponent props={props} />;
+
+    case 'pricing_table':
+      return <PricingTableComponent props={props} />;
+
     default:
-        // This case should be unreachable due to the check above, but as a safety net:
-        return null;
+      // This case should be unreachable due to the check above, but as a safety net:
+      return null;
   }
 }
 
@@ -265,7 +271,7 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
   const { translateContent } = useContentTranslation();
   const currency = useSettingsStore((s) => s.currency);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  
+
   const addItem = useCartStore((s) => s.addItem);
   const removeItem = useCartStore((s) => s.removeItem);
   const allItems = useCartStore((s) => s.items);
@@ -326,11 +332,10 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
         <div className="flex flex-wrap gap-2 mb-8 justify-center">
           <button
             onClick={() => setSelectedCategory(null)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              !selectedCategory
-                ? 'bg-primary-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
-            }`}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${!selectedCategory
+              ? 'bg-primary-600 text-white'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+              }`}
           >
             {tCommon('all')}
           </button>
@@ -338,11 +343,10 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                selectedCategory === cat.id
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
-              }`}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${selectedCategory === cat.id
+                ? 'bg-primary-600 text-white'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                }`}
             >
               {translateContent(cat, 'name')}
             </button>
@@ -487,13 +491,12 @@ function SessionListComponent({ module, props }: { module: Module; props: BlockP
                   {translateContent(session, 'name')}
                 </h3>
                 {session.gender && (
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    session.gender === 'mixed' 
-                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                      : session.gender === 'female'
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${session.gender === 'mixed'
+                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                    : session.gender === 'female'
                       ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300'
                       : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                  }`}>
+                    }`}>
                     {session.gender}
                   </span>
                 )}
@@ -559,7 +562,7 @@ function BookingCalendarComponent({ module, props }: { module: Module; props: Bl
         <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 text-center">
           {props.title || 'Select Your Dates'}
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -609,24 +612,36 @@ function FormContainerComponent({ module, block, props }: { module: Module; bloc
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
-      // Determine endpoint based on formAction
-      let endpoint = '/api/contact';
-      if (props.formAction === 'reservation') {
-        endpoint = '/api/reservations/request';
-      } else if (props.formAction === 'feedback') {
-        endpoint = '/api/feedback';
-      } else if (props.formAction === 'custom' && props.customEndpoint) {
-        endpoint = props.customEndpoint;
+      const { formAction } = props;
+      let subject = 'Contact Form Submission';
+      let message = '';
+
+      if (formAction === 'reservation') {
+        subject = 'Reservation Request';
+        message = `Requested Date: ${formData.date}\nGuests: ${formData.guests}\nNotes: ${formData.notes || 'None'}`;
+      } else if (formAction === 'feedback') {
+        subject = 'Customer Feedback';
+        message = `Rating: ${formData.rating || 'N/A'}\nFeedback: ${formData.feedback}`;
+      } else {
+        subject = formData.subject || 'Contact Inquiry';
+        message = formData.message;
       }
 
-      // Simulate form submission for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast.success('Form submitted successfully!');
+      await supportApi.submitContact({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject,
+        message
+      });
+
+      toast.success('Your request has been submitted successfully!');
       setFormData({});
-    } catch (error) {
-      toast.error('Failed to submit form. Please try again.');
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error || 'Failed to submit form. Please try again.';
+      toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -692,7 +707,7 @@ function FormContainerComponent({ module, block, props }: { module: Module; bloc
             )}
           </div>
         ))}
-        
+
         <button
           type="submit"
           disabled={isSubmitting}
@@ -702,6 +717,98 @@ function FormContainerComponent({ module, block, props }: { module: Module; bloc
           {props.submitText || tCommon('submit')}
         </button>
       </form>
+    </div>
+  );
+}
+
+// ============================================
+// Testimonials Component
+// ============================================
+function TestimonialsComponent({ props }: { props: BlockProps }) {
+  const staticTestimonials = [
+    { name: 'John Doe', avatar: 'JD', text: 'Amazing experience! The staff was super friendly.', rating: 5 },
+    { name: 'Sarah Smith', avatar: 'SS', text: 'The pool was crystal clear and very refreshing.', rating: 4 },
+    { name: 'Michael Brown', avatar: 'MB', text: 'Best food I have had in a long time. Will come back!', rating: 5 },
+  ];
+
+  return (
+    <div className="container mx-auto px-4 py-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {staticTestimonials.slice(0, props.count || 3).map((item, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.1 }}
+            className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-700"
+          >
+            <div className="flex items-center gap-2 mb-4 text-amber-400">
+              {Array.from({ length: item.rating }).map((_, r) => (
+                <Star key={r} className="w-4 h-4 fill-current" />
+              ))}
+            </div>
+            <p className="text-slate-600 dark:text-slate-400 italic mb-6">"{item.text}"</p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 font-bold">
+                {item.avatar}
+              </div>
+              <span className="font-bold text-slate-900 dark:text-white">{item.name}</span>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Pricing Table Component
+// ============================================
+function PricingTableComponent({ props }: { props: BlockProps }) {
+  let plans = [];
+  try {
+    plans = typeof props.plans === 'string' ? JSON.parse(props.plans) : (props.plans || []);
+  } catch (e) {
+    console.error("Failed to parse pricing plans", e);
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-12">
+      {props.title && <h2 className="text-3xl font-bold text-center mb-12 dark:text-white">{props.title}</h2>}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        {plans.map((plan: any, i: number) => (
+          <div
+            key={i}
+            className={`flex flex-col p-8 rounded-3xl border-2 transition-all ${plan.popular
+              ? 'border-primary-500 bg-white dark:bg-slate-800 shadow-xl scale-105 z-10'
+              : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900'
+              }`}
+          >
+            {plan.popular && (
+              <span className="bg-primary-500 text-white text-xs font-bold uppercase py-1 px-3 rounded-full self-start mb-4">
+                Most Popular
+              </span>
+            )}
+            <h3 className="text-2xl font-bold mb-2 dark:text-white">{plan.name}</h3>
+            <div className="text-4xl font-bold mb-6 text-primary-600">{plan.price}</div>
+            <ul className="space-y-4 mb-8 flex-grow">
+              {plan.features.map((feature: string, f: number) => (
+                <li key={f} className="flex items-center gap-3 text-slate-600 dark:text-slate-400">
+                  <Check className="w-5 h-5 text-green-500 shrink-0" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+            <button className={`w-full py-3 px-6 rounded-xl font-bold transition-all ${plan.popular
+              ? 'bg-primary-600 text-white hover:bg-primary-700'
+              : 'bg-slate-800 text-white hover:bg-slate-700'
+              }`}>
+              Get Started
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

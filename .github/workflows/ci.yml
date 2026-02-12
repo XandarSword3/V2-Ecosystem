@@ -225,9 +225,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: v2-resort/frontend/package-lock.json
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Deploy frontend to Vercel (staging)
+        working-directory: v2-resort/frontend
+        run: vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --confirm
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy backend to Render
+        if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
+        run: curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+
       - name: Deploy notification
         run: |
-          echo "🚀 Ready for staging deployment"
+          echo "🚀 Staging deployment triggered"
           echo "Commit: ${{ github.sha }}"
           echo "Branch: ${{ github.ref_name }}"
           echo "Author: ${{ github.actor }}"
+          echo "Frontend: Vercel deployment initiated"
+          echo "Backend: Render deploy hook triggered"

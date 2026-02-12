@@ -6,12 +6,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number | string | undefined | null, currency: Currency = 'USD'): string {
+export function formatCurrency(amount: number | string | undefined | null, currency: Currency | string = 'USD'): string {
   // Handle undefined/null/NaN amounts - also handles string prices from API
   const numAmount = Number(amount) || 0;
   
   // Convert from USD base price to target currency
-  const convertedAmount = numAmount * exchangeRates[currency];
+  const convertedAmount = numAmount * (exchangeRates[currency as Currency] || 1);
   
   if (currency === 'LBP') {
     // For LBP, format without decimals and use custom symbol

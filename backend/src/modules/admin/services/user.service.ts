@@ -87,7 +87,7 @@ export class UserService {
     const usersWithRoles: UserWithRoles[] = ((data || []) as unknown as RawUserData[]).map(user => ({
       ...user,
       roles: user.user_roles?.map(ur => ur.role?.name).filter(Boolean) as string[] || [],
-      permissions: []
+      permissions: [] as string[]
     }));
 
     return {

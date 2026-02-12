@@ -32,6 +32,7 @@ import { getSupabase } from '../../database/connection.js';
 import QRCode from 'qrcode';
 
 import { createInMemoryNotificationRepository } from '../repositories/notification.repository.memory.js';
+import { createSupabaseNotificationRepository } from '../repositories/notification.repository.supabase.js';
 import { createNotificationService } from '../services/notification.service.js';
 
 // ============================================
@@ -150,8 +151,9 @@ export function createContainer(overrides?: Partial<Container>): Container {
   // Default implementations
   const supabase = getSupabase();
   
-  // Core defaults - other repositories/services are injected by the consuming code
-  const notificationRepo = createInMemoryNotificationRepository();
+  // Core defaults - use Supabase for production, in-memory for tests
+  // Use Supabase notification repository for persistent notifications
+  const notificationRepo = createSupabaseNotificationRepository();
   
   const defaults: Partial<Container> = {
     // Database client (Supabase adapter)

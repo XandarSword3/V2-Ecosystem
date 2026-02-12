@@ -78,12 +78,13 @@ export default function StaffBookingsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
 
-  const fetchBookings = useCallback(async () => {
+  const fetchBookings = useCallback(async (signal?: AbortSignal) => { // FIX Iter-23: AbortController support
     try {
       setLoading(true);
-      const response = await api.get('/chalets/staff/bookings');
-      setBookings(response.data.data || []);
-    } catch (error) {
+      const response = await api.get('/chalets/staff/bookings', { signal }); // FIX Iter-23: pass signal
+      if (!signal?.aborted) setBookings(response.data.data || []); // FIX Iter-23: guard setState
+    } catch (error: any) {
+      if (error?.name === 'CanceledError') return; // FIX Iter-23: ignore abort
       console.error('Failed to fetch bookings:', error);
       toast.error(tc('errors.failedToLoad'));
       setBookings([]);
@@ -93,7 +94,9 @@ export default function StaffBookingsPage() {
   }, []);
 
   useEffect(() => {
-    fetchBookings();
+    const controller = new AbortController(); // FIX Iter-23: cleanup on unmount
+    fetchBookings(controller.signal);
+    return () => controller.abort();
   }, [fetchBookings]);
 
   const handleCheckIn = async (bookingId: string) => {
@@ -170,7 +173,7 @@ export default function StaffBookingsPage() {
           </h1>
           <p className="text-slate-500 dark:text-slate-400">{tb('subtitle')}</p>
         </div>
-        <Button variant="outline" onClick={fetchBookings}>
+        <Button variant="outline" onClick={() => fetchBookings()}>
           <RefreshCw className="w-4 h-4 mr-2" />
           {tb('refresh')}
         </Button>
@@ -282,11 +285,11 @@ export default function StaffBookingsPage() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                             <Home className="w-4 h-4" />
-                            <span>{booking.chalets?.name || 'Unknown Chalet'}</span>
+                            <span>{booking.chalets?.name || tch('unknownChalet')}</span>
                           </div>
                           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                             <Users className="w-4 h-4" />
-                            <span>{booking.guests} guests</span>
+                            <span>{booking.guests} {tb('guests')}</span>
                           </div>
                           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                             <Calendar className="w-4 h-4" />

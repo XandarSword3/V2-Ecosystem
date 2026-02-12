@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { formatCurrency } from '@/lib/utils';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import {
@@ -28,6 +29,10 @@ import {
   EyeOff,
   Flame,
   Leaf,
+  ChefHat,
+  Layers,
+  Check,
+  Package,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -45,6 +50,39 @@ interface MenuItem {
   is_spicy: boolean;
   preparation_time?: number;
   allergens?: string[];
+  recipe?: RecipeItem[];
+  customization_group_ids?: string[];
+}
+
+interface RecipeItem {
+  ingredient_id: string;
+  ingredient_name?: string;
+  quantity: number;
+  unit: string;
+}
+
+interface Ingredient {
+  id: string;
+  name: string;
+  unit: string;
+  stock_quantity: number;
+  cost_per_unit: number;
+}
+
+interface CustomizationGroup {
+  id: string;
+  name: string;
+  description?: string;
+  is_required: boolean;
+  min_selections: number;
+  max_selections: number;
+  options: CustomizationOption[];
+}
+
+interface CustomizationOption {
+  id: string;
+  name: string;
+  price_modifier: number;
 }
 
 interface Category {
@@ -64,6 +102,8 @@ export default function DynamicMenuPage() {
 
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [customizationGroups, setCustomizationGroups] = useState<CustomizationGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -71,6 +111,9 @@ export default function DynamicMenuPage() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [formData, setFormData] = useState<Partial<MenuItem>>({});
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
+  const [recipeItems, setRecipeItems] = useState<RecipeItem[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
 
   useEffect(() => {
     if (currentModule) {
@@ -82,12 +125,16 @@ export default function DynamicMenuPage() {
     if (!currentModule) return;
     try {
       setLoading(true);
-      const [menuRes, catRes] = await Promise.all([
+      const [menuRes, catRes, ingredientsRes, groupsRes] = await Promise.all([
         api.get('/restaurant/items', { params: { moduleId: currentModule.id } }),
         api.get('/restaurant/categories', { params: { moduleId: currentModule.id } }),
+        api.get('/inventory/ingredients', { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
+        api.get('/restaurant/customization-groups', { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
       ]);
       setItems(menuRes.data.data || []);
       setCategories(catRes.data.data || []);
+      setIngredients(ingredientsRes.data.data || []);
+      setCustomizationGroups(groupsRes.data.data || []);
     } catch (error) {
       toast.error('Failed to fetch menu data');
       console.error(error);
@@ -111,13 +158,52 @@ export default function DynamicMenuPage() {
       is_spicy: false,
       preparation_time: 15,
     });
+    setRecipeItems([]);
+    setSelectedGroups([]);
+    setActiveTab('details');
     setShowModal(true);
   };
 
   const openEditModal = (item: MenuItem) => {
     setEditingItem(item);
     setFormData({ ...item });
+    setRecipeItems(item.recipe || []);
+    setSelectedGroups(item.customization_group_ids || []);
+    setActiveTab('details');
     setShowModal(true);
+  };
+
+  // Recipe management
+  const addRecipeItem = () => {
+    if (ingredients.length === 0) return;
+    setRecipeItems([
+      ...recipeItems,
+      { ingredient_id: ingredients[0].id, quantity: 1, unit: ingredients[0].unit }
+    ]);
+  };
+
+  const updateRecipeItem = (index: number, field: keyof RecipeItem, value: string | number) => {
+    const updated = [...recipeItems];
+    if (field === 'ingredient_id') {
+      const ingredient = ingredients.find(i => i.id === value);
+      updated[index] = { ...updated[index], [field]: value as string, unit: ingredient?.unit || '' };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
+    setRecipeItems(updated);
+  };
+
+  const removeRecipeItem = (index: number) => {
+    setRecipeItems(recipeItems.filter((_, i) => i !== index));
+  };
+
+  // Customization group management
+  const toggleCustomizationGroup = (groupId: string) => {
+    setSelectedGroups(prev => 
+      prev.includes(groupId) 
+        ? prev.filter(id => id !== groupId)
+        : [...prev, groupId]
+    );
   };
 
   const handleSave = async () => {
@@ -130,7 +216,12 @@ export default function DynamicMenuPage() {
 
     try {
       setSaving(true);
-      const payload = { ...formData, module_id: currentModule.id };
+      const payload = { 
+        ...formData, 
+        module_id: currentModule.id,
+        recipe: recipeItems.length > 0 ? recipeItems : undefined,
+        customization_group_ids: selectedGroups.length > 0 ? selectedGroups : undefined,
+      };
       
       if (editingItem) {
         await api.put(`/restaurant/admin/items/${editingItem.id}`, payload);
@@ -207,7 +298,7 @@ export default function DynamicMenuPage() {
         </motion.div>
 
         <motion.div variants={fadeInUp} className="flex gap-2">
-          <Button variant="outline" onClick={fetchData} className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => fetchData()} className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4" />
             Refresh
           </Button>
@@ -426,9 +517,9 @@ export default function DynamicMenuPage() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
             >
-              <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6 flex justify-between items-center">
+              <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6 flex justify-between items-center z-10">
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
                   {editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}
                 </h3>
@@ -440,159 +531,354 @@ export default function DynamicMenuPage() {
                 </button>
               </div>
 
-              <div className="p-6 space-y-6">
-                {/* Basic Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Name (English) *
-                    </label>
-                    <Input
-                      value={formData.name || ''}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g., Grilled Chicken"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Name (Arabic)
-                    </label>
-                    <Input
-                      value={formData.name_ar || ''}
-                      onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
-                      placeholder="الاسم بالعربية"
-                      dir="rtl"
-                    />
-                  </div>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <div className="px-6 pt-4 border-b border-slate-200 dark:border-slate-700">
+                  <TabsList className="grid grid-cols-3 w-full">
+                    <TabsTrigger value="details" className="flex items-center gap-2">
+                      <UtensilsCrossed className="w-4 h-4" />
+                      Basic Details
+                    </TabsTrigger>
+                    <TabsTrigger value="recipe" className="flex items-center gap-2">
+                      <ChefHat className="w-4 h-4" />
+                      Recipe
+                    </TabsTrigger>
+                    <TabsTrigger value="customizations" className="flex items-center gap-2">
+                      <Layers className="w-4 h-4" />
+                      Customizations
+                    </TabsTrigger>
+                  </TabsList>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Description (English)
-                    </label>
-                    <textarea
-                      value={formData.description || ''}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Describe the dish..."
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-orange-500"
-                      rows={3}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Description (Arabic)
-                    </label>
-                    <textarea
-                      value={formData.description_ar || ''}
-                      onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
-                      placeholder="الوصف بالعربية..."
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-orange-500"
-                      rows={3}
-                      dir="rtl"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Price (USD) *
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                {/* Basic Details Tab */}
+                <TabsContent value="details" className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        Name (English) *
+                      </label>
                       <Input
-                        type="number"
-                        step="0.01"
-                        value={formData.price || ''}
-                        onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-                        className="pl-10"
+                        value={formData.name || ''}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g., Grilled Chicken"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        Name (Arabic)
+                      </label>
+                      <Input
+                        value={formData.name_ar || ''}
+                        onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
+                        placeholder="الاسم بالعربية"
+                        dir="rtl"
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Category *
-                    </label>
-                    <select
-                      value={formData.category_id || ''}
-                      onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-orange-500"
-                    >
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        Description (English)
+                      </label>
+                      <textarea
+                        value={formData.description || ''}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Describe the dish..."
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-orange-500"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        Description (Arabic)
+                      </label>
+                      <textarea
+                        value={formData.description_ar || ''}
+                        onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
+                        placeholder="الوصف بالعربية..."
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-orange-500"
+                        rows={3}
+                        dir="rtl"
+                      />
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        Price (USD) *
+                      </label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={formData.price || ''}
+                          onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        Category *
+                      </label>
+                      <select
+                        value={formData.category_id || ''}
+                        onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-orange-500"
+                      >
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        Prep Time (min)
+                      </label>
+                      <Input
+                        type="number"
+                        value={formData.preparation_time || ''}
+                        onChange={(e) => setFormData({ ...formData, preparation_time: parseInt(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Prep Time (min)
+                      Image URL
                     </label>
                     <Input
-                      type="number"
-                      value={formData.preparation_time || ''}
-                      onChange={(e) => setFormData({ ...formData, preparation_time: parseInt(e.target.value) })}
+                      value={formData.image_url || ''}
+                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                      placeholder="https://..."
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Image URL
-                  </label>
-                  <Input
-                    value={formData.image_url || ''}
-                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    placeholder="https://..."
-                  />
-                </div>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_available ?? true}
+                        onChange={(e) => setFormData({ ...formData, is_available: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-slate-700 dark:text-slate-300">Available</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_featured ?? false}
+                        onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-sm text-slate-700 dark:text-slate-300">Featured</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_vegetarian ?? false}
+                        onChange={(e) => setFormData({ ...formData, is_vegetarian: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                      />
+                      <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <Leaf className="w-4 h-4 text-green-500" />
+                        Vegetarian
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_spicy ?? false}
+                        onChange={(e) => setFormData({ ...formData, is_spicy: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                      />
+                      <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <Flame className="w-4 h-4 text-red-500" />
+                        Spicy
+                      </span>
+                    </label>
+                  </div>
+                </TabsContent>
 
-                {/* Toggles */}
-                <div className="flex flex-wrap gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_available ?? true}
-                      onChange={(e) => setFormData({ ...formData, is_available: e.target.checked })}
-                      className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
-                    />
-                    <span className="text-sm text-slate-700 dark:text-slate-300">Available</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_featured ?? false}
-                      onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
-                      className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                    />
-                    <span className="text-sm text-slate-700 dark:text-slate-300">Featured</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_vegetarian ?? false}
-                      onChange={(e) => setFormData({ ...formData, is_vegetarian: e.target.checked })}
-                      className="w-4 h-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                    />
-                    <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                      <Leaf className="w-4 h-4 text-green-500" />
-                      Vegetarian
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_spicy ?? false}
-                      onChange={(e) => setFormData({ ...formData, is_spicy: e.target.checked })}
-                      className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                    />
-                    <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                      <Flame className="w-4 h-4 text-red-500" />
-                      Spicy
-                    </span>
-                  </label>
-                </div>
-              </div>
+                {/* Recipe Tab */}
+                <TabsContent value="recipe" className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-slate-900 dark:text-white">Recipe & Ingredients</h4>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Define ingredients and quantities for inventory tracking
+                      </p>
+                    </div>
+                    <Button
+                      onClick={addRecipeItem}
+                      disabled={ingredients.length === 0}
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Ingredient
+                    </Button>
+                  </div>
+
+                  {ingredients.length === 0 ? (
+                    <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                      <Package className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                      <p className="text-slate-500 dark:text-slate-400">No ingredients available</p>
+                      <p className="text-sm text-slate-400 dark:text-slate-500">
+                        Add ingredients in Inventory management first
+                      </p>
+                    </div>
+                  ) : recipeItems.length === 0 ? (
+                    <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                      <ChefHat className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                      <p className="text-slate-500 dark:text-slate-400">No recipe defined</p>
+                      <p className="text-sm text-slate-400 dark:text-slate-500">
+                        Click &quot;Add Ingredient&quot; to start building the recipe
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recipeItems.map((item, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg"
+                        >
+                          <select
+                            value={item.ingredient_id}
+                            onChange={(e) => updateRecipeItem(index, 'ingredient_id', e.target.value)}
+                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                          >
+                            {ingredients.map(ing => (
+                              <option key={ing.id} value={ing.id}>{ing.name}</option>
+                            ))}
+                          </select>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.quantity}
+                            onChange={(e) => updateRecipeItem(index, 'quantity', parseFloat(e.target.value))}
+                            className="w-24"
+                            placeholder="Qty"
+                          />
+                          <span className="text-sm text-slate-500 dark:text-slate-400 w-16">
+                            {item.unit || ingredients.find(i => i.id === item.ingredient_id)?.unit || 'unit'}
+                          </span>
+                          <button
+                            onClick={() => removeRecipeItem(index)}
+                            className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {recipeItems.length > 0 && (
+                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
+                        <strong>Estimated Cost:</strong>{' '}
+                        {formatCurrency(
+                          recipeItems.reduce((sum, item) => {
+                            const ing = ingredients.find(i => i.id === item.ingredient_id);
+                            return sum + (ing?.cost_per_unit || 0) * item.quantity;
+                          }, 0)
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Customizations Tab */}
+                <TabsContent value="customizations" className="p-6 space-y-6">
+                  <div>
+                    <h4 className="font-medium text-slate-900 dark:text-white">Customization Groups</h4>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Select which customization options are available for this item
+                    </p>
+                  </div>
+
+                  {customizationGroups.length === 0 ? (
+                    <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                      <Layers className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                      <p className="text-slate-500 dark:text-slate-400">No customization groups available</p>
+                      <p className="text-sm text-slate-400 dark:text-slate-500">
+                        Create customization groups in Settings → Customizations
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {customizationGroups.map(group => (
+                        <div
+                          key={group.id}
+                          onClick={() => toggleCustomizationGroup(group.id)}
+                          className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                            selectedGroups.includes(group.id)
+                              ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                              : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h5 className="font-medium text-slate-900 dark:text-white">
+                                  {group.name}
+                                </h5>
+                                {group.is_required && (
+                                  <span className="px-2 py-0.5 text-xs bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-full">
+                                    Required
+                                  </span>
+                                )}
+                              </div>
+                              {group.description && (
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                  {group.description}
+                                </p>
+                              )}
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {group.options.slice(0, 5).map(opt => (
+                                  <span
+                                    key={opt.id}
+                                    className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-700 rounded"
+                                  >
+                                    {opt.name}
+                                    {opt.price_modifier !== 0 && (
+                                      <span className="ml-1 text-orange-600">
+                                        {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
+                                      </span>
+                                    )}
+                                  </span>
+                                ))}
+                                {group.options.length > 5 && (
+                                  <span className="px-2 py-1 text-xs text-slate-500">
+                                    +{group.options.length - 5} more
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              selectedGroups.includes(group.id)
+                                ? 'border-orange-500 bg-orange-500'
+                                : 'border-slate-300 dark:border-slate-600'
+                            }`}>
+                              {selectedGroups.includes(group.id) && (
+                                <Check className="w-4 h-4 text-white" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {selectedGroups.length > 0 && (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {selectedGroups.length} customization group{selectedGroups.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
+                </TabsContent>
+              </Tabs>
 
               <div className="sticky bottom-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-6 flex gap-3">
                 <Button

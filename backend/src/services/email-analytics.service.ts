@@ -3,7 +3,7 @@
  * Tracks email metrics and provides insights
  */
 
-import { supabase } from '../lib/supabase';
+import { supabase } from "../lib/supabase.js";
 
 export interface EmailMetrics {
   sent: number;
@@ -497,7 +497,7 @@ class EmailAnalyticsService {
    * Generate pixel tracking URL
    */
   generateTrackingPixel(messageId: string): string {
-    const baseUrl = process.env.BACKEND_URL || 'https://api.v2resort.com';
+    const baseUrl = process.env.BACKEND_URL || 'https://api.ironparadisegym.com';
     return `${baseUrl}/email/track/open/${messageId}`;
   }
 
@@ -505,7 +505,7 @@ class EmailAnalyticsService {
    * Generate click tracking URL
    */
   generateClickTrackingUrl(messageId: string, originalUrl: string): string {
-    const baseUrl = process.env.BACKEND_URL || 'https://api.v2resort.com';
+    const baseUrl = process.env.BACKEND_URL || 'https://api.ironparadisegym.com';
     const encoded = encodeURIComponent(originalUrl);
     return `${baseUrl}/email/track/click/${messageId}?url=${encoded}`;
   }

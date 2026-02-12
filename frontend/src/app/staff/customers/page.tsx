@@ -69,9 +69,10 @@ export default function CustomerLookupPage() {
     setNotFound(false);
 
     try {
-      const res = await api.get('/admin/users/search', {
+      const res = await api.get('/admin/users', {
         params: {
-          [searchType]: searchQuery.trim(),
+          search: searchQuery.trim(),
+          type: 'customer',
         },
       });
 
@@ -116,7 +117,8 @@ export default function CustomerLookupPage() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  // FIX Iter-10: renamed from handleKeyPress (deprecated) to handleKeyDown
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSearch();
     }
@@ -174,7 +176,7 @@ export default function CustomerLookupPage() {
                     }
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={handleKeyPress}
+                    onKeyDown={handleKeyDown} // FIX Iter-10: onKeyPress is deprecated
                     className="pl-10"
                   />
                 </div>

@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { useModuleBuilderStore } from '@/store/module-builder-store';
+import { useModuleBuilderStore } from '@/stores/module-builder-store';
 import { BuilderCanvas } from '@/components/module-builder/BuilderCanvas';
 import { ComponentToolbar } from '@/components/module-builder/ComponentToolbar';
 import { PropertyPanel } from '@/components/module-builder/PropertyPanel';
@@ -36,9 +36,10 @@ export default function ModuleBuilderPage() {
     setZoom,
   } = useModuleBuilderStore();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['module', id],
     queryFn: () => modulesApi.getById(id),
+    staleTime: 0, // Always fetch fresh data when navigating to builder
   });
 
   const saveMutation = useMutation({
@@ -54,7 +55,10 @@ export default function ModuleBuilderPage() {
             settings_version: data?.data?.settings_version
         });
     },
-    onSuccess: () => toast.success('Layout saved successfully'),
+    onSuccess: () => {
+      toast.success('Layout saved successfully');
+      refetch(); // Refresh data after save to ensure consistency
+    },
     onError: () => toast.error('Failed to save layout')
   });
 
@@ -62,8 +66,10 @@ export default function ModuleBuilderPage() {
     if (data?.data) {
       setActiveModuleId(id);
       // Load layout from settings if it exists, otherwise empty
+      // Use skipHistory=true to not add initial load to undo stack
       const savedLayout = data.data.settings?.layout || [];
-      setLayout(savedLayout);
+      console.log('[ModuleBuilder] Loading layout from API:', savedLayout);
+      setLayout(savedLayout, true); // Skip history for initial load
     }
   }, [data, id, setActiveModuleId, setLayout]);
 

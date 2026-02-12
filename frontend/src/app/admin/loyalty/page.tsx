@@ -44,14 +44,26 @@ interface LoyaltyTier {
 interface LoyaltyAccount {
   id: string;
   user_id: string;
-  user_name: string;
-  user_email: string;
-  current_tier: string;
-  tier_name: string;
-  tier_color: string;
+  user?: {
+    id: string;
+    full_name: string;
+    email: string;
+  };
+  tier?: {
+    id: string;
+    name: string;
+    color: string;
+  };
+  // Legacy direct fields for compatibility
+  user_name?: string;
+  user_email?: string;
+  current_tier?: string;
+  tier_name?: string;
+  tier_color?: string;
+  available_points?: number;
   total_points: number;
   lifetime_points: number;
-  redeemed_points: number;
+  redeemed_points?: number;
   created_at: string;
 }
 
@@ -71,6 +83,24 @@ interface LoyaltyStats {
   totalPointsRedeemed: number;
   activeMembers30Days: number;
   tierDistribution: Array<{ tier_name: string; tier_color: string; count: number }>;
+}
+
+// Map backend response structure to frontend LoyaltyStats interface
+function mapBackendStats(raw: any): LoyaltyStats {
+  const summary = raw?.summary || raw || {};
+  return {
+    totalMembers: summary.total_members ?? summary.totalMembers ?? 0,
+    totalPointsIssued: summary.total_lifetime_points ?? summary.totalPointsIssued ?? 0,
+    totalPointsRedeemed: summary.total_outstanding_points
+      ? (summary.total_lifetime_points || 0) - (summary.total_outstanding_points || 0)
+      : summary.totalPointsRedeemed ?? 0,
+    activeMembers30Days: summary.active_members_30_days ?? summary.activeMembers30Days ?? 0,
+    tierDistribution: (raw?.tierDistribution || []).map((t: any) => ({
+      tier_name: t.tier_name || t.name || 'Unknown',
+      tier_color: t.tier_color || t.color || '#6b7280',
+      count: t.count || 0,
+    })),
+  };
 }
 
 interface LoyaltySettings {
@@ -110,7 +140,7 @@ export default function LoyaltyAdminPage() {
       ]);
 
       if (tiersRes.data.success) setTiers(tiersRes.data.data);
-      if (statsRes.data.success) setStats(statsRes.data.data);
+      if (statsRes.data.success) setStats(mapBackendStats(statsRes.data.data));
       if (settingsRes.data.success) setSettings(settingsRes.data.data);
     } catch (error) {
       toast.error('Failed to load loyalty data');
@@ -196,7 +226,7 @@ export default function LoyaltyAdminPage() {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Loyalty Program</h1>
           <p className="text-slate-500 dark:text-slate-400">Manage rewards, tiers, and member points</p>
         </div>
-        <Button onClick={loadData} variant="outline" className="gap-2">
+        <Button onClick={() => loadData()} variant="outline" className="gap-2">
           <RefreshCw className="w-4 h-4" />
           Refresh
         </Button>
@@ -367,45 +397,55 @@ export default function LoyaltyAdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {accounts.map((account) => (
-                      <tr key={account.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
-                        <td className="p-4">
-                          <div>
-                            <p className="font-medium">{account.user_name}</p>
-                            <p className="text-sm text-slate-500">{account.user_email}</p>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <Badge 
-                            style={{ backgroundColor: account.tier_color + '20', color: account.tier_color }}
-                          >
-                            {account.tier_name}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-right font-semibold">
-                          {account.total_points.toLocaleString()}
-                        </td>
-                        <td className="p-4 text-right text-slate-500">
-                          {account.lifetime_points.toLocaleString()}
-                        </td>
-                        <td className="p-4 text-slate-500">
-                          {formatDate(account.created_at)}
-                        </td>
-                        <td className="p-4 text-right">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => {
-                              setSelectedAccount(account);
-                              setShowAdjustModal(true);
+                    {accounts.map((account) => {
+                      // Handle both nested and flat structures
+                      const userName = account.user?.full_name || account.user_name || 'Unknown';
+                      const userEmail = account.user?.email || account.user_email || '';
+                      const tierName = account.tier?.name || account.tier_name || 'Bronze';
+                      const tierColor = account.tier?.color || account.tier_color || '#CD7F32';
+                      const currentPoints = account.available_points ?? account.total_points ?? 0;
+                      const lifetimePoints = account.lifetime_points ?? 0;
+                      
+                      return (
+                        <tr key={account.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                          <td className="p-4">
+                            <div>
+                              <p className="font-medium">{userName}</p>
+                              <p className="text-sm text-slate-500">{userEmail}</p>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <Badge 
+                              style={{ backgroundColor: tierColor + '20', color: tierColor }}
+                            >
+                              {tierName}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-right font-semibold">
+                            {currentPoints.toLocaleString()}
+                          </td>
+                          <td className="p-4 text-right text-slate-500">
+                            {lifetimePoints.toLocaleString()}
+                          </td>
+                          <td className="p-4 text-slate-500">
+                            {formatDate(account.created_at)}
+                          </td>
+                          <td className="p-4 text-right">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedAccount(account);
+                                setShowAdjustModal(true);
                             }}
                           >
                             <ArrowUpDown className="w-4 h-4 mr-1" />
                             Adjust
                           </Button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -447,6 +487,34 @@ export default function LoyaltyAdminPage() {
                         onClick={() => { setEditingTier(tier); setShowTierModal(true); }}
                       >
                         <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={async () => {
+                          if (!confirm(`Are you sure you want to delete the "${tier.name}" tier? Members will be migrated to another tier.`)) return;
+                          try {
+                            // Ensure CSRF token is present
+                            const csrfCookie = document.cookie.match(/(^| )csrf-token=([^;]+)/);
+                            let csrfToken = csrfCookie ? csrfCookie[2] : undefined;
+                            if (!csrfToken) {
+                              // Fetch new CSRF token
+                              const res = await api.get('/csrf-token');
+                              csrfToken = res.data.csrfToken;
+                            }
+                            await api.delete(`/loyalty/tiers/${tier.id}`, {
+                              headers: { 'X-CSRF-Token': csrfToken },
+                              withCredentials: true,
+                            });
+                            toast.success('Tier deleted successfully');
+                            loadData();
+                          } catch (error: any) {
+                            toast.error(error.response?.data?.error || 'Failed to delete tier');
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>

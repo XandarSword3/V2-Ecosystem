@@ -1,5 +1,5 @@
 /**
- * OpenAPI 3.0 Specification for V2 Resort API
+ * OpenAPI 3.0 Specification for Iron Paradise Gym API
  * 
  * This provides interactive API documentation via Swagger UI.
  * Access at: /api/docs
@@ -8,10 +8,10 @@
 export const openApiSpec = {
   openapi: '3.0.3',
   info: {
-    title: 'V2 Resort Management API',
+    title: 'Iron Paradise Gym Management API',
     version: '1.0.0',
     description: `
-# V2 Resort Management System API
+# Iron Paradise Gym Management System API
 
 A comprehensive REST API for managing resort operations including restaurant, chalets, pool, and more.
 
@@ -45,8 +45,8 @@ Error responses:
 \`\`\`
     `,
     contact: {
-      name: 'V2 Resort Support',
-      email: 'support@v2resort.com',
+      name: 'Iron Paradise Gym Support',
+      email: 'support@ironparadisegym.com',
     },
     license: {
       name: 'Proprietary',
@@ -194,7 +194,7 @@ Error responses:
       get: {
         tags: ['Auth'],
         summary: 'Get current user profile',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         responses: {
           '200': {
             description: 'User profile',
@@ -264,7 +264,7 @@ Error responses:
       get: {
         tags: ['Restaurant'],
         summary: 'Get orders (staff/admin)',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'] } },
           { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
@@ -281,7 +281,7 @@ Error responses:
       patch: {
         tags: ['Restaurant'],
         summary: 'Update order status',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
@@ -442,7 +442,7 @@ Error responses:
       post: {
         tags: ['Pool'],
         summary: 'Validate ticket (staff)',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
@@ -457,7 +457,7 @@ Error responses:
       get: {
         tags: ['Admin'],
         summary: 'Get dashboard statistics',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         responses: {
           '200': {
             description: 'Dashboard data',
@@ -488,7 +488,7 @@ Error responses:
       get: {
         tags: ['Admin'],
         summary: 'List users',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'search', in: 'query', schema: { type: 'string' } },
           { name: 'role', in: 'query', schema: { type: 'string' } },
@@ -502,7 +502,7 @@ Error responses:
       post: {
         tags: ['Admin'],
         summary: 'Create user',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         requestBody: {
           required: true,
           content: {

@@ -72,13 +72,13 @@ export default function ContactPage() {
     {
       icon: Mail,
       label: 'Email',
-      value: settings.email || 'info@v2resort.com',
-      href: `mailto:${settings.email || 'info@v2resort.com'}`,
+      value: settings.email || 'info@ironparadisegym.com',
+      href: `mailto:${settings.email || 'info@ironparadisegym.com'}`,
     },
     {
       icon: MapPin,
       label: 'Address',
-      value: settings.address || 'V2 Resort, Lebanon',
+      value: settings.address || 'Iron Paradise Gym, Lebanon',
       href: '#',
     },
     {

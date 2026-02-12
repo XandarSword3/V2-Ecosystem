@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 import { JsonLd, generateRestaurantSchema, generateBreadcrumbSchema } from '@/lib/structured-data';
 
 export const metadata: Metadata = {
-  title: 'Fine Dining Restaurant | V2 Resort',
-  description: 'Experience exquisite international cuisine at V2 Resort. Features fresh ingredients, stunning views, and an extensive wine list. Open for lunch and dinner.',
-  keywords: ['fine dining', 'resort restaurant', 'V2 Resort dining', 'seafood', 'international cuisine'],
+  title: 'Fine Dining Restaurant | Iron Paradise Gym',
+  description: 'Experience exquisite international cuisine at Iron Paradise Gym. Features fresh ingredients, stunning views, and an extensive wine list. Open for lunch and dinner.',
+  keywords: ['fine dining', 'resort restaurant', 'Iron Paradise Gym dining', 'seafood', 'international cuisine'],
   openGraph: {
-    title: 'Fine Dining Restaurant | V2 Resort',
-    description: 'Experience exquisite international cuisine at V2 Resort. Book your table now.',
+    title: 'Fine Dining Restaurant | Iron Paradise Gym',
+    description: 'Experience exquisite international cuisine at Iron Paradise Gym. Book your table now.',
     type: 'website',
     url: 'https://v2-ecosystem.vercel.app/restaurant',
   },
@@ -19,7 +19,7 @@ export default function RestaurantLayout({
   children: React.ReactNode;
 }) {
   const restaurantSchema = generateRestaurantSchema({
-    name: 'V2 Resort Restaurant',
+    name: 'Iron Paradise Gym Restaurant',
     description: 'A premium dining destination offering authentic International cuisine with breathtaking views.',
     url: 'https://v2-ecosystem.vercel.app/restaurant',
     menuUrl: 'https://v2-ecosystem.vercel.app/restaurant/menu',
@@ -49,11 +49,11 @@ export default function RestaurantLayout({
       */}
       <div className="sr-only">
         <article>
-          <h1>V2 Resort Fine Dining Restaurant</h1>
+          <h1>Iron Paradise Gym Fine Dining Restaurant</h1>
           <section>
             <h2>About Our Cuisine</h2>
             <p>
-              Welcome to the V2 Resort Restaurant, where traditional flavors meet modern culinary techniques.
+              Welcome to the Iron Paradise Gym Restaurant, where traditional flavors meet modern culinary techniques.
               Our chefs use only the freshest local ingredients to create memorable dining experiences.
             </p>
             <p>
@@ -81,7 +81,7 @@ export default function RestaurantLayout({
           </section>
 
           <address>
-            <p><strong>Location:</strong> V2 Resort Main Building</p>
+            <p><strong>Location:</strong> Iron Paradise Gym Main Building</p>
             <p><strong>Cuisine:</strong> International & Mediterranean</p>
             <p><strong>Service Options:</strong> Dine-in, Takeaway</p>
           </address>

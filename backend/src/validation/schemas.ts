@@ -132,11 +132,33 @@ export const updatePoolTicketSchema = z.object({
 
 // ============ RESTAURANT ORDER SCHEMAS ============
 
+// Schema for selected modifiers in order items
+const selectedModifierSchema = z.object({
+  optionId: uuidSchema,
+  optionName: z.string().max(100),
+  groupId: uuidSchema,
+  groupName: z.string().max(100),
+  modifierType: z.enum(['add', 'remove', 'swap']),
+  priceAdjustment: z.number(),
+  quantity: z.number().int().min(1).max(10),
+  inventoryItemId: uuidSchema.optional(),
+  inventoryQuantity: z.number().optional(),
+});
+
 export const orderItemSchema = z.object({
   menuItemId: uuidSchema,
   quantity: z.number().int().min(1).max(50, 'Maximum 50 of each item'),
   notes: sanitizedString(500).optional(),
   customizations: z.array(z.string().max(100)).optional(),
+  selectedModifiers: z.array(selectedModifierSchema).optional(),
+  modifierTotal: z.number().optional(),
+});
+
+// FIX: Iteration 1 - Added discount fields to schema so they go through Zod validation
+// instead of being read from raw req.body (which bypassed sanitization).
+const giftCardRedemptionSchema = z.object({
+  code: z.string().min(1).max(50),
+  amount: z.number().positive().max(100000),
 });
 
 export const createRestaurantOrderSchema = z.object({
@@ -148,6 +170,12 @@ export const createRestaurantOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1, 'Order must have at least one item'),
   specialInstructions: sanitizedString(500).optional(),
   paymentMethod: z.enum(['cash', 'card', 'online', 'room_charge']).optional(),
+  taxExempt: z.boolean().optional(),
+  // Discount integration fields (validated, not raw)
+  couponCode: z.string().max(50).optional(),
+  giftCardRedemptions: z.array(giftCardRedemptionSchema).max(5).optional(),
+  loyaltyPointsToRedeem: z.number().int().min(0).max(1000000).optional(),
+  loyaltyPointsDollarValue: z.number().min(0).max(100000).optional(),
 });
 
 export const updateOrderStatusSchema = z.object({
@@ -295,6 +323,7 @@ export const updateModuleSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   description: sanitizedString(500).optional(),
   is_active: z.boolean().optional(),
+  show_in_main: z.boolean().optional(),
   settings: z.record(z.any()).optional(),
   sort_order: z.number().int().min(0).optional(),
   // For optimistic locking

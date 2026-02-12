@@ -8,8 +8,8 @@ import { useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { restaurantApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { useCartStore } from '@/lib/stores/cartStore';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useCartStore } from '@/stores/cartStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
@@ -37,6 +37,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { PaymentDiscounts } from '@/components/customer/PaymentDiscounts';
+import StripePayment from '@/components/payments/StripePayment';
 
 export default function ModuleCartPage() {
   const t = useTranslations('common');
@@ -45,7 +46,7 @@ export default function ModuleCartPage() {
   const rawSlug = params?.slug;
   const slug = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
 
-  const { modules, loading: modulesLoading } = useSiteSettings();
+  const { modules, loading: modulesLoading, settings } = useSiteSettings();
   
   const normalizedSlug = slug ? decodeURIComponent(slug).toLowerCase() : '';
   const currentModule = modules.find((m) => m.slug.toLowerCase() === normalizedSlug);
@@ -82,9 +83,19 @@ export default function ModuleCartPage() {
   const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
   const [finalTotal, setFinalTotal] = useState(0);
 
+  // Stripe payment state
+  const [showStripePayment, setShowStripePayment] = useState(false);
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+
   const subtotal = moduleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * 0.11;
-  const preDiscountTotal = subtotal + tax;
+  // FIX: Iteration 4 - Use dynamic tax rate from settings instead of hardcoded 0.11
+  const taxRate = settings.taxRate || 0.11;
+  const tax = subtotal * taxRate;
+  // Phase 2: Add service charge + delivery fee to match restaurant cart parity
+  const serviceChargeRate = settings.serviceChargeRate ?? 0.10;
+  const serviceCharge = orderType === 'dine_in' ? subtotal * serviceChargeRate : 0;
+  const deliveryFee = orderType === 'delivery' ? (settings.deliveryFee ?? 5) : 0;
+  const preDiscountTotal = subtotal + tax + serviceCharge + deliveryFee;
   const totalDiscount = appliedDiscounts.reduce((sum, d) => sum + d.amount, 0);
   const total = Math.max(0, preDiscountTotal - totalDiscount);
 
@@ -116,16 +127,42 @@ export default function ModuleCartPage() {
 
   const orderMutation = useMutation({
     mutationFn: (data: OrderData) => restaurantApi.createOrder(data),
-    onSuccess: () => {
-      moduleItems.forEach(item => removeItem(item.id));
-      toast.success(t('orderPlaced') || 'Order placed successfully!');
-      router.push(`/${slug}`);
-      toast.success('Order confirmed. Check your email for details.');
+    onSuccess: (response) => {
+      const order = response?.data?.data;
+      const orderId = order?.id || order?.order_id || '';
+
+      // For card payments, show Stripe checkout instead of redirecting
+      if (paymentMethod === 'card' && total > 0) {
+        setPendingOrderId(orderId);
+        setShowStripePayment(true);
+        toast.info('Complete your card payment');
+      } else {
+        // For cash payments or zero total, redirect directly
+        moduleItems.forEach(item => removeItem(item.id));
+        toast.success(t('orderPlaced') || 'Order placed successfully!');
+        router.push(`/${slug}/confirmation?type=order&id=${orderId}`);
+      }
     },
     onError: (err: MutationError) => {
       toast.error(err.response?.data?.error || t('orderFailed') || 'Failed to place order');
     },
   });
+
+  // Stripe payment handlers
+  const handleStripePaymentSuccess = () => {
+    moduleItems.forEach(item => removeItem(item.id));
+    toast.success(t('orderPlaced') || 'Order placed successfully!');
+    router.push(`/${slug}/confirmation?type=order&id=${pendingOrderId}`);
+  };
+
+  const handleStripePaymentError = (error: string) => {
+    toast.error(`Payment failed: ${error}`);
+  };
+
+  const handleStripePaymentCancel = () => {
+    setShowStripePayment(false);
+    toast.info('Payment cancelled. Your order is still saved.');
+  };
 
   const handlePlaceOrder = () => {
     if (!customerName.trim()) {
@@ -393,7 +430,8 @@ export default function ModuleCartPage() {
 
                           <div className="hidden sm:block text-right pl-4 border-l border-slate-200 dark:border-slate-700">
                             <p className="text-xl font-bold text-slate-900 dark:text-white">
-                              {formatCurrency(item.price * item.quantity, currency)}
+                              {/* FIX Iter-6: Include modifier costs in line total */}
+                              {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, currency)}
                             </p>
                           </div>
                         </div>
@@ -687,7 +725,8 @@ export default function ModuleCartPage() {
                           <span className="text-slate-700 dark:text-slate-300 line-clamp-1">{item.name}</span>
                         </div>
                         <span className="font-medium text-slate-900 dark:text-white flex-shrink-0 ml-2">
-                          {formatCurrency(item.price * item.quantity, currency)}
+                          {/* FIX Iter-6: Include modifier costs in summary sidebar */}
+                          {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, currency)}
                         </span>
                       </div>
                     ))}
@@ -701,9 +740,22 @@ export default function ModuleCartPage() {
                       <span className="text-slate-700 dark:text-slate-300">{formatCurrency(subtotal, currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Tax (11%)</span>
+                      {/* FIX: Iteration 4 - Dynamic tax rate label */}
+                      <span className="text-slate-500">Tax ({Math.round(taxRate * 100)}%)</span>
                       <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, currency)}</span>
                     </div>
+                    {serviceCharge > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Service Charge ({Math.round(serviceChargeRate * 100)}%)</span>
+                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(serviceCharge, currency)}</span>
+                      </div>
+                    )}
+                    {deliveryFee > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Delivery Fee</span>
+                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(deliveryFee, currency)}</span>
+                      </div>
+                    )}
                     
                     {/* Show applied discounts */}
                     {appliedDiscounts.length > 0 && (
@@ -812,6 +864,51 @@ export default function ModuleCartPage() {
           </div>
         </div>
       </div>
+
+      {/* Stripe Payment Modal */}
+      <AnimatePresence>
+        {showStripePayment && pendingOrderId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="slug-cart-payment-modal-title"
+            onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Escape') handleStripePaymentCancel(); }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-full flex items-center justify-center">
+                  <CreditCard className="w-8 h-8 text-blue-600" />
+                </div>
+                <h3 id="slug-cart-payment-modal-title" className="text-xl font-bold text-slate-900 dark:text-white">
+                  Complete Payment
+                </h3>
+                <p className="text-slate-500 dark:text-slate-400 mt-1">
+                  Enter your card details to complete your order
+                </p>
+              </div>
+
+              <StripePayment
+                amount={total}
+                currency="USD"
+                referenceType="restaurant_order"
+                referenceId={pendingOrderId}
+                onSuccess={handleStripePaymentSuccess}
+                onError={handleStripePaymentError}
+                onCancel={handleStripePaymentCancel}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import { useModuleBuilderStore } from '@/store/module-builder-store';
-import { Layout, Type, Image as ImageIcon, Grid, List, Box, Calendar, Clock, MousePointer2, FormInput, LucideIcon } from 'lucide-react';
+import { useModuleBuilderStore } from '@/stores/module-builder-store';
+import { Layout, Type, Image as ImageIcon, Grid, List, Box, Calendar, Clock, MousePointer2, FormInput, LucideIcon, Users, CreditCard } from 'lucide-react';
 import { UIComponentType } from '@/types/module-builder';
 
 const COMPONENTS: { type: UIComponentType; label: string; icon: LucideIcon }[] = [
@@ -13,6 +13,8 @@ const COMPONENTS: { type: UIComponentType; label: string; icon: LucideIcon }[] =
   { type: 'container', label: 'Container', icon: Box },
   { type: 'form_container', label: 'Form', icon: FormInput },
   { type: 'booking_calendar', label: 'Calendar', icon: Calendar },
+  { type: 'testimonials', label: 'Testimonials', icon: Users },
+  { type: 'pricing_table', label: 'Pricing', icon: CreditCard },
 ];
 
 export function ComponentToolbar() {

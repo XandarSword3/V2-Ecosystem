@@ -1,5 +1,5 @@
-import { getSupabase } from "../database/connection";
-import { logger } from "./logger";
+import { getSupabase } from "../database/connection.js";
+import { logger } from "./logger.js";
 
 interface AuditLogEntry {
   user_id: string;
@@ -18,7 +18,7 @@ interface AuditLogEntry {
 export async function logActivity(entry: AuditLogEntry) {
   try {
     const supabase = getSupabase();
-    
+
     // Convert objects to strings if needed
     const safePayload = {
       ...entry,
@@ -41,7 +41,7 @@ export async function logActivity(entry: AuditLogEntry) {
 export const activityLogger = {
   log: async (arg1: string | Partial<AuditLogEntry>, arg2?: any) => {
     let entry: AuditLogEntry;
-    
+
     if (typeof arg1 === 'string') {
       entry = {
         action: arg1,
@@ -52,13 +52,13 @@ export const activityLogger = {
       } as AuditLogEntry;
     } else {
       entry = {
-         user_id: 'system',
-         action: 'unknown',
-         resource: 'system',
-         ...arg1
+        user_id: 'system',
+        action: 'unknown',
+        resource: 'system',
+        ...arg1
       } as AuditLogEntry;
     }
-    
+
     return logActivity(entry);
   }
 };

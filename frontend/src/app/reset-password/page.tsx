@@ -5,8 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Lock, Loader2, AlertCircle, CheckCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+import { authApi } from '@/lib/api'; // FIX Iter-12: use api client instead of raw fetch
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -43,13 +42,9 @@ function ResetPasswordForm() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, newPassword: password }),
-      });
-
-      const data = await response.json();
+      // FIX Iter-12: use authApi instead of raw fetch (correct URL, retry, CSRF)
+      const response = await authApi.resetPassword(token!, password);
+      const data = response.data;
 
       if (data.success) {
         setSuccess(true);

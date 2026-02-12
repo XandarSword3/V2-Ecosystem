@@ -13,7 +13,7 @@ const DEV_HOST = '192.168.10.154';
 export const API_BASE_URL = `http://${DEV_HOST}:3001`;
 export const SOCKET_URL = `http://${DEV_HOST}:3001`;
 
-export const STRIPE_PUBLISHABLE_KEY = 'pk_test_51Sk2n3GeUR83oBpE6KvhV8nWgPwV4kNz2568skUzGWcKB1bjnC3KJKMpy78QFX4DWGwBmeZRfO9BKHk8N5Gikt5s00tPt8EGfD';
-export const STRIPE_MERCHANT_ID = 'merchant.com.v2resort';
+export const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_KEY || '';
+export const STRIPE_MERCHANT_ID = process.env.EXPO_PUBLIC_STRIPE_MERCHANT_ID || 'merchant.com.v2resort';
 
 export const IS_DEV = true;

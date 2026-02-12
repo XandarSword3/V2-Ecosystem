@@ -28,6 +28,28 @@ vi.mock('../../../src/scripts/expire-pool-tickets.js', () => ({
   expirePoolTickets: vi.fn().mockResolvedValue({ expired: 5 })
 }));
 
+vi.mock('../../../src/services/booking-reminders.service.js', () => ({
+  bookingRemindersService: {
+    sendPreArrivalReminders: vi.fn().mockResolvedValue({ sent: 0, errors: 0 })
+  }
+}));
+
+vi.mock('../../../src/modules/reporting/reporting.service.js', () => ({
+  reportingService: {
+    startScheduler: vi.fn()
+  }
+}));
+
+vi.mock('../../../src/services/business-metrics.service.js', () => ({
+  businessMetricsService: {
+    getDashboardMetrics: vi.fn().mockResolvedValue({})
+  }
+}));
+
+vi.mock('../../../src/socket/index.js', () => ({
+  emitToRole: vi.fn()
+}));
+
 vi.mock('../../../src/utils/logger.js', () => ({
   logger: {
     info: vi.fn(),

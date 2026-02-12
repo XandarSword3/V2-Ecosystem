@@ -1,3 +1,4 @@
-import { getSupabase } from '../database/supabase';
+import { getSupabase, getSupabaseAdmin } from '../database/supabase.js';
 
 export const supabase = getSupabase();
+export const supabaseAdmin = getSupabaseAdmin();

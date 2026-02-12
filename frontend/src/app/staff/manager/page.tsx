@@ -95,6 +95,7 @@ export default function ManagerDashboard() {
   const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [activeModules, setActiveModules] = useState<any[]>([]);
 
   // Check for manager role
   const isManager = user?.roles?.some(r => 
@@ -112,24 +113,71 @@ export default function ManagerDashboard() {
       return;
     }
     if (isAuthenticated && isManager) {
-      loadDashboardData();
+      // FIX Iter-14: AbortController prevents setState on unmounted component
+      const controller = new AbortController();
+      loadDashboardData(controller.signal);
+      return () => controller.abort();
     }
   }, [isAuthenticated, isLoading, isManager]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      // Fetch real data from multiple API endpoints
-      const [ordersRes, staffRes, activityRes, weeklyOrdersRes, approvalsRes, todayShiftsRes] = await Promise.all([
-        api.get('/restaurant/staff/orders/live').catch(() => ({ data: { data: [] } })),
-        api.get('/admin/users', { params: { role: 'staff' } }).catch(() => ({ data: { data: [] } })),
-        api.get('/admin/audit/activity_logs', { params: { limit: 50 } }).catch(() => ({ data: { data: [] } })),
-        api.get('/admin/dashboard/stats').catch(() => ({ data: { data: null } })),
-        api.get('/manager/approvals/pending').catch(() => ({ data: { data: [] } })),
-        api.get('/manager/shifts/today').catch(() => ({ data: { data: [], summary: null } })),
+      // FIX Iter-14: Pass AbortSignal to all API calls to cancel on unmount
+      // Phase 2: Also fetch dynamic module orders for aggregation
+      const [ordersRes, snackOrdersRes, modulesRes, staffRes, activityRes, weeklyOrdersRes, approvalsRes, todayShiftsRes] = await Promise.all([
+        api.get('/restaurant/staff/orders/live', { signal }).catch(() => ({ data: { data: [] } })),
+        api.get('/snack/staff/orders/live', { signal }).catch(() => ({ data: { data: [] } })),
+        api.get('/admin/modules', { signal }).catch(() => ({ data: { data: [] } })),
+        api.get('/admin/users', { params: { role: 'staff' }, signal }).catch(() => ({ data: { data: [] } })),
+        api.get('/admin/audit-logs', { params: { limit: 50 }, signal }).catch(() => ({ data: { data: [] } })), // FIX: Iteration 12 - Was '/admin/audit/activity_logs' (404)
+        api.get('/admin/dashboard', { signal }).catch(() => ({ data: { data: null } })), // FIX: Iteration 12 - Was '/admin/dashboard/stats' (404)
+        api.get('/manager/approvals/pending', { signal }).catch(() => ({ data: { data: [] } })),
+        api.get('/manager/shifts/today', { signal }).catch(() => ({ data: { data: [], summary: null } })),
       ]);
+      // FIX Iter-14: Bail out if aborted before processing results
+      if (signal?.aborted) return;
 
-      const orders = ordersRes.data.data || [];
+      // Fetch orders from dynamic menu_service modules (Cafe, Room Service, etc.)
+      const allModules = modulesRes.data?.data || [];
+      const dynamicMenuModules = allModules.filter((m: any) => 
+        m.template_type === 'menu_service' && m.is_active && !['restaurant', 'snack-bar'].includes(m.slug)
+      );
+      const dynamicBookingModules = allModules.filter((m: any) =>
+        m.template_type === 'multi_day_booking' && m.is_active
+      );
+      const dynamicSessionModules = allModules.filter((m: any) =>
+        m.template_type === 'session_access' && m.is_active
+      );
+      
+      const dynamicOrderPromises = dynamicMenuModules.map((m: any) =>
+        api.get(`/staff/modules/${m.slug}/orders`, { signal }).catch(() => ({ data: { data: [] } }))
+      );
+      const dynamicBookingPromises = dynamicBookingModules.map((m: any) =>
+        api.get(`/staff/modules/${m.slug}/bookings`, { signal }).catch(() => ({ data: { data: [] } }))
+      );
+      const dynamicSessionPromises = dynamicSessionModules.map((m: any) =>
+        api.get(`/staff/modules/${m.slug}/sessions`, { signal }).catch(() => ({ data: { data: [] } }))
+      );
+      const [dynamicOrderResults, dynamicBookingResults, dynamicSessionResults] = await Promise.all([
+        Promise.all(dynamicOrderPromises),
+        Promise.all(dynamicBookingPromises),
+        Promise.all(dynamicSessionPromises),
+      ]);
+      if (signal?.aborted) return;
+
+      // Combine all orders from all sources
+      const restaurantOrders = ordersRes.data.data || [];
+      const snackOrders = snackOrdersRes.data.data || [];
+      const dynamicOrders = dynamicOrderResults.flatMap((r: any) => r.data?.data || []);
+      const orders = [...restaurantOrders, ...snackOrders, ...dynamicOrders];
+
+      // Aggregate booking and session data for manager overview
+      const allBookings = dynamicBookingResults.flatMap((r: any) => r.data?.data || []);
+      const allSessions = dynamicSessionResults.flatMap((r: any) => r.data?.data || []);
+      const activeModulesList = allModules.filter((m: any) => m.is_active);
+      setActiveModules(activeModulesList);
+
       const staff = staffRes.data.data || [];
       const activityLogs = activityRes.data.data || [];
       const dashboardStats = weeklyOrdersRes.data?.data || weeklyOrdersRes.data;
@@ -310,7 +358,7 @@ export default function ManagerDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={loadDashboardData}>
+          <Button variant="outline" onClick={() => loadDashboardData()}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
@@ -415,7 +463,8 @@ export default function ManagerDashboard() {
                       <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
                         <div 
                           className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
-                          style={{ width: `${(day.orders / 100) * 100}%` }}
+                          // FIX Iter-14: Normalize against max in dataset to prevent overflow >100%
+                          style={{ width: `${Math.min(100, (day.orders / Math.max(...performanceData.map(d => d.orders), 1)) * 100)}%` }}
                         />
                       </div>
                       <span className="text-sm font-medium w-20 text-right">{day.orders} orders</span>
@@ -454,6 +503,20 @@ export default function ManagerDashboard() {
                     Pool Management
                   </Button>
                 </Link>
+                {/* Dynamic modules */}
+                {(activeModules || [])
+                  .filter((m: any) => !['restaurant', 'snack-bar', 'chalets', 'pool'].includes(m.slug))
+                  .slice(0, 6)
+                  .map((m: any) => (
+                    <Link key={m.id} href={`/staff/${m.slug}`} className="block">
+                      <Button variant="outline" className="w-full justify-start gap-3">
+                        {m.template_type === 'menu_service' && <ChefHat className="w-5 h-5 text-amber-500" />}
+                        {m.template_type === 'multi_day_booking' && <Calendar className="w-5 h-5 text-indigo-500" />}
+                        {m.template_type === 'session_access' && <Users className="w-5 h-5 text-teal-500" />}
+                        {m.name}
+                      </Button>
+                    </Link>
+                  ))}
                 <Link href="/admin/housekeeping" className="block">
                   <Button variant="outline" className="w-full justify-start gap-3">
                     <ClipboardList className="w-5 h-5 text-purple-500" />

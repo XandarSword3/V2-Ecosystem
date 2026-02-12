@@ -184,8 +184,10 @@ export default function AppearanceSettingsPage() {
   // Update custom colors when theme changes
   useEffect(() => {
     if (!useCustomColors && selectedTheme) {
-      const themeColors = resortThemes[selectedTheme].colors;
-      setCustomColors(themeColors);
+      const theme = resortThemes[selectedTheme];
+      if (theme) {
+        setCustomColors(theme.colors);
+      }
     }
   }, [selectedTheme, useCustomColors]);
 

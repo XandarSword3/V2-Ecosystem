@@ -94,9 +94,9 @@ test.describe('Phase 1: Admin Creates Notification Template', () => {
     await adminPage.waitForLoadState('load');
     await adminPage.waitForTimeout(1000);
     
-    // Check for page content instead of specific heading
-    const pageContent = await adminPage.locator('main').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    // Verify notification settings page loaded with relevant content
+    await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
+    await expect(adminPage.locator('text=/Notification|Send|Template|Settings/i').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 1.3: Admin views templates tab', async () => {
@@ -106,7 +106,8 @@ test.describe('Phase 1: Admin Creates Notification Template', () => {
       await templatesTab.first().click();
       await adminPage.waitForTimeout(500);
     }
-    expect(true).toBeTruthy();
+    // Verify notifications page remains functional
+    await expect(adminPage.locator('main').first()).toBeVisible();
   });
 
   test('Step 1.4: Admin opens create template modal', async () => {
@@ -121,8 +122,8 @@ test.describe('Phase 1: Admin Creates Notification Template', () => {
       const modalVisible = await adminPage.getByRole('heading', { name: /Create|Template|New/i }).first().isVisible({ timeout: 3000 }).catch(() => false);
       expect(modalVisible || btnVisible).toBe(true);
     } else {
-      // Feature may not exist - pass the test
-      expect(true).toBe(true);
+      // Feature may not exist - verify page is still functional
+      await expect(adminPage.locator('main').first()).toBeVisible();
     }
   });
 
@@ -175,8 +176,8 @@ test.describe('Phase 1: Admin Creates Notification Template', () => {
       
       await adminPage.waitForTimeout(1000);
     }
-    // Pass even if button not visible (feature may not exist)
-    expect(true).toBeTruthy();
+    // Verify notifications page is still loaded and functional
+    await expect(adminPage.locator('main').first()).toBeVisible();
   });
 
   test('Step 1.7: Admin verifies template in list', async () => {
@@ -191,8 +192,8 @@ test.describe('Phase 1: Admin Creates Notification Template', () => {
     // Log result for debugging
     console.log(`Template verification: visible=${templateVisible}`);
     
-    // Always pass - the creation was tested in Step 1.6
-    expect(true).toBe(true);
+    // Verify the notifications admin page is still functional
+    await expect(adminPage.locator('main').first()).toBeVisible();
   });
 });
 
@@ -221,8 +222,7 @@ test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
     // Page should load
     await expect(adminPage.locator('main').first()).toBeVisible();
     // Check for notifications-related content
-    const pageContent = await adminPage.locator('text=/Notification|Send|Template|Settings/i').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    await expect(adminPage.locator('text=/Notification|Send|Template|Settings/i').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 2.2: Admin clicks send notification', async () => {
@@ -231,7 +231,7 @@ test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
       await sendBtn.first().click();
       await adminPage.waitForTimeout(500);
     }
-    expect(true).toBeTruthy();
+    await expect(adminPage.locator('main').first()).toBeVisible();
   });
 
   test('Step 2.3: Admin fills notification form', async () => {
@@ -256,7 +256,7 @@ test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
         // Ignore if selection fails
       }
     }
-    expect(true).toBeTruthy();
+    await expect(adminPage.locator('main').first()).toBeVisible();
   });
 
   test('Step 2.4: Admin sets priority to high', async () => {
@@ -323,9 +323,7 @@ test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
     // Check for success message or toast
     const successMessage = adminPage.locator('text=/sent|success|delivered/i');
     
-    if (await successMessage.isVisible({ timeout: 3000 }).catch(() => false)) {
-      expect(true).toBe(true);
-    }
+    const successVisible = await successMessage.isVisible({ timeout: 3000 }).catch(() => false);
     
     // Or check broadcasts tab if visible
     const broadcastsTab = adminPage.locator('button:has-text("broadcasts"), a:has-text("broadcasts")');
@@ -335,11 +333,12 @@ test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
       
       // Should see the broadcast in list
       const broadcastItem = adminPage.locator(`text=${testBroadcastTitle}`);
-      if (await broadcastItem.isVisible({ timeout: 5000 }).catch(() => false)) {
-        expect(true).toBe(true);
-      }
+      const broadcastVisible = await broadcastItem.isVisible({ timeout: 5000 }).catch(() => false);
+      expect(successVisible || broadcastVisible).toBe(true);
+    } else {
+      // Verify the notification page is still functional
+      await expect(adminPage.locator('main').first()).toBeVisible();
     }
-    expect(true).toBeTruthy();
   });
 });
 
@@ -370,8 +369,8 @@ test.describe('Phase 3: Admin Schedules Future Notification', () => {
       await sendBtn.click();
       await adminPage.waitForTimeout(500);
     }
-    // Pass even if button not visible
-    expect(true).toBeTruthy();
+    // Verify notification page is still loaded
+    await expect(adminPage.locator('main').first()).toBeVisible();
   });
 
   test('Step 3.2: Admin fills scheduled notification', async () => {
@@ -382,7 +381,7 @@ test.describe('Phase 3: Admin Schedules Future Notification', () => {
       const messageInput = adminPage.locator('textarea[placeholder*="message" i]');
       await messageInput.fill('Reminder: Pool hours are extended this weekend!');
     }
-    expect(true).toBeTruthy();
+    await expect(adminPage.locator('main').first()).toBeVisible();
   });
 
   test('Step 3.3: Admin sets schedule time', async () => {
@@ -419,8 +418,8 @@ test.describe('Phase 3: Admin Schedules Future Notification', () => {
     // Log result for debugging
     console.log(`Scheduled verification: visible=${scheduledVisible}`);
     
-    // Always pass - the scheduling was tested in Step 3.4
-    expect(true).toBe(true);
+    // Verify the notification admin page is still functional
+    await expect(adminPage.locator('main').first()).toBeVisible();
   });
 });
 
@@ -480,8 +479,9 @@ test.describe('Phase 4: Customer Receives & Views Notifications', () => {
   test('Step 4.4: Customer sees notification list', async () => {
     // Page should have some content
     await expect(customerPage.locator('main, body').first()).toBeVisible({ timeout: 5000 });
-    // Pass - the notifications feature may or may not be available
-    expect(true).toBeTruthy();
+    // Verify the page loaded with actual content (not just an empty shell)
+    const bodyText = await customerPage.locator('body').textContent() || '';
+    expect(bodyText.length).toBeGreaterThan(0);
   });
 
   test('Step 4.5: Customer marks notification as read', async () => {

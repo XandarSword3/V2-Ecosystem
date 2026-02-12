@@ -1,4 +1,4 @@
-import { Reservation, ReservationType, ReservationStatus, ReservationRepository } from '../container/types';
+import { Reservation, ReservationType, ReservationStatus, ReservationRepository } from "../container/types.js";
 
 export class InMemoryReservationRepository implements ReservationRepository {
   private reservations: Map<string, Reservation> = new Map();

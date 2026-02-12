@@ -89,15 +89,13 @@ test.describe('1. Staff Dashboard', () => {
 
   test('1.2 View today\'s tasks', async () => {
     const tasksSection = staffPage.locator('text=/task|today|pending|action/i');
-    if (await tasksSection.first().isVisible()) {
-      expect(true).toBe(true);
-    }
+    await expect(tasksSection.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('1.3 View quick stats', async () => {
     const stats = staffPage.locator('[class*="stat"], [class*="Card"]');
     const count = await stats.count();
-    expect(count).toBeGreaterThanOrEqual(0);
+    expect(count).toBeGreaterThan(0);
   });
 });
 
@@ -241,9 +239,7 @@ test.describe('3. Pool Session Management', () => {
 
   test('3.3 View current capacity', async () => {
     const capacityInfo = staffPage.locator('text=/capacity|\\d+\\/\\d+|available/i');
-    if (await capacityInfo.first().isVisible()) {
-      expect(true).toBe(true);
-    }
+    await expect(capacityInfo.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('3.4 View ticket passes', async () => {
@@ -275,9 +271,7 @@ test.describe('3. Pool Session Management', () => {
 
   test('3.7 View guest list', async () => {
     const guestList = staffPage.locator('table, [class*="guest-list"]');
-    if (await guestList.first().isVisible()) {
-      expect(true).toBe(true);
-    }
+    await expect(guestList.first()).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -310,16 +304,12 @@ test.describe('4. Chalet Booking Management', () => {
 
   test('4.2 View today\'s check-ins', async () => {
     const checkInsSection = staffPage.locator('text=/check.?in|arrival|today/i');
-    if (await checkInsSection.first().isVisible()) {
-      expect(true).toBe(true);
-    }
+    await expect(checkInsSection.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('4.3 View today\'s check-outs', async () => {
     const checkOutsSection = staffPage.locator('text=/check.?out|departure/i');
-    if (await checkOutsSection.first().isVisible()) {
-      expect(true).toBe(true);
-    }
+    await expect(checkOutsSection.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('4.4 View booking details', async () => {
@@ -354,7 +344,7 @@ test.describe('4. Chalet Booking Management', () => {
   test('4.8 View chalet status', async () => {
     const statusBadges = staffPage.locator('[class*="badge"], [class*="status"]');
     const count = await statusBadges.count();
-    expect(count).toBeGreaterThanOrEqual(0);
+    expect(count).toBeGreaterThan(0);
   });
 
   test('4.9 Add note to booking', async () => {
@@ -430,10 +420,8 @@ test.describe('5. Menu Viewing (Read-Only)', () => {
 
   test('5.5 Check item availability', async () => {
     const availabilityToggle = staffPage.locator('[role="switch"], input[type="checkbox"]').first();
-    if (await availabilityToggle.isVisible()) {
-      // Staff might not be able to change, but can view
-      expect(true).toBe(true);
-    }
+    // Staff might not be able to change, but can view
+    await expect(availabilityToggle).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -542,9 +530,7 @@ test.describe('7. Customer Lookup', () => {
 
   test('7.4 View customer booking history', async () => {
     const historySection = staffPage.locator('text=/history|booking|order/i');
-    if (await historySection.first().isVisible()) {
-      expect(true).toBe(true);
-    }
+    await expect(historySection.first()).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -577,9 +563,7 @@ test.describe('8. Staff Notifications', () => {
 
   test('8.2 View notifications list', async () => {
     const notificationsList = staffPage.locator('[class*="notification"], [class*="dropdown"]');
-    if (await notificationsList.first().isVisible()) {
-      expect(true).toBe(true);
-    }
+    await expect(notificationsList.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('8.3 Mark notification as read', async () => {

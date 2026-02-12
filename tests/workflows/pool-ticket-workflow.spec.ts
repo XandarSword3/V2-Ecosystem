@@ -102,8 +102,8 @@ test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
     const pageContent = customerPage.locator('text=/Session|Schedule|Ticket|Adult|Child|Morning|Afternoon|Available/i');
     const count = await pageContent.count();
     
-    // Should have some pool-related content or display page anyway
-    expect(count >= 0).toBeTruthy();
+    // Should have some pool-related content
+    expect(count).toBeGreaterThan(0);
   });
 
   test('Step 1.3: Customer views pricing tiers', async () => {
@@ -125,35 +125,34 @@ test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
   });
 
   test('Step 1.5: Customer selects session time', async () => {
-    // Click on a session time
-    const sessionSlot = customerPage.locator('[data-testid="session-slot"], button:has-text("Morning"), button:has-text("Afternoon"), button:has-text("10:00")').first();
+    // Click on a session card to open booking modal - look for "Book Now" button or session card
+    const bookButton = customerPage.locator('button:has-text("Book Now"), button:has-text("Book"), button:has-text("Purchase"), [data-testid="session-slot"]').first();
     
-    if (await sessionSlot.isVisible()) {
-      await sessionSlot.click();
-      await customerPage.waitForTimeout(500);
+    if (await bookButton.isVisible()) {
+      await bookButton.click();
+      await customerPage.waitForTimeout(1000);
     }
   });
 
   test('Step 1.6: Customer selects ticket quantities', async () => {
-    // Adult tickets
+    // Adult tickets - look for number input or plus button in modal
+    const adultInput = customerPage.locator('input[type="number"]').first();
     const adultPlus = customerPage.locator('[data-testid="adult-plus"], button:has-text("+")').first();
-    if (await adultPlus.isVisible()) {
+    
+    if (await adultInput.isVisible()) {
+      await adultInput.fill('2');
+      await customerPage.waitForTimeout(500);
+    } else if (await adultPlus.isVisible()) {
       await adultPlus.click();
       await adultPlus.click(); // 2 adults
       await customerPage.waitForTimeout(500);
     }
-    
-    // Child tickets (if available)
-    const childPlus = customerPage.locator('[data-testid="child-plus"]').first();
-    if (await childPlus.isVisible()) {
-      await childPlus.click(); // 1 child
-    }
   });
 
   test('Step 1.7: Customer sees total calculation', async () => {
-    // Should show total
-    const total = customerPage.locator('text=/Total|Subtotal|\\$\\d+\\.\\d{2}/');
-    await expect(total.first()).toBeVisible({ timeout: 3000 });
+    // Should show total in the booking modal
+    const total = customerPage.locator('text=/Total|Subtotal|\\$\\d+\\.\\d{2}/i');
+    await expect(total.first()).toBeVisible({ timeout: 5000 });
   });
 
   test('Step 1.8: Customer proceeds to checkout', async () => {
@@ -217,10 +216,7 @@ test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
   test('Step 1.11: Customer receives ticket confirmation', async () => {
     // Should see confirmation or ticket
     const confirmation = customerPage.locator('text=/ticket.*confirmed|purchase.*complete|success|QR code/i');
-    
-    if (await confirmation.isVisible({ timeout: 5000 }).catch(() => false)) {
-      expect(true).toBe(true);
-    }
+    await expect(confirmation).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 1.12: Customer can view their tickets', async () => {
@@ -270,8 +266,8 @@ test.describe('Phase 2: Staff Validates Tickets', () => {
     // Page should load
     await expect(staffPage.locator('main').first()).toBeVisible({ timeout: 10000 });
     // Check for session or pool related content
-    const pageContent = await staffPage.locator('text=/Session|Pool|Ticket|No sessions/i').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    const pageContent = staffPage.locator('text=/Session|Pool|Ticket|No sessions/i').first();
+    await expect(pageContent).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 2.4: Staff views passes/tickets', async () => {
@@ -280,17 +276,14 @@ test.describe('Phase 2: Staff Validates Tickets', () => {
     await staffPage.waitForTimeout(1000);
     
     // Check for any relevant content
-    const pageContent = await staffPage.locator('text=/pass|ticket|admission|pool|session|no data/i').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    const pageContent = staffPage.locator('text=/pass|ticket|admission|pool|session|no data/i').first();
+    await expect(pageContent).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 2.5: Staff checks capacity', async () => {
     // Look for capacity indicator
     const capacityInfo = staffPage.locator('text=/capacity|available|spots|\\d+\\/\\d+/i');
-    
-    if (await capacityInfo.first().isVisible()) {
-      expect(true).toBe(true);
-    }
+    await expect(capacityInfo.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 2.6: Staff can scan/validate ticket', async () => {
@@ -366,8 +359,8 @@ test.describe('Phase 3: Admin Monitors Pool', () => {
     // Page should load
     await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
     // Check for pool-related content
-    const pageContent = await adminPage.locator('text=/Pool|Session|Capacity|Ticket/i').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    const pageContent = adminPage.locator('text=/Pool|Session|Capacity|Ticket/i').first();
+    await expect(pageContent).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 3.4: Admin views ticket sales', async () => {
@@ -376,8 +369,7 @@ test.describe('Phase 3: Admin Monitors Pool', () => {
     await adminPage.waitForTimeout(1000);
     
     // Should show ticket sales/passes or main content
-    const pageContent = await adminPage.locator('main').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 3.5: Admin checks revenue', async () => {
@@ -386,8 +378,7 @@ test.describe('Phase 3: Admin Monitors Pool', () => {
     await adminPage.waitForTimeout(1000);
     
     // Check for page content
-    const pageContent = await adminPage.locator('main').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 3.6: Admin can adjust pool settings', async () => {

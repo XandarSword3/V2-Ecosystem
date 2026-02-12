@@ -5,7 +5,7 @@
  */
 
 import { randomUUID } from 'crypto';
-import type { Shift, ShiftFilters, ShiftSwapRequest, ShiftRepository } from '../container/types';
+import type { Shift, ShiftFilters, ShiftSwapRequest, ShiftRepository } from "../container/types.js";
 
 export class InMemoryShiftRepository implements ShiftRepository {
   private shifts: Map<string, Shift> = new Map();

@@ -101,8 +101,7 @@ test.describe('Phase 1: Customer Books Chalet', () => {
     
     // Check for chalet-related content text
     const chaletContent = customerPage.locator('text=/Chalet|Book|Stay|Accommodation|Night|Reserve/i').first();
-    const visible = await chaletContent.isVisible().catch(() => false);
-    expect(visible || true).toBeTruthy();
+    await expect(chaletContent).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 1.2: Customer checks availability for dates', async () => {
@@ -132,7 +131,7 @@ test.describe('Phase 1: Customer Books Chalet', () => {
     const chaletContent = customerPage.locator('text=/chalet|cabin|stay|book|reserve/i');
     const count = await chaletContent.count();
     
-    expect(count >= 0).toBeTruthy();
+    expect(count).toBeGreaterThan(0);
     
     // Try to get first chalet name if available
     const chaletCards = customerPage.locator('[data-testid="chalet-card"], a[href*="/chalets/"]');
@@ -156,8 +155,7 @@ test.describe('Phase 1: Customer Books Chalet', () => {
   test('Step 1.5: Customer views chalet details', async () => {
     await customerPage.waitForTimeout(1000);
     // Check for any chalet-related content
-    const pageContent = await customerPage.locator('main').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    await expect(customerPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 1.6: Customer selects booking dates', async () => {
@@ -238,9 +236,8 @@ test.describe('Phase 1: Customer Books Chalet', () => {
     
     console.log(`Guest form filled. Submit button enabled: ${submitEnabled}`);
     
-    // Test passes if we got this far - form may not be present in all flows
-    // The actual submission will happen in the next step
-    expect(true).toBe(true);
+    // Verify form is present and main content is visible
+    await expect(customerPage.locator('main').first()).toBeVisible();
   });
 
   test('Step 1.8: Customer confirms booking', async () => {
@@ -271,10 +268,7 @@ test.describe('Phase 1: Customer Books Chalet', () => {
   test('Step 1.9: Customer sees booking confirmation', async () => {
     // Should see confirmation
     const confirmation = customerPage.locator('text=/booking.*confirmed|reservation.*complete|thank you|success/i');
-    
-    if (await confirmation.isVisible({ timeout: 5000 }).catch(() => false)) {
-      expect(true).toBe(true);
-    }
+    await expect(confirmation).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -309,8 +303,8 @@ test.describe('Phase 2: Staff Processes Booking', () => {
     // Page should load
     await expect(staffPage.locator('main').first()).toBeVisible({ timeout: 10000 });
     // Check for chalet-related content
-    const pageContent = await staffPage.locator('text=/Chalet|Booking|No bookings|Empty/i').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    const pageContent = staffPage.locator('text=/Chalet|Booking|No bookings|Empty/i').first();
+    await expect(pageContent).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 2.3: Staff sees pending bookings', async () => {
@@ -323,8 +317,7 @@ test.describe('Phase 2: Staff Processes Booking', () => {
     }
     
     // Check for any page content
-    const pageContent = await staffPage.locator('main').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    await expect(staffPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 2.4: Staff confirms booking', async () => {
@@ -461,8 +454,7 @@ test.describe('Phase 4: Admin Reviews Booking & Analytics', () => {
     await adminPage.waitForTimeout(1000);
     
     // Check for page content
-    const pageContent = await adminPage.locator('main').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 4.5: Admin reviews customer feedback', async () => {
@@ -471,8 +463,8 @@ test.describe('Phase 4: Admin Reviews Booking & Analytics', () => {
     await adminPage.waitForTimeout(1000);
     
     // Check for any review-related content or main area
-    const pageContent = await adminPage.locator('text=/review|feedback|rating|no review/i').first().isVisible().catch(() => false);
-    expect(pageContent || true).toBeTruthy();
+    const pageContent = adminPage.locator('text=/review|feedback|rating|no review/i').first();
+    await expect(pageContent).toBeVisible({ timeout: 10000 });
   });
 
   test('Step 4.6: Admin can respond to review', async () => {
@@ -500,7 +492,7 @@ test.describe('Phase 5: Verify Data Persistence', () => {
   });
 
   test('API: Verify chalets are available', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/chalets`);
+    const response = await request.get(`${API_URL}/api/v1/chalets`);
     // Accept 200, 401 (needs auth), or 404 (endpoint doesn't exist)
     expect([200, 401, 404]).toContain(response.status());
     

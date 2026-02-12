@@ -4,13 +4,13 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection';
 import { emitToAll } from '../../../socket/index';
 import { logActivity } from '../../../utils/activityLogger';
 import { logger } from '../../../utils/logger.js';
 
-export async function getSettings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
     // Get all settings from database (existing schema uses 'key' and 'value' columns)
@@ -53,13 +53,9 @@ export async function getSettings(req: Request, res: Response, next: NextFunctio
     }
 
     res.json({ success: true, data: combinedSettings });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateSettings(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const settings = req.body;
     const userId = req.user?.userId;
@@ -178,6 +174,11 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       updates.push({ key: 'navbar', value: settings.navbar });
     }
 
+    // FIX: Iteration 13 - Payment settings were silently dropped (frontend sends { key: 'payments', value: {...} })
+    if (settings.key === 'payments' && settings.value) {
+      updates.push({ key: 'payments', value: settings.value });
+    }
+
     // Perform all updates
     for (const update of updates) {
       const { error } = await supabase
@@ -213,7 +214,51 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
     });
 
     res.json({ success: true, message: 'Settings saved successfully' });
-  } catch (error) {
-    next(error);
+});
+// FIX: Iteration 26 - Dedicated homepage settings endpoints (frontend calls /admin/settings/homepage)
+export const getHomepageSettings = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'homepage')
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    logger.error('Failed to fetch homepage settings:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch homepage settings' });
   }
-}
+
+  res.json({ success: true, data: data?.value || {} });
+});
+
+export const updateHomepageSettings = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const userId = (req as any).user?.id;
+  const homepageData = req.body;
+
+  const { error } = await supabase
+    .from('site_settings')
+    .upsert({
+      key: 'homepage',
+      value: homepageData,
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    }, { onConflict: 'key' });
+
+  if (error) {
+    logger.error('Failed to update homepage settings:', error);
+    return res.status(500).json({ success: false, error: 'Failed to save homepage settings' });
+  }
+
+  emitToAll('settings.updated', { homepage: homepageData });
+
+  await logActivity({
+    user_id: userId!,
+    action: 'UPDATE_SETTINGS',
+    resource: 'settings:homepage',
+    new_value: homepageData,
+  });
+
+  res.json({ success: true, message: 'Homepage settings saved successfully' });
+});

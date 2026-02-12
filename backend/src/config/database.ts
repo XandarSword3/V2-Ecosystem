@@ -1,3 +1,1 @@
-import { PrismaClient } from '@prisma/client';
-
-export const prisma = new PrismaClient();
+// Prisma has been removed. All database access uses Supabase client. See src/database/connection.ts

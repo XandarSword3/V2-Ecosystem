@@ -26,7 +26,7 @@ export default function ModulePage() {
   useEffect(() => {
     const fetchAllModules = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/modules`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005'}/api/modules`);
         if (response.ok) {
           const data = await response.json();
           setAllModules(data.data || []);

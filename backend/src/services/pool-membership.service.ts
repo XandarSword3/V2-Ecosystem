@@ -4,7 +4,7 @@
  * Handles annual memberships, corporate accounts, and recurring billing.
  */
 
-import { prisma } from '../config/database.js';
+import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
 import { stripeClient } from '../config/stripe.js';
 import { emailService } from './email.service.js';
@@ -152,12 +152,15 @@ export async function createMembership(
     }
 
     // Check if user already has an active membership
-    const existingMembership = await prisma.poolMembership.findFirst({
-      where: {
-        userId: input.userId,
-        status: MembershipStatus.ACTIVE,
-      },
-    });
+    const supabase = getSupabase();
+    const { data: existingMembership, error: existingError } = await supabase
+      .from('pool_memberships')
+      .select('id')
+      .eq('user_id', input.userId)
+      .eq('status', MembershipStatus.ACTIVE)
+      .limit(1)
+      .maybeSingle();
+    if (existingError) throw existingError;
 
     if (existingMembership) {
       return {
@@ -175,29 +178,33 @@ export async function createMembership(
     }
 
     // Get or create Stripe customer
-    const user = await prisma.users.findUnique({
-      where: { id: input.userId },
-    });
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', input.userId)
+      .maybeSingle();
+    if (userError) throw userError;
 
     if (!user) {
       return { success: false, message: 'User not found' };
     }
 
-    let stripeCustomerId = user.stripeCustomerId;
+    let stripeCustomerId = user.stripe_customer_id;
     
     if (!stripeCustomerId) {
       const customer = await stripeClient.customers.create({
         email: user.email,
-        name: `${user.firstName} ${user.lastName}`,
+        name: `${user.first_name} ${user.last_name}`,
         metadata: { userId: input.userId },
       });
       
       stripeCustomerId = customer.id;
       
-      await prisma.users.update({
-        where: { id: input.userId },
-        data: { stripeCustomerId },
-      });
+      const { error: updateUserError } = await supabase
+        .from('users')
+        .update({ stripe_customer_id: stripeCustomerId })
+        .eq('id', input.userId);
+      if (updateUserError) throw updateUserError;
     }
 
     // Create or get Stripe price
@@ -223,33 +230,37 @@ export async function createMembership(
     const endDate = calculateEndDate(startDate, input.billingCycle);
 
     // Create membership in database
-    const membership = await prisma.poolMembership.create({
-      data: {
-        userId: input.userId,
+    const { data: membership, error: membershipError } = await supabase
+      .from('pool_memberships')
+      .insert({
+        user_id: input.userId,
         type: input.type,
-        billingCycle: input.billingCycle,
+        billing_cycle: input.billingCycle,
         status: MembershipStatus.PENDING_PAYMENT,
-        startDate,
-        endDate,
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
         price: pricing.basePrice,
-        stripeSubscriptionId: subscription.id,
-        corporateName: input.corporateName,
-        maxMembers: pricing.maxMembers,
-        remainingGuestPasses: pricing.guestPasses,
-        discountPercentage: pricing.discountPercentage,
-      },
-    });
+        stripe_subscription_id: subscription.id,
+        corporate_name: input.corporateName,
+        max_members: pricing.maxMembers,
+        remaining_guest_passes: pricing.guestPasses,
+        discount_percentage: pricing.discountPercentage,
+      })
+      .select()
+      .single();
+    if (membershipError) throw membershipError;
 
     // Add additional members if provided
     if (input.memberEmails && input.memberEmails.length > 0) {
       for (const email of input.memberEmails) {
-        await prisma.membershipMember.create({
-          data: {
-            membershipId: membership.id,
+        const { error: memberError } = await supabase
+          .from('membership_members')
+          .insert({
+            membership_id: membership.id,
             email,
             status: 'PENDING_INVITATION',
-          },
-        });
+          });
+        if (memberError) throw memberError;
         
         // Send invitation email
         await sendMemberInvitation(email, membership, user);
@@ -289,15 +300,19 @@ export async function cancelMembership(
   immediate: boolean = false
 ): Promise<MembershipResult> {
   try {
-    const membership = await prisma.poolMembership.findUnique({
-      where: { id: membershipId },
-    });
+    const supabase = getSupabase();
+    const { data: membership, error: membershipError } = await supabase
+      .from('pool_memberships')
+      .select('*')
+      .eq('id', membershipId)
+      .maybeSingle();
+    if (membershipError) throw membershipError;
 
     if (!membership) {
       return { success: false, message: 'Membership not found' };
     }
 
-    if (membership.userId !== userId) {
+    if (membership.user_id !== userId) {
       return { success: false, message: 'Unauthorized' };
     }
 
@@ -306,26 +321,27 @@ export async function cancelMembership(
     }
 
     // Cancel Stripe subscription
-    if (membership.stripeSubscriptionId) {
-      await stripeClient.subscriptions.update(membership.stripeSubscriptionId, {
+    if (membership.stripe_subscription_id) {
+      await stripeClient.subscriptions.update(membership.stripe_subscription_id, {
         cancel_at_period_end: !immediate,
       });
 
       if (immediate) {
-        await stripeClient.subscriptions.cancel(membership.stripeSubscriptionId);
+        await stripeClient.subscriptions.cancel(membership.stripe_subscription_id);
       }
     }
 
     // Update membership status
-    await prisma.poolMembership.update({
-      where: { id: membershipId },
-      data: {
+    const { error: updateError } = await supabase
+      .from('pool_memberships')
+      .update({
         status: immediate ? MembershipStatus.CANCELLED : MembershipStatus.ACTIVE,
-        cancelledAt: new Date(),
-        cancellationReason: reason,
-        autoRenew: false,
-      },
-    });
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: reason,
+        auto_renew: false,
+      })
+      .eq('id', membershipId);
+    if (updateError) throw updateError;
 
     logger.info('Pool membership cancelled', {
       membershipId,
@@ -356,23 +372,45 @@ export async function validateMembershipAccess(
   remainingGuestPasses?: number;
   discountPercentage?: number;
 }> {
-  const membership = await prisma.poolMembership.findFirst({
-    where: {
-      OR: [
-        { userId },
-        {
-          members: {
-            some: { userId, status: 'ACTIVE' },
-          },
-        },
-      ],
-      status: MembershipStatus.ACTIVE,
-      endDate: { gte: new Date() },
-    },
-    include: {
-      members: true,
-    },
-  });
+  const supabase = getSupabase();
+  const now = new Date().toISOString();
+
+  // Check direct membership
+  const { data: directMembership, error: directError } = await supabase
+    .from('pool_memberships')
+    .select('*, members:membership_members(*)')
+    .eq('user_id', userId)
+    .eq('status', MembershipStatus.ACTIVE)
+    .gte('end_date', now)
+    .limit(1)
+    .maybeSingle();
+  if (directError) throw directError;
+
+  let membership = directMembership;
+
+  // If no direct membership, check via membership_members
+  if (!membership) {
+    const { data: memberRecord, error: memberError } = await supabase
+      .from('membership_members')
+      .select('membership_id')
+      .eq('user_id', userId)
+      .eq('status', 'ACTIVE')
+      .limit(1)
+      .maybeSingle();
+    if (memberError) throw memberError;
+
+    if (memberRecord) {
+      const { data: parentMembership, error: parentError } = await supabase
+        .from('pool_memberships')
+        .select('*, members:membership_members(*)')
+        .eq('id', memberRecord.membership_id)
+        .eq('status', MembershipStatus.ACTIVE)
+        .gte('end_date', now)
+        .maybeSingle();
+      if (parentError) throw parentError;
+      membership = parentMembership;
+    }
+  }
 
   if (!membership) {
     return { hasAccess: false };
@@ -381,8 +419,8 @@ export async function validateMembershipAccess(
   return {
     hasAccess: true,
     membership,
-    remainingGuestPasses: membership.remainingGuestPasses,
-    discountPercentage: membership.discountPercentage ? Number(membership.discountPercentage) : 0,
+    remainingGuestPasses: membership.remaining_guest_passes,
+    discountPercentage: membership.discount_percentage ? Number(membership.discount_percentage) : 0,
   };
 }
 
@@ -394,9 +432,13 @@ export async function useGuestPass(
   guestName: string,
   guestEmail?: string
 ): Promise<{ success: boolean; message: string; remainingPasses?: number }> {
-  const membership = await prisma.poolMembership.findUnique({
-    where: { id: membershipId },
-  });
+  const supabase = getSupabase();
+  const { data: membership, error: membershipError } = await supabase
+    .from('pool_memberships')
+    .select('*')
+    .eq('id', membershipId)
+    .maybeSingle();
+  if (membershipError) throw membershipError;
 
   if (!membership) {
     return { success: false, message: 'Membership not found' };
@@ -407,26 +449,28 @@ export async function useGuestPass(
   }
 
   // VIP has unlimited passes
-  if (membership.type !== MembershipType.VIP && membership.remainingGuestPasses <= 0) {
+  if (membership.type !== MembershipType.VIP && membership.remaining_guest_passes <= 0) {
     return { success: false, message: 'No guest passes remaining' };
   }
 
   // Record guest pass usage
-  await prisma.guestPassUsage.create({
-    data: {
-      membershipId,
-      guestName,
-      guestEmail,
-      usedAt: new Date(),
-    },
-  });
+  const { error: usageError } = await supabase
+    .from('guest_pass_usage')
+    .insert({
+      membership_id: membershipId,
+      guest_name: guestName,
+      guest_email: guestEmail,
+      used_at: new Date().toISOString(),
+    });
+  if (usageError) throw usageError;
 
   // Decrement remaining passes (except for VIP)
   if (membership.type !== MembershipType.VIP) {
-    await prisma.poolMembership.update({
-      where: { id: membershipId },
-      data: { remainingGuestPasses: { decrement: 1 } },
-    });
+    const { error: updateError } = await supabase
+      .from('pool_memberships')
+      .update({ remaining_guest_passes: membership.remaining_guest_passes - 1 })
+      .eq('id', membershipId);
+    if (updateError) throw updateError;
   }
 
   return {
@@ -434,7 +478,7 @@ export async function useGuestPass(
     message: 'Guest pass used successfully',
     remainingPasses: membership.type === MembershipType.VIP 
       ? -1 // Unlimited
-      : membership.remainingGuestPasses - 1,
+      : membership.remaining_guest_passes - 1,
   };
 }
 
@@ -444,10 +488,14 @@ export async function useGuestPass(
 export async function processRenewal(
   subscriptionId: string
 ): Promise<void> {
-  const membership = await prisma.poolMembership.findFirst({
-    where: { stripeSubscriptionId: subscriptionId },
-    include: { user: true },
-  });
+  const supabase = getSupabase();
+  const { data: membership, error: membershipError } = await supabase
+    .from('pool_memberships')
+    .select('*, user:users(*)')
+    .eq('stripe_subscription_id', subscriptionId)
+    .limit(1)
+    .maybeSingle();
+  if (membershipError) throw membershipError;
 
   if (!membership) {
     logger.warn('Membership not found for renewal', { subscriptionId });
@@ -456,22 +504,23 @@ export async function processRenewal(
 
   const pricing = getMembershipPricing(
     membership.type as MembershipType,
-    membership.billingCycle as BillingCycle
+    membership.billing_cycle as BillingCycle
   );
 
   const newEndDate = calculateEndDate(
-    new Date(membership.endDate),
-    membership.billingCycle as BillingCycle
+    new Date(membership.end_date || new Date()),
+    membership.billing_cycle as BillingCycle
   );
 
-  await prisma.poolMembership.update({
-    where: { id: membership.id },
-    data: {
-      endDate: newEndDate,
-      remainingGuestPasses: pricing?.guestPasses || membership.remainingGuestPasses,
-      renewedAt: new Date(),
-    },
-  });
+  const { error: updateError } = await supabase
+    .from('pool_memberships')
+    .update({
+      end_date: newEndDate.toISOString(),
+      remaining_guest_passes: pricing?.guestPasses || membership.remaining_guest_passes,
+      renewed_at: new Date().toISOString(),
+    })
+    .eq('id', membership.id);
+  if (updateError) throw updateError;
 
   // Send renewal confirmation
   await emailService.sendEmail({
@@ -494,17 +543,22 @@ export async function processRenewal(
 export async function handleFailedPayment(
   subscriptionId: string
 ): Promise<void> {
-  const membership = await prisma.poolMembership.findFirst({
-    where: { stripeSubscriptionId: subscriptionId },
-    include: { user: true },
-  });
+  const supabase = getSupabase();
+  const { data: membership, error: membershipError } = await supabase
+    .from('pool_memberships')
+    .select('*, user:users(*)')
+    .eq('stripe_subscription_id', subscriptionId)
+    .limit(1)
+    .maybeSingle();
+  if (membershipError) throw membershipError;
 
   if (!membership) return;
 
-  await prisma.poolMembership.update({
-    where: { id: membership.id },
-    data: { status: MembershipStatus.SUSPENDED },
-  });
+  const { error: updateError } = await supabase
+    .from('pool_memberships')
+    .update({ status: MembershipStatus.SUSPENDED })
+    .eq('id', membership.id);
+  if (updateError) throw updateError;
 
   // Send notification
   await emailService.sendEmail({
@@ -545,9 +599,13 @@ async function getOrCreateStripePrice(pricing: MembershipPricing): Promise<strin
   const priceKey = `pool_${pricing.type.toLowerCase()}_${pricing.billingCycle.toLowerCase()}`;
   
   // Check if price exists in settings
-  const existingPrice = await prisma.systemSettings.findUnique({
-    where: { key: `stripe.price.${priceKey}` },
-  });
+  const supabase = getSupabase();
+  const { data: existingPrice, error: priceError } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', `stripe.price.${priceKey}`)
+    .maybeSingle();
+  if (priceError) throw priceError;
 
   if (existingPrice) {
     return existingPrice.value;
@@ -576,13 +634,14 @@ async function getOrCreateStripePrice(pricing: MembershipPricing): Promise<strin
   });
 
   // Store price ID
-  await prisma.systemSettings.create({
-    data: {
+  const { error: storeError } = await supabase
+    .from('system_settings')
+    .insert({
       key: `stripe.price.${priceKey}`,
       value: price.id,
       category: 'stripe',
-    },
-  });
+    });
+  if (storeError) throw storeError;
 
   return price.id;
 }

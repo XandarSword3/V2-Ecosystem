@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { restaurantApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import {

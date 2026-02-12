@@ -1,16 +1,29 @@
 import { getSupabase } from "../../../database/connection.js";
-import { emitToUnit } from "../../../socket/index.js";
+import { emitToUnit, emitToRole } from "../../../socket/index.js";
 import { emailService } from "../../../services/email.service.js";
 import { logger } from "../../../utils/logger.js";
+import { taxService } from "../../../services/tax.service.js";
+import { orderConfigService } from "../../../services/order-config.service.js"; // FIX: Iteration 7 - Dynamic service charge & delivery fee
 import dayjs from 'dayjs';
-
-const TAX_RATE = 0.11; // 11% VAT in Lebanon
 
 function generateOrderNumber(): string {
   const date = dayjs().format('YYMMDD');
   const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
   const suffix = Date.now().toString(36).slice(-4);
   return `R-${date}-${random}${suffix}`;
+}
+
+// Type for selected modifiers passed from frontend
+interface SelectedModifier {
+  optionId: string;
+  optionName: string;
+  groupId: string;
+  groupName: string;
+  modifierType: 'add' | 'remove' | 'swap';
+  priceAdjustment: number;
+  quantity: number;
+  inventoryItemId?: string;
+  inventoryQuantity?: number;
 }
 
 export async function createOrder(data: {
@@ -21,9 +34,16 @@ export async function createOrder(data: {
   tableId?: string;
   tableNumber?: string;
   orderType: 'dine_in' | 'takeaway' | 'delivery' | 'room_service';
-  items: Array<{ menuItemId: string; quantity: number; specialInstructions?: string }>;
+  items: Array<{ 
+    menuItemId: string; 
+    quantity: number; 
+    specialInstructions?: string;
+    selectedModifiers?: SelectedModifier[];
+    modifierTotal?: number;
+  }>;
   specialInstructions?: string;
   paymentMethod?: 'cash' | 'card' | 'whish' | 'online' | 'room_charge';
+  taxExempt?: boolean;
   // Discount integration fields
   couponCode?: string;
   giftCardRedemptions?: Array<{ code: string; amount: number }>;
@@ -63,15 +83,29 @@ export async function createOrder(data: {
   // but frontend now enforces single module per checkout.
   const moduleId = menuItemsList?.[0]?.module_id;
 
-  // Calculate totals
+  // Calculate totals (including modifiers)
   let subtotal = 0;
   const orderItems = data.items.map(item => {
     const menuItem = itemMap.get(item.menuItemId);
     if (!menuItem) throw new Error(`Menu item ${item.menuItemId} not found`);
     if (!menuItem.is_available) throw new Error(`${menuItem.name} is not available`);
 
-    const unitPrice = parseFloat(menuItem.price);
-    const itemSubtotal = unitPrice * item.quantity;
+    // FIX Iter-1: Use discount_price when available, fall back to regular price
+    // Previously only used menuItem.price, causing overcharge when items are on sale
+    const unitPrice = menuItem.discount_price != null && parseFloat(menuItem.discount_price) > 0
+      ? parseFloat(menuItem.discount_price)
+      : parseFloat(menuItem.price);
+    
+    // Calculate modifier total for this item
+    let modifierTotal = 0;
+    if (item.selectedModifiers && item.selectedModifiers.length > 0) {
+      modifierTotal = item.selectedModifiers.reduce((sum, mod) => {
+        return sum + (mod.priceAdjustment * mod.quantity);
+      }, 0);
+    }
+    
+    // Item subtotal = (base price + modifier total) * quantity
+    const itemSubtotal = (unitPrice + modifierTotal) * item.quantity;
     subtotal += itemSubtotal;
 
     return {
@@ -79,13 +113,20 @@ export async function createOrder(data: {
       quantity: item.quantity,
       unit_price: unitPrice,
       subtotal: itemSubtotal,
+      modifier_total: modifierTotal,
       special_instructions: item.specialInstructions,
+      selected_modifiers: item.selectedModifiers || [],
     };
   });
 
-  const taxAmount = subtotal * TAX_RATE;
-  const serviceCharge = data.orderType === 'dine_in' ? subtotal * 0.1 : 0; // 10% service for dine-in
-  const deliveryFee = data.orderType === 'delivery' ? 5 : 0; // Flat delivery fee
+  // Fetch tax rate dynamically
+  const taxRate = data.taxExempt ? 0 : await taxService.getTaxRate(moduleId);
+
+  const taxAmount = subtotal * taxRate;
+  // FIX: Iteration 7 - Fetch service charge & delivery fee from DB config
+  const orderConfig = await orderConfigService.getOrderConfig();
+  const serviceCharge = data.orderType === 'dine_in' ? subtotal * orderConfig.serviceChargeRate : 0;
+  const deliveryFee = data.orderType === 'delivery' ? orderConfig.deliveryFee : 0;
   const preDiscountTotal = subtotal + taxAmount + serviceCharge + deliveryFee;
 
   // Initialize discount tracking
@@ -130,7 +171,7 @@ export async function createOrder(data: {
 
   if (orderError) throw orderError;
 
-  // Create order items
+  // Create order items (including modifiers data for inventory deduction)
   const { error: insertItemsError } = await supabase
     .from('restaurant_order_items')
     .insert(orderItems.map(item => ({
@@ -139,7 +180,9 @@ export async function createOrder(data: {
       quantity: item.quantity,
       unit_price: item.unit_price.toFixed(2),
       subtotal: item.subtotal.toFixed(2),
+      modifier_total: item.modifier_total.toFixed(2),
       special_instructions: item.special_instructions,
+      selected_modifiers: item.selected_modifiers,
     })));
 
   if (insertItemsError) throw insertItemsError;
@@ -168,7 +211,7 @@ export async function createOrder(data: {
         couponId = couponResult[0].coupon_id;
         
         // Coupons are pre-tax, so we need to reduce the tax amount
-        const currentTaxSavings = couponDiscount * TAX_RATE;
+        const currentTaxSavings = couponDiscount * taxRate;
         taxSavings += currentTaxSavings;
         
         totalDiscount += couponDiscount;
@@ -300,17 +343,22 @@ export async function createOrder(data: {
     }
   }
 
-  // === DEDUCT INVENTORY (for ingredients linked to menu items) ===
+  // === DEDUCT INVENTORY (for ingredients linked to menu items AND modifiers) ===
   try {
     const { data: inventoryResult, error: inventoryError } = await supabase.rpc(
-      'deduct_inventory_for_order',
+      'deduct_inventory_for_order_v2', // Use v2 that handles modifiers
       { p_order_id: order.id }
     );
 
     if (inventoryError) {
       logger.warn('[ORDER SERVICE] Inventory deduction failed:', inventoryError);
-    } else if (inventoryResult && inventoryResult[0]?.items_deducted > 0) {
-      logger.info('[ORDER SERVICE] Inventory deducted:', inventoryResult[0].items_deducted, 'items');
+    } else if (inventoryResult && inventoryResult[0]) {
+      const { base_items_deducted, modifier_items_deducted, skipped_removals } = inventoryResult[0];
+      logger.info('[ORDER SERVICE] Inventory deducted:', {
+        baseItems: base_items_deducted,
+        modifierItems: modifier_items_deducted,
+        skippedRemovals: skipped_removals,
+      });
     }
   } catch (err) {
     logger.warn('[ORDER SERVICE] Inventory deduction error (non-fatal):', err);
@@ -338,6 +386,15 @@ export async function createOrder(data: {
     orderType: order.order_type,
     totalAmount: order.total_amount,
     moduleId: order.module_id,
+  });
+
+  // Notify admin dashboard of new revenue activity
+  emitToRole('admin', 'dashboard:activity', {
+    type: 'new_order',
+    source: 'restaurant',
+    amount: order.total_amount,
+    orderNumber: order.order_number,
+    timestamp: new Date().toISOString(),
   });
 
   // Send order confirmation email if customer email is available
@@ -441,6 +498,8 @@ export async function getOrders(filters: { status?: string; date?: string; modul
         quantity,
         unit_price,
         special_instructions,
+        selected_modifiers,
+        modifier_total,
         menu_items (
           id,
           name,
@@ -493,6 +552,8 @@ export async function getLiveOrders(moduleId?: string) {
         quantity,
         unit_price,
         special_instructions,
+        selected_modifiers,
+        modifier_total,
         menu_items (
           id,
           name
@@ -551,6 +612,17 @@ export async function updateOrderStatus(
   if (status === 'cancelled') {
     updateData.cancelled_at = new Date().toISOString();
     updateData.cancellation_reason = notes;
+  }
+  if (status === 'voided') {
+    updateData.cancelled_at = new Date().toISOString();
+    updateData.cancellation_reason = notes || 'Voided by manager';
+    updateData.payment_status = 'voided';
+  }
+  if (status === 'comped') {
+    updateData.cancelled_at = new Date().toISOString();
+    updateData.cancellation_reason = notes || 'Complimentary';
+    updateData.payment_status = 'comped';
+    updateData.total_amount = '0.00';
   }
 
   const { data: order, error: updateError } = await supabase

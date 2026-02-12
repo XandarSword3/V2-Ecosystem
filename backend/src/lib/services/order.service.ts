@@ -36,6 +36,23 @@ export class OrderServiceError extends Error {
 // SERVICE TYPES
 // ============================================
 
+export interface SelectedModifier {
+  optionId: string;
+  quantity?: number; // For modifiers that can be added multiple times (e.g., extra cheese x2)
+}
+
+export interface ValidatedModifier {
+  optionId: string;
+  optionName: string;
+  groupId: string;
+  groupName: string;
+  modifierType: 'add' | 'remove' | 'swap';
+  priceAdjustment: number;
+  quantity: number;
+  inventoryItemId?: string;
+  inventoryQuantity?: number;
+}
+
 export interface CreateOrderInput {
   customerId?: string;
   customerName: string;
@@ -47,6 +64,7 @@ export interface CreateOrderInput {
     menuItemId: string;
     quantity: number;
     specialInstructions?: string;
+    modifiers?: SelectedModifier[]; // NEW: Support item-level modifiers
   }>;
   specialInstructions?: string;
   paymentMethod?: 'cash' | 'card' | 'whish' | 'online' | 'room_charge';
@@ -67,6 +85,8 @@ export interface OrderResult {
     quantity: number;
     unitPrice: number;
     subtotal: number;
+    modifiers?: ValidatedModifier[];
+    modifierTotal?: number;
   }>;
   discountsApplied?: {
     coupon?: { code: string; discount: number; couponId: string };
@@ -75,6 +95,7 @@ export interface OrderResult {
     totalDiscount: number;
   };
   loyaltyPointsEarned?: number;
+  modifiersTotal?: number; // NEW: Total price of all modifiers
 }
 
 export interface OrderServiceDependencies {
@@ -90,9 +111,8 @@ export interface OrderServiceDependencies {
 // CONSTANTS
 // ============================================
 
-const TAX_RATE = 0.11; // 11% VAT in Lebanon
-const SERVICE_CHARGE_RATE = 0.10; // 10% service for dine-in
-const DELIVERY_FEE = 5; // Flat delivery fee
+import { taxService } from '../../services/tax.service.js';
+import { orderConfigService } from '../../services/order-config.service.js'; // FIX: Iteration 7 - Dynamic service charge & delivery fee
 
 // ============================================
 // ORDER SERVICE
@@ -166,26 +186,104 @@ export function createOrderService(deps: OrderServiceDependencies): OrderService
       // Get module_id from first item (all items assumed same module)
       const moduleId = menuItemsList[0]?.module_id;
 
-      // Calculate totals
-      let subtotal = 0;
-      const orderItemsData = input.items.map(item => {
-        const menuItem = itemMap.get(item.menuItemId)!;
-        const unitPrice = parseFloat(menuItem.price);
-        const itemSubtotal = unitPrice * item.quantity;
-        subtotal += itemSubtotal;
+      // Validate and process modifiers for each item
+      interface ProcessedModifierResult {
+        totalPrice: number;
+        validatedModifiers: ValidatedModifier[];
+        errors: string[];
+      }
+
+      async function processItemModifiers(
+        menuItemId: string,
+        modifiers: SelectedModifier[] | undefined
+      ): Promise<ProcessedModifierResult> {
+        if (!modifiers || modifiers.length === 0) {
+          return { totalPrice: 0, validatedModifiers: [], errors: [] };
+        }
+
+        // Use database function to validate and calculate
+        const { data: result, error } = await restaurantRepository.rpc(
+          'calculate_item_modifiers_price',
+          {
+            p_menu_item_id: menuItemId,
+            p_selected_modifiers: JSON.stringify(modifiers),
+          }
+        );
+
+        if (error) {
+          logger.warn('[ORDER SERVICE] Modifier validation failed:', error);
+          return { totalPrice: 0, validatedModifiers: [], errors: [error.message] };
+        }
+
+        const row = (result as any[])?.[0];
+        if (!row) {
+          return { totalPrice: 0, validatedModifiers: [], errors: ['Modifier validation returned no result'] };
+        }
 
         return {
+          totalPrice: parseFloat(row.total_modifier_price) || 0,
+          validatedModifiers: row.validated_modifiers || [],
+          errors: row.validation_errors || [],
+        };
+      }
+
+      // Calculate totals including modifiers
+      let subtotal = 0;
+      let totalModifiersPrice = 0;
+      const orderItemsData: Array<{
+        menu_item_id: string;
+        quantity: number;
+        unit_price: string;
+        subtotal: string;
+        special_instructions?: string;
+        selected_modifiers: ValidatedModifier[];
+        modifier_total: string;
+      }> = [];
+
+      for (const item of input.items) {
+        const menuItem = itemMap.get(item.menuItemId)!;
+        // FIX Iter-1: Use discount_price when available
+        const unitPrice = menuItem.discount_price != null && parseFloat(menuItem.discount_price) > 0
+          ? parseFloat(menuItem.discount_price)
+          : parseFloat(menuItem.price);
+        
+        // Process modifiers for this item
+        const modifierResult = await processItemModifiers(item.menuItemId, item.modifiers);
+        
+        // Check for modifier validation errors
+        if (modifierResult.errors.length > 0) {
+          throw new OrderServiceError(
+            `Modifier error for ${menuItem.name}: ${modifierResult.errors.join(', ')}`,
+            'MODIFIER_VALIDATION_ERROR',
+            400
+          );
+        }
+
+        // Calculate item totals (modifiers are per-item, multiplied by quantity)
+        const modifierPricePerItem = modifierResult.totalPrice;
+        const itemSubtotal = (unitPrice + modifierPricePerItem) * item.quantity;
+        const itemModifierTotal = modifierPricePerItem * item.quantity;
+
+        subtotal += itemSubtotal;
+        totalModifiersPrice += itemModifierTotal;
+
+        orderItemsData.push({
           menu_item_id: item.menuItemId,
           quantity: item.quantity,
           unit_price: unitPrice.toFixed(2),
           subtotal: itemSubtotal.toFixed(2),
           special_instructions: item.specialInstructions,
-        };
-      });
+          selected_modifiers: modifierResult.validatedModifiers,
+          modifier_total: itemModifierTotal.toFixed(2),
+        });
+      }
 
-      const taxAmount = subtotal * TAX_RATE;
-      const serviceCharge = input.orderType === 'dine_in' ? subtotal * SERVICE_CHARGE_RATE : 0;
-      const deliveryFee = input.orderType === 'delivery' ? DELIVERY_FEE : 0;
+      const taxRate = await taxService.getTaxRate('restaurant');
+      const taxAmount = subtotal * taxRate;
+      // FIX: Iteration 7 - Fetch service charge & delivery fee from DB config
+      const orderConfig = await orderConfigService.getOrderConfig();
+      const serviceCharge = input.orderType === 'dine_in' ? subtotal * orderConfig.serviceChargeRate : 0;
+      const deliveryFee = input.orderType === 'delivery' ? orderConfig.deliveryFee : 0;
       let preDiscountTotal = subtotal + taxAmount + serviceCharge + deliveryFee;
 
       // Initialize discount tracking
@@ -216,13 +314,14 @@ export function createOrderService(deps: OrderServiceDependencies): OrderService
         delivery_fee: deliveryFee.toFixed(2),
         discount_amount: '0', // Will be updated after discounts are applied
         total_amount: preDiscountTotal.toFixed(2), // Will be updated
+        modifiers_total: totalModifiersPrice.toFixed(2), // NEW: Total modifiers price
         special_instructions: input.specialInstructions,
         estimated_ready_time: estimatedReadyTime,
         payment_status: 'pending',
         payment_method: input.paymentMethod,
       });
 
-      // Create order items
+      // Create order items with modifiers
       await restaurantRepository.createOrderItems(
         orderItemsData.map(item => ({
           order_id: order.id,
@@ -398,18 +497,23 @@ export function createOrderService(deps: OrderServiceDependencies): OrderService
         }
       }
 
-      // === DEDUCT INVENTORY (for ingredients linked to menu items) ===
+      // === DEDUCT INVENTORY (for ingredients linked to menu items AND modifiers) ===
       try {
         const { data: inventoryData, error: inventoryError } = await restaurantRepository.rpc(
-          'deduct_inventory_for_order',
+          'deduct_inventory_for_order_v2', // Use v2 that handles modifiers
           { p_order_id: order.id }
         );
-        const inventoryResult = inventoryData as InventoryRpcResult[] | null;
+        const inventoryResult = inventoryData as { base_items_deducted: number; modifier_items_deducted: number; skipped_removals: number }[] | null;
 
         if (inventoryError) {
           logger.warn('[ORDER SERVICE] Inventory deduction failed:', inventoryError);
-        } else if (inventoryResult && inventoryResult[0]?.items_deducted > 0) {
-          logger.info('[ORDER SERVICE] Inventory deducted:', inventoryResult[0].items_deducted, 'items');
+        } else if (inventoryResult && inventoryResult[0]) {
+          const { base_items_deducted, modifier_items_deducted, skipped_removals } = inventoryResult[0];
+          logger.info('[ORDER SERVICE] Inventory deducted:', {
+            baseItems: base_items_deducted,
+            modifierItems: modifier_items_deducted,
+            skippedRemovals: skipped_removals,
+          });
         }
       } catch (err) {
         logger.warn('[ORDER SERVICE] Inventory deduction error (non-fatal):', err);
@@ -442,24 +546,49 @@ export function createOrderService(deps: OrderServiceDependencies): OrderService
 
       // Send confirmation email (non-blocking)
       if (input.customerEmail) {
-        this.sendOrderConfirmationEmail(order, menuItemsList, orderItemsData).catch(err => {
+        this.sendOrderConfirmationEmail(order, menuItemsList, orderItemsData).catch((err: unknown) => {
           logger.warn('[ORDER SERVICE] Failed to send confirmation email:', err);
         });
       }
 
-      // Build result
-      const resultItems = input.items.map(item => {
-        const menuItem = itemMap.get(item.menuItemId)!;
-        const unitPrice = parseFloat(menuItem.price);
+      // Build result with modifiers
+      const resultItems = orderItemsData.map((itemData, index) => {
+        const menuItem = itemMap.get(itemData.menu_item_id)!;
+        // FIX Iter-1: Use discount_price when available
+        const unitPrice = menuItem.discount_price != null && parseFloat(menuItem.discount_price) > 0
+          ? parseFloat(menuItem.discount_price)
+          : parseFloat(menuItem.price);
         return {
           menuItem,
-          quantity: item.quantity,
+          quantity: itemData.quantity,
           unitPrice,
-          subtotal: unitPrice * item.quantity,
+          subtotal: parseFloat(itemData.subtotal),
+          modifiers: itemData.selected_modifiers,
+          modifierTotal: parseFloat(itemData.modifier_total),
         };
       });
 
-      return { order, items: resultItems };
+      const result: OrderResult = {
+        order,
+        items: resultItems,
+        modifiersTotal: totalModifiersPrice,
+      };
+
+      // Add discount info if any discounts were applied
+      if (totalDiscount > 0) {
+        result.discountsApplied = {
+          totalDiscount,
+          ...(couponDiscount > 0 && couponId ? { coupon: { code: input.couponCode!, discount: couponDiscount, couponId } } : {}),
+          ...(giftCardRedemptions.length > 0 ? { giftCards: giftCardRedemptions } : {}),
+          ...(loyaltyDiscount > 0 ? { loyalty: { pointsUsed: loyaltyPointsUsed, discount: loyaltyDiscount } } : {}),
+        };
+      }
+
+      if (loyaltyPointsEarned > 0) {
+        result.loyaltyPointsEarned = loyaltyPointsEarned;
+      }
+
+      return result;
     },
 
     async sendOrderConfirmationEmail(

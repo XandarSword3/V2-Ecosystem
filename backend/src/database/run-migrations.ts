@@ -24,7 +24,7 @@ interface Migration {
 
 async function runMigrations() {
   const connectionString = process.env.DATABASE_URL;
-  
+
   if (!connectionString) {
     console.error('❌ DATABASE_URL is not defined in .env');
     process.exit(1);
@@ -32,7 +32,8 @@ async function runMigrations() {
 
   const pool = new Pool({
     connectionString,
-    ssl: { rejectUnauthorized: false }
+    // ssl: { rejectUnauthorized: false } // Commented out for local execution which may not support SSL
+    ssl: false
   });
 
   try {
@@ -84,7 +85,7 @@ async function runMigrations() {
       const sql = fs.readFileSync(filePath, 'utf8');
 
       console.log(`🔄 Applying ${file}...`);
-      
+
       try {
         await client.query('BEGIN');
         await client.query(sql);
@@ -110,7 +111,7 @@ async function runMigrations() {
 
     client.release();
     await pool.end();
-    
+
     console.log('✨ Migrations complete!');
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

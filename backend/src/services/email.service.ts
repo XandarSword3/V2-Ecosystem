@@ -98,16 +98,16 @@ class EmailService {
       const settings: Record<string, string> = {};
       (data || []).forEach((s: { key: string; value: Record<string, unknown> | null }) => {
         if (s.key === 'general' && s.value) {
-          settings.company_name = String(s.value.resortName || 'V2 Resort');
-          settings.companyName = String(s.value.resortName || 'V2 Resort');
+          settings.company_name = String(s.value.resortName || 'Iron Paradise Gym');
+          settings.companyName = String(s.value.resortName || 'Iron Paradise Gym');
         }
         if (s.key === 'contact' && s.value) {
-          settings.contact_email = String(s.value.email || 'info@v2resort.com');
-          settings.contactEmail = String(s.value.email || 'info@v2resort.com');
+          settings.contact_email = String(s.value.email || 'info@ironparadisegym.com');
+          settings.contactEmail = String(s.value.email || 'info@ironparadisegym.com');
           settings.contact_phone = String(s.value.phone || 'Not configured');
           settings.contactPhone = String(s.value.phone || 'Not configured');
-          settings.contact_address = String(s.value.address || 'V2 Resort, Lebanon');
-          settings.companyAddress = String(s.value.address || 'V2 Resort, Lebanon');
+          settings.contact_address = String(s.value.address || 'Iron Paradise Gym');
+          settings.companyAddress = String(s.value.address || 'Iron Paradise Gym');
         }
         if (s.key === 'chalets' && s.value) {
           settings.chalet_check_in = String(s.value.checkIn || s.value.check_in_time || '3:00 PM');
@@ -122,14 +122,14 @@ class EmailService {
 
   private getDefaultSettings(): Record<string, string> {
     return {
-      company_name: 'V2 Resort',
-      contact_email: 'info@v2resort.com',
+      company_name: 'Iron Paradise Gym',
+      contact_email: 'info@ironparadisegym.com',
       contact_phone: 'Not configured',
-      contact_address: 'V2 Resort, Lebanon',
-      companyName: 'V2 Resort',
-      contactEmail: 'info@v2resort.com',
+      contact_address: 'Iron Paradise Gym',
+      companyName: 'Iron Paradise Gym',
+      contactEmail: 'info@ironparadisegym.com',
       contactPhone: 'Not configured',
-      companyAddress: 'V2 Resort, Lebanon',
+      companyAddress: 'Iron Paradise Gym',
     };
   }
 
@@ -174,8 +174,8 @@ class EmailService {
         return false;
     }
 
-    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@v2resort.com';
-    const fromName = process.env.SMTP_FROM_NAME || 'V2 Resort';
+    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@ironparadisegym.com';
+    const fromName = process.env.SMTP_FROM_NAME || 'Iron Paradise Gym';
 
     try {
       const info = await this.transporter.sendMail({
@@ -486,7 +486,7 @@ class EmailService {
   }): Promise<boolean> {
     const template = await this.getTemplate('welcome');
     const settings = await this.getSiteSettings();
-    const siteUrl = config.frontendUrl || 'https://v2resort.com';
+    const siteUrl = config.frontendUrl || 'https://ironparadisegym.com';
 
     if (!template) {
       const html = `
@@ -531,7 +531,7 @@ class EmailService {
   }): Promise<boolean> {
     const template = await this.getTemplate('pre_arrival_reminder');
     const settings = await this.getSiteSettings();
-    const siteUrl = config.frontendUrl || 'https://v2resort.com';
+    const siteUrl = config.frontendUrl || 'https://ironparadisegym.com';
 
     if (!template) {
       // Fallback email if template doesn't exist
@@ -623,7 +623,7 @@ class EmailService {
   }): Promise<boolean> {
     const template = await this.getTemplate('gift_card_delivery');
     const settings = await this.getSiteSettings();
-    const siteUrl = config.frontendUrl || 'https://v2resort.com';
+    const siteUrl = config.frontendUrl || 'https://ironparadisegym.com';
 
     // Format the code with dashes for readability (XXXX-XXXX-XXXX-XXXX)
     const formattedCode = data.code.replace(/(.{4})(?=.)/g, '$1-');

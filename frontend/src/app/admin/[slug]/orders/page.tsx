@@ -176,7 +176,7 @@ export default function DynamicOrdersPage() {
             Manage incoming orders for {currentModule.name}
           </p>
         </div>
-        <Button onClick={fetchOrders} variant="outline" className="gap-2">
+        <Button onClick={() => fetchOrders()} variant="outline" className="gap-2">
           <RefreshCw className="w-4 h-4" />
           Refresh
         </Button>

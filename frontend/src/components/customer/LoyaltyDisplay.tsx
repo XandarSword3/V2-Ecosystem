@@ -47,7 +47,8 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
 
   const loadAccount = async () => {
     try {
-      const res = await api.get('/loyalty/account');
+      // FIX: Iteration 3 - Use /loyalty/me (backend route) instead of /loyalty/account (doesn't exist)
+      const res = await api.get('/loyalty/me');
       if (res.data.success) {
         setAccount(res.data.data);
       }
@@ -63,8 +64,9 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
   }
 
   const tierColor = account.tier?.color || '#6366f1';
-  const progressPercent = account.nextTier 
-    ? Math.round(((account.tier?.pointsMultiplier || 0) * 100 / (account.nextTier.pointsRequired - account.nextTier.pointsNeeded + account.currentPoints)) * 100)
+  // FIX Iter-10: progress formula was using pointsMultiplier instead of actual points
+  const progressPercent = account.nextTier
+    ? Math.min(100, Math.round(((account.nextTier.pointsRequired - account.nextTier.pointsNeeded) / account.nextTier.pointsRequired) * 100))
     : 100;
 
   // Mini variant - just points badge
@@ -217,7 +219,8 @@ export function PointsPreview({ amount, className = '' }: PointsPreviewProps) {
 
   useEffect(() => {
     if (isAuthenticated) {
-      api.get('/loyalty/calculate', { params: { amount } })
+      // FIX: Iteration 3 - Backend only defines POST /calculate, not GET
+      api.post('/loyalty/calculate', { amount })
         .then(res => {
           if (res.data.success) {
             setPointsRate(res.data.data.points / amount || 1);

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { seasonalPricingService } from '../services/seasonal-pricing.service';
-import { supabase } from '../config/supabase';
+import { seasonalPricingService } from '../src/services/seasonal-pricing.service';
+import { supabase } from '../src/lib/supabase';
 
 // Mock supabase
-vi.mock('../config/supabase', () => ({
+vi.mock('../src/lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
   },
@@ -229,9 +229,9 @@ describe('SeasonalPricingService', () => {
       const mockFromSystemSettings = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ 
-              data: { value: { enabled: false } }, 
-              error: null 
+            single: vi.fn().mockResolvedValue({
+              data: { value: { enabled: false } },
+              error: null
             }),
           }),
         }),
@@ -300,9 +300,9 @@ describe('SeasonalPricingService', () => {
       const mockFromSystemSettings = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ 
-              data: { value: { enabled: false } }, 
-              error: null 
+            single: vi.fn().mockResolvedValue({
+              data: { value: { enabled: false } },
+              error: null
             }),
           }),
         }),
@@ -360,9 +360,9 @@ describe('SeasonalPricingService', () => {
       const mockFromSystemSettings = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ 
-              data: { value: { enabled: false } }, 
-              error: null 
+            single: vi.fn().mockResolvedValue({
+              data: { value: { enabled: false } },
+              error: null
             }),
           }),
         }),
@@ -420,9 +420,9 @@ describe('SeasonalPricingService', () => {
       const mockFromSystemSettings = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ 
-              data: { value: { enabled: false } }, 
-              error: null 
+            single: vi.fn().mockResolvedValue({
+              data: { value: { enabled: false } },
+              error: null
             }),
           }),
         }),

@@ -143,9 +143,9 @@ describe('CSRF Protection Middleware', () => {
   });
 
   it('should skip validation for exempt paths (login)', () => {
-    const req = createMockRequest({ 
-      method: 'POST', 
-      path: '/api/auth/login' 
+    const req = createMockRequest({
+      method: 'POST',
+      path: '/api/v1/auth/login'
     });
     const res = createMockResponse();
     let nextCalled = false;
@@ -156,9 +156,9 @@ describe('CSRF Protection Middleware', () => {
   });
 
   it('should skip validation for Stripe webhook', () => {
-    const req = createMockRequest({ 
-      method: 'POST', 
-      path: '/api/payments/webhook' 
+    const req = createMockRequest({
+      method: 'POST',
+      path: '/api/v1/payments/webhook'
     });
     const res = createMockResponse();
     let nextCalled = false;
@@ -182,7 +182,7 @@ describe('CSRF Protection Middleware', () => {
 
   it('should reject POST without header token', () => {
     const token = generateCsrfToken();
-    const req = createMockRequest({ 
+    const req = createMockRequest({
       method: 'POST',
       cookies: { 'csrf-token': token },
     });
@@ -199,7 +199,7 @@ describe('CSRF Protection Middleware', () => {
   it('should reject POST with mismatched tokens', () => {
     const cookieToken = generateCsrfToken();
     const headerToken = generateCsrfToken(); // Different token
-    const req = createMockRequest({ 
+    const req = createMockRequest({
       method: 'POST',
       cookies: { 'csrf-token': cookieToken },
       headers: { 'x-csrf-token': headerToken },
@@ -216,7 +216,7 @@ describe('CSRF Protection Middleware', () => {
 
   it('should allow POST with matching tokens', () => {
     const token = generateCsrfToken();
-    const req = createMockRequest({ 
+    const req = createMockRequest({
       method: 'POST',
       cookies: { 'csrf-token': token },
       headers: { 'x-csrf-token': token },
@@ -232,7 +232,7 @@ describe('CSRF Protection Middleware', () => {
 
   it('should allow PUT with matching tokens', () => {
     const token = generateCsrfToken();
-    const req = createMockRequest({ 
+    const req = createMockRequest({
       method: 'PUT',
       cookies: { 'csrf-token': token },
       headers: { 'x-csrf-token': token },
@@ -247,7 +247,7 @@ describe('CSRF Protection Middleware', () => {
 
   it('should allow DELETE with matching tokens', () => {
     const token = generateCsrfToken();
-    const req = createMockRequest({ 
+    const req = createMockRequest({
       method: 'DELETE',
       cookies: { 'csrf-token': token },
       headers: { 'x-csrf-token': token },
@@ -262,7 +262,7 @@ describe('CSRF Protection Middleware', () => {
 
   it('should allow PATCH with matching tokens', () => {
     const token = generateCsrfToken();
-    const req = createMockRequest({ 
+    const req = createMockRequest({
       method: 'PATCH',
       cookies: { 'csrf-token': token },
       headers: { 'x-csrf-token': token },
@@ -310,8 +310,8 @@ describe('Timing-Safe Comparison', () => {
     // by checking that tokens of different lengths are properly rejected
     const token = generateCsrfToken();
     const shortToken = token.slice(0, 32);
-    
-    const req = createMockRequest({ 
+
+    const req = createMockRequest({
       method: 'POST',
       cookies: { 'csrf-token': token },
       headers: { 'x-csrf-token': shortToken },

@@ -8,14 +8,13 @@ import { ArrowLeft, Save, Shield, Check, User, Mail, Phone, Edit2, X } from 'luc
 import { toast } from 'sonner';
 
 interface Permission {
-    id: string;
     slug: string;
     description: string;
     module_slug: string;
 }
 
 interface PermissionOverride {
-    permission_id: string;
+    permission_slug: string;
     is_granted: boolean;
 }
 
@@ -49,7 +48,7 @@ export default function UserDetailsPage() {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   
   // State for overrides
-  const [overrides, setOverrides] = useState<Record<string, boolean>>({}); // permissionId -> is_granted
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({}); // permissionSlug -> is_granted
 
   useEffect(() => {
     if (id) {
@@ -72,8 +71,8 @@ export default function UserDetailsPage() {
                 setSelectedRoles(userPayload.roles || []);
                 // Initialize overrides from user data
                 const initialOverrides: Record<string, boolean> = {};
-                (userPayload.user_permissions_overrides || []).forEach((p: { permission_id: string; is_granted: boolean }) => {
-                    initialOverrides[p.permission_id] = p.is_granted;
+                (userPayload.user_permissions_overrides || []).forEach((p: { permission_slug: string; is_granted: boolean }) => {
+                    initialOverrides[p.permission_slug] = p.is_granted;
                 });
                 setOverrides(initialOverrides);
             }
@@ -93,7 +92,7 @@ export default function UserDetailsPage() {
   const handleSaveProfile = async () => {
     setSavingProfile(true);
     try {
-      await api.patch(`/admin/users/${id}`, profileForm);
+      await api.put(`/admin/users/${id}`, profileForm);
       setUser({ ...user, ...profileForm });
       setEditingProfile(false);
       toast.success('Profile updated successfully');
@@ -122,8 +121,8 @@ export default function UserDetailsPage() {
       setSaving(true);
       try {
           // Convert map to array
-          const permissionsPayload = Object.entries(overrides).map(([pid, granted]) => ({
-              permission_id: pid,
+          const permissionsPayload = Object.entries(overrides).map(([pSlug, granted]) => ({
+              permission_slug: pSlug,
               is_granted: granted
           }));
 
@@ -137,12 +136,12 @@ export default function UserDetailsPage() {
       }
   };
 
-  const toggleOverride = (permissionId: string, value: boolean | undefined) => {
+  const toggleOverride = (permissionSlug: string, value: boolean | undefined) => {
       const newOverrides = { ...overrides };
       if (value === undefined) {
-          delete newOverrides[permissionId]; // Remove override (reset to role default)
+          delete newOverrides[permissionSlug]; // Remove override (reset to role default)
       } else {
-          newOverrides[permissionId] = value;
+          newOverrides[permissionSlug] = value;
       }
       setOverrides(newOverrides);
   };
@@ -229,13 +228,13 @@ export default function UserDetailsPage() {
                 <button
                   type="button"
                   onClick={() => setProfileForm({ ...profileForm, is_active: !profileForm.is_active })}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                  className={`relative w-11 h-6 rounded-full transition-colors ${
                     profileForm.is_active ? 'bg-green-500' : 'bg-gray-300'
                   }`}
                 >
                   <span
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      profileForm.is_active ? 'translate-x-7' : 'translate-x-1'
+                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${
+                      profileForm.is_active ? 'translate-x-5' : 'translate-x-0'
                     }`}
                   />
                 </button>
@@ -385,11 +384,11 @@ export default function UserDetailsPage() {
                                   <div className="space-y-2">
                                       {perms.map(perm => {
                                           const roleHasIt = user.role_permissions?.includes(perm.slug);
-                                          const override = overrides[perm.id];
+                                          const override = overrides[perm.slug];
                                           const isEffective = override === true || (roleHasIt && override !== false);
                                           
                                           return (
-                                              <div key={perm.id} className="flex items-center justify-between py-2 border-b last:border-0 pl-2 hover:bg-muted/30 rounded transition-colors">
+                                              <div key={perm.slug} className="flex items-center justify-between py-2 border-b last:border-0 pl-2 hover:bg-muted/30 rounded transition-colors">
                                                   <div>
                                                       <div className="font-medium text-sm">{perm.slug}</div>
                                                       <div className="text-xs text-muted-foreground">{perm.description}</div>
@@ -404,13 +403,13 @@ export default function UserDetailsPage() {
                                                       {/* Simple Toggle - For now just "Grant" override vs "Default" */}
                                                       <div className="flex items-center border rounded overflow-hidden">
                                                           <button 
-                                                            onClick={() => toggleOverride(perm.id, undefined)}
+                                                            onClick={() => toggleOverride(perm.slug, undefined)}
                                                             className={`px-3 py-1 text-xs ${override === undefined ? 'bg-muted text-muted-foreground font-medium' : 'hover:bg-muted/50'}`}
                                                           >
                                                               Default
                                                           </button>
                                                           <button 
-                                                            onClick={() => toggleOverride(perm.id, true)}
+                                                            onClick={() => toggleOverride(perm.slug, true)}
                                                             className={`px-3 py-1 text-xs ${override === true ? 'bg-green-100 text-green-700 font-bold border-l border-green-200' : 'hover:bg-green-50 border-l'}`}
                                                           >
                                                               Grant

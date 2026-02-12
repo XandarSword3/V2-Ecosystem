@@ -9,14 +9,42 @@ import { Input } from '@/components/ui/Input';
 import { ArrowLeft, UserPlus, Mail, Phone, Lock, User, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Valid roles matching backend schema
+type ValidRole = 
+  | 'customer' 
+  | 'admin' 
+  | 'super_admin'
+  | 'restaurant_staff' 
+  | 'restaurant_admin'
+  | 'chalet_staff' 
+  | 'chalet_admin'
+  | 'pool_staff' 
+  | 'pool_admin'
+  | 'snack_bar_staff' 
+  | 'snack_bar_admin';
+
 interface FormData {
   email: string;
   password: string;
   confirmPassword: string;
   fullName: string;
   phone: string;
-  role: 'customer' | 'staff' | 'admin';
+  role: ValidRole;
 }
+
+const ROLE_OPTIONS: { value: ValidRole; label: string; description: string; category: string }[] = [
+  { value: 'customer', label: 'Customer', description: 'Regular customer with booking and ordering access.', category: 'General' },
+  { value: 'admin', label: 'Admin', description: 'Administrator with full access to the admin dashboard.', category: 'General' },
+  { value: 'super_admin', label: 'Super Admin', description: 'Super administrator with system-wide access.', category: 'General' },
+  { value: 'restaurant_staff', label: 'Restaurant Staff', description: 'Staff member for restaurant operations.', category: 'Restaurant' },
+  { value: 'restaurant_admin', label: 'Restaurant Admin', description: 'Administrator for restaurant management.', category: 'Restaurant' },
+  { value: 'chalet_staff', label: 'Chalet Staff', description: 'Staff member for chalet operations.', category: 'Chalet' },
+  { value: 'chalet_admin', label: 'Chalet Admin', description: 'Administrator for chalet management.', category: 'Chalet' },
+  { value: 'pool_staff', label: 'Pool Staff', description: 'Staff member for pool operations.', category: 'Pool' },
+  { value: 'pool_admin', label: 'Pool Admin', description: 'Administrator for pool management.', category: 'Pool' },
+  { value: 'snack_bar_staff', label: 'Snack Bar Staff', description: 'Staff member for snack bar operations.', category: 'Snack Bar' },
+  { value: 'snack_bar_admin', label: 'Snack Bar Admin', description: 'Administrator for snack bar management.', category: 'Snack Bar' },
+];
 
 export default function CreateUserPage() {
   const router = useRouter();
@@ -42,8 +70,16 @@ export default function CreateUserPage() {
 
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    } else if (!/[A-Z]/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one uppercase letter';
+    } else if (!/[a-z]/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one lowercase letter';
+    } else if (!/[0-9]/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one number';
+    } else if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one special character';
     }
 
     if (formData.password !== formData.confirmPassword) {
@@ -70,11 +106,14 @@ export default function CreateUserPage() {
         password: formData.password,
         full_name: formData.fullName,
         phone: formData.phone || null,
-        role: formData.role,
+        roles: [formData.role], // Backend expects roles as an array
       });
       
       toast.success('User created successfully');
-      router.push(`/admin/users/${formData.role === 'customer' ? 'customers' : formData.role === 'staff' ? 'staff' : 'admins'}`);
+      // Navigate to appropriate list based on role
+      const isStaffRole = formData.role.includes('staff');
+      const isAdminRole = formData.role.includes('admin') && formData.role !== 'customer';
+      router.push(`/admin/users/${formData.role === 'customer' ? 'customers' : isStaffRole ? 'staff' : isAdminRole ? 'admins' : 'customers'}`);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string; error?: string } } };
       const message = axiosError.response?.data?.message || axiosError.response?.data?.error || 'Failed to create user';
@@ -179,14 +218,20 @@ export default function CreateUserPage() {
                 onChange={handleChange('role')}
                 className="w-full px-3 py-2 border rounded-lg bg-background focus:ring-2 focus:ring-primary focus:border-primary"
               >
-                <option value="customer">Customer</option>
-                <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
+                {['General', 'Restaurant', 'Chalet', 'Pool', 'Snack Bar'].map(category => (
+                  <optgroup key={category} label={category}>
+                    {ROLE_OPTIONS
+                      .filter(role => role.category === category)
+                      .map(role => (
+                        <option key={role.value} value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
               </select>
               <p className="text-xs text-muted-foreground">
-                {formData.role === 'customer' && 'Regular customer with booking and ordering access.'}
-                {formData.role === 'staff' && 'Staff member with access to orders and operational features.'}
-                {formData.role === 'admin' && 'Administrator with full access to the admin dashboard.'}
+                {ROLE_OPTIONS.find(r => r.value === formData.role)?.description}
               </p>
             </div>
 

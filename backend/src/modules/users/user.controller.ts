@@ -5,6 +5,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from '../../database/connection.js';
 import { logActivity } from '../../utils/activityLogger.js';
 import { logger } from '../../utils/logger.js';
@@ -13,8 +14,11 @@ import { z } from 'zod';
 // Validation schemas
 const updateProfileSchema = z.object({
   full_name: z.string().min(2).max(100).optional(),
-  phone: z.string().regex(/^\+?[0-9\s\-()]{7,20}$/).optional().nullable(),
-  preferred_language: z.enum(['en', 'ar', 'fr']).optional()
+  phone: z.preprocess(
+    (val) => (val === '' ? null : val),
+    z.string().regex(/^\+?[0-9\s\-()]{7,20}$/).nullable()
+  ).optional(),
+  preferred_language: z.enum(['en', 'ar', 'fr', 'de', 'it']).optional()
 });
 
 const updateUserRolesSchema = z.object({
@@ -38,8 +42,7 @@ interface UserWithRoles {
  * GET /api/users/profile
  * Get current user's profile
  */
-export async function getProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const getProfile = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     if (!userId) {
       res.status(401).json({ success: false, error: 'Authentication required' });
@@ -88,17 +91,13 @@ export async function getProfile(req: Request, res: Response, next: NextFunction
         roles
       }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * PUT /api/users/profile
  * Update current user's profile
  */
-export async function updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     if (!userId) {
       res.status(401).json({ success: false, error: 'Authentication required' });
@@ -151,17 +150,13 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
     });
 
     res.json({ success: true, data: updated, message: 'Profile updated successfully' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * GET /api/users (Admin only)
  * List all users with pagination
  */
-export async function listUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const listUsers = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     
     const page = parseInt(req.query.page as string) || 1;
@@ -224,17 +219,13 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
         totalPages: Math.ceil((count || 0) / limit)
       }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * GET /api/users/:id (Admin only)
  * Get user by ID
  */
-export async function getUserById(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const getUserById = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     
     // Validate UUID
@@ -287,17 +278,13 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
         roles
       }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * PUT /api/users/:id/roles (Super Admin only)
  * Update user roles
  */
-export async function updateUserRoles(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const updateUserRoles = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     
     // Validate UUID
@@ -390,7 +377,4 @@ export async function updateUserRoles(req: Request, res: Response, next: NextFun
       message: 'Roles updated successfully',
       data: { roles: roles.map(r => r.name) }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});

@@ -5,8 +5,8 @@
  */
 
 import crypto from 'crypto';
-import { getSupabase } from '../database/supabase';
-import { logger } from '../utils/logger';
+import { getSupabase } from '../database/supabase.js';
+import { logger } from '../utils/logger.js';
 
 interface ProcessedEvent {
   id: string;
@@ -88,11 +88,11 @@ export async function processWithIdempotency<T>(
 
     // Mark as processed (with race condition protection)
     // Convert result to Record<string, unknown> if it's an object
-    const resultRecord = result && typeof result === 'object' 
-      ? (result as Record<string, unknown>) 
+    const resultRecord = result && typeof result === 'object'
+      ? (result as Record<string, unknown>)
       : undefined;
     const wasMarked = await markEventProcessed(eventId, eventType, resultRecord);
-    
+
     if (!wasMarked) {
       // Another process beat us to it
       logger.debug(`Webhook event ${eventId} was processed by another worker`);
