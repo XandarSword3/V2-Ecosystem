@@ -22,7 +22,7 @@ This document provides a high-level overview of the V2 Resort platform architect
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    Third-Party Services                          │   │
 │  ├─────────────────┬─────────────────┬─────────────────────────────┤   │
-│  │  Stripe         │  SendGrid       │  Sentry                     │   │
+│  │  Stripe         │  Nodemailer     │  Sentry                     │   │
 │  │  (Payments)     │  (Email)        │  (Error Tracking)           │   │
 │  └─────────────────┴─────────────────┴─────────────────────────────┘   │
 │                                                                          │
@@ -47,7 +47,7 @@ v2-resort/
 │   │   ├── app/          # Next.js App Router pages
 │   │   ├── components/   # React components
 │   │   ├── lib/          # Client libraries (API, socket)
-│   │   ├── store/        # Zustand state stores
+│   │   ├── stores/       # Zustand state stores
 │   │   ├── types/        # Frontend TypeScript types
 │   │   └── i18n/         # Internationalization
 │   └── tests/            # Frontend unit tests
@@ -100,8 +100,8 @@ Client → Checkout → Stripe → Webhook → Order Confirmed → Email
 - **Database**: Supabase PostgreSQL
 - **Real-time**: Socket.io 4.8
 - **Payments**: Stripe 14.25
-- **Email**: SendGrid
-- **Security**: bcryptjs, JWT, speakeasy (2FA)
+- **Email**: Nodemailer
+- **Security**: bcryptjs, JWT, otplib (2FA)
 
 ### Frontend
 - **Framework**: Next.js 14.2

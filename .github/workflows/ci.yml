@@ -237,14 +237,23 @@ jobs:
 
       - name: Deploy frontend to Vercel (staging)
         working-directory: v2-resort/frontend
+        continue-on-error: true
         run: vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --confirm
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Deploy backend to Render
-        if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
-        run: curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+        continue-on-error: true
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK" ]; then
+            curl -s -X POST "$RENDER_DEPLOY_HOOK"
+            echo "Render deploy hook triggered"
+          else
+            echo "No Render deploy hook configured, skipping"
+          fi
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
 
       - name: Deploy notification
         run: |
