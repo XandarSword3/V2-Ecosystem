@@ -1,5 +1,20 @@
 // File: frontend/src/lib/structured-data-generator.ts
-import { BusinessTypeConfig } from '../../../backend/src/config/business-types'; // Assume shared or copied
+
+/**
+ * Business type configuration for Schema.org structured data
+ * Duplicated from backend to avoid cross-package imports in Vercel builds
+ */
+export interface BusinessTypeConfig {
+    id: string;
+    name: string;
+    description: string;
+    terminologyOverrides: Record<string, string>;
+    activeModules: string[];
+    themeDefaults: {
+        primaryColor: string;
+        borderRadius: string;
+    };
+}
 
 export function generateLocalBusinessSchema(
     businessName: string,
