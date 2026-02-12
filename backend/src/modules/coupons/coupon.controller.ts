@@ -25,6 +25,7 @@ const createCouponSchema = z.object({
   perUserLimit: z.number().int().positive().default(1),
   validFrom: dateOrDatetimeSchema,
   validUntil: dateOrDatetimeSchema,
+  requiresMinItems: z.number().int().min(0).optional(),
   firstOrderOnly: z.boolean().optional(),
 });
 
@@ -233,7 +234,7 @@ export class CouponController {
       // Reuse validation logic
       const normalizedCode = code.toUpperCase().trim();
       const supabase = getSupabase();
-      
+
       const { data: c, error: couponError } = await supabase
         .from('coupons')
         .select('*')
@@ -303,7 +304,7 @@ export class CouponController {
           .single();
 
         if (currentOrder) {
-          const newTotalAmount = 
+          const newTotalAmount =
             parseFloat(currentOrder.subtotal || 0) +
             parseFloat(currentOrder.tax_amount || 0) +
             parseFloat(currentOrder.service_charge || 0) +
@@ -632,7 +633,7 @@ export class CouponController {
     try {
       const { id } = req.params;
       const validation = updateCouponSchema.safeParse(req.body);
-      
+
       if (!validation.success) {
         return res.status(400).json({
           success: false,
@@ -788,7 +789,7 @@ export class CouponController {
       }
 
       const totalCoupons = allCoupons?.length || 0;
-      const activeCoupons = allCoupons?.filter(c => 
+      const activeCoupons = allCoupons?.filter(c =>
         c.is_active && (!c.valid_until || new Date(c.valid_until) > new Date())
       ).length || 0;
       const totalUses = allCoupons?.reduce((sum, c) => sum + (c.usage_count || 0), 0) || 0;
@@ -872,7 +873,7 @@ export class CouponController {
       const { prefix = '' } = req.query;
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let code = (prefix as string).toUpperCase();
-      
+
       for (let i = 0; i < 8; i++) {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
       }
