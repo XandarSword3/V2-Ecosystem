@@ -5,7 +5,18 @@
 > Staff see schedules, complete tasks, clock in/out.  
 > You see everything: sales, occupancy, inventory, and reports.
 
-![Dashboard Preview](docs/screenshots/dashboard-preview.png)
+
+
+
+---
+
+## Project Status
+
+![Status](https://img.shields.io/badge/Status-Active_Development-success)
+![Version](https://img.shields.io/badge/Version-1.0.0-blue)
+![License](https://img.shields.io/badge/License-Proprietary-red)
+
+> **Note:** This project involves a complex micro-services architecture. Please consult the [Development Setup Guide](DEVELOPMENT_SETUP.md) before contributing or attempting to deploy.
 
 ---
 
@@ -450,9 +461,9 @@ We'll set up a live walkthrough tailored to your needs.
 - 📞 **Call Us:** +1 (555) 123-4567
 
 ### For Buyers
-- [**Full Feature List →**](docs/FEATURES.md)
+- [**Full Feature List →**](docs/ADMIN_FEATURE_INVENTORY.md)
 - [**User Guide →**](USER_GUIDE.md)
-- [**Case Studies →**](docs/CASE_STUDIES.md)
+
 
 ### For Developers
 - [**Setup Guide →**](DEVELOPMENT_SETUP.md) — Get it running locally
