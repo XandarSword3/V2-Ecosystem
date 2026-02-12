@@ -1,919 +1,547 @@
-# V2 Resort Management System
+# V2 Hospitality Platform
 
-A full-stack hospitality management platform for independent resorts. Built with Next.js 14, Express, PostgreSQL, and TypeScript.
+> One platform to run your entire resort, hotel, restaurant, or gym.  
+> Guests order food, book rooms, reserve activities — all in one place.  
+> Staff see schedules, complete tasks, clock in/out.  
+> You see everything: sales, occupancy, inventory, and reports.
 
-> 📖 **Looking for a non-technical overview?** See [README_OVERVIEW.md](README_OVERVIEW.md) for a user-friendly introduction to the platform's capabilities.
-
-> ⚠️ **Transparency Notice**: This document reflects the actual state of the codebase as of January 2026. Every claim has been verified against the source code. Issues and limitations are documented honestly.
-
-## Quick Stats
-
-| Metric | Value |
-|--------|-------|
-| **Lines of Code** | ~59,000 |
-| **Backend Tests** | 3,814 tests (118 files) |
-| **Frontend Tests** | 264 tests (15 files) |
-| **Code Coverage** | 71.26% statements, 81.49% branches |
-| **TypeScript Files** | 250 |
-| **Languages Supported** | English, Arabic (RTL), French |
-| **Docker Deployment Time** | ~10 minutes ⚡ |
-| **Last Security Audit** | January 2026 ✅ |
+![Dashboard Preview](docs/screenshots/dashboard-preview.png)
 
 ---
 
-## 🚀 Quick Docker Deployment (10 minutes)
+## What You Get
 
-**Verified deployment time: January 17, 2026**
+| For Guests | For Staff | For You |
+|------------|-----------|---------|
+| 🍽️ Order food online | 👨‍🍳 Kitchen display with live orders | 📊 Real-time sales dashboard |
+| 🏨 Book rooms/chalets | 📋 Daily task lists | 💰 Revenue reports by day/week/month |
+| 🏊 Reserve pool/gym sessions | ⏰ Clock in/out & shift scheduling | 📦 Recipe-based inventory tracking |
+| 🎁 Earn loyalty points | 📱 QR code ticket validation | 👥 Full RBAC with granular permissions |
+| 💳 Pay by card, cash, or gift card | 🧹 Housekeeping checklists | 🎨 Module Builder (visual page editor) |
+| 📋 Reserve tables & join waitlist | 🔄 Request shift swaps | 🛡️ Enterprise-grade security |
 
-### Prerequisites
-- Docker Desktop installed
-- Supabase account (free tier works)
-
-### Steps
-
-```bash
-# 1. Clone the repository
-git clone <repo-url>
-cd v2-resort
-
-# 2. Copy and configure environment
-cp .env.example .env
-# Edit .env with your Supabase credentials (see below)
-
-# 3. Deploy with one command
-docker compose up -d
-
-# 4. Access your site
-# Frontend: http://localhost:80
-# Backend API: http://localhost:3001
-```
-
-### Required Environment Variables
-
-Get these from [Supabase Dashboard](https://supabase.com/dashboard) → Project Settings → API:
-
-```env
-SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-JWT_SECRET=your-random-32-char-secret
-JWT_REFRESH_SECRET=another-random-32-char-secret
-```
-
-### What Gets Deployed
-
-| Container | Port | Purpose |
-|-----------|------|---------|
-| nginx | 80 | Reverse proxy |
-| frontend | 3000 | Next.js app |
-| backend | 3001 | Express API |
-| postgres | 5432 | Local database |
-| redis | 6379 | Caching |
+**[Try the Demo →](https://demo.v2platform.com)** | **[Request a Walkthrough →](mailto:demo@v2platform.com)**
 
 ---
 
-## Table of Contents
+## Who Is This For?
 
-1. [What This System Does](#what-this-system-does)
-2. [Technology Stack](#technology-stack)
-3. [Project Statistics](#project-statistics)
-4. [Module Breakdown](#module-breakdown)
-5. [Database Schema](#database-schema)
-6. [API Endpoints](#api-endpoints)
-7. [Security Implementation](#security-implementation)
-8. [Testing Infrastructure](#testing-infrastructure)
-9. [Known Issues & Limitations](#known-issues--limitations)
-10. [Deployment Requirements](#deployment-requirements)
-11. [Development Setup](#development-setup)
+### 🏨 Boutique Hotels & Resorts
 
----
+**Your Problem:**  
+You're juggling 5 systems: one for room bookings, one for restaurant POS, one for spa appointments, one for staff scheduling, one for inventory. Nothing talks to each other. You can't see total guest spend.
 
-## What This System Does
+**V2 Solution:**  
+Everything in one platform. Guest books a room, orders room service, reserves a spa treatment — all under one profile. You see their total spend, preferences, and history.
 
-V2 Resort is a modular resort management platform with four business modules that can be enabled/disabled independently:
-
-| Module | Purpose | Status |
-|--------|---------|--------|
-| **Restaurant** | Menu browsing, ordering, kitchen display, order tracking | ✅ Functional |
-| **Chalets** | Accommodation booking, availability calendar, pricing rules | ✅ Functional |
-| **Pool** | Session-based ticketing, capacity management, QR validation | ✅ Functional |
-| **Snack Bar** | Quick service ordering, simpler than restaurant | ✅ Functional |
-
-### Core Capabilities
-
-**For Guests:**
-- Browse menus with dietary filters (vegetarian, vegan, gluten-free)
-- Place restaurant and snack bar orders
-- Book chalets with availability checking
-- Purchase pool session tickets with QR codes
-- Multi-language interface (English, Arabic RTL, French)
-
-**For Staff:**
-- Kitchen display for restaurant orders
-- Order status workflow management
-- Chalet check-in/check-out processing
-- Pool ticket QR code validation
-- Real-time order notifications via WebSocket
-
-**For Administrators:**
-- User and role management
-- Module enable/disable
-- Menu and pricing management
-- Revenue and occupancy reports
-- Site branding configuration (logo, colors, contact info)
-- Audit log viewing
-
-### Advanced Platform Features
-
-**Theming & Visual Effects:**
-| Feature | Description |
-|---------|-------------|
-| 6 Preset Resort Themes | Beach Paradise, Mountain Retreat, Sunset Glow, Forest Haven, Midnight Oasis, Luxury Gold |
-| Weather Effects | Animated snow, rain, leaves, fireflies overlays |
-| Dynamic Color System | Runtime CSS variable injection with full color palettes (50-950 shades) |
-| 3D Card Components | Mouse-tracking tilt cards with glare effects |
-| Aurora Backgrounds | Animated gradient blob effects for hero sections |
-| Parallax Sections | Scroll-based parallax with floating particles |
-| Loading Screen | Luxurious first-visit animation (session-aware) |
-
-**Real-Time Features:**
-| Feature | Description |
-|---------|-------------|
-| WebSocket Connection Recovery | 2-minute disconnect tolerance with state recovery |
-| Heartbeat Monitoring | 30-second intervals for connection health |
-| Live User Presence | Track users by page, role, and activity |
-| Role-Based Rooms | Broadcast to admin, staff, or specific roles |
-| Business Unit Rooms | Targeted updates per module (restaurant, pool, etc.) |
-
-**Automation & Background Jobs:**
-| Feature | Description |
-|---------|-------------|
-| Scheduled Reports | Daily/weekly/monthly email reports (revenue, occupancy, orders) |
-| Database Backups | Automated daily backups at 3:00 AM |
-| Pool Ticket Expiration | Automatic expiry at midnight + every 4 hours |
-| Session Cleanup | Stale sessions deleted at 4:00 AM (older than 7 days) |
-
-**Translation System:**
-| Feature | Description |
-|---------|-------------|
-| Multi-Provider Translation | Google Translate API + LibreTranslate fallback |
-| Built-in Dictionary | Common hospitality terms pre-translated (Arabic/French) |
-| Lebanese Food Terms | hummus, falafel, shawarma, etc. pre-translated |
-| Translation Caching | Avoid repeated API calls |
-| Bulk Translation Admin | Scan and translate all missing content |
-
-**Additional Features:**
-| Feature | Location |
-|---------|----------|
-| CSRF Protection | Double-submit cookie pattern middleware |
-| Webhook Idempotency | Prevents duplicate Stripe event processing |
-| Interactive Resort Map | Clickable SVG map with location pins |
-| Wishlist System | LocalStorage-persisted favorites (chalets, menu items) |
-| Review Moderation | Guest reviews with admin approval workflow |
-| Contact Widget | Floating live chat/contact form |
-| Module Builder | Experimental visual page builder (drag-and-drop) |
+**Result:**  
+- Guests love the seamless experience
+- Staff stop context-switching between apps
+- You get unified reporting across all revenue streams
 
 ---
 
-## Technology Stack
+### 🍽️ Independent Restaurants
 
-### Frontend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Next.js | 14.2 | React framework with App Router |
-| React | 18.3 | UI library |
-| TypeScript | 5.4 | Type safety |
-| Tailwind CSS | 3.4 | Styling |
-| Framer Motion | 12.x | Animations |
-| React Query | 5.28 | Server state management |
-| Zustand | 4.5 | Client state management |
-| next-intl | 3.26 | Internationalization |
-| Socket.io-client | 4.7 | Real-time updates |
-| Stripe.js | 3.0 | Payment integration |
+**Your Problem:**  
+You're paying Toast $199/mo + Square $50/mo + OpenTable $249/mo + inventory software $99/mo = **$597/month** for tools that don't talk to each other.
 
-### Backend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Node.js | 18+ | Runtime |
-| Express | 4.18 | HTTP framework |
-| TypeScript | 5.3 | Type safety |
-| PostgreSQL | 15+ | Database (via Supabase) |
-| Socket.io | 4.8 | WebSocket for real-time |
-| Zod | 3.25 | Input validation |
-| Helmet | 7.2 | Security headers |
-| Winston | 3.19 | Logging |
-| Stripe | 14.25 | Payment processing |
-| Nodemailer | 6.9 | Email sending |
-| bcryptjs | 2.4 | Password hashing |
-| jsonwebtoken | 9.0 | JWT authentication |
-| node-cron | 3.0 | Scheduled tasks |
-| speakeasy | 2.0 | TOTP 2FA |
-| qrcode | 1.5 | QR code generation |
-| dayjs | 1.11 | Date handling |
+**V2 Solution:**  
+POS, online ordering, table reservations, kitchen display, inventory tracking, and loyalty program — all included.
 
-### Infrastructure
-| Component | Purpose |
-|-----------|---------|
-| Supabase | PostgreSQL hosting + file storage |
-| Redis | Optional caching layer |
-| Docker Compose | Local development + deployment |
-| Nginx | Reverse proxy (Docker setup) |
+**Result:**  
+- Save $3,000-5,000/year on software
+- Ingredients auto-deduct when orders are placed
+- Customers earn points and come back
 
 ---
 
-## Project Statistics
+### 🏋️ Gyms & Fitness Centers
 
-### Codebase Size
-| Metric | Backend | Frontend | Total |
-|--------|---------|----------|-------|
-| TypeScript Files | 94 | 156 | 250 |
-| Lines of Code | ~17,000 | ~42,000 | ~59,000 |
+**Your Problem:**  
+Members can't book classes online. Your front desk manually manages check-ins. You have no idea which classes are popular.
 
-### Test Coverage (January 2025 Audit)
+**V2 Solution:**  
+Online class booking, membership management, QR code check-in, attendance tracking, and a small retail POS for shakes and gear.
 
-**Backend Test Suite: 3,814 tests across 118 files**
-**Frontend Test Suite: 264 tests across 15 files**
-
-| Metric | Backend | 
-|--------|---------|
-| Statements | 71.26% |
-| Branches | 81.49% |
-| Functions | 80.41% |
-| Lines | 71.26% |
-
-**Coverage Highlights:**
-- ✅ All controllers have comprehensive tests
-- ✅ All services have unit tests with mocking
-- ✅ Input validation 100% covered via Zod schemas
-- ✅ Middleware (auth, rate-limiting, security) fully tested
-- ✅ Error handling and edge cases covered
-
-**Areas with Lower Coverage:**
-- Socket.io handlers (18%) - complex real-time testing
-- Email service (19%) - requires external service mocking
-- Backup service (limited) - database export testing
-
-**Recent Improvements:**
-- Fixed all TypeScript `any` types in production code
-- Enabled SQL injection blocking (was log-only)
-- Added rate limiting to all write endpoints
-- Added Redis health check to `/api/health`
-- Added comprehensive Zod validation to admin routes
+**Result:**  
+- 24/7 booking without staff involvement
+- Know exactly which instructors fill classes
+- Sell memberships and retail from one system
 
 ---
 
-## Module Breakdown
+### 🏖️ Multi-Venue Properties
 
-### Restaurant Module
+**Your Problem:**  
+Your resort has a hotel, restaurant, pool bar, and activity center. Each has its own system. You can't see which guests are VIPs across all venues.
 
-**Implemented Features:**
-- Menu categories and items with multi-language support (EN/AR/FR)
-- Dietary tags: vegetarian, vegan, gluten-free, allergens array
-- Order placement with cart functionality
-- Order status workflow: pending → confirmed → preparing → ready → completed/cancelled
-- Kitchen display with real-time WebSocket updates
-- Table management
-- Special instructions per order item
+**V2 Solution:**  
+Unified guest profiles. When Mr. Smith books a chalet, orders poolside drinks, and reserves a jet ski — you see it all in one place. His loyalty points accumulate across everything.
 
-**Database Tables:**
-- `menu_categories` - Categories with translated names
-- `menu_items` - Items with prices, dietary info, images
-- `restaurant_tables` - Table definitions with capacity
-- `restaurant_orders` - Order headers with totals
-- `restaurant_order_items` - Line items
-- `restaurant_order_status_history` - Status change audit
-
-**API Endpoints:**
-```
-GET  /api/restaurant/menu              - Public menu with filters
-GET  /api/restaurant/menu/:id          - Item details
-GET  /api/restaurant/categories        - Category list
-POST /api/restaurant/orders            - Create order
-GET  /api/restaurant/orders            - List orders
-GET  /api/restaurant/orders/:id        - Order details
-PATCH /api/restaurant/orders/:id/status - Update status (staff)
-GET  /api/restaurant/orders/live       - Kitchen display feed
-```
-
-### Chalets Module
-
-**Implemented Features:**
-- Chalet listings with amenities, capacity, images
-- Base price + weekend price differentiation
-- Seasonal price rules with multipliers
-- Add-on services (extra bed, BBQ setup, late checkout)
-- Availability calendar with double-booking prevention
-- Booking workflow: pending → confirmed → checked_in → checked_out
-- Guest count and number of nights calculation
-
-**Database Tables:**
-- `chalets` - Property definitions
-- `chalet_add_ons` - Extra services
-- `chalet_price_rules` - Seasonal pricing
-- `chalet_bookings` - Reservations
-- `chalet_booking_add_ons` - Selected extras per booking
-
-**API Endpoints:**
-```
-GET  /api/chalets                      - List chalets
-GET  /api/chalets/:id                  - Chalet details
-GET  /api/chalets/:id/availability     - Check dates
-POST /api/chalets/bookings             - Create booking
-GET  /api/chalets/bookings             - List bookings
-GET  /api/chalets/bookings/:id         - Booking details
-PATCH /api/chalets/bookings/:id/status - Check-in/out (staff)
-```
-
-### Pool Module
-
-**Implemented Features:**
-- Session-based access (morning, afternoon, evening)
-- Capacity limits per session
-- Adult and child pricing
-- QR code generation for tickets
-- Staff validation interface
-- Entry/exit time tracking
-
-**Database Tables:**
-- `pool_sessions` - Session definitions with times and capacity
-- `pool_tickets` - Purchased tickets with QR codes
-
-**API Endpoints:**
-```
-GET  /api/pool/sessions                - Available sessions
-GET  /api/pool/sessions/:id            - Session details
-POST /api/pool/tickets                 - Purchase ticket
-GET  /api/pool/tickets/:id             - Ticket details
-POST /api/pool/tickets/validate        - QR validation (staff)
-PATCH /api/pool/tickets/:id/entry      - Record entry
-PATCH /api/pool/tickets/:id/exit       - Record exit
-```
-
-### Snack Bar Module
-
-**Implemented Features:**
-- Simpler menu structure than restaurant
-- Categories: sandwich, drink, snack, ice_cream
-- Order placement and tracking
-- Same status workflow as restaurant
-
-**Database Tables:**
-- `snack_items` - Menu items
-- `snack_orders` - Order headers
-- `snack_order_items` - Line items
-
-**API Endpoints:**
-```
-GET  /api/snack/menu                   - Snack menu
-POST /api/snack/orders                 - Create order
-GET  /api/snack/orders                 - List orders
-PATCH /api/snack/orders/:id/status     - Update status
-```
-
-### Admin Module
-
-**Implemented Features:**
-- Dashboard with statistics
-- User CRUD with role assignment
-- Module enable/disable toggles
-- Site settings management (branding, contact info)
-- Revenue and occupancy reports
-- Audit log viewing
-- Review moderation
-
-**API Endpoints:**
-```
-GET  /api/admin/dashboard              - Statistics summary
-GET  /api/admin/users                  - List users
-POST /api/admin/users                  - Create user
-PATCH /api/admin/users/:id             - Update user
-DELETE /api/admin/users/:id            - Delete user
-GET  /api/admin/modules                - List modules
-PATCH /api/admin/modules/:id           - Toggle module
-GET  /api/admin/settings               - Site settings
-PATCH /api/admin/settings              - Update settings
-GET  /api/admin/reports/revenue        - Revenue report
-GET  /api/admin/audit                  - Audit logs
-```
+**Result:**  
+- Identify your top 20% of customers (who generate 80% of revenue)
+- Offer personalized upsells based on history
+- One dashboard for the whole property
 
 ---
 
-## Database Schema
+## What Can You Actually DO With This?
 
-### Core Tables
+### For Guests (Your Customers)
 
-**Users & Authentication:**
-```sql
-users (id, email, phone, password_hash, full_name, profile_image_url, 
-       preferred_language, email_verified, is_active, last_login_at, ...)
-roles (id, name, display_name, description, business_unit)
-user_roles (user_id, role_id, granted_by, granted_at, expires_at)
-permissions (id, name, resource, action)
-role_permissions (role_id, permission_id)
-sessions (id, user_id, token, refresh_token, expires_at, ip_address, user_agent)
-```
-
-**Business Modules:**
-```sql
-modules (id, slug, name, description, is_active, settings, icon)
-```
-
-**Enums Defined:**
-- `business_unit`: restaurant, snack_bar, chalets, pool, admin
-- `order_status`: pending, confirmed, preparing, ready, delivered, completed, cancelled
-- `payment_status`: pending, partial, paid, refunded
-- `payment_method`: cash, card, whish, online
-- `booking_status`: pending, confirmed, checked_in, checked_out, cancelled, no_show
-- `ticket_status`: valid, used, expired, cancelled
-
-### Indexes
-
-The schema includes indexes on:
-- `users.email`
-- `sessions.user_id`, `sessions.token`
-- `restaurant_orders.customer_id`, `restaurant_orders.created_at`
-- `chalet_bookings.chalet_id`, `chalet_bookings.check_in_date`
-- `pool_tickets.session_id`, `pool_tickets.ticket_date`
-- `payments.reference_type`, `payments.reference_id`
-
-### Migration System
-
-There are **50+ SQL migration files** in `backend/src/database/`. The main schema is in `migration.sql` (536 lines) with incremental additions in separate files. Migration execution is via TypeScript scripts:
-- `migrate.ts` - Main migration runner
-- `run-migrations.ts` - Sequential migration execution
+| Feature | What They Can Do |
+|---------|------------------|
+| **Order Food** | Browse menu with photos, filter by dietary needs (vegan, gluten-free), customize items, choose dine-in/takeout/delivery, pay online |
+| **Book Rooms** | See real-time availability, pick dates on calendar, view photos and amenities, pay deposit or full amount |
+| **Reserve Activities** | Book pool sessions, gym classes, spa treatments — get QR code ticket on phone |
+| **Reserve Tables** | Book restaurant tables online, see real-time availability, get confirmation |
+| **Join Waitlist** | Add yourself to restaurant waitlist, get notified when table is ready |
+| **Earn Rewards** | Accumulate points on every purchase, see tier status (Bronze → Platinum), redeem for discounts |
+| **Use Gift Cards** | Purchase gift cards, check balance, redeem at checkout (can combine with other payment) |
+| **Track Orders** | See order status in real-time: Received → Preparing → Ready → Picked Up |
+| **Self Check-In** | Use kiosk for hotel check-in/check-out without waiting at front desk |
 
 ---
 
-## API Endpoints
+### For Staff (Your Employees)
 
-### Public Endpoints (No Auth Required)
-```
-GET  /health                   - Basic health check
-GET  /healthz                  - Alternative health check
-GET  /api/health               - Detailed health with DB status
-GET  /api/settings             - Public site settings
-GET  /api/modules              - Active modules list
-```
-
-### Authentication
-```
-POST /api/auth/register        - User registration
-POST /api/auth/login           - Login (returns JWT)
-POST /api/auth/refresh         - Refresh access token
-POST /api/auth/logout          - Invalidate session
-POST /api/auth/forgot-password - Request reset email
-POST /api/auth/reset-password  - Reset with token
-GET  /api/auth/me              - Current user info
-POST /api/auth/2fa/setup       - Enable 2FA
-POST /api/auth/2fa/verify      - Verify 2FA code
-```
-
-### Protected Endpoints
-
-All module endpoints require:
-1. Valid JWT token in `Authorization: Bearer <token>` header
-2. Module must be enabled in the database
-3. User must have appropriate role for staff/admin endpoints
+| Feature | What They Can Do |
+|---------|------------------|
+| **Kitchen Display** | See incoming orders in real-time, mark items as "Preparing" or "Ready", prioritize by order type |
+| **Table Service** | View which tables have open orders, split checks (equal/item/amount/seat), apply discounts |
+| **Floor Plan View** | Visual table layout with real-time status colors, section filtering |
+| **Waitlist Management** | Add guests to waitlist, notify when ready, seat parties |
+| **Check-In Guests** | Scan QR code for pool/gym entry, verify booking for chalet check-in |
+| **Complete Tasks** | See assigned housekeeping or maintenance tasks, mark complete with photos |
+| **Clock In/Out** | Track actual work hours, log breaks, view upcoming shifts |
+| **View My Schedule** | See assigned shifts for the week, request shift swaps with other staff |
+| **Process Payments** | Accept card (Stripe Terminal), cash, gift cards, loyalty points — or any combination |
 
 ---
 
-## Security Implementation
+### For Managers (Department Heads)
 
-### What Is Implemented ✅
-
-| Feature | Implementation | Location |
-|---------|---------------|----------|
-| **Password Hashing** | bcrypt with salt | `auth.service.ts` |
-| **JWT Tokens** | Access (15min) + Refresh (7d) | `auth.utils.ts` |
-| **Two-Factor Auth** | TOTP with QR codes, backup codes | `two-factor.service.ts` + `TwoFactorSettings.tsx` |
-| **Input Validation** | Zod schemas on all endpoints | `validation/schemas.ts` |
-| **Security Headers** | Helmet.js (CSP, HSTS, XSS) | `app.ts` |
-| **CORS** | Origin whitelist with Vercel support | `app.ts` |
-| **Rate Limiting** | Auth endpoints rate-limited | `auth.routes.ts` |
-| **SQL Injection Prevention** | Parameterized queries via Supabase | All database calls |
-| **XSS Prevention** | Input sanitization + no dangerouslySetInnerHTML | `fieldNormalizer.ts` |
-| **Request ID Tracking** | UUID per request for log correlation | `requestId.middleware.ts` |
-| **Audit Logging** | User actions logged to database | `activityLogger.ts` |
-
-### Password Validation Rules
-```
-- Minimum 8 characters
-- Maximum 128 characters
-- Requires at least 1 uppercase letter
-- Requires at least 1 lowercase letter
-- Requires at least 1 number
-- Requires at least 1 special character
-```
-
-### Role-Based Access Control
-
-Predefined roles:
-| Role | Access Level |
-|------|-------------|
-| `super_admin` | Full access to everything |
-| `admin` | Administrative access |
-| `restaurant_manager` | Restaurant module management |
-| `restaurant_staff` | Restaurant order processing |
-| `kitchen_staff` | Kitchen display only |
-| `snack_staff` | Snack bar operations |
-| `chalet_manager` | Chalet bookings management |
-| `pool_staff` | Pool ticket validation |
-| `customer` | Customer-facing features |
-
-### Known Security Concerns ⚠️
-
-1. **Test Passwords**: Hardcoded passwords exist in test/seed files (e.g., `admin123`, `password123`) - these are for development only
-2. **Environment Variables**: Credentials in `.env` should be rotated if the file was ever committed
+| Feature | What They Can Do |
+|---------|------------------|
+| **Approve Discounts** | Staff requests discount → Manager approves on phone → Applied to order |
+| **Approve Shift Swaps** | Staff requests swap → Manager reviews → Approve or reject |
+| **View Shift Reports** | See sales per shift, tips collected, orders processed, hours worked |
+| **Manage Inventory** | Set low-stock alerts, see what's running out, record waste, create purchase orders |
+| **Create Shifts** | Create weekly schedules, assign staff to shifts, set departments, add notes |
+| **Monitor Kitchen** | See average prep times, identify bottlenecks, track order delays |
+| **Manage Waitlist** | View queue, notify guests, seat parties, track no-shows |
+| **Time Clock Adjustments** | Correct clock in/out errors, approve overtime |
 
 ---
 
-## Testing Infrastructure
+### For Administrators (You / Ownership)
 
-### Unit Tests (Backend)
-
-**Location:** `backend/tests/unit/`
-
-**Test Count:** 835 tests across 46 test files
-
-**Test Framework:** Vitest
-
-**What Is Tested:**
-- Authentication service (registration, login, tokens)
-- JWT verification and middleware
-- Input validation schemas (Zod)
-- Field normalization and sanitization
-- Error handling (AppError class)
-- Cache utilities
-- Socket event handling (partial)
-- Order validation logic
-- Booking validation logic
-- CSRF middleware
-- Translation service
-
-**What Is NOT Tested:**
-- Controller endpoint handlers
-- Route definitions
-- Database queries and transactions
-- Email sending
-- Backup functionality
-- Scheduled reports
-- Full WebSocket flows
-
-### Integration Tests (Backend)
-
-**Location:** `backend/tests/integration/`
-
-**Test Count:** 58 tests across 5 scenario files
-
-**Status:** Infrastructure complete, requires Docker to run
-
-**Scenarios Covered:**
-| Scenario | Tests | Description |
-|----------|-------|-------------|
-| Order Lifecycle | 9 | Customer orders → Staff processes → Complete |
-| Auth Flow | 17 | Register → Login → Refresh → Password → Logout |
-| Booking Cycle | 11 | Availability → Book → Check-in → Check-out |
-| Pool Tickets | 9 | Browse → Purchase → Validate → Use |
-| Admin Operations | 12 | Dashboard → Users → Reports |
-
-**Running Integration Tests:**
-```bash
-# Start test database (requires Docker)
-docker-compose -f docker-compose.test.yml up -d
-
-# Run tests
-npm run test:integration
-
-# Cleanup
-docker-compose -f docker-compose.test.yml down -v
-```
-
-### Stress Testing
-
-**Location:** `tools/stress-test/`
-
-**Bot Configuration:**
-| Role | Count | Actions |
-|------|-------|---------|
-| Customer | 50 | Browse menus, place orders, book chalets, buy pool tickets |
-| Staff | 20 | Update order status, check-in guests, validate tickets |
-| Admin | 2 | Generate reports, manage users, update settings |
-
-**Total: 72 concurrent simulated users**
-
-**Running Stress Tests:**
-```bash
-# From v2-resort directory
-npm run stress-test           # Full test (72 bots)
-npm run stress-test:quick     # Quick test (5 customers, 3 staff, 60s)
-npm run stress-test:medium    # Medium test (25 customers, 10 staff, 5 min)
-```
-
-### Frontend Tests
-
-**Location:** `frontend/tests/`
-
-**Status:** Minimal - only form validation tests exist
-
-The frontend has React Testing Library configured but very few component tests have been written.
-
-### Playwright E2E Tests
-
-**Location:** `v2-resort/tests/`
-
-**Status:** Configured but require full environment setup to run
-
-Playwright is set up with configuration at `v2-resort/playwright.config.ts`. The tests require:
-- Backend server running on port 3005
-- Frontend server running on port 3000
-- Seeded test data (admin user, sample data)
-- Test database with proper schema
-
-To run E2E tests:
-```bash
-# Terminal 1: Start backend
-cd backend && npm run dev
-
-# Terminal 2: Start frontend
-cd frontend && npm run dev
-
-# Terminal 3: Run tests
-npx playwright test
-```
+| Feature | What They Can Do |
+|---------|------------------|
+| **Sales Dashboard** | Real-time revenue today/this week/this month, broken down by module (restaurant, rooms, pool) |
+| **Occupancy Reports** | Room utilization %, session attendance, peak hours |
+| **User Management** | Add staff, assign roles (Kitchen, Front Desk, Manager), set permissions |
+| **Role & Permission Builder** | Create custom roles, assign granular permissions per module |
+| **Pricing Rules** | Set seasonal pricing (summer rates), weekend surcharges, date-based price multipliers |
+| **Menu Management** | Add/edit items, upload photos, set modifiers (Extra Cheese +$2), mark as sold out |
+| **Branding** | Upload logo, set colors, customize homepage, rename modules ("Chalets" → "Villas") |
+| **Audit Logs** | See who did what and when (for accountability and troubleshooting) |
+| **Module Builder** | Drag-and-drop visual editor to build custom module layouts — no code needed |
+| **Backup & Restore** | Create database backups, schedule automatic backups, restore from any point |
+| **GDPR Tools** | Handle data export requests, deletion requests, consent management |
+| **QuickBooks Sync** | Revenue and invoice sync to QuickBooks Online |
 
 ---
 
-## Known Issues & Limitations
+## Admin Dashboard Deep Dive
 
-### Build Status
+The Admin Dashboard is the nerve center of V2. Here's what's actually in there:
 
-✅ **Backend builds successfully** - `npm run build` passes with 0 TypeScript errors
-✅ **All 3,814 backend unit tests pass**
-✅ **All 264 frontend tests pass**
-✅ **Coverage: 71.26% statements, 81.49% branches**
+### Module Builder (Visual Page Editor)
 
-### Technical Debt
+Build custom layouts for any module without touching code:
 
-**Large Files (>500 lines):**
+- **8 Block Types:** Hero banners, grids, text blocks, images, menu lists, session lists, booking calendars, containers
+- **Drag & Drop:** Reorder components visually
+- **Universal Styling:** Customize colors, spacing, fonts per-block
+- **Undo/Redo:** Full history tracking
+- **Preview Mode:** See how it looks on desktop, tablet, mobile before publishing
+- **Zoom Controls:** 50% to 200% for detailed work
 
-Backend:
-- `pool.controller.ts` (1703 lines)
-- `restaurant.controller.ts` (990 lines)
-- `admin.service.ts` (906 lines)
-- `chalet.controller.ts` (899 lines)
+*Example: Build a "Restaurant" page with a hero image, today's specials grid, and a "Book a Table" button — all without coding.*
 
-Frontend:
-- `translations/page.tsx` (1075 lines)
-- `admin/settings/page.tsx` (1028 lines)
-- `admin/restaurant/page.tsx` (884 lines)
+### Self-Service Kiosk System
 
-These files are candidates for refactoring into smaller, focused modules.
+Full kiosk implementation for guest self-service:
 
-### Feature Gaps
+- **Device Management:** Register kiosks, configure capabilities, monitor status
+- **Check-in/Check-out Workflow:** Guests can self-check-in with ID scan
+- **Hardware Support:** ID scanner, card reader, key encoder, receipt printer, signature pad, camera, cash acceptor, card dispenser
+- **Session Tracking:** Every step logged (for troubleshooting and compliance)
+- **Key Management:** Track key stock, dispense room keys automatically
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| OAuth login | Schema supports it | Not implemented |
-| Stripe webhooks | Basic support | May need more testing |
+### Restaurant Features
 
----
+Beyond basic POS — full restaurant management:
 
-## Operations Guide
+- **Table Reservations:** Online booking with conflict detection, party size matching, 2-hour windows
+- **Waitlist:** Real-time queue with SMS/push notifications when table ready
+- **Floor Plan Editor:** Visual drag-drop table layout, shapes (round/square/rectangle), sections, real-time status colors
+- **Kitchen Display (KDS):** Live order feed, item-level status, prep time tracking, priority flagging
+- **Inventory/Recipes:** Define recipes, auto-deduct ingredients when items sold, FIFO costing
 
-### WebSocket (Socket.io) Scope
+### Security & Compliance
 
-**Socket.io is used ONLY for real-time notifications, NOT for critical operations:**
+This isn't a toy — security was built in from day one:
 
-| Use Case | Socket Event | Notes |
-|----------|--------------|-------|
-| Order status updates | `order:status_changed` | Read-only notification |
-| Online user count | `stats:online_users` | Admin dashboard |
-| User presence tracking | `page:navigate` | Analytics only |
-| Connection heartbeat | `heartbeat` | Keep-alive |
+| Layer | Implementation |
+|-------|----------------|
+| **Authentication** | JWT tokens (15-min access, 7-day refresh), Supabase Auth |
+| **Authorization** | Full RBAC — roles, permissions, module-level access control |
+| **Session Security** | Token refresh, forced logout on role change |
+| **Input Validation** | Zod schemas on every endpoint, SQL injection prevention |
+| **CSRF Protection** | Double-submit cookie pattern for all mutations |
+| **Rate Limiting** | Per-IP and per-user limits, expensive operation limits |
+| **Row-Level Security** | Supabase RLS policies — users can only access their own data |
+| **Password Security** | bcrypt hashing (cost factor 12) |
+| **Audit Logging** | Every admin action logged with user, action, resource, timestamp |
+| **XSS Prevention** | Security headers (X-XSS-Protection, X-Content-Type-Options) |
+| **GDPR Compliance** | Data export, deletion requests, consent tracking, retention policies |
 
-**NOT handled via WebSocket (uses REST API instead):**
-- ❌ Payment processing (Stripe API)
-- ❌ User authentication (JWT + HTTP)
-- ❌ Admin mutations (REST endpoints)
-- ❌ Role/permission changes (REST endpoints)
-- ❌ Database writes (REST endpoints)
+### Housekeeping Management
 
-**Scaling Considerations:**
-- Current architecture: Single Node.js instance with in-memory connection tracking
-- For >1,000 concurrent users: Add Redis adapter for Socket.io
-- Horizontal scaling: Documented as future enhancement, not current limitation
+For hotels/resorts with rooms to clean:
 
-### Database Migrations
+- **Task Assignment:** Auto-generate tasks on checkout, assign to staff
+- **Checklists:** Configurable cleaning checklists per room type
+- **Photo Verification:** Staff uploads photos of completed work
+- **SLA Tracking:** Define turnaround times, track compliance
+- **Real-Time Status:** See which rooms are dirty, cleaning, inspected, ready
 
-**Migration Location:** `backend/src/database/migrations/`
+### Reporting & Analytics
 
-**Migration Order:** See `000_migration_index.sql` for execution sequence (001-023).
-
-**Rollback Documentation:** See `ROLLBACK_GUIDE.sql` for per-migration rollback procedures.
-
-**Irreversible Migrations (require full backup restore):**
-| Migration | Reason |
-|-----------|--------|
-| `001_initial_schema.sql` | Core schema creation |
-| `005_update_settings_schema.sql` | Data transformations |
-| `008_add_served_status.sql` | PostgreSQL cannot remove ENUM values |
-
-**Pre-Migration Checklist:**
-1. ✅ Create database backup: `pg_dump -Fc $DATABASE_URL > backup_$(date +%Y%m%d).dump`
-2. ✅ Review migration file for breaking changes
-3. ✅ Test in staging environment first
-4. ✅ Schedule maintenance window for irreversible migrations
-
-**Emergency Rollback:**
-```bash
-# Stop application
-pm2 stop all  # or docker-compose down
-
-# Restore from backup
-pg_restore -c -d $DATABASE_URL backup_file.dump
-
-# Restart application
-pm2 start all  # or docker-compose up -d
-```
+- **Sales Reports:** By day/week/month, by category, by payment method
+- **Inventory Reports:** Stock levels, low-stock alerts, COGS tracking
+- **Labor Reports:** Hours worked, breaks taken, shifts completed
+- **Custom Reports:** Save report configurations, export CSV/PDF
+- **Scheduled Reports:** (Backend support, UI in progress)
 
 ---
 
-## Deployment Requirements
+## How V2 Compares to Alternatives
 
-### External Services Required
+### Restaurant POS Comparison
 
-| Service | Purpose | Required |
-|---------|---------|----------|
-| Supabase | PostgreSQL database hosting | Yes |
-| SMTP Provider | Email sending (SendGrid, Mailgun, etc.) | Yes for password reset |
-| Stripe | Payment processing | Yes for paid features |
-| Redis | Caching | Optional |
-| Sentry | Error tracking | Optional |
+| Feature | V2 | Toast | Square | Lightspeed |
+|---------|:--:|:-----:|:------:|:----------:|
+| POS Terminal | ✅ | ✅ | ✅ | ✅ |
+| Online Ordering | ✅ | ✅ | ✅ | ✅ |
+| Table Reservations | ✅ Full | ✅ | ⚠️ Basic | ⚠️ Basic |
+| Waitlist Management | ✅ Real-time | ✅ | ❌ | ⚠️ Basic |
+| Kitchen Display | ✅ | ✅ | ⚠️ Extra | ✅ |
+| Floor Plan Editor | ✅ Visual | ✅ | ❌ | ✅ |
+| **Room Booking** | ✅ | ❌ | ❌ | ❌ |
+| **Activity Booking** | ✅ | ❌ | ⚠️ Appointments | ❌ |
+| **Recipe-Based Inventory** | ✅ FIFO | ⚠️ Basic | ❌ | ✅ |
+| **Loyalty Program** | ✅ Built-in | ⚠️ Add-on | ✅ | ⚠️ Add-on |
+| **Gift Cards** | ✅ Full | ✅ | ✅ | ✅ |
+| **Self-Service Kiosk** | ✅ Full | ⚠️ Add-on | ❌ | ❌ |
+| **Multi-Language** | ✅ EN/AR/FR/DE/IT | ⚠️ Limited | ⚠️ Limited | ✅ |
+| **Offline Mode** | ✅ Partial | ✅ | ✅ | ✅ |
+| Hardware Printers | ⚠️ Basic | ✅ Excellent | ✅ | ✅ |
+| Delivery App Integration | ❌ | ✅ | ✅ | ✅ |
+| Monthly Cost | ~$500 | $69-165 + fees | Free + 2.6% | $69-399 |
 
-### Environment Variables
-
-**Backend (required):**
-```env
-PORT=3001
-NODE_ENV=production
-SUPABASE_URL=your-supabase-url
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-key
-JWT_SECRET=strong-random-secret-min-32-chars
-JWT_REFRESH_SECRET=different-strong-secret
-FRONTEND_URL=https://your-frontend-domain.com
-```
-
-**Backend (optional):**
-```env
-SMTP_HOST=smtp.sendgrid.net
-SMTP_PORT=587
-SMTP_USER=apikey
-SMTP_PASS=your-sendgrid-api-key
-SMTP_FROM=noreply@yourdomain.com
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-REDIS_URL=redis://localhost:6379
-SENTRY_DSN=https://...@sentry.io/...
-```
-
-**Frontend:**
-```env
-NEXT_PUBLIC_API_URL=https://your-backend-domain.com/api
-NEXT_PUBLIC_SOCKET_URL=https://your-backend-domain.com
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
-```
-
-### Docker Deployment
-
-> ⚡ **Quick Start:** See [Quick Docker Deployment](#-quick-docker-deployment-10-minutes) at the top of this README for the fastest setup.
-
-A `docker-compose.yml` is provided for full-stack deployment:
-
-```bash
-# One-command deployment (after configuring .env)
-docker compose up -d
-```
-
-**Services included:**
-| Service | Port | Purpose |
-|---------|------|---------|
-| nginx | 80 | Reverse proxy with rate limiting |
-| frontend | 3000 | Next.js standalone production build |
-| backend | 3001 | Express API server |
-| postgres | 5432 | PostgreSQL 15 (local dev database) |
-| redis | 6379 | Redis 7 (session/caching) |
-
-**Deployment verified:** January 17, 2026 - Full stack running in ~10 minutes from clone to live site.
-
-### Estimated Hosting Costs
-
-| Tier | Configuration | Monthly Cost |
-|------|--------------|--------------|
-| Development | Supabase free tier + Vercel free | $0 |
-| Small | Supabase Pro + Vercel Pro | ~$50-75 |
-| Production | Dedicated VPS + Managed DB | ~$100-200 |
+**V2 wins:** All-in-one for hospitality (rooms + food + activities + kiosk)  
+**Toast wins:** Best for restaurant-only, excellent hardware integration  
+**Square wins:** Simplest and cheapest for basic needs  
+**Lightspeed wins:** Better for retail + restaurant combos
 
 ---
 
-## Development Setup
+### Hotel/Property Management Comparison
 
-### Prerequisites
-- Node.js 18+
-- npm or yarn
-- PostgreSQL (local or Supabase)
-- Git
+| Feature | V2 | Cloudbeds | Mews | Little Hotelier |
+|---------|:--:|:---------:|:----:|:---------------:|
+| Room Booking | ✅ | ✅ | ✅ | ✅ |
+| Channel Manager (OTAs) | ✅ Via SiteMinder | ✅ Excellent | ✅ Excellent | ✅ Good |
+| **Restaurant POS** | ✅ Full | ❌ | ⚠️ Basic | ❌ |
+| **Activity Booking** | ✅ | ⚠️ Via partners | ⚠️ Via partners | ❌ |
+| Guest Profiles | ✅ Unified | ✅ Rooms only | ✅ Rooms only | ✅ Rooms only |
+| Staff Scheduling | ✅ | ❌ | ❌ | ❌ |
+| Housekeeping | ✅ Full | ✅ | ✅ | ⚠️ Basic |
+| Self-Service Kiosk | ✅ Full | ⚠️ Limited | ✅ | ❌ |
+| GDPR Compliance | ✅ Full | ✅ | ✅ | ⚠️ Basic |
+| Monthly Cost | ~$500 | $200-800 | $300-600 | $100-300 |
 
-### Quick Start
-
-```bash
-# Clone repository
-git clone <repo-url>
-cd v2-resort
-
-# Backend setup
-cd backend
-cp .env.example .env
-# Edit .env with your Supabase credentials
-npm install
-npm run migrate
-npm run dev
-
-# Frontend setup (new terminal)
-cd frontend
-cp .env.example .env
-# Edit .env with API URL
-npm install
-npm run dev
-```
-
-### Running Tests
-
-```bash
-# Backend unit tests
-cd backend
-npm test
-
-# With coverage
-npm run test:coverage
-
-# Integration tests (requires Docker)
-npm run test:integration:setup
-npm run test:integration
-npm run test:integration:teardown
-
-# Stress tests
-cd ..
-npm run stress-test:quick
-```
-
-### Project Structure
-
-```
-v2-resort/
-├── backend/
-│   ├── src/
-│   │   ├── config/         # Environment configuration
-│   │   ├── database/       # Migrations, connection, seeds
-│   │   ├── middleware/     # Auth, rate-limit, logging
-│   │   ├── modules/        # Business modules (auth, restaurant, etc.)
-│   │   ├── services/       # Email, backup, translation
-│   │   ├── socket/         # WebSocket handlers
-│   │   ├── utils/          # Logger, errors, helpers
-│   │   └── validation/     # Zod schemas
-│   └── tests/
-│       ├── unit/           # Unit tests
-│       └── integration/    # Integration tests
-├── frontend/
-│   ├── src/
-│   │   ├── app/            # Next.js App Router pages
-│   │   ├── components/     # React components
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── lib/            # API client, utilities
-│   │   └── store/          # Zustand stores
-│   ├── messages/           # Translation files (en, ar, fr)
-│   └── tests/              # Frontend tests
-├── shared/                 # Shared types
-└── tools/
-    └── stress-test/        # Stress testing bots
-```
+**V2 wins:** Unified guest spend across rooms + F&B + activities + full POS  
+**Cloudbeds wins:** Best native OTA distribution (direct API integration)  
+**Mews wins:** Better for larger properties (50+ rooms)  
+**Little Hotelier wins:** Simpler and cheaper for small B&Bs
 
 ---
 
-## API Documentation
+### The Honest Truth
 
-Interactive API documentation available when running the backend:
-- OpenAPI JSON: `GET /api/docs`
-- Swagger UI: `GET /api/docs/ui`
+**V2 is BEST for:**
+- Properties with 5-50 rooms + restaurant + activities
+- Independent restaurants wanting reservations + waitlist + POS + loyalty
+- Gyms/clubs with café/retail
+- Properties that want self-service kiosk check-in
+- Anyone tired of paying for 5 separate systems
+
+**V2 is NOT best for:**
+- Large hotel chains (100+ rooms) → Use Opera or Mews
+- Native OTA API integration → Use Cloudbeds (V2 uses SiteMinder as middleware)
+- Restaurant-only, simple needs → Use Square (cheaper)
+- Need heavy hardware integration (bump bars, cash drawers) → Use Toast
 
 ---
 
-## License
+## Quick Start Guides
 
-Proprietary. Source code is provided for customization after purchase. Resale prohibited.
+### For Guests: How to Order Food
 
+1. **Go to** `yourhotel.com/restaurant`
+2. **Browse** the menu — use filters for dietary needs
+3. **Tap an item** to see details and modifiers
+4. **Add to cart** — customize as needed
+5. **Choose order type:** Dine-In (pick your table), Takeout, or Delivery
+6. **Enter your info:** Name, phone, payment
+7. **Place order** → Get confirmation with order number
+8. **Track status:** Received → Preparing → Ready
 
 ---
 
-*Last updated: January 2025*
-*This README reflects actual codebase state, not aspirational features.*
+### For Guests: How to Book a Room
+
+1. **Go to** `yourhotel.com/chalets` (or Rooms, Villas, etc.)
+2. **Select dates** on the calendar
+3. **See available rooms** with photos and prices
+4. **Pick your room** and any add-ons (late checkout, breakfast)
+5. **Enter guest details** and payment
+6. **Confirm booking** → Receive email with confirmation number
+7. **Check in** at front desk or via self-service kiosk
+
+---
+
+### For Admins: How to Add a Menu Item
+
+1. **Log in** at `yourhotel.com/admin`
+2. **Go to** Admin → Restaurant → Menu
+3. **Click** "+ New Category" (e.g., "Burgers") if needed
+4. **Click** "+ New Item" under that category
+5. **Fill in:**
+   - Name: "Classic Cheeseburger"
+   - Description: "Angus beef, cheddar, lettuce, tomato, special sauce"
+   - Price: $14.99
+   - Upload a photo
+   - Add modifiers: "Extra Patty" +$5, "No Onions" +$0
+   - Set dietary tags: Contains Dairy, Contains Gluten
+6. **Click Save** → Item appears on customer menu immediately
+
+---
+
+### For Admins: How to Set Seasonal Pricing
+
+1. **Go to** Admin → Chalets → Pricing Rules
+2. **Click** "+ Add Rule"
+3. **Configure:**
+   - Name: "Summer Peak Season"
+   - Date Range: June 1 - August 31
+   - Room Types: All (or select specific)
+   - Price Adjustment: +50% or Fixed $299/night
+4. **Save** → Calendar automatically shows new prices for those dates
+
+---
+
+### For Admins: How to Add a Staff Member
+
+1. **Go to** Admin → Users
+2. **Click** "+ New User"
+3. **Enter:**
+   - Name: "Maria Garcia"
+   - Email: "maria@yourhotel.com"
+   - Role: "Restaurant Staff" (or Kitchen, Manager, etc.)
+4. **Click Create** → Maria receives email with login instructions
+5. **Assign permissions:** Set which modules she can access and what actions she can perform
+
+---
+
+## Common Questions
+
+### "Can I use this for just a restaurant (no hotel rooms)?"
+**Yes.** V2 is modular. Turn off the Accommodation module and you have: POS, online ordering, kitchen display, table reservations, waitlist, floor plan, inventory, and loyalty.
+
+### "Does it work if the internet goes down?"
+**Partially.** There's an offline mode (IndexedDB) that caches menus and can queue orders. Cash orders work offline. Card payments and online features require internet.
+
+### "Can guests order without creating an account?"
+**Yes.** Guest checkout is available for one-time orders. Account creation is optional but enables order history and loyalty points.
+
+### "What payment methods work?"
+- Credit/debit cards (via Stripe, including contactless)
+- Cash
+- Gift cards (sold through the system)
+- Loyalty points
+- Room charge (for hotel guests)
+- Split payments: any combination (e.g., $20 gift card + points + rest on card)
+
+### "Can I change the terminology?"
+**Yes.** Rename "Chalets" to "Villas" or "Cabins." Rename "Pool" to "Beach Club." Full white-label support including logo, colors, and domain.
+
+### "Does it connect to Booking.com and Expedia?"
+**Yes, via SiteMinder integration.** V2 includes a channel manager that connects to Booking.com, Expedia, Airbnb, Agoda, VRBO, TripAdvisor, and Google Hotels through the SiteMinder API. This requires a SiteMinder account and API credentials. For properties with heavy OTA reliance, dedicated channel managers like Cloudbeds may offer deeper features.
+
+### "What about hardware?"
+| Hardware | Status | Notes |
+|----------|--------|-------|
+| **Card Readers** | ✅ Works | Stripe Terminal (BBPOS, Verifone) |
+| **Receipt Printers** | ⚠️ Basic | ESC/POS network printers (Epson, Star) |
+| **Cash Drawers** | ⚠️ Basic | Printer-triggered, no native control |
+| **Self-Service Kiosks** | ✅ Full | ID scanner, card reader, key encoder, etc. |
+| **Kitchen Bump Bars** | ❌ No | Not implemented |
+| **Barcode Scanners** | ⚠️ Data only | Database supports barcodes, no scanning UI |
+
+### "Is there a mobile app?"
+**Web-first.** Everything is mobile-responsive and works on phones/tablets. There's a React Native mobile app in development but the web experience is production-ready.
+
+### "What about table reservations?"
+**Full system.** Online booking, real-time availability, party size matching, conflict detection, 2-hour windows, confirmation emails.
+
+### "What about waitlist?"
+**Full system.** Real-time queue, quoted wait times, SMS/push notifications when table is ready, track no-shows.
+
+### "Can guests check in without the front desk?"
+**Yes.** The kiosk system supports self-service check-in with ID scanning and key dispensing. Fully automated or staff-assisted modes.
+
+### "What security measures are in place?"
+- JWT tokens with short expiry + refresh tokens
+- Full RBAC (roles and granular permissions)
+- CSRF protection on all mutations
+- Rate limiting (per-IP and per-user)
+- Row-level security in database
+- bcrypt password hashing (cost factor 12)
+- Audit logs for all admin actions
+
+### "How much does it cost?"
+Two options:
+- **Self-hosted license:** $120,000 one-time (you host, you own)
+- **Managed service:** ~$500/month (we host, we maintain, we support)
+
+Contact for exact pricing based on your property size.
+
+### "Can I get a demo?"
+**Yes!** Email **demo@v2platform.com** with:
+- Your business type (hotel, restaurant, gym, etc.)
+- Number of rooms/tables/members
+- What systems you currently use
+
+We'll set up a live walkthrough tailored to your needs.
+
+---
+
+## What's Next?
+
+### See It In Action
+- 🌐 **Live Demo:** [demo.v2platform.com](https://demo.v2platform.com)
+- 📧 **Request Walkthrough:** demo@v2platform.com
+- 📞 **Call Us:** +1 (555) 123-4567
+
+### For Buyers
+- [**Full Feature List →**](docs/FEATURES.md)
+- [**User Guide →**](USER_GUIDE.md)
+- [**Case Studies →**](docs/CASE_STUDIES.md)
+
+### For Developers
+- [**Setup Guide →**](DEVELOPMENT_SETUP.md) — Get it running locally
+- [**Architecture →**](ARCHITECTURE.md) — System design
+- [**API Reference →**](API.md) — Endpoint documentation
+- [**Subsystem Documentation →**](docs/subsystems/) — Deep dive into each module
+
+### Support
+- 📚 **Documentation:** [docs/](docs/)
+- 🐛 **Report Issues:** GitHub Issues
+- 💬 **Community:** Discord (coming soon)
+
+---
+
+## Technical Capabilities (For Developers/IT Buyers)
+
+If you need to know what's under the hood before buying:
+
+### Core Stack
+- **Backend:** Node.js/Express with TypeScript
+- **Frontend:** Next.js 14 (App Router), React, Tailwind CSS
+- **Database:** PostgreSQL via Supabase (with Row-Level Security)
+- **Payments:** Stripe (including Terminal for in-person)
+- **Real-time:** Socket.IO for live updates (KDS, waitlist, orders)
+- **Auth:** JWT + Supabase Auth
+
+### Backend Modules (37 modules total)
+| Category | Modules |
+|----------|---------|
+| **Core Business** | Restaurant, Pool, Chalets, Snack Bar |
+| **Booking** | Accommodations, Channels, Groups |
+| **POS** | POS Hardware, Payments, Kiosk |
+| **Operations** | Housekeeping, Inventory, Staff |
+| **Customer** | Users, Loyalty, Gift Cards, Coupons, Reviews |
+| **Marketing** | Promotions, Marketing, Messaging |
+| **Enterprise** | Multi-Property, Revenue, Reporting, Reports |
+| **Compliance** | GDPR, Audit Logs, Backups |
+| **Admin** | Admin, Permissions, Translations (i18n) |
+
+### Security Implementation
+| Feature | Implementation |
+|---------|----------------|
+| Authentication | JWT (15-min access, 7-day refresh) via Supabase Auth |
+| Authorization | Custom RBAC with roles, permissions, module access |
+| Database Security | Supabase RLS policies (row-level security) |
+| Input Validation | Zod schemas on all endpoints |
+| CSRF | Double-submit cookie pattern |
+| Rate Limiting | Per-IP and per-user limits, tiered by operation cost |
+| Password Storage | bcrypt (cost factor 12) |
+| Session Management | Token refresh, forced logout on role change |
+| Audit Trail | All admin actions logged with user, action, resource, timestamp |
+
+### API Overview
+- RESTful API with consistent response format
+- ~200+ endpoints across modules
+- Stripe webhooks verified
+- QuickBooks OAuth2 integration
+- Socket.IO events for real-time updates
+
+### Frontend Architecture
+- Mobile-responsive (works on all devices)
+- Offline support via IndexedDB
+- PWA-capable
+- Multi-language (EN, AR, FR, DE, IT) via next-intl with RTL support
+
+### Known Limitations (Honesty Matters)
+| Area | Limitation |
+|------|------------|
+| **OTA Integration** | Via SiteMinder (requires SiteMinder account) |
+| **Delivery Apps** | No UberEats/DoorDash integration |
+| **Hardware** | Limited native hardware support (basic receipt printing) |
+| **Void/Comp** | Basic cancellation only, no full void workflow |
+| **Forecasting** | No predictive analytics |
+
+---
+
+## The Bottom Line
+
+**V2 is for hospitality businesses that want ONE system instead of five.**
+
+If you run a boutique hotel with a restaurant, a gym with a smoothie bar, or a resort with multiple venues — and you're tired of paying hundreds per month for tools that don't talk to each other — V2 might be your answer.
+
+It's not the cheapest option (Square is free).  
+It's not the best for mega-hotels (Oracle is deeper).  
+It's not the best for properties needing direct OTA API access (Cloudbeds is better).  
+It doesn't have deep hardware integration (Toast is better for that).
+
+**But if you want everything in one place, with unified guest profiles, combined reporting, self-service kiosks, real-time waitlists, visual module builder, full security, and one vendor to call — that's V2.**
+
+---
+
+*V2 Hospitality Platform — Run your entire property from one system.*

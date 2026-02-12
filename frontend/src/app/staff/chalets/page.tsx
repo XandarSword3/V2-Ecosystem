@@ -61,13 +61,14 @@ interface ChaletBooking {
   };
 }
 
-const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-  pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock, label: 'Pending' },
-  confirmed: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle2, label: 'Confirmed' },
-  checked_in: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: LogIn, label: 'Checked In' },
-  checked_out: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: LogOut, label: 'Checked Out' },
-  cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: AlertCircle, label: 'Cancelled' },
-  no_show: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: AlertCircle, label: 'No Show' },
+// IMPROVE Iter-24: Split statusConfig — colors/icons outside, labels inside component with i18n
+const statusConfigBase: Record<string, { color: string; icon: React.ElementType }> = {
+  pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock },
+  confirmed: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle2 },
+  checked_in: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: LogIn },
+  checked_out: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: LogOut },
+  cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: AlertCircle },
+  no_show: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: AlertCircle },
 };
 
 export default function StaffChaletsPage() {
@@ -75,6 +76,16 @@ export default function StaffChaletsPage() {
   const tc = useTranslations('staff.chalets');
   const tst = useTranslations('staff.statuses');
   const tCommon = useTranslations('adminCommon');
+
+  // IMPROVE Iter-24: i18n status labels via tst() hook
+  const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
+    pending: { ...statusConfigBase.pending, label: tst('pending') },
+    confirmed: { ...statusConfigBase.confirmed, label: tst('confirmed') },
+    checked_in: { ...statusConfigBase.checked_in, label: tst('checked_in') },
+    checked_out: { ...statusConfigBase.checked_out, label: tst('checked_out') },
+    cancelled: { ...statusConfigBase.cancelled, label: tst('cancelled') },
+    no_show: { ...statusConfigBase.no_show, label: tst('no_show') },
+  };
   const [bookings, setBookings] = useState<ChaletBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'today' | 'all'>('today');
@@ -82,13 +93,15 @@ export default function StaffChaletsPage() {
   const [selectedBooking, setSelectedBooking] = useState<ChaletBooking | null>(null);
   const { socket } = useSocket();
 
-  const fetchBookings = useCallback(async () => {
+  const fetchBookings = useCallback(async (signal?: AbortSignal) => { // FIX Iter-23: AbortController support
     try {
       const response = await api.get('/chalets/staff/bookings', {
         params: filter === 'today' ? { date: new Date().toISOString().split('T')[0] } : {},
+        signal, // FIX Iter-23: pass signal
       });
-      setBookings(response.data.data || []);
-    } catch (error) {
+      if (!signal?.aborted) setBookings(response.data.data || []); // FIX Iter-23: guard setState
+    } catch (error: any) {
+      if (error?.name === 'CanceledError') return; // FIX Iter-23: ignore abort
       toast.error(tCommon('errors.failedToLoad'));
       setBookings([]);
     } finally {
@@ -97,7 +110,9 @@ export default function StaffChaletsPage() {
   }, [filter]);
 
   useEffect(() => {
-    fetchBookings();
+    const controller = new AbortController(); // FIX Iter-23: cleanup on unmount
+    fetchBookings(controller.signal);
+    return () => controller.abort();
   }, [fetchBookings]);
 
   // Real-time updates
@@ -177,7 +192,7 @@ export default function StaffChaletsPage() {
             {tc('subtitle')}
           </p>
         </div>
-        <Button variant="outline" onClick={fetchBookings}>
+        <Button variant="outline" onClick={() => fetchBookings()}>
           <RefreshCw className="w-4 h-4 mr-2" />
           {tc('refresh')}
         </Button>
@@ -423,7 +438,11 @@ export default function StaffChaletsPage() {
         {selectedBooking && (
           <div 
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            role="dialog" // FIX Iter-22: modal a11y
+            aria-modal="true"
+            aria-labelledby="chalets-booking-detail-title"
             onClick={() => setSelectedBooking(null)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setSelectedBooking(null); }} // FIX Iter-22: Escape to close
           >
              <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -434,7 +453,7 @@ export default function StaffChaletsPage() {
             >
               <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                  <h2 id="chalets-booking-detail-title" className="text-2xl font-bold text-slate-900 dark:text-white">
                     Booking #{selectedBooking.booking_number}
                   </h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -443,6 +462,7 @@ export default function StaffChaletsPage() {
                 </div>
                 <button 
                   onClick={() => setSelectedBooking(null)}
+                  aria-label="Close booking details" // FIX Iter-22: close button a11y
                   className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
                 >
                   <XCircle className="w-6 h-6 text-slate-500" />
@@ -454,7 +474,7 @@ export default function StaffChaletsPage() {
                 {/* Status & Dates */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Status</h3>
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{tc('modalStatus')}</h3>
                      <div className="flex items-center gap-2">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-medium ${statusConfig[selectedBooking.status]?.color}`}>
                             {tst(selectedBooking.status)}
@@ -462,34 +482,34 @@ export default function StaffChaletsPage() {
                      </div>
                   </div>
                    <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Dates</h3>
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{tc('modalDates')}</h3>
                     <p className="text-sm font-medium text-slate-900 dark:text-white">
                         {new Date(selectedBooking.check_in_date).toLocaleDateString()} - {new Date(selectedBooking.check_out_date).toLocaleDateString()}
                     </p>
                     <p className="text-xs text-slate-500">
-                        {selectedBooking.number_of_nights || 1} Nights
+                        {tc('modalNights', { count: selectedBooking.number_of_nights || 1 })}
                     </p>
                   </div>
                 </div>
 
                 {/* Customer Info */}
                 <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Customer Information</h3>
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{tc('customerInfo')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <span className="text-xs text-slate-400">Name</span>
+                            <span className="text-xs text-slate-400">{tc('customerName')}</span>
                             <p className="font-medium">{selectedBooking.customer_name || selectedBooking.users?.full_name}</p>
                         </div>
                          <div>
-                            <span className="text-xs text-slate-400">Email</span>
+                            <span className="text-xs text-slate-400">{tc('customerEmail')}</span>
                             <p className="font-medium">{selectedBooking.customer_email || selectedBooking.users?.email}</p>
                         </div>
                          <div>
-                            <span className="text-xs text-slate-400">Phone</span>
+                            <span className="text-xs text-slate-400">{tc('customerPhone')}</span>
                             <p className="font-medium">{selectedBooking.customer_phone || selectedBooking.users?.phone || '-'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-400">Guests</span>
+                            <span className="text-xs text-slate-400">{tc('guests')}</span>
                             <p className="font-medium">{selectedBooking.number_of_guests || selectedBooking.guests || 1}</p>
                         </div>
                     </div>
@@ -497,30 +517,30 @@ export default function StaffChaletsPage() {
 
                  {/* Financials */}
                  <div className="space-y-2">
-                    <h3 className="font-semibold text-slate-900 dark:text-white">Billing</h3>
+                    <h3 className="font-semibold text-slate-900 dark:text-white">{tc('billing')}</h3>
                     <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Base Amount</span>
+                        <span className="text-slate-500">{tc('baseAmount')}</span>
                         <span>{formatCurrency(selectedBooking.base_amount || selectedBooking.total_amount)}</span>
                     </div>
                      {selectedBooking.add_ons_amount ? (
                         <div className="flex justify-between text-sm">
-                            <span className="text-slate-500">Add-ons</span>
+                            <span className="text-slate-500">{tc('addOns')}</span>
                             <span>{formatCurrency(selectedBooking.add_ons_amount)}</span>
                         </div>
                      ) : null}
                      <div className="flex justify-between font-bold text-lg pt-2 border-t border-slate-200 dark:border-slate-700">
-                        <span>Total</span>
+                        <span>{tc('total')}</span>
                         <span>{formatCurrency(selectedBooking.total_amount)}</span>
                      </div>
                      <div className="flex justify-between text-sm text-slate-500">
-                         <span>Payment Status</span>
-                         <span className="capitalize">{selectedBooking.payment_status || 'Pending'}</span>
+                         <span>{tc('paymentStatus')}</span>
+                         <span className="capitalize">{selectedBooking.payment_status || tc('paymentPending')}</span>
                      </div>
                  </div>
 
                  {selectedBooking.special_requests && (
                     <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                        <h3 className="text-sm font-bold text-yellow-800 dark:text-yellow-200 mb-1">Special Requests</h3>
+                        <h3 className="text-sm font-bold text-yellow-800 dark:text-yellow-200 mb-1">{tc('specialRequests')}</h3>
                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
                             {selectedBooking.special_requests}
                         </p>

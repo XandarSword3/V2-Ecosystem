@@ -1,6 +1,6 @@
 {
-  "name": "V2 Resort Management Platform",
-  "short_name": "V2 Resort",
+  "name": "Iron Paradise Gym Management Platform",
+  "short_name": "Iron Paradise Gym",
   "description": "Complete resort management system with hotel, restaurant, pool, and activity bookings",
   "start_url": "/",
   "display": "standalone",
@@ -9,7 +9,11 @@
   "orientation": "any",
   "scope": "/",
   "id": "/",
-  "categories": ["business", "travel", "lifestyle"],
+  "categories": [
+    "business",
+    "travel",
+    "lifestyle"
+  ],
   "icons": [
     {
       "src": "/icons/icon-512x512.svg",
@@ -34,10 +38,11 @@
       "sizes": "144x144",
       "type": "image/svg+xml",
       "purpose": "any"
-    }
+    },
+    {
       "src": "/icons/icon-384x384.png",
       "sizes": "384x384",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     }
   ],
@@ -47,14 +52,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "V2 Resort Dashboard"
+      "label": "Iron Paradise Gym Dashboard"
     },
     {
       "src": "/screenshots/mobile.png",
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "V2 Resort Mobile"
+      "label": "Iron Paradise Gym Mobile"
     }
   ],
   "shortcuts": [
@@ -63,21 +68,36 @@
       "short_name": "Rooms",
       "description": "Browse and book hotel rooms",
       "url": "/rooms",
-      "icons": [{ "src": "/icons/icon-512x512.svg", "sizes": "any" }]
+      "icons": [
+        {
+          "src": "/icons/icon-512x512.svg",
+          "sizes": "any"
+        }
+      ]
     },
     {
       "name": "Restaurant",
       "short_name": "Dining",
       "description": "View menu and order food",
       "url": "/restaurant",
-      "icons": [{ "src": "/icons/icon-512x512.svg", "sizes": "any" }]
+      "icons": [
+        {
+          "src": "/icons/icon-512x512.svg",
+          "sizes": "any"
+        }
+      ]
     },
     {
       "name": "My Bookings",
       "short_name": "Bookings",
       "description": "View your reservations",
       "url": "/bookings",
-      "icons": [{ "src": "/icons/icon-512x512.svg", "sizes": "any" }]
+      "icons": [
+        {
+          "src": "/icons/icon-512x512.svg",
+          "sizes": "any"
+        }
+      ]
     }
   ],
   "related_applications": [],

@@ -1,9 +1,9 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { config } from '../config/index';
-import * as schema from './schema/index';
-import { getSupabaseAdmin } from './supabase';
-import { logger } from '../utils/logger';
+import { config } from '../config/index.js';
+import * as schema from './schema/index.js';
+import { getSupabaseAdmin } from './supabase.js';
+import { logger } from '../utils/logger.js';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 let pool: Pool | null = null;
@@ -15,7 +15,7 @@ export async function initializeDatabase() {
   // Try direct PostgreSQL connection first
   try {
     const isLocalConnection = config.database.url.includes('localhost') || config.database.url.includes('127.0.0.1');
-    
+
     pool = new Pool({
       connectionString: config.database.url,
       max: 20,
@@ -38,7 +38,7 @@ export async function initializeDatabase() {
     logger.warn(`Direct PostgreSQL connection failed: ${message}`);
     logger.warn('This is expected if using Supabase Transaction Pooler on port 6543 without prepared statements, or if the connection string is invalid.');
     logger.info('Falling back to Supabase client (HTTP API)...');
-    
+
     // Use Supabase client
     supabase = getSupabaseAdmin();
     useSupabaseClient = true;

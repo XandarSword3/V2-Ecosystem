@@ -16,13 +16,15 @@ import { useLocale } from 'next-intl';
 import { useMemo, useCallback } from 'react';
 
 // Supported locales
-export type SupportedLocale = 'en' | 'ar' | 'fr';
+export type SupportedLocale = 'en' | 'ar' | 'fr' | 'de' | 'it';
 
 // Language suffix mapping
 const localeSuffixMap: Record<SupportedLocale, string> = {
   en: '',        // English is the default, no suffix
   ar: '_ar',
   fr: '_fr',
+  de: '_de',
+  it: '_it',
 };
 
 /**

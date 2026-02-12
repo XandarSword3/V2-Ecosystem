@@ -78,7 +78,6 @@ export async function registerDevice(req: Request, res: Response): Promise<void>
           platform,
           device_name: deviceName || null,
           app_version: appVersion || null,
-          device_model: deviceModel || null,
           os_version: osVersion || null,
           notifications_enabled: notificationsEnabled,
           is_active: true,
@@ -112,7 +111,6 @@ export async function registerDevice(req: Request, res: Response): Promise<void>
         platform,
         device_name: deviceName || null,
         app_version: appVersion || null,
-        device_model: deviceModel || null,
         os_version: osVersion || null,
         notifications_enabled: notificationsEnabled,
         is_active: true,
@@ -205,7 +203,7 @@ export async function getUserDevices(req: Request, res: Response): Promise<void>
 
     const { data: devices, error } = await supabase
       .from('device_tokens')
-      .select('id, platform, device_name, device_model, app_version, os_version, notifications_enabled, is_active, last_used_at, created_at')
+      .select('id, platform, device_name, app_version, os_version, notifications_enabled, is_active, last_used_at, created_at')
       .eq('user_id', userId)
       .eq('is_active', true)
       .order('last_used_at', { ascending: false });

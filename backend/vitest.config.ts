@@ -40,14 +40,14 @@ export default defineConfig({
         '*.config.ts',
         '*.config.js',
       ],
-      // Coverage thresholds - set to current levels, increase as tests are added
-      // Current: ~30% statements, ~47% branches, ~45% functions
+      // Coverage thresholds - raised after Phase 3 test rebuild
+      // Current: ~68% statements, ~59% branches, ~67% functions
       // Target: 80% statements, 70% branches, 75% functions
       thresholds: {
-        statements: 30,
-        branches: 47,
-        functions: 33,
-        lines: 30,
+        statements: 60,
+        branches: 50,
+        functions: 55,
+        lines: 60,
       },
     },
   },

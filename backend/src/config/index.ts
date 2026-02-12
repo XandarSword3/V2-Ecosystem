@@ -12,7 +12,7 @@ const isTest = process.env.NODE_ENV === 'test';
  * This allows tests to import modules without env validation.
  */
 export function validateEnvironment(): void {
-  const requiredEnvVars = isProduction 
+  const requiredEnvVars = isProduction
     ? ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'DATABASE_URL']
     : ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
 
@@ -29,7 +29,7 @@ export function validateEnvironment(): void {
 // Only validate at import time in non-test environments
 // Tests can call validateEnvironment() explicitly if needed
 if (!isTest) {
-  const requiredEnvVars = isProduction 
+  const requiredEnvVars = isProduction
     ? ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'DATABASE_URL']
     : ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
 
@@ -53,10 +53,12 @@ const generateDevSecret = (prefix: string) => {
 
 export const config = {
   env: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT || '3000', 10),
-  apiUrl: process.env.API_URL || 'http://localhost:3000',
+  port: parseInt(process.env.PORT || '3005', 10),
+  apiUrl: process.env.API_URL || 'http://localhost:3005',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-  corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
+  corsOrigins: process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',')
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3005'],
 
   database: {
     url: process.env.DATABASE_URL || '',
@@ -86,7 +88,7 @@ export const config = {
     port: parseInt(process.env.SMTP_PORT || '587', 10),
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
-    from: process.env.EMAIL_FROM || 'noreply@v2resort.com',
+    from: process.env.EMAIL_FROM || 'noreply@ironparadisegym.com',
   },
 
   storage: {

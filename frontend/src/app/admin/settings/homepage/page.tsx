@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
@@ -22,6 +22,9 @@ import {
   EyeOff,
   ArrowUp,
   ArrowDown,
+  Upload,
+  X,
+  Loader2,
 } from 'lucide-react';
 
 interface HeroSlide {
@@ -55,8 +58,8 @@ const defaultSettings: HomepageSettings = {
   heroSlides: [
     {
       id: '1',
-      title: 'Welcome to V2 Resort',
-      subtitle: "Premier Resort Experience",
+      title: 'Welcome to Iron Paradise Gym',
+      subtitle: "Forge Your Strength",
       buttonText: 'Explore Our Services',
       buttonLink: '#services',
       imageUrl: '',
@@ -71,7 +74,7 @@ const defaultSettings: HomepageSettings = {
     { id: '5', type: 'map', title: 'Find Us', enabled: true, order: 5 },
     { id: '6', type: 'cta', title: 'Call to Action', enabled: true, order: 6 },
   ],
-  ctaTitle: 'Ready to Experience V2 Resort?',
+  ctaTitle: 'Ready to Experience Iron Paradise Gym?',
   ctaSubtitle: 'Book your stay today and discover why we\'re the preferred destination.',
   ctaButtonText: 'Book Now',
   ctaButtonLink: '/chalets',
@@ -84,6 +87,8 @@ export default function HomepageSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<'hero' | 'sections' | 'cta'>('hero');
+  const [uploadingSlideId, setUploadingSlideId] = useState<string | null>(null);
+  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   useEffect(() => {
     loadSettings();
@@ -91,19 +96,80 @@ export default function HomepageSettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const response = await api.get('/admin/settings');
-      if (response.data?.data?.homepage) {
-        setSettings({ ...defaultSettings, ...response.data.data.homepage });
+      // Use dedicated homepage endpoint for better data isolation
+      const response = await api.get('/admin/settings/homepage');
+      if (response.data?.success && response.data?.data) {
+        setSettings({ ...defaultSettings, ...response.data.data });
       }
     } catch (error) {
       console.error('Failed to load homepage settings:', error);
+      // Fallback to general settings endpoint if dedicated one fails
+      try {
+        const fallbackResponse = await api.get('/admin/settings');
+        if (fallbackResponse.data?.data?.homepage) {
+          setSettings({ ...defaultSettings, ...fallbackResponse.data.data.homepage });
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+      }
+    }
+  };
+
+  // Handle image upload for hero slides
+  const handleImageUpload = async (slideId: string, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image must be less than 10MB');
+      return;
+    }
+
+    setUploadingSlideId(slideId);
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Data = reader.result as string;
+          const response = await api.post('/admin/uploads', {
+            file: base64Data,
+            type: 'image',
+            filename: file.name,
+          });
+          
+          if (response.data?.success && response.data?.data?.url) {
+            updateHeroSlide(slideId, 'imageUrl', response.data.data.url);
+            toast.success('Image uploaded successfully');
+          } else {
+            toast.error('Failed to upload image');
+          }
+        } catch (error: any) {
+          console.error('Upload error:', error);
+          toast.error(error.response?.data?.error || 'Failed to upload image');
+        } finally {
+          setUploadingSlideId(null);
+        }
+      };
+      reader.onerror = () => {
+        toast.error('Failed to read file');
+        setUploadingSlideId(null);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload image');
+      setUploadingSlideId(null);
     }
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await api.put('/admin/settings', { homepage: settings });
+      // Use dedicated homepage endpoint for better reliability
+      await api.put('/admin/settings/homepage', settings);
       toast.success(t('homepage.saved'));
       setHasChanges(false);
     } catch (error) {
@@ -297,13 +363,76 @@ export default function HomepageSettingsPage() {
                           onChange={(e) => updateHeroSlide(slide.id, 'buttonLink', e.target.value)}
                         />
                       </div>
+                      {/* Background Image Upload */}
                       <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">Background Image URL</label>
-                        <Input
-                          value={slide.imageUrl}
-                          onChange={(e) => updateHeroSlide(slide.id, 'imageUrl', e.target.value)}
-                          placeholder="https://example.com/image.jpg"
-                        />
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                          <ImageIcon className="w-4 h-4 inline mr-2" />
+                          Background Image
+                        </label>
+                        <div className="space-y-3">
+                          {/* Image Preview */}
+                          {slide.imageUrl && (
+                            <div className="relative rounded-lg overflow-hidden h-40 bg-slate-100 dark:bg-slate-800">
+                              <img
+                                src={slide.imageUrl}
+                                alt={`Slide ${index + 1} background`}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => updateHeroSlide(slide.id, 'imageUrl', '')}
+                                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                          
+                          {/* Upload Area */}
+                          <div className="flex gap-3">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              ref={(el) => { fileInputRefs.current[slide.id] = el; }}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(slide.id, file);
+                              }}
+                              className="hidden"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fileInputRefs.current[slide.id]?.click()}
+                              disabled={uploadingSlideId === slide.id}
+                              className="flex-1"
+                            >
+                              {uploadingSlideId === slide.id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Uploading...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4 mr-2" />
+                                  {slide.imageUrl ? 'Change Image' : 'Upload Image'}
+                                </>
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* Or enter URL manually */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-400">or enter URL:</span>
+                            <Input
+                              value={slide.imageUrl}
+                              onChange={(e) => updateHeroSlide(slide.id, 'imageUrl', e.target.value)}
+                              placeholder="https://example.com/image.jpg"
+                              className="flex-1 text-sm"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

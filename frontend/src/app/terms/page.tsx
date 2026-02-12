@@ -111,11 +111,11 @@ export default function TermsPage() {
               {t('contactUs')}
             </p>
             <a 
-              href="mailto:legal@v2resort.com"
+              href="mailto:legal@ironparadisegym.com"
               className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-medium"
             >
               <Mail className="w-5 h-5" />
-              legal@v2resort.com
+              legal@ironparadisegym.com
             </a>
           </motion.div>
         </div>

@@ -19,11 +19,15 @@ import { PWAPrompt } from '@/components/pwa';
 import enMessages from '../../messages/en.json';
 import arMessages from '../../messages/ar.json';
 import frMessages from '../../messages/fr.json';
+import deMessages from '../../messages/de.json';
+import itMessages from '../../messages/it.json';
 
 const allMessages: Record<Locale, typeof enMessages> = {
   en: enMessages,
-  ar: arMessages,
-  fr: frMessages,
+  ar: arMessages as unknown as typeof enMessages,
+  fr: frMessages as unknown as typeof enMessages,
+  de: deMessages as unknown as typeof enMessages,
+  it: itMessages as unknown as typeof enMessages,
 };
 
 interface ProvidersProps {

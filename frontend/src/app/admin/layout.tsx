@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useSiteSettings } from '@/lib/settings-context';
 import { cn } from '@/lib/cn';
@@ -13,41 +13,30 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { CurrencySwitcher } from '@/components/CurrencySwitcher';
 import { api } from '@/lib/api';
 import {
-  LayoutDashboard,
-  UtensilsCrossed,
-  Home,
-  Waves,
-  Cookie,
-  Users,
-  Settings,
-  BarChart3,
-  FileText,
-  Shield,
-  LogOut,
   Menu,
   X,
   ChevronDown,
+  ChevronRight,
   Bell,
-  Palette,
-  Cloud,
-  Star,
-  Award,
-  Gift,
-  Ticket,
-  Brush,
-  Package,
+  LogOut,
+  Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  type NavCategory,
+  type NavItem,
+  getStaticNavigation,
+  getModuleChildren,
+  moduleTypeIcons,
+  filterNavigationByRole,
+  flattenNavigation,
+  getInitialExpandedCategories,
+  saveExpandedCategories,
+  SIDEBAR_EXPANDED_KEY,
+} from '@/config/admin-navigation';
 
 interface AdminLayoutProps {
   children: ReactNode;
-}
-
-interface NavItem {
-  name: string;
-  href: string;
-  icon: React.ElementType;
-  children?: { name: string; href: string }[];
 }
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
@@ -55,158 +44,110 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const t = useTranslations('admin');
   const { modules, settings } = useSiteSettings();
+  const { user, logout, isAuthenticated, isLoading } = useAuth();
   
   // Dynamic branding from CMS
-  const resortName = settings.resortName || 'V2 Resort';
+  const resortName = settings.resortName || 'Your Business';
   const logoText = resortName.substring(0, 2).toUpperCase();
 
-  const navigation: NavItem[] = [
-    { name: t('nav.dashboard'), href: '/admin', icon: LayoutDashboard },
-    {
-      name: t('nav.restaurant'),
-      href: '/admin/restaurant',
-      icon: UtensilsCrossed,
-      children: [
-        { name: t('nav.menuItems'), href: '/admin/restaurant/menu' },
-        { name: t('nav.categories'), href: '/admin/restaurant/categories' },
-        { name: t('nav.orders'), href: '/admin/restaurant/orders' },
-        { name: t('nav.tables'), href: '/admin/restaurant/tables' },
-      ]
-    },
-    {
-      name: t('nav.chalets'),
-      href: '/admin/chalets',
-      icon: Home,
-      children: [
-        { name: t('nav.allChalets'), href: '/admin/chalets' },
-        { name: t('nav.bookings'), href: '/admin/chalets/bookings' },
-        { name: t('nav.pricingRules'), href: '/admin/chalets/pricing' },
-        { name: t('nav.addons'), href: '/admin/chalets/addons' },
-        { name: t('nav.settings'), href: '/admin/chalets/settings' },
-      ]
-    },
-    {
-      name: t('nav.pool'),
-      href: '/admin/pool',
-      icon: Waves,
-      children: [
-        { name: t('nav.sessions'), href: '/admin/pool/sessions' },
-        { name: t('nav.tickets'), href: '/admin/pool/tickets' },
-        { name: t('nav.capacity'), href: '/admin/pool/capacity' },
-      ]
-    },
-    {
-      name: t('nav.snackBar'),
-      href: '/admin/snack',
-      icon: Cookie,
-      children: [
-        { name: t('nav.menu'), href: '/admin/snack/menu' },
-        { name: t('nav.categories'), href: '/admin/snack/categories' },
-        { name: t('nav.orders'), href: '/admin/snack/orders' },
-      ]
-    },
-    { name: t('nav.loyalty') || 'Loyalty Program', href: '/admin/loyalty', icon: Award },
-    { name: t('nav.giftCards') || 'Gift Cards', href: '/admin/giftcards', icon: Gift },
-    { name: t('nav.coupons') || 'Coupons', href: '/admin/coupons', icon: Ticket },
-    { name: t('nav.housekeeping') || 'Housekeeping', href: '/admin/housekeeping', icon: Brush },
-    { name: t('nav.inventory') || 'Inventory', href: '/admin/inventory', icon: Package },
-    {
-      name: t('nav.users'),
-      href: '/admin/users',
-      icon: Users,
-      children: [
-        { name: t('nav.customers'), href: '/admin/users/customers' },
-        { name: t('nav.staff'), href: '/admin/users/staff' },
-        { name: t('nav.admins'), href: '/admin/users/admins' },
-        { name: t('nav.rolesPermissions'), href: '/admin/users/roles' },
-        { name: t('nav.liveUsers') || 'Live Users', href: '/admin/users/live' },
-      ]
-    },
-    { name: t('nav.reviews') || 'Reviews', href: '/admin/reviews', icon: Star },
-    { name: t('nav.reports'), href: '/admin/reports', icon: BarChart3 },
-    { name: t('nav.modules'), href: '/admin/modules', icon: Cloud },
-    {
-      name: t('nav.settings'),
-      href: '/admin/settings',
-      icon: Settings,
-      children: [
-        { name: t('nav.general'), href: '/admin/settings' },
-        { name: t('nav.appearance'), href: '/admin/settings/appearance' },
-        { name: t('nav.homepage'), href: '/admin/settings/homepage' },
-        { name: t('nav.footer'), href: '/admin/settings/footer' },
-        { name: t('nav.translations'), href: '/admin/settings/translations' },
-        { name: t('nav.payments'), href: '/admin/settings/payments' },
-        { name: t('nav.notifications'), href: '/admin/settings/notifications' },
-        { name: t('nav.databaseBackups'), href: '/admin/settings/backups' },
-      ]
-    },
-    { name: t('nav.auditLogs'), href: '/admin/audit', icon: Shield },
-  ];
-
-  // Inject dynamic modules
-  if (modules && modules.length > 0) {
-    const dynamicModules = modules
-      .filter(m => m.is_active)
-      // Filter out core modules that are already hardcoded in the navigation
-      .filter(m => !['restaurant', 'chalets', 'pool', 'snack-bar', 'snack'].includes(m.slug))
-      .map(module => {
-        let children: { name: string; href: string }[] = [];
-        let icon = Cloud;
-        
-        // Ensure slug is URL-safe (encode any problematic characters from legacy data)
-        const safeSlug = encodeURIComponent(module.slug);
-
-        if (module.template_type === 'menu_service') {
-          icon = UtensilsCrossed;
-          children = [
-            { name: t('nav.menuItems'), href: `/admin/${safeSlug}/menu` },
-            { name: t('nav.categories'), href: `/admin/${safeSlug}/categories` },
-            { name: t('nav.orders'), href: `/admin/${safeSlug}/orders` },
-            { name: t('nav.tables'), href: `/admin/${safeSlug}/tables` },
-          ];
-        } else if (module.template_type === 'multi_day_booking') {
-          icon = Home;
-          children = [
-            { name: t('nav.allChalets'), href: `/admin/${safeSlug}` },
-            { name: t('nav.bookings'), href: `/admin/${safeSlug}/bookings` },
-            { name: t('nav.pricingRules'), href: `/admin/${safeSlug}/pricing` },
-            { name: t('nav.addons'), href: `/admin/${safeSlug}/addons` },
-          ];
-        } else if (module.template_type === 'session_access') {
-          icon = Waves;
-          children = [
-            { name: t('nav.sessions'), href: `/admin/${safeSlug}/sessions` },
-            { name: t('nav.tickets'), href: `/admin/${safeSlug}/tickets` },
-            { name: t('nav.capacity'), href: `/admin/${safeSlug}/capacity` },
-          ];
-        }
-
-        return {
-          name: module.name,
-          href: `/admin/${safeSlug}`,
-          icon,
-          children
-        };
-      });
-
-    // Insert before 'Modules' link (use href since name is translated)
-    const modulesIndex = navigation.findIndex(n => n.href === '/admin/modules');
-    if (modulesIndex !== -1) {
-      // Insert dynamic modules before the 'Modules' management link so the management page stays available
-      navigation.splice(modulesIndex, 0, ...dynamicModules);
-    }
-  }
-
-  const { user, logout, isAuthenticated, isLoading } = useAuth();
+  // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(['modules']);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [authChecked, setAuthChecked] = useState(false);
+  
+  // Notifications state
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Array<{ id: string; title: string; message: string; time: string; read: boolean }>>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
 
-  // Fetch real notifications from backend
+  // Load persisted sidebar state
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedSidebar = localStorage.getItem(SIDEBAR_EXPANDED_KEY);
+      if (savedSidebar !== null) {
+        setSidebarOpen(savedSidebar === 'true');
+      }
+      setExpandedCategories(getInitialExpandedCategories());
+    }
+  }, []);
+
+  // Build navigation with categories
+  const navigation = useMemo((): NavCategory[] => {
+    const categories = getStaticNavigation(t);
+    
+    // Populate modules category with actual modules from database
+    const modulesCategory = categories.find(c => c.id === 'modules');
+    if (modulesCategory && modules && modules.length > 0) {
+      const activeModules = modules
+        .filter(m => m.is_active)
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      
+      modulesCategory.items = activeModules.map(module => {
+        const icon = moduleTypeIcons[module.template_type] || moduleTypeIcons.default;
+        const children = getModuleChildren(module.slug, module.template_type, t);
+        
+        return {
+          name: module.name,
+          href: `/admin/${encodeURIComponent(module.slug)}`,
+          icon,
+          children: children.length > 0 ? children : undefined,
+        };
+      });
+    }
+    
+    // Filter by user roles
+    const userRoles = user?.roles || [];
+    return filterNavigationByRole(categories, userRoles.length > 0 ? userRoles : ['admin']);
+  }, [modules, t, user?.roles]);
+
+  // Flatten for search
+  const searchableItems = useMemo(() => flattenNavigation(navigation), [navigation]);
+
+  // Filtered items based on search
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    const query = searchQuery.toLowerCase();
+    return searchableItems.filter(item => 
+      item.name.toLowerCase().includes(query) || 
+      item.category.toLowerCase().includes(query)
+    );
+  }, [searchQuery, searchableItems]);
+
+  // Toggle category expansion
+  const toggleCategory = useCallback((categoryId: string) => {
+    setExpandedCategories(prev => {
+      const next = prev.includes(categoryId) 
+        ? prev.filter(id => id !== categoryId)
+        : [...prev, categoryId];
+      saveExpandedCategories(next);
+      return next;
+    });
+  }, []);
+
+  // Toggle item expansion (for items with children)
+  const toggleItem = useCallback((itemName: string) => {
+    setExpandedItems(prev => 
+      prev.includes(itemName) 
+        ? prev.filter(n => n !== itemName)
+        : [...prev, itemName]
+    );
+  }, []);
+
+  // Persist sidebar state
+  const handleSidebarToggle = useCallback(() => {
+    setSidebarOpen(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(SIDEBAR_EXPANDED_KEY, String(next));
+      }
+      return next;
+    });
+  }, []);
+
+  // Fetch notifications
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
@@ -214,8 +155,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         if (response.data?.success && response.data?.data) {
           setNotifications(response.data.data);
         }
-      } catch (error) {
-        // If endpoint doesn't exist yet, use empty array
+      } catch {
         setNotifications([]);
       } finally {
         setLoadingNotifications(false);
@@ -224,7 +164,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
     if (isAuthenticated) {
       fetchNotifications();
-      // Refresh notifications every 30 seconds
       const interval = setInterval(fetchNotifications, 30000);
       return () => clearInterval(interval);
     }
@@ -240,7 +179,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
-  // Check authentication - wait for auth to fully load
+  // Check authentication
   useEffect(() => {
     if (!isLoading) {
       setAuthChecked(true);
@@ -252,12 +191,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       }
     }
   }, [isAuthenticated, isLoading, router, user, t]);
-
-  const toggleExpanded = (name: string) => {
-    setExpandedItems((prev) =>
-      prev.includes(name) ? prev.filter((i) => i !== name) : [...prev, name]
-    );
-  };
 
   const handleLogout = async () => {
     await logout();
@@ -279,7 +212,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Mobile Header - Premium Glassmorphism */}
+      {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-[200] backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/50 dark:border-slate-700/50 px-4 h-16 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <button
@@ -318,7 +251,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="lg:hidden fixed inset-y-0 left-0 z-[200] w-72 backdrop-blur-xl bg-gradient-to-b from-white/95 via-slate-50/90 to-white/95 dark:from-slate-900/95 dark:via-slate-800/90 dark:to-slate-900/95 shadow-2xl border-r border-slate-200/30 dark:border-slate-700/30"
             >
-              <div className="flex items-center justify-between p-4 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-transparent via-slate-100/50 dark:via-slate-800/50 to-transparent">
+              <div className="flex items-center justify-between p-4 border-b border-slate-200/50 dark:border-slate-700/50">
                 <div className="flex items-center gap-2">
                   <div className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-bold text-lg px-2.5 py-1 rounded-lg">
                     {logoText}
@@ -332,18 +265,66 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   <X className="h-5 w-5 text-slate-600 dark:text-slate-400" />
                 </button>
               </div>
-              <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)]">
-                {navigation.map((item) => (
-                  <NavItemComponent
-                    key={item.name}
-                    item={item}
-                    pathname={pathname}
-                    expanded={expandedItems.includes(item.name)}
-                    onToggle={() => toggleExpanded(item.name)}
-                    onNavigate={() => setMobileMenuOpen(false)}
+              
+              {/* Mobile Search */}
+              <div className="p-3 border-b border-slate-200/50 dark:border-slate-700/50">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search pages..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg border-0 focus:ring-2 focus:ring-blue-500"
                   />
-                ))}
+                </div>
+              </div>
+              
+              <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-200px)]">
+                {filteredItems ? (
+                  // Search results
+                  <div className="space-y-1">
+                    <p className="px-3 py-1 text-xs font-medium text-slate-500 uppercase">
+                      {filteredItems.length} results
+                    </p>
+                    {filteredItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          setSearchQuery('');
+                        }}
+                        className={cn(
+                          'block px-3 py-2 rounded-lg text-sm',
+                          pathname === item.href
+                            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        )}
+                      >
+                        <span className="font-medium">{item.name}</span>
+                        <span className="text-xs text-slate-400 ml-2">in {item.category}</span>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  // Normal navigation
+                  navigation.map((category) => (
+                    <CategorySection
+                      key={category.id}
+                      category={category}
+                      pathname={pathname}
+                      expanded={expandedCategories.includes(category.id)}
+                      onToggleCategory={() => toggleCategory(category.id)}
+                      expandedItems={expandedItems}
+                      onToggleItem={toggleItem}
+                      onNavigate={() => setMobileMenuOpen(false)}
+                      collapsed={false}
+                    />
+                  ))
+                )}
               </nav>
+              
               <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-t from-white dark:from-slate-900 to-transparent">
                 <button
                   onClick={handleLogout}
@@ -358,7 +339,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         )}
       </AnimatePresence>
 
-      {/* Desktop Sidebar - Premium Glassmorphism */}
+      {/* Desktop Sidebar */}
       <aside
         className={cn(
           'hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 transition-all duration-300',
@@ -370,7 +351,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         )}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-transparent via-slate-100/50 dark:via-slate-800/50 to-transparent">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200/50 dark:border-slate-700/50">
           <div className="flex items-center gap-2">
             <div className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-bold text-lg px-2.5 py-1 rounded-lg shrink-0">
               {logoText}
@@ -387,25 +368,77 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             )}
           </div>
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={handleSidebarToggle}
             className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
           >
             <Menu className="h-4 w-4 text-slate-600 dark:text-slate-400" />
           </button>
         </div>
 
+        {/* Search */}
+        {sidebarOpen && (
+          <div className="p-3 border-b border-slate-200/50 dark:border-slate-700/50">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search pages..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg border-0 focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600">
-          {navigation.map((item) => (
-            <NavItemComponent
-              key={item.name}
-              item={item}
-              pathname={pathname}
-              expanded={expandedItems.includes(item.name)}
-              onToggle={() => toggleExpanded(item.name)}
-              collapsed={!sidebarOpen}
-            />
-          ))}
+          {filteredItems ? (
+            // Search results
+            <div className="space-y-1">
+              {sidebarOpen && (
+                <p className="px-3 py-1 text-xs font-medium text-slate-500 uppercase">
+                  {filteredItems.length} results
+                </p>
+              )}
+              {filteredItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setSearchQuery('')}
+                  className={cn(
+                    'block px-3 py-2 rounded-lg text-sm',
+                    pathname === item.href
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  )}
+                >
+                  {sidebarOpen ? (
+                    <>
+                      <span className="font-medium">{item.name}</span>
+                      <span className="text-xs text-slate-400 ml-2">in {item.category}</span>
+                    </>
+                  ) : (
+                    <span className="font-medium">{item.name.substring(0, 2)}</span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          ) : (
+            // Normal navigation with categories
+            navigation.map((category) => (
+              <CategorySection
+                key={category.id}
+                category={category}
+                pathname={pathname}
+                expanded={expandedCategories.includes(category.id)}
+                onToggleCategory={() => toggleCategory(category.id)}
+                expandedItems={expandedItems}
+                onToggleItem={toggleItem}
+                collapsed={!sidebarOpen}
+              />
+            ))
+          )}
         </nav>
 
         {/* User Section */}
@@ -420,7 +453,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   {user?.fullName || 'Admin'}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {user?.email || 'admin@v2resort.com'}
+                  {user?.email || 'admin@ironparadisegym.com'}
                 </p>
               </div>
             </div>
@@ -445,14 +478,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'
         )}
       >
-        {/* Top Bar - Premium Glassmorphism */}
+        {/* Top Bar */}
         <div className="hidden lg:flex items-center justify-between h-16 px-6 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/50 dark:border-slate-700/50 shadow-sm sticky top-0 z-[100]">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
-              {navigation.find((n) => pathname === n.href || pathname.startsWith(n.href + '/'))?.name || 'Dashboard'}
+              {getCurrentPageTitle(navigation, pathname)}
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            {/* Notifications */}
             <div className="relative z-[110]">
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
@@ -464,7 +498,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 )}
               </button>
 
-              {/* Notifications Dropdown */}
               <AnimatePresence>
                 {notificationsOpen && (
                   <motion.div
@@ -546,6 +579,133 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   );
 }
 
+// Helper to get current page title
+function getCurrentPageTitle(navigation: NavCategory[], pathname: string | null): string {
+  if (!pathname) return 'Dashboard';
+  
+  for (const category of navigation) {
+    for (const item of category.items) {
+      if (pathname === item.href) return item.name;
+      if (pathname.startsWith(item.href + '/')) return item.name;
+      if (item.children) {
+        for (const child of item.children) {
+          if (pathname === child.href) return child.name;
+        }
+      }
+    }
+  }
+  
+  return 'Dashboard';
+}
+
+// Category Section Component
+interface CategorySectionProps {
+  category: NavCategory;
+  pathname: string | null;
+  expanded: boolean;
+  onToggleCategory: () => void;
+  expandedItems: string[];
+  onToggleItem: (name: string) => void;
+  onNavigate?: () => void;
+  collapsed?: boolean;
+}
+
+function CategorySection({
+  category,
+  pathname,
+  expanded,
+  onToggleCategory,
+  expandedItems,
+  onToggleItem,
+  onNavigate,
+  collapsed = false,
+}: CategorySectionProps) {
+  // Dashboard category - no header, just show items
+  if (category.id === 'dashboard') {
+    return (
+      <div className="space-y-1">
+        {category.items.map((item) => (
+          <NavItemComponent
+            key={item.href}
+            item={item}
+            pathname={pathname}
+            expanded={expandedItems.includes(item.name)}
+            onToggle={() => onToggleItem(item.name)}
+            onNavigate={onNavigate}
+            collapsed={collapsed}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // Skip empty categories
+  if (category.items.length === 0) return null;
+
+  // Collapsed sidebar - just show items without headers
+  if (collapsed) {
+    return (
+      <div className="space-y-1">
+        {category.items.map((item) => (
+          <NavItemComponent
+            key={item.href}
+            item={item}
+            pathname={pathname}
+            expanded={expandedItems.includes(item.name)}
+            onToggle={() => onToggleItem(item.name)}
+            onNavigate={onNavigate}
+            collapsed={true}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      {/* Category Header */}
+      <button
+        onClick={onToggleCategory}
+        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+      >
+        <span>{category.name}</span>
+        <motion.div
+          animate={{ rotate: expanded ? 90 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </motion.div>
+      </button>
+
+      {/* Category Items */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden space-y-0.5"
+          >
+            {category.items.map((item) => (
+              <NavItemComponent
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                expanded={expandedItems.includes(item.name)}
+                onToggle={() => onToggleItem(item.name)}
+                onNavigate={onNavigate}
+                collapsed={false}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// Nav Item Component
 interface NavItemComponentProps {
   item: NavItem;
   pathname: string | null;
@@ -562,7 +722,7 @@ function NavItemComponent({ item, pathname, expanded, onToggle, onNavigate, coll
 
   if (collapsed) {
     return (
-      <Link href={item.href}>
+      <Link href={item.href} onClick={onNavigate}>
         <motion.div
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -660,6 +820,11 @@ function NavItemComponent({ item, pathname, expanded, onToggle, onNavigate, coll
           <Icon className="h-4 w-4" />
         </div>
         <span className="text-sm font-medium">{item.name}</span>
+        {item.badge && (
+          <span className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+            {item.badge}
+          </span>
+        )}
       </motion.div>
     </Link>
   );

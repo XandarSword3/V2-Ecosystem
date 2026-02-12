@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection";
 import { getOnlineUsers } from "../../socket";
 import { logger } from "../../utils/logger.js";
@@ -31,8 +32,7 @@ interface UserRoleData {
 }
 
 // Get users with advanced filtering and online status
-export async function getUsers(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getUsers = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { type, limit = 50, offset = 0, search } = req.query; // type: 'customer' | 'staff' | 'admin'
 
@@ -138,13 +138,9 @@ export async function getUsers(req: Request, res: Response, next: NextFunction) 
       data: filteredResults,
       total: count // Note: count might be inaccurate due to in-memory filtering
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getUserDetails(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getUserDetails = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
 
@@ -281,17 +277,13 @@ export async function getUserDetails(req: Request, res: Response, next: NextFunc
     };
 
     res.json({ success: true, data: detailedUser });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // ============================================
 // User Management (Create, Update, Delete)
 // ============================================
 
-export async function createUser(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createUser = asyncHandler(async (req: Request, res: Response) => {
     // Validate input with strong password requirements
     const validatedData = validateBody(createUserSchema, req.body);
     const { email, password, full_name, phone, roles } = validatedData;
@@ -355,13 +347,9 @@ export async function createUser(req: Request, res: Response, next: NextFunction
     });
 
     res.status(201).json({ success: true, data: { ...user, roles } });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateUser(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(adminUpdateUserSchema, req.body);
     const supabase = getSupabase();
     const updateData: Record<string, unknown> = {
@@ -391,13 +379,9 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
     });
 
     res.json({ success: true, data: user });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateUserRoles(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateUserRoles = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(assignUserRolesSchema, req.body);
     const supabase = getSupabase();
     let { roleIds, roles } = validatedData;
@@ -448,13 +432,9 @@ export async function updateUserRoles(req: Request, res: Response, next: NextFun
     });
 
     res.json({ success: true, message: 'Roles updated' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteUser(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { error } = await supabase
       .from('users')
@@ -474,7 +454,4 @@ export async function deleteUser(req: Request, res: Response, next: NextFunction
     });
 
     res.json({ success: true, message: 'User deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});

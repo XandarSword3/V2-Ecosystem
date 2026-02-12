@@ -1,7 +1,7 @@
-import { getSupabase } from "../database/connection";
+import { getSupabase } from "../database/connection.js";
 import * as fs from "fs";
 import * as path from "path";
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger.js";
 
 const MIGRATION_FILE = path.join(__dirname, "../database/migrations/create_permissions_tables.sql");
 

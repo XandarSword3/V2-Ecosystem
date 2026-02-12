@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from "../../../database/connection.js";
 import { emailService } from "../../../services/email.service.js";
 import { purchasePoolTicketSchema, validateBody } from "../../../validation/schemas.js";
@@ -22,8 +23,7 @@ function generateTicketNumber(): string {
 /**
  * Purchase a pool ticket
  */
-export async function purchaseTicket(req: Request, res: Response, next: NextFunction) {
-  try {
+export const purchaseTicket = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(purchasePoolTicketSchema, req.body);
 
     const supabase = getSupabase();
@@ -156,16 +156,12 @@ export async function purchaseTicket(req: Request, res: Response, next: NextFunc
     }
 
     res.status(201).json({ success: true, data: ticket });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get a ticket by ID
  */
-export async function getTicket(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTicket = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: ticket, error: ticketError } = await supabase
       .from('pool_tickets')
@@ -209,16 +205,12 @@ export async function getTicket(req: Request, res: Response, next: NextFunction)
     if (sessionError) throw sessionError;
 
     res.json({ success: true, data: { ...ticket, session } });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get current user's tickets
  */
-export async function getMyTickets(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getMyTickets = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: tickets, error } = await supabase
       .from('pool_tickets')
@@ -229,16 +221,12 @@ export async function getMyTickets(req: Request, res: Response, next: NextFuncti
     if (error) throw error;
 
     res.json({ success: true, data: tickets || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Cancel a ticket
  */
-export async function cancelTicket(req: Request, res: Response, next: NextFunction) {
-  try {
+export const cancelTicket = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
     const { reason } = req.body;
@@ -316,16 +304,12 @@ export async function cancelTicket(req: Request, res: Response, next: NextFuncti
     });
 
     res.json({ success: true, data: cancelledTicket });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Validate a ticket (staff)
  */
-export async function validateTicket(req: Request, res: Response, next: NextFunction) {
-  try {
+export const validateTicket = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { ticketNumber } = req.params;
 
@@ -382,16 +366,12 @@ export async function validateTicket(req: Request, res: Response, next: NextFunc
       data: ticket,
       validation: { isValid: true, reason: 'VALID' }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Record pool entry
  */
-export async function recordEntry(req: Request, res: Response, next: NextFunction) {
-  try {
+export const recordEntry = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { ticketNumber } = req.params;
 
@@ -435,16 +415,12 @@ export async function recordEntry(req: Request, res: Response, next: NextFunctio
     });
 
     res.json({ success: true, data: updated });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Record pool exit
  */
-export async function recordExit(req: Request, res: Response, next: NextFunction) {
-  try {
+export const recordExit = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { ticketNumber } = req.params;
 
@@ -484,16 +460,12 @@ export async function recordExit(req: Request, res: Response, next: NextFunction
     });
 
     res.json({ success: true, data: updated });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get today's tickets (admin)
  */
-export async function getTodayTickets(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTodayTickets = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
@@ -508,7 +480,4 @@ export async function getTodayTickets(req: Request, res: Response, next: NextFun
     if (error) throw error;
 
     res.json({ success: true, data: tickets || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});

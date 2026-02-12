@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import * as tableService from "../services/table.service";
 
 // Helper to map DB response to Frontend model
@@ -7,15 +8,11 @@ const mapTableToResponse = (table: any) => ({
   is_available: table.is_active
 });
 
-export async function getTables(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTables = asyncHandler(async (req: Request, res: Response) => {
     const tables = await tableService.getAllTables();
     const mappedTables = tables.map(mapTableToResponse);
     res.json({ success: true, data: mappedTables });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 export async function createTable(req: Request, res: Response, next: NextFunction) {
   try {
@@ -62,8 +59,7 @@ export async function createTable(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function updateTable(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateTable = asyncHandler(async (req: Request, res: Response) => {
     const updateData = {
       ...req.body,
       // Map frontend is_available to backend isActive if present
@@ -72,16 +68,9 @@ export async function updateTable(req: Request, res: Response, next: NextFunctio
     
     const table = await tableService.updateTable(req.params.id, updateData);
     res.json({ success: true, data: mapTableToResponse(table) });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteTable(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteTable = asyncHandler(async (req: Request, res: Response) => {
     await tableService.deleteTable(req.params.id);
     res.json({ success: true, message: 'Table deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});

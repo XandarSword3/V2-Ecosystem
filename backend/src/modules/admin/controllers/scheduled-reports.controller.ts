@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { scheduledReportsService } from '../../../services/scheduled-reports.service.js';
 import { logActivity } from '../../../utils/activityLogger.js';
 import { logger } from '../../../utils/logger.js';
@@ -11,24 +12,19 @@ import { logger } from '../../../utils/logger.js';
 /**
  * List all scheduled reports
  */
-export async function getScheduledReports(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getScheduledReports = asyncHandler(async (req: Request, res: Response) => {
     const reports = await scheduledReportsService.listReports();
     
     res.json({
       success: true,
       data: reports,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Create a new scheduled report
  */
-export async function createScheduledReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createScheduledReport = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const { name, type, reportType, recipients, enabled = true } = req.body;
     
@@ -73,16 +69,12 @@ export async function createScheduledReport(req: Request, res: Response, next: N
       success: true,
       data: report,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Update a scheduled report
  */
-export async function updateScheduledReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateScheduledReport = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const { id } = req.params;
     const updates = req.body;
@@ -100,16 +92,12 @@ export async function updateScheduledReport(req: Request, res: Response, next: N
       success: true,
       data: report,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Delete a scheduled report
  */
-export async function deleteScheduledReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteScheduledReport = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const { id } = req.params;
     
@@ -126,16 +114,12 @@ export async function deleteScheduledReport(req: Request, res: Response, next: N
       success: true,
       message: 'Scheduled report deleted',
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Send a report immediately (manual trigger)
  */
-export async function sendReportNow(req: Request, res: Response, next: NextFunction) {
-  try {
+export const sendReportNow = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const { id } = req.params;
     
@@ -152,16 +136,12 @@ export async function sendReportNow(req: Request, res: Response, next: NextFunct
       success: true,
       message: 'Report sent successfully',
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Preview a report (generate without sending)
  */
-export async function previewReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const previewReport = asyncHandler(async (req: Request, res: Response) => {
     const { reportType, period = 'day' } = req.query;
     
     if (!reportType) {
@@ -194,7 +174,4 @@ export async function previewReport(req: Request, res: Response, next: NextFunct
         htmlPreview: html,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});

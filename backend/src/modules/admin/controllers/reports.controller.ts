@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection';
 import dayjs from 'dayjs';
 
@@ -14,8 +15,7 @@ interface OrderItemWithJoins {
   snack_items?: { name: string } | null;
 }
 
-export async function getOverviewReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getOverviewReport = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { range = 'month' } = req.query;
 
@@ -152,13 +152,9 @@ export async function getOverviewReport(req: Request, res: Response, next: NextF
         topItems,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function exportReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const exportReport = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { type, format = 'csv', range = 'month' } = req.query;
 
@@ -326,13 +322,9 @@ export async function exportReport(req: Request, res: Response, next: NextFuncti
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
     return res.send(csv);
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getOccupancyReport(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getOccupancyReport = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { range = 'month' } = req.query;
 
@@ -396,13 +388,9 @@ export async function getOccupancyReport(req: Request, res: Response, next: Next
         }
       }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getCustomerAnalytics(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getCustomerAnalytics = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { range = 'month' } = req.query;
 
@@ -481,7 +469,4 @@ export async function getCustomerAnalytics(req: Request, res: Response, next: Ne
         }
       }
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});

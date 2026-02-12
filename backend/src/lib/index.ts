@@ -28,7 +28,7 @@
  * ## Usage in Production
  * 
  * ```typescript
- * import { createContainer, createPoolService, createPoolController } from './lib';
+ * import { createContainer, createPoolService, createPoolController } from "./lib.js";
  * 
  * const container = createContainer();
  * const poolService = createPoolService(container);
@@ -40,7 +40,7 @@
  * ## Usage in Tests
  * 
  * ```typescript
- * import { createInMemoryPoolRepository, createPoolService } from './lib';
+ * import { createInMemoryPoolRepository, createPoolService } from "./lib.js";
  * 
  * const mockRepo = createInMemoryPoolRepository();
  * mockRepo.addSession({ name: 'Test', capacity: 100 });

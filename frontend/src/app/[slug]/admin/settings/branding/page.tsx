@@ -872,7 +872,7 @@ export default function AdminBrandingPage() {
                             Show "Powered By" Footer
                           </FormLabel>
                           <FormDescription>
-                            Display V2 Resort attribution in the footer
+                            Display Iron Paradise Gym attribution in the footer
                           </FormDescription>
                         </div>
                         <FormControl>

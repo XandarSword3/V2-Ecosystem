@@ -5,7 +5,8 @@
  */
 
 import { z } from 'zod';
-import { prisma } from '../config/database.js';
+import { randomInt } from 'crypto'; // FIX: Iteration 20 - CSPRNG for password generation
+import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
 
 // Default password policy
@@ -58,18 +59,17 @@ interface UserInfo {
  */
 export async function getPasswordPolicy(): Promise<PasswordPolicy> {
   try {
-    const settings = await prisma.systemSettings.findMany({
-      where: {
-        category: 'security',
-        key: {
-          startsWith: 'password.'
-        }
-      }
-    });
+    const supabase = getSupabase();
+    const { data: settings, error } = await supabase
+      .from('system_settings')
+      .select('*')
+      .eq('category', 'security')
+      .like('key', 'password.%');
+    if (error) throw error;
 
     const policy = { ...DEFAULT_POLICY };
 
-    for (const setting of settings) {
+    for (const setting of (settings || [])) {
       const key = setting.key.replace('password.', '') as keyof PasswordPolicy;
       if (key in policy) {
         const value = setting.value;
@@ -98,25 +98,22 @@ export async function updatePasswordPolicy(
   userId: string
 ): Promise<void> {
   const validKeys = Object.keys(DEFAULT_POLICY);
-  
+  const supabase = getSupabase();
+
   for (const [key, value] of Object.entries(policy)) {
     if (!validKeys.includes(key)) continue;
     
-    await prisma.systemSettings.upsert({
-      where: { key: `password.${key}` },
-      update: {
-        value: String(value),
-        updatedAt: new Date(),
-        updatedBy: userId
-      },
-      create: {
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert({
         key: `password.${key}`,
         value: String(value),
         category: 'security',
-        createdBy: userId,
-        updatedBy: userId
-      }
-    });
+        updated_at: new Date().toISOString(),
+        updated_by: userId,
+        created_by: userId,
+      }, { onConflict: 'key' });
+    if (error) throw error;
   }
 
   logger.info('Password policy updated', { userId, changes: Object.keys(policy) });
@@ -283,20 +280,26 @@ export function generateSecurePassword(length: number = 16): string {
   const special = '!@#$%^&*()_+-=[]{}|;:,.<>?';
   const all = uppercase + lowercase + numbers + special;
 
+  // FIX: Iteration 20 - Use crypto.randomInt() instead of Math.random() for CSPRNG
   // Ensure at least one of each type
   let password = '';
-  password += uppercase[Math.floor(Math.random() * uppercase.length)];
-  password += lowercase[Math.floor(Math.random() * lowercase.length)];
-  password += numbers[Math.floor(Math.random() * numbers.length)];
-  password += special[Math.floor(Math.random() * special.length)];
+  password += uppercase[randomInt(uppercase.length)];
+  password += lowercase[randomInt(lowercase.length)];
+  password += numbers[randomInt(numbers.length)];
+  password += special[randomInt(special.length)];
 
   // Fill the rest randomly
   for (let i = password.length; i < length; i++) {
-    password += all[Math.floor(Math.random() * all.length)];
+    password += all[randomInt(all.length)];
   }
 
-  // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  // Fisher-Yates shuffle with CSPRNG
+  const arr = password.split('');
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.join('');
 }
 
 export default {

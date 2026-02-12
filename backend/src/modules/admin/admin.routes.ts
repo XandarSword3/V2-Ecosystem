@@ -18,6 +18,7 @@ import * as notificationsController from "./controllers/notifications.controller
 import * as uploadController from "./controllers/upload.controller";
 import * as scheduledReportsController from "./controllers/scheduled-reports.controller";
 import * as deletePreviewController from "./controllers/delete-preview.controller";
+import pricingRoutes from "./pricing.controller";
 import * as softDeleteController from "./controllers/soft-delete.controller";
 
 const router = Router();
@@ -72,6 +73,10 @@ router.get('/permissions', authorize('super_admin'), permissionsController.getAl
 // Settings (using refactored controller) - SUPER ADMIN ONLY
 router.get('/settings', authorize('super_admin'), settingsController.getSettings);
 router.put('/settings', authorize('super_admin'), settingsController.updateSettings);
+
+// FIX: Iteration 26 - Dedicated homepage settings endpoint (frontend calls /admin/settings/homepage which 404'd)
+router.get('/settings/homepage', authorize('super_admin'), settingsController.getHomepageSettings);
+router.put('/settings/homepage', authorize('super_admin'), settingsController.updateHomepageSettings);
 
 // File Uploads (branding assets) - MANAGER
 router.get('/uploads', authorizeManager, uploadController.listFiles);
@@ -149,6 +154,9 @@ router.post('/translations/ui/publish', authorize('super_admin'), translationsCo
 
 // Delete Preview - Impact Analysis - MANAGER
 router.get('/delete-preview/:entityType/:entityId', authorizeManager, deletePreviewController.getDeletePreview);
+
+// Pricing Management - SUPER ADMIN
+router.use('/pricing', pricingRoutes);
 
 // Soft Delete Management
 router.get('/deleted/:entityType', authorizeManager, softDeleteController.getDeletedRecords);

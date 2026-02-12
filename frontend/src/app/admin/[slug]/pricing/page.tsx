@@ -103,8 +103,15 @@ export default function DynamicPricingPage() {
       setShowModal(false);
       setEditing(null);
       fetchPricingRules();
-    } catch (error) {
-      toast.error(tc('errors.failedToSave'));
+    } catch (error: any) {
+      // Show detailed error message for debugging
+      const errorMessage = error?.response?.data?.error || error?.message || tc('errors.failedToSave');
+      console.error('Pricing rule save error:', {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message
+      });
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }

@@ -8,7 +8,7 @@ import {
   Currency, 
   currencySymbols, 
   currencyNames 
-} from '@/lib/stores/settingsStore';
+} from '@/stores/settingsStore';
 
 const currencies: Currency[] = ['USD', 'EUR', 'LBP'];
 

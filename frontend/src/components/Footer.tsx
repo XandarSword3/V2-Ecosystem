@@ -25,10 +25,13 @@ export default function Footer() {
     const tFooter = useTranslations('footer');
     const { settings, modules } = useSiteSettings();
 
-    // Don't show footer on admin or staff pages
-    if (pathname?.startsWith('/admin') || pathname?.startsWith('/staff')) {
-        return null;
-    }
+    // Get active modules for Quick Links - memoized
+    const activeModules = useMemo(() => {
+        if (!modules || modules.length === 0) return [];
+        return modules
+            .filter(m => m.is_active && m.show_in_main)
+            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    }, [modules]);
 
     // Helper to translate nav items
     const getNavTranslation = (slug: string) => {
@@ -42,43 +45,36 @@ export default function Footer() {
         return navMap[slug.toLowerCase()] || slug;
     };
 
-    // Get active modules for Quick Links - memoized
-    const activeModules = useMemo(() => {
-        if (!modules || modules.length === 0) return [];
-        return modules
-            .filter(m => m.is_active && m.show_in_main)
-            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-    }, [modules]);
-
     // Build dynamic Quick Links from active modules
     const dynamicQuickLinks = useMemo(() => {
         if (activeModules.length === 0) {
-            // Fallback to defaults when no modules configured
+            // No modules configured - show just gift cards
             return [
-                { label: tNav('restaurant'), href: '/restaurant' },
-                { label: tNav('snackBar'), href: '/snack-bar' },
-                { label: tNav('chalets'), href: '/chalets' },
-                { label: tNav('pool'), href: '/pool' },
                 { label: tFooter('giftCards') || 'Gift Cards', href: '/giftcards' }
             ];
         }
-        
+
         // Build links from active modules
         const moduleLinks = activeModules.map(m => ({
             label: getNavTranslation(m.slug) || m.name,
             href: `/${m.slug}`,
             moduleSlug: m.slug
         }));
-        
+
         // Add gift cards link
         moduleLinks.push({ label: tFooter('giftCards') || 'Gift Cards', href: '/giftcards', moduleSlug: '' });
-        
+
         return moduleLinks;
     }, [activeModules, tNav, tFooter]);
 
+    // Don't show footer on admin or staff pages
+    if (pathname?.startsWith('/admin') || pathname?.startsWith('/staff')) {
+        return null;
+    }
+
     // Build footer with translations - always use translated defaults
     const defaultFooterConfig = {
-        logo: { text: settings.resortName || 'V2 Resort', showIcon: true },
+        logo: { text: settings.resortName || 'Iron Paradise Gym', showIcon: true },
         description: tFooter('description'),
         columns: [
             {
@@ -122,18 +118,25 @@ export default function Footer() {
         text: string;
         showIcon: boolean;
     }
-    
+
     // Normalize logo to always be an object
     const normalizeLogo = (logo: string | FooterLogo | undefined): FooterLogo => {
         if (!logo) return defaultFooterConfig.logo;
         if (typeof logo === 'string') return { text: logo, showIcon: true };
         return { text: logo.text || defaultFooterConfig.logo.text, showIcon: logo.showIcon ?? true };
     };
-    
+
+    // FIX Iter-7: Fallback socials to defaults when CMS provides empty URLs, and filter out any with blank href
+    const normalizeSocials = (cmsSocials: { platform: string; url: string }[] | undefined) => {
+        const socials = cmsSocials && cmsSocials.length > 0 ? cmsSocials : defaultFooterConfig.socials;
+        return socials.filter((s: { platform: string; url: string }) => s.url && s.url.trim() !== '');
+    };
+
     const footerConfig = settings.footer ? {
         ...settings.footer,
         logo: normalizeLogo(settings.footer.logo),
         description: settings.footer.description || defaultFooterConfig.description,
+        socials: normalizeSocials(settings.footer.socials), // FIX Iter-7: socials fallback + filter
         columns: settings.footer.columns?.map((col: FooterColumn) => ({
             ...col,
             // Translate column title if it matches known keys
@@ -141,8 +144,8 @@ export default function Footer() {
             links: col.links?.map((link: FooterLink) => ({
                 ...link,
                 // Translate link labels for module links
-                label: link.moduleSlug ? getNavTranslation(link.moduleSlug) : 
-                       link.labelKey ? tFooter(link.labelKey) : link.label
+                label: link.moduleSlug ? getNavTranslation(link.moduleSlug) :
+                    link.labelKey ? tFooter(link.labelKey) : link.label
             }))
         })) || defaultFooterConfig.columns,
         copyright: settings.footer.copyright || defaultFooterConfig.copyright
@@ -164,7 +167,7 @@ export default function Footer() {
                 <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl" />
                 <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-secondary-500/10 rounded-full blur-3xl" />
             </div>
-            
+
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
                     {/* Brand Column */}
@@ -182,12 +185,13 @@ export default function Footer() {
                                     className="w-12 h-12 bg-gradient-to-br from-primary-400 via-primary-500 to-primary-600 rounded-xl flex items-center justify-center shadow-xl shadow-primary-500/30 backdrop-blur-sm"
                                 >
                                     <span className="text-white font-bold text-xl">
-                                        {footerConfig.logo.text.substring(0, 2)}
+                                        {/* Generate initials from text */}
+                                        {footerConfig.logo.text.split(' ').map((word: string) => word[0]).slice(0, 2).join('').toUpperCase()}
                                     </span>
                                 </motion.div>
                             )}
                             <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                                {footerConfig.logo.text.substring(footerConfig.logo.showIcon ? 2 : 0)}
+                                {footerConfig.logo.text}
                             </span>
                         </div>
 
@@ -255,32 +259,40 @@ export default function Footer() {
                         <h4 className="text-sm font-semibold uppercase tracking-wider text-white/80 mb-6">
                             {tFooter('contact')}
                         </h4>
-                        <ul className="space-y-4 text-slate-400/90">
-                            {footerConfig.contact?.showAddress && (
-                                <li className="flex items-start gap-3 group">
-                                    <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
-                                        <MapPin className="w-4 h-4 text-primary-400" />
-                                    </div>
-                                    <span className="text-sm leading-relaxed">{settings.address || tFooter('address')}</span>
-                                </li>
-                            )}
-                            {footerConfig.contact?.showPhone && (
-                                <li className="flex items-center gap-3 group">
-                                    <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
-                                        <Phone className="w-4 h-4 text-primary-400" />
-                                    </div>
-                                    <span className="text-sm">{settings.phone || tFooter('phone')}</span>
-                                </li>
-                            )}
-                            {footerConfig.contact?.showEmail && (
-                                <li className="flex items-center gap-3 group">
-                                    <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
-                                        <Mail className="w-4 h-4 text-primary-400" />
-                                    </div>
-                                    <span className="text-sm">{settings.email || tFooter('email')}</span>
-                                </li>
-                            )}
-                        </ul>
+                        <address className="not-italic">
+                            <ul className="space-y-4 text-slate-400/90">
+                                {footerConfig.contact?.showAddress && (
+                                    <li className="flex items-start gap-3 group">
+                                        <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
+                                            <MapPin className="w-4 h-4 text-primary-400" aria-hidden="true" />
+                                        </div>
+                                        <span className="text-sm leading-relaxed">{settings.address || tFooter('address')}</span>
+                                    </li>
+                                )}
+                                {footerConfig.contact?.showPhone && (
+                                    <li className="flex items-center gap-3 group">
+                                        <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
+                                            <Phone className="w-4 h-4 text-primary-400" aria-hidden="true" />
+                                        </div>
+                                        {/* FIX Iter-4: Use same fallback for href as display text */}
+                                        <a href={`tel:${settings.phone || tFooter('phone')}`} className="text-sm hover:text-white transition-colors">
+                                            {settings.phone || tFooter('phone')}
+                                        </a>
+                                    </li>
+                                )}
+                                {footerConfig.contact?.showEmail && (
+                                    <li className="flex items-center gap-3 group">
+                                        <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
+                                            <Mail className="w-4 h-4 text-primary-400" aria-hidden="true" />
+                                        </div>
+                                        {/* FIX Iter-4: Use same fallback for href as display text */}
+                                        <a href={`mailto:${settings.email || tFooter('email')}`} className="text-sm hover:text-white transition-colors">
+                                            {settings.email || tFooter('email')}
+                                        </a>
+                                    </li>
+                                )}
+                            </ul>
+                        </address>
                     </motion.div>
                 </div>
 

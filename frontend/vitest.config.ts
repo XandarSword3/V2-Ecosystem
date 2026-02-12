@@ -10,9 +10,13 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
     exclude: ['node_modules', '.next', 'dist'],
+    pool: 'threads',
+    maxConcurrency: 10,
+    fileParallelism: true,
     coverage: {
+      enabled: true,
       provider: 'v8',
-      reporter: ['text', 'html', 'json'],
+      reporter: ['text', 'json-summary'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'src/**/*.d.ts',
@@ -20,6 +24,8 @@ export default defineConfig({
         'src/**/*.stories.{ts,tsx}',
         'node_modules',
       ],
+      reportsDirectory: './coverage',
+      reportOnFailure: true,
     },
     css: {
       modules: {

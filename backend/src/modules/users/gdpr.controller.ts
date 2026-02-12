@@ -1,4 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { logActivity } from '../../utils/activityLogger.js';
@@ -31,9 +32,8 @@ interface UserData {
  * GDPR Article 15 - Right of Access
  * Returns all personal data associated with the authenticated user
  */
-export async function exportUserData(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
+export const exportUserData = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
     
     if (!userId) {
       res.status(401).json({ success: false, error: 'Authentication required' });
@@ -162,11 +162,7 @@ export async function exportUserData(req: Request, res: Response, next: NextFunc
         'activity_logs'
       ]
     });
-  } catch (error) {
-    logger.error('GDPR data export failed', { error, userId: (req as Request & { user?: { userId: string } }).user?.userId });
-    next(error);
-  }
-}
+});
 
 /**
  * DELETE /api/users/me/data
@@ -175,9 +171,8 @@ export async function exportUserData(req: Request, res: Response, next: NextFunc
  * 
  * Note: Some data may be retained for legal/compliance reasons (configurable)
  */
-export async function deleteUserData(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
+export const deleteUserData = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
     
     if (!userId) {
       res.status(401).json({ success: false, error: 'Authentication required' });
@@ -343,23 +338,15 @@ export async function deleteUserData(req: Request, res: Response, next: NextFunc
       summary: deletionResults,
       note: 'Financial records have been anonymized for compliance but retained for accounting purposes'
     });
-  } catch (error) {
-    logger.error('GDPR account deletion failed', { 
-      error, 
-      userId: (req as Request & { user?: { userId: string } }).user?.userId 
-    });
-    next(error);
-  }
-}
+});
 
 /**
  * POST /api/users/me/data/portable
  * GDPR Article 20 - Right to Data Portability
  * Returns user data in a machine-readable format (JSON)
  */
-export async function getPortableData(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
+export const getPortableData = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
     
     if (!userId) {
       res.status(401).json({ success: false, error: 'Authentication required' });
@@ -391,12 +378,5 @@ export async function getPortableData(req: Request, res: Response, next: NextFun
       user_agent: req.get('user-agent')
     });
 
-    await exportUserData(tempReq, tempRes as unknown as Response, next);
-  } catch (error) {
-    logger.error('GDPR data portability failed', { 
-      error, 
-      userId: (req as Request & { user?: { userId: string } }).user?.userId 
-    });
-    next(error);
-  }
-}
+    await exportUserData(tempReq, tempRes as unknown as Response, ((err: unknown) => { if (err) throw err; }) as any);
+});

@@ -1,4 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection.js';
 import { logger } from '../../../utils/logger.js';
 
@@ -38,8 +39,7 @@ interface DeletePreviewResult {
  * GET /api/admin/delete-preview/:entityType/:entityId
  * Returns impact analysis for deleting an entity
  */
-export async function getDeletePreview(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
+export const getDeletePreview = asyncHandler(async (req: Request, res: Response) => {
     const { entityType, entityId } = req.params;
     const supabase = getSupabase();
 
@@ -88,11 +88,7 @@ export async function getDeletePreview(req: Request, res: Response, next: NextFu
     });
 
     res.json({ success: true, data: result });
-  } catch (error: any) {
-    logger.error('Error generating delete preview', { error: error.message });
-    next(error);
-  }
-}
+});
 
 /**
  * User delete preview

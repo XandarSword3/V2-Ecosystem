@@ -4,10 +4,10 @@
  */
 
 import Stripe from 'stripe';
-import { supabase } from '../lib/supabase';
-import { emailService } from './email.service';
-import { activityLogger } from '../utils/activityLogger';
-import { logger } from '../utils/logger';
+import { supabase } from "../lib/supabase.js";
+import { emailService } from "./email.service.js";
+import { activityLogger } from "../utils/activityLogger.js";
+import { logger } from "../utils/logger.js";
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -84,9 +84,9 @@ class ChargebackService {
       currency: dispute.currency.toUpperCase(),
       reason: dispute.reason,
       status: 'needs_response' as ChargebackStatus,
-      due_date: new Date(dispute.evidence_details.due_by * 1000).toISOString(),
-      evidence_submitted: null,
-      outcome: null,
+      due_date: new Date((dispute.evidence_details.due_by ?? 0) * 1000).toISOString(),
+      evidence_submitted: null as string | null,
+      outcome: null as string | null,
     };
 
     const { data: chargeback, error: insertError } = await supabase

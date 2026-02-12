@@ -1,8 +1,8 @@
 
-import { initializeDatabase, getPool, closeDatabase } from './connection';
+import { initializeDatabase, getPool, closeDatabase } from "./connection.js";
 import fs from 'fs';
 import path from 'path';
-import { logger } from '../utils/logger';
+import { logger } from "../utils/logger.js";
 
 async function runMigration() {
   try {

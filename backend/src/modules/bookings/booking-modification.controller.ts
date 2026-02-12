@@ -4,7 +4,8 @@
  * API endpoints for modifying, cancelling, and rescheduling bookings.
  */
 
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
+import { asyncHandler } from '../../middleware/async-handler.js';
 import { z } from 'zod';
 import { authenticate as authMiddleware } from '../../middleware/auth.middleware';
 import { logger } from '../../utils/logger';
@@ -40,8 +41,7 @@ const rescheduleTicketSchema = z.object({
 router.post(
   '/chalets/:id/cancel',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const userId = req.user!.id;
       
@@ -66,10 +66,7 @@ router.post(
           creditAmount: result.creditAmount,
         },
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -79,8 +76,7 @@ router.post(
 router.put(
   '/chalets/:id/dates',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const userId = req.user!.id;
       
@@ -119,10 +115,7 @@ router.put(
           newPaymentRequired: result.newPaymentRequired,
         },
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -132,14 +125,17 @@ router.put(
 router.get(
   '/chalets/:id/cancellation-policy',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       
-      const booking = await prisma.chaletBooking.findUnique({
-        where: { id },
-        select: { checkInDate: true, totalPrice: true },
-      });
+      const supabase = getSupabase();
+      const { data: booking, error: bookingError } = await supabase
+        .from('chalet_bookings')
+        .select('check_in_date, total_price')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (bookingError) throw bookingError;
 
       if (!booking) {
         return res.status(404).json({
@@ -148,9 +144,9 @@ router.get(
         });
       }
 
-      const policy = getCancellationPolicy(new Date(booking.checkInDate));
+      const policy = getCancellationPolicy(new Date(booking.check_in_date || new Date()));
       const refundAmount = Math.round(
-        (Number(booking.totalPrice) * policy.refundPercentage) / 100
+        (Number(booking.total_price) * policy.refundPercentage) / 100
       );
 
       res.json({
@@ -162,10 +158,7 @@ router.get(
           daysBeforeCheckin: policy.daysBeforeCheckin,
         },
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -175,8 +168,7 @@ router.get(
 router.post(
   '/pool-tickets/:id/cancel',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const userId = req.user!.id;
       
@@ -201,10 +193,7 @@ router.post(
           creditAmount: result.creditAmount,
         },
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -214,8 +203,7 @@ router.post(
 router.put(
   '/pool-tickets/:id/reschedule',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const userId = req.user!.id;
       
@@ -248,10 +236,7 @@ router.put(
         success: true,
         message: result.message,
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
 /**
@@ -261,8 +246,7 @@ router.put(
 router.get(
   '/credits',
   authMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
+  asyncHandler(async (req: Request, res: Response) => {
       const userId = req.user!.id;
       const { totalCredits, credits } = await getUserCredits(userId);
 
@@ -278,13 +262,10 @@ router.get(
           })),
         },
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+  })
 );
 
-// Import prisma for direct queries
-import { prisma } from '../../config/database.js';
+// Using Supabase for direct queries
+import { getSupabase } from '../../database/connection.js';
 
 export default router;

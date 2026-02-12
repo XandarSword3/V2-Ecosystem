@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 export function HydrateSettingsFromBackend() {
   useEffect(() => {
     async function hydrate() {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
         const res = await fetch(`${apiUrl.replace(/\/api\/?$/, '')}/api/settings`);
         if (!res.ok) return;
         const data = await res.json();

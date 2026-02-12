@@ -1,8 +1,8 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
-import { config } from "../config/index";
-import { logger } from "../utils/logger";
-import { verifyToken } from "../modules/auth/auth.utils";
+import { config } from "../config/index.js";
+import { logger } from "../utils/logger.js";
+import { verifyToken } from "../modules/auth/auth.utils.js";
 
 let io: Server;
 
@@ -25,30 +25,30 @@ const activeConnections = new Map<string, ActiveConnection>();
 // Function to check if origin is allowed for socket.io (same as Express CORS)
 function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return true;
-  
+
   const allowedOrigins = [
     'http://localhost:3000',
-    'http://localhost:3001', 
+    'http://localhost:3001',
     'http://localhost:3002',
     'http://localhost:3003',
     config.frontendUrl,
     'https://v2-ecosystem.vercel.app',
   ].filter(Boolean);
-  
+
   // Check exact match
   if (allowedOrigins.includes(origin)) return true;
-  
+
   // Allow only YOUR Vercel project's preview URLs
   // Pattern: https://v2-ecosystem-{hash}-{username}.vercel.app
   if (origin.match(/^https:\/\/v2-ecosystem(-[a-z0-9]+)*\.vercel\.app$/)) return true;
-  
+
   return false;
 }
 
 export function getOnlineUsers(): string[] {
   if (!io) return [];
   const userIds = new Set<string>();
-  
+
   // Iterate through all connected sockets
   io.sockets.sockets.forEach((socket) => {
     if (socket.data.userId) {
@@ -66,13 +66,13 @@ export function getOnlineUsersDetailed(): ActiveConnection[] {
 
 // Get count of authenticated users only
 function getAuthenticatedUserCount(): number {
-  let count = 0;
+  const userIds = new Set<string>();
   activeConnections.forEach(conn => {
     if (conn.userId) {
-      count++;
+      userIds.add(conn.userId);
     }
   });
-  return count;
+  return userIds.size;
 }
 
 // Broadcast online users update to admins
@@ -168,7 +168,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
   adminIo.on('connection', (socket) => {
     handleConnection(socket, 'admin');
-    
+
     // Join Role Rooms
     socket.data.roles?.forEach((r: string) => socket.join(`role:${r}`));
     if (socket.data.userId) socket.join(`user:${socket.data.userId}`);
@@ -177,18 +177,19 @@ export function initializeSocketServer(httpServer: HttpServer) {
     broadcastOnlineUsersToAdmins();
 
     socket.on('request:online_users', () => {
-       socket.emit('stats:online_users', { count: getAuthenticatedUserCount() });
+      socket.emit('stats:online_users', { count: getAuthenticatedUserCount() });
     });
-    
+
     socket.on('request:online_users_detailed', () => {
       if (socket.data.roles?.includes('admin') || socket.data.roles?.includes('super_admin')) {
         const users = getOnlineUsersDetailed();
-        socket.emit('stats:online_users_detailed', { users, count: users.length });
+        // Use authenticated user count (unique users) not socket count
+        socket.emit('stats:online_users_detailed', { users, count: getAuthenticatedUserCount() });
       }
     });
 
     socket.on('join:unit', (unit: string) => {
-        if (['restaurant', 'snack_bar', 'chalets', 'pool'].includes(unit)) socket.join(`unit:${unit}`);
+      if (['restaurant', 'snack_bar', 'chalets', 'pool'].includes(unit)) socket.join(`unit:${unit}`);
     });
   });
 
@@ -207,6 +208,26 @@ export function initializeSocketServer(httpServer: HttpServer) {
   io.on('connection', (socket) => {
     handleConnection(socket, 'public');
     if (socket.data.userId) socket.join(`user:${socket.data.userId}`);
+
+    // Join role rooms so public-namespace clients receive role-targeted events
+    socket.data.roles?.forEach((r: string) => socket.join(`role:${r}`));
+
+    // Allow public-namespace clients to join unit rooms (restaurant, snack_bar, etc.)
+    socket.on('join:unit', (unit: string) => {
+      if (['restaurant', 'snack_bar', 'chalets', 'pool'].includes(unit)) socket.join(`unit:${unit}`);
+    });
+
+    // Allow public-namespace clients to request online users
+    socket.on('request:online_users', () => {
+      socket.emit('stats:online_users', { count: getAuthenticatedUserCount() });
+    });
+
+    socket.on('request:online_users_detailed', () => {
+      if (socket.data.roles?.includes('admin') || socket.data.roles?.includes('super_admin')) {
+        const users = getOnlineUsersDetailed();
+        socket.emit('stats:online_users_detailed', { users, count: getAuthenticatedUserCount() });
+      }
+    });
   });
 
   // Log connection stats periodically
@@ -236,19 +257,19 @@ export function getIO() {
  */
 export async function closeSocketServer(): Promise<void> {
   if (!io) return;
-  
+
   return new Promise((resolve) => {
     // Notify all connected clients
     io.emit('server:shutdown', { message: 'Server is shutting down' });
-    
+
     // Disconnect all sockets
     io.sockets.sockets.forEach((socket) => {
       socket.disconnect(true);
     });
-    
+
     // Clear active connections
     activeConnections.clear();
-    
+
     // Close the server
     io.close(() => {
       logger.info('Socket.io server closed');

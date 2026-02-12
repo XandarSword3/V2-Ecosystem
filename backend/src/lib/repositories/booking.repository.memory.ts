@@ -1,4 +1,4 @@
-import { Booking, BookingStatus, BookingSource, BookingRepository } from '../container/types';
+import { Booking, BookingStatus, BookingSource, BookingRepository } from "../container/types.js";
 
 export class InMemoryBookingRepository implements BookingRepository {
   private bookings: Map<string, Booking> = new Map();

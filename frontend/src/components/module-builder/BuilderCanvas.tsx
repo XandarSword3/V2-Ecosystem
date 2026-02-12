@@ -13,7 +13,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { useModuleBuilderStore } from '@/store/module-builder-store';
+import { useModuleBuilderStore } from '@/stores/module-builder-store';
 import { SortableBlock } from './SortableBlock';
 
 export function BuilderCanvas() {

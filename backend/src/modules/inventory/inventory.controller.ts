@@ -457,7 +457,7 @@ export class InventoryController {
       }
 
       const data = validation.data;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       // Generate SKU if not provided
@@ -640,7 +640,7 @@ export class InventoryController {
       }
 
       const data = validation.data;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       // Get current stock
@@ -754,7 +754,7 @@ export class InventoryController {
       }
 
       const { transactions } = validation.data;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
       const results: any[] = [];
       const errors: any[] = [];
@@ -858,7 +858,9 @@ export class InventoryController {
       }
 
       if (type) {
-        query = query.eq('type', type as string);
+        // FIX: Iteration 11 - Column is 'transaction_type' not 'type'; map API values to DB values
+        const dbType = type === 'in' ? 'purchase' : type === 'out' ? 'sale' : type as string;
+        query = query.eq('transaction_type', dbType);
       }
 
       if (startDate) {
@@ -996,7 +998,7 @@ export class InventoryController {
   async resolveAlert(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const supabase = getSupabase();
 
       const { error } = await supabase
@@ -1077,21 +1079,22 @@ export class InventoryController {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
+      // FIX: Iteration 11 - Column is 'transaction_type' not 'type'; DB stores 'purchase'/'sale' not 'in'/'out'
       const { data: recentTransactions } = await supabase
         .from('inventory_transactions')
-        .select('type, created_at')
+        .select('transaction_type, created_at')
         .gte('created_at', sevenDaysAgo.toISOString());
 
       // Group by date
       const activityByDate: Record<string, any> = {};
-      (recentTransactions || []).forEach(t => {
+      (recentTransactions || []).forEach((t: any) => {
         const date = t.created_at.split('T')[0];
         if (!activityByDate[date]) {
           activityByDate[date] = { date, stock_in: 0, stock_out: 0, waste: 0 };
         }
-        if (t.type === 'in') activityByDate[date].stock_in++;
-        else if (t.type === 'out') activityByDate[date].stock_out++;
-        else if (t.type === 'waste') activityByDate[date].waste++;
+        if (t.transaction_type === 'purchase') activityByDate[date].stock_in++;
+        else if (t.transaction_type === 'sale') activityByDate[date].stock_out++;
+        else if (t.transaction_type === 'waste') activityByDate[date].waste++;
       });
 
       const recentActivity = Object.values(activityByDate)

@@ -4,13 +4,13 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection';
 import { logger } from '../../../utils/logger';
 import { getContainer } from '../../../lib/container';
 import type { NotificationPriority, NotificationTargetType, NotificationType } from '../../../lib/container/types';
 
-export async function getNotifications(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getNotifications = asyncHandler(async (req: Request, res: Response) => {
     const container = getContainer();
     const notificationService = container.notificationService();
     const { userId } = req.query;
@@ -41,68 +41,80 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
       priority: string;
     }> = [];
 
-    // Get recent restaurant orders
-    const { data: recentOrders } = await supabase
-      .from('restaurant_orders')
-      .select('id, order_number, status, created_at')
-      .gte('created_at', oneDayAgo.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(5);
+    // Get recent restaurant orders with error handling
+    try {
+      const { data: recentOrders } = await supabase
+        .from('restaurant_orders')
+        .select('id, order_number, status, created_at')
+        .gte('created_at', oneDayAgo.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-    (recentOrders || []).forEach(order => {
-      systemNotifications.push({
-        id: `order-${order.id}`,
-        title: 'New Order',
-        message: `Order #${order.order_number} - ${order.status}`,
-        type: 'info',
-        target_type: 'staff',
-        created_at: order.created_at,
-        is_read: order.status !== 'pending',
-        priority: order.status === 'pending' ? 'high' : 'normal',
+      (recentOrders || []).forEach(order => {
+        systemNotifications.push({
+          id: `order-${order.id}`,
+          title: 'New Order',
+          message: `Order #${order.order_number} - ${order.status}`,
+          type: 'info',
+          target_type: 'staff',
+          created_at: order.created_at,
+          is_read: order.status !== 'pending',
+          priority: order.status === 'pending' ? 'high' : 'normal',
+        });
       });
-    });
+    } catch (error) {
+      logger.warn('Failed to fetch recent restaurant orders for notifications:', error);
+    }
 
-    // Get recent chalet bookings
-    const { data: recentBookings } = await supabase
-      .from('chalet_bookings')
-      .select('id, chalet_id, check_in_date, status, created_at')
-      .gte('created_at', oneDayAgo.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(5);
+    // Get recent chalet bookings with error handling
+    try {
+      const { data: recentBookings } = await supabase
+        .from('chalet_bookings')
+        .select('id, chalet_id, check_in_date, status, created_at')
+        .gte('created_at', oneDayAgo.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-    (recentBookings || []).forEach(booking => {
-      systemNotifications.push({
-        id: `booking-${booking.id}`,
-        title: 'Chalet Booking',
-        message: `New booking for ${booking.check_in_date}`,
-        type: 'info',
-        target_type: 'staff',
-        created_at: booking.created_at,
-        is_read: booking.status !== 'pending',
-        priority: 'normal',
+      (recentBookings || []).forEach(booking => {
+        systemNotifications.push({
+          id: `booking-${booking.id}`,
+          title: 'Chalet Booking',
+          message: `New booking for ${booking.check_in_date}`,
+          type: 'info',
+          target_type: 'staff',
+          created_at: booking.created_at,
+          is_read: booking.status !== 'pending',
+          priority: 'normal',
+        });
       });
-    });
+    } catch (error) {
+      logger.warn('Failed to fetch recent chalet bookings for notifications:', error);
+    }
 
-    // Get pending reviews
-    const { data: pendingReviews } = await supabase
-      .from('reviews')
-      .select('id, rating, created_at')
-      .eq('is_approved', false)
-      .order('created_at', { ascending: false })
-      .limit(5);
+    // Get pending reviews with error handling
+    try {
+      const { data: pendingReviews } = await supabase
+        .from('reviews')
+        .select('id, rating, created_at')
+        .eq('is_approved', false)
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-    (pendingReviews || []).forEach(review => {
-      systemNotifications.push({
-        id: `review-${review.id}`,
-        title: 'Review Pending',
-        message: `New ${review.rating}-star review awaiting approval`,
-        type: 'warning',
-        target_type: 'admin',
-        created_at: review.created_at,
-        is_read: false,
-        priority: 'normal',
+      (pendingReviews || []).forEach(review => {
+        systemNotifications.push({
+          id: `review-${review.id}`,
+          title: 'Review Pending',
+          message: `New ${review.rating}-star review awaiting approval`,
+          type: 'warning',
+          target_type: 'admin',
+          created_at: review.created_at,
+          is_read: false,
+          priority: 'normal',
+        });
       });
-    });
+    } catch (error) {
+      logger.warn('Failed to fetch pending reviews for notifications:', error);
+    }
 
     // Combine stored notifications with system notifications
     const allNotifications = [
@@ -115,39 +127,27 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
       data: allNotifications.slice(0, 20),
       total: notifications.length + systemNotifications.length
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function markNotificationRead(req: Request, res: Response, next: NextFunction) {
-  try {
+export const markNotificationRead = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const container = getContainer();
     const notificationService = container.notificationService();
     
     const notification = await notificationService.markAsRead(id);
     res.json({ success: true, data: notification });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function markAllNotificationsRead(req: Request, res: Response, next: NextFunction) {
-  try {
+export const markAllNotificationsRead = asyncHandler(async (req: Request, res: Response) => {
     const container = getContainer();
     const notificationService = container.notificationService();
     const userId = req.user?.userId || '';
     
     const count = await notificationService.markAllAsRead(userId);
     res.json({ success: true, message: `${count} notifications marked as read` });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function broadcastNotification(req: Request, res: Response, next: NextFunction) {
-  try {
+export const broadcastNotification = asyncHandler(async (req: Request, res: Response) => {
     const { 
       title, 
       message, 
@@ -179,26 +179,18 @@ export async function broadcastNotification(req: Request, res: Response, next: N
     });
 
     res.status(201).json({ success: true, data: broadcast });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteNotification(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteNotification = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const container = getContainer();
     const notificationService = container.notificationService();
     
     await notificationService.delete(id);
     res.json({ success: true, message: 'Notification deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteMultipleNotifications(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteMultipleNotifications = asyncHandler(async (req: Request, res: Response) => {
     const { ids } = req.body;
     
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -210,27 +202,19 @@ export async function deleteMultipleNotifications(req: Request, res: Response, n
     
     const count = await notificationService.deleteMultiple(ids);
     res.json({ success: true, message: `${count} notifications deleted` });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // Template Management
-export async function getTemplates(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTemplates = asyncHandler(async (req: Request, res: Response) => {
     const container = getContainer();
     const notificationService = container.notificationService();
     const activeOnly = req.query.activeOnly !== 'false';
     
     const templates = await notificationService.getTemplates(activeOnly);
     res.json({ success: true, data: templates });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getTemplateById(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getTemplateById = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const container = getContainer();
     const notificationService = container.notificationService();
@@ -241,13 +225,9 @@ export async function getTemplateById(req: Request, res: Response, next: NextFun
     }
     
     res.json({ success: true, data: template });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function createTemplate(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createTemplate = asyncHandler(async (req: Request, res: Response) => {
     const { 
       name, 
       title, 
@@ -280,13 +260,9 @@ export async function createTemplate(req: Request, res: Response, next: NextFunc
     });
 
     res.status(201).json({ success: true, data: template });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateTemplate(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateTemplate = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const updates = req.body;
     
@@ -306,26 +282,18 @@ export async function updateTemplate(req: Request, res: Response, next: NextFunc
     });
 
     res.json({ success: true, data: template });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteTemplate(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteTemplate = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const container = getContainer();
     const notificationService = container.notificationService();
     
     await notificationService.deleteTemplate(id);
     res.json({ success: true, message: 'Template deleted' });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function sendFromTemplate(req: Request, res: Response, next: NextFunction) {
-  try {
+export const sendFromTemplate = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const { variables = {}, target_user_ids, scheduled_for } = req.body;
     
@@ -343,46 +311,31 @@ export async function sendFromTemplate(req: Request, res: Response, next: NextFu
     );
 
     res.status(201).json({ success: true, data: broadcast });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // Broadcast Management
-export async function getBroadcasts(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getBroadcasts = asyncHandler(async (req: Request, res: Response) => {
     const container = getContainer();
     const notificationService = container.notificationService();
     const targetType = req.query.target_type as NotificationTargetType | undefined;
     
     const broadcasts = await notificationService.getBroadcasts(targetType);
     res.json({ success: true, data: broadcasts });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getValidPriorities(_req: Request, res: Response, next: NextFunction) {
-  try {
+export const getValidPriorities = asyncHandler(async (req: Request, res: Response) => {
     const container = getContainer();
     const notificationService = container.notificationService();
     
     const priorities = notificationService.getValidPriorities();
     res.json({ success: true, data: priorities });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 // Process scheduled notifications (called by cron job or admin)
-export async function processScheduledNotifications(_req: Request, res: Response, next: NextFunction) {
-  try {
+export const processScheduledNotifications = asyncHandler(async (req: Request, res: Response) => {
     const container = getContainer();
     const notificationService = container.notificationService();
     
     const count = await notificationService.processScheduledNotifications();
     res.json({ success: true, message: `${count} scheduled notifications processed` });
-  } catch (error) {
-    next(error);
-  }
-}
+});

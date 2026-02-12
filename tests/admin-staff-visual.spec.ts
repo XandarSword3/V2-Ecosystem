@@ -123,10 +123,14 @@ test.describe('Admin Settings Tests', () => {
       // Look for theme cards or buttons
       const themeOptions = ['beach', 'mountain', 'sunset', 'forest', 'midnight', 'luxury'];
       
+      let visibleThemes = 0;
       for (const theme of themeOptions) {
         const themeElement = page.locator(`text=/${theme}/i`).first();
-        // At least some themes should be visible
+        if (await themeElement.isVisible().catch(() => false)) {
+          visibleThemes++;
+        }
       }
+      expect(visibleThemes).toBeGreaterThan(0);
     });
 
     test('should have weather effect selector', async ({ page }) => {
@@ -135,7 +139,8 @@ test.describe('Admin Settings Tests', () => {
       
       // Look for weather effect dropdown or options
       const weatherSelector = page.locator('select, [role="combobox"]').filter({ hasText: /wave|snow|rain|auto/i });
-      // Should exist (may or may not be visible depending on weather widget toggle)
+      // Verify appearance settings page is functional
+      await expect(page.locator('text=/theme|Theme/i').first()).toBeVisible({ timeout: 10000 });
     });
 
     test('should save appearance settings via API', async ({ request }) => {
@@ -144,6 +149,7 @@ test.describe('Admin Settings Tests', () => {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
       });
       
+      expect(loginRes.ok()).toBeTruthy();
       if (loginRes.ok()) {
         const loginData = await loginRes.json();
         authToken = loginData.data?.tokens?.accessToken;
@@ -173,6 +179,7 @@ test.describe('Admin Settings Tests', () => {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
       });
       
+      expect(loginRes.ok()).toBeTruthy();
       if (loginRes.ok()) {
         const loginData = await loginRes.json();
         authToken = loginData.data?.tokens?.accessToken;
@@ -200,6 +207,7 @@ test.describe('Admin Settings Tests', () => {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
       });
       
+      expect(loginRes.ok()).toBeTruthy();
       if (loginRes.ok()) {
         const loginData = await loginRes.json();
         authToken = loginData.data?.tokens?.accessToken;
@@ -241,6 +249,7 @@ test.describe('Admin Settings Tests', () => {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
       });
       
+      expect(loginRes.ok()).toBeTruthy();
       if (loginRes.ok()) {
         const loginData = await loginRes.json();
         authToken = loginData.data?.tokens?.accessToken;
@@ -264,6 +273,7 @@ test.describe('Admin Settings Tests', () => {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
       });
       
+      expect(loginRes.ok()).toBeTruthy();
       if (loginRes.ok()) {
         const loginData = await loginRes.json();
         authToken = loginData.data?.tokens?.accessToken;
@@ -346,8 +356,8 @@ test.describe('Staff Pages Tests', () => {
       await page.goto(`${FRONTEND_URL}/staff/pool`);
       await page.waitForLoadState('networkidle');
       
-      // Page should have loaded successfully
-      await expect(page.locator('body')).toBeVisible();
+      // Page should have loaded successfully with pool-related content
+      await expect(page.locator('text=/capacity|tickets|check.?in|guests|pool/i').first()).toBeVisible({ timeout: 10000 });
       await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     });
   });
@@ -400,8 +410,8 @@ test.describe('Staff Pages Tests', () => {
       
       // Should see QR scanner or camera UI or at least the page loaded
       const scannerUI = page.locator('text=/scan|qr|camera|ticket|scanner/i').first();
-      // Scanner may require permissions, just verify page loads
-      await expect(page.locator('body')).toBeVisible();
+      // Scanner may require permissions, verify page loaded with content
+      await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     });
   });
 });
@@ -441,8 +451,8 @@ test.describe('Visual Regression - Theme Tests', () => {
         fullPage: false 
       });
       
-      // Verify page loaded successfully
-      await expect(page.locator('body')).toBeVisible();
+      // Verify page loaded with actual content
+      await expect(page.locator('main, header').first()).toBeVisible({ timeout: 10000 });
     });
   }
 
@@ -469,8 +479,8 @@ test.describe('Visual Regression - Theme Tests', () => {
       fullPage: false 
     });
     
-    // Page should load successfully
-    await expect(page.locator('body')).toBeVisible();
+    // Page should load with actual content
+    await expect(page.locator('main, header').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should hide weather effects when disabled', async ({ page, request }) => {
@@ -493,8 +503,8 @@ test.describe('Visual Regression - Theme Tests', () => {
       fullPage: false 
     });
     
-    // Page should load
-    await expect(page.locator('body')).toBeVisible();
+    // Page should load with actual content
+    await expect(page.locator('main, header').first()).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -751,21 +761,21 @@ test.describe('Dynamic Module Tests', () => {
     await page.goto(`${FRONTEND_URL}/modules/restaurant`, { waitUntil: 'networkidle' });
     
     // May redirect or show restaurant page - verify page loaded
-    await expect(page.locator('body')).toBeVisible();
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     await page.screenshot({ path: 'test-results/module-restaurant.png' });
   });
 
   test('should load dynamic pool module', async ({ page }) => {
     await page.goto(`${FRONTEND_URL}/modules/pool`, { waitUntil: 'networkidle' });
     
-    await expect(page.locator('body')).toBeVisible();
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     await page.screenshot({ path: 'test-results/module-pool.png' });
   });
 
   test('should load dynamic chalets module', async ({ page }) => {
     await page.goto(`${FRONTEND_URL}/modules/chalets`, { waitUntil: 'networkidle' });
     
-    await expect(page.locator('body')).toBeVisible();
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
     await page.screenshot({ path: 'test-results/module-chalets.png' });
   });
 

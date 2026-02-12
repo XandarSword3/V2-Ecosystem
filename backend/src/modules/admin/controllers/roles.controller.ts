@@ -4,11 +4,11 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection';
 import { logActivity } from '../../../utils/activityLogger';
 
-export async function getRoles(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getRoles = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: rolesList, error } = await supabase
       .from('roles')
@@ -55,13 +55,9 @@ export async function getRoles(req: Request, res: Response, next: NextFunction) 
     }));
 
     res.json({ success: true, data: enriched });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function createRole(req: Request, res: Response, next: NextFunction) {
-  try {
+export const createRole = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: role, error } = await supabase
       .from('roles')
@@ -85,13 +81,9 @@ export async function createRole(req: Request, res: Response, next: NextFunction
     });
 
     res.status(201).json({ success: true, data: role });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function updateRole(req: Request, res: Response, next: NextFunction) {
-  try {
+export const updateRole = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString()
@@ -120,13 +112,9 @@ export async function updateRole(req: Request, res: Response, next: NextFunction
     });
 
     res.json({ success: true, data: role });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function deleteRole(req: Request, res: Response, next: NextFunction) {
-  try {
+export const deleteRole = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
 
@@ -165,7 +153,4 @@ export async function deleteRole(req: Request, res: Response, next: NextFunction
     });
 
     res.json({ success: true, message: 'Role deleted successfully' });
-  } catch (error) {
-    next(error);
-  }
-}
+});

@@ -1,0 +1,45 @@
+// File: backend/tests/ai-agent.integration.test.ts
+import { describe, it, expect, beforeAll } from 'vitest';
+import request from 'supertest';
+import app from '../src/app';
+
+describe('AI Agent Interaction Tests', () => {
+    const API_V1 = '/api/v1';
+
+    it('should allow an agent to discover the API terminology', async () => {
+        const response = await request(app)
+            .get(`${API_V1}/terminology?business_type=hotel`)
+            .expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.data.unit_singular).toBe('Room');
+    });
+
+    it('should allow an agent to fetch the OpenAPI specification', async () => {
+        const response = await request(app)
+            .get('/api/docs/spec.json')
+            .expect(200);
+
+        expect(response.body.openapi).toBe('3.0.3');
+        expect(response.body.info.title).toContain('V2 Resort Management API');
+    });
+
+    it('should allow an agent to use generic unit endpoints', async () => {
+        // This assumes the DB is migrated and seeded
+        const response = await request(app)
+            .get(`${API_V1}/units`)
+            .expect(200);
+
+        expect(response.body.success).toBe(true);
+        // expect(Array.isArray(response.body.data)).toBe(true);
+    });
+
+    it('should handle legacy routes correctly for agents using old paths', async () => {
+        // Path /api/v1/chalets should redirect or be handled as /api/v1/units
+        const response = await request(app)
+            .get(`${API_V1}/chalets`)
+            .expect(200); // Middleware handles it
+
+        expect(response.body.success).toBe(true);
+    });
+});

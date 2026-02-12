@@ -1,0 +1,17 @@
+﻿200 /health
+200 /api/health
+200 /api/settings
+200 /api/modules
+200 /api/weather
+404 /api/v1
+200 /api/v1/units
+200 /api/v1/facilities/sessions
+200 /api/v1/dining/menu
+200 /api/v1/terminology
+200 /api/v1/restaurant/menu
+200 /api/v1/restaurant/menu/categories
+200 /api/v1/pool/sessions
+200 /api/v1/chalets
+200 /api/v1/loyalty/settings
+200 /api/v1/loyalty/tiers
+200 /api/v1/reviews

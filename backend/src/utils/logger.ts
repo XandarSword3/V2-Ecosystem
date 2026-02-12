@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import winston from 'winston';
-import { config } from '../config/index';
+import { config } from '../config/index.js';
 
 const levels = {
   error: 0,

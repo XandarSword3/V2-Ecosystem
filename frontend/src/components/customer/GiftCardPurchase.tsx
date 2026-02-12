@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency } from '@/lib/utils';
+import { currencySymbols } from '@/stores/settingsStore'; // FIX Iter-17: Import for currency-aware symbol
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -44,22 +45,26 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
     senderName: '',
   });
 
+  // FIX Iter-17: AbortController to prevent state updates on unmounted component
   useEffect(() => {
-    loadTemplates();
-  }, []);
-
-  const loadTemplates = async () => {
-    try {
-      const res = await api.get('/giftcards/templates');
-      if (res.data.success) {
-        setTemplates(res.data.data.filter((t: GiftCardTemplate) => t.isActive));
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const res = await api.get('/giftcards/templates', { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        if (res.data.success) {
+          setTemplates(res.data.data.filter((t: GiftCardTemplate) => t.isActive));
+        }
+      } catch (err: any) {
+        if (err?.name === 'CanceledError' || controller.signal.aborted) return;
+        toast.error('Failed to load gift card options');
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
       }
-    } catch {
-      toast.error('Failed to load gift card options');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    load();
+    return () => controller.abort();
+  }, []);
 
   const handleSelectAmount = (template: GiftCardTemplate | null, amount?: number) => {
     if (template) {
@@ -80,7 +85,7 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
 
     const amount = selectedTemplate?.amount || parseFloat(customAmount);
     if (!amount || amount < 10) {
-      toast.error('Minimum gift card amount is $10');
+      toast.error(`Minimum gift card amount is ${formatCurrency(10)}`); // FIX Iter-17: Currency-aware
       return;
     }
 
@@ -179,7 +184,7 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
               </p>
               <div className="flex gap-3">
                 <div className="relative flex-1">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">{currencySymbols.USD}</span>
                   <Input
                     type="number"
                     placeholder="50"
@@ -198,7 +203,7 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               </div>
-              <p className="text-xs text-slate-500 mt-2">Minimum $10, Maximum $1,000</p>
+              <p className="text-xs text-slate-500 mt-2">Minimum {formatCurrency(10)}, Maximum {formatCurrency(1000)}</p>
             </div>
           </motion.div>
         )}

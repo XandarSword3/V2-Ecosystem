@@ -4,8 +4,8 @@
  */
 
 import { Twilio } from 'twilio';
-import { supabase } from '../lib/supabase';
-import { activityLogger } from '../utils/activityLogger';
+import { supabase } from "../lib/supabase.js";
+import { activityLogger } from "../utils/activityLogger.js";
 
 // Twilio client - initialized lazily
 let twilioClient: Twilio | null = null;

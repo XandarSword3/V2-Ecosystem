@@ -22,6 +22,7 @@ vi.mock('../../../src/socket/index.js', () => ({
   emitToUnit: vi.fn(),
   emitToUser: vi.fn(),
   notifyAdmins: vi.fn(),
+  emitToRole: vi.fn(),
 }));
 
 // 4. Mock Email Service

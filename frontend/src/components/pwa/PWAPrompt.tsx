@@ -128,7 +128,7 @@ export function PWAPrompt() {
 
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  Install V2 Resort
+                  Install Iron Paradise Gym
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                   Add to your home screen for faster access and offline support.

@@ -89,7 +89,8 @@ export default function StaffDashboard() {
         pendingOrders: pending,
         completedToday: completed,
         issues: allOrders.filter((o: OrderRecord) => o.status === 'cancelled').length,
-        avgResponseTime: pending > 0 ? `${Math.round(5 + Math.random() * 10)}m` : '-',
+        // FIX Iter-11: removed fake Math.random() metric — show dash until real data is available
+        avgResponseTime: '-',
       });
 
       // Generate recent activity from orders

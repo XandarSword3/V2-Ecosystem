@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection';
 
 interface ActivityLogRow {
@@ -18,8 +19,7 @@ interface ActivityLogRow {
   users?: { full_name: string; email: string };
 }
 
-export async function getAuditLogs(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getAuditLogs = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { limit = 50, offset = 0 } = req.query;
 
@@ -47,13 +47,9 @@ export async function getAuditLogs(req: Request, res: Response, next: NextFuncti
     }));
 
     res.json({ success: true, data: mappedLogs });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
-export async function getAuditLogsByResource(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getAuditLogsByResource = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { resource, resourceId } = req.params;
     const { limit = 20 } = req.query;
@@ -80,7 +76,4 @@ export async function getAuditLogsByResource(req: Request, res: Response, next: 
     if (error) throw error;
 
     res.json({ success: true, data: logs || [] });
-  } catch (error) {
-    next(error);
-  }
-}
+});

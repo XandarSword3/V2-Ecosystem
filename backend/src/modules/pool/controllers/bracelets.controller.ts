@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from "../../../database/connection.js";
 import { logger } from "../../../utils/logger.js";
 import { logActivity } from "../../../utils/activityLogger.js";
@@ -12,8 +13,7 @@ import dayjs from 'dayjs';
 /**
  * Assign a bracelet to a ticket
  */
-export async function assignBracelet(req: Request, res: Response, next: NextFunction) {
-  try {
+export const assignBracelet = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
     const { braceletNumber, braceletColor } = req.body;
@@ -84,16 +84,12 @@ export async function assignBracelet(req: Request, res: Response, next: NextFunc
 
     logger.info(`Bracelet ${braceletNumber} assigned to ticket ${ticket.ticket_number}`);
     res.json({ success: true, data: updatedTicket });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Return a bracelet
  */
-export async function returnBracelet(req: Request, res: Response, next: NextFunction) {
-  try {
+export const returnBracelet = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
 
@@ -136,16 +132,12 @@ export async function returnBracelet(req: Request, res: Response, next: NextFunc
 
     logger.info(`Bracelet ${ticket.bracelet_number} returned for ticket ${ticket.ticket_number}`);
     res.json({ success: true, data: updatedTicket });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Get all active bracelets (assigned but not returned) for today
  */
-export async function getActiveBracelets(req: Request, res: Response, next: NextFunction) {
-  try {
+export const getActiveBracelets = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
@@ -175,16 +167,12 @@ export async function getActiveBracelets(req: Request, res: Response, next: Next
       data: bracelets,
       count: bracelets?.length || 0
     });
-  } catch (error) {
-    next(error);
-  }
-}
+});
 
 /**
  * Search for a ticket by bracelet number
  */
-export async function searchByBracelet(req: Request, res: Response, next: NextFunction) {
-  try {
+export const searchByBracelet = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { braceletNumber } = req.query;
 
@@ -214,7 +202,4 @@ export async function searchByBracelet(req: Request, res: Response, next: NextFu
     }
 
     res.json({ success: true, data: ticket });
-  } catch (error) {
-    next(error);
-  }
-}
+});

@@ -61,28 +61,33 @@ export default function StaffSnackPage() {
   const [selectedOrder, setSelectedOrder] = useState<SnackOrder | null>(null);
   const { socket } = useSocket();
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await api.get('/snack/staff/orders/live');
+      const response = await api.get('/snack/staff/orders/live', { signal });
+      if (signal?.aborted) return;
       setOrders(response.data.data || []);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'CanceledError' || signal?.aborted) return;
       toast.error(tc('errors.failedToLoad'));
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
+  // FIX Iter-18: AbortController to prevent state updates on unmounted component
   useEffect(() => {
-    fetchOrders();
+    const controller = new AbortController();
+    fetchOrders(controller.signal);
     // Refresh every 30 seconds
-    const interval = setInterval(fetchOrders, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => fetchOrders(), 30000);
+    return () => { controller.abort(); clearInterval(interval); };
   }, [fetchOrders]);
 
   // Real-time updates
   useEffect(() => {
     if (socket) {
-      socket.on('snack:order:new', (order: SnackOrder) => {
+      // FIX: Iteration 12 - Event names must match backend emitToUnit (no 'snack:' prefix)
+      socket.on('order:new', (order: SnackOrder) => {
         setOrders((prev) => [order, ...prev]);
         toast.info(`New snack bar order: #${order.order_number || order.id.slice(0, 8)}`);
         // Play notification sound
@@ -90,15 +95,15 @@ export default function StaffSnackPage() {
         audio.play().catch(() => {});
       });
 
-      socket.on('snack:order:updated', (order: SnackOrder) => {
+      socket.on('order:updated', (order: SnackOrder) => {
         setOrders((prev) =>
           prev.map((o) => (o.id === order.id ? order : o))
         );
       });
 
       return () => {
-        socket.off('snack:order:new');
-        socket.off('snack:order:updated');
+        socket.off('order:new');
+        socket.off('order:updated');
       };
     }
   }, [socket]);
@@ -170,7 +175,7 @@ export default function StaffSnackPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={fetchOrders}>
+          <Button variant="outline" onClick={() => fetchOrders()}>
             <RefreshCw className="w-4 h-4 mr-2" />
             {ts('refresh')}
           </Button>
@@ -288,6 +293,10 @@ export default function StaffSnackPage() {
                   transition={{ delay: index * 0.05 }}
                   layout
                   onClick={() => setSelectedOrder(order)}
+                  // FIX Iter-16: keyboard a11y for clickable order card
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedOrder(order); } }}
                   className="cursor-pointer"
                 >
                   <Card 
@@ -371,6 +380,11 @@ export default function StaffSnackPage() {
           <div 
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
             onClick={() => setSelectedOrder(null)}
+            // FIX Iter-16: modal a11y — role, aria-modal, Escape handler
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Order details for #${selectedOrder.order_number || selectedOrder.id.slice(0, 8)}`}
+            onKeyDown={(e) => { if (e.key === 'Escape') setSelectedOrder(null); }}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -390,6 +404,7 @@ export default function StaffSnackPage() {
                 </div>
                 <button 
                   onClick={() => setSelectedOrder(null)}
+                  aria-label="Close order details"
                   className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
                 >
                   <XCircle className="w-6 h-6 text-slate-500" />

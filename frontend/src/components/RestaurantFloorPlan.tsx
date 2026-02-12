@@ -85,7 +85,7 @@ export function RestaurantFloorPlan({
   isEditable = false,
 }: FloorPlanProps) {
   const t = useTranslations('restaurant');
-  const socket = useSocket();
+  const { socket } = useSocket();
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [tables, setTables] = useState<Table[]>([]);
@@ -99,15 +99,17 @@ export function RestaurantFloorPlan({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   // Fetch floor plan data
-  const fetchFloorPlan = useCallback(async () => {
+  const fetchFloorPlan = useCallback(async (signal?: AbortSignal) => { // FIX Iter-23: AbortController support
     try {
-      const response = await api.get('/restaurant/floor-plan');
+      const response = await api.get('/restaurant/floor-plan', { signal }); // FIX Iter-23: pass signal
       const { tables: fetchedTables, sections: fetchedSections, dimensions: dims } = response.data.data;
-      
-      setTables(fetchedTables);
-      setSections(fetchedSections);
-      setDimensions(dims);
-    } catch (error) {
+      if (!signal?.aborted) { // FIX Iter-23: guard setState
+        setTables(fetchedTables);
+        setSections(fetchedSections);
+        setDimensions(dims);
+      }
+    } catch (error: any) {
+      if (error?.name === 'CanceledError') return; // FIX Iter-23: ignore abort
       console.error('Failed to fetch floor plan:', error);
       toast.error('Failed to load floor plan');
     } finally {
@@ -116,7 +118,9 @@ export function RestaurantFloorPlan({
   }, []);
 
   useEffect(() => {
-    fetchFloorPlan();
+    const controller = new AbortController(); // FIX Iter-23: cleanup on unmount
+    fetchFloorPlan(controller.signal);
+    return () => controller.abort();
   }, [fetchFloorPlan]);
 
   // Socket listeners for real-time updates

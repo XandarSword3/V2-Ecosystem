@@ -1,0 +1,607 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32mΓ£ô[39m tests/unit/middleware/requestLogger.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 103[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/reviews.controller.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 121[2mms[22m[39m
+[90mstdout[2m | tests/unit/restaurant/table.controller.test.ts[2m > [22m[2mTable Controller[2m > [22m[2mcreateTable[2m > [22m[2mshould create a new table
+[22m[39m[Table Controller] Request body: {"tableNumber":"3","capacity":6}
+[Table Controller] Parsed values: { tableNumber: [32m'3'[39m, capacity: [33m6[39m, location: [90mundefined[39m }
+[Table Controller] Normalized data: { tableNumber: [32m'3'[39m, capacity: [33m6[39m, location: [1mnull[22m }
+
+[90mstdout[2m | tests/unit/restaurant/table.controller.test.ts[2m > [22m[2mTable Controller[2m > [22m[2mcreateTable[2m > [22m[2mshould create a new table
+[22m[39m[Table Controller] Table created: {
+  id: [32m'3'[39m,
+  number: [33m3[39m,
+  capacity: [33m6[39m,
+  status: [32m'available'[39m,
+  is_active: [33mtrue[39m
+}
+
+ [32mΓ£ô[39m tests/unit/user.controller.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 182[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/restaurant/table.controller.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 154[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/snack.controller.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 178[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/pool.controller.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 178[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/admin.services.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 187[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/chalet.pricing.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 177[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/chalet.controller.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 186[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth.module.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 191[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/restaurant/order.controller.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 202[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/payment.controller.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 222[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth.controller.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 253[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/admin.controller.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 258[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/support.routes.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 228[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/support.service.test.ts [2m([22m[2m52 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/monitoring.middleware.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 75[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/invoice.service.test.ts [2m([22m[2m61 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/inventory.service.test.ts [2m([22m[2m99 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/amenity.service.test.ts [2m([22m[2m68 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/loyalty.service.test.ts [2m([22m[2m98 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/notification.service.test.ts [2m([22m[2m79 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/dashboard.controller.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/lib.booking.controller.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/analytics.service.test.ts [2m([22m[2m69 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/coupon.service.test.ts [2m([22m[2m92 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/reservation.service.test.ts [2m([22m[2m73 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/reporting.service.test.ts [2m([22m[2m78 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/order.service.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/reports.controller.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/email.service.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/audit.service.test.ts [2m([22m[2m71 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/document.service.test.ts [2m([22m[2m77 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth-lifecycle.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/upload.controller.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/users.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 1291[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should hash password when changing [33m 314[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should require current password to change password [33m 969[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/waitlist.service.test.ts [2m([22m[2m96 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/payment.service.test.ts [2m([22m[2m98 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/currency.service.test.ts [2m([22m[2m69 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/settings.service.test.ts [2m([22m[2m78 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/lib.order.controller.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/menu.service.test.ts [2m([22m[2m66 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/shift.service.test.ts [2m([22m[2m77 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/modules/snack.controller.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/snack.service.test.ts [2m([22m[2m44 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/order.table.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/guest.service.test.ts [2m([22m[2m68 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/booking.service.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/pool.service.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/task.service.test.ts [2m([22m[2m72 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/weather.service.test.ts [2m([22m[2m97 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/event.service.test.ts [2m([22m[2m66 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/maintenance.service.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/membership.service.test.ts [2m([22m[2m67 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/pool.controller.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/feedback.service.test.ts [2m([22m[2m52 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m tests/security-patches.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1774[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m should allow creating dynamic application permissions in app_permissions [33m 914[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m should prevent modification of payment_ledger financial fields [33m 858[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/lib.auth.controller.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/lib.pool.controller.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/housekeeping.service.test.ts [2m([22m[2m47 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/rate.service.test.ts [2m([22m[2m59 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/giftcard.service.test.ts [2m([22m[2m62 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/user.module.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/promotion.service.test.ts [2m([22m[2m54 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+[90mstdout[2m | tests/unit/giftcard.controller.test.ts
+[22m[39m2026-02-02 13:04:20 [33mwarn[39m: [33mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS environment variables.[39m
+
+node.exe : [90mstderr[2m | tests/unit/giftcard.controller.test.ts[2m > [22m[2mGift 
+Card Controller[2m > [22m[2mgetTemplates[2m > [22m[2mshould handle database errors
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([90mstderr[2m...database errors:String)  
+   [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[22m[39mError fetching templates: { message: [32m'Database error'[39m }
+
+[90mstdout[2m | tests/unit/giftcard.controller.test.ts[2m > [22m[2mGift Card Controller[2m > [22m[2mpurchaseGiftCard[2m > [22m[2mshould purchase a gift card from template
+[22m[39m2026-02-02 13:04:20 [33mwarn[39m: [33mEmail not sent - service not configured[39m
+
+[90mstdout[2m | tests/unit/giftcard.controller.test.ts[2m > [22m[2mGift Card Controller[2m > [22m[2mpurchaseGiftCard[2m > [22m[2mshould purchase a gift card from template
+[22m[39m2026-02-02 13:04:20 [33mwarn[39m: [33mGift card email failed to send for code GIFT-ABCD1234[39m
+
+[90mstdout[2m | tests/unit/auth.middleware.test.ts[2m > [22m[2mAuth Middleware (Source)[2m > [22m[2mauthenticate[2m > [22m[2mshould return 401 when no authorization header
+[22m[39m2026-02-02 13:04:20 [33mwarn[39m: [33mAuth failure: No token provided[39m
+
+[90mstdout[2m | tests/unit/auth.middleware.test.ts[2m > [22m[2mAuth Middleware (Source)[2m > [22m[2mauthenticate[2m > [22m[2mshould return 401 when authorization header does not start with Bearer
+[22m[39m2026-02-02 13:04:20 [33mwarn[39m: [33mAuth failure: No token provided[39m
+
+[90mstdout[2m | tests/unit/auth.middleware.test.ts[2m > [22m[2mAuth Middleware (Source)[2m > [22m[2mauthenticate[2m > [22m[2mshould return 401 when token is invalid
+[22m[39m2026-02-02 13:04:20 [33mwarn[39m: [33mAuth failure: Invalid or expired token[39m
+
+[90mstdout[2m | tests/unit/auth.middleware.test.ts[2m > [22m[2mAuth Middleware (Source)[2m > [22m[2mauthorize[2m > [22m[2mshould return 401 when no user attached to request
+[22m[39m2026-02-02 13:04:20 [33mwarn[39m: [33mAuthorization failure: Not authenticated[39m
+
+[90mstdout[2m | tests/unit/auth.middleware.test.ts[2m > [22m[2mAuth Middleware (Source)[2m > [22m[2mauthorize[2m > [22m[2mshould return 403 when user does not have required role
+[22m[39m2026-02-02 13:04:20 [33mwarn[39m: [33mAuthorization failure: Insufficient permissions[39m
+
+ [32mΓ£ô[39m tests/unit/giftcard.controller.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth.middleware.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/order-utils.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/package.service.test.ts [2m([22m[2m44 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+[90mstderr[2m | tests/unit/housekeeping.controller.test.ts[2m > 
+[22m[2mHousekeeping Controller[2m > [22m[2mgetTaskTypes[2m > [22m[2mshould 
+handle database errors
+[22m[39mError fetching task types: { message: [32m'Database error'[39m }
+
+ [32mΓ£ô[39m tests/unit/housekeeping.controller.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/validation.schemas.test.ts [2m([22m[2m47 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/webhookIdempotency.service.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/channel.service.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/review.service.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/user.service.test.ts [2m([22m[2m46 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth.utils.source.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+[90mstdout[2m | tests/unit/oauth.controller.test.ts[2m > [22m[2mOAuth Controller[2m > [22m[2mgoogleCallback[2m > [22m[2mshould reject callback with invalid state (CSRF protection)
+[22m[39m2026-02-02 13:04:20 [33mwarn[39m: [33mOAuth state mismatch - possible CSRF attack[39m
+
+[90mstdout[2m | tests/unit/oauth.controller.test.ts[2m > [22m[2mOAuth Controller[2m > [22m[2mgoogleCallback[2m > [22m[2mshould handle OAuth service error
+[22m[39m2026-02-02 13:04:20 [31merror[39m: [31mError handling Google OAuth callback: Failed to authenticate[39m
+
+[90mstdout[2m | tests/unit/oauth.controller.test.ts[2m > [22m[2mOAuth Controller[2m > [22m[2mfacebookCallback[2m > [22m[2mshould reject Facebook callback with state mismatch
+[22m[39m2026-02-02 13:04:20 [33mwarn[39m: [33mOAuth state mismatch - possible CSRF attack[39m
+
+ [32mΓ£ô[39m tests/unit/controllers/notifications.controller.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/oauth.controller.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/settings.controller.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/audit.controller.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+[90mstderr[2m | tests/unit/inventory.controller.test.ts[2m > [22m[2mInventory 
+Controller[2m > [22m[2mgetCategories[2m > [22m[2mshould handle database errors
+[22m[39mError fetching categories: { message: [32m'Database error'[39m }
+
+ [32mΓ£ô[39m tests/unit/auth/auth.utils.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32mΓ£ô[39m tests/contract/openapi-lint.test.ts [2m([22m[2m125 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/inventory.controller.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/validation.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/two-factor.service.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+[90mstdout[2m | tests/unit/middleware/auth.middleware.test.ts[2m > [22m[2mAuth Middleware[2m > [22m[2mauthenticate[2m > [22m[2mshould reject request without auth header
+[22m[39m2026-02-02 13:04:21 [33mwarn[39m: [33mAuth failure: No token provided[39m
+
+[90mstdout[2m | tests/unit/middleware/auth.middleware.test.ts[2m > [22m[2mAuth Middleware[2m > [22m[2mauthenticate[2m > [22m[2mshould reject request without Bearer prefix
+[22m[39m2026-02-02 13:04:21 [33mwarn[39m: [33mAuth failure: No token provided[39m
+
+[90mstdout[2m | tests/unit/middleware/auth.middleware.test.ts[2m > [22m[2mAuth Middleware[2m > [22m[2mauthenticate[2m > [22m[2mshould reject invalid token
+[22m[39m2026-02-02 13:04:21 [33mwarn[39m: [33mAuth failure: Invalid or expired token[39m
+
+[90mstdout[2m | tests/unit/middleware/auth.middleware.test.ts[2m > [22m[2mAuth Middleware[2m > [22m[2mauthorize[2m > [22m[2mshould reject user without required role
+[22m[39m2026-02-02 13:04:21 [33mwarn[39m: [33mAuthorization failure: Insufficient permissions[39m
+
+[90mstdout[2m | tests/unit/middleware/auth.middleware.test.ts[2m > [22m[2mAuth Middleware[2m > [22m[2mauthorize[2m > [22m[2mshould reject unauthenticated request
+[22m[39m2026-02-02 13:04:21 [33mwarn[39m: [33mAuthorization failure: Not authenticated[39m
+
+ [32mΓ£ô[39m tests/unit/middleware/auth.middleware.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/security.middleware.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/schemas.source.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/roles.controller.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/coupon.controller.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/bookings.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/email.service.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+[90mstdout[2m | tests/unit/csrf.middleware.test.ts[2m > [22m[2mCSRF Protection Middleware[2m > [22m[2mshould reject POST without cookie token
+[22m[39m2026-02-02 13:04:21 [33mwarn[39m: [33mCSRF: No token cookie present for POST /api/some-endpoint[39m
+
+[90mstdout[2m | tests/unit/csrf.middleware.test.ts[2m > [22m[2mCSRF Protection Middleware[2m > [22m[2mshould reject POST without header token
+[22m[39m2026-02-02 13:04:21 [33mwarn[39m: [33mCSRF: No token header for POST /api/some-endpoint from 127.0.0.1[39m
+
+[90mstdout[2m | tests/unit/csrf.middleware.test.ts[2m > [22m[2mCSRF Protection Middleware[2m > [22m[2mshould reject POST with mismatched tokens
+[22m[39m2026-02-02 13:04:21 [33mwarn[39m: [33mCSRF: Token mismatch for POST /api/some-endpoint from 127.0.0.1[39m
+
+[90mstdout[2m | tests/unit/csrf.middleware.test.ts[2m > [22m[2mTiming-Safe Comparison[2m > [22m[2mshould use timing-safe comparison to prevent timing attacks
+[22m[39m2026-02-02 13:04:21 [33mwarn[39m: [33mCSRF: Token mismatch for POST /api/some-endpoint from 127.0.0.1[39m
+
+ [32mΓ£ô[39m tests/security.service.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/csrf.middleware.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+[90mstdout[2m | tests/unit/logger.source.test.ts[2m > [22m[2mLogger (Source)[2m > [22m[2mlogging operations[2m > [22m[2mshould not throw when logging error
+[22m[39m2026-02-02 13:04:21 [31merror[39m: [31mTest error message[39m
+
+[90mstdout[2m | tests/unit/logger.source.test.ts[2m > [22m[2mLogger (Source)[2m > [22m[2mlogging operations[2m > [22m[2mshould not throw when logging warn
+[22m[39m2026-02-02 13:04:21 [33mwarn[39m: [33mTest warning message[39m
+
+[90mstdout[2m | tests/unit/logger.source.test.ts[2m > [22m[2mLogger (Source)[2m > [22m[2mlogging operations[2m > [22m[2mshould not throw when logging error with stack trace
+[22m[39m2026-02-02 13:04:21 [31merror[39m: [31mAn error occurred[39m
+
+ [32mΓ£ô[39m tests/unit/logger.source.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/AppError.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/backup.service.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/push-notification.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/two-factor.service.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/controllers/scheduled-reports.controller.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/orders.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/pricing.controller.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/socket.events.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/branding.controller.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/middleware.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/middleware/moduleGuard.middleware.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/AppError.source.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/security.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+Sourcemap for "C:/Alessandro/Work/Attempts to Code/V2 
+Ecosystem/v2-resort/backend/node_modules/node-cron/dist/esm/node-cron.js" points to 
+missing source files
+[90mstdout[2m | tests/seasonal-pricing.service.test.ts[2m > [22m[2mSeasonalPricingService[2m > [22m[2mgetSeasonalRules[2m > [22m[2mshould throw error when fetch fails
+[22m[39m2026-02-02 13:04:21 [31merror[39m: [31mFailed to fetch seasonal pricing rules DB error[39m
+
+ [32mΓ£ô[39m tests/seasonal-pricing.service.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/transaction.utils.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/middleware/userRateLimit.middleware.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/auth/auth.validation.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/scheduler.service.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/translation.service.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/services/scheduler.service.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/loyalty.controller.test.ts [2m([22m[2m10 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/pool.validation.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/payment.webhook.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/fieldNormalizer.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/reviews.module.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/support.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+[90mstdout[2m | tests/ai-agent.integration.test.ts
+[22m[39m2026-02-02 13:04:22 [33mwarn[39m: [33mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS environment variables.[39m
+
+ [32mΓ£ô[39m tests/unit/socket/socket.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/translation.service.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/fieldNormalizer.source.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/reviews.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/config.source.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/types.source.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/cache.source.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/delete-preview.controller.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/database/connection.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/socket.source.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/cache.utils.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/payment.module.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m tests/unit/oauth.service.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+[90mstdout[2m | tests/unit/sentry.source.test.ts[2m > [22m[2mSentry Utils (Source)[2m > [22m[2mcaptureException[2m > [22m[2mshould accept error parameter
+[22m[39m2026-02-02 13:04:23 [31merror[39m: [31mError captured (Sentry disabled): Test error[39m
+
+[90mstdout[2m | tests/unit/sentry.source.test.ts[2m > [22m[2mSentry Utils (Source)[2m > [22m[2mcaptureException[2m > [22m[2mshould accept error with context
+[22m[39m2026-02-02 13:04:23 [31merror[39m: [31mError captured (Sentry disabled): Test error[39m
+
+ [32mΓ£ô[39m tests/unit/sentry.source.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+[90mstdout[2m | tests/comprehensive-verification.test.ts
+[22m[39m2026-02-02 13:04:24 [33mwarn[39m: [33mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS environment variables.[39m
+
+ [32mΓ£ô[39m tests/ai-agent.integration.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1140[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m should allow an agent to discover the API terminology [33m 318[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m should allow an agent to use generic unit endpoints [33m 697[2mms[22m[39m
+ [2m[90mΓåô[39m[22m tests/comprehensive-verification.test.ts [2m([22m[2m6 tests[22m[2m | [22m[33m6 skipped[39m[2m)[22m
+ [32mΓ£ô[39m tests/unit/auth.service.test.ts [2m([22m[2m37 tests[22m[2m)[22m[33m 12115[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should register a new user successfully [33m 347[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should hash the password before storing [33m 328[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should normalize email to lowercase [33m 312[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should assign customer role by default [33m 351[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should log activity after registration [33m 308[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should use default language if not specified [33m 339[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should respect specified language preference [33m 314[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should login with valid credentials [33m 676[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should return user roles [33m 662[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should create a session on login [33m 512[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should update last_login_at [33m 482[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should throw for invalid password [33m 502[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should log activity on login [33m 484[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should refresh tokens with valid refresh token [33m 467[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should throw for inactive session [33m 471[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should invalidate session on logout [33m 446[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should change password with correct current password [33m 898[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should throw for incorrect current password [33m 442[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should invalidate all sessions after password change [33m 885[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should log activity after password change [33m 662[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should reset password with valid token [33m 661[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should delete reset token after use [33m 449[2mms[22m[39m
+       [33m[2mΓ£ô[22m[39m should log activity after password reset [33m 445[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m136 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (137)[39m
+[2m      Tests [22m [1m[32m4136 passed[39m[22m[2m | [22m[33m7 skipped[39m[90m (4143)[39m
+[2m   Start at [22m 13:04:17
+[2m   Duration [22m 14.05s[2m (transform 14.62s, setup 0ms, import 33.39s, tests 21.78s, environment 21ms)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   45.25 |    40.02 |      51 |   46.99 |                   
+ src               |   39.15 |      0.9 |       0 |   44.52 |                   
+  app.ts           |   39.15 |      0.9 |       0 |   44.52 | ...85,392,400-403 
+ src/config        |   33.33 |    66.94 |       0 |    37.5 |                   
+  index.ts         |      28 |    66.94 |       0 |   31.81 | 15-25,32-42,49-51 
+  swagger.ts       |     100 |      100 |     100 |     100 |                   
+ src/database      |   35.13 |    22.22 |    62.5 |   35.13 |                   
+  connection.ts    |   27.27 |    18.75 |      50 |   27.27 | 16-54,65-68,77    
+  supabase.ts      |     100 |       50 |     100 |     100 | 7                 
+ ...atabase/schema |   53.03 |      100 |       0 |   53.03 |                   
+  index.ts         |   53.03 |      100 |       0 |   53.03 | ...67,388,400,416 
+ src/lib           |     100 |      100 |     100 |     100 |                   
+  supabase.ts      |     100 |      100 |     100 |     100 |                   
+ src/lib/container |     5.4 |        0 |       0 |     5.4 |                   
+  index.ts         |     5.4 |        0 |       0 |     5.4 | 47-128,147-217    
+ ...ib/controllers |   90.24 |       90 |     100 |   90.24 |                   
+  ...controller.ts |    98.5 |      100 |     100 |    98.5 | 180               
+  ...controller.ts |    87.4 |    82.85 |     100 |    87.4 | ...75,401-411,454 
+  ...controller.ts |   91.01 |     91.3 |     100 |   91.01 | ...46-247,290,333 
+  ...controller.ts |    87.2 |    94.44 |     100 |    87.2 | ...20,234,244,254 
+ ...b/repositories |   68.47 |    60.36 |   66.18 |   71.01 |                   
+  ...ory.memory.ts |   86.95 |    71.42 |   81.81 |   90.24 | 28,50,102,108     
+  ...ory.memory.ts |   84.74 |       75 |   86.95 |   85.96 | ...03,139,160-167 
+  ...ory.memory.ts |   96.66 |    94.11 |   95.45 |      98 | 72                
+  ...ory.memory.ts |   74.72 |    68.18 |    82.6 |   76.74 | ...05-218,230-234 
+  ...ory.memory.ts |   34.14 |    31.42 |   34.92 |   35.33 | ...48,356,364-393 
+  ...ory.memory.ts |   69.11 |    65.38 |   60.71 |   68.75 | ...17,139,171-197 
+  ...ory.memory.ts |   88.05 |    82.14 |    91.3 |   86.66 | 141-147,163-165   
+  ...ory.memory.ts |    80.7 |    73.07 |   80.95 |   84.31 | ...22-123,136-138 
+  ...ory.memory.ts |   68.85 |    66.66 |   60.86 |   75.92 | ...11-112,139-140 
+  ...ory.memory.ts |   73.61 |    73.68 |   62.96 |    74.6 | ...40-143,166-183 
+  ...ory.memory.ts |   48.33 |     62.5 |      30 |   50.94 | ...13-115,129-164 
+  ...ory.memory.ts |   85.29 |     87.5 |      85 |    87.5 | 56,75,96-97       
+  ...ory.memory.ts |   73.68 |    81.25 |    62.5 |      78 | ...99,102,124-137 
+  ...ory.memory.ts |   63.93 |    63.63 |   48.14 |   66.66 | ...36,144,156-173 
+  ...ory.memory.ts |   81.81 |    72.72 |   81.81 |   80.64 | ...34-135,146-160 
+  ...ory.memory.ts |   82.85 |    46.66 |      75 |   81.81 | 33-41,60          
+  ...ory.memory.ts |      75 |    77.27 |      60 |   83.33 | ...21,125,144-154 
+  ...ory.memory.ts |   64.28 |       60 |   54.16 |   64.58 | ...88,100,123-148 
+  ...ory.memory.ts |    92.5 |     62.5 |   94.44 |   97.14 | 46                
+  ...ory.memory.ts |   86.36 |    84.61 |   80.48 |   90.78 | 122,130,195-205   
+  ...ory.memory.ts |   63.33 |    63.29 |   54.34 |   62.85 | ...91-295,309-313 
+  ...y.supabase.ts |       0 |        0 |       0 |       0 | 17-334            
+  ...ory.memory.ts |      56 |    55.55 |   42.85 |   61.36 | ...,80-84,106-128 
+  ...ory.memory.ts |   85.96 |    78.57 |   78.94 |   89.58 | 55,86,111,114,158 
+  ...ory.memory.ts |   82.19 |    94.02 |      70 |   83.07 | 75-90,169-178     
+  ...repository.ts |       0 |        0 |       0 |       0 | 14-224            
+  ...ory.memory.ts |   91.66 |    70.58 |   93.33 |   93.75 | 53-54             
+  ...ory.memory.ts |   62.82 |    44.23 |   65.51 |   70.96 | ...,74-79,133-155 
+  ...ory.memory.ts |      75 |      100 |   88.88 |      75 | 91-118            
+  ...ory.memory.ts |   94.44 |       85 |     100 |   96.55 | 60                
+  ...ory.memory.ts |      52 |    35.29 |   52.27 |   55.29 | ...31-235,251-255 
+  ...ory.memory.ts |   92.72 |    96.42 |   96.15 |   93.61 | 133-135           
+  ...ory.memory.ts |      90 |    91.66 |   81.81 |   89.47 | 79-83             
+  ...ory.memory.ts |   83.33 |    82.35 |   68.75 |   86.76 | 134-136,173-190   
+  ...ory.memory.ts |    84.9 |    73.91 |   86.84 |   86.81 | 45,225-241,249    
+  ...ory.memory.ts |   86.27 |       80 |   83.33 |   89.36 | ...13,128,151-155 
+  ...ory.memory.ts |   72.22 |    65.78 |   61.29 |   77.58 | ...,81,84,134-152 
+  ...ory.memory.ts |   63.63 |    58.33 |   52.77 |   63.85 | ...59-162,182-202 
+  ...ory.memory.ts |    83.6 |    84.61 |      76 |   89.58 | 78,81,119-127     
+  ...ory.memory.ts |   86.27 |       80 |      90 |   91.48 | 24,138-140        
+ src/lib/services  |   87.08 |    82.33 |    91.8 |   87.55 |                   
+  ...ty.service.ts |   93.33 |    84.95 |   91.89 |   93.26 | ...93,513,557,563 
+  ...cs.service.ts |   87.61 |    87.16 |   83.72 |   88.29 | ...80,597-609,634 
+  audit.service.ts |   95.41 |    96.59 |     100 |   95.41 | ...43,189-190,280 
+  auth.service.ts  |   89.43 |    78.26 |     100 |   90.16 | ...11,359,430-431 
+  ...ng.service.ts |   85.23 |    64.55 |   78.26 |    86.3 | ...70,403,436,459 
+  ...el.service.ts |   75.87 |    74.54 |   79.41 |   75.25 | ...23,581,615,620 
+  ...on.service.ts |   94.21 |    90.57 |   95.65 |   94.65 | ...60,490-491,608 
+  ...cy.service.ts |   94.57 |     94.8 |   95.83 |   95.23 | ...99,248,253,434 
+  ...nt.service.ts |   90.57 |    84.71 |   90.69 |   90.63 | ...88-596,629-631 
+  event.service.ts |   88.14 |       80 |   88.23 |   89.06 | ...18,541,566-574 
+  ...ck.service.ts |   74.43 |    77.84 |   74.19 |   76.36 | ...47,492,547,552 
+  ...rd.service.ts |    89.1 |    85.63 |     100 |   89.39 | ...78,487,501,511 
+  guest.service.ts |   84.23 |    77.57 |     100 |   84.15 | ...59-463,487,491 
+  ...ng.service.ts |   77.83 |    71.31 |   78.37 |   78.12 | ...65-566,599-602 
+  ...ry.service.ts |   99.36 |    96.68 |     100 |   99.36 | 390               
+  ...ce.service.ts |   87.16 |       74 |   88.88 |   86.95 | ...78,498,551-557 
+  ...ty.service.ts |    98.1 |    96.03 |     100 |   98.05 | 258,303,396       
+  ...ce.service.ts |   88.58 |    79.67 |   94.11 |   88.39 | ...78-579,583,587 
+  ...ip.service.ts |   84.05 |    77.77 |     100 |   84.05 | ...72,577,600,605 
+  menu.service.ts  |   91.54 |       80 |     100 |   99.11 | 338               
+  ...on.service.ts |   57.14 |    50.98 |   68.08 |   59.37 | ...95,524-732,826 
+  order.service.ts |   69.78 |    44.56 |   96.15 |   68.96 | ...12-415,446,583 
+  ...ge.service.ts |   83.53 |     84.8 |   78.26 |   83.53 | ...18,510,539,544 
+  ...nt.service.ts |   96.21 |    97.12 |     100 |   96.08 | 224,472-476,539   
+  pool.service.ts  |   87.05 |       75 |      75 |    86.9 | ...06,210,248,256 
+  ...on.service.ts |    83.6 |    79.86 |     100 |   83.42 | ...74,483,511,516 
+  rate.service.ts  |   85.79 |    80.95 |     100 |    87.7 | ...77,394,423,514 
+  ...ng.service.ts |   99.33 |    97.77 |     100 |   99.33 | 365               
+  ...on.service.ts |   89.26 |    92.64 |   86.48 |   90.27 | ...77,401,445-464 
+  ...ew.service.ts |     100 |      100 |     100 |     100 |                   
+  ...gs.service.ts |    99.2 |    99.07 |     100 |    99.2 | 80                
+  shift.service.ts |   84.13 |    77.29 |   96.77 |   84.07 | ...24-725,730-731 
+  snack.service.ts |   97.08 |    87.75 |     100 |     100 | 187-190,193-194   
+  ...rt.service.ts |     100 |    92.77 |     100 |     100 | ...80,301,309,329 
+  task.service.ts  |   81.46 |    79.22 |     100 |   81.46 | ...66-677,682-683 
+  user.service.ts  |     100 |     98.3 |     100 |     100 | 238               
+  ...st.service.ts |   94.68 |    88.98 |     100 |    94.5 | ...38,373,402,431 
+  ...er.service.ts |   90.04 |    87.67 |     100 |   90.25 | ...53-654,656-658 
+ src/middleware    |   88.14 |    78.18 |   89.36 |   88.59 |                   
+  ...middleware.ts |   64.44 |       50 |   71.42 |   64.44 | 69-105            
+  ...middleware.ts |   92.68 |      100 |   88.88 |    92.5 | 92-94             
+  ...middleware.ts |   95.12 |       90 |     100 |      95 | 93-95             
+  ...middleware.ts |   87.87 |       70 |   81.81 |   89.06 | ...49,151,175,220 
+  ...middleware.ts |     100 |      100 |     100 |     100 |                   
+  ...middleware.ts |     100 |      100 |     100 |     100 |                   
+  ...middleware.ts |   86.36 |    69.69 |     100 |   88.37 | 66-70,81          
+  ...middleware.ts |     100 |     90.9 |     100 |     100 | 48,82             
+  ...middleware.ts |   93.54 |    86.66 |     100 |   93.54 | 102-103           
+ src/modules/admin |   14.87 |     7.88 |   12.97 |   16.37 |                   
+  ...controller.ts |   21.62 |    15.18 |   21.21 |   23.88 | ...1063,1077-1714 
+  admin.routes.ts  |     100 |      100 |     100 |     100 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 7-100             
+  ...controller.ts |       0 |        0 |       0 |       0 | 11-586            
+  ...controller.ts |       0 |        0 |       0 |       0 | 9-116             
+  ...controller.ts |    0.28 |        0 |       0 |    0.31 | 83-1051           
+  types.ts         |   33.33 |    17.85 |      60 |   41.66 | 330-342           
+  ...controller.ts |       0 |        0 |       0 |       0 | 35-478            
+ ...in/controllers |   52.71 |    43.39 |    60.3 |    52.7 |                   
+  ...controller.ts |     100 |    90.47 |     100 |     100 | 41,82             
+  ...controller.ts |     100 |    77.41 |     100 |     100 | ...68,259,264-284 
+  ...controller.ts |   15.34 |    14.66 |    12.5 |    15.6 | ...55-156,184-560 
+  ...controller.ts |   39.06 |     40.9 |   47.36 |   39.06 | 132,145,201-386   
+  ...controller.ts |   59.37 |    38.51 |   67.44 |   60.47 | ...06-308,335-485 
+  ...controller.ts |   89.06 |       65 |     100 |   98.07 | 140               
+  ...controller.ts |      64 |    57.69 |   66.66 |      64 | 138-198           
+  ...controller.ts |   84.88 |    59.09 |     100 |   84.14 | ...75,178,193-194 
+  ...controller.ts |       0 |        0 |       0 |       0 | 25-325            
+  ...controller.ts |   93.54 |     74.6 |     100 |   93.47 | 54,105-109,186    
+ ...admin/services |   67.74 |    48.34 |   67.44 |   73.13 |                   
+  ...rd.service.ts |   96.77 |    54.73 |     100 |   96.66 | 249-250           
+  role.service.ts  |   34.61 |     32.5 |   46.15 |    37.5 | 78,99,106-181     
+  ...gs.service.ts |   65.85 |       50 |   53.33 |   73.52 | 102-134           
+ src/modules/auth  |    29.7 |    22.08 |   34.84 |   30.08 |                   
+  ...controller.ts |   93.44 |    61.11 |     100 |   93.44 | 30,41,67,93       
+  auth.routes.ts   |     100 |      100 |     100 |     100 |                   
+  auth.service.ts  |   26.06 |    26.05 |   26.66 |   27.56 | ...43,361,392-609 
+  auth.utils.ts    |   81.81 |    69.23 |     100 |   85.71 | 25,27,29          
+  ...validation.ts |     100 |      100 |     100 |     100 |                   
+  ...controller.ts |    1.55 |        0 |       0 |    1.57 | 23-458            
+  ...controller.ts |   48.97 |    51.35 |   66.66 |   48.61 | ...04,206,211-317 
+  oauth.service.ts |    0.78 |        0 |    7.14 |    0.78 | 77-521            
+  ...controller.ts |       0 |        0 |       0 |       0 | 16-256            
+ ...odules/chalets |   38.36 |    25.97 |   29.26 |   40.93 |                   
+  ...controller.ts |   33.76 |    25.97 |   29.26 |   36.13 | ...4,776,791-1052 
+  chalet.routes.ts |     100 |      100 |     100 |     100 |                   
+ ...dules/channels |     6.9 |     0.81 |       0 |    7.21 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 7-404             
+  ...nel.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...el.service.ts |     1.8 |     1.15 |       0 |    1.96 | 6,57-943          
+ ...odules/coupons |   27.89 |    22.16 |   22.72 |   28.41 |                   
+  ...controller.ts |    24.9 |    22.16 |   22.72 |   25.38 | ...65,608,616-895 
+  coupon.routes.ts |     100 |      100 |     100 |     100 |                   
+ ...odules/devices |    5.55 |        0 |       0 |    5.55 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 29-368            
+  ...ces.routes.ts |     100 |      100 |     100 |     100 |                   
+ ...odules/finance |   12.96 |        0 |       0 |   14.58 |                   
+  ...controller.ts |    2.08 |        0 |       0 |    2.38 | 8-142             
+  ...nce.routes.ts |     100 |      100 |     100 |     100 |                   
+ src/modules/gdpr  |    6.23 |     0.98 |       0 |    6.47 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 7-467             
+  gdpr.routes.ts   |     100 |      100 |     100 |     100 |                   
+  gdpr.service.ts  |    2.51 |     1.76 |       0 |    2.71 | 10,76-780         
+ ...ules/giftcards |   46.85 |    39.88 |   37.93 |   49.04 |                   
+  ...controller.ts |   43.49 |    39.88 |   37.93 |   45.52 | ...44-551,572-862 
+  ...ard.routes.ts |     100 |      100 |     100 |     100 |                   
+ ...modules/groups |    5.98 |        0 |       0 |    6.94 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 15-422            
+  groups.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...ps.service.ts |    0.42 |        0 |       0 |    0.54 | 135-1042          
+ ...s/housekeeping |   35.01 |    24.38 |   36.06 |   38.97 |                   
+  ...controller.ts |   32.21 |    24.38 |   36.06 |   35.87 | ...1138,1145-1146 
+  ...ing.routes.ts |     100 |      100 |     100 |     100 |                   
+ src/modules/i18n  |    7.87 |        0 |       0 |    8.22 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 14-456            
+  i18n.routes.ts   |     100 |      100 |     100 |     100 |                   
+  i18n.service.ts  |    1.14 |        0 |       0 |    1.25 | 60-910            
+ ...ules/inventory |   34.34 |    26.64 |   44.06 |   36.92 |                   
+  ...controller.ts |   31.43 |    26.64 |   44.06 |   33.73 | ...1108,1135-1392 
+  ...ory.routes.ts |     100 |      100 |     100 |     100 |                   
+ src/modules/kiosk |    7.09 |        0 |       0 |    7.57 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 14-562            
+  kiosk.routes.ts  |     100 |      100 |     100 |     100 |                   
+  kiosk.service.ts |    0.43 |        0 |       0 |    0.49 | 55-1211           
+ ...odules/loyalty |   31.45 |    22.39 |      25 |   34.29 |                   
+  ...controller.ts |   27.81 |    22.39 |   26.31 |    30.5 | ...82,899,939-940 
+  ...lty.routes.ts |   88.88 |      100 |       0 |   88.88 | 13-14             
+ ...odules/manager |    6.88 |        0 |       0 |    8.07 |                   
+  ...controller.ts |    2.18 |        0 |       0 |    2.52 | 29-430            
+  ...ger.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...controller.ts |     2.2 |        0 |       0 |    2.66 | 28-517            
+ ...ules/marketing |    5.59 |     1.75 |    1.16 |    6.12 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 14-622            
+  ...ing.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...ng.service.ts |     0.7 |      1.8 |    1.81 |    0.81 | 62,89-1648        
+ ...ules/messaging |    5.66 |        0 |       0 |    6.13 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 14-478            
+  ...ing.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...ng.service.ts |    0.34 |        0 |       0 |    0.39 | 73-1234           
+ ...mobile-checkin |    6.55 |        0 |    1.81 |    7.54 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 14-481            
+  ...kin.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...in.service.ts |    0.83 |        0 |    3.22 |    1.08 | 80,95-966         
+ ...multi-property |    6.25 |        0 |       0 |    6.74 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 7-340             
+  ...rty.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...ty.service.ts |    0.74 |        0 |       0 |    0.87 | 5-560             
+ ...modules/parity |    5.57 |        0 |       0 |     5.9 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 7-206             
+  parity.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...ty.service.ts |    0.62 |        0 |       0 |    0.68 | 5-667             
+ ...dules/payments |   29.41 |    20.79 |   58.33 |      30 |                   
+  ...ntegration.ts |       0 |        0 |       0 |       0 | 13-188            
+  ...controller.ts |   36.02 |     32.3 |   63.63 |   37.12 | ...51,393-413,430 
+  ...ent.routes.ts |     100 |      100 |     100 |     100 |                   
+ src/modules/pool  |   25.92 |    17.81 |      26 |   28.04 |                   
+  ...controller.ts |   21.11 |    17.81 |      26 |   22.77 | ...0-902,916-1258 
+  pool.routes.ts   |     100 |      100 |     100 |     100 |                   
+ ...ol/controllers |       0 |        0 |       0 |       0 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 16-248            
+  ...controller.ts |       0 |        0 |       0 |       0 | 16-218            
+  index.ts         |       0 |        0 |       0 |       0 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 22-294            
+  ...controller.ts |       0 |        0 |       0 |       0 | 17-512            
+ src/modules/pos   |   10.21 |     3.63 |       0 |   10.37 |                   
+  ...controller.ts |     0.8 |     3.63 |       0 |    0.81 | 22-390            
+  ...are.routes.ts |     100 |      100 |     100 |     100 |                   
+ ...ules/reporting |    4.58 |     0.17 |    1.73 |    5.06 |                   
+  ...controller.ts |    0.37 |        0 |       0 |    0.37 | 15-598            
+  ...ing.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...ng.service.ts |    0.75 |     0.19 |    2.38 |    0.88 | 41,52-1612        
+ ...les/restaurant |   24.56 |        0 |       0 |   25.22 |                   
+  ...controller.ts |    2.43 |        0 |       0 |    2.85 | 6-101             
+  ...ers.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...ant.routes.ts |   28.47 |        0 |       0 |   28.47 | ...92-316,322-350 
+  ...ist.routes.ts |   21.62 |        0 |       0 |   21.62 | 22-72,78-112      
+ ...nt/controllers |    21.4 |    12.22 |   41.93 |   24.89 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 9-317             
+  ...controller.ts |   57.37 |    43.33 |   66.66 |   56.66 | ...65,191,201-215 
+  ...controller.ts |   76.47 |    56.25 |     100 |   75.75 | 34-35,54-62,77,86 
+ ...urant/services |   35.08 |    20.71 |      50 |   40.36 |                   
+  menu.service.ts  |       0 |        0 |       0 |       0 | 4-324             
+  order.service.ts |   51.09 |    33.33 |   66.66 |   53.92 | ...53,601,627-650 
+  table.service.ts |   65.71 |    46.42 |      80 |   84.61 | 18-26             
+ ...urant/waitlist |    3.33 |        0 |       0 |    3.77 |                   
+  ...controller.ts |    3.33 |        0 |       0 |    3.77 | 18-156            
+ ...odules/revenue |    5.51 |        0 |       0 |    6.09 |                   
+  ...controller.ts |    0.43 |        0 |       0 |    0.43 | 15-544            
+  ...nue.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...ue.service.ts |    0.34 |        0 |       0 |    0.42 | 68-1111           
+ ...odules/reviews |   94.59 |    91.89 |      75 |    94.2 |                   
+  ...controller.ts |     100 |    91.89 |     100 |     100 | 48,56,152         
+  ...ews.routes.ts |   66.66 |      100 |       0 |   66.66 | 17-18,21-22       
+ src/modules/snack |   83.79 |    69.23 |   96.15 |   91.93 |                   
+  ...controller.ts |   82.14 |    69.23 |   96.15 |   90.96 | ...81,517,533,576 
+  snack.routes.ts  |     100 |      100 |     100 |     100 |                   
+ src/modules/staff |    7.14 |        0 |       0 |    8.03 |                   
+  ...controller.ts |    1.04 |        0 |       0 |    1.19 | 46-948            
+  staff.routes.ts  |     100 |      100 |     100 |     100 |                   
+ ...odules/support |     100 |      100 |     100 |     100 |                   
+  ...ort.routes.ts |     100 |      100 |     100 |     100 |                   
+ src/modules/users |   56.87 |    47.89 |    61.9 |   57.84 |                   
+  ...controller.ts |       0 |        0 |       0 |       0 | 35-400            
+  ...controller.ts |   90.16 |     82.6 |     100 |    93.1 | ...91,369-371,394 
+  user.routes.ts   |     100 |      100 |     100 |     100 |                   
+ src/routes        |   46.57 |    13.04 |      25 |   46.57 |                   
+  docs.routes.ts   |     100 |      100 |     100 |     100 |                   
+  ...ric.routes.ts |     100 |      100 |     100 |     100 |                   
+  ...ogy.routes.ts |   33.33 |    17.64 |      25 |   33.33 | ...6,56-76,86-104 
+  ...ion.routes.ts |   17.39 |        0 |       0 |   17.39 | 12-22,31-41,50-60 
+ src/services      |    39.1 |    29.22 |   45.16 |   39.42 |                   
+  ...up.service.ts |   74.75 |    66.66 |     100 |   77.52 | ...62,188,216-217 
+  ...rs.service.ts |      10 |        0 |       0 |      10 | 10-44             
+  ...on.service.ts |    3.03 |        0 |       0 |    3.12 | 26-136            
+  email.service.ts |    24.4 |    12.59 |   30.43 |    24.4 | ...77,190-609,678 
+  ...ts.service.ts |    2.06 |        0 |       0 |    2.17 | 46-519            
+  ...er.service.ts |    64.7 |        0 |      80 |    64.7 | ...08-122,139-144 
+  ...ng.service.ts |   37.95 |    30.68 |   53.84 |    39.2 | ...61-309,353-441 
+  ...gy.service.ts |   20.45 |     8.33 |   33.33 |   23.07 | 29-32,44-135      
+  ...on.service.ts |   53.16 |    51.35 |      70 |   52.63 | ...35,269,278-280 
+  ...or.service.ts |   54.45 |    53.12 |   84.61 |      54 | ...59,308,325-338 
+  ...cy.service.ts |   95.74 |     90.9 |     100 |   95.74 | 98-99             
+ src/socket        |    7.27 |     7.14 |    12.5 |    6.25 |                   
+  index.ts         |    7.27 |     7.14 |    12.5 |    6.25 | ...24,231,241-282 
+ src/types         |     100 |      100 |     100 |     100 |                   
+  index.ts         |     100 |      100 |     100 |     100 |                   
+ src/utils         |   38.27 |    33.51 |   41.79 |   35.52 |                   
+  AppError.ts      |     100 |      100 |     100 |     100 |                   
+  ...vityLogger.ts |    8.33 |        0 |       0 |    8.33 | 19-37,45-62       
+  cache.ts         |    8.95 |     10.9 |    6.66 |    8.19 | ...11-285,295-387 
+  ...Normalizer.ts |     100 |    97.05 |     100 |     100 | 81                
+  logger.ts        |   74.07 |       50 |     100 |   74.07 | 43-44,53-63,83    
+  sentry.ts        |   53.62 |     41.3 |   94.11 |   47.54 | ...73,290,299-300 
+  transaction.ts   |   26.53 |        0 |   11.11 |   26.08 | 70-181            
+ src/validation    |    92.3 |    23.07 |   77.77 |   92.15 |                   
+  schemas.ts       |    92.3 |    23.07 |   77.77 |   92.15 | 239-243,327       
+-------------------|---------|----------|---------|---------|-------------------
+
+=============================== Coverage summary ===============================
+Statements   : 45.25% ( 11893/26280 )
+Branches     : 40.02% ( 6743/16845 )
+Functions    : 51% ( 2179/4272 )
+Lines        : 46.99% ( 11456/24379 )
+================================================================================
+ERROR: Coverage for branches (40.02%) does not meet global threshold (47%)

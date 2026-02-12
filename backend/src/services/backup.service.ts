@@ -1,6 +1,6 @@
-import { getSupabase } from "../database/connection";
-import { config } from "../config";
-import { logger } from "../utils/logger";
+import { getSupabase } from "../database/connection.js";
+import { config } from "../config/index.js";
+import { logger } from "../utils/logger.js";
 
 interface BackupResult {
     id: string;

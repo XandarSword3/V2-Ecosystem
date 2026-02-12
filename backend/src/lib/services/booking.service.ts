@@ -7,6 +7,7 @@
  */
 
 import dayjs from 'dayjs';
+import { cache } from "../../utils/cache.js";
 import type {
   ChaletRepository,
   ChaletBooking,
@@ -240,53 +241,67 @@ export function createBookingService(deps: BookingServiceDeps): BookingService {
         );
       }
 
-      // Check availability
-      const isAvailable = await this.checkAvailability(chaletId, checkInDate, checkOutDate);
-      if (!isAvailable) {
-        throw new BookingServiceError(
-          'Chalet is already booked for the selected dates',
-          'NOT_AVAILABLE',
-          400
-        );
+      const lockKey = `booking_lock:${chaletId}`;
+      const hasLock = await cache.acquireLock(lockKey, 10);
+      if (!hasLock) {
+        throw new BookingServiceError('System busy, please try again', 'CONCURRENCY_ERROR', 409);
       }
 
-      // Calculate pricing
-      const pricing = await calculatePricing(chalet, checkIn, checkOut, selectedAddOns);
 
-      // Create booking
-      const booking = await chaletRepository.createBooking({
-        booking_number: generateBookingNumber(),
-        chalet_id: chaletId,
-        customer_id: customerId,
-        customer_name: customerName,
-        customer_email: customerEmail,
-        customer_phone: customerPhone,
-        check_in_date: checkIn.toISOString(),
-        check_out_date: checkOut.toISOString(),
-        number_of_guests: numberOfGuests,
-        number_of_nights: pricing.numberOfNights,
-        base_amount: pricing.baseAmount.toFixed(2),
-        add_ons_amount: pricing.addOnsAmount.toFixed(2),
-        deposit_amount: pricing.depositAmount.toFixed(2),
-        total_amount: pricing.totalAmount.toFixed(2),
-        status: 'pending',
-        payment_status: 'pending',
-        payment_method: paymentMethod,
-        special_requests: specialRequests,
-      });
-
-      // Create booking add-ons
+      // Declare outside try for scope
+      let booking: ChaletBooking;
       let bookingAddOns: ChaletBookingAddOn[] = [];
-      if (pricing.addOnItems.length > 0) {
-        bookingAddOns = await chaletRepository.createBookingAddOns(
-          pricing.addOnItems.map(item => ({
-            booking_id: booking.id,
-            add_on_id: item.add_on_id,
-            quantity: item.quantity,
-            unit_price: item.unit_price.toFixed(2),
-            subtotal: item.subtotal.toFixed(2),
-          }))
-        );
+      let pricing: Awaited<ReturnType<typeof calculatePricing>>;
+      try {
+        // Check availability
+        const isAvailable = await this.checkAvailability(chaletId, checkInDate, checkOutDate);
+        if (!isAvailable) {
+          throw new BookingServiceError(
+            'Chalet is already booked for the selected dates',
+            'NOT_AVAILABLE',
+            400
+          );
+        }
+
+        // Calculate pricing
+        pricing = await calculatePricing(chalet, checkIn, checkOut, selectedAddOns);
+
+        // Create booking
+        booking = await chaletRepository.createBooking({
+          booking_number: generateBookingNumber(),
+          chalet_id: chaletId,
+          customer_id: customerId,
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
+          check_in_date: checkIn.toISOString(),
+          check_out_date: checkOut.toISOString(),
+          number_of_guests: numberOfGuests,
+          number_of_nights: pricing.numberOfNights,
+          base_amount: pricing.baseAmount.toFixed(2),
+          add_ons_amount: pricing.addOnsAmount.toFixed(2),
+          deposit_amount: pricing.depositAmount.toFixed(2),
+          total_amount: pricing.totalAmount.toFixed(2),
+          status: 'pending',
+          payment_status: 'pending',
+          payment_method: paymentMethod,
+          special_requests: specialRequests,
+        });
+
+        // Create booking add-ons
+        if (pricing.addOnItems.length > 0) {
+          bookingAddOns = await chaletRepository.createBookingAddOns(
+            pricing.addOnItems.map(item => ({
+              booking_id: booking.id,
+              add_on_id: item.add_on_id,
+              quantity: item.quantity,
+              unit_price: item.unit_price.toFixed(2),
+              subtotal: item.subtotal.toFixed(2),
+            }))
+          );
+        }
+      } finally {
+        await cache.releaseLock(lockKey);
       }
 
       // Send confirmation email

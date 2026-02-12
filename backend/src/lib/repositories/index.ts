@@ -40,6 +40,7 @@ export { createInMemorySettingsRepository } from './settings.repository.memory.j
 export { createInMemoryAuditRepository } from './audit.repository.memory.js';
 
 export { createInMemoryNotificationRepository } from './notification.repository.memory.js';
+export { createSupabaseNotificationRepository } from './notification.repository.supabase.js';
 
 export { InMemoryPaymentRepository } from './payment.repository.memory.js';
 

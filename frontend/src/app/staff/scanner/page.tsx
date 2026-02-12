@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useTranslations } from 'next-intl'; // IMPROVE Iter-9: i18n
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -47,6 +48,7 @@ interface ScanHistory {
 }
 
 export default function StaffScannerPage() {
+  const t = useTranslations('staffScanner'); // IMPROVE Iter-9: i18n
   const [manualCode, setManualCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [lastResult, setLastResult] = useState<ValidationResult | null>(null);
@@ -68,7 +70,7 @@ export default function StaffScannerPage() {
       const response = await api.post('/pool/staff/validate', { ticketNumber: code.trim() });
       const result: ValidationResult = {
         success: true,
-        message: response.data.message || 'Ticket validated successfully',
+        message: response.data.message || t('ticketValidated'), // IMPROVE Iter-9: i18n
         ticket: response.data.data,
       };
       setLastResult(result);
@@ -81,7 +83,7 @@ export default function StaffScannerPage() {
       const axiosError = error as { response?: { data?: { error?: string } } };
       const result: ValidationResult = {
         success: false,
-        message: axiosError.response?.data?.error || 'Invalid or expired ticket',
+        message: axiosError.response?.data?.error || t('invalidOrExpired'), // IMPROVE Iter-9: i18n
       };
       setLastResult(result);
       setScanHistory((prev) => [
@@ -101,11 +103,11 @@ export default function StaffScannerPage() {
 
     try {
       await api.post(`/pool/tickets/${lastResult.ticket.id}/entry`);
-      toast.success('Entry recorded successfully');
+      toast.success(t('entryRecorded')); // IMPROVE Iter-9: i18n
       setLastResult(null);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || 'Failed to record entry');
+      toast.error(axiosError.response?.data?.message || t('failedRecordEntry')); // IMPROVE Iter-9: i18n
     }
   };
 
@@ -114,11 +116,11 @@ export default function StaffScannerPage() {
 
     try {
       await api.post(`/pool/tickets/${lastResult.ticket.id}/exit`);
-      toast.success('Exit recorded successfully');
+      toast.success(t('exitRecorded')); // IMPROVE Iter-9: i18n
       setLastResult(null);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || 'Failed to record exit');
+      toast.error(axiosError.response?.data?.message || t('failedRecordExit')); // IMPROVE Iter-9: i18n
     }
   };
 
@@ -132,11 +134,12 @@ export default function StaffScannerPage() {
     setLastResult(null);
   };
 
+  // IMPROVE Iter-9: i18n ticket type labels
   const ticketTypeLabels: Record<string, string> = {
-    adult: 'Adult',
-    child: 'Child',
-    family: 'Family',
-    vip: 'VIP',
+    adult: t('adult'),
+    child: t('child'),
+    family: t('family'),
+    vip: t('vip'),
   };
 
   return (
@@ -148,13 +151,13 @@ export default function StaffScannerPage() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
               <QrCode className="w-5 h-5 text-white" />
             </div>
-            Ticket Scanner
+            {t('title')}{/* IMPROVE Iter-9: i18n */}
           </h1>
-          <p className="text-slate-500 dark:text-slate-400">Scan pool tickets to validate entry</p>
+          <p className="text-slate-500 dark:text-slate-400">{t('subtitle')}{/* IMPROVE Iter-9: i18n */}</p>
         </div>
         <Button variant="outline" onClick={clearHistory}>
           <RefreshCw className="w-4 h-4 mr-2" />
-          Clear History
+          {t('clearHistory')}{/* IMPROVE Iter-9: i18n */}
         </Button>
       </div>
 
@@ -165,7 +168,7 @@ export default function StaffScannerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <QrCode className="w-5 h-5" />
-                Scan or Enter Code
+                {t('scanOrEnterCode')}{/* IMPROVE Iter-9: i18n */}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -176,7 +179,7 @@ export default function StaffScannerPage() {
                     type="text"
                     value={manualCode}
                     onChange={(e) => setManualCode(e.target.value)}
-                    placeholder="Enter ticket code or scan QR..."
+                    placeholder={t('enterTicketCode')} // IMPROVE Iter-9: i18n
                     className="text-center text-lg font-mono h-14"
                     autoFocus
                     autoComplete="off"
@@ -186,12 +189,12 @@ export default function StaffScannerPage() {
                   {loading ? (
                     <>
                       <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                      Validating...
+                      {t('validating')}{/* IMPROVE Iter-9: i18n */}
                     </>
                   ) : (
                     <>
                       <Ticket className="w-4 h-4 mr-2" />
-                      Validate Ticket
+                      {t('validateTicket')}{/* IMPROVE Iter-9: i18n */}
                     </>
                   )}
                 </Button>
@@ -219,7 +222,7 @@ export default function StaffScannerPage() {
                       )}
                       <div>
                         <h3 className={`text-xl font-bold ${lastResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                          {lastResult.success ? 'Valid Ticket' : 'Invalid Ticket'}
+                          {lastResult.success ? t('validTicket') : t('invalidTicket')}{/* IMPROVE Iter-9: i18n */}
                         </h3>
                         <p className="text-slate-600 dark:text-slate-400">{lastResult.message}</p>
                       </div>
@@ -252,11 +255,11 @@ export default function StaffScannerPage() {
                         <div className="flex gap-2">
                           <Button onClick={handleEntry} className="flex-1">
                             <LogIn className="w-4 h-4 mr-2" />
-                            Record Entry
+                            {t('recordEntry')}{/* IMPROVE Iter-9: i18n */}
                           </Button>
                           <Button onClick={handleExit} variant="outline" className="flex-1">
                             <LogOut className="w-4 h-4 mr-2" />
-                            Record Exit
+                            {t('recordExit')}{/* IMPROVE Iter-9: i18n */}
                           </Button>
                         </div>
                       </>
@@ -274,15 +277,15 @@ export default function StaffScannerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
-                Recent Scans
+                {t('recentScans')}{/* IMPROVE Iter-9: i18n */}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {scanHistory.length === 0 ? (
                 <div className="text-center py-12">
                   <QrCode className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                  <p className="text-slate-500 dark:text-slate-400">No scans yet</p>
-                  <p className="text-sm text-slate-400 dark:text-slate-500">Scanned tickets will appear here</p>
+                  <p className="text-slate-500 dark:text-slate-400">{t('noScansYet')}</p>{/* IMPROVE Iter-9: i18n */}
+                  <p className="text-sm text-slate-400 dark:text-slate-500">{t('scannedTicketsWillAppear')}</p>{/* IMPROVE Iter-9: i18n */}
                 </div>
               ) : (
                 <div className="space-y-3">

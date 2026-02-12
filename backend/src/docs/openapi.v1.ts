@@ -1,5 +1,5 @@
 /**
- * OpenAPI 3.0.3 Specification for V2 Resort API v1
+ * OpenAPI 3.0.3 Specification for Iron Paradise Gym API v1
  * 
  * Complete API contract for mobile app development.
  * All mobile apps MUST use /api/v1/* endpoints.
@@ -11,12 +11,12 @@
 export const openApiV1Spec = {
   openapi: '3.0.3',
   info: {
-    title: 'V2 Resort Management API',
+    title: 'Iron Paradise Gym Management API',
     version: '1.0.0',
     description: `
-# V2 Resort Management System API - Version 1
+# Iron Paradise Gym Management System API - Version 1
 
-This is the stable API contract for V2 Resort. **Mobile apps must use \`/api/v1/*\` endpoints.**
+This is the stable API contract for Iron Paradise Gym. **Mobile apps must use \`/api/v1/*\` endpoints.**
 
 ## Versioning Policy
 - **v1** is the current stable version
@@ -61,9 +61,9 @@ All errors follow RFC 7807 Problem Details format:
 - **Android**: Include \`X-Platform: android\` and \`X-App-Version\` headers
     `,
     contact: {
-      name: 'V2 Resort API Support',
-      email: 'api-support@v2resort.com',
-      url: 'https://v2resort.com/support',
+      name: 'Iron Paradise Gym API Support',
+      email: 'api-support@ironparadisegym.com',
+      url: 'https://ironparadisegym.com/support',
     },
     license: {
       name: 'Proprietary',
@@ -217,7 +217,7 @@ All errors follow RFC 7807 Problem Details format:
         operationId: 'logout',
         summary: 'Logout current session',
         description: 'Invalidates current access token',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         responses: {
           '200': {
             description: 'Logout successful',
@@ -237,7 +237,7 @@ All errors follow RFC 7807 Problem Details format:
         operationId: 'getCurrentUser',
         summary: 'Get current user profile',
         description: 'Returns the authenticated user profile with roles and permissions',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         responses: {
           '200': {
             description: 'User profile',
@@ -323,7 +323,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Auth'],
         operationId: 'changePassword',
         summary: 'Change password (authenticated)',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         requestBody: {
           required: true,
           content: {
@@ -351,7 +351,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Auth'],
         operationId: 'get2FAStatus',
         summary: 'Get 2FA status',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         responses: {
           '200': {
             description: '2FA status',
@@ -381,7 +381,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Auth'],
         operationId: 'setup2FA',
         summary: 'Initialize 2FA setup',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         responses: {
           '200': {
             description: '2FA setup data',
@@ -412,7 +412,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Auth'],
         operationId: 'enable2FA',
         summary: 'Enable 2FA with verification code',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         requestBody: {
           required: true,
           content: {
@@ -492,7 +492,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Auth'],
         operationId: 'disable2FA',
         summary: 'Disable 2FA',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         requestBody: {
           required: true,
           content: {
@@ -523,7 +523,7 @@ All errors follow RFC 7807 Problem Details format:
         operationId: 'getUserDevices',
         summary: 'List registered devices',
         description: 'Returns all devices registered for push notifications',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         responses: {
           '200': {
             description: 'List of devices',
@@ -552,7 +552,7 @@ All errors follow RFC 7807 Problem Details format:
         operationId: 'registerDevice',
         summary: 'Register device for push notifications',
         description: 'Registers a device token for FCM/APNS push notifications',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         requestBody: {
           required: true,
           content: {
@@ -587,7 +587,7 @@ All errors follow RFC 7807 Problem Details format:
         operationId: 'unregisterDevice',
         summary: 'Unregister device',
         description: 'Removes device from push notification list',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         requestBody: {
           required: true,
           content: {
@@ -613,7 +613,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Devices'],
         operationId: 'updateDevicePreferences',
         summary: 'Update device notification preferences',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'deviceId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
@@ -642,7 +642,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Devices'],
         operationId: 'removeDevice',
         summary: 'Remove device (hard delete)',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'deviceId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
@@ -658,7 +658,7 @@ All errors follow RFC 7807 Problem Details format:
         operationId: 'logoutAllDevices',
         summary: 'Logout from all devices',
         description: 'Invalidates all device tokens for push notifications',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         requestBody: {
           content: {
             'application/json': {
@@ -745,7 +745,7 @@ All errors follow RFC 7807 Problem Details format:
         operationId: 'createOrder',
         summary: 'Create new order',
         description: 'Creates a restaurant order. Supports guest checkout.',
-        security: [{ bearerAuth: [] }, {}],
+        security: [{ bearerAuth: [] as string[] }, {}],
         requestBody: {
           required: true,
           content: {
@@ -776,7 +776,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Restaurant'],
         operationId: 'getOrders',
         summary: 'Get orders (staff only)',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'preparing', 'ready', 'served', 'completed', 'cancelled'] } },
           { name: 'date', in: 'query', schema: { type: 'string', format: 'date' } },
@@ -794,7 +794,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Restaurant'],
         operationId: 'getOrderById',
         summary: 'Get order details',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
@@ -809,7 +809,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Restaurant'],
         operationId: 'updateOrderStatus',
         summary: 'Update order status (staff only)',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
@@ -965,7 +965,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Chalets'],
         operationId: 'createBooking',
         summary: 'Create chalet booking',
-        security: [{ bearerAuth: [] }, {}],
+        security: [{ bearerAuth: [] as string[] }, {}],
         requestBody: {
           required: true,
           content: {
@@ -1064,7 +1064,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Pool'],
         operationId: 'validatePoolTicket',
         summary: 'Validate ticket (staff)',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
@@ -1086,7 +1086,7 @@ All errors follow RFC 7807 Problem Details format:
         operationId: 'createPaymentIntent',
         summary: 'Create Stripe payment intent',
         description: 'Creates a payment intent for card payments, Apple Pay, or Google Pay',
-        security: [{ bearerAuth: [] }, {}],
+        security: [{ bearerAuth: [] as string[] }, {}],
         requestBody: {
           required: true,
           content: {
@@ -1126,7 +1126,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Payments'],
         operationId: 'getPaymentMethods',
         summary: 'Get saved payment methods',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         responses: {
           '200': {
             description: 'Payment methods',
@@ -1157,7 +1157,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Loyalty'],
         operationId: 'getMyLoyaltyAccount',
         summary: 'Get my loyalty account',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         responses: {
           '200': {
             description: 'Loyalty account',
@@ -1181,7 +1181,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Loyalty'],
         operationId: 'getMyLoyaltyTransactions',
         summary: 'Get my points transactions',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         parameters: [
           { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
           { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
@@ -1403,7 +1403,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Coupons'],
         operationId: 'applyCoupon',
         summary: 'Apply coupon to order',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         requestBody: {
           required: true,
           content: {
@@ -1434,7 +1434,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Support'],
         operationId: 'createSupportTicket',
         summary: 'Create support ticket',
-        security: [{ bearerAuth: [] }, {}],
+        security: [{ bearerAuth: [] as string[] }, {}],
         requestBody: {
           required: true,
           content: {
@@ -1452,7 +1452,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Support'],
         operationId: 'getMyTickets',
         summary: 'Get my support tickets',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         responses: {
           '200': { description: 'Tickets list' },
         },
@@ -1467,7 +1467,7 @@ All errors follow RFC 7807 Problem Details format:
         tags: ['Reviews'],
         operationId: 'createReview',
         summary: 'Create review',
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] as string[] }],
         requestBody: {
           required: true,
           content: {
