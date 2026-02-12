@@ -14,8 +14,15 @@ const SESSION_SECRET = process.env.SESSION_SECRET;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 if (!SESSION_SECRET && NODE_ENV === 'production') {
-  throw new Error('SESSION_SECRET is required in production');
+  console.warn(
+    'WARN: SESSION_SECRET is not set in production. Using a generated secret. ' +
+    'Sessions will be invalidated on restart.'
+  );
 }
+
+// Generate a random secret if one isn't provided (for fallback)
+const FALLBACK_SECRET = require('crypto').randomBytes(32).toString('hex');
+const FINAL_SESSION_SECRET = SESSION_SECRET || FALLBACK_SECRET;
 
 // Redis connection options
 const redisOptions = {
@@ -39,7 +46,7 @@ export const createRedisClient = () => {
       const [host, port] = node.split(':');
       return { host, port: parseInt(port, 10) };
     });
-    
+
     return new Redis.Cluster(nodes, {
       redisOptions: {
         ...redisOptions,
@@ -50,7 +57,7 @@ export const createRedisClient = () => {
       },
     });
   }
-  
+
   return new Redis(REDIS_URL, redisOptions);
 };
 
@@ -95,7 +102,7 @@ export const createSessionStore = () => {
 // Session middleware configuration
 export const sessionConfig = {
   store: createSessionStore(),
-  secret: SESSION_SECRET || 'dev-secret-change-in-production',
+  secret: FINAL_SESSION_SECRET,
   name: 'v2resort.sid',
   resave: false,
   saveUninitialized: false,
