@@ -1,0 +1,1 @@
+ALTER TABLE chalet_bookings ADD COLUMN IF NOT EXISTS pricing_rules_applied JSONB DEFAULT '[]';

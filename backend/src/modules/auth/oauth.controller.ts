@@ -101,14 +101,25 @@ export async function googleCallback(req: Request, res: Response, next: NextFunc
       redirectPath = '/staff';
     }
 
-    // Pass tokens in URL for frontend to capture (since httpOnly cookies don't work cross-port)
-    // The frontend will read these from URL, store them, and clear from URL
-    const redirectUrl = new URL(`${FRONTEND_URL}${redirectPath}`);
-    redirectUrl.searchParams.set('oauth', 'success');
-    redirectUrl.searchParams.set('accessToken', result.accessToken);
-    redirectUrl.searchParams.set('refreshToken', result.refreshToken);
-    
-    res.redirect(redirectUrl.toString());
+    // SECURITY FIX (HIGH-008): Set tokens in httpOnly cookies instead of URL params
+    // This prevents tokens from leaking via browser history, Referer headers, and server logs
+    res.cookie('accessToken', result.accessToken, {
+      httpOnly: true,
+      secure: config.env === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+      path: '/',
+    });
+
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: config.env === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
+    res.redirect(`${FRONTEND_URL}${redirectPath}?oauth=success`);
   } catch (error) {
     logger.error('Error handling Google OAuth callback:', error);
     res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`);
@@ -306,12 +317,24 @@ export async function appleCallback(req: Request, res: Response, next: NextFunct
       redirectPath = '/staff';
     }
 
-    const redirectUrl = new URL(`${FRONTEND_URL}${redirectPath}`);
-    redirectUrl.searchParams.set('oauth', 'success');
-    redirectUrl.searchParams.set('accessToken', result.accessToken);
-    redirectUrl.searchParams.set('refreshToken', result.refreshToken);
-    
-    res.redirect(redirectUrl.toString());
+    // SECURITY FIX (HIGH-008): Set tokens in httpOnly cookies instead of URL params
+    res.cookie('accessToken', result.accessToken, {
+      httpOnly: true,
+      secure: config.env === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000,
+      path: '/',
+    });
+
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: config.env === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    res.redirect(`${FRONTEND_URL}${redirectPath}?oauth=success`);
   } catch (error) {
     logger.error('Error handling Apple OAuth callback:', error);
     res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`);

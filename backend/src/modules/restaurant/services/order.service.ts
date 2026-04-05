@@ -1,10 +1,12 @@
+import dayjs from 'dayjs';
 import { getSupabase } from "../../../database/connection.js";
 import { emitToUnit, emitToRole } from "../../../socket/index.js";
 import { emailService } from "../../../services/email.service.js";
 import { logger } from "../../../utils/logger.js";
 import { taxService } from "../../../services/tax.service.js";
-import { orderConfigService } from "../../../services/order-config.service.js"; // FIX: Iteration 7 - Dynamic service charge & delivery fee
-import dayjs from 'dayjs';
+import { orderConfigService } from "../../../services/order-config.service.js";
+import { getEngineService } from '../../../engines/engine-service.js';
+import type { PricingLineItem, PricingContext } from '../../../engines/types.js';
 
 function generateOrderNumber(): string {
   const date = dayjs().format('YYMMDD');
@@ -26,6 +28,110 @@ interface SelectedModifier {
   inventoryQuantity?: number;
 }
 
+/**
+ * Propagate a restaurant order to the kitchen display system.
+ * Creates a kitchen_orders record + kitchen_order_items for each line item.
+ * This is called automatically when a restaurant order is created.
+ */
+async function propagateToKitchen(
+  orderId: string,
+  orderNumber: string,
+  tableId: string | undefined,
+  orderItems: Array<{ menu_item_id: string; quantity: number; special_instructions?: string; selected_modifiers?: SelectedModifier[] }>,
+  menuItemMap: Map<string, any>,
+  estimatedReadyTime: string
+) {
+  const supabase = getSupabase();
+
+  try {
+    // Calculate estimated prep time in minutes from items
+    const maxPrepTime = Math.max(
+      ...Array.from(menuItemMap.values()).map((i: any) => i.preparation_time_minutes || 15)
+    );
+
+    // Insert kitchen order
+    const { data: kitchenOrder, error: koError } = await supabase
+      .from('kitchen_orders')
+      .insert({
+        order_number: orderNumber,
+        source_order_id: orderId,
+        table_id: tableId || null,
+        status: 'PENDING',
+        priority: 'NORMAL',
+        estimated_time: maxPrepTime,
+        notes: null,
+      })
+      .select()
+      .single();
+
+    if (koError) {
+      logger.warn('[KITCHEN SYNC] Failed to create kitchen order:', koError);
+      return; // Non-fatal — restaurant order still succeeds
+    }
+
+    // Insert kitchen order items
+    const kitchenItems = orderItems.map(item => {
+      const menuItem = menuItemMap.get(item.menu_item_id);
+
+      // Build modifications array from special instructions + selected modifiers
+      const modifications: string[] = [];
+      if (item.special_instructions) {
+        modifications.push(item.special_instructions);
+      }
+      if (item.selected_modifiers && item.selected_modifiers.length > 0) {
+        item.selected_modifiers.forEach(mod => {
+          modifications.push(`${mod.modifierType}: ${mod.optionName}`);
+        });
+      }
+
+      return {
+        order_id: kitchenOrder.id,
+        menu_item_id: item.menu_item_id,
+        name: menuItem?.name || 'Unknown Item',
+        quantity: item.quantity,
+        modifications: modifications.length > 0 ? modifications : null,
+        notes: item.special_instructions || null,
+        status: 'PENDING',
+      };
+    });
+
+    const { error: kiError } = await supabase
+      .from('kitchen_order_items')
+      .insert(kitchenItems);
+
+    if (kiError) {
+      logger.warn('[KITCHEN SYNC] Failed to create kitchen order items:', kiError);
+    }
+
+    // Emit socket event to kitchen display
+    try {
+      const { getIO } = await import('../../../socket/index.js');
+      const io = getIO();
+      io.to('kitchen').emit('kitchen:new-order', {
+        id: kitchenOrder.id,
+        orderNumber: kitchenOrder.order_number,
+        tableId: kitchenOrder.table_id,
+        status: kitchenOrder.status,
+        priority: kitchenOrder.priority,
+        items: kitchenItems.map(i => ({
+          name: i.name,
+          quantity: i.quantity,
+          modifications: i.modifications,
+          notes: i.notes,
+        })),
+        createdAt: kitchenOrder.created_at,
+        estimatedTime: maxPrepTime,
+      });
+    } catch (socketErr) {
+      logger.warn('[KITCHEN SYNC] Socket emit failed (non-fatal):', socketErr);
+    }
+
+    logger.info(`[KITCHEN SYNC] Kitchen order ${kitchenOrder.id} created for restaurant order ${orderNumber}`);
+  } catch (err) {
+    logger.warn('[KITCHEN SYNC] Propagation error (non-fatal):', err);
+  }
+}
+
 export async function createOrder(data: {
   customerId?: string;
   customerName: string;
@@ -34,9 +140,9 @@ export async function createOrder(data: {
   tableId?: string;
   tableNumber?: string;
   orderType: 'dine_in' | 'takeaway' | 'delivery' | 'room_service';
-  items: Array<{ 
-    menuItemId: string; 
-    quantity: number; 
+  items: Array<{
+    menuItemId: string;
+    quantity: number;
     specialInstructions?: string;
     selectedModifiers?: SelectedModifier[];
     modifierTotal?: number;
@@ -61,7 +167,7 @@ export async function createOrder(data: {
       .eq('table_number', data.tableNumber)
       .eq('is_active', true)
       .single();
-    
+
     if (tableRes) {
       finalTableId = tableRes.id;
     }
@@ -83,6 +189,22 @@ export async function createOrder(data: {
   // but frontend now enforces single module per checkout.
   const moduleId = menuItemsList?.[0]?.module_id;
 
+  // Pre-fetch all modifier option prices from DB for accurate pricing
+  const allModifierOptionIds = data.items
+    .flatMap(item => (item.selectedModifiers || []).map(m => m.optionId))
+    .filter(Boolean);
+  
+  let modifierPriceMap = new Map<string, number>();
+  if (allModifierOptionIds.length > 0) {
+    const { data: modOpts } = await supabase
+      .from('menu_modifier_options')
+      .select('id, price_adjustment')
+      .in('id', allModifierOptionIds);
+    if (modOpts) {
+      modifierPriceMap = new Map(modOpts.map(o => [o.id, parseFloat(o.price_adjustment) || 0]));
+    }
+  }
+
   // Calculate totals (including modifiers)
   let subtotal = 0;
   const orderItems = data.items.map(item => {
@@ -95,15 +217,17 @@ export async function createOrder(data: {
     const unitPrice = menuItem.discount_price != null && parseFloat(menuItem.discount_price) > 0
       ? parseFloat(menuItem.discount_price)
       : parseFloat(menuItem.price);
-    
-    // Calculate modifier total for this item
+
+    // Calculate modifier total for this item using DB prices (not client-provided)
     let modifierTotal = 0;
     if (item.selectedModifiers && item.selectedModifiers.length > 0) {
       modifierTotal = item.selectedModifiers.reduce((sum, mod) => {
-        return sum + (mod.priceAdjustment * mod.quantity);
+        const dbPrice = modifierPriceMap.get(mod.optionId) ?? mod.priceAdjustment;
+        const qty = mod.quantity || 1;
+        return sum + (dbPrice * qty);
       }, 0);
     }
-    
+
     // Item subtotal = (base price + modifier total) * quantity
     const itemSubtotal = (unitPrice + modifierTotal) * item.quantity;
     subtotal += itemSubtotal;
@@ -119,31 +243,41 @@ export async function createOrder(data: {
     };
   });
 
-  // Fetch tax rate dynamically
-  const taxRate = data.taxExempt ? 0 : await taxService.getTaxRate(moduleId);
+  // === ENGINE-POWERED PRICING (Engine A: instant_transaction) ===
+  // Route through unified pricing pipeline instead of inline calculation.
+  // This handles: tax, service charge, delivery fee, coupons, gift cards, loyalty points.
+  const engineService = getEngineService();
+  const pricingLineItems: PricingLineItem[] = orderItems.map(item => ({
+    name: itemMap.get(item.menu_item_id)?.name || 'Unknown',
+    unitPrice: item.unit_price,
+    quantity: item.quantity,
+    unitAdjustment: item.modifier_total,
+  }));
+  const pricingContext: PricingContext = {
+    moduleId,
+    conditions: { orderType: data.orderType, taxExempt: data.taxExempt },
+    couponCode: data.couponCode,
+    giftCardCodes: data.giftCardRedemptions?.map(g => g.code),
+    loyaltyPointsToRedeem: data.loyaltyPointsToRedeem,
+    customerId: data.customerId,
+  };
+  const pricing = await engineService.calculatePricing('menu_service', pricingLineItems, pricingContext);
 
-  const taxAmount = subtotal * taxRate;
-  // FIX: Iteration 7 - Fetch service charge & delivery fee from DB config
-  const orderConfig = await orderConfigService.getOrderConfig();
-  const serviceCharge = data.orderType === 'dine_in' ? subtotal * orderConfig.serviceChargeRate : 0;
-  const deliveryFee = data.orderType === 'delivery' ? orderConfig.deliveryFee : 0;
-  const preDiscountTotal = subtotal + taxAmount + serviceCharge + deliveryFee;
-
-  // Initialize discount tracking
-  let totalDiscount = 0;
-  let couponDiscount = 0;
-  let taxSavings = 0; // Track tax reduction from pre-tax coupons
-  let couponId: string | undefined;
-  let giftCardAmount = 0;
-  const giftCardRedemptions: Array<{ code: string; amount: number; giftCardId: string }> = [];
-  let loyaltyPointsUsed = 0;
-  let loyaltyDiscount = 0;
+  // Extract discount details from pricing result for DB storage
+  const couponDiscount = pricing.discounts.find(d => d.type === 'coupon')?.amount || 0;
+  const giftCardAmount = pricing.discounts.filter(d => d.type === 'gift_card').reduce((sum, d) => sum + d.amount, 0);
+  const loyaltyPointsUsed = (pricing.discounts.find(d => d.type === 'loyalty')?.metadata?.pointsUsed as number) || 0;
+  const loyaltyDiscount = pricing.discounts.find(d => d.type === 'loyalty')?.amount || 0;
+  const couponId = pricing.discounts.find(d => d.type === 'coupon')?.referenceId;
 
   // Estimate ready time (average prep time + buffer)
   const avgPrepTime = Math.max(...(menuItemsList || []).map(i => i.preparation_time_minutes || 15));
   const estimatedReadyTime = dayjs().add(avgPrepTime + 5, 'minute').toISOString();
 
-  // Create order first (we need the ID for discount tracking)
+  // Use initial state from engine
+  const initialState = engineService.getInitialState('menu_service');
+
+  // Create order with engine-calculated totals
   const { data: order, error: orderError } = await supabase
     .from('restaurant_orders')
     .insert({
@@ -154,13 +288,19 @@ export async function createOrder(data: {
       table_id: finalTableId,
       module_id: moduleId,
       order_type: data.orderType,
-      status: 'pending',
-      subtotal: subtotal.toFixed(2),
-      tax_amount: taxAmount.toFixed(2),
-      service_charge: serviceCharge.toFixed(2),
-      delivery_fee: deliveryFee.toFixed(2),
-      discount_amount: '0', // Will be updated after discounts
-      total_amount: preDiscountTotal.toFixed(2), // Will be updated
+      status: initialState,
+      subtotal: pricing.subtotal.toFixed(2),
+      tax_amount: pricing.taxAmount.toFixed(2),
+      service_charge: pricing.serviceCharge.toFixed(2),
+      delivery_fee: pricing.deliveryFee.toFixed(2),
+      discount_amount: pricing.totalDiscount.toFixed(2),
+      total_amount: pricing.totalAmount.toFixed(2),
+      coupon_id: couponId,
+      coupon_code: data.couponCode,
+      coupon_discount: couponDiscount.toFixed(2),
+      gift_card_amount: giftCardAmount.toFixed(2),
+      loyalty_points_used: loyaltyPointsUsed,
+      loyalty_discount: loyaltyDiscount.toFixed(2),
       special_instructions: data.specialInstructions,
       estimated_ready_time: estimatedReadyTime,
       payment_status: 'pending',
@@ -187,162 +327,6 @@ export async function createOrder(data: {
 
   if (insertItemsError) throw insertItemsError;
 
-  // === APPLY DISCOUNTS (Order: Coupon -> Gift Cards -> Loyalty Points) ===
-  let remainingTotal = preDiscountTotal;
-
-  // 1. Apply Coupon (if provided)
-  if (data.couponCode) {
-    try {
-      const { data: couponResult, error: couponError } = await supabase.rpc(
-        'apply_coupon_atomic',
-        {
-          p_code: data.couponCode.toUpperCase(),
-          p_user_id: data.customerId || null,
-          p_order_total: subtotal, // Coupon applies to subtotal
-          p_order_id: order.id,
-          p_module_type: 'all',
-        }
-      );
-
-      if (couponError) {
-        logger.warn('[ORDER SERVICE] Coupon application failed:', couponError);
-      } else if (couponResult && couponResult[0]?.success) {
-        couponDiscount = parseFloat(couponResult[0].discount_amount) || 0;
-        couponId = couponResult[0].coupon_id;
-        
-        // Coupons are pre-tax, so we need to reduce the tax amount
-        const currentTaxSavings = couponDiscount * taxRate;
-        taxSavings += currentTaxSavings;
-        
-        totalDiscount += couponDiscount;
-        // Reduce remaining total by discount AND the tax that is no longer applicable
-        remainingTotal -= (couponDiscount + currentTaxSavings);
-        
-        logger.info('[ORDER SERVICE] Coupon applied:', { code: data.couponCode, discount: couponDiscount, taxSavings: currentTaxSavings });
-      } else if (couponResult && couponResult[0]?.error_message) {
-        logger.warn('[ORDER SERVICE] Coupon invalid:', couponResult[0].error_message);
-      }
-    } catch (err) {
-      logger.warn('[ORDER SERVICE] Coupon error (non-fatal):', err);
-    }
-  }
-
-  // 2. Apply Gift Cards (if provided)
-  if (data.giftCardRedemptions && data.giftCardRedemptions.length > 0) {
-    for (const gc of data.giftCardRedemptions) {
-      if (remainingTotal <= 0) break;
-
-      try {
-        const { data: gcResult, error: gcError } = await supabase.rpc(
-          'redeem_giftcard_atomic',
-          {
-            p_code: gc.code.toUpperCase(),
-            p_amount: Math.min(gc.amount, remainingTotal),
-            p_order_id: order.id,
-          }
-        );
-
-        if (gcError) {
-          logger.warn('[ORDER SERVICE] Gift card redemption failed:', gcError);
-        } else if (gcResult && gcResult[0]?.success) {
-          const redeemed = parseFloat(gcResult[0].amount_redeemed) || 0;
-          giftCardAmount += redeemed;
-          totalDiscount += redeemed;
-          remainingTotal -= redeemed;
-          giftCardRedemptions.push({
-            code: gc.code,
-            amount: redeemed,
-            giftCardId: gcResult[0].gift_card_id,
-          });
-          logger.info('[ORDER SERVICE] Gift card redeemed:', { code: gc.code, amount: redeemed });
-        }
-      } catch (err) {
-        logger.warn('[ORDER SERVICE] Gift card error (non-fatal):', err);
-      }
-    }
-  }
-
-  // 3. Apply Loyalty Points (if provided)
-  if (data.loyaltyPointsToRedeem && data.loyaltyPointsToRedeem > 0 && data.customerId) {
-    try {
-      const pointsDollarValue = data.loyaltyPointsDollarValue || (data.loyaltyPointsToRedeem / 100);
-      const redeemAmount = Math.min(pointsDollarValue, remainingTotal);
-
-      const { data: loyaltyResult, error: loyaltyError } = await supabase.rpc(
-        'redeem_loyalty_points_atomic',
-        {
-          p_user_id: data.customerId,
-          p_points: data.loyaltyPointsToRedeem,
-          p_order_id: order.id,
-          p_dollar_value: redeemAmount,
-        }
-      );
-
-      if (loyaltyError) {
-        logger.warn('[ORDER SERVICE] Loyalty redemption failed:', loyaltyError);
-      } else if (loyaltyResult && loyaltyResult[0]?.success) {
-        loyaltyPointsUsed = loyaltyResult[0].points_redeemed || 0;
-        loyaltyDiscount = redeemAmount;
-        totalDiscount += loyaltyDiscount;
-        remainingTotal -= loyaltyDiscount;
-        logger.info('[ORDER SERVICE] Loyalty points redeemed:', { points: loyaltyPointsUsed, value: loyaltyDiscount });
-      }
-    } catch (err) {
-      logger.warn('[ORDER SERVICE] Loyalty error (non-fatal):', err);
-    }
-  }
-
-  // Calculate final total
-  // original preDiscountTotal included full tax. We subtract the discount amounts AND the tax savings.
-  const finalTotal = Math.max(0, preDiscountTotal - totalDiscount - taxSavings);
-  const finalTaxAmount = Math.max(0, taxAmount - taxSavings);
-
-  // Update order with discount information if any discounts were applied
-  if (totalDiscount > 0) {
-    await supabase
-      .from('restaurant_orders')
-      .update({
-        discount_amount: totalDiscount.toFixed(2),
-        total_amount: finalTotal.toFixed(2),
-        tax_amount: finalTaxAmount.toFixed(2), // Update tax to reflect pre-tax discount
-        coupon_id: couponId,
-        coupon_code: data.couponCode,
-        coupon_discount: couponDiscount.toFixed(2),
-        gift_card_amount: giftCardAmount.toFixed(2),
-        loyalty_points_used: loyaltyPointsUsed,
-        loyalty_discount: loyaltyDiscount.toFixed(2),
-      })
-      .eq('id', order.id);
-    
-    // Update local order object
-    order.discount_amount = totalDiscount.toFixed(2);
-    order.total_amount = finalTotal.toFixed(2);
-    order.tax_amount = finalTaxAmount.toFixed(2);
-  }
-
-  // === EARN LOYALTY POINTS (if customer is logged in) ===
-  let loyaltyPointsEarned = 0;
-  if (data.customerId && finalTotal > 0) {
-    try {
-      const { data: earnResult } = await supabase.rpc(
-        'earn_loyalty_points_atomic',
-        {
-          p_user_id: data.customerId,
-          p_order_total: finalTotal,
-          p_order_id: order.id,
-          p_points_per_dollar: 1, // Could be configurable
-        }
-      );
-
-      if (earnResult && earnResult[0]?.success) {
-        loyaltyPointsEarned = earnResult[0].points_earned || 0;
-        logger.info('[ORDER SERVICE] Loyalty points earned:', loyaltyPointsEarned);
-      }
-    } catch (err) {
-      logger.warn('[ORDER SERVICE] Points earning error (non-fatal):', err);
-    }
-  }
-
   // === DEDUCT INVENTORY (for ingredients linked to menu items AND modifiers) ===
   try {
     const { data: inventoryResult, error: inventoryError } = await supabase.rpc(
@@ -365,10 +349,10 @@ export async function createOrder(data: {
   }
 
   logger.info('[ORDER SERVICE] Order created:', order.order_number, {
-    subtotal,
-    totalDiscount,
-    finalTotal,
-    pointsEarned: loyaltyPointsEarned,
+    subtotal: pricing.subtotal,
+    totalDiscount: pricing.totalDiscount,
+    finalTotal: pricing.totalAmount,
+    pointsEarned: pricing.loyaltyPointsEarned,
   });
 
   // Create status history
@@ -378,6 +362,27 @@ export async function createOrder(data: {
       order_id: order.id,
       to_status: 'pending',
     });
+
+  // Calculate estimated ready time for kitchen
+  const maxPrepTime = Math.max(...data.items.map(i => itemMap.get(i.menuItemId)?.preparation_time_minutes || 15));
+  const kitchenReadyTime = dayjs().add(maxPrepTime, 'minute').toISOString();
+
+  // FIX: Issue 3 — Propagate order to kitchen display system
+  propagateToKitchen(
+    order.id,
+    order.order_number,
+    finalTableId,
+    data.items.map(i => ({
+      menu_item_id: i.menuItemId,
+      quantity: i.quantity,
+      special_instructions: i.specialInstructions,
+      selected_modifiers: i.selectedModifiers
+    })),
+    itemMap,
+    kitchenReadyTime
+  ).catch(err => {
+    logger.warn('[ORDER SERVICE] Kitchen propagation failed (non-fatal):', err);
+  });
 
   // Emit real-time event to restaurant staff
   emitToUnit('restaurant', 'order:new', {
@@ -592,6 +597,39 @@ export async function updateOrderStatus(
     .single();
 
   if (fetchError) throw new Error('Order not found');
+
+  // === ENGINE-POWERED STATE TRANSITION (Engine A: instant_transaction) ===
+  const engineService = getEngineService();
+  
+  // Map target status → engine action. Special statuses (voided, comped) bypass engine.
+  const isSpecialStatus = ['voided', 'comped'].includes(status);
+  if (!isSpecialStatus) {
+    const statusToAction: Record<string, string> = {
+      confirmed: 'confirm',
+      preparing: 'start_preparation',
+      ready: 'mark_ready',
+      served: 'deliver', // served maps to deliver action
+      delivered: 'deliver',
+      completed: ['ready', 'delivered', 'served'].includes(currentOrder.status) ? 'complete' : 'deliver',
+      cancelled: 'cancel',
+    };
+    const action = statusToAction[status];
+    if (action) {
+      const actor = changedBy ? 'staff' : 'system'; // Could check roles for admin
+      const transitionResult = await engineService.transitionState(
+        'menu_service',
+        currentOrder.status,
+        action,
+        actor
+      );
+
+      if (!transitionResult.allowed) {
+        throw new Error(transitionResult.error || `Cannot transition from ${currentOrder.status} to ${status}`);
+      }
+      // Use the engine's target state (may differ from requested status)
+      status = transitionResult.targetState;
+    }
+  }
 
   const updateData: Record<string, unknown> = {
     status,

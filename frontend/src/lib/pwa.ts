@@ -12,10 +12,25 @@ export function isPushSupported(): boolean {
   return 'PushManager' in window;
 }
 
-// Register service worker
+// Register service worker (disabled in development to prevent stale JS caching)
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!isPWASupported()) {
     console.log('[PWA] Service workers not supported');
+    return null;
+  }
+
+  // In development, unregister any existing service worker to prevent stale cache
+  if (process.env.NODE_ENV === 'development') {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const reg of registrations) {
+      await reg.unregister();
+      console.log('[PWA] Unregistered service worker in dev mode');
+    }
+    // Also clear all caches
+    const cacheNames = await caches.keys();
+    for (const name of cacheNames) {
+      await caches.delete(name);
+    }
     return null;
   }
 

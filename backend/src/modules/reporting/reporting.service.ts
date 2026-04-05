@@ -2,7 +2,7 @@
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
-import { format as formatDate, startOfMonth, endOfMonth, subDays, subMonths, startOfYear, endOfYear, startOfWeek, endOfWeek, addDays, addWeeks, addMonths, addYears, startOfDay, endOfDay } from 'date-fns';
+import dayjs from 'dayjs';
 import nodemailer from 'nodemailer';
 import cron from 'node-cron';
 import PDFDocument from 'pdfkit';
@@ -105,7 +105,7 @@ class ReportingService {
     allowedRoles?: string[];
   }, userId: string): Promise<any> {
     const id = uuidv4();
-    
+
     const { data: template, error } = await this.supabase
       .from('report_templates')
       .insert({
@@ -142,7 +142,7 @@ class ReportingService {
     isActive: boolean;
   }>): Promise<any> {
     const updateData: any = { updated_at: new Date().toISOString() };
-    
+
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.category !== undefined) updateData.category = data.category;
@@ -198,7 +198,7 @@ class ReportingService {
 
     // Build and execute the query
     const data = await this.buildReportQuery(propertyId, queryConfig, mergedParams);
-    
+
     // Calculate totals if configured
     let totals: Record<string, number> = {};
     if (queryConfig.aggregateColumns && queryConfig.aggregateColumns.length > 0) {
@@ -230,13 +230,13 @@ class ReportingService {
   }
 
   private async buildReportQuery(
-    propertyId: string, 
-    config: any, 
+    propertyId: string,
+    config: any,
     params: Record<string, any>
   ): Promise<any[]> {
     const tableName = config.table || 'bookings';
     const selectColumns = config.columns?.join(', ') || '*';
-    
+
     let query = this.supabase
       .from(tableName)
       .select(selectColumns)
@@ -283,11 +283,11 @@ class ReportingService {
 
   private calculateTotals(data: any[], aggregateColumns: string[]): Record<string, number> {
     const totals: Record<string, number> = {};
-    
+
     for (const col of aggregateColumns) {
       totals[col] = data.reduce((sum, row) => sum + (Number(row[col]) || 0), 0);
     }
-    
+
     return totals;
   }
 
@@ -318,7 +318,7 @@ class ReportingService {
     isPublic?: boolean;
   }): Promise<any> {
     const id = uuidv4();
-    
+
     const { data: saved, error } = await this.supabase
       .from('saved_reports')
       .insert({
@@ -345,7 +345,7 @@ class ReportingService {
     isPublic: boolean;
   }>): Promise<any> {
     const updateData: any = { updated_at: new Date().toISOString() };
-    
+
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.params !== undefined) updateData.params = data.params;
@@ -396,7 +396,7 @@ class ReportingService {
     const kpis = [];
     for (const def of (definitions || [])) {
       const value = await this.calculateKPIValue(propertyId, def, dateRange);
-      
+
       // Get target if exists
       const { data: targetData } = await this.supabase
         .from('kpi_targets')
@@ -427,8 +427,8 @@ class ReportingService {
   }
 
   private async calculateKPIValue(
-    propertyId: string, 
-    def: any, 
+    propertyId: string,
+    def: any,
     dateRange: DateRange
   ): Promise<number> {
     const startStr = dateRange.start.toISOString();
@@ -570,7 +570,7 @@ class ReportingService {
     userId?: string
   ): Promise<any> {
     const id = uuidv4();
-    
+
     const { data: target, error } = await this.supabase
       .from('kpi_targets')
       .insert({
@@ -618,18 +618,18 @@ class ReportingService {
     for (const booking of (bookings || [])) {
       let periodKey: string;
       const bookingDate = new Date(booking.created_at);
-      
+
       switch (groupBy) {
         case 'week':
-          periodKey = formatDate(startOfWeek(bookingDate), 'yyyy-MM-dd');
+          periodKey = dayjs(bookingDate).startOf('week').format('YYYY-MM-DD');
           break;
         case 'month':
-          periodKey = formatDate(bookingDate, 'yyyy-MM');
+          periodKey = dayjs(bookingDate).format('YYYY-MM');
           break;
         default: // day
-          periodKey = formatDate(bookingDate, 'yyyy-MM-dd');
+          periodKey = dayjs(bookingDate).format('YYYY-MM-DD');
       }
-      
+
       revenueByPeriod[periodKey] = (revenueByPeriod[periodKey] || 0) + (booking.total_amount || 0);
     }
 
@@ -684,7 +684,7 @@ class ReportingService {
     const occupancyByType: Record<string, { occupied: number; total: number }> = {};
     for (const rt of (roomTypes || [])) {
       const typeRooms = (rooms || []).filter(r => r.room_type_id === rt.id);
-      const typeBookings = (bookings || []).filter(b => 
+      const typeBookings = (bookings || []).filter(b =>
         typeRooms.some(r => r.id === b.room_id)
       );
       // FIX: Iteration 15 - Same room-night calculation for per-type breakdown
@@ -755,8 +755,8 @@ class ReportingService {
   // =============================================
 
   async generateHousekeepingReport(propertyId: string, reportDate: Date): Promise<any> {
-    const dayStart = startOfDay(reportDate).toISOString();
-    const dayEnd = endOfDay(reportDate).toISOString();
+    const dayStart = dayjs(reportDate).startOf('day').toISOString();
+    const dayEnd = dayjs(reportDate).endOf('day').toISOString();
 
     const { data: tasks } = await this.supabase
       .from('housekeeping_tasks')
@@ -790,7 +790,7 @@ class ReportingService {
     }
 
     return {
-      date: formatDate(reportDate, 'yyyy-MM-dd'),
+      date: dayjs(reportDate).format('YYYY-MM-DD'),
       summary: {
         total,
         completed,
@@ -934,20 +934,20 @@ class ReportingService {
   }): Date {
     const now = new Date();
     let next = new Date(now);
-    
+
     next.setHours(config.hour, config.minute, 0, 0);
 
     switch (frequency) {
       case 'daily':
         if (next <= now) {
-          next = addDays(next, 1);
+          next = dayjs(next).add(1, 'day').toDate();
         }
         break;
 
       case 'weekly':
         const targetDay = config.dayOfWeek ?? 1;
         while (next.getDay() !== targetDay || next <= now) {
-          next = addDays(next, 1);
+          next = dayjs(next).add(1, 'day').toDate();
         }
         break;
 
@@ -955,19 +955,19 @@ class ReportingService {
         const targetDate = config.dayOfMonth ?? 1;
         next.setDate(targetDate);
         if (next <= now) {
-          next = addMonths(next, 1);
+          next = dayjs(next).add(1, 'month').toDate();
           next.setDate(targetDate);
         }
         break;
 
       case 'yearly':
         if (next <= now) {
-          next = addYears(next, 1);
+          next = dayjs(next).add(1, 'year').toDate();
         }
         break;
 
       default:
-        next = addDays(next, 1);
+        next = dayjs(next).add(1, 'day').toDate();
     }
 
     return next;
@@ -990,7 +990,7 @@ class ReportingService {
     isActive: boolean;
   }>): Promise<any> {
     const updateData: any = { updated_at: new Date().toISOString() };
-    
+
     if (data.name !== undefined) updateData.name = data.name;
     if (data.params !== undefined) updateData.params = data.params;
     if (data.frequency !== undefined) updateData.frequency = data.frequency;
@@ -1007,8 +1007,8 @@ class ReportingService {
     if (data.isActive !== undefined) updateData.is_active = data.isActive;
 
     // Recalculate next run time if schedule changed
-    if (data.frequency || data.hour !== undefined || data.minute !== undefined || 
-        data.dayOfWeek !== undefined || data.dayOfMonth !== undefined) {
+    if (data.frequency || data.hour !== undefined || data.minute !== undefined ||
+      data.dayOfWeek !== undefined || data.dayOfMonth !== undefined) {
       const { data: current } = await this.supabase
         .from('report_scheduled')
         .select('*')
@@ -1123,24 +1123,24 @@ class ReportingService {
 
     switch (frequency) {
       case 'daily':
-        start = subDays(now, 1);
-        end = subDays(now, 1);
+        start = dayjs(now).subtract(1, 'day').toDate();
+        end = dayjs(now).subtract(1, 'day').toDate();
         break;
       case 'weekly':
-        start = startOfWeek(subDays(now, 7));
-        end = endOfWeek(subDays(now, 7));
+        start = dayjs(now).subtract(7, 'day').startOf('week').toDate();
+        end = dayjs(now).subtract(7, 'day').endOf('week').toDate();
         break;
       case 'monthly':
-        start = startOfMonth(subMonths(now, 1));
-        end = endOfMonth(subMonths(now, 1));
+        start = dayjs(now).subtract(1, 'month').startOf('month').toDate();
+        end = dayjs(now).subtract(1, 'month').endOf('month').toDate();
         break;
       case 'yearly':
         const lastYear = now.getFullYear() - 1;
-        start = new Date(lastYear, 0, 1);
-        end = new Date(lastYear, 11, 31);
+        start = dayjs(new Date(lastYear, 0, 1)).toDate();
+        end = dayjs(new Date(lastYear, 11, 31)).toDate();
         break;
       default:
-        start = subDays(now, 1);
+        start = dayjs(now).subtract(1, 'day').toDate();
         end = now;
     }
 
@@ -1152,7 +1152,7 @@ class ReportingService {
   // =============================================
 
   async exportReport(result: ReportResult, format: string, name: string): Promise<string> {
-    const filename = `${name.replace(/\s+/g, '_')}_${formatDate(new Date(), 'yyyyMMdd_HHmmss')}`;
+    const filename = `${name.replace(/\s+/g, '_')}_${dayjs().format('YYYYMMDD_HHmmss')}`;
 
     switch (format.toLowerCase()) {
       case 'pdf':
@@ -1200,7 +1200,7 @@ class ReportingService {
       if (result.data.length > 0) {
         const headers = Object.keys(result.data[0]);
         doc.fontSize(8);
-        
+
         doc.font('Helvetica-Bold');
         doc.text(headers.join('  |  '));
         doc.font('Helvetica');
@@ -1259,8 +1259,8 @@ class ReportingService {
     const path = `reports/${filename}.xlsx`;
     const { error } = await this.supabase.storage
       .from('exports')
-      .upload(path, buffer, { 
-        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      .upload(path, buffer, {
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
 
     if (error) throw error;
@@ -1324,7 +1324,7 @@ class ReportingService {
       }
 
       if (this.emailTransporter) {
-        const subject = scheduled.email_subject_template 
+        const subject = scheduled.email_subject_template
           ? this.interpolateTemplate(scheduled.email_subject_template, scheduled)
           : `Report: ${scheduled.name}`;
 
@@ -1533,7 +1533,7 @@ class ReportingService {
   // =============================================
 
   async createDailySnapshot(propertyId: string, date: Date = new Date()): Promise<void> {
-    const snapshotDate = formatDate(date, 'yyyy-MM-dd');
+    const snapshotDate = dayjs(date).format('YYYY-MM-DD');
 
     const kpis = await this.getKPIs(propertyId, {
       start: new Date(snapshotDate),
@@ -1579,8 +1579,8 @@ class ReportingService {
   }
 
   async lockMonthSnapshot(propertyId: string, month: Date, userId: string): Promise<void> {
-    const monthStart = formatDate(startOfMonth(month), 'yyyy-MM-dd');
-    const monthEnd = formatDate(endOfMonth(month), 'yyyy-MM-dd');
+    const monthStart = dayjs(month).startOf('month').format('YYYY-MM-DD');
+    const monthEnd = dayjs(month).endOf('month').format('YYYY-MM-DD');
 
     const { error } = await this.supabase
       .from('data_snapshots')

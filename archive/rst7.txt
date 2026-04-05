@@ -1,0 +1,10 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+ [32mΓ£ô[39m tests/unit/modules/restaurant/order.service.test.ts [2m([22m[2m60 tests[22m[2m)[22m[32m 110[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m60 passed[39m[22m[90m (60)[39m
+[2m   Start at [22m 10:07:25
+[2m   Duration [22m 448ms[2m (transform 161ms, setup 0ms, import 198ms, tests 110ms, environment 0ms)[22m
+

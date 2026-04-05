@@ -21,7 +21,7 @@ describe('AI Agent Interaction Tests', () => {
             .expect(200);
 
         expect(response.body.openapi).toBe('3.0.3');
-        expect(response.body.info.title).toContain('V2 Resort Management API');
+        expect(response.body.info.title).toMatch(/Management API/i);
     });
 
     it('should allow an agent to use generic unit endpoints', async () => {

@@ -543,32 +543,6 @@ export const criticalCSS = `
 `;
 
 // ==================== Service Worker Registration ====================
-
-/**
- * Register service worker for caching
- */
-export async function registerServiceWorker() {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-    return;
-  }
-
-  try {
-    const registration = await navigator.serviceWorker.register('/sw.js');
-    
-    registration.addEventListener('updatefound', () => {
-      const newWorker = registration.installing;
-      if (newWorker) {
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // New content available, prompt user to refresh
-            if (confirm('New version available! Reload to update?')) {
-              window.location.reload();
-            }
-          }
-        });
-      }
-    });
-  } catch (error) {
-    console.error('Service worker registration failed:', error);
-  }
-}
+// REMOVED: Duplicate service worker registration.
+// Service worker registration is handled exclusively by @/lib/pwa.ts
+// to avoid double-registration and stale cache issues.

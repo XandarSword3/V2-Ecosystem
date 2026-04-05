@@ -1,53 +1,57 @@
 /**
  * In-Memory Coupon Repository
- *
- * Test double implementation for coupon/discount operations.
- * Stores data in memory for fast, isolated testing.
+ * Test double for CouponRepository using in-memory data structures.
  */
 
 import type {
+  CouponRepository,
   Coupon,
   CouponUsage,
   CouponFilters,
-  CouponRepository,
-} from '../container/types';
+} from '../container/types.js';
 
 export class InMemoryCouponRepository implements CouponRepository {
-  private coupons: Map<string, Coupon> = new Map();
-  private usages: Map<string, CouponUsage> = new Map();
-  private usageIdCounter = 1;
+  private coupons = new Map<string, Coupon>();
+  private usages: CouponUsage[] = [];
 
-  // ============================================
-  // COUPON CRUD
-  // ============================================
+  /** Test helper: directly insert a coupon */
+  addCoupon(coupon: Coupon): void {
+    this.coupons.set(coupon.id, coupon);
+  }
 
-  async create(
-    coupon: Omit<Coupon, 'id' | 'usageCount' | 'createdAt' | 'updatedAt'>
-  ): Promise<Coupon> {
+  /** Test helper: directly insert a usage record */
+  addUsage(usage: CouponUsage): void {
+    this.usages.push(usage);
+  }
+
+  /** Test helper: get all usages */
+  getAllUsages(): CouponUsage[] {
+    return [...this.usages];
+  }
+
+  /** Test helper: get all coupons */
+  getAll(): Coupon[] {
+    return [...this.coupons.values()];
+  }
+
+  reset() {
+    this.coupons.clear();
+    this.usages = [];
+  }
+
+  async create(data: Omit<Coupon, 'id' | 'usageCount' | 'createdAt' | 'updatedAt'>): Promise<Coupon> {
     const id = crypto.randomUUID();
-    const newCoupon: Coupon = {
-      ...coupon,
-      id,
-      usageCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: null,
-    };
-    this.coupons.set(id, newCoupon);
-    return { ...newCoupon };
+    const coupon: Coupon = { ...data, id, usageCount: 0, createdAt: new Date().toISOString(), updatedAt: null };
+    this.coupons.set(id, coupon);
+    return coupon;
   }
 
   async update(id: string, data: Partial<Coupon>): Promise<Coupon | null> {
     const existing = this.coupons.get(id);
     if (!existing) return null;
-
-    const updated: Coupon = {
-      ...existing,
-      ...data,
-      id, // Ensure ID is not changed
-      updatedAt: new Date().toISOString(),
-    };
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
     this.coupons.set(id, updated);
-    return { ...updated };
+    return updated;
   }
 
   async delete(id: string): Promise<boolean> {
@@ -55,121 +59,51 @@ export class InMemoryCouponRepository implements CouponRepository {
   }
 
   async getById(id: string): Promise<Coupon | null> {
-    const coupon = this.coupons.get(id);
-    return coupon ? { ...coupon } : null;
+    return this.coupons.get(id) ?? null;
   }
 
   async getByCode(code: string): Promise<Coupon | null> {
-    const upperCode = code.toUpperCase();
-    for (const coupon of this.coupons.values()) {
-      if (coupon.code.toUpperCase() === upperCode) {
-        return { ...coupon };
-      }
+    for (const c of this.coupons.values()) {
+      if (c.code === code) return c;
     }
     return null;
   }
 
   async list(filters?: CouponFilters): Promise<Coupon[]> {
-    let results = Array.from(this.coupons.values());
-
-    if (filters?.type) {
-      results = results.filter((c) => c.type === filters.type);
-    }
-
-    if (filters?.scope) {
-      results = results.filter((c) => c.scope === filters.scope);
-    }
-
-    if (filters?.isActive !== undefined) {
-      results = results.filter((c) => c.isActive === filters.isActive);
-    }
-
+    let result = [...this.coupons.values()];
+    if (filters?.type) result = result.filter(c => c.type === filters.type);
+    if (filters?.scope) result = result.filter(c => c.scope === filters.scope);
+    if (filters?.isActive !== undefined) result = result.filter(c => c.isActive === filters.isActive);
     if (filters?.search) {
-      const search = filters.search.toLowerCase();
-      results = results.filter(
-        (c) =>
-          c.code.toLowerCase().includes(search) ||
-          c.name.toLowerCase().includes(search)
-      );
+      const q = filters.search.toLowerCase();
+      result = result.filter(c => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
     }
-
     if (!filters?.includeExpired) {
       const now = new Date().toISOString();
-      results = results.filter(
-        (c) => !c.endDate || c.endDate >= now
-      );
+      result = result.filter(c => !c.endDate || c.endDate >= now);
     }
-
-    return results.map((c) => ({ ...c }));
+    return result;
   }
-
-  // ============================================
-  // USAGE TRACKING
-  // ============================================
 
   async incrementUsage(id: string): Promise<void> {
-    const coupon = this.coupons.get(id);
-    if (coupon) {
-      coupon.usageCount += 1;
+    const existing = this.coupons.get(id);
+    if (existing) {
+      existing.usageCount++;
+      this.coupons.set(id, existing);
     }
   }
 
-  async recordUsage(
-    usage: Omit<CouponUsage, 'id' | 'createdAt'>
-  ): Promise<CouponUsage> {
-    const id = `usage-${this.usageIdCounter++}`;
-    const newUsage: CouponUsage = {
-      ...usage,
-      id,
-      createdAt: new Date().toISOString(),
-    };
-    this.usages.set(id, newUsage);
-    return { ...newUsage };
+  async recordUsage(data: Omit<CouponUsage, 'id' | 'createdAt'>): Promise<CouponUsage> {
+    const usage: CouponUsage = { ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    this.usages.push(usage);
+    return usage;
   }
 
   async getUsageByUser(couponId: string, userId: string): Promise<CouponUsage[]> {
-    const results: CouponUsage[] = [];
-    for (const usage of this.usages.values()) {
-      if (usage.couponId === couponId && usage.userId === userId) {
-        results.push({ ...usage });
-      }
-    }
-    return results;
+    return this.usages.filter(u => u.couponId === couponId && u.userId === userId);
   }
 
   async getUsageCount(couponId: string): Promise<number> {
-    let count = 0;
-    for (const usage of this.usages.values()) {
-      if (usage.couponId === couponId) {
-        count++;
-      }
-    }
-    return count;
-  }
-
-  // ============================================
-  // TEST HELPERS
-  // ============================================
-
-  addCoupon(coupon: Coupon): void {
-    this.coupons.set(coupon.id, { ...coupon });
-  }
-
-  addUsage(usage: CouponUsage): void {
-    this.usages.set(usage.id, { ...usage });
-  }
-
-  clear(): void {
-    this.coupons.clear();
-    this.usages.clear();
-    this.usageIdCounter = 1;
-  }
-
-  getAll(): Coupon[] {
-    return Array.from(this.coupons.values()).map((c) => ({ ...c }));
-  }
-
-  getAllUsages(): CouponUsage[] {
-    return Array.from(this.usages.values()).map((u) => ({ ...u }));
+    return this.usages.filter(u => u.couponId === couponId).length;
   }
 }

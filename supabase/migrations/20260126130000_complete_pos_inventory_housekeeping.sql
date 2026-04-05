@@ -263,6 +263,17 @@ CREATE TABLE IF NOT EXISTS coupon_usage (
     used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+DO $$ BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'coupon_usage'
+    ) THEN
+        ALTER TABLE coupon_usage ADD COLUMN IF NOT EXISTS ip_address INET;
+        ALTER TABLE coupon_usage ADD COLUMN IF NOT EXISTS device_fingerprint VARCHAR(255);
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_coupon_usage_user ON coupon_usage(coupon_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_coupon_usage_ip ON coupon_usage(coupon_id, ip_address);
 
@@ -652,6 +663,7 @@ CREATE TRIGGER trg_checkout_housekeeping
     EXECUTE FUNCTION trigger_checkout_housekeeping();
 
 -- Deduct inventory for completed order (existing but improved)
+DROP FUNCTION IF EXISTS deduct_inventory_for_order(UUID);
 CREATE OR REPLACE FUNCTION deduct_inventory_for_order(p_order_id UUID) RETURNS JSONB AS $$
 DECLARE
     v_item RECORD;
@@ -749,7 +761,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_orders_created_date ON restaurant_orders(DATE(created_at));
+CREATE INDEX IF NOT EXISTS idx_orders_created_date ON restaurant_orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_module_status ON restaurant_orders(module_id, status);
 CREATE INDEX IF NOT EXISTS idx_tabs_table_status ON restaurant_tabs(table_id, status);
 CREATE INDEX IF NOT EXISTS idx_batches_item_status ON inventory_batches(item_id, status);

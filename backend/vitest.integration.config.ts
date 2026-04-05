@@ -1,4 +1,27 @@
+import dotenv from 'dotenv';
+import path from 'path';
 import { defineConfig } from 'vitest/config';
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env.test') });
+
+const REQUIRED_INTEGRATION_ENV_VARS = [
+  'DATABASE_URL',
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_KEY',
+  'SUPABASE_ANON_KEY',
+  'JWT_SECRET',
+] as const;
+
+const missingIntegrationEnvVars = REQUIRED_INTEGRATION_ENV_VARS.filter((key) => {
+  const value = process.env[key];
+  return !value || value.trim() === '';
+});
+
+if (missingIntegrationEnvVars.length > 0) {
+  throw new Error(
+    `Missing required integration test env vars: ${missingIntegrationEnvVars.join(', ')}. Define them in backend/.env.test or export them before running integration tests.`
+  );
+}
 
 /**
  * Vitest Configuration for Integration Tests
@@ -10,7 +33,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/integration/**/*.test.ts'],
+    include: [
+      'tests/integration/**/*.test.ts',
+      'tests/**/*.integration.test.ts',
+      'tests/comprehensive-verification.test.ts',
+      'tests/security-patches.test.ts',
+      'tests/criticalFlows.test.ts',
+    ],
     exclude: ['node_modules', 'dist'],
 
     // Integration test settings
@@ -39,11 +68,11 @@ export default defineConfig({
     env: {
       RUN_INTEGRATION_TESTS: 'true',
       NODE_ENV: 'test',
-      DATABASE_URL: '',
-      SUPABASE_URL: '',
-      SUPABASE_SERVICE_KEY: '',
-      SUPABASE_ANON_KEY: '',
-      JWT_SECRET: '',
+      DATABASE_URL: process.env.DATABASE_URL!,
+      SUPABASE_URL: process.env.SUPABASE_URL!,
+      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY!,
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
+      JWT_SECRET: process.env.JWT_SECRET!,
     },
 
     // Setup file

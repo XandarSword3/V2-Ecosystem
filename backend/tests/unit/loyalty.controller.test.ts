@@ -29,8 +29,11 @@ const createMockQueryBuilder = () => ({
   gte: mockGte.mockReturnThis(),
 });
 
+const mockRpc = vi.fn();
+
 const mockSupabaseClient = {
   from: mockFrom.mockReturnValue(createMockQueryBuilder()),
+  rpc: mockRpc,
 };
 
 // Mock the database connection module
@@ -148,30 +151,9 @@ describe('Loyalty Controller', () => {
 
   describe('earnPoints', () => {
     it('should earn points for a user', async () => {
-      const mockAccount = {
-        id: 'account-123',
-        user_id: '550e8400-e29b-41d4-a716-446655440001',
-        current_points: 500,
-        lifetime_points: 500,
-        tier_id: 'tier-1',
-        tier: { points_multiplier: 1.5 },
-      };
-
-      mockSingle
-        .mockResolvedValueOnce({ data: mockAccount, error: null }) // Get account
-        .mockResolvedValueOnce({ data: {}, error: null })  // Get settings
-        .mockResolvedValueOnce({ data: { id: 'tier-1' }, error: null }); // Get new tier
-
-      mockUpdate.mockReturnValue({
-        eq: mockEq.mockReturnValue({
-          select: mockSelect.mockReturnThis(),
-          single: mockSingle.mockResolvedValue({ error: null }),
-        }),
-      });
-
-      mockInsert.mockReturnValue({
-        select: mockSelect.mockReturnThis(),
-        single: mockSingle.mockResolvedValue({ data: {}, error: null }),
+      mockRpc.mockResolvedValue({
+        data: [{ success: true, points_earned: 150, tier_multiplier: '1.5', new_balance: 650 }],
+        error: null,
       });
 
       mockRequest.body = {
@@ -213,27 +195,20 @@ describe('Loyalty Controller', () => {
 
   describe('redeemPoints', () => {
     it('should redeem points successfully', async () => {
-      const mockAccount = {
-        id: 'account-123',
-        user_id: '550e8400-e29b-41d4-a716-446655440001',
-        current_points: 1000,
-        available_points: 1000,
-        lifetime_points: 1500,
-      };
-
       const mockSettings = {
         min_redemption: 100,
         redemption_rate: 0.01,
       };
 
-      // Account select and Settings select
-      mockSingle
-        .mockResolvedValueOnce({ data: mockAccount, error: null })
-        .mockResolvedValueOnce({ data: mockSettings, error: null });
+      // Settings query
+      mockSingle.mockResolvedValueOnce({ data: mockSettings, error: null });
 
-      // For update().eq(), we don't need to override if we accept the builder as the return value (simulating success)
-      // The code awaits .eq(), which returns the builder. { error } from builder is undefined => success.
-      
+      // RPC mock for redeem
+      mockRpc.mockResolvedValue({
+        data: [{ success: true, points_redeemed: 500, new_balance: 500 }],
+        error: null,
+      });
+
       mockRequest.body = {
         userId: '550e8400-e29b-41d4-a716-446655440001',
         points: 500,
@@ -256,20 +231,19 @@ describe('Loyalty Controller', () => {
     });
 
     it('should reject if insufficient points', async () => {
-      const mockAccount = {
-        id: 'account-123',
-        user_id: '550e8400-e29b-41d4-a716-446655440001',
-        current_points: 100,
-      };
-
       const mockSettings = {
         min_redemption: 100,
         redemption_rate: 0.01,
       };
 
-      mockSingle
-        .mockResolvedValueOnce({ data: mockAccount, error: null })
-        .mockResolvedValueOnce({ data: mockSettings, error: null });
+      // Settings query
+      mockSingle.mockResolvedValueOnce({ data: mockSettings, error: null });
+
+      // RPC mock for insufficient
+      mockRpc.mockResolvedValue({
+        data: [{ success: false, error_message: 'Insufficient points', new_balance: 100 }],
+        error: null,
+      });
 
       mockRequest.body = {
         userId: '550e8400-e29b-41d4-a716-446655440001',

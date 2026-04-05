@@ -6,6 +6,7 @@
  */
 
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { getSupabase } from '../../database/connection.js';
 import { generateTokens } from './auth.utils.js';
 import { config } from '../../config/index.js';
@@ -122,7 +123,7 @@ async function getGoogleUserInfo(accessToken: string): Promise<GoogleUserInfo> {
 export async function handleGoogleCallback(code: string): Promise<OAuthResult> {
   // Exchange code for tokens
   const tokens = await getGoogleAccessToken(code);
-  
+
   // Get user info from Google
   const googleUser = await getGoogleUserInfo(tokens.access_token);
 
@@ -231,14 +232,14 @@ interface AppleIdTokenPayload {
  */
 async function generateAppleClientSecret(): Promise<string> {
   const { clientId, teamId, keyId, privateKey } = config.oauth.apple;
-  
+
   if (!teamId || !keyId || !privateKey) {
     throw new Error('Apple OAuth not fully configured');
   }
 
   // Replace escaped newlines with actual newlines
   const key = privateKey.replace(/\\n/g, '\n');
-  
+
   const now = Math.floor(Date.now() / 1000);
   const expiresAt = now + (86400 * 180); // 180 days
 
@@ -268,7 +269,7 @@ async function generateAppleClientSecret(): Promise<string> {
  */
 async function signJWT(header: object, payload: object, privateKey: string): Promise<string> {
   const crypto = await import('crypto');
-  
+
   const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signatureInput = `${encodedHeader}.${encodedPayload}`;
@@ -276,20 +277,20 @@ async function signJWT(header: object, payload: object, privateKey: string): Pro
   const sign = crypto.createSign('SHA256');
   sign.update(signatureInput);
   sign.end();
-  
+
   const signature = sign.sign(privateKey);
-  
+
   // Convert DER signature to raw r||s format for ES256
   const r = signature.subarray(4, 4 + signature[3]);
   const sOffset = 4 + signature[3] + 2;
   const s = signature.subarray(sOffset);
-  
+
   // Pad to 32 bytes each
   const rPadded = Buffer.alloc(32);
   r.copy(rPadded, 32 - r.length);
   const sPadded = Buffer.alloc(32);
   s.copy(sPadded, 32 - s.length);
-  
+
   const rawSignature = Buffer.concat([rPadded, sPadded]);
   const encodedSignature = rawSignature.toString('base64url');
 
@@ -326,46 +327,100 @@ async function getAppleAccessToken(code: string): Promise<AppleTokenResponse> {
   return response.json() as Promise<AppleTokenResponse>;
 }
 
+// Apple JWKS cache to avoid fetching on every login
+let appleJWKSCache: { keys: Array<{ kty: string; kid: string; use: string; alg: string; n: string; e: string }>; fetchedAt: number } | null = null;
+const JWKS_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
 /**
- * Decode and verify Apple ID token (simplified - production should verify signature)
+ * Fetch Apple's public keys (JWKS) for ID token verification
+ * Caches keys for 1 hour to reduce external requests
  */
-function decodeAppleIdToken(idToken: string): AppleIdTokenPayload {
+async function getApplePublicKeys() {
+  const now = Date.now();
+  if (appleJWKSCache && (now - appleJWKSCache.fetchedAt) < JWKS_CACHE_TTL) {
+    return appleJWKSCache.keys;
+  }
+
+  const response = await fetch('https://appleid.apple.com/auth/keys');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Apple JWKS: ${response.status}`);
+  }
+
+  const jwks = await response.json() as { keys: typeof appleJWKSCache extends null ? never : NonNullable<typeof appleJWKSCache>['keys'] };
+  appleJWKSCache = { keys: jwks.keys, fetchedAt: now };
+  return jwks.keys;
+}
+
+/**
+ * Verify Apple ID token using JWKS signature verification
+ * Fetches Apple's public keys and verifies the JWT signature cryptographically
+ */
+async function verifyAppleIdToken(idToken: string): Promise<AppleIdTokenPayload> {
   const parts = idToken.split('.');
   if (parts.length !== 3) {
-    throw new Error('Invalid Apple ID token');
+    throw new Error('Invalid Apple ID token format');
   }
 
-  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-  
-  // Verify issuer
-  if (payload.iss !== 'https://appleid.apple.com') {
-    throw new Error('Invalid Apple ID token issuer');
+  // Decode header to get the key ID (kid)
+  const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString()) as { kid: string; alg: string };
+
+  // Fetch Apple's public keys and find the matching key
+  const keys = await getApplePublicKeys();
+  const signingKey = keys.find(k => k.kid === header.kid);
+
+  if (!signingKey) {
+    // Key not found — cache may be stale, force refresh
+    appleJWKSCache = null;
+    const refreshedKeys = await getApplePublicKeys();
+    const retryKey = refreshedKeys.find(k => k.kid === header.kid);
+    if (!retryKey) {
+      throw new Error('Apple signing key not found in JWKS');
+    }
+    return verifyWithKey(idToken, retryKey);
   }
 
-  // Verify audience (should be your client ID)
-  if (payload.aud !== config.oauth.apple.clientId) {
-    throw new Error('Invalid Apple ID token audience');
-  }
+  return verifyWithKey(idToken, signingKey);
+}
 
-  // Verify expiration
-  if (payload.exp < Math.floor(Date.now() / 1000)) {
-    throw new Error('Apple ID token expired');
-  }
+/**
+ * Verify JWT with a specific JWK
+ */
+function verifyWithKey(
+  idToken: string,
+  jwk: { kty: string; kid: string; alg: string; n: string; e: string }
+): AppleIdTokenPayload {
+  // Convert JWK to PEM using Node.js crypto
+  const publicKey = crypto.createPublicKey({
+    key: {
+      kty: jwk.kty,
+      n: jwk.n,
+      e: jwk.e,
+    },
+    format: 'jwk',
+  });
+
+  // Verify the token signature + standard claims
+  const payload = jwt.verify(idToken, publicKey, {
+    algorithms: [jwk.alg as jwt.Algorithm],
+    issuer: 'https://appleid.apple.com',
+    audience: config.oauth.apple.clientId,
+  }) as AppleIdTokenPayload;
 
   return payload;
 }
+
 
 /**
  * Handle Apple Sign-In callback
  */
 export async function handleAppleCallback(
-  code: string, 
+  code: string,
   idToken: string,
   userName?: { firstName?: string; lastName?: string }
 ): Promise<OAuthResult> {
-  // Decode the ID token to get user info
-  const tokenPayload = decodeAppleIdToken(idToken);
-  
+  // Verify the ID token cryptographically using Apple's JWKS
+  const tokenPayload = await verifyAppleIdToken(idToken);
+
   if (!tokenPayload.email && !tokenPayload.sub) {
     throw new Error('Email not provided by Apple');
   }
@@ -373,7 +428,7 @@ export async function handleAppleCallback(
   // Apple sometimes hides the email after first sign-in
   // The sub (subject) is the unique user identifier
   const email = tokenPayload.email || `${tokenPayload.sub}@privaterelay.appleid.com`;
-  
+
   // Build full name from first sign-in data or default
   let fullName = 'Apple User';
   if (userName?.firstName || userName?.lastName) {

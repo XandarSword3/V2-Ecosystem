@@ -40,7 +40,7 @@ import { GradientText, StaggerText, RevealHeading, BlurReveal, HighlightText } f
 const InteractiveResortMap = dynamic(() => import('@/components/InteractiveResortMap'), { ssr: false });
 const LiveChatWidget = dynamic(() => import('@/components/LiveChatWidget'), { ssr: false });
 const TestimonialsCarousel = dynamic(() => import('@/components/TestimonialsCarousel'), { ssr: false });
-const WeatherWidget = dynamic(() => import('@/components/WeatherWidget'), { ssr: false });
+import WeatherWidget from '@/components/WeatherWidget';
 
 export default function HomePage() {
   const t = useTranslations();

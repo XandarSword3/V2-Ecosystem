@@ -7,6 +7,7 @@
 import '@testing-library/jest-dom';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
+import React from 'react';
 
 // Cleanup after each test
 afterEach(() => {
@@ -28,14 +29,20 @@ vi.mock('next/navigation', () => ({
   useParams: () => ({}),
 }));
 
+// Mock next/link
+vi.mock('next/link', () => ({
+  default: ({ href, children, ...props }: any) => {
+    const resolvedHref = typeof href === 'string'
+      ? href
+      : href?.pathname || '#';
+    return React.createElement('a', { href: resolvedHref, ...props }, children);
+  },
+}));
+
 // Mock next/image
 vi.mock('next/image', () => ({
   default: (props: any) => {
-    // Return a mock element without JSX
-    return {
-      type: 'img',
-      props: { ...props, alt: props.alt || '' },
-    };
+    return React.createElement('img', { ...props, alt: props.alt || '' });
   },
 }));
 
@@ -102,8 +109,46 @@ global.IntersectionObserver = IntersectionObserver as any;
 
 // Suppress console errors during tests (optional)
 const originalError = console.error;
+const originalWarn = console.warn;
+
+const expectedLogNoisePatterns: RegExp[] = [
+  /React does not recognize the .*prop on a DOM element\./i,
+  /whilehover|whiletap/i,
+  /node-cron/i,
+  /source\s*map|sourcemap/i,
+  /poolOptions/i,
+  /deprecated/i,
+];
+
+function shouldSuppressExpectedNoise(args: unknown[]): boolean {
+  const message = args
+    .map((arg) => {
+      if (typeof arg === 'string') return arg;
+      if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
+      try {
+        return JSON.stringify(arg);
+      } catch {
+        return String(arg);
+      }
+    })
+    .join(' ');
+
+  const isReactMotionNoise =
+    expectedLogNoisePatterns[0].test(message) && expectedLogNoisePatterns[1].test(message);
+  const isNodeCronSourcemapNoise =
+    expectedLogNoisePatterns[2].test(message) && expectedLogNoisePatterns[3].test(message);
+  const isVitestPoolOptionsDeprecation =
+    expectedLogNoisePatterns[4].test(message) && expectedLogNoisePatterns[5].test(message);
+
+  return isReactMotionNoise || isNodeCronSourcemapNoise || isVitestPoolOptionsDeprecation;
+}
+
 beforeAll(() => {
   console.error = (...args: any[]) => {
+    if (shouldSuppressExpectedNoise(args)) {
+      return;
+    }
+
     // Filter out known React warnings in tests
     if (
       typeof args[0] === 'string' &&
@@ -114,89 +159,71 @@ beforeAll(() => {
     }
     originalError.call(console, ...args);
   };
+
+  console.warn = (...args: any[]) => {
+    if (shouldSuppressExpectedNoise(args)) {
+      return;
+    }
+    originalWarn.call(console, ...args);
+  };
 });
 
 afterAll(() => {
   console.error = originalError;
+  console.warn = originalWarn;
 });
 
-// Global mock for lucide-react icons to handle dynamic icon imports
-// This creates a handler that returns a stub component for any icon name
-vi.mock('lucide-react', async () => {
-  // Create a proxy that returns a stub component for any property access
+// Global mock for lucide-react icons to handle dynamic icon imports.
+// Important: explicitly ignore then/catch/finally to avoid Promise-thenable proxy hangs.
+vi.mock('lucide-react', () => {
   const createIconStub = (name: string) => {
     const IconComponent = (props: any) => {
-      // Return a simple span element with the icon name
-      const element = document.createElement('span');
-      element.setAttribute('data-testid', `icon-${name.toLowerCase()}`);
-      element.setAttribute('data-lucide', name);
-      element.textContent = name;
-      Object.keys(props || {}).forEach(key => {
+      const dataProps: Record<string, string> = {};
+      Object.keys(props || {}).forEach((key) => {
         if (key !== 'children' && typeof props[key] === 'string') {
-          element.setAttribute(`data-${key}`, props[key]);
+          const normalizedKey = key.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+          dataProps[`data-${normalizedKey}`] = props[key];
         }
       });
-      return element;
+
+      return React.createElement(
+        'span',
+        {
+          'data-testid': `icon-${name.toLowerCase()}`,
+          'data-lucide': name,
+          ...dataProps,
+        },
+        name
+      );
     };
+
     IconComponent.displayName = name;
     return IconComponent;
   };
-  
-  // Common icons that are frequently used
-  const commonIcons = [
-    'UtensilsCrossed', 'List', 'ShoppingCart', 'LayoutGrid', 'Calendar', 'Tags',
-    'Settings', 'Ticket', 'Users', 'Plus', 'Edit', 'Trash2', 'Save', 'X', 'Check',
-    'ChevronDown', 'ChevronUp', 'ChevronLeft', 'ChevronRight', 'Search', 'Filter',
-    'Menu', 'Home', 'User', 'LogOut', 'LogIn', 'Eye', 'EyeOff', 'Lock', 'Unlock',
-    'Mail', 'Phone', 'MapPin', 'Clock', 'AlertCircle', 'AlertTriangle', 'Info',
-    'CheckCircle', 'XCircle', 'Loader2', 'RefreshCw', 'Download', 'Upload',
-    'Star', 'Heart', 'Share', 'Copy', 'Link', 'ExternalLink', 'Printer', 'QrCode',
-    'CreditCard', 'DollarSign', 'Percent', 'Tag', 'Package', 'Box', 'Archive',
-    'Folder', 'File', 'FileText', 'Image', 'Video', 'Music', 'Camera', 'Mic',
-    'Bell', 'BellOff', 'Volume2', 'VolumeX', 'Sun', 'Moon', 'Cloud', 'CloudRain',
-    'Thermometer', 'Droplets', 'Wind', 'Waves', 'Mountain', 'Tree', 'Flower',
-    'Coffee', 'Utensils', 'Wine', 'Beer', 'Pizza', 'Cake', 'IceCream',
-    'ShoppingBag', 'Gift', 'Award', 'Trophy', 'Medal', 'Crown', 'Gem',
-    'Palette', 'Brush', 'Pencil', 'Scissors', 'Ruler', 'Compass', 'Crosshair',
-    'Target', 'Zap', 'Flame', 'Sparkles', 'PartyPopper', 'Confetti',
-    'MessageCircle', 'MessageSquare', 'Send', 'Inbox', 'Archive', 'Trash',
-    'MoreHorizontal', 'MoreVertical', 'Grip', 'Move', 'Maximize', 'Minimize',
-    'Undo', 'Redo', 'RotateCw', 'RotateCcw', 'ZoomIn', 'ZoomOut', 'Expand',
-    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUpRight',
-    'Building', 'Store', 'Warehouse', 'Factory', 'Hotel', 'Home',
-    'Car', 'Bike', 'Bus', 'Train', 'Plane', 'Ship', 'Anchor',
-    'Globe', 'Map', 'Navigation', 'Compass', 'Flag', 'Bookmark',
-    'Hash', 'AtSign', 'Wifi', 'WifiOff', 'Bluetooth', 'Battery', 'Power',
-    'Monitor', 'Laptop', 'Tablet', 'Smartphone', 'Watch', 'Tv', 'Speaker',
-    'Headphones', 'Radio', 'Gamepad', 'Joystick', 'Mouse', 'Keyboard',
-    'BarChart', 'BarChart2', 'BarChart3', 'LineChart', 'PieChart', 'Activity',
-    'TrendingUp', 'TrendingDown', 'Gauge', 'Thermometer', 'Timer', 'Hourglass',
-    'Shield', 'ShieldCheck', 'ShieldAlert', 'ShieldOff', 'Key', 'Fingerprint',
-    'UserPlus', 'UserMinus', 'UserCheck', 'UserX', 'Users', 'UsersRound',
-    'Building2', 'Landmark', 'Church', 'GraduationCap', 'Library', 'Book',
-    'BookOpen', 'Notebook', 'Journal', 'Newspaper', 'Receipt', 'Clipboard',
-    'ClipboardList', 'ClipboardCheck', 'ClipboardCopy', 'ClipboardPaste',
-    'Calendar', 'CalendarDays', 'CalendarRange', 'CalendarClock', 'CalendarCheck',
-    'ToggleLeft', 'ToggleRight', 'Layers', 'LayoutList', 'LayoutDashboard',
-    'Boxes', 'BoxSelect', 'Kanban', 'Table', 'Grid', 'Columns', 'Rows',
-    'Sliders', 'SlidersHorizontal', 'Equalizer', 'Wrench', 'Hammer', 'Screwdriver',
-    'FileCode', 'FileCog', 'FileJson', 'FileLock', 'FileKey', 'FileSearch',
-    'FolderOpen', 'FolderPlus', 'FolderMinus', 'FolderCheck', 'FolderCog'
-  ];
-  
-  const icons: Record<string, any> = {};
-  commonIcons.forEach(name => {
-    icons[name] = createIconStub(name);
-  });
-  
-  // Return a proxy that handles any icon access 
-  return new Proxy(icons, {
-    get: (target, prop: string) => {
-      if (prop in target) {
-        return target[prop];
+
+  const exports: Record<string, any> = {
+    __esModule: true,
+  };
+
+  return new Proxy(exports, {
+    get: (target, prop: string | symbol) => {
+      if (typeof prop === 'symbol') {
+        return undefined;
       }
-      // For any icon not in our list, create a stub on-demand
-      target[prop] = createIconStub(prop);
+
+      if (prop === 'default') {
+        return target;
+      }
+
+      // Prevent mock module from being treated as a thenable.
+      if (prop === 'then' || prop === 'catch' || prop === 'finally') {
+        return undefined;
+      }
+
+      if (!(prop in target)) {
+        target[prop] = createIconStub(prop);
+      }
+
       return target[prop];
     },
   });

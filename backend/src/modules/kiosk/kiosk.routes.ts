@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { authenticateDevice } from '../../middleware/deviceAuth.middleware.js';
 import * as controller from './kiosk.controller';
 
 const router = Router();
@@ -40,7 +41,8 @@ router.get(
 // Update device status (from kiosk itself)
 router.patch(
   '/devices/:deviceId/status',
-  controller.updateDeviceStatus // No auth - kiosk uses device token
+  authenticateDevice,
+  controller.updateDeviceStatus
 );
 
 // Update device config
@@ -70,6 +72,7 @@ router.delete(
 // Device heartbeat (from kiosk)
 router.post(
   '/devices/:deviceId/heartbeat',
+  authenticateDevice,
   controller.heartbeat
 );
 
@@ -80,30 +83,35 @@ router.post(
 // Start session (from kiosk)
 router.post(
   '/sessions/:kioskId',
+  authenticateDevice,
   controller.startSession
 );
 
 // Get session
 router.get(
   '/sessions/:sessionId',
+  authenticateDevice,
   controller.getSession
 );
 
 // Update session step
 router.patch(
   '/sessions/:sessionId/step',
+  authenticateDevice,
   controller.updateSessionStep
 );
 
 // Abandon session
 router.post(
   '/sessions/:sessionId/abandon',
+  authenticateDevice,
   controller.abandonSession
 );
 
-// Transfer to desk (can be triggered by staff)
+// Transfer to desk (can be triggered by staff or kiosk)
 router.post(
   '/sessions/:sessionId/transfer',
+  authenticateDevice,
   controller.transferToDesk
 );
 
@@ -114,24 +122,28 @@ router.post(
 // Initiate check-in
 router.post(
   '/checkin/:kioskId',
+  authenticateDevice,
   controller.initiateCheckin
 );
 
 // Complete check-in
 router.post(
   '/checkin/:sessionId/complete',
+  authenticateDevice,
   controller.completeCheckin
 );
 
 // Initiate check-out
 router.post(
   '/checkout/:kioskId',
+  authenticateDevice,
   controller.initiateCheckout
 );
 
 // Complete check-out
 router.post(
   '/checkout/:sessionId/complete',
+  authenticateDevice,
   controller.completeCheckout
 );
 
@@ -142,24 +154,28 @@ router.post(
 // Scan ID
 router.post(
   '/transactions/:sessionId/:kioskId/id-scan',
+  authenticateDevice,
   controller.scanId
 );
 
 // Encode key
 router.post(
   '/transactions/:sessionId/:kioskId/key-encode',
+  authenticateDevice,
   controller.encodeKey
 );
 
 // Process payment
 router.post(
   '/transactions/:sessionId/:kioskId/payment',
+  authenticateDevice,
   controller.processPayment
 );
 
 // Print receipt
 router.post(
   '/transactions/:sessionId/:kioskId/receipt',
+  authenticateDevice,
   controller.printReceipt
 );
 
@@ -190,6 +206,7 @@ router.post(
 // Log hardware event (from kiosk)
 router.post(
   '/hardware-events/:kioskId',
+  authenticateDevice,
   controller.logHardwareEvent
 );
 
@@ -216,12 +233,14 @@ router.get(
 // Get flow configuration
 router.get(
   '/flows/:propertyId/:flowType',
+  authenticateDevice,
   controller.getScreenFlow
 );
 
 // Get screen content
 router.get(
   '/flows/:flowId/content/:stepKey',
+  authenticateDevice,
   controller.getScreenContent
 );
 

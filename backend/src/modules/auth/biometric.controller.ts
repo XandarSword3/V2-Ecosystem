@@ -311,8 +311,36 @@ export async function authenticateComplete(req: Request, res: Response) {
       return res.status(401).json({ success: false, error: 'Invalid credential' });
     }
 
-    // In production, verify signature using stored public key
-    // For now, we'll trust the credential ID match
+    // SECURITY FIX (HIGH-005): Verify counter to detect cloned authenticators
+    // The counter in authenticatorData should be greater than the stored counter.
+    // If it's not, the authenticator may have been cloned.
+    const authDataBuffer = Buffer.from(response.authenticatorData, 'base64url');
+    // Counter is bytes 33-36 of authenticatorData (big-endian uint32)
+    const presentedCounter = authDataBuffer.length >= 37
+      ? authDataBuffer.readUInt32BE(33)
+      : 0;
+
+    if (storedCredential.counter > 0 && presentedCounter <= storedCredential.counter) {
+      logger.warn(`WebAuthn counter mismatch for user ${userId} - possible authenticator clone`, {
+        storedCounter: storedCredential.counter,
+        presentedCounter,
+        credentialId,
+      });
+      // Deactivate the credential as a precaution
+      await supabase
+        .from('biometric_credentials')
+        .update({ is_active: false })
+        .eq('id', storedCredential.id);
+
+      return res.status(401).json({
+        success: false,
+        error: 'Credential security check failed. Please re-register your biometric.',
+      });
+    }
+
+    // TODO: For full production security, integrate @simplewebauthn/server
+    // to perform cryptographic signature verification against the stored public key.
+    // The current implementation trusts credential ID match + counter validation.
 
     // Update counter and last_used_at
     await supabase

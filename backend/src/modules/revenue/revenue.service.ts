@@ -4,7 +4,7 @@
  * Refactored to use Supabase instead of Prisma
  */
 
-import { format, addDays, differenceInDays } from 'date-fns';
+import dayjs from 'dayjs';
 import { v4 as uuidv4 } from 'uuid';
 import { getSupabase } from '../../database/connection.js';
 
@@ -94,8 +94,8 @@ export class RevenueManagementService {
           .from('bookings')
           .select('*')
           .eq('property_id', propertyId)
-          .gte('check_in', format(addDays(currentDate, -365), 'yyyy-MM-dd'))
-          .lte('check_in', format(addDays(currentDate, -335), 'yyyy-MM-dd'));
+          .gte('check_in', dayjs(currentDate).subtract(365, 'day').format('YYYY-MM-DD'))
+          .lte('check_in', dayjs(currentDate).subtract(335, 'day').format('YYYY-MM-DD'));
 
         const avgDemand = historicalData?.length || 5;
 
@@ -105,7 +105,7 @@ export class RevenueManagementService {
             id: uuidv4(),
             property_id: propertyId,
             room_type_id: rt.id,
-            forecast_date: format(currentDate, 'yyyy-MM-dd'),
+            forecast_date: dayjs(currentDate).format('YYYY-MM-DD'),
             forecasted_demand: avgDemand,
             forecasted_occupancy: Math.min(avgDemand * 10, 100),
             forecasted_adr: rt.base_rate,
@@ -118,7 +118,7 @@ export class RevenueManagementService {
           });
         count++;
       }
-      currentDate = addDays(currentDate, 1);
+      currentDate = dayjs(currentDate).add(1, 'day').toDate();
     }
 
     return count;
@@ -134,8 +134,8 @@ export class RevenueManagementService {
       .from('demand_forecasts')
       .select('*, room_types(name)')
       .eq('property_id', propertyId)
-      .gte('forecast_date', format(startDate, 'yyyy-MM-dd'))
-      .lte('forecast_date', format(endDate, 'yyyy-MM-dd'));
+      .gte('forecast_date', dayjs(startDate).format('YYYY-MM-DD'))
+      .lte('forecast_date', dayjs(endDate).format('YYYY-MM-DD'));
 
     if (roomTypeId) {
       query = query.eq('room_type_id', roomTypeId);
@@ -170,12 +170,12 @@ export class RevenueManagementService {
       .from('bookings')
       .select('room_id, room_rate, total_amount')
       .eq('property_id', propertyId)
-      .lte('check_in', format(date, 'yyyy-MM-dd'))
-      .gt('check_out', format(date, 'yyyy-MM-dd'))
+      .lte('check_in', dayjs(date).format('YYYY-MM-DD'))
+      .gt('check_out', dayjs(date).format('YYYY-MM-DD'))
       .not('status', 'in', '("cancelled","no_show")');
 
     const roomsSold = bookings?.length || 0;
-    
+
     const { data: totalRooms } = await this.supabase
       .from('rooms')
       .select('id', { count: 'exact' })
@@ -183,8 +183,8 @@ export class RevenueManagementService {
 
     const totalRoomCount = totalRooms?.length || 1;
     const occupancy = (roomsSold / totalRoomCount) * 100;
-    const adr = roomsSold > 0 
-      ? bookings!.reduce((sum, b) => sum + (b.room_rate || 0), 0) / roomsSold 
+    const adr = roomsSold > 0
+      ? bookings!.reduce((sum, b) => sum + (b.room_rate || 0), 0) / roomsSold
       : 0;
     const revenue = bookings?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
 
@@ -199,7 +199,7 @@ export class RevenueManagementService {
         updated_at: new Date().toISOString()
       })
       .eq('property_id', propertyId)
-      .eq('forecast_date', format(date, 'yyyy-MM-dd'));
+      .eq('forecast_date', dayjs(date).format('YYYY-MM-DD'));
   }
 
   // =============================================
@@ -260,8 +260,8 @@ export class RevenueManagementService {
         min_rate: rule.minRate,
         max_rate: rule.maxRate,
         priority: rule.priority || 100,
-        start_date: rule.startDate ? format(rule.startDate, 'yyyy-MM-dd') : null,
-        end_date: rule.endDate ? format(rule.endDate, 'yyyy-MM-dd') : null,
+        start_date: rule.startDate ? dayjs(rule.startDate).format('YYYY-MM-DD') : null,
+        end_date: rule.endDate ? dayjs(rule.endDate).format('YYYY-MM-DD') : null,
         is_active: rule.isActive !== false,
         created_by: userId
       })
@@ -291,8 +291,8 @@ export class RevenueManagementService {
     if (updates.minRate !== undefined) updateData.min_rate = updates.minRate;
     if (updates.maxRate !== undefined) updateData.max_rate = updates.maxRate;
     if (updates.priority !== undefined) updateData.priority = updates.priority;
-    if (updates.startDate !== undefined) updateData.start_date = format(updates.startDate, 'yyyy-MM-dd');
-    if (updates.endDate !== undefined) updateData.end_date = format(updates.endDate, 'yyyy-MM-dd');
+    if (updates.startDate !== undefined) updateData.start_date = dayjs(updates.startDate).format('YYYY-MM-DD');
+    if (updates.endDate !== undefined) updateData.end_date = dayjs(updates.endDate).format('YYYY-MM-DD');
     if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
 
     const { error } = await this.supabase
@@ -334,7 +334,7 @@ export class RevenueManagementService {
 
     // Apply pricing rules
     const rules = await this.getPricingRules(propertyId, true);
-    const dateStr = format(date, 'yyyy-MM-dd');
+    const dateStr = dayjs(date).format('YYYY-MM-DD');
 
     for (const rule of rules) {
       // Check if rule applies to this room type
@@ -343,8 +343,8 @@ export class RevenueManagementService {
       }
 
       // Check date range
-      if (rule.startDate && dateStr < format(rule.startDate, 'yyyy-MM-dd')) continue;
-      if (rule.endDate && dateStr > format(rule.endDate, 'yyyy-MM-dd')) continue;
+      if (rule.startDate && dateStr < dayjs(rule.startDate).format('YYYY-MM-DD')) continue;
+      if (rule.endDate && dateStr > dayjs(rule.endDate).format('YYYY-MM-DD')) continue;
 
       // Apply adjustment
       let adjustment = 0;
@@ -390,7 +390,7 @@ export class RevenueManagementService {
         date: new Date(currentDate),
         ...rate
       });
-      currentDate = addDays(currentDate, 1);
+      currentDate = dayjs(currentDate).add(1, 'day').toDate();
     }
 
     return results;
@@ -410,8 +410,8 @@ export class RevenueManagementService {
       .from('pricing_calendar')
       .select('*, room_types(name, base_rate)')
       .eq('property_id', propertyId)
-      .gte('date', format(startDate, 'yyyy-MM-dd'))
-      .lte('date', format(endDate, 'yyyy-MM-dd'));
+      .gte('date', dayjs(startDate).format('YYYY-MM-DD'))
+      .lte('date', dayjs(endDate).format('YYYY-MM-DD'));
 
     if (roomTypeId) {
       query = query.eq('room_type_id', roomTypeId);
@@ -441,7 +441,7 @@ export class RevenueManagementService {
     // Get calculated rate if needed
     let baseRate = 0;
     let recommendedRate = 0;
-    
+
     if (updates.overrideRate !== undefined) {
       const calculated = await this.calculateDynamicRate(propertyId, roomTypeId, date);
       baseRate = calculated.baseRate;
@@ -454,7 +454,7 @@ export class RevenueManagementService {
         id: uuidv4(),
         property_id: propertyId,
         room_type_id: roomTypeId,
-        date: format(date, 'yyyy-MM-dd'),
+        date: dayjs(date).format('YYYY-MM-DD'),
         base_rate: baseRate || undefined,
         recommended_rate: recommendedRate || undefined,
         final_rate: updates.overrideRate,
@@ -478,8 +478,8 @@ export class RevenueManagementService {
 
     // Log the change
     if (updates.overrideRate !== undefined) {
-      await this.logYieldChange(propertyId, date, roomTypeId, 'manual_override', 
-        { rate: recommendedRate }, 
+      await this.logYieldChange(propertyId, date, roomTypeId, 'manual_override',
+        { rate: recommendedRate },
         { rate: updates.overrideRate, reason: updates.overrideReason },
         'rate_override', 'user', userId);
     }
@@ -505,7 +505,7 @@ export class RevenueManagementService {
 
     while (currentDate <= endDate) {
       await this.updatePricingCalendar(propertyId, roomTypeId, currentDate, updates, userId);
-      currentDate = addDays(currentDate, 1);
+      currentDate = dayjs(currentDate).add(1, 'day').toDate();
       count++;
     }
 
@@ -532,7 +532,7 @@ export class RevenueManagementService {
         .select('override_rate, final_rate')
         .eq('property_id', propertyId)
         .eq('room_type_id', roomType.id)
-        .eq('date', format(date, 'yyyy-MM-dd'))
+        .eq('date', dayjs(date).format('YYYY-MM-DD'))
         .maybeSingle();
 
       const currentRate = currentCalendar?.override_rate || currentCalendar?.final_rate || roomType.base_rate;
@@ -546,7 +546,7 @@ export class RevenueManagementService {
         .select('*')
         .eq('property_id', propertyId)
         .eq('room_type_id', roomType.id)
-        .eq('forecast_date', format(date, 'yyyy-MM-dd'))
+        .eq('forecast_date', dayjs(date).format('YYYY-MM-DD'))
         .maybeSingle();
 
       // Get competitor rates
@@ -554,7 +554,7 @@ export class RevenueManagementService {
         .from('competitor_rates')
         .select('rate')
         .eq('property_id', propertyId)
-        .eq('date', format(date, 'yyyy-MM-dd'));
+        .eq('date', dayjs(date).format('YYYY-MM-DD'));
 
       const avgCompRate = competitors && competitors.length > 0
         ? competitors.reduce((sum, c) => sum + c.rate, 0) / competitors.length
@@ -583,7 +583,7 @@ export class RevenueManagementService {
       }
 
       // Estimate revenue impact
-      const daysUntil = differenceInDays(date, new Date());
+      const daysUntil = dayjs(date).diff(dayjs(), 'day');
       const estimatedBookingProbability = daysUntil > 30 ? 0.3 : daysUntil > 7 ? 0.6 : 0.9;
       const estimatedRevenueImpact = rateDiff * estimatedBookingProbability * (forecast?.forecasted_demand || 1);
 
@@ -613,7 +613,7 @@ export class RevenueManagementService {
         .upsert({
           id: uuidv4(),
           property_id: propertyId,
-          date: format(date, 'yyyy-MM-dd'),
+          date: dayjs(date).format('YYYY-MM-DD'),
           room_type_id: roomType.id,
           current_rate: currentRate,
           recommended_rate: finalRate,
@@ -623,7 +623,7 @@ export class RevenueManagementService {
           reasoning,
           supporting_data: recommendation.supportingData,
           estimated_revenue_impact: estimatedRevenueImpact,
-          valid_until: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
+          valid_until: dayjs().add(7, 'day').format('YYYY-MM-DD'),
           status: 'pending'
         }, {
           onConflict: 'property_id,date,room_type_id'
@@ -717,8 +717,8 @@ export class RevenueManagementService {
       .from('market_events')
       .select('*')
       .or(`property_id.is.null,property_id.eq.${propertyId}`)
-      .lte('start_date', format(endDate, 'yyyy-MM-dd'))
-      .gte('end_date', format(startDate, 'yyyy-MM-dd'))
+      .lte('start_date', dayjs(endDate).format('YYYY-MM-DD'))
+      .gte('end_date', dayjs(startDate).format('YYYY-MM-DD'))
       .order('start_date');
 
     if (error) throw error;
@@ -752,8 +752,8 @@ export class RevenueManagementService {
         name: event.name,
         description: event.description,
         event_type: event.eventType,
-        start_date: format(event.startDate, 'yyyy-MM-dd'),
-        end_date: format(event.endDate, 'yyyy-MM-dd'),
+        start_date: dayjs(event.startDate).format('YYYY-MM-DD'),
+        end_date: dayjs(event.endDate).format('YYYY-MM-DD'),
         expected_demand_impact: event.expectedDemandImpact,
         expected_rate_impact: event.expectedRateImpact,
         location: event.location,
@@ -773,8 +773,8 @@ export class RevenueManagementService {
 
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.eventType !== undefined) updateData.event_type = updates.eventType;
-    if (updates.startDate !== undefined) updateData.start_date = format(updates.startDate, 'yyyy-MM-dd');
-    if (updates.endDate !== undefined) updateData.end_date = format(updates.endDate, 'yyyy-MM-dd');
+    if (updates.startDate !== undefined) updateData.start_date = dayjs(updates.startDate).format('YYYY-MM-DD');
+    if (updates.endDate !== undefined) updateData.end_date = dayjs(updates.endDate).format('YYYY-MM-DD');
     if (updates.expectedDemandImpact !== undefined) updateData.expected_demand_impact = updates.expectedDemandImpact;
     if (updates.expectedRateImpact !== undefined) updateData.expected_rate_impact = updates.expectedRateImpact;
 
@@ -820,7 +820,7 @@ export class RevenueManagementService {
         property_id: propertyId,
         competitor_name: competitorName,
         competitor_source: options?.competitorSource,
-        date: format(date, 'yyyy-MM-dd'),
+        date: dayjs(date).format('YYYY-MM-DD'),
         room_type_name: options?.roomTypeName,
         rate,
         rate_type: options?.rateType || 'room_only',
@@ -844,8 +844,8 @@ export class RevenueManagementService {
       .from('competitor_rates')
       .select('date, competitor_name, rate')
       .eq('property_id', propertyId)
-      .gte('date', format(startDate, 'yyyy-MM-dd'))
-      .lte('date', format(endDate, 'yyyy-MM-dd'))
+      .gte('date', dayjs(startDate).format('YYYY-MM-DD'))
+      .lte('date', dayjs(endDate).format('YYYY-MM-DD'))
       .order('date')
       .order('competitor_name');
 
@@ -969,7 +969,7 @@ export class RevenueManagementService {
       .insert({
         id: uuidv4(),
         property_id: propertyId,
-        date: date ? format(date, 'yyyy-MM-dd') : null,
+        date: date ? dayjs(date).format('YYYY-MM-DD') : null,
         room_type_id: roomTypeId,
         action_type: actionType,
         previous_value: previousValue,
@@ -1017,15 +1017,15 @@ export class RevenueManagementService {
       .from('bookings')
       .select('total_amount, room_rate, nights')
       .eq('property_id', propertyId)
-      .gte('check_in', format(startDate, 'yyyy-MM-dd'))
-      .lte('check_in', format(endDate, 'yyyy-MM-dd'))
+      .gte('check_in', dayjs(startDate).format('YYYY-MM-DD'))
+      .lte('check_in', dayjs(endDate).format('YYYY-MM-DD'))
       .not('status', 'in', '("cancelled","no_show")');
 
     const totalRevenue = bookings?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
     const totalBookings = bookings?.length || 0;
     const roomNightsSold = bookings?.reduce((sum, b) => sum + (b.nights || 0), 0) || 0;
-    const adr = roomNightsSold > 0 
-      ? bookings!.reduce((sum, b) => sum + (b.room_rate || 0), 0) / totalBookings 
+    const adr = roomNightsSold > 0
+      ? bookings!.reduce((sum, b) => sum + (b.room_rate || 0), 0) / totalBookings
       : 0;
 
     // Get available inventory
@@ -1035,7 +1035,7 @@ export class RevenueManagementService {
       .eq('property_id', propertyId)
       .eq('status', 'active');
 
-    const daysInRange = differenceInDays(endDate, startDate) + 1;
+    const daysInRange = dayjs(endDate).diff(dayjs(startDate), 'day') + 1;
     const availableRoomNights = (roomCount || 0) * daysInRange;
     const occupancy = availableRoomNights > 0 ? (roomNightsSold / availableRoomNights) * 100 : 0;
     const revpar = availableRoomNights > 0 ? totalRevenue / availableRoomNights : 0;
@@ -1087,15 +1087,15 @@ export class RevenueManagementService {
         .from('bookings')
         .select('total_amount, room_rate, nights')
         .in('room_id', roomIdList)
-        .gte('check_in', format(startDate, 'yyyy-MM-dd'))
-        .lte('check_in', format(endDate, 'yyyy-MM-dd'))
+        .gte('check_in', dayjs(startDate).format('YYYY-MM-DD'))
+        .lte('check_in', dayjs(endDate).format('YYYY-MM-DD'))
         .not('status', 'in', '("cancelled","no_show")');
 
       const revenue = bookings?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
       const bookingCount = bookings?.length || 0;
       const roomNights = bookings?.reduce((sum, b) => sum + (b.nights || 0), 0) || 0;
-      const avgRate = bookingCount > 0 
-        ? bookings!.reduce((sum, b) => sum + (b.room_rate || 0), 0) / bookingCount 
+      const avgRate = bookingCount > 0
+        ? bookings!.reduce((sum, b) => sum + (b.room_rate || 0), 0) / bookingCount
         : 0;
 
       results.push({

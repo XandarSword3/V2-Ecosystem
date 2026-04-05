@@ -46,6 +46,7 @@ export const loyaltyTransactions = pgTable('loyalty_transactions', {
   description: text('description'),
   referenceType: varchar('reference_type', { length: 50 }),
   referenceId: uuid('reference_id'),
+  createdBy: uuid('created_by').references(() => users.id),
   expiresAt: timestamp('expires_at'),
   createdAt: timestamp('created_at').defaultNow(),
 });

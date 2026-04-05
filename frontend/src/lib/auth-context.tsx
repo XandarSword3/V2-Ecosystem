@@ -47,21 +47,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Handle OAuth callback - check for tokens in URL
     const handleOAuthCallback = () => {
       if (typeof window === 'undefined') return false;
-      
+
       const params = new URLSearchParams(window.location.search);
       const oauth = params.get('oauth');
       const accessToken = params.get('accessToken');
       const refreshToken = params.get('refreshToken');
-      
+
       if (oauth === 'success' && accessToken && refreshToken) {
         // Store tokens from OAuth callback
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
-        
+
         // Clean URL by removing OAuth params
         const cleanUrl = window.location.pathname;
         window.history.replaceState({}, '', cleanUrl);
-        
+
         authLogger.info('OAuth tokens received and stored');
         return true;
       }
@@ -72,20 +72,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const validateSession = async () => {
       // First check for OAuth callback
       const oauthHandled = handleOAuthCallback();
-      
+
       const storedUser = localStorage.getItem('user');
       const accessToken = localStorage.getItem('accessToken');
-      
+
       // If no access token (and OAuth didn't just set one), nothing to validate
       if (!accessToken) {
         setIsLoading(false);
         return;
       }
-      
+
       try {
         // Validate token with backend using the api instance (which handles token refresh)
         const response = await api.get('/auth/me');
-        
+
         if (response.data.success && response.data.data) {
           // Use server-validated user data, not localStorage
           const validatedUser: User = {
@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(validatedUser);
           // Update localStorage with validated data
           localStorage.setItem('user', JSON.stringify(validatedUser));
-          
+
           // If this was an OAuth login, log success
           if (oauthHandled) {
             authLogger.info('OAuth login successful for:', validatedUser.email);
@@ -116,10 +116,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('refreshToken');
         setUser(null);
       }
-      
+
       setIsLoading(false);
     };
-    
+
     validateSession();
   }, []);
 
@@ -141,17 +141,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const { user: userData, tokens } = data.data;
-    
+
     if (!tokens?.accessToken || !tokens?.refreshToken) {
       throw new Error('Invalid login response - missing tokens');
     }
-    
+
     localStorage.setItem('accessToken', tokens.accessToken);
     localStorage.setItem('refreshToken', tokens.refreshToken);
     localStorage.setItem('user', JSON.stringify(userData));
-    
+
     setUser(userData);
-    
+
     return userData;
   };
 
@@ -164,21 +164,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const { user: userData, tokens } = data.data;
-    
+
     if (!tokens?.accessToken || !tokens?.refreshToken) {
       throw new Error('Invalid response - missing tokens');
     }
-    
+
     localStorage.setItem('accessToken', tokens.accessToken);
     localStorage.setItem('refreshToken', tokens.refreshToken);
     localStorage.setItem('user', JSON.stringify(userData));
-    
+
     setUser(userData);
-    
+
     return userData;
   };
 
   const logout = () => {
+    // Invalidate server-side session (fire-and-forget)
+    const refreshToken = localStorage.getItem('refreshToken');
+    api.post('/auth/logout', { refreshToken }).catch(() => {
+      // Best-effort: still clear client state even if API call fails
+    });
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');

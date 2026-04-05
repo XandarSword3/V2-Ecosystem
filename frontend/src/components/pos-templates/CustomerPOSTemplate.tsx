@@ -275,11 +275,11 @@ export default function CustomerPOSTemplate({ moduleId, moduleSlug, moduleName }
         subtotal: cartTotal,
         moduleId 
       });
-      if (res.data.success && res.data.data.valid) {
-        setAppliedDiscount(res.data.data.discount);
-        toast.success(`Coupon applied: ${formatCurrency(res.data.data.discount)} off`);
+      if (res.data.success && res.data.valid) {
+        setAppliedDiscount(res.data.data.discountAmount);
+        toast.success(`Coupon applied: ${formatCurrency(res.data.data.discountAmount)} off`);
       } else {
-        toast.error(res.data.data.reason || 'Invalid coupon');
+        toast.error(res.data.error || 'Invalid coupon');
       }
     } catch (error) {
       toast.error('Failed to apply coupon');

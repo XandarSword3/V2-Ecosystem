@@ -1,50 +1,36 @@
 /**
  * In-Memory Housekeeping Repository
- *
- * Test double for housekeeping/room cleaning operations.
+ * Test double for HousekeepingRepository using in-memory data structures.
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import type {
+  HousekeepingRepository,
   RoomCleaningTask,
   CleaningSupply,
   HousekeepingFilters,
-  HousekeepingRepository,
 } from '../container/types.js';
 
 export class InMemoryHousekeepingRepository implements HousekeepingRepository {
-  private tasks: Map<string, RoomCleaningTask> = new Map();
-  private supplies: Map<string, CleaningSupply> = new Map();
+  private tasks = new Map<string, RoomCleaningTask>();
+  private supplies = new Map<string, CleaningSupply>();
 
-  // ============================================
-  // TASK OPERATIONS
-  // ============================================
+  reset() {
+    this.tasks.clear();
+    this.supplies.clear();
+  }
 
-  async createTask(task: Omit<RoomCleaningTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<RoomCleaningTask> {
-    const now = new Date().toISOString();
-    const newTask: RoomCleaningTask = {
-      ...task,
-      id: uuidv4(),
-      createdAt: now,
-      updatedAt: null,
-    };
-    this.tasks.set(newTask.id, newTask);
-    return newTask;
+  // Task operations
+  async createTask(data: Omit<RoomCleaningTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<RoomCleaningTask> {
+    const id = crypto.randomUUID();
+    const task: RoomCleaningTask = { ...data, id, createdAt: new Date().toISOString(), updatedAt: null };
+    this.tasks.set(id, task);
+    return task;
   }
 
   async updateTask(id: string, data: Partial<RoomCleaningTask>): Promise<RoomCleaningTask> {
-    const task = this.tasks.get(id);
-    if (!task) {
-      throw new Error('Task not found');
-    }
-
-    const updated: RoomCleaningTask = {
-      ...task,
-      ...data,
-      id: task.id,
-      createdAt: task.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
+    const existing = this.tasks.get(id);
+    if (!existing) throw new Error(`Task ${id} not found`);
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
     this.tasks.set(id, updated);
     return updated;
   }
@@ -58,76 +44,41 @@ export class InMemoryHousekeepingRepository implements HousekeepingRepository {
   }
 
   async getTaskByRoomId(roomId: string): Promise<RoomCleaningTask | null> {
-    for (const task of this.tasks.values()) {
-      if (task.roomId === roomId) {
-        return task;
-      }
+    for (const t of this.tasks.values()) {
+      if (t.roomId === roomId) return t;
     }
     return null;
   }
 
   async listTasks(filters?: HousekeepingFilters): Promise<RoomCleaningTask[]> {
-    let result = Array.from(this.tasks.values());
-
-    if (filters?.status) {
-      result = result.filter(t => t.status === filters.status);
-    }
-
-    if (filters?.priority) {
-      result = result.filter(t => t.priority === filters.priority);
-    }
-
-    if (filters?.floor !== undefined) {
-      result = result.filter(t => t.floor === filters.floor);
-    }
-
-    if (filters?.assignedTo) {
-      result = result.filter(t => t.assignedTo === filters.assignedTo);
-    }
-
-    if (filters?.dateRange) {
-      const { start, end } = filters.dateRange;
-      result = result.filter(t => {
-        const created = t.createdAt.split('T')[0];
-        return created >= start && created <= end;
-      });
-    }
-
+    let result = [...this.tasks.values()];
+    if (filters?.status) result = result.filter(t => t.status === filters.status);
+    if (filters?.priority) result = result.filter(t => t.priority === filters.priority);
+    if (filters?.floor !== undefined) result = result.filter(t => t.floor === filters.floor);
+    if (filters?.assignedTo) result = result.filter(t => t.assignedTo === filters.assignedTo);
     return result;
   }
 
   async getTasksByAssignee(assigneeId: string): Promise<RoomCleaningTask[]> {
-    return Array.from(this.tasks.values()).filter(t => t.assignedTo === assigneeId);
+    return [...this.tasks.values()].filter(t => t.assignedTo === assigneeId);
   }
 
   async getTasksByFloor(floor: number): Promise<RoomCleaningTask[]> {
-    return Array.from(this.tasks.values()).filter(t => t.floor === floor);
+    return [...this.tasks.values()].filter(t => t.floor === floor);
   }
 
-  // ============================================
-  // SUPPLY OPERATIONS
-  // ============================================
-
-  async createSupply(supply: Omit<CleaningSupply, 'id'>): Promise<CleaningSupply> {
-    const newSupply: CleaningSupply = {
-      ...supply,
-      id: uuidv4(),
-    };
-    this.supplies.set(newSupply.id, newSupply);
-    return newSupply;
+  // Supply operations
+  async createSupply(data: Omit<CleaningSupply, 'id'>): Promise<CleaningSupply> {
+    const id = crypto.randomUUID();
+    const supply: CleaningSupply = { ...data, id };
+    this.supplies.set(id, supply);
+    return supply;
   }
 
   async updateSupply(id: string, data: Partial<CleaningSupply>): Promise<CleaningSupply> {
-    const supply = this.supplies.get(id);
-    if (!supply) {
-      throw new Error('Supply not found');
-    }
-
-    const updated: CleaningSupply = {
-      ...supply,
-      ...data,
-      id: supply.id,
-    };
+    const existing = this.supplies.get(id);
+    if (!existing) throw new Error(`Supply ${id} not found`);
+    const updated = { ...existing, ...data };
     this.supplies.set(id, updated);
     return updated;
   }
@@ -141,35 +92,10 @@ export class InMemoryHousekeepingRepository implements HousekeepingRepository {
   }
 
   async listSupplies(): Promise<CleaningSupply[]> {
-    return Array.from(this.supplies.values());
+    return [...this.supplies.values()];
   }
 
   async getLowSupplies(): Promise<CleaningSupply[]> {
-    return Array.from(this.supplies.values()).filter(s => s.quantity <= s.minQuantity);
-  }
-
-  // ============================================
-  // TEST HELPERS
-  // ============================================
-
-  addTask(task: RoomCleaningTask): void {
-    this.tasks.set(task.id, task);
-  }
-
-  addSupply(supply: CleaningSupply): void {
-    this.supplies.set(supply.id, supply);
-  }
-
-  clear(): void {
-    this.tasks.clear();
-    this.supplies.clear();
-  }
-
-  getAllTasks(): RoomCleaningTask[] {
-    return Array.from(this.tasks.values());
-  }
-
-  getAllSupplies(): CleaningSupply[] {
-    return Array.from(this.supplies.values());
+    return [...this.supplies.values()].filter(s => s.quantity <= s.minQuantity);
   }
 }

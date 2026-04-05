@@ -152,12 +152,12 @@ export interface AuthRepository {
   getUserByEmail(email: string): Promise<AuthUser | null>;
   createUser(user: Omit<AuthUser, 'id' | 'created_at' | 'updated_at'>): Promise<AuthUser>;
   updateUser(id: string, data: Partial<AuthUser>): Promise<AuthUser>;
-  
+
   // Role operations
   getRoleByName(name: string): Promise<AuthRole | null>;
   getUserRoles(userId: string): Promise<string[]>;
   assignRole(userId: string, roleId: string): Promise<void>;
-  
+
   // Session operations
   createSession(session: Omit<AuthSession, 'id' | 'created_at'>): Promise<AuthSession>;
   getSessionByToken(token: string): Promise<AuthSession | null>;
@@ -191,6 +191,8 @@ export interface RestaurantOrder {
   total_amount: string;
   modifiers_total?: string;  // NEW: Total price of all modifiers
   special_instructions?: string;
+  cancellation_reason?: string;
+  cancelled_at?: string;
   estimated_ready_time?: string;
   payment_status: 'pending' | 'paid' | 'refunded';
   payment_method?: 'cash' | 'card' | 'whish' | 'online' | 'room_charge';
@@ -287,16 +289,16 @@ export interface RestaurantRepository {
   getLiveOrders(moduleId?: string): Promise<RestaurantOrder[]>;
   getOrdersByCustomer(customerId: string): Promise<RestaurantOrder[]>;
   updateOrder(id: string, data: Partial<RestaurantOrder>): Promise<RestaurantOrder>;
-  
+
   // Order items operations
   createOrderItems(items: Omit<RestaurantOrderItem, 'id' | 'created_at'>[]): Promise<RestaurantOrderItem[]>;
   getOrderItems(orderId: string): Promise<RestaurantOrderItem[]>;
-  
+
   // Menu item operations
   getMenuItemById(id: string): Promise<RestaurantMenuItem | null>;
   getMenuItemsByIds(ids: string[]): Promise<RestaurantMenuItem[]>;
   getMenuItems(filters?: { categoryId?: string; moduleId?: string; available?: boolean }): Promise<RestaurantMenuItem[]>;
-  
+
   // Table operations
   getTableById(id: string): Promise<RestaurantTable | null>;
   getTables(moduleId?: string): Promise<RestaurantTable[]>;
@@ -324,7 +326,7 @@ export interface MenuRepository {
   createCategory(category: Omit<MenuCategory, 'id' | 'created_at' | 'updated_at'>): Promise<MenuCategory>;
   updateCategory(id: string, data: Partial<MenuCategory>): Promise<MenuCategory>;
   deleteCategory(id: string): Promise<void>;
-  
+
   // Menu item operations
   getMenuItems(filters?: MenuItemFilters): Promise<RestaurantMenuItem[]>;
   getMenuItemById(id: string): Promise<RestaurantMenuItem | null>;
@@ -439,7 +441,7 @@ export interface ChaletRepository {
   createChalet(chalet: Omit<Chalet, 'id' | 'created_at' | 'updated_at'>): Promise<Chalet>;
   updateChalet(id: string, data: Partial<Chalet>): Promise<Chalet>;
   deleteChalet(id: string): Promise<void>;
-  
+
   // Booking operations
   createBooking(booking: Omit<ChaletBooking, 'id' | 'created_at' | 'updated_at'>): Promise<ChaletBooking>;
   getBookingById(id: string): Promise<ChaletBooking | null>;
@@ -449,11 +451,11 @@ export interface ChaletRepository {
   getBookingsForChalet(chaletId: string, startDate?: string, endDate?: string): Promise<ChaletBooking[]>;
   getTodayBookings(): Promise<{ checkIns: ChaletBooking[]; checkOuts: ChaletBooking[] }>;
   updateBooking(id: string, data: Partial<ChaletBooking>): Promise<ChaletBooking>;
-  
+
   // Booking add-ons
   createBookingAddOns(addOns: Omit<ChaletBookingAddOn, 'id' | 'created_at'>[]): Promise<ChaletBookingAddOn[]>;
   getBookingAddOns(bookingId: string): Promise<ChaletBookingAddOn[]>;
-  
+
   // Add-on operations
   getAddOns(activeOnly?: boolean): Promise<ChaletAddOn[]>;
   getAddOnById(id: string): Promise<ChaletAddOn | null>;
@@ -461,13 +463,13 @@ export interface ChaletRepository {
   createAddOn(addOn: Omit<ChaletAddOn, 'id' | 'created_at' | 'updated_at'>): Promise<ChaletAddOn>;
   updateAddOn(id: string, data: Partial<ChaletAddOn>): Promise<ChaletAddOn>;
   deleteAddOn(id: string): Promise<void>;
-  
+
   // Price rule operations
   getPriceRules(chaletId?: string): Promise<ChaletPriceRule[]>;
   createPriceRule(rule: Omit<ChaletPriceRule, 'id' | 'created_at' | 'updated_at'>): Promise<ChaletPriceRule>;
   updatePriceRule(id: string, data: Partial<ChaletPriceRule>): Promise<ChaletPriceRule>;
   deletePriceRule(id: string): Promise<void>;
-  
+
   // Settings operations
   getChaletSettings(): Promise<{ deposit_percentage: number; check_in_time: string; check_out_time: string; deposit_type?: 'percentage' | 'fixed'; deposit_fixed?: number }>;
   updateChaletSettings(settings: Record<string, unknown>): Promise<void>;
@@ -599,7 +601,7 @@ export interface SnackRepository {
   updateItem(id: string, data: Partial<SnackItem>): Promise<SnackItem>;
   deleteItem(id: string): Promise<void>;
   setItemAvailability(id: string, isAvailable: boolean): Promise<SnackItem>;
-  
+
   // Order operations
   createOrder(order: Omit<SnackOrder, 'id' | 'created_at' | 'updated_at'>): Promise<SnackOrder>;
   createOrderItems(items: Omit<SnackOrderItem, 'id'>[]): Promise<SnackOrderItem[]>;
@@ -647,7 +649,7 @@ export interface SupportRepository {
   getInquiryById(id: string): Promise<SupportInquiry | null>;
   getInquiries(filters?: { status?: SupportInquiryStatus }): Promise<SupportInquiry[]>;
   updateInquiryStatus(id: string, status: SupportInquiryStatus): Promise<SupportInquiry>;
-  
+
   // FAQ operations
   getPublishedFAQs(): Promise<FAQ[]>;
   getFAQById(id: string): Promise<FAQ | null>;
@@ -735,25 +737,25 @@ export interface SettingsRepository {
 // AUDIT MODULE TYPES
 // ============================================
 
-export type AuditAction = 
-  | 'create' 
-  | 'update' 
-  | 'delete' 
-  | 'login' 
-  | 'logout' 
-  | 'password_change' 
+export type AuditAction =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'login'
+  | 'logout'
+  | 'password_change'
   | 'role_change'
   | 'status_change'
   | 'settings_update';
 
-export type AuditResource = 
-  | 'user' 
-  | 'booking' 
-  | 'order' 
-  | 'chalet' 
-  | 'menu_item' 
-  | 'review' 
-  | 'settings' 
+export type AuditResource =
+  | 'user'
+  | 'booking'
+  | 'order'
+  | 'chalet'
+  | 'menu_item'
+  | 'review'
+  | 'settings'
   | 'pool_ticket'
   | 'snack_item'
   | 'support_inquiry';
@@ -1207,6 +1209,7 @@ export interface LoyaltyTransaction {
   accountId: string;
   type: LoyaltyTransactionType;
   points: number;
+  balanceAfter: number;
   description: string;
   referenceType: string | null;
   referenceId: string | null;
@@ -1236,6 +1239,7 @@ export interface LoyaltyRepository {
   getTransactions(accountId: string, limit?: number): Promise<LoyaltyTransaction[]>;
   getExpiringPoints(accountId: string, beforeDate: string): Promise<LoyaltyTransaction[]>;
   listAccounts(filters?: LoyaltyFilters): Promise<LoyaltyAccount[]>;
+  adjustPointsAtomic(id: string, points: number): Promise<LoyaltyAccount>;
 }
 
 // ============================================
@@ -1617,7 +1621,7 @@ export interface EventRepository {
   deleteVenue(id: string): Promise<void>;
   getVenueById(id: string): Promise<Venue | null>;
   listVenues(filters?: VenueFilters): Promise<Venue[]>;
-  
+
   createEvent(event: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>): Promise<Event>;
   updateEvent(id: string, data: Partial<Event>): Promise<Event>;
   deleteEvent(id: string): Promise<void>;
@@ -1685,7 +1689,7 @@ export interface MaintenanceRepository {
   list(filters?: WorkOrderFilters): Promise<WorkOrder[]>;
   getByLocation(locationId: string): Promise<WorkOrder[]>;
   getByAssignee(assignedTo: string): Promise<WorkOrder[]>;
-  
+
   addPart(part: Omit<WorkOrderPart, 'id' | 'createdAt'>): Promise<WorkOrderPart>;
   getParts(workOrderId: string): Promise<WorkOrderPart[]>;
   deletePart(id: string): Promise<void>;
@@ -1743,7 +1747,7 @@ export interface HousekeepingRepository {
   listTasks(filters?: HousekeepingFilters): Promise<RoomCleaningTask[]>;
   getTasksByAssignee(assigneeId: string): Promise<RoomCleaningTask[]>;
   getTasksByFloor(floor: number): Promise<RoomCleaningTask[]>;
-  
+
   createSupply(supply: Omit<CleaningSupply, 'id'>): Promise<CleaningSupply>;
   updateSupply(id: string, data: Partial<CleaningSupply>): Promise<CleaningSupply>;
   deleteSupply(id: string): Promise<void>;
@@ -1823,13 +1827,13 @@ export interface ChannelRepository {
   getById(id: string): Promise<Channel | null>;
   getByCode(code: string): Promise<Channel | null>;
   list(filters?: ChannelFilters): Promise<Channel[]>;
-  
+
   createRate(rate: Omit<ChannelRate, 'id' | 'createdAt'>): Promise<ChannelRate>;
   updateRate(id: string, data: Partial<ChannelRate>): Promise<ChannelRate>;
   deleteRate(id: string): Promise<void>;
   getRateById(id: string): Promise<ChannelRate | null>;
   getRatesForChannel(channelId: string): Promise<ChannelRate[]>;
-  
+
   createReservation(res: Omit<ChannelReservation, 'id' | 'createdAt' | 'updatedAt'>): Promise<ChannelReservation>;
   updateReservation(id: string, data: Partial<ChannelReservation>): Promise<ChannelReservation>;
   getReservationById(id: string): Promise<ChannelReservation | null>;
@@ -1901,13 +1905,13 @@ export interface FeedbackRepository {
   getById(id: string): Promise<Feedback | null>;
   list(filters?: FeedbackFilters): Promise<Feedback[]>;
   getByGuest(guestId: string): Promise<Feedback[]>;
-  
+
   createQuestion(q: Omit<SurveyQuestion, 'id'>): Promise<SurveyQuestion>;
   updateQuestion(id: string, data: Partial<SurveyQuestion>): Promise<SurveyQuestion>;
   deleteQuestion(id: string): Promise<void>;
   getQuestionById(id: string): Promise<SurveyQuestion | null>;
   getQuestionsForSurvey(surveyId: string): Promise<SurveyQuestion[]>;
-  
+
   createResponse(r: Omit<SurveyResponse, 'id'>): Promise<SurveyResponse>;
   getResponsesForSurvey(surveyId: string): Promise<SurveyResponse[]>;
   getResponsesForGuest(guestId: string): Promise<SurveyResponse[]>;
@@ -1970,7 +1974,7 @@ export interface PackageRepository {
   getById(id: string): Promise<Package | null>;
   getByCode(code: string): Promise<Package | null>;
   list(filters?: PackageFilters): Promise<Package[]>;
-  
+
   createRedemption(r: Omit<PackageRedemption, 'id'>): Promise<PackageRedemption>;
   getRedemptionsForPackage(packageId: string): Promise<PackageRedemption[]>;
   getRedemptionsForGuest(guestId: string): Promise<PackageRedemption[]>;
@@ -1979,7 +1983,7 @@ export interface PackageRepository {
 // ============================================
 // DOCUMENT TYPES
 // ============================================
-export type DocumentType = 
+export type DocumentType =
   | 'contract'
   | 'invoice'
   | 'receipt'
@@ -1990,14 +1994,14 @@ export type DocumentType =
   | 'image'
   | 'other';
 
-export type DocumentStatus = 
+export type DocumentStatus =
   | 'pending'
   | 'approved'
   | 'rejected'
   | 'expired'
   | 'archived';
 
-export type DocumentVisibility = 
+export type DocumentVisibility =
   | 'public'
   | 'private'
   | 'internal'
@@ -2057,7 +2061,7 @@ export interface DocumentRepository {
   getByPath(path: string): Promise<Document | null>;
   list(filters?: DocumentFilters): Promise<Document[]>;
   getByRelatedEntity(entityType: string, entityId: string): Promise<Document[]>;
-  
+
   createVersion(version: Omit<DocumentVersion, 'id'>): Promise<DocumentVersion>;
   getVersions(documentId: string): Promise<DocumentVersion[]>;
   getLatestVersion(documentId: string): Promise<DocumentVersion | null>;
@@ -2066,7 +2070,7 @@ export interface DocumentRepository {
 // ============================================
 // ANALYTICS TYPES
 // ============================================
-export type MetricType = 
+export type MetricType =
   | 'revenue'
   | 'occupancy'
   | 'bookings'
@@ -2077,14 +2081,14 @@ export type MetricType =
   | 'revpar'
   | 'custom';
 
-export type MetricPeriod = 
+export type MetricPeriod =
   | 'daily'
   | 'weekly'
   | 'monthly'
   | 'quarterly'
   | 'yearly';
 
-export type MetricAggregation = 
+export type MetricAggregation =
   | 'sum'
   | 'average'
   | 'count'
@@ -2149,14 +2153,14 @@ export interface AnalyticsRepository {
   getMetricsByType(type: MetricType, period: MetricPeriod): Promise<Metric[]>;
   getMetricsForPeriod(startDate: string, endDate: string): Promise<Metric[]>;
   getLatestMetrics(types: MetricType[]): Promise<Metric[]>;
-  
+
   createDashboard(dashboard: Omit<Dashboard, 'id' | 'createdAt' | 'updatedAt'>): Promise<Dashboard>;
   updateDashboard(id: string, data: Partial<Dashboard>): Promise<Dashboard>;
   deleteDashboard(id: string): Promise<void>;
   getDashboard(id: string): Promise<Dashboard | null>;
   getDashboardsByOwner(ownerId: string): Promise<Dashboard[]>;
   getDefaultDashboard(): Promise<Dashboard | null>;
-  
+
   createWidget(widget: Omit<DashboardWidget, 'id' | 'createdAt'>): Promise<DashboardWidget>;
   updateWidget(id: string, data: Partial<DashboardWidget>): Promise<DashboardWidget>;
   deleteWidget(id: string): Promise<void>;
@@ -2242,12 +2246,12 @@ export interface WeatherRepository {
   saveWeather(data: Omit<WeatherData, 'id' | 'createdAt' | 'updatedAt'>): Promise<WeatherData>;
   updateWeather(id: string, data: Partial<WeatherData>): Promise<WeatherData>;
   getWeatherHistory(location: string, startDate: string, endDate: string): Promise<WeatherData[]>;
-  
+
   getAlerts(location: string): Promise<WeatherAlert[]>;
   createAlert(data: Omit<WeatherAlert, 'id' | 'createdAt'>): Promise<WeatherAlert>;
   updateAlert(id: string, data: Partial<WeatherAlert>): Promise<WeatherAlert>;
   deleteAlert(id: string): Promise<void>;
-  
+
   getActivities(): Promise<ActivityRecommendation[]>;
   getActivityById(id: string): Promise<ActivityRecommendation | null>;
   createActivity(data: Omit<ActivityRecommendation, 'id' | 'createdAt'>): Promise<ActivityRecommendation>;
@@ -2300,11 +2304,11 @@ export interface CurrencyRepository {
   createCurrency(data: Omit<Currency, 'createdAt' | 'updatedAt'>): Promise<Currency>;
   updateCurrency(code: string, data: Partial<Currency>): Promise<Currency>;
   deleteCurrency(code: string): Promise<void>;
-  
+
   getExchangeRate(baseCurrency: string, targetCurrency: string): Promise<ExchangeRate | null>;
   getExchangeRates(baseCurrency: string): Promise<ExchangeRate[]>;
   saveExchangeRate(data: Omit<ExchangeRate, 'id' | 'createdAt'>): Promise<ExchangeRate>;
-  
+
   logConversion(data: Omit<CurrencyConversion, 'id' | 'createdAt'>): Promise<CurrencyConversion>;
   getConversions(filters: { fromDate?: string; toDate?: string; currency?: string }): Promise<CurrencyConversion[]>;
 }
@@ -2356,7 +2360,7 @@ export interface GiftCardRepository {
   getByPurchaser(purchaserId: string): Promise<GiftCard[]>;
   getByRecipient(recipientEmail: string): Promise<GiftCard[]>;
   getExpiring(beforeDate: string): Promise<GiftCard[]>;
-  
+
   logTransaction(data: Omit<GiftCardTransaction, 'id' | 'createdAt'>): Promise<GiftCardTransaction>;
   getTransactions(giftCardId: string): Promise<GiftCardTransaction[]>;
 }
@@ -2421,7 +2425,7 @@ export interface MembershipRepository {
   createPlan(data: Omit<MembershipPlan, 'id' | 'createdAt' | 'updatedAt'>): Promise<MembershipPlan>;
   updatePlan(id: string, data: Partial<MembershipPlan>): Promise<MembershipPlan>;
   deletePlan(id: string): Promise<void>;
-  
+
   // Memberships
   getMembership(id: string): Promise<Membership | null>;
   getMembershipByMember(memberId: string): Promise<Membership | null>;
@@ -2429,7 +2433,7 @@ export interface MembershipRepository {
   updateMembership(id: string, data: Partial<Membership>): Promise<Membership>;
   getExpiring(beforeDate: string): Promise<Membership[]>;
   getByStatus(status: MembershipStatus): Promise<Membership[]>;
-  
+
   // Payments
   logPayment(data: Omit<MembershipPayment, 'id' | 'createdAt'>): Promise<MembershipPayment>;
   getPayments(membershipId: string): Promise<MembershipPayment[]>;
@@ -2484,7 +2488,7 @@ export interface PromotionRepository {
   update(id: string, data: Partial<Promotion>): Promise<Promotion>;
   delete(id: string): Promise<void>;
   getByStatus(status: PromotionStatus): Promise<Promotion[]>;
-  
+
   logUsage(data: Omit<PromotionUsage, 'id' | 'usedAt'>): Promise<PromotionUsage>;
   getUsage(promotionId: string): Promise<PromotionUsage[]>;
   getUserUsage(promotionId: string, userId: string): Promise<PromotionUsage[]>;
@@ -2612,7 +2616,7 @@ export interface InvoiceRepository {
   create(data: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>): Promise<Invoice>;
   update(id: string, data: Partial<Invoice>): Promise<Invoice>;
   delete(id: string): Promise<void>;
-  
+
   addPayment(data: Omit<InvoicePayment, 'id' | 'processedAt'>): Promise<InvoicePayment>;
   getPayments(invoiceId: string): Promise<InvoicePayment[]>;
 }
@@ -2740,10 +2744,10 @@ export interface AmenityRepository {
   create(data: Omit<Amenity, 'id' | 'createdAt' | 'updatedAt'>): Promise<Amenity>;
   update(id: string, data: Partial<Amenity>): Promise<Amenity>;
   delete(id: string): Promise<void>;
-  
+
   getSchedule(amenityId: string): Promise<AmenitySchedule[]>;
   setSchedule(amenityId: string, schedule: Omit<AmenitySchedule, 'id'>[]): Promise<AmenitySchedule[]>;
-  
+
   createReservation(data: Omit<AmenityReservation, 'id' | 'createdAt'>): Promise<AmenityReservation>;
   getReservation(id: string): Promise<AmenityReservation | null>;
   getReservationsByAmenity(amenityId: string, date: string): Promise<AmenityReservation[]>;
@@ -2755,7 +2759,7 @@ export interface AmenityRepository {
 export interface Container {
   // Database
   database: DatabaseClient;
-  
+
   // Repositories
   poolRepository: PoolRepository;
   authRepository: AuthRepository;
@@ -2796,7 +2800,7 @@ export interface Container {
   invoiceRepository: InvoiceRepository;
   bookingRepository: BookingRepository;
   amenityRepository: AmenityRepository;
-  
+
   // Services
   emailService: EmailService;
   qrCodeService: QRCodeService;
@@ -2804,7 +2808,7 @@ export interface Container {
   logger: LoggerService;
   activityLogger: ActivityLoggerService;
   socketEmitter: SocketEmitter;
-  
+
   // Config
   config: AppConfig;
 }

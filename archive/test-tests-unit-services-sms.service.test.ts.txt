@@ -1,0 +1,46 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+node.exe : [90mstderr[2m | 
+tests/unit/services/sms.service.test.ts[2m > [22m[2mSMS 
+Service[2m > [22m[2mSMS Templates[2m > [22m[2mshould have 
+booking-confirmation template
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([90mstderr[2m...matio 
+   n template:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[22m[39m[SMSService] Twilio not configured - SMS disabled
+
+[90mstdout[2m | tests/unit/services/sms.service.test.ts[2m > [22m[2mSMS Service[2m > [22m[2mSMS Templates[2m > [22m[2mshould have booking-confirmation template
+[22m[39m[SMSService] SMS disabled - would send to +1234567890: V2 Resort: Your booking #B-001 is confirmed for 2024-01-15. Check-in: 15:00. Questions? Call +1-555-0123
+
+[90mstderr[2m | tests/unit/services/sms.service.test.ts[2m > 
+[22m[2mSMS Service[2m > [22m[2mSMS Templates[2m > 
+[22m[2mshould throw for invalid template
+[22m[39m[SMSService] Twilio not configured - SMS disabled
+
+[90mstderr[2m | tests/unit/services/sms.service.test.ts[2m > 
+[22m[2mSMS Service[2m > [22m[2mPhone Number Validation[2m > 
+[22m[2mshould normalize and validate phone numbers
+[22m[39m[SMSService] Twilio not configured - SMS disabled
+
+[90mstderr[2m | tests/unit/services/sms.service.test.ts[2m > 
+[22m[2mSMS Service[2m > [22m[2mSMS Consent[2m > 
+[22m[2mshould return failed when SMS service is disabled
+[22m[39m[SMSService] Twilio not configured - SMS disabled
+
+[90mstdout[2m | tests/unit/services/sms.service.test.ts[2m > [22m[2mSMS Service[2m > [22m[2mSMS Consent[2m > [22m[2mshould return failed when SMS service is disabled
+[22m[39m[SMSService] SMS disabled - would send to +1234567890: Test message
+
+ [32mΓ£ô[39m tests/unit/services/sms.service.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 10:03:26
+[2m   Duration [22m 208ms[2m (transform 53ms, setup 0ms, import 44ms, tests 35ms, environment 0ms)[22m
+

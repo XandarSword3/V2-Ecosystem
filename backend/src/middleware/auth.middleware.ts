@@ -65,8 +65,19 @@ export function authorize(...args: (string | string[])[]) {
   };
 }
 
-export function requirePermission(permissionSlug: string) {
+/**
+ * Database-based permission check.
+ * DEPRECATED: Use requirePermission from permission.middleware.ts instead.
+ * This queries the app_role_permissions table at runtime.
+ * The in-memory version in permission.middleware.ts is the canonical source of truth.
+ * This function is retained only for cases where DB-level permission overrides are needed.
+ */
+export function requireDbPermission(permissionSlug: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[DEPRECATED] requireDbPermission('${permissionSlug}') is deprecated. Use requirePermission() from permission.middleware.ts instead.`);
+    }
+
     if (!req.user) {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }

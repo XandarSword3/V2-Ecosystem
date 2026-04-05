@@ -404,6 +404,8 @@ CREATE TABLE IF NOT EXISTS snack_orders (
   customer_phone VARCHAR(20),
   status order_status DEFAULT 'pending' NOT NULL,
   total_amount DECIMAL(10,2) NOT NULL,
+  subtotal DECIMAL(10,2),
+  tax_amount DECIMAL(10,2) DEFAULT 0,
   payment_status payment_status DEFAULT 'pending' NOT NULL,
   payment_method payment_method,
   special_instructions TEXT,

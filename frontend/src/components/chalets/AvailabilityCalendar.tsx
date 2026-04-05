@@ -3,6 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
+interface DailyPriceInfo {
+  price: number;
+  type: 'weekday' | 'weekend' | 'holiday' | 'seasonal';
+  ruleName?: string;
+  isBlocked: boolean;
+}
+
 interface AvailabilityCalendarProps {
   blockedDates?: string[];
   selectedCheckIn?: string;
@@ -12,7 +19,9 @@ interface AvailabilityCalendarProps {
   maxMonthsAhead?: number;
   weekendHighlight?: boolean;
   pricePerNight?: { weekday: number; weekend: number };
+  dailyPrices?: Record<string, DailyPriceInfo>;
   currency?: string;
+  formatPrice?: (amount: number) => string;
 }
 
 interface CalendarDay {
@@ -51,7 +60,9 @@ export default function AvailabilityCalendar({
   maxMonthsAhead = 12,
   weekendHighlight = true,
   pricePerNight,
+  dailyPrices,
   currency = 'USD',
+  formatPrice,
 }: AvailabilityCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectingCheckOut, setSelectingCheckOut] = useState(false);
@@ -264,13 +275,18 @@ export default function AvailabilityCalendar({
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-1">
         {calendarDays.map((day, index) => {
+          const dateStr = formatDateString(day.date);
+          const dayPrice = dailyPrices?.[dateStr];
+          const hasDailyPrice = dayPrice && !dayPrice.isBlocked;
+
           const dayClasses = [
-            'relative h-12 flex flex-col items-center justify-center rounded-lg text-sm transition-all',
+            'relative flex flex-col items-center justify-center rounded-lg text-sm transition-all',
+            hasDailyPrice ? 'h-16' : 'h-12',
           ];
 
           if (!day.isCurrentMonth) {
             dayClasses.push('text-slate-300 dark:text-slate-600');
-          } else if (day.isBlocked) {
+          } else if (day.isBlocked || dayPrice?.isBlocked) {
             dayClasses.push('text-slate-300 dark:text-slate-600 line-through cursor-not-allowed');
           } else if (day.isCheckIn) {
             dayClasses.push('bg-green-600 text-white rounded-r-none');
@@ -280,11 +296,56 @@ export default function AvailabilityCalendar({
             dayClasses.push('bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-none');
           } else if (day.isToday) {
             dayClasses.push('border-2 border-green-500 font-bold text-green-600 cursor-pointer hover:bg-green-50 dark:hover:bg-green-900/20');
+          } else if (hasDailyPrice) {
+            // Color-code by price type
+            const typeColors: Record<string, string> = {
+              weekday: 'text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700',
+              weekend: 'text-amber-600 dark:text-amber-400 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/20',
+              holiday: 'text-red-600 dark:text-red-400 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20',
+              seasonal: 'text-purple-600 dark:text-purple-400 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20',
+            };
+            dayClasses.push(typeColors[dayPrice.type] || typeColors.weekday);
           } else if (day.isWeekend && weekendHighlight) {
             dayClasses.push('text-amber-600 dark:text-amber-400 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/20');
           } else {
             dayClasses.push('text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700');
           }
+
+          // Price display helper
+          const renderPrice = () => {
+            if (day.isBlocked || !day.isCurrentMonth) return null;
+            
+            if (hasDailyPrice) {
+              const priceText = formatPrice
+                ? formatPrice(dayPrice.price)
+                : `$${dayPrice.price}`;
+              const priceColorClass = day.isSelected || day.isCheckIn || day.isCheckOut
+                ? 'text-white/80'
+                : day.isInRange
+                ? 'text-green-600 dark:text-green-400'
+                : {
+                    weekday: 'text-slate-500 dark:text-slate-400',
+                    weekend: 'text-amber-500 dark:text-amber-400',
+                    holiday: 'text-red-500 dark:text-red-400',
+                    seasonal: 'text-purple-500 dark:text-purple-400',
+                  }[dayPrice.type] || 'text-slate-500';
+              return (
+                <span className={`text-[9px] font-medium leading-tight ${priceColorClass}`}>
+                  {priceText}
+                </span>
+              );
+            }
+            
+            if (pricePerNight) {
+              return (
+                <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                  ${day.isWeekend ? pricePerNight.weekend : pricePerNight.weekday}
+                </span>
+              );
+            }
+            
+            return null;
+          };
 
           return (
             <button
@@ -292,39 +353,48 @@ export default function AvailabilityCalendar({
               onClick={() => handleDayClick(day)}
               onMouseEnter={() => setHoverDate(day.date)}
               onMouseLeave={() => setHoverDate(null)}
-              disabled={day.isBlocked || !day.isCurrentMonth}
+              disabled={day.isBlocked || dayPrice?.isBlocked || !day.isCurrentMonth}
               className={dayClasses.join(' ')}
+              title={dayPrice?.ruleName ? `${dayPrice.ruleName}` : undefined}
             >
               <span>{day.dayOfMonth}</span>
-              {pricePerNight && day.isCurrentMonth && !day.isBlocked && (
-                <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                  ${day.isWeekend ? pricePerNight.weekend : pricePerNight.weekday}
-                </span>
-              )}
+              {renderPrice()}
             </button>
           );
         })}
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap items-center justify-center gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-700 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-green-600 rounded"></div>
+      <div className="flex flex-wrap items-center justify-center gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-700 text-xs">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 bg-green-600 rounded"></div>
           <span className="text-slate-600 dark:text-slate-400">Selected</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-green-100 dark:bg-green-900/30 rounded"></div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 bg-green-100 dark:bg-green-900/30 rounded"></div>
           <span className="text-slate-600 dark:text-slate-400">Your stay</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded line-through"></div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded line-through"></div>
           <span className="text-slate-600 dark:text-slate-400">Unavailable</span>
         </div>
         {weekendHighlight && (
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-amber-400 rounded"></div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 border-2 border-amber-400 rounded"></div>
             <span className="text-slate-600 dark:text-slate-400">Weekend</span>
           </div>
+        )}
+        {dailyPrices && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 border-2 border-purple-400 rounded"></div>
+              <span className="text-slate-600 dark:text-slate-400">Seasonal</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 border-2 border-red-400 rounded"></div>
+              <span className="text-slate-600 dark:text-slate-400">Holiday</span>
+            </div>
+          </>
         )}
       </div>
 
