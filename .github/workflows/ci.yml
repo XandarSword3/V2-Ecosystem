@@ -138,20 +138,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: backend-unit
     services:
-      postgres-test:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: v2resort_test
-          POSTGRES_PASSWORD: v2resort_test_secret
-          POSTGRES_DB: v2resort_test
-        ports:
-          - 5433:5432
-        options: >-
-          --tmpfs /var/lib/postgresql/data
-          --health-cmd "pg_isready -U v2resort_test"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
       redis-test:
         image: redis:7-alpine
         ports:
@@ -162,16 +148,6 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
-      postgrest-test:
-        image: postgrest/postgrest:v12.2.8
-        env:
-          PGRST_DB_URI: postgres://v2resort_test:v2resort_test_secret@postgres-test:5432/v2resort_test
-          PGRST_DB_SCHEMAS: public
-          PGRST_DB_ANON_ROLE: v2resort_test
-          PGRST_JWT_SECRET: test-jwt-secret-for-ci-minimum-32-characters
-          PGRST_SERVER_PORT: 3000
-        ports:
-          - 3007:3000
 
     steps:
       - name: Checkout repository
@@ -184,9 +160,30 @@ jobs:
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
       - name: Install dependencies
         working-directory: backend
         run: npm ci
+
+      - name: Start Supabase local stack
+        run: |
+          supabase start
+          supabase status
+
+          supabase status -o env > /tmp/supabase.env
+          cat /tmp/supabase.env >> "$GITHUB_ENV"
+
+          source /tmp/supabase.env
+          echo "SUPABASE_URL=${API_URL}" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_KEY=${SERVICE_ROLE_KEY}" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=${ANON_KEY}" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=${DB_URL}" >> "$GITHUB_ENV"
+          echo "TEST_DATABASE_URL=${DB_URL}" >> "$GITHUB_ENV"
 
       - name: Run integration tests
         working-directory: backend
@@ -194,13 +191,13 @@ jobs:
         env:
           NODE_ENV: test
           JWT_SECRET: test-jwt-secret-for-ci-minimum-32-characters
-          DATABASE_URL: postgresql://v2resort_test:v2resort_test_secret@127.0.0.1:5433/v2resort_test
-          TEST_DATABASE_URL: postgresql://v2resort_test:v2resort_test_secret@127.0.0.1:5433/v2resort_test
           REDIS_URL: redis://127.0.0.1:6380
           TEST_REDIS_URL: redis://127.0.0.1:6380
-          SUPABASE_URL: http://127.0.0.1:3007
-          SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiaWF0IjoxNzM1Njg5NjAwLCJpc3MiOiJzdXBhYmFzZSIsImV4cCI6MjA1MTIyMjQwMCwicm9sZSI6InNlcnZpY2Vfcm9sZSJ9.m90MoaLqExSiHL6aqM6qN8NNO8gpym-QpOW1hRTEgbA
-          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiaWF0IjoxNzM1Njg5NjAwLCJpc3MiOiJzdXBhYmFzZSIsImV4cCI6MjA1MTIyMjQwMCwicm9sZSI6ImFub24ifQ.n41diJVAoCbfggtbtNWQ0DpOx1XO2MXBM06EfBlCJ2w
+
+      - name: Stop Supabase local stack
+        if: always()
+        run: |
+          supabase stop --no-backup || supabase stop || true
 
       - name: Upload integration results
         uses: actions/upload-artifact@v4
