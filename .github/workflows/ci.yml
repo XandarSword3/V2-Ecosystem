@@ -168,6 +168,7 @@ jobs:
           PGRST_DB_URI: postgres://v2resort_test:v2resort_test_secret@postgres-test:5432/v2resort_test
           PGRST_DB_SCHEMAS: public
           PGRST_DB_ANON_ROLE: v2resort_test
+          PGRST_JWT_SECRET: test-jwt-secret-for-ci-minimum-32-characters
           PGRST_SERVER_PORT: 3000
         ports:
           - 3007:3000
@@ -198,8 +199,8 @@ jobs:
           REDIS_URL: redis://127.0.0.1:6380
           TEST_REDIS_URL: redis://127.0.0.1:6380
           SUPABASE_URL: http://127.0.0.1:3007
-          SUPABASE_SERVICE_KEY: test-service-role-key
-          SUPABASE_ANON_KEY: test-anon-key
+          SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiaWF0IjoxNzM1Njg5NjAwLCJpc3MiOiJzdXBhYmFzZSIsImV4cCI6MjA1MTIyMjQwMCwicm9sZSI6InNlcnZpY2Vfcm9sZSJ9.m90MoaLqExSiHL6aqM6qN8NNO8gpym-QpOW1hRTEgbA
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiaWF0IjoxNzM1Njg5NjAwLCJpc3MiOiJzdXBhYmFzZSIsImV4cCI6MjA1MTIyMjQwMCwicm9sZSI6ImFub24ifQ.n41diJVAoCbfggtbtNWQ0DpOx1XO2MXBM06EfBlCJ2w
 
       - name: Upload integration results
         uses: actions/upload-artifact@v4
