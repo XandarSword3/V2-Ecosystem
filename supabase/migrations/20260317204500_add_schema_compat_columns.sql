@@ -1,6 +1,8 @@
 -- Restore legacy compatibility columns required by current backend controllers/services.
 BEGIN;
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- menu_categories compatibility
 ALTER TABLE IF EXISTS menu_categories
   ADD COLUMN IF NOT EXISTS name_ar TEXT,
@@ -9,9 +11,24 @@ ALTER TABLE IF EXISTS menu_categories
   ADD COLUMN IF NOT EXISTS image_url TEXT,
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
-UPDATE menu_categories
-SET display_order = COALESCE(display_order, sort_order, 0)
-WHERE display_order IS NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'menu_categories'
+      AND column_name = 'sort_order'
+  ) THEN
+    UPDATE menu_categories
+    SET display_order = COALESCE(display_order, sort_order, 0)
+    WHERE display_order IS NULL;
+  ELSE
+    UPDATE menu_categories
+    SET display_order = COALESCE(display_order, 0)
+    WHERE display_order IS NULL;
+  END IF;
+END $$;
 
 UPDATE menu_categories
 SET updated_at = COALESCE(updated_at, created_at, now())
@@ -57,6 +74,7 @@ ALTER TABLE IF EXISTS snack_items
   ADD COLUMN IF NOT EXISTS description_ar TEXT,
   ADD COLUMN IF NOT EXISTS description_fr TEXT,
   ADD COLUMN IF NOT EXISTS category TEXT,
+  ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS image_url TEXT,
   ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now(),
@@ -82,6 +100,7 @@ ALTER TABLE IF EXISTS chalets
   ADD COLUMN IF NOT EXISTS description_fr TEXT,
   ADD COLUMN IF NOT EXISTS bedroom_count INTEGER,
   ADD COLUMN IF NOT EXISTS bathroom_count INTEGER,
+  ADD COLUMN IF NOT EXISTS size_sqm INTEGER,
   ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false,
   ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS image_url TEXT;
@@ -103,6 +122,11 @@ WHERE updated_at IS NULL;
 
 -- pool_tickets compatibility (legacy date/quantity/total_price -> modern ticket schema)
 ALTER TABLE IF EXISTS pool_tickets
+  ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS date DATE,
+  ADD COLUMN IF NOT EXISTS quantity INTEGER,
+  ADD COLUMN IF NOT EXISTS total_price NUMERIC(10,2),
+  ADD COLUMN IF NOT EXISTS status VARCHAR(50),
   ADD COLUMN IF NOT EXISTS ticket_number VARCHAR(50),
   ADD COLUMN IF NOT EXISTS session_id UUID REFERENCES pool_sessions(id),
   ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id),
@@ -151,13 +175,10 @@ SET tax_amount = COALESCE(tax_amount, 0)
 WHERE tax_amount IS NULL;
 
 UPDATE pool_tickets
-SET payment_status = COALESCE(
-  payment_status,
-  CASE
-    WHEN status = 'used' THEN 'paid'
-    ELSE 'pending'
-  END
-)
+SET payment_status = CASE
+  WHEN status = 'used' THEN 'paid'::payment_status
+  ELSE 'pending'::payment_status
+END
 WHERE payment_status IS NULL;
 
 UPDATE pool_tickets
@@ -232,6 +253,11 @@ VALUES
   ('customer', 'Customer', 'Registered customer', NULL)
 ON CONFLICT (name) DO NOTHING;
 
+ALTER TABLE IF EXISTS users
+  ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'customer',
+  ADD COLUMN IF NOT EXISTS roles TEXT[] DEFAULT ARRAY['customer']::TEXT[],
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
 INSERT INTO users (
   email,
   password_hash,
@@ -244,7 +270,7 @@ INSERT INTO users (
 VALUES
   (
     'admin@v2resort.com',
-    crypt('admin123', gen_salt('bf')),
+    extensions.crypt('admin123', extensions.gen_salt('bf')),
     'System Administrator',
     'super_admin',
     ARRAY['super_admin']::TEXT[],
@@ -253,7 +279,7 @@ VALUES
   ),
   (
     'restaurant.staff@v2resort.com',
-    crypt('staff123', gen_salt('bf')),
+    extensions.crypt('staff123', extensions.gen_salt('bf')),
     'Restaurant Staff',
     'restaurant_staff',
     ARRAY['restaurant_staff']::TEXT[],
@@ -262,7 +288,7 @@ VALUES
   ),
   (
     'e2e.customer@test.com',
-    crypt('TestPass123!', gen_salt('bf')),
+    extensions.crypt('TestPass123!', extensions.gen_salt('bf')),
     'Test Customer',
     'customer',
     ARRAY['customer']::TEXT[],
@@ -308,31 +334,66 @@ ALTER TABLE IF EXISTS audit_logs
   ADD COLUMN IF NOT EXISTS user_agent TEXT;
 
 -- minimal baseline data for local end-to-end journeys
-WITH restaurant_module AS (
-  SELECT id FROM modules WHERE slug = 'restaurant' LIMIT 1
-)
-INSERT INTO menu_categories (
-  name,
-  description,
-  sort_order,
-  is_active,
-  module_id,
-  display_order
-)
-SELECT
-  'Main Dishes',
-  'Seeded category for local E2E validation',
-  1,
-  true,
-  rm.id,
-  1
-FROM restaurant_module rm
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM menu_categories mc
-  WHERE mc.module_id = rm.id
-    AND lower(mc.name) = 'main dishes'
-);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'menu_categories'
+      AND column_name = 'sort_order'
+  ) THEN
+    WITH restaurant_module AS (
+      SELECT id FROM modules WHERE slug = 'restaurant' LIMIT 1
+    )
+    INSERT INTO menu_categories (
+      name,
+      description,
+      sort_order,
+      is_active,
+      module_id,
+      display_order
+    )
+    SELECT
+      'Main Dishes',
+      'Seeded category for local E2E validation',
+      1,
+      true,
+      rm.id,
+      1
+    FROM restaurant_module rm
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM menu_categories mc
+      WHERE mc.module_id = rm.id
+        AND lower(mc.name) = 'main dishes'
+    );
+  ELSE
+    WITH restaurant_module AS (
+      SELECT id FROM modules WHERE slug = 'restaurant' LIMIT 1
+    )
+    INSERT INTO menu_categories (
+      name,
+      description,
+      is_active,
+      module_id,
+      display_order
+    )
+    SELECT
+      'Main Dishes',
+      'Seeded category for local E2E validation',
+      true,
+      rm.id,
+      1
+    FROM restaurant_module rm
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM menu_categories mc
+      WHERE mc.module_id = rm.id
+        AND lower(mc.name) = 'main dishes'
+    );
+  END IF;
+END $$;
 
 WITH restaurant_module AS (
   SELECT id FROM modules WHERE slug = 'restaurant' LIMIT 1
@@ -411,6 +472,8 @@ INSERT INTO chalets (
   base_price,
   weekend_price,
   capacity,
+  bedroom_count,
+  bathroom_count,
   size_sqm,
   is_active,
   module_id,
@@ -423,6 +486,8 @@ SELECT
   180.00,
   220.00,
   4,
+  2,
+  1,
   65,
   true,
   cm.id,
@@ -436,39 +501,54 @@ WHERE NOT EXISTS (
     AND lower(c.name) = 'sunset chalet'
 );
 
-WITH pool_module AS (
-  SELECT id FROM modules WHERE slug = 'pool' LIMIT 1
-)
-INSERT INTO pool_sessions (
-  name,
-  start_time,
-  end_time,
-  max_capacity,
-  price,
-  is_active,
-  module_id,
-  adult_price,
-  child_price,
-  gender_restriction
-)
-SELECT
-  'Morning Swim Session',
-  '09:00:00'::time,
-  '12:00:00'::time,
-  120,
-  25.00,
-  true,
-  pm.id,
-  25.00,
-  15.00,
-  'mixed'
-FROM pool_module pm
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM pool_sessions ps
-  WHERE ps.module_id = pm.id
-    AND ps.is_active = true
-);
+DO $$
+DECLARE
+  v_pool_module_id UUID;
+BEGIN
+  SELECT id
+  INTO v_pool_module_id
+  FROM modules
+  WHERE slug = 'pool'
+  LIMIT 1;
+
+  IF v_pool_module_id IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1
+       FROM pool_sessions ps
+       WHERE ps.module_id = v_pool_module_id
+         AND ps.is_active = true
+     ) THEN
+    BEGIN
+      INSERT INTO pool_sessions (
+        name,
+        start_time,
+        end_time,
+        max_capacity,
+        price,
+        is_active,
+        module_id,
+        adult_price,
+        child_price,
+        gender_restriction
+      )
+      VALUES (
+        'Morning Swim Session',
+        '09:00:00'::time,
+        '12:00:00'::time,
+        120,
+        25.00,
+        true,
+        v_pool_module_id,
+        25.00,
+        15.00,
+        'mixed'
+      );
+    EXCEPTION
+      WHEN OTHERS THEN
+        RAISE NOTICE 'Skipping pool_sessions baseline insert in schema-compat migration: %', SQLERRM;
+    END;
+  END IF;
+END $$;
 
 -- Helpful indexes for common module-scoped filters
 CREATE INDEX IF NOT EXISTS idx_menu_items_module_id ON menu_items(module_id);

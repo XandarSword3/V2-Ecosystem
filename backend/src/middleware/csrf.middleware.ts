@@ -20,6 +20,14 @@ import { logger } from '../utils/logger.js';
 const CSRF_COOKIE_NAME = 'csrf-token';
 const CSRF_HEADER_NAME = 'x-csrf-token';
 const CSRF_TOKEN_LENGTH = 32;
+type CookieSameSite = 'strict' | 'lax' | 'none';
+
+const configuredSameSite = (process.env.CSRF_COOKIE_SAMESITE || '').toLowerCase();
+const CSRF_COOKIE_SAME_SITE: CookieSameSite =
+  configuredSameSite === 'none' || configuredSameSite === 'lax' || configuredSameSite === 'strict'
+    ? configuredSameSite
+    : (process.env.NODE_ENV === 'production' ? 'none' : 'strict');
+const CSRF_COOKIE_SECURE = process.env.NODE_ENV === 'production' || CSRF_COOKIE_SAME_SITE === 'none';
 
 // Methods that don't require CSRF protection (safe methods)
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
@@ -56,8 +64,8 @@ export function generateCsrfToken(): string {
 export function setCsrfCookie(res: Response, token: string): void {
   res.cookie(CSRF_COOKIE_NAME, token, {
     httpOnly: false, // Must be readable by JavaScript to include in header
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict', // Strict same-site enforcement for CSRF protection
+    secure: CSRF_COOKIE_SECURE,
+    sameSite: CSRF_COOKIE_SAME_SITE,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
   });

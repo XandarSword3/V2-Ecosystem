@@ -169,7 +169,7 @@ export default function SnackCartPage() {
               {t('yourCart')}
             </h1>
             <p className="text-slate-600 dark:text-slate-400">
-              {snackItems.length} {tCommon('items')}
+              {snackItems.length} {tCommon('items', { count: snackItems.length })}
             </p>
           </div>
         </motion.div>
