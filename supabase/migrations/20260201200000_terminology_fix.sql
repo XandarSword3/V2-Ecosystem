@@ -18,12 +18,14 @@ CREATE INDEX IF NOT EXISTS idx_terminology_lookup
 ALTER TABLE terminology_overrides ENABLE ROW LEVEL SECURITY;
 
 -- Allow all users to read terminology
-CREATE POLICY IF NOT EXISTS "Allow public read access to terminology" 
+DROP POLICY IF EXISTS "Allow public read access to terminology" ON terminology_overrides;
+CREATE POLICY "Allow public read access to terminology"
     ON terminology_overrides FOR SELECT USING (true);
 
 -- Allow authenticated admins to modify
-CREATE POLICY IF NOT EXISTS "Allow admin write access to terminology" 
-    ON terminology_overrides FOR ALL 
+DROP POLICY IF EXISTS "Allow admin write access to terminology" ON terminology_overrides;
+CREATE POLICY "Allow admin write access to terminology"
+    ON terminology_overrides FOR ALL
     USING (true)
     WITH CHECK (true);
 

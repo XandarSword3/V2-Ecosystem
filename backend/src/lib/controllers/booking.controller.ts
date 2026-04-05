@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 import type { Request, Response } from 'express';
-import type { BookingService } from '../services/booking.service.js';
+import type { BookingService } from '../services/index.js';
 import type { LoggerService } from '../container/types.js';
 import { isErrorWithStatusCode, getErrorMessage } from '../../types/index.js';
 
@@ -79,13 +79,13 @@ export interface BookingController {
   // Public
   createBooking: (req: Request, res: Response) => Promise<void>;
   getAvailability: (req: Request, res: Response) => Promise<void>;
-  
+
   // Customer
   getBookingById: (req: Request, res: Response) => Promise<void>;
   getBookingByNumber: (req: Request, res: Response) => Promise<void>;
   getMyBookings: (req: Request, res: Response) => Promise<void>;
   cancelBooking: (req: Request, res: Response) => Promise<void>;
-  
+
   // Staff
   getBookings: (req: Request, res: Response) => Promise<void>;
   getTodayBookings: (req: Request, res: Response) => Promise<void>;
@@ -154,7 +154,7 @@ export function createBookingController(deps: BookingControllerDeps): BookingCon
       try {
         const { id } = req.params;
         const validation = availabilityQuerySchema.safeParse(req.query);
-        
+
         if (!validation.success) {
           res.status(400).json({
             error: 'startDate and endDate are required',

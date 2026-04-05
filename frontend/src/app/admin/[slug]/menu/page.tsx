@@ -128,7 +128,7 @@ export default function DynamicMenuPage() {
       const [menuRes, catRes, ingredientsRes, groupsRes] = await Promise.all([
         api.get('/restaurant/items', { params: { moduleId: currentModule.id } }),
         api.get('/restaurant/categories', { params: { moduleId: currentModule.id } }),
-        api.get('/inventory/ingredients', { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
+        api.get('/inventory/items', { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
         api.get('/restaurant/customization-groups', { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
       ]);
       setItems(menuRes.data.data || []);

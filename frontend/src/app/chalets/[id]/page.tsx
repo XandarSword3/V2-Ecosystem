@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import AvailabilityCalendar from '@/components/chalets/AvailabilityCalendar';
 import {
   Loader2,
   Home,
@@ -102,6 +103,7 @@ export default function ChaletDetailPage() {
   const [specialRequests, setSpecialRequests] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [dailyPricesMap, setDailyPricesMap] = useState<Record<string, { price: number; type: string; ruleName?: string; isBlocked: boolean }>>({});
 
   // Fetch chalet details
   const { data: chaletData, isLoading: chaletLoading, error: chaletError } = useQuery({
@@ -125,6 +127,30 @@ export default function ChaletDetailPage() {
       setCustomerEmail(user.email || '');
     }
   }, [user]);
+
+  // Fetch daily prices for the calendar (next 3 months)
+  useEffect(() => {
+    if (!chalet) return;
+    const fetchDailyPrices = async () => {
+      try {
+        const startDate = new Date().toISOString().split('T')[0];
+        const endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const response = await api.get(`/chalets/${chalet.id}/daily-prices`, { params: { startDate, endDate } });
+        const prices = response.data?.data?.dailyPrices || [];
+        const priceMap: Record<string, { price: number; type: string; ruleName?: string; isBlocked: boolean }> = {};
+        prices.forEach((dp: { date: string; price: number; type: string; ruleName?: string; isBlocked: boolean }) => {
+          priceMap[dp.date] = { price: dp.price, type: dp.type, ruleName: dp.ruleName, isBlocked: dp.isBlocked };
+        });
+        setDailyPricesMap(priceMap);
+        // Extract blocked dates from the daily prices response
+        const blocked = prices.filter((dp: { isBlocked: boolean }) => dp.isBlocked).map((dp: { date: string }) => dp.date);
+        setBlockedDates(blocked);
+      } catch (error) {
+        console.error('Failed to fetch daily prices:', error);
+      }
+    };
+    fetchDailyPrices();
+  }, [chalet]);
 
   // Fetch availability when dates change
   useEffect(() => {
@@ -155,14 +181,31 @@ export default function ChaletDetailPage() {
 
     let baseAmount = 0;
     const current = new Date(checkIn);
+    const nightBreakdown: Array<{ date: string; price: number; type: string }> = [];
     
     while (current < checkOut) {
-      const dayOfWeek = current.getDay();
-      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Friday or Saturday
-      const nightPrice = isWeekend 
-        ? (chalet.weekend_price || chalet.base_price || 0) 
-        : (chalet.base_price || 0);
+      const dateStr = current.toISOString().split('T')[0];
+      const dailyPrice = dailyPricesMap[dateStr];
+      
+      let nightPrice: number;
+      let nightType: string;
+      
+      if (dailyPrice) {
+        // Use engine-calculated price (includes price rules, seasonal adjustments)
+        nightPrice = dailyPrice.price;
+        nightType = dailyPrice.type;
+      } else {
+        // Fallback to chalet base prices if daily prices not loaded
+        const dayOfWeek = current.getDay();
+        const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+        nightPrice = isWeekend 
+          ? (chalet.weekend_price || chalet.base_price || 0) 
+          : (chalet.base_price || 0);
+        nightType = isWeekend ? 'weekend' : 'weekday';
+      }
+      
       baseAmount += nightPrice;
+      nightBreakdown.push({ date: dateStr, price: nightPrice, type: nightType });
       current.setDate(current.getDate() + 1);
     }
 
@@ -178,7 +221,7 @@ export default function ChaletDetailPage() {
     const depositAmount = baseAmount * 0.3;
     const totalAmount = baseAmount + addOnsAmount;
 
-    return { nights, baseAmount, addOnsAmount, depositAmount, totalAmount };
+    return { nights, baseAmount, addOnsAmount, depositAmount, totalAmount, nightBreakdown };
   };
 
   const pricing = calculatePricing();
@@ -427,31 +470,19 @@ export default function ChaletDetailPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Dates */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('checkIn')}</label>
-                      <input
-                        type="date"
-                        value={checkInDate}
-                        onChange={(e) => setCheckInDate(e.target.value)}
-                        min={new Date().toISOString().split('T')[0]}
-                        className="input w-full"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('checkOut')}</label>
-                      <input
-                        type="date"
-                        value={checkOutDate}
-                        onChange={(e) => setCheckOutDate(e.target.value)}
-                        min={checkInDate || new Date().toISOString().split('T')[0]}
-                        className="input w-full"
-                        required
-                      />
-                    </div>
-                  </div>
+                  {/* Availability Calendar with Daily Prices */}
+                  <AvailabilityCalendar
+                    blockedDates={blockedDates}
+                    selectedCheckIn={checkInDate || undefined}
+                    selectedCheckOut={checkOutDate || undefined}
+                    onDateSelect={(checkIn, checkOut) => {
+                      setCheckInDate(checkIn);
+                      setCheckOutDate(checkOut || '');
+                    }}
+                    dailyPrices={dailyPricesMap as Record<string, { price: number; type: 'weekday' | 'weekend' | 'holiday' | 'seasonal'; ruleName?: string; isBlocked: boolean }>}
+                    formatPrice={(amount) => formatCurrency(amount, currency)}
+                    maxMonthsAhead={3}
+                  />
 
                   {/* Guests */}
                   <div>
@@ -582,6 +613,20 @@ export default function ChaletDetailPage() {
                         <span>{pricing.nights} {pricing.nights === 1 ? 'night' : 'nights'}</span>
                         <span>{formatCurrency(pricing.baseAmount, currency)}</span>
                       </div>
+                      {/* Nightly breakdown */}
+                      {pricing.nightBreakdown && pricing.nightBreakdown.length > 0 && pricing.nightBreakdown.length <= 14 && (
+                        <div className="space-y-1 pl-2 border-l-2 border-slate-200 dark:border-slate-600 ml-1">
+                          {pricing.nightBreakdown.map((night) => {
+                            const typeLabel = { weekday: '', weekend: '(weekend)', holiday: '(holiday)', seasonal: '(seasonal)' }[night.type] || '';
+                            return (
+                              <div key={night.date} className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                                <span>{new Date(night.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} {typeLabel}</span>
+                                <span>{formatCurrency(night.price, currency)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                       {pricing.addOnsAmount > 0 && (
                         <div className="flex justify-between text-sm">
                           <span>{t('addOns')}</span>

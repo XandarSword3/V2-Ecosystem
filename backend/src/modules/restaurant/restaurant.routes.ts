@@ -8,6 +8,19 @@ import { modifiersController } from './modifiers.controller.js';
 import { getSupabase } from '../../database/connection.js';
 import { emailService } from '../../services/email.service.js';
 import { logger } from '../../utils/logger.js';
+import { z } from 'zod';
+
+// FIX: Issue 11 — Zod validation for reservation updates
+const updateReservationSchema = z.object({
+  status: z.enum(['PENDING', 'CONFIRMED', 'SEATED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']).optional(),
+  table_id: z.string().uuid().optional(),
+  party_size: z.number().int().positive().max(50).optional(),
+  guest_name: z.string().min(1).max(100).optional(),
+  special_requests: z.string().max(500).optional(),
+  notes: z.string().max(500).optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD format').optional(),
+  time: z.string().regex(/^\d{2}:\d{2}$/, 'Time must be HH:MM format').optional(),
+}).strict();
 
 const router = Router();
 
@@ -39,11 +52,10 @@ router.get('/my-orders', authenticate, orderController.getMyOrders);
 // Staff Routes
 // ============================================
 const staffRoles = [
-  'staff', 
-  'restaurant_staff', 'restaurant_admin', 
+  'staff',
+  'restaurant_staff', 'restaurant_admin',
   'snack_bar_staff', 'snack_bar_admin',
-  'chalet_staff', 'chalet_admin',
-  'pool_staff', 'pool_admin',
+  'admin',
   'super_admin'
 ];
 
@@ -55,6 +67,7 @@ router.put('/staff/orders/:id/status', authenticate, authorize(...staffRoles), o
 // Tables - Public (for reservations)
 router.get('/tables', tableController.getTables);
 router.get('/tables/available', tableController.getTables); // Simplified: returns all active tables
+router.get('/tables/:id/qr', tableController.getTableQRCode); // Generate QR code for table ordering
 
 // Tables - Staff
 router.get('/staff/tables', authenticate, authorize(...staffRoles), tableController.getTables);
@@ -69,16 +82,16 @@ router.get('/reservations', authenticate, authorize(...staffRoles), async (req: 
   try {
     const supabase = getSupabase();
     const { date, status, table_id } = req.query;
-    
+
     let query = supabase
       .from('table_reservations')
       .select(`
         *,
-        restaurant_tables (id, table_number, section, capacity)
+        restaurant_tables (id, number, section, capacity)
       `)
       .order('date', { ascending: true })
       .order('time', { ascending: true });
-    
+
     if (date) {
       query = query.eq('date', date as string);
     }
@@ -88,9 +101,9 @@ router.get('/reservations', authenticate, authorize(...staffRoles), async (req: 
     if (table_id) {
       query = query.eq('table_id', table_id as string);
     }
-    
+
     const { data, error } = await query;
-    
+
     if (error) {
       logger.error('Failed to fetch reservations:', error.message, 'code:', error.code, 'details:', error.details);
       // If table doesn't exist, return empty array gracefully
@@ -99,7 +112,7 @@ router.get('/reservations', authenticate, authorize(...staffRoles), async (req: 
       }
       return res.status(500).json({ success: false, error: 'Failed to fetch reservations' });
     }
-    
+
     res.json({ success: true, data: data || [] });
   } catch (error) {
     logger.error('Error fetching reservations:', error);
@@ -112,33 +125,33 @@ router.get('/reservations/availability', async (req: Request, res: Response) => 
   try {
     const supabase = getSupabase();
     const { date, party_size } = req.query;
-    
+
     if (!date) {
       return res.status(400).json({ success: false, error: 'Date is required' });
     }
-    
+
     // Get all available tables
     const { data: tables, error: tablesError } = await supabase
       .from('restaurant_tables')
       .select('id, number, section, capacity, status')
       .eq('is_active', true)
       .gte('capacity', parseInt(party_size as string || '1', 10));
-    
+
     if (tablesError) {
       return res.status(500).json({ success: false, error: 'Failed to fetch tables' });
     }
-    
+
     // Get reservations for that date
     const { data: reservations, error: resError } = await supabase
       .from('table_reservations')
       .select('table_id, time, end_time, status')
       .eq('date', date as string)
       .in('status', ['CONFIRMED', 'PENDING', 'SEATED']);
-    
+
     if (resError) {
       return res.status(500).json({ success: false, error: 'Failed to fetch reservations' });
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -167,7 +180,7 @@ router.post('/reservations', rateLimits.write, async (req: Request, res: Respons
       guest_email,
       special_requests
     } = req.body;
-    
+
     // Validate required fields
     if (!date || !time || !party_size || !guest_name || !guest_phone) {
       return res.status(400).json({
@@ -175,10 +188,10 @@ router.post('/reservations', rateLimits.write, async (req: Request, res: Respons
         error: 'Missing required fields: date, time, party_size, guest_name, guest_phone'
       });
     }
-    
+
     // Calculate end_time if not provided (default 2 hours)
     const calculatedEndTime = end_time || calculateEndTime(time);
-    
+
     // Check for conflicts if table_id provided
     if (table_id) {
       const { data: conflicts } = await supabase
@@ -188,7 +201,7 @@ router.post('/reservations', rateLimits.write, async (req: Request, res: Respons
         .eq('date', date)
         .in('status', ['CONFIRMED', 'PENDING', 'SEATED'])
         .or(`time.lte.${calculatedEndTime},end_time.gte.${time}`);
-      
+
       if (conflicts && conflicts.length > 0) {
         return res.status(409).json({
           success: false,
@@ -196,7 +209,7 @@ router.post('/reservations', rateLimits.write, async (req: Request, res: Respons
         });
       }
     }
-    
+
     // Create reservation
     const { data: reservation, error } = await supabase
       .from('table_reservations')
@@ -214,12 +227,12 @@ router.post('/reservations', rateLimits.write, async (req: Request, res: Respons
       })
       .select()
       .single();
-    
+
     if (error) {
       logger.error('Failed to create reservation:', error.message);
       return res.status(500).json({ success: false, error: 'Failed to create reservation' });
     }
-    
+
     // Send confirmation email if email provided
     if (guest_email && reservation) {
       try {
@@ -242,7 +255,7 @@ router.post('/reservations', rateLimits.write, async (req: Request, res: Respons
         // Don't fail the reservation if email fails
       }
     }
-    
+
     res.status(201).json({ success: true, data: reservation });
   } catch (error) {
     logger.error('Error creating reservation:', error);
@@ -255,9 +268,27 @@ router.patch('/reservations/:id', authenticate, authorize(...staffRoles), async 
   try {
     const supabase = getSupabase();
     const { id } = req.params;
-    const updates = req.body;
     const userId = req.user?.id;
-    
+
+    // FIX: Issue 11 — Validate with Zod before processing
+    const validation = updateReservationSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: validation.error.errors,
+      });
+    }
+
+    // Whitelist allowed update fields to prevent mass assignment
+    const allowedFields = ['status', 'table_id', 'party_size', 'guest_name', 'special_requests', 'notes', 'date', 'time'];
+    const updates: Record<string, any> = {};
+    for (const field of allowedFields) {
+      if (validation.data[field as keyof typeof validation.data] !== undefined) {
+        updates[field] = validation.data[field as keyof typeof validation.data];
+      }
+    }
+
     // Add audit fields based on status
     if (updates.status === 'CONFIRMED') {
       updates.confirmed_at = new Date().toISOString();
@@ -273,19 +304,19 @@ router.patch('/reservations/:id', authenticate, authorize(...staffRoles), async 
       updates.no_show_marked_at = new Date().toISOString();
       updates.no_show_marked_by = userId;
     }
-    
+
     const { data, error } = await supabase
       .from('table_reservations')
       .update(updates)
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) {
       logger.error('Failed to update reservation:', error.message);
       return res.status(500).json({ success: false, error: 'Failed to update reservation' });
     }
-    
+
     res.json({ success: true, data });
   } catch (error) {
     logger.error('Error updating reservation:', error);
@@ -299,23 +330,23 @@ router.post('/reservations/:id/assign-table', authenticate, authorize(...staffRo
     const supabase = getSupabase();
     const { id } = req.params;
     const { table_id } = req.body;
-    
+
     if (!table_id) {
       return res.status(400).json({ success: false, error: 'table_id is required' });
     }
-    
+
     const { data, error } = await supabase
       .from('table_reservations')
       .update({ table_id })
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) {
       logger.error('Failed to assign table:', error.message);
       return res.status(500).json({ success: false, error: 'Failed to assign table' });
     }
-    
+
     res.json({ success: true, data });
   } catch (error) {
     logger.error('Error assigning table:', error);
@@ -328,20 +359,20 @@ router.get('/reservations/:id', authenticate, authorize(...staffRoles), async (r
   try {
     const supabase = getSupabase();
     const { id } = req.params;
-    
+
     const { data, error } = await supabase
       .from('table_reservations')
       .select(`
         *,
-        restaurant_tables (id, table_number, section, capacity)
+        restaurant_tables (id, number, section, capacity)
       `)
       .eq('id', id)
       .single();
-    
+
     if (error) {
       return res.status(404).json({ success: false, error: 'Reservation not found' });
     }
-    
+
     res.json({ success: true, data });
   } catch (error) {
     logger.error('Error fetching reservation:', error);
@@ -360,7 +391,7 @@ function calculateEndTime(startTime: string): string {
 // Admin Routes (Menu Management)
 // ============================================
 const adminRoles = [
-  'restaurant_admin', 
+  'restaurant_admin',
   'snack_bar_admin',
   'chalet_admin',
   'pool_admin',

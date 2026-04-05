@@ -14,13 +14,20 @@ import { v4 as uuidv4 } from 'uuid';
 interface KioskDevice {
   id: string;
   propertyId: string;
+  property_id: string;
   deviceName: string;
+  name: string;
   deviceCode: string;
   location?: string;
   deviceType: string;
-  capabilities: KioskCapabilities;
+  capabilities: any;
   status: string;
   config: Record<string, any>;
+  last_heartbeat?: string;
+  key_stock: number;
+  is_active: boolean;
+  error_count: number;
+  [key: string]: any;
 }
 
 interface KioskCapabilities {
@@ -118,7 +125,7 @@ class KioskService {
   async getDevice(deviceId: string): Promise<KioskDevice | null> {
     const { data: device, error } = await this.supabase
       .from('kiosk_devices')
-      .select('*')
+      .select('*, kiosk_key_stock(current_stock)')
       .eq('id', deviceId)
       .single();
 
@@ -129,7 +136,7 @@ class KioskService {
   async getDeviceByCode(propertyId: string, deviceCode: string): Promise<KioskDevice | null> {
     const { data: device, error } = await this.supabase
       .from('kiosk_devices')
-      .select('*')
+      .select('*, kiosk_key_stock(current_stock)')
       .eq('property_id', propertyId)
       .eq('device_code', deviceCode)
       .single();
@@ -141,7 +148,7 @@ class KioskService {
   async getPropertyDevices(propertyId: string, includeInactive = false): Promise<KioskDevice[]> {
     let query = this.supabase
       .from('kiosk_devices')
-      .select('*')
+      .select('*, kiosk_key_stock(current_stock)')
       .eq('property_id', propertyId)
       .order('device_code');
 
@@ -1191,25 +1198,48 @@ class KioskService {
   // =============================================
 
   private mapDevice(row: any): KioskDevice {
+    // Build capabilities as both object and string array for frontend compatibility
+    const capabilityMap: Record<string, boolean> = {
+      id_scanner: row.has_id_scanner,
+      card_reader: row.has_card_reader,
+      key_encoder: row.has_key_encoder,
+      receipt_printer: row.has_receipt_printer,
+      signature_pad: row.has_signature_pad,
+      camera: row.has_camera,
+      cash_acceptor: row.has_cash_acceptor,
+      card_dispenser: row.has_card_dispenser
+    };
+    const capabilitiesArray = Object.entries(capabilityMap)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+
+    // Attach boolean accessors for internal use (e.g. device.capabilities.hasKeyEncoder)
+    const capabilities: any = capabilitiesArray;
+    capabilities.hasIdScanner = !!row.has_id_scanner;
+    capabilities.hasCardReader = !!row.has_card_reader;
+    capabilities.hasKeyEncoder = !!row.has_key_encoder;
+    capabilities.hasReceiptPrinter = !!row.has_receipt_printer;
+    capabilities.hasSignaturePad = !!row.has_signature_pad;
+    capabilities.hasCamera = !!row.has_camera;
+    capabilities.hasCashAcceptor = !!row.has_cash_acceptor;
+    capabilities.hasCardDispenser = !!row.has_card_dispenser;
+
     return {
       id: row.id,
       propertyId: row.property_id,
+      property_id: row.property_id,
       deviceName: row.device_name,
+      name: row.device_name,
       deviceCode: row.device_code,
       location: row.location,
       deviceType: row.device_type,
-      capabilities: {
-        hasIdScanner: row.has_id_scanner,
-        hasCardReader: row.has_card_reader,
-        hasKeyEncoder: row.has_key_encoder,
-        hasReceiptPrinter: row.has_receipt_printer,
-        hasSignaturePad: row.has_signature_pad,
-        hasCamera: row.has_camera,
-        hasCashAcceptor: row.has_cash_acceptor,
-        hasCardDispenser: row.has_card_dispenser
-      },
+      capabilities,
       status: row.status,
-      config: row.config || {}
+      config: row.config || {},
+      last_heartbeat: row.last_heartbeat,
+      key_stock: row.kiosk_key_stock?.[0]?.current_stock ?? row.kiosk_key_stock?.current_stock ?? 0,
+      is_active: row.is_active ?? true,
+      error_count: row.error_count ?? 0,
     };
   }
 

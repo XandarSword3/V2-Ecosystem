@@ -15,7 +15,7 @@ export class StaffBot {
   private botId: number;
   private isTrainee: boolean;
   private isRunning = false;
-  
+
   // Cached work items
   private pendingOrders: any[] = [];
   private todayBookings: any[] = [];
@@ -38,22 +38,22 @@ export class StaffBot {
   async initializeWithCredentials(email: string, password: string): Promise<boolean> {
     // Try to login first
     let success = await this.api.login(email, password);
-    
+
     if (!success) {
       // Try alternate passwords (seeded accounts might use 'staff123')
       success = await this.api.login(email, 'staff123');
     }
-    
+
     if (!success) {
       this.logger.warn(`Could not login as ${email}, credentials may not exist`);
       return false;
     }
 
     this.logger.success(`Logged in as ${this.isTrainee ? 'Trainee' : 'Staff'} ${email}`);
-    
+
     // Load initial work data
     await this.refreshWorkData();
-    
+
     return true;
   }
 
@@ -97,8 +97,8 @@ export class StaffBot {
     if (modulesRes.success && modulesRes.data) {
       const modules = Array.isArray(modulesRes.data) ? modulesRes.data : (modulesRes.data.modules || []);
       this.dynamicModuleSlugs = modules
-        .filter((m: any) => 
-          m.template_type === 'menu_service' && 
+        .filter((m: any) =>
+          m.template_type === 'menu_service' &&
           m.is_active &&
           !['restaurant', 'snack-bar'].includes(m.slug)
         )
@@ -115,19 +115,19 @@ export class StaffBot {
       // 1. Prioritize processing pending orders
       // 2. Refresh orders periodically
       // 3. Handle other tasks when no orders pending
-      
+
       let action: string;
-      
+
       // Always check for orders first
       if (this.pendingOrders.length === 0) {
         // Refresh orders from API
         action = 'VIEW_LIVE_ORDERS';
       } else {
         // Find orders that need to be advanced
-        const orderToProcess = this.pendingOrders.find(o => 
+        const orderToProcess = this.pendingOrders.find(o =>
           o.status && this.shouldAdvanceOrder(o)
         );
-        
+
         if (orderToProcess) {
           // Process orders that are ready to be advanced
           action = 'UPDATE_ORDER_STATUS';
@@ -136,39 +136,42 @@ export class StaffBot {
           action = weightedRandom(CONFIG.STAFF_ACTIONS);
         }
       }
-      
+
       await this.performAction(action);
       await randomDelay(CONFIG.STAFF_ACTION_INTERVAL.min, CONFIG.STAFF_ACTION_INTERVAL.max);
     }
   }
 
   // Check if an order should be advanced based on realistic timing
-  // Timings are accelerated for stress testing (real-world would be 5-10x longer)
+  // Timings are adjusted for realism (30s - 4m per stage)
   private shouldAdvanceOrder(order: any): boolean {
     const now = Date.now();
     const createdAt = new Date(order.created_at || order.createdAt || now).getTime();
     const ageSeconds = (now - createdAt) / 1000;
-    
-    // Use deterministic thresholds based on order ID to avoid randomness on each check
-    const orderHash = order.id ? order.id.charCodeAt(0) % 10 : 0;
-    
-    // Accelerated timing for stress test (fixed thresholds)
+
+    // Use deterministic variance based on order ID
+    // Using % 60 gives us up to 60 seconds of variance
+    const orderHash = order.id ? order.id.charCodeAt(0) % 60 : 0;
+    const isComplex = orderHash > 30; // Some orders are "complex"
+    const complexityFactor = isComplex ? 1.5 : 1.0;
+
     switch (order.status) {
       case 'pending':
-        // Confirm orders within 5-10 seconds
-        return ageSeconds > (5 + orderHash % 5);
+        // Confirm orders within 15-45 seconds
+        return ageSeconds > (15 + (orderHash % 30));
       case 'confirmed':
-        // Start preparing after 8-15 seconds
-        return ageSeconds > (8 + orderHash % 7);
+        // Start preparing after 30-60 seconds (prep queue)
+        return ageSeconds > (30 + (orderHash % 30));
       case 'preparing':
-        // Ready after 15-25 seconds
-        return ageSeconds > (15 + orderHash % 10);
+        // Preparation takes 1-3 minutes * complexity
+        // Min 60s, Max ~240s
+        return ageSeconds > ((60 + (orderHash * 2)) * complexityFactor);
       case 'ready':
-        // Deliver after 5-10 seconds
-        return ageSeconds > (5 + orderHash % 5);
+        // Deliver after 30-90 seconds (waiter availability)
+        return ageSeconds > (30 + (orderHash % 60));
       case 'delivered':
-        // Complete after 3-6 seconds (finalize order)
-        return ageSeconds > (3 + orderHash % 3);
+        // Complete (payment/cleanup) after 1-2 minutes
+        return ageSeconds > (60 + (orderHash % 60));
       default:
         return false;
     }
@@ -239,22 +242,22 @@ export class StaffBot {
   private async viewLiveOrders(): Promise<boolean> {
     const module = randomElement(['restaurant', 'snack']) as 'restaurant' | 'snack';
     this.logger.action(`Checking live ${module} orders...`);
-    
+
     const result = await this.api.getLiveOrders(module);
-    
+
     if (result.success) {
       const orders = Array.isArray(result.data) ? result.data : (result.data?.orders || []);
       // Tag orders with their module for correct routing when updating
       orders.forEach((o: any) => o.module = module);
-      
+
       // MERGE orders instead of replacing - keep orders from other module
       const existingOtherModule = this.pendingOrders.filter(o => o.module !== module);
       // Filter out completed orders and merge
-      const activeNewOrders = orders.filter((o: any) => 
+      const activeNewOrders = orders.filter((o: any) =>
         o.status !== 'completed' && o.status !== 'cancelled'
       );
       this.pendingOrders = [...existingOtherModule, ...activeNewOrders];
-      
+
       this.logger.success(`Found ${orders.length} ${module} orders (${this.pendingOrders.length} total tracked)`);
     }
 
@@ -271,19 +274,19 @@ export class StaffBot {
     // Dynamic module staff endpoints may not exist yet - fail silently
     try {
       const result = await this.api.getModuleLiveOrders(slug);
-      
+
       if (result.success && result.data) {
         const orders = Array.isArray(result.data) ? result.data : (result.data?.orders || []);
         if (orders.length > 0) {
           orders.forEach((o: any) => o.module = slug);
-          
+
           // Merge with existing (keep orders from other modules)
           const existingOtherModule = this.pendingOrders.filter(o => o.module !== slug);
-          const activeNewOrders = orders.filter((o: any) => 
+          const activeNewOrders = orders.filter((o: any) =>
             o.status !== 'completed' && o.status !== 'cancelled'
           );
           this.pendingOrders = [...existingOtherModule, ...activeNewOrders];
-          
+
           this.logger.success(`Found ${orders.length} ${slug} orders`);
         }
       }
@@ -303,7 +306,7 @@ export class StaffBot {
     }
 
     // Find an order that can be advanced AND is ready based on realistic timing
-    const order = this.pendingOrders.find(o => 
+    const order = this.pendingOrders.find(o =>
       o.status && nextOrderStatus(o.status) !== null && this.shouldAdvanceOrder(o)
     );
 
@@ -322,7 +325,7 @@ export class StaffBot {
     if (!newStatus) return true;
 
     const module = order.module || (order.table_number !== undefined ? 'restaurant' : 'snack');
-    
+
     // Realistic status messages
     const statusEmoji: Record<string, string> = {
       'confirmed': '✅',
@@ -330,9 +333,9 @@ export class StaffBot {
       'ready': '🔔',
       'completed': '🎉'
     };
-    
+
     this.logger.action(`${statusEmoji[newStatus] || '📋'} Order ${order.id}: ${order.status} → ${newStatus}`);
-    
+
     // Use appropriate API based on module type
     let result;
     if (module === 'restaurant' || module === 'snack') {
@@ -341,7 +344,7 @@ export class StaffBot {
       // Dynamic module - use the module-specific endpoint
       result = await this.api.updateModuleOrderStatus(module, order.id, newStatus);
     }
-    
+
     if (result.success) {
       // Update local cache
       order.status = newStatus;
@@ -361,9 +364,9 @@ export class StaffBot {
 
   private async viewTodayBookings(): Promise<boolean> {
     this.logger.action('Checking today\'s bookings...');
-    
+
     const result = await this.api.getTodayBookings();
-    
+
     if (result.success) {
       this.todayBookings = Array.isArray(result.data) ? result.data : (result.data?.bookings || []);
       this.logger.success(`Found ${this.todayBookings.length} bookings for today`);
@@ -377,7 +380,7 @@ export class StaffBot {
     }
 
     // Find a booking pending check-in
-    const booking = this.todayBookings.find(b => 
+    const booking = this.todayBookings.find(b =>
       b.status === 'confirmed' || b.status === 'pending'
     );
 
@@ -387,9 +390,9 @@ export class StaffBot {
     }
 
     this.logger.action(`Checking in guest for booking ${booking.id}...`);
-    
+
     const result = await this.api.checkinGuest(booking.id);
-    
+
     if (result.success) {
       booking.status = 'checked_in';
       this.logger.success(`Guest checked in! Booking ${booking.id}`);
@@ -406,9 +409,9 @@ export class StaffBot {
     }
 
     this.logger.action(`Checking out guest for booking ${booking.id}...`);
-    
+
     const result = await this.api.checkoutGuest(booking.id);
-    
+
     if (result.success) {
       booking.status = 'checked_out';
       this.logger.success(`Guest checked out! Booking ${booking.id}`);
@@ -431,9 +434,9 @@ export class StaffBot {
     }
 
     this.logger.action(`Validating ticket ${ticket.code || ticket.id}...`);
-    
+
     const result = await this.api.validatePoolTicket(ticket.code || ticket.id);
-    
+
     if (result.success) {
       this.logger.success(`Ticket validated: ${result.data?.valid ? 'VALID' : 'INVALID'}`);
     }
@@ -441,7 +444,7 @@ export class StaffBot {
   }
 
   private async recordPoolEntry(): Promise<boolean> {
-    const ticket = this.todayTickets.find(t => 
+    const ticket = this.todayTickets.find(t =>
       t.status === 'valid' && !t.entered
     );
 
@@ -451,9 +454,9 @@ export class StaffBot {
     }
 
     this.logger.action(`Recording pool entry for ticket ${ticket.id}...`);
-    
+
     const result = await this.api.recordPoolEntry(ticket.id);
-    
+
     if (result.success) {
       ticket.entered = true;
       this.logger.success('Pool entry recorded');
@@ -470,9 +473,9 @@ export class StaffBot {
     }
 
     this.logger.action(`Recording pool exit for ticket ${ticket.id}...`);
-    
+
     const result = await this.api.recordPoolExit(ticket.id);
-    
+
     if (result.success) {
       ticket.exited = true;
       this.logger.success('Pool exit recorded');
@@ -482,9 +485,9 @@ export class StaffBot {
 
   private async viewPoolCapacity(): Promise<boolean> {
     this.logger.action('Checking pool capacity...');
-    
+
     const result = await this.api.getPoolCapacity();
-    
+
     if (result.success) {
       const capacity = result.data?.current || result.data?.capacity || 'unknown';
       this.logger.success(`Current pool capacity: ${capacity}`);
@@ -515,7 +518,7 @@ export class StaffBot {
 
   private async recordOrderPayment(): Promise<boolean> {
     // Find an order that needs payment
-    const order = this.pendingOrders.find(o => 
+    const order = this.pendingOrders.find(o =>
       o.payment_status === 'pending' || o.payment_status === 'unpaid'
     );
 
@@ -525,10 +528,10 @@ export class StaffBot {
     }
 
     this.logger.action(`Recording payment for ${order.module || 'restaurant'} order ${order.id}...`);
-    
+
     // Determine referenceType based on module
     const referenceType = order.module === 'snack' ? 'snack_order' : 'restaurant_order';
-    
+
     const result = await this.api.recordPayment({
       referenceType,
       referenceId: order.id,
@@ -546,7 +549,7 @@ export class StaffBot {
 
   private async recordBookingPayment(): Promise<boolean> {
     // Find a chalet booking that needs payment
-    const booking = this.todayBookings.find(b => 
+    const booking = this.todayBookings.find(b =>
       b.payment_status === 'pending' || b.payment_status === 'unpaid'
     );
 
@@ -557,7 +560,7 @@ export class StaffBot {
     }
 
     this.logger.action(`Recording payment for chalet booking ${booking.id}...`);
-    
+
     const result = await this.api.recordPayment({
       referenceType: 'chalet_booking',
       referenceId: booking.id,
@@ -575,7 +578,7 @@ export class StaffBot {
 
   private async recordTicketPayment(): Promise<boolean> {
     // Find a pool ticket that needs payment
-    const ticket = this.todayTickets.find(t => 
+    const ticket = this.todayTickets.find(t =>
       t.payment_status === 'pending' || t.payment_status === 'unpaid'
     );
 
@@ -586,7 +589,7 @@ export class StaffBot {
     }
 
     this.logger.action(`Recording payment for pool ticket ${ticket.id}...`);
-    
+
     const result = await this.api.recordPayment({
       referenceType: 'pool_ticket',
       referenceId: ticket.id,
@@ -604,9 +607,9 @@ export class StaffBot {
 
   private async viewTables(): Promise<boolean> {
     this.logger.action('Checking restaurant tables...');
-    
+
     const result = await this.api.getTables();
-    
+
     if (result.success) {
       this.tables = Array.isArray(result.data) ? result.data : (result.data?.tables || []);
       this.logger.success(`Found ${this.tables.length} tables`);

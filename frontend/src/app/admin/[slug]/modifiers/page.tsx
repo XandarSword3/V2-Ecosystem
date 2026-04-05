@@ -103,7 +103,7 @@ export default function DynamicModifiersPage() {
     if (!currentModule) return;
     try {
       setLoading(true);
-      const groupsRes = await api.get('/restaurant/admin/modifiers/groups', { 
+      const groupsRes = await api.get('/restaurant/modifiers', { 
         params: { moduleId: currentModule.id } 
       });
       setGroups(groupsRes.data.data || []);
@@ -174,10 +174,10 @@ export default function DynamicModifiersPage() {
       };
 
       if (editingGroup) {
-        await api.put(`/restaurant/admin/modifiers/groups/${editingGroup.id}`, payload);
+        await api.put(`/restaurant/modifiers/${editingGroup.id}`, payload);
         toast.success('Modifier group updated');
       } else {
-        await api.post('/restaurant/admin/modifiers/groups', payload);
+        await api.post('/restaurant/modifiers', payload);
         toast.success('Modifier group created');
       }
       setShowGroupModal(false);
@@ -192,7 +192,7 @@ export default function DynamicModifiersPage() {
   const deleteGroup = async (groupId: string) => {
     if (!confirm('Delete this modifier group and all its options?')) return;
     try {
-      await api.delete(`/restaurant/admin/modifiers/groups/${groupId}`);
+      await api.delete(`/restaurant/modifiers/${groupId}`);
       toast.success('Modifier group deleted');
       fetchData();
     } catch (error) {
@@ -247,10 +247,10 @@ export default function DynamicModifiersPage() {
       };
 
       if (editingOption) {
-        await api.put(`/restaurant/admin/modifiers/options/${editingOption.id}`, payload);
+        await api.put(`/restaurant/modifiers/options/${editingOption.id}`, payload);
         toast.success('Modifier option updated');
       } else {
-        await api.post(`/restaurant/admin/modifiers/groups/${selectedGroupId}/options`, payload);
+        await api.post(`/restaurant/modifiers/${selectedGroupId}/options`, payload);
         toast.success('Modifier option created');
       }
       setShowOptionModal(false);
@@ -265,7 +265,7 @@ export default function DynamicModifiersPage() {
   const deleteOption = async (optionId: string) => {
     if (!confirm('Delete this modifier option?')) return;
     try {
-      await api.delete(`/restaurant/admin/modifiers/options/${optionId}`);
+      await api.delete(`/restaurant/modifiers/options/${optionId}`);
       toast.success('Modifier option deleted');
       fetchData();
     } catch (error) {

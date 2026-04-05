@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Admin Complete Feature Coverage E2E Test
  * 
  * This test has the admin bot systematically try out EVERY admin feature.
@@ -67,6 +67,13 @@ const createdItems = {
 // HELPER FUNCTIONS
 // ============================================
 
+async function waitForStableUI(page: Page): Promise<void> {
+  try {
+    await page.waitForLoadState('networkidle', { timeout: 10000 });
+  } catch {
+    await page.locator('main, [role="main"], body').first().waitFor({ state: 'visible', timeout: 10000 });
+  }
+}
 async function loginAsAdmin(page: Page, retries = 3): Promise<boolean> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -76,9 +83,7 @@ async function loginAsAdmin(page: Page, retries = 3): Promise<boolean> {
       await page.waitForSelector('input[type="email"]', { state: 'visible', timeout: 10000 });
       
       // Wait extra for React hydration
-      await page.waitForTimeout(2000);
-      
-      // Listen for login API response AFTER page is loaded
+      await waitForStableUI(page);
       let loginSuccess = false;
       const responseHandler = (response: any) => {
         if (response.url().includes('/auth/login') && response.status() === 200) {
@@ -99,15 +104,11 @@ async function loginAsAdmin(page: Page, retries = 3): Promise<boolean> {
       await passwordInput.fill(ADMIN_CREDENTIALS.password);
       
       // Wait for React to process the input
-      await page.waitForTimeout(500);
-      
-      // Submit via form - more reliable than button click for React forms
+      await waitForStableUI(page);
       await passwordInput.press('Enter');
       
       // Wait for navigation to admin (window.location.href = '/admin')
-      await page.waitForTimeout(5000);
-      
-      // Remove listener
+      await waitForStableUI(page);
       page.off('response', responseHandler);
       
       // Verify we're logged in by checking URL
@@ -119,26 +120,26 @@ async function loginAsAdmin(page: Page, retries = 3): Promise<boolean> {
       if (currentUrl.includes('/admin') && hasToken) {
         console.log(`Login succeeded on attempt ${attempt}`);
         // Wait for dashboard to load
-        await page.waitForTimeout(2000);
+        await waitForStableUI(page);
         return true;
       }
       
       // If still on login page but we have a token, try navigating manually
       if (hasToken) {
         await page.goto(`${FRONTEND_URL}/admin`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForTimeout(2000);
+        await waitForStableUI(page);
         return true;
       }
       
       console.log(`Login attempt ${attempt} failed, URL: ${currentUrl}, hasToken: ${hasToken}`);
       
       if (attempt < retries) {
-        await page.waitForTimeout(2000); // Wait before retry
+        await waitForStableUI(page);
       }
     } catch (error) {
       console.error(`Admin login attempt ${attempt} failed:`, error);
       if (attempt < retries) {
-        await page.waitForTimeout(2000);
+        await waitForStableUI(page);
       }
     }
   }
@@ -150,8 +151,7 @@ async function loginAsAdmin(page: Page, retries = 3): Promise<boolean> {
 async function navigateTo(page: Page, path: string): Promise<void> {
   await page.goto(`${FRONTEND_URL}${path}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   // Wait for React to hydrate and any loading states to clear
-  await page.waitForTimeout(2000);
-  // Wait for the main content to be visible (not just spinner)
+  await waitForStableUI(page);
   await page.waitForLoadState('load');
 }
 
@@ -166,7 +166,7 @@ async function clickButton(page: Page, text: string): Promise<boolean> {
   const button = page.locator(`button:has-text("${text}")`).first();
   if (await button.isVisible()) {
     await button.click();
-    await page.waitForTimeout(500);
+    await waitForStableUI(page);
     return true;
   }
   return false;
@@ -261,7 +261,7 @@ test.describe('2. User Management Features', () => {
     const search = adminPage.locator('input[placeholder*="Search" i]').first();
     if (await search.isVisible()) {
       await search.fill('test');
-      await adminPage.waitForTimeout(1000);
+      await waitForStableUI(adminPage);
       await search.clear();
     }
   });
@@ -270,7 +270,7 @@ test.describe('2. User Management Features', () => {
     const filterButton = adminPage.locator('button:has-text("Filter"), select').first();
     if (await filterButton.isVisible()) {
       await filterButton.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -284,9 +284,7 @@ test.describe('2. User Management Features', () => {
     const addButton = adminPage.locator('button:has-text("Add"), button:has-text("Create"), button:has-text("New")').first();
     if (await addButton.isVisible()) {
       await addButton.click();
-      await adminPage.waitForTimeout(500);
-      
-      // Close modal
+      await waitForStableUI(adminPage);
       const cancelButton = adminPage.locator('button:has-text("Cancel"), button:has-text("Close")').first();
       if (await cancelButton.isVisible()) {
         await cancelButton.click();
@@ -310,7 +308,7 @@ test.describe('2. User Management Features', () => {
     const roleCard = adminPage.locator('[class*="role"], tr').first();
     if (await roleCard.isVisible()) {
       await roleCard.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -324,8 +322,7 @@ test.describe('2. User Management Features', () => {
   // --- CREATE USER ---
   test('2.10 Open create user page', async () => {
     await navigateTo(adminPage, '/admin/users/create');
-    await adminPage.waitForTimeout(1000);
-    // Check for create user form or page content
+    await waitForStableUI(adminPage);
     await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
 });
@@ -359,9 +356,7 @@ test.describe('3. Restaurant Management Features', () => {
     const addButton = adminPage.locator('button:has-text("Add"), button:has-text("Create"), button:has-text("New")').first();
     if (await addButton.isVisible()) {
       await addButton.click();
-      await adminPage.waitForTimeout(500);
-      
-      // Verify modal opened
+      await waitForStableUI(adminPage);
       const modal = adminPage.locator('[class*="modal"], [class*="Modal"], [role="dialog"]');
       if (await modal.first().isVisible()) {
         // Fill form
@@ -378,7 +373,7 @@ test.describe('3. Restaurant Management Features', () => {
     const search = adminPage.locator('input[placeholder*="Search" i]').first();
     if (await search.isVisible()) {
       await search.fill('burger');
-      await adminPage.waitForTimeout(1000);
+      await waitForStableUI(adminPage);
       await search.clear();
     }
   });
@@ -389,11 +384,11 @@ test.describe('3. Restaurant Management Features', () => {
       const tagName = await categoryFilter.evaluate(el => el.tagName.toLowerCase());
       if (tagName === 'select') {
         await categoryFilter.selectOption({ index: 1 });
-        await adminPage.waitForTimeout(500);
+        await waitForStableUI(adminPage);
         await categoryFilter.selectOption({ index: 0 });
       } else {
         await categoryFilter.click();
-        await adminPage.waitForTimeout(500);
+        await waitForStableUI(adminPage);
       }
     }
   });
@@ -408,9 +403,7 @@ test.describe('3. Restaurant Management Features', () => {
     const addButton = adminPage.locator('button:has-text("Add"), button:has-text("Create")').first();
     if (await addButton.isVisible()) {
       await addButton.click();
-      await adminPage.waitForTimeout(500);
-      
-      // Fill and cancel
+      await waitForStableUI(adminPage);
       await fillInput(adminPage, 'input[name="name"], input[placeholder*="name" i]', TEST_DATA.category.name);
       await clickButton(adminPage, 'Cancel');
     }
@@ -436,7 +429,7 @@ test.describe('3. Restaurant Management Features', () => {
       const tagName = await statusFilter.evaluate(el => el.tagName.toLowerCase());
       if (tagName === 'select') {
         await statusFilter.selectOption({ index: 1 });
-        await adminPage.waitForTimeout(500);
+        await waitForStableUI(adminPage);
       }
     }
   });
@@ -446,7 +439,7 @@ test.describe('3. Restaurant Management Features', () => {
     if (await dateFilter.isVisible()) {
       const today = new Date().toISOString().split('T')[0];
       await dateFilter.fill(today);
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -454,7 +447,7 @@ test.describe('3. Restaurant Management Features', () => {
     const orderRow = adminPage.locator('tr, [class*="order-item"]').first();
     if (await orderRow.isVisible()) {
       await orderRow.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -469,7 +462,7 @@ test.describe('3. Restaurant Management Features', () => {
     const addButton = adminPage.locator('button:has-text("Add"), button:has-text("Create")').first();
     if (await addButton.isVisible()) {
       await addButton.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
       await clickButton(adminPage, 'Cancel');
     }
   });
@@ -509,7 +502,7 @@ test.describe('4. Pool Management Features', () => {
     const addButton = adminPage.locator('button:has-text("Add"), button:has-text("Create"), button:has-text("New")').first();
     if (await addButton.isVisible()) {
       await addButton.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
       await clickButton(adminPage, 'Cancel');
     }
   });
@@ -518,7 +511,7 @@ test.describe('4. Pool Management Features', () => {
     const sessionCard = adminPage.locator('[class*="session"], tr').first();
     if (await sessionCard.isVisible()) {
       await sessionCard.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -533,7 +526,7 @@ test.describe('4. Pool Management Features', () => {
     const statusFilter = adminPage.locator('select, button:has-text("Status")').first();
     if (await statusFilter.isVisible()) {
       await statusFilter.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -577,8 +570,7 @@ test.describe('5. Chalet Management Features', () => {
   });
 
   test('5.2 View chalet stats', async () => {
-    await adminPage.waitForTimeout(1000);
-    // Check for chalet management content on the page
+    await waitForStableUI(adminPage);
     await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -586,9 +578,7 @@ test.describe('5. Chalet Management Features', () => {
     const addButton = adminPage.locator('button:has-text("Add"), button:has-text("Create")').first();
     if (await addButton.isVisible()) {
       await addButton.click();
-      await adminPage.waitForTimeout(500);
-      
-      // Fill form
+      await waitForStableUI(adminPage);
       await fillInput(adminPage, 'input[name="name"], input[placeholder*="name" i]', TEST_DATA.chalet.name);
       await fillInput(adminPage, 'input[name="price"], input[placeholder*="price" i]', TEST_DATA.chalet.price);
       
@@ -600,7 +590,7 @@ test.describe('5. Chalet Management Features', () => {
     const bookingsTab = adminPage.locator('button:has-text("Booking"), [data-testid="bookings-tab"]').first();
     if (await bookingsTab.isVisible()) {
       await bookingsTab.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -608,7 +598,7 @@ test.describe('5. Chalet Management Features', () => {
     const statusFilter = adminPage.locator('select, button:has-text("Status")').first();
     if (await statusFilter.isVisible()) {
       await statusFilter.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 });
@@ -641,7 +631,7 @@ test.describe('6. Reviews Management Features', () => {
     const ratingFilter = adminPage.locator('select, button:has-text("Rating")').first();
     if (await ratingFilter.isVisible()) {
       await ratingFilter.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -649,7 +639,7 @@ test.describe('6. Reviews Management Features', () => {
     const statusFilter = adminPage.locator('select:has-text("pending"), select').first();
     if (await statusFilter.isVisible()) {
       await statusFilter.selectOption({ index: 1 });
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -657,7 +647,7 @@ test.describe('6. Reviews Management Features', () => {
     const reviewCard = adminPage.locator('[class*="review"], tr').first();
     if (await reviewCard.isVisible()) {
       await reviewCard.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -665,7 +655,7 @@ test.describe('6. Reviews Management Features', () => {
     const respondButton = adminPage.locator('button:has-text("Respond"), button:has-text("Reply")').first();
     if (await respondButton.isVisible()) {
       await respondButton.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
       await clickButton(adminPage, 'Cancel');
     }
   });
@@ -699,7 +689,7 @@ test.describe('7. Reports & Analytics Features', () => {
     const revenueTab = adminPage.locator('button:has-text("Revenue"), [data-testid="revenue-tab"]').first();
     if (await revenueTab.isVisible()) {
       await revenueTab.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -707,7 +697,7 @@ test.describe('7. Reports & Analytics Features', () => {
     const occupancyTab = adminPage.locator('button:has-text("Occupancy"), [data-testid="occupancy-tab"]').first();
     if (await occupancyTab.isVisible()) {
       await occupancyTab.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -718,7 +708,7 @@ test.describe('7. Reports & Analytics Features', () => {
       if (tagName === 'select') {
         await dateRange.selectOption({ index: 1 });
       }
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -726,7 +716,7 @@ test.describe('7. Reports & Analytics Features', () => {
     const refreshButton = adminPage.locator('button:has-text("Refresh"), button[aria-label*="refresh" i]').first();
     if (await refreshButton.isVisible()) {
       await refreshButton.click();
-      await adminPage.waitForTimeout(1000);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -856,7 +846,7 @@ test.describe('9. Notification Features', () => {
     const broadcastsTab = adminPage.locator('button:has-text("broadcasts")');
     if (await broadcastsTab.isVisible()) {
       await broadcastsTab.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -864,7 +854,7 @@ test.describe('9. Notification Features', () => {
     const templatesTab = adminPage.locator('button:has-text("templates")');
     if (await templatesTab.isVisible()) {
       await templatesTab.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -872,9 +862,7 @@ test.describe('9. Notification Features', () => {
     const sendButton = adminPage.locator('button:has-text("Send Notification")');
     await expect(sendButton).toBeVisible();
     await sendButton.click();
-    await adminPage.waitForTimeout(500);
-    
-    // Verify modal
+    await waitForStableUI(adminPage);
     await expect(adminPage.getByRole('heading', { name: /Send Notification/i })).toBeVisible();
   });
 
@@ -905,7 +893,7 @@ test.describe('9. Notification Features', () => {
     const addActionButton = adminPage.locator('button:has-text("Add Action")');
     if (await addActionButton.isVisible()) {
       await addActionButton.click();
-      await adminPage.waitForTimeout(300);
+      await waitForStableUI(adminPage);
       
       await fillInput(adminPage, 'input[placeholder*="Label" i]', 'View');
       await fillInput(adminPage, 'input[placeholder*="URL" i]', '/test');
@@ -929,14 +917,12 @@ test.describe('9. Notification Features', () => {
     // Switch to templates tab first
     const templatesTab = adminPage.locator('button:has-text("templates")');
     await templatesTab.click();
-    await adminPage.waitForTimeout(500);
+    await waitForStableUI(adminPage);
     
     const newTemplateButton = adminPage.locator('button:has-text("New Template")');
     if (await newTemplateButton.isVisible()) {
       await newTemplateButton.click();
-      await adminPage.waitForTimeout(500);
-      
-      // Fill template
+      await waitForStableUI(adminPage);
       await fillInput(adminPage, 'input[placeholder*="Template" i], input[placeholder*="Welcome" i]', TEST_DATA.template.name);
       
       await clickButton(adminPage, 'Cancel');
@@ -973,7 +959,7 @@ test.describe('10. Translations Features', () => {
     const frontendTab = adminPage.locator('button:has-text("Frontend"), button:has-text("JSON")').first();
     if (await frontendTab.isVisible()) {
       await frontendTab.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -981,7 +967,7 @@ test.describe('10. Translations Features', () => {
     const databaseTab = adminPage.locator('button:has-text("Database"), button:has-text("Content")').first();
     if (await databaseTab.isVisible()) {
       await databaseTab.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -1083,7 +1069,7 @@ test.describe('12. Modules Features', () => {
     const settingsButton = adminPage.locator('button:has-text("Settings"), button:has-text("Configure")').first();
     if (await settingsButton.isVisible()) {
       await settingsButton.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
       await clickButton(adminPage, 'Cancel');
     }
   });
@@ -1123,7 +1109,7 @@ test.describe('13. Audit Log Features', () => {
     const actionFilter = adminPage.locator('select, button:has-text("Action")').first();
     if (await actionFilter.isVisible()) {
       await actionFilter.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -1131,7 +1117,7 @@ test.describe('13. Audit Log Features', () => {
     const userFilter = adminPage.locator('select:has-text("user"), input[placeholder*="user" i]').first();
     if (await userFilter.isVisible()) {
       await userFilter.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -1139,7 +1125,7 @@ test.describe('13. Audit Log Features', () => {
     const logRow = adminPage.locator('tr, [class*="log"]').first();
     if (await logRow.isVisible()) {
       await logRow.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 });
@@ -1172,7 +1158,7 @@ test.describe('14. Global Orders Features', () => {
     const typeFilter = adminPage.locator('select, button:has-text("Type")').first();
     if (await typeFilter.isVisible()) {
       await typeFilter.click();
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
     }
   });
 
@@ -1180,7 +1166,7 @@ test.describe('14. Global Orders Features', () => {
     const search = adminPage.locator('input[placeholder*="Search" i]').first();
     if (await search.isVisible()) {
       await search.fill('test');
-      await adminPage.waitForTimeout(500);
+      await waitForStableUI(adminPage);
       await search.clear();
     }
   });
@@ -1198,10 +1184,9 @@ test.describe('15. Final Verification', () => {
     const logoutButton = page.locator('button:has-text("Logout"), button:has-text("Sign Out"), a:has-text("Logout")').first();
     if (await logoutButton.isVisible()) {
       await logoutButton.click();
-      await page.waitForTimeout(2000);
-      
-      // Should be redirected to login
+      await waitForStableUI(page);
       expect(page.url()).toMatch(/\/login|\/$/);
     }
   });
 });
+

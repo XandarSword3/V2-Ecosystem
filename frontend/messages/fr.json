@@ -762,7 +762,12 @@
       "addFirstTable": "Ajoutez votre première table",
       "addTable": "Ajouter une table",
       "editTable": "Modifier la table",
-      "deleteConfirm": "Êtes-vous sûr de vouloir supprimer cette table?"
+      "deleteConfirm": "Êtes-vous sûr de vouloir supprimer cette table?",
+      "confirmDelete": "Êtes-vous sûr de vouloir supprimer cette table?",
+      "location": "Emplacement",
+      "markedOccupied": "Table marquée comme occupée",
+      "markedAvailable": "Table marquée comme disponible",
+      "tableNumberRequired": "Le numéro de table est requis"
     },
     "pagination": {
       "previous": "Précédent",

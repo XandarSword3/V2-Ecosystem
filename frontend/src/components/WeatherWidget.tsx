@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Sun, 
-  Cloud, 
-  CloudRain, 
-  CloudSnow, 
-  CloudLightning, 
+import {
+  Sun,
+  Cloud,
+  CloudRain,
+  CloudSnow,
+  CloudLightning,
   Wind,
   Droplets,
   Thermometer,
@@ -37,7 +37,7 @@ interface WeatherWidgetProps {
 // Weather condition to icon mapping
 function getWeatherIcon(condition: string, size = 'w-8 h-8') {
   const conditionLower = condition.toLowerCase();
-  
+
   if (conditionLower.includes('thunder') || conditionLower.includes('storm')) {
     return <CloudLightning className={`${size} text-yellow-500`} />;
   }
@@ -56,7 +56,7 @@ function getWeatherIcon(condition: string, size = 'w-8 h-8') {
   return <Sun className={`${size} text-yellow-400`} />;
 }
 
-export function WeatherWidget({ variant = 'compact', className = '' }: WeatherWidgetProps) {
+export default function WeatherWidget({ variant = 'compact', className = '' }: WeatherWidgetProps) {
   const { settings } = useSiteSettings();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,9 +81,9 @@ export function WeatherWidget({ variant = 'compact', className = '' }: WeatherWi
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
         const apiUrl = baseUrl.replace(/\/api\/?$/, '');
         const location = encodeURIComponent(settings.weatherLocation || 'New York, USA');
-        
+
         const response = await fetch(`${apiUrl}/api/weather?location=${location}`, { signal: controller.signal });
-        
+
         if (!response.ok) {
           if (controller.signal.aborted) return;
           // FIX Iter-12: mark fallback data so UI can indicate it's demo data
@@ -129,7 +129,7 @@ export function WeatherWidget({ variant = 'compact', className = '' }: WeatherWi
     };
 
     fetchWeather();
-    
+
     // Refresh weather every 30 minutes
     const interval = setInterval(fetchWeather, 30 * 60 * 1000);
     return () => { controller.abort(); clearInterval(interval); };
@@ -155,7 +155,7 @@ export function WeatherWidget({ variant = 'compact', className = '' }: WeatherWi
   // Compact variant - for header/navbar
   if (variant === 'header') {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm ${className}`}
@@ -225,7 +225,7 @@ export function WeatherWidget({ variant = 'compact', className = '' }: WeatherWi
             <div className="font-medium">{Math.round(weather.feels_like)}°C</div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2 opacity-80">
           <Droplets className="w-5 h-5" />
           <div>
@@ -233,7 +233,7 @@ export function WeatherWidget({ variant = 'compact', className = '' }: WeatherWi
             <div className="font-medium">{weather.humidity}%</div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2 opacity-80">
           <Wind className="w-5 h-5" />
           <div>
@@ -241,7 +241,7 @@ export function WeatherWidget({ variant = 'compact', className = '' }: WeatherWi
             <div className="font-medium">{Math.round(weather.wind_speed)} km/h</div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2 opacity-80">
           <Eye className="w-5 h-5" />
           <div>
@@ -254,4 +254,4 @@ export function WeatherWidget({ variant = 'compact', className = '' }: WeatherWi
   );
 }
 
-export default WeatherWidget;
+

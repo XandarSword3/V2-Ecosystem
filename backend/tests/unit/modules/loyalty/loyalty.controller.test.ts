@@ -132,13 +132,8 @@ describe('LoyaltyController', () => {
     });
 
     it('should earn points with multiplier 1', async () => {
-      const acct = { id: 'acc-1', available_points: 200, total_points: 200, lifetime_points: 200, tier_id: 't1', tier: { points_multiplier: 1 } };
       resolveQueue = [
-        { data: acct, error: null },            // get acct
-        { data: null, error: null },             // settings (not strictly needed but consumed)
-        { error: null },                          // update
-        { data: null, error: null },             // transaction log
-        { data: { id: 't1', name: 'Bronze' }, error: null }, // tier check
+        { data: [{ success: true, points_earned: 50, tier_multiplier: '1', new_balance: 250 }], error: null },
       ];
       const req = createReq({
         body: { userId: '550e8400-e29b-41d4-a716-446655440000', points: 50, referenceType: 'order' },
@@ -165,8 +160,8 @@ describe('LoyaltyController', () => {
 
     it('should reject insufficient points', async () => {
       resolveQueue = [
-        { data: { id: 'acc-1', available_points: 50 }, error: null },   // account
         { data: { min_redemption: 10, redemption_rate: 0.01 }, error: null }, // settings
+        { data: [{ success: false, error_message: 'Insufficient points', new_balance: 50 }], error: null }, // rpc
       ];
       const req = createReq({
         body: { userId: '550e8400-e29b-41d4-a716-446655440000', points: 1000 },
@@ -179,10 +174,8 @@ describe('LoyaltyController', () => {
 
     it('should redeem points and return dollar value', async () => {
       resolveQueue = [
-        { data: { id: 'acc-1', available_points: 500 }, error: null },          // account
         { data: { min_redemption: 100, redemption_rate: 0.01 }, error: null },   // settings
-        { error: null },  // update
-        { data: null, error: null },  // transaction log
+        { data: [{ success: true, points_redeemed: 200, new_balance: 300 }], error: null }, // rpc
       ];
       const req = createReq({
         body: { userId: '550e8400-e29b-41d4-a716-446655440000', points: 200 },
@@ -210,9 +203,7 @@ describe('LoyaltyController', () => {
 
     it('should adjust points correctly (negative)', async () => {
       resolveQueue = [
-        { data: { id: 'acc-1', available_points: 200, total_points: 200, lifetime_points: 200 }, error: null },
-        { error: null },             // update
-        { data: null, error: null }, // transaction
+        { data: [{ success: true, adjustment: -50, new_balance: 150, tier_name: 'Silver' }], error: null }, // rpc
       ];
       const req = createReq({
         body: { userId: '550e8400-e29b-41d4-a716-446655440000', points: -50, reason: 'Correction' },
@@ -221,15 +212,13 @@ describe('LoyaltyController', () => {
       await controller.adjustPoints(req, res);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
-        data: { adjustment: -50, newBalance: 150, reason: 'Correction' },
+        data: expect.objectContaining({ adjustment: -50, newBalance: 150, reason: 'Correction' }),
       }));
     });
 
     it('should clamp balance to 0 for large negative adjustment', async () => {
       resolveQueue = [
-        { data: { id: 'acc-1', available_points: 30, total_points: 30, lifetime_points: 100 }, error: null },
-        { error: null },
-        { data: null, error: null },
+        { data: [{ success: true, adjustment: -100, new_balance: 0, tier_name: 'Bronze' }], error: null }, // rpc
       ];
       const req = createReq({
         body: { userId: '550e8400-e29b-41d4-a716-446655440000', points: -100, reason: 'Penalty' },

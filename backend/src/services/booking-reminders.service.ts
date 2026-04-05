@@ -11,9 +11,9 @@ class BookingRemindersService {
     const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD');
 
     try {
-      // Updated to use accommodation_bookings and unit_id/accommodation_units
+      // Query chalet bookings with chalet name for reminder emails
       const { data: bookings, error } = await supabase
-        .from('accommodation_bookings') // RENAMED
+        .from('chalet_bookings')
         .select(`
           id,
           booking_number,
@@ -24,7 +24,7 @@ class BookingRemindersService {
           number_of_nights,
           special_requests,
           reminder_sent,
-          accommodation_units (name)  -- RENAMED relation
+          chalets (name)
         `)
         .eq('status', 'confirmed')
         .gte('check_in_date', `${tomorrow}T00:00:00`)
@@ -32,14 +32,43 @@ class BookingRemindersService {
         .or('reminder_sent.is.null,reminder_sent.eq.false');
 
       if (error) {
-        logger.error('Failed to fetch bookings', error);
+        logger.error('Failed to fetch bookings for reminders', error);
         return { sent: 0, errors: 1 };
       }
 
-      // ... Iteration and sending logic ...
-      // Uses accommodation_units[0].name
+      // Send reminder emails for each booking
+      let sent = 0;
+      let errors = 0;
 
-      return { sent: bookings?.length || 0, errors: 0 };
+      for (const booking of (bookings || []) as any[]) {
+        try {
+          const chaletName = (booking as any).chalets?.name || 'Your Chalet';
+          await emailService.sendPreArrivalReminder({
+            to: booking.customer_email,
+            guestName: booking.customer_name,
+            bookingNumber: booking.booking_number,
+            chaletName,
+            checkInDate: booking.check_in_date,
+            checkOutDate: booking.check_out_date,
+            numberOfNights: booking.number_of_nights,
+            specialInstructions: booking.special_requests || '',
+          } as any);
+
+          // Mark reminder as sent
+          await supabase
+            .from('chalet_bookings')
+            .update({ reminder_sent: true })
+            .eq('id', booking.id);
+
+          sent++;
+        } catch (emailError) {
+          logger.error(`Failed to send reminder for booking ${booking.id}`, emailError);
+          errors++;
+        }
+      }
+
+      logger.info(`Booking reminders: ${sent} sent, ${errors} errors`);
+      return { sent, errors };
     } catch (error) {
       return { sent: 0, errors: 1 };
     }

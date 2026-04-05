@@ -47,7 +47,7 @@ const SUPPORTED_CURRENCIES: Record<string, Omit<Currency, 'exchange_rate' | 'is_
 };
 
 // Cache for exchange rates
-let ratesCache: Map<string, { rate: number; timestamp: number }> = new Map();
+const ratesCache: Map<string, { rate: number; timestamp: number }> = new Map();
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 class CurrencyService {

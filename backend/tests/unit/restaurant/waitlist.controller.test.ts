@@ -33,7 +33,7 @@ describe('Waitlist Controller', () => {
         select: vi.fn().mockReturnThis(),
         in: vi.fn().mockReturnThis(),
         order: vi.fn().mockReturnThis(),
-        ilike: vi.fn().mockResolvedValue({ data: mockEntries, error: null })
+        eq: vi.fn().mockResolvedValue({ data: mockEntries, error: null })
       };
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
 
@@ -43,7 +43,20 @@ describe('Waitlist Controller', () => {
 
       await waitlistController.getWaitlist(req, res);
 
-      expect(res.json).toHaveBeenCalledWith({ success: true, data: mockEntries });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'entry-1',
+            customer_name: 'John',
+            guest_name: 'John',
+            party_size: 4,
+            status: 'waiting',
+            position: 1,
+            estimated_wait: 10,
+          }),
+        ]),
+      }));
     });
 
     it('should return entries without type filter', async () => {
@@ -63,7 +76,16 @@ describe('Waitlist Controller', () => {
 
       await waitlistController.getWaitlist(req, res);
 
-      expect(res.json).toHaveBeenCalledWith({ success: true, data: mockEntries });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'entry-1',
+            position: 1,
+            estimated_wait: 10,
+          }),
+        ]),
+      }));
     });
 
     it('should handle errors', async () => {
@@ -104,7 +126,17 @@ describe('Waitlist Controller', () => {
 
       await waitlistController.getEntry(req, res);
 
-      expect(res.json).toHaveBeenCalledWith({ success: true, data: mockEntry });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          id: 'entry-1',
+          customer_name: 'Jane',
+          guest_name: 'Jane',
+          party_size: 2,
+          position: 1,
+          estimated_wait: 10,
+        }),
+      }));
     });
 
     it('should return 404 if entry not found', async () => {
@@ -133,14 +165,30 @@ describe('Waitlist Controller', () => {
         id: 'entry-new', 
         customer_name: 'Bob', 
         party_size: 3,
-        status: 'waiting'
+        status: 'waiting',
+        phone_number: '555-1234',
+        created_at: '2025-01-01T10:00:00Z',
       };
 
+      let fromCalls = 0;
       const mockSupabase = {
-        from: vi.fn().mockReturnThis(),
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: mockEntry, error: null })
+        from: vi.fn().mockImplementation(() => {
+          fromCalls += 1;
+
+          if (fromCalls === 1) {
+            return {
+              insert: vi.fn().mockReturnThis(),
+              select: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({ data: mockEntry, error: null }),
+            };
+          }
+
+          return {
+            select: vi.fn().mockReturnThis(),
+            in: vi.fn().mockReturnThis(),
+            lte: vi.fn().mockResolvedValue({ count: 1, error: null }),
+          };
+        }),
       };
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
 
@@ -156,26 +204,55 @@ describe('Waitlist Controller', () => {
       await waitlistController.join(req, res);
 
       expect(res.status).toHaveBeenCalledWith(201);
-      expect(res.json).toHaveBeenCalledWith({ success: true, data: mockEntry });
-      expect(emitToAll).toHaveBeenCalledWith('waitlist.updated', {
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          id: 'entry-new',
+          customer_name: 'Bob',
+          guest_name: 'Bob',
+          party_size: 3,
+          phone: '555-1234',
+          position: 1,
+          estimated_wait: 10,
+        }),
+      }));
+      expect(emitToAll).toHaveBeenCalledWith('waitlist.updated', expect.objectContaining({
         type: 'restaurant',
         action: 'join',
-        entry: mockEntry
-      });
+        entry: expect.objectContaining({
+          id: 'entry-new',
+        }),
+      }));
     });
 
     it('should accept snake_case field names', async () => {
       const mockEntry = { 
         id: 'entry-new', 
         customer_name: 'Alice', 
-        party_size: 2
+        party_size: 2,
+        phone_number: '555-5678',
+        created_at: '2025-01-01T10:00:00Z',
       };
 
+      let fromCalls = 0;
       const mockSupabase = {
-        from: vi.fn().mockReturnThis(),
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: mockEntry, error: null })
+        from: vi.fn().mockImplementation(() => {
+          fromCalls += 1;
+
+          if (fromCalls === 1) {
+            return {
+              insert: vi.fn().mockReturnThis(),
+              select: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({ data: mockEntry, error: null }),
+            };
+          }
+
+          return {
+            select: vi.fn().mockReturnThis(),
+            in: vi.fn().mockReturnThis(),
+            lte: vi.fn().mockResolvedValue({ count: 1, error: null }),
+          };
+        }),
       };
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
 

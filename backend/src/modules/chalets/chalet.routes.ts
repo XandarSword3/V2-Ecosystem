@@ -47,9 +47,15 @@ router.delete('/admin/price-rules/:id', authenticate, authorize(...adminRoles), 
 router.get('/admin/settings', authenticate, authorize(...adminRoles), chaletController.getChaletSettings);
 router.put('/admin/settings', authenticate, authorize(...adminRoles), chaletController.updateChaletSettings);
 
+// Admin calendar & date blocking
+router.get('/admin/chalets/:id/calendar', authenticate, authorize(...adminRoles), chaletController.getAdminCalendar);
+router.post('/admin/chalets/:id/block-dates', authenticate, authorize(...adminRoles), chaletController.blockDates);
+router.post('/admin/chalets/:id/unblock-dates', authenticate, authorize(...adminRoles), chaletController.unblockDates);
+
 // Public routes (Moved to end to avoid conflict with specific routes)
 router.get('/', chaletController.getChalets);
 router.get('/:id', chaletController.getChalet);
 router.get('/:id/availability', chaletController.getAvailability);
+router.get('/:id/daily-prices', chaletController.getDailyPrices);
 
 export default router;

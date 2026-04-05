@@ -1,0 +1,186 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+ [31mΓ¥»[39m tests/unit/modules/auth/auth.service.test.ts [2m([22m[2m18 tests[22m[2m | [22m[31m6 failed[39m[2m)[22m[32m 28[2mms[22m[39m
+[31m       [31m├ù[31m should register a new user successfully[39m[32m 5[2mms[22m[39m
+       [32mΓ£ô[39m should throw error if email already exists[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should register user with preferred language[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should login successfully with valid credentials[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should return 2FA required when enabled[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject disabled account[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid credentials when user not found[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should complete login after 2FA verification[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should refresh access token[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should logout user and invalidate tokens[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should logout all sessions when no token provided[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return current user data[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return user by ID[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should change password successfully[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should send password reset email[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should not throw error for non-existent email[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should reset password with valid token[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should disable 2FA for user[32m 1[2mms[22m[39m
+node.exe : 
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteExce 
+   ption
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 6 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/auth/auth.service.test.ts[2m > 
+[22mAuthService[2m > [22mregister[2m > [22mshould register a 
+new user successfully
+[31m[1mError[22m: Password does not meet policy: Password must 
+contain at least one uppercase letter, Password must contain at 
+least one special character, Password is too common. Please choose a 
+stronger password.[39m
+[36m [2mΓ¥»[22m Module.register 
+src/modules/auth/auth.service.ts:[2m46:11[22m[39m
+    [90m 44| [39m  [35mconst[39m policyResult [33m=[39m 
+[35mawait[39m 
+[34mvalidatePassword[39m(data[33m.[39mpassword)[33m;[39m
+    [90m 45| [39m  [35mif[39m 
+([33m![39mpolicyResult[33m.[39mvalid) {
+    [90m 46| [39m    throw new Error(`Password does not meet 
+policy: ${policyResult.errΓÇª
+    [90m   | [39m          [31m^[39m
+    [90m 47| [39m  }
+    [90m 48| [39m
+[90m [2mΓ¥»[22m 
+tests/unit/modules/auth/auth.service.test.ts:[2m179:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/6]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/auth/auth.service.test.ts[2m > 
+[22mAuthService[2m > [22mregister[2m > [22mshould register user 
+with preferred language
+[31m[1mError[22m: Password does not meet policy: Password must 
+contain at least one uppercase letter, Password must contain at 
+least one special character, Password is too common. Please choose a 
+stronger password.[39m
+[36m [2mΓ¥»[22m Module.register 
+src/modules/auth/auth.service.ts:[2m46:11[22m[39m
+    [90m 44| [39m  [35mconst[39m policyResult [33m=[39m 
+[35mawait[39m 
+[34mvalidatePassword[39m(data[33m.[39mpassword)[33m;[39m
+    [90m 45| [39m  [35mif[39m 
+([33m![39mpolicyResult[33m.[39mvalid) {
+    [90m 46| [39m    throw new Error(`Password does not meet 
+policy: ${policyResult.errΓÇª
+    [90m   | [39m          [31m^[39m
+    [90m 47| [39m  }
+    [90m 48| [39m
+[90m [2mΓ¥»[22m 
+tests/unit/modules/auth/auth.service.test.ts:[2m203:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/6]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/auth/auth.service.test.ts[2m > 
+[22mAuthService[2m > [22mlogin[2m > [22mshould login 
+successfully with valid credentials
+[31m[1mError[22m: Email not verified. Please check your inbox for 
+the verification link.[39m
+[36m [2mΓ¥»[22m Module.login 
+src/modules/auth/auth.service.ts:[2m136:11[22m[39m
+    [90m134| [39m  [90m// FIX: Issue 5 ΓÇö Enforce email 
+verification before allowing login[39m
+    [90m135| [39m  [35mif[39m 
+([33m![39muser[33m.[39memail_verified) {
+    [90m136| [39m    throw new AppError('Email not verified. 
+Please check your inbox foΓÇª
+    [90m   | [39m          [31m^[39m
+    [90m137| [39m  }
+    [90m138| [39m
+[90m [2mΓ¥»[22m 
+tests/unit/modules/auth/auth.service.test.ts:[2m230:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[3/6]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/auth/auth.service.test.ts[2m > 
+[22mAuthService[2m > [22mlogin[2m > [22mshould return 2FA 
+required when enabled
+[31m[1mError[22m: Email not verified. Please check your inbox for 
+the verification link.[39m
+[36m [2mΓ¥»[22m Module.login 
+src/modules/auth/auth.service.ts:[2m136:11[22m[39m
+    [90m134| [39m  [90m// FIX: Issue 5 ΓÇö Enforce email 
+verification before allowing login[39m
+    [90m135| [39m  [35mif[39m 
+([33m![39muser[33m.[39memail_verified) {
+    [90m136| [39m    throw new AppError('Email not verified. 
+Please check your inbox foΓÇª
+    [90m   | [39m          [31m^[39m
+    [90m137| [39m  }
+    [90m138| [39m
+[90m [2mΓ¥»[22m 
+tests/unit/modules/auth/auth.service.test.ts:[2m249:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[4/6]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/auth/auth.service.test.ts[2m > 
+[22mAuthService[2m > [22mchangePassword[2m > [22mshould change 
+password successfully
+[31m[1mError[22m: Password does not meet policy: Password must 
+contain at least one number, Password must contain at least one 
+special character[39m
+[36m [2mΓ¥»[22m Module.changePassword 
+src/modules/auth/auth.service.ts:[2m491:11[22m[39m
+    [90m489| [39m  [35mconst[39m policyResult [33m=[39m 
+[35mawait[39m [34mvalidatePassword[39m(newPassword)[33m;[39m
+    [90m490| [39m  [35mif[39m 
+([33m![39mpolicyResult[33m.[39mvalid) {
+    [90m491| [39m    throw new AppError(`Password does not meet 
+policy: ${policyResult.ΓÇª
+    [90m   | [39m          [31m^[39m
+    [90m492| [39m  }
+    [90m493| [39m
+[90m [2mΓ¥»[22m 
+tests/unit/modules/auth/auth.service.test.ts:[2m398:7[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[5/6]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/auth/auth.service.test.ts[2m > 
+[22mAuthService[2m > [22mresetPassword[2m > [22mshould reset 
+password with valid token
+[31m[1mError[22m: Password does not meet policy: Password must 
+contain at least one special character[39m
+[36m [2mΓ¥»[22m Module.resetPassword 
+src/modules/auth/auth.service.ts:[2m633:11[22m[39m
+    [90m631| [39m  [35mconst[39m policyResult [33m=[39m 
+[35mawait[39m [34mvalidatePassword[39m(newPassword)[33m;[39m
+    [90m632| [39m  [35mif[39m 
+([33m![39mpolicyResult[33m.[39mvalid) {
+    [90m633| [39m    throw new AppError(`Password does not meet 
+policy: ${policyResult.ΓÇª
+    [90m   | [39m          [31m^[39m
+    [90m634| [39m  }
+    [90m635| [39m
+[90m [2mΓ¥»[22m 
+tests/unit/modules/auth/auth.service.test.ts:[2m438:7[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[6/6]ΓÄ»[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m6 failed[39m[22m[2m | [22m[1m[32m12 passed[39m[22m[90m (18)[39m
+[2m   Start at [22m 10:03:31
+[2m   Duration [22m 369ms[2m (transform 128ms, setup 0ms, import 207ms, tests 28ms, environment 0ms)[22m
+

@@ -94,10 +94,7 @@ describe('Loyalty Controller', () => {
 
   describe('earnPoints', () => {
     it('should earn points successfully', async () => {
-      mock.queueResponse({ id: 'a1', points_balance: 100, user_id: UUID1 }); // account (single)
-      mock.queueResponse(null); // transaction insert
-      mock.queueResponse({ id: 'a1', points_balance: 150 }); // update (single)
-      mock.queueResponse([{ id: 'tier1', min_points: 0 }, { id: 'tier2', min_points: 200 }]); // tiers
+      mock.queueResponse([{ success: true, points_earned: 50, tier_multiplier: '1', new_balance: 150 }]); // rpc
       const mocks = createMockReqRes({
         body: { userId: UUID1, points: 50, description: 'Purchase', referenceType: 'order' },
       });
@@ -121,10 +118,8 @@ describe('Loyalty Controller', () => {
 
   describe('redeemPoints', () => {
     it('should redeem points', async () => {
-      mock.queueResponse({ id: 'a1', user_id: UUID1, available_points: 500 }); // account (single)
       mock.queueResponse({ redemption_rate: 0.01, min_redemption: 10 }); // settings (single)
-      mock.queueResponse(null); // update
-      mock.queueResponse(null); // transaction insert
+      mock.queueResponse([{ success: true, points_redeemed: 100, new_balance: 400 }]); // rpc
       const mocks = createMockReqRes({
         body: { userId: UUID1, points: 100, description: 'Redemption' },
       });
@@ -139,7 +134,8 @@ describe('Loyalty Controller', () => {
     });
 
     it('should return 404 for missing account', async () => {
-      mock.queueResponse(null, { code: 'PGRST116' });
+      mock.queueResponse({ min_redemption: 10, redemption_rate: 0.01 }); // settings (single)
+      mock.queueResponse([{ success: false, error_message: 'Account not found' }]); // rpc
       const mocks = createMockReqRes({ body: { userId: UUID1, points: 100 } });
       await ctrl.redeemPoints(mocks.req as Request, mocks.res as Response);
       expect(mocks.res.status).toHaveBeenCalledWith(404);
@@ -156,9 +152,7 @@ describe('Loyalty Controller', () => {
 
   describe('adjustPoints', () => {
     it('should adjust points', async () => {
-      mock.queueResponse({ id: 'a1', user_id: UUID1, points_balance: 100 }); // account (single)
-      mock.queueResponse(null); // transaction insert
-      mock.queueResponse({ id: 'a1', points_balance: 150 }); // update (single)
+      mock.queueResponse([{ success: true, adjustment: 50, new_balance: 150, tier_name: 'Silver' }]); // rpc
       const mocks = createMockReqRes({
         body: { userId: UUID1, points: 50, reason: 'Correction' },
       });
@@ -182,9 +176,7 @@ describe('Loyalty Controller', () => {
 
   describe('adjustPointsByAccountId', () => {
     it('should adjust points by account ID', async () => {
-      mock.queueResponse({ id: 'a1', user_id: UUID1, points_balance: 100 }); // account (single)
-      mock.queueResponse(null); // transaction insert
-      mock.queueResponse({ id: 'a1', points_balance: 150 }); // update (single)
+      mock.queueResponse([{ success: true, adjustment: 50, new_balance: 150, tier_name: 'Silver' }]); // rpc
       const mocks = createMockReqRes({
         params: { accountId: 'a1' },
         body: { points: 50, reason: 'Correction' },

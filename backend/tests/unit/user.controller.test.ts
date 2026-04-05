@@ -249,7 +249,7 @@ describe('User Controller', () => {
     it('should return 400 for invalid preferred_language', async () => {
       const { updateProfile } = await import('../../src/modules/users/user.controller.js');
       const { req, res, next } = createMockReqRes({
-        body: { preferred_language: 'de' }, // Only en, ar, fr are valid
+        body: { preferred_language: 'zz' }, // Only en, ar, fr, de, it are valid
       });
       req.user = { userId: 'user-123', role: 'customer' };
 

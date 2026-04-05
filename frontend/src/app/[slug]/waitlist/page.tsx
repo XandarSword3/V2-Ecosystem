@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useCallback, Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Users, Clock, CheckCircle, Loader2, Phone, User, AlertCircle } from 'lucide-react';
@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
+import { useWaitlistUpdates } from '@/lib/socket';
 import Link from 'next/link';
 
 interface WaitlistEntry {
@@ -43,8 +44,16 @@ function WaitlistContent() {
       return res.data;
     },
     enabled: !!(entryId || submittedEntry?.id),
-    refetchInterval: 30000,
   });
+
+  // Real-time waitlist updates via Socket.IO
+  const handleWaitlistUpdate = useCallback((data: any) => {
+    const currentId = entryId || submittedEntry?.id;
+    if (currentId && (data.entry?.id === currentId || data.entryId === currentId)) {
+      refetchStatus();
+    }
+  }, [entryId, submittedEntry?.id, refetchStatus]);
+  useWaitlistUpdates(handleWaitlistUpdate);
 
   const joinMutation = useMutation({
     mutationFn: async (data: { name: string; phone: string; partySize: number }) => {
@@ -66,7 +75,7 @@ function WaitlistContent() {
 
   const leaveMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await api.delete(`/restaurant/waitlist/${id}`);
+      const res = await api.delete(`/restaurant/waitlist/${id}/leave`);
       return res.data;
     },
     onSuccess: () => {

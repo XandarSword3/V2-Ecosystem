@@ -3,7 +3,7 @@
 -- Recipes table - links menu items to inventory ingredients
 CREATE TABLE IF NOT EXISTS inventory_recipes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  menu_item_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  menu_item_id UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
   name VARCHAR(255),
   yields INTEGER DEFAULT 1, -- How many portions this recipe makes
   prep_time_minutes INTEGER,
@@ -36,7 +36,7 @@ DROP TRIGGER IF EXISTS inventory_recipes_updated_at ON inventory_recipes;
 CREATE TRIGGER inventory_recipes_updated_at
   BEFORE UPDATE ON inventory_recipes
   FOR EACH ROW
-  EXECUTE FUNCTION update_modified_column();
+  EXECUTE FUNCTION update_updated_at_column();
 
 -- Add cost tracking columns to inventory_items if not exists
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS cost_per_unit DECIMAL(10, 2);
@@ -146,14 +146,14 @@ CREATE OR REPLACE FUNCTION deduct_stock_fifo(
   p_quantity DECIMAL,
   p_reason VARCHAR,
   p_user_id UUID
-) RETURNS VOID AS $$
+) RETURNS JSONB AS $$
 DECLARE
   v_remaining DECIMAL := p_quantity;
   v_batch RECORD;
 BEGIN
   -- Only deduct if positive quantity (negative means adding stock)
   IF p_quantity <= 0 THEN
-    RETURN;
+    RETURN jsonb_build_object('success', false, 'error', 'Quantity must be greater than zero');
   END IF;
 
   -- Loop through batches in FIFO order
@@ -186,8 +186,14 @@ BEGIN
 
   -- Update main inventory item stock
   UPDATE inventory_items 
-  SET current_stock = GREATEST(0, current_stock - p_quantity)
+  SET current_stock = GREATEST(0, current_stock - (p_quantity - v_remaining))
   WHERE id = p_item_id;
+
+  RETURN jsonb_build_object(
+    'success', v_remaining <= 0,
+    'requested_quantity', p_quantity,
+    'remaining_quantity', v_remaining
+  );
 END;
 $$ LANGUAGE plpgsql;
 
@@ -211,16 +217,72 @@ CREATE POLICY inventory_batches_read ON inventory_batches FOR SELECT TO authenti
 
 -- Allow staff/admin to modify
 CREATE POLICY inventory_recipes_modify ON inventory_recipes FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND roles && ARRAY['admin', 'staff']));
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin', 'staff')
+    )
+  );
 CREATE POLICY inventory_ingredients_modify ON inventory_recipe_ingredients FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND roles && ARRAY['admin', 'staff']));
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin', 'staff')
+    )
+  );
 CREATE POLICY inventory_wastage_modify ON inventory_wastage FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND roles && ARRAY['admin', 'staff']));
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin', 'staff')
+    )
+  );
 CREATE POLICY inventory_variance_modify ON inventory_variance FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND roles && ARRAY['admin', 'staff']));
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin', 'staff')
+    )
+  );
 CREATE POLICY inventory_suppliers_modify ON inventory_suppliers FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND roles && ARRAY['admin', 'staff']));
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin', 'staff')
+    )
+  );
 CREATE POLICY inventory_po_modify ON inventory_purchase_orders FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND roles && ARRAY['admin', 'staff']));
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin', 'staff')
+    )
+  );
 CREATE POLICY inventory_batches_modify ON inventory_batches FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND roles && ARRAY['admin', 'staff']));
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin', 'staff')
+    )
+  );

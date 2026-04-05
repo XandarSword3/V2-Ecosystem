@@ -21,12 +21,13 @@ test.describe('Customer Auth Flow [CUS-AUTH]', () => {
 
   test('CUS-AUTH-003: show/hide password toggle', async ({ page }) => {
     await page.goto(`${FRONTEND}/login`);
-    const passwordInput = page.getByLabel(/password/i);
+    const passwordInput = page.getByLabel(/password/i).first();
     await expect(passwordInput).toHaveAttribute('type', 'password');
-    const toggleBtn = page.getByRole('button', { name: /show|hide|eye|toggle/i })
-      .or(page.locator('[class*="toggle-password"], [class*="eye"], [aria-label*="show"]'));
-    await expect(toggleBtn.first()).toBeVisible();
-    await toggleBtn.first().click();
+
+    // The login toggle is an icon-only button next to #password.
+    const toggleBtn = page.locator('#password + button[type="button"]');
+    await expect(toggleBtn).toBeVisible();
+    await toggleBtn.click();
     await expect(passwordInput).toHaveAttribute('type', 'text');
   });
 

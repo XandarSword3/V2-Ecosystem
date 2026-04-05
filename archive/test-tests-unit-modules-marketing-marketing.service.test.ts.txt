@@ -1,0 +1,164 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+node.exe : Sourcemap for "C:/Alessandro/Work/Attempts to Code/V2 Ecos
+ystem/v2-resort/backend/node_modules/node-cron/dist/esm/node-cron.js"
+ points to missing source files
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Sourcemap for "...ng so 
+   urce files:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ [31mΓ¥»[39m tests/unit/modules/marketing/marketing.service.test.ts [2m([22m[2m76 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 98[2mms[22m[39m
+       [32mΓ£ô[39m should be defined[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should be instance of MarketingAutomationService[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should create a segment with rules[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should default to dynamic segment type[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should calculate segment members after creation[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return active segments for property[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return empty array when no segments[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should call RPC to calculate members[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return 0 when no members[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return members for static segment[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should query by rules for dynamic segment[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should throw error when segment not found[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should add guests to segment[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should recalculate segment members after adding[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should remove guests from segment[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should create email template[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should handle optional fields[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return all templates for property[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should filter by category when provided[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return empty array when no templates[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should update template fields[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should increment version on update[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should duplicate existing template[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should throw when template not found[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should create journey with steps[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should create multiple steps[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should return journeys with enrollment counts[39m[32m 10[2mms[22m[39m
+       [32mΓ£ô[39m should filter by status when provided[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return journey with steps[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return null when journey not found[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should update journey status to active[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should update journey status to paused[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should enroll guest in active journey[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should throw when journey not active[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return existing enrollment if reentry not allowed[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should create marketing campaign[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle custom audience[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should support scheduled campaigns[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return campaigns with related data[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by status when provided[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should send campaign to segment members[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should throw when campaign already sent[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should throw when no recipients defined[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should schedule campaign for future send[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should cancel campaign[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should create triggered automation[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should set default values for options[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return automations with template name[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should create pending execution[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should suppress if recent send within hours[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should not trigger if automation inactive[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should queue email for sending[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should merge variables into content[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should send queued emails[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should update status on success[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should record open event[32m 4[2mms[22m[39m
+       [32mΓ£ô[39m should update campaign metrics[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should record click event with URL[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should update guest preferences[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should update campaign unsubscribe count[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should create percentage discount promo[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should create fixed discount promo[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should uppercase code[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should validate valid promo code[32m 4[2mms[22m[39m
+       [32mΓ£ô[39m should return error for invalid code[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return error for expired code[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return error when usage limit reached[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return error for minimum nights not met[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should record promo code usage[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should increment times_used[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return campaign metrics and rates[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should throw when campaign not found[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should call RPC for click breakdown[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return journey stats and step performance[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should throw when journey not found[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should schedule cron job[39m[32m 2[2mms[22m[39m
+
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 2 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/marketing/marketing.service.test.ts[2m > 
+[22mMarketingAutomationService[2m > [22mgetJourneys[2m > 
+[22mshould return journeys with enrollment counts
+[31m[1mTypeError[22m: this.supabase.from(...).select(...).in is 
+not a function[39m
+[36m [2mΓ¥»[22m MarketingAutomationService.getJourneys 
+src/modules/marketing/marketing.service.ts:[2m419:8[22m[39m
+    [90m417| [39m      
+[33m.[39m[35mfrom[39m([32m'journey_enrollments'[39m)
+    [90m418| [39m      
+[33m.[39m[34mselect[39m([32m'journey_id'[39m)
+    [90m419| [39m      
+[33m.[39m[35min[39m([32m'journey_id'[39m[33m,[39m journeyIds)
+    [90m   | [39m       [31m^[39m
+    [90m420| [39m      
+[33m.[39m[34meq[39m([32m'status'[39m[33m,[39m 
+[32m'active'[39m)[33m;[39m
+    [90m421| [39m
+[90m [2mΓ¥»[22m tests/unit/modules/marketing/marketing.service.tes
+t.ts:[2m565:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/2]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/marketing/marketing.service.test.ts[2m > 
+[22mMarketingAutomationService[2m > 
+[22mstartBackgroundProcessing[2m > [22mshould schedule cron job
+[31m[1mError[22m: [vitest] No "default" export is defined on the 
+"node-cron" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("node-cron"), async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m 
+MarketingAutomationService.startBackgroundProcessing 
+src/modules/marketing/marketing.service.ts:[2m1409:5[22m[39m
+    [90m1407| [39m  
+[34mstartBackgroundProcessing[39m()[33m:[39m [35mvoid[39m {
+    [90m1408| [39m    [90m// Process pending automations every 
+minute[39m
+    [90m1409| [39m    cron[33m.[39m[34mschedule[39m([32m'* * 
+* * *'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m    [31m^[39m
+    [90m1410| [39m      [35mif[39m 
+([35mthis[39m[33m.[39misProcessing) [35mreturn[39m[33m;[39m
+    [90m1411| [39m      [35mthis[39m[33m.[39misProcessing 
+[33m=[39m [35mtrue[39m[33m;[39m
+[90m [2mΓ¥»[22m tests/unit/modules/marketing/marketing.service.tes
+t.ts:[2m1301:34[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/2]ΓÄ»[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m74 passed[39m[22m[90m (76)[39m
+[2m   Start at [22m 10:03:37
+[2m   Duration [22m 374ms[2m (transform 110ms, setup 0ms, import 137ms, tests 98ms, environment 0ms)[22m
+

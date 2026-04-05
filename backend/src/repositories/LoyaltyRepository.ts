@@ -1,4 +1,5 @@
 import { BaseRepository, FindManyOptions } from './BaseRepository.js';
+import { getPool } from '../database/connection.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,6 +58,29 @@ export interface LoyaltyReward {
 export class LoyaltyMemberRepository extends BaseRepository<LoyaltyMember> {
   constructor() {
     super('loyalty_members');
+  }
+
+  /**
+   * Atomically adjust a member's points using raw SQL.
+   */
+  async adjustPointsAtomic(id: string, points: number): Promise<LoyaltyMember> {
+    const pool = getPool();
+    const query = `
+      UPDATE loyalty_members
+      SET 
+        available_points = available_points + $1,
+        total_points = total_points + $1,
+        lifetime_points = CASE WHEN $1 > 0 THEN lifetime_points + $1 ELSE lifetime_points END,
+        updated_at = NOW()
+      WHERE id = $2
+      RETURNING *;
+    `;
+
+    const result = await pool.query(query, [points, id]);
+    if (result.rows.length === 0) {
+      throw new Error(`Loyalty member with ID ${id} not found for update`);
+    }
+    return result.rows[0] as LoyaltyMember;
   }
 
   /** Find the loyalty account for a specific user. */

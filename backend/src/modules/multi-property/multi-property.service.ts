@@ -376,6 +376,43 @@ export async function updatePropertyDetails(
   return data;
 }
 
+export async function createProperty(propertyData: {
+  name: string;
+  property_code?: string;
+  property_type?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  timezone?: string;
+  currency?: string;
+  phone?: string;
+  email?: string;
+  total_rooms?: number;
+  group_id?: string;
+}): Promise<Property> {
+  const { data, error } = await supabase
+    .from('properties')
+    .insert({
+      name: propertyData.name,
+      property_code: propertyData.property_code,
+      property_type: propertyData.property_type || 'hotel',
+      address_line1: propertyData.address,
+      city: propertyData.city,
+      country: propertyData.country,
+      timezone: propertyData.timezone || 'UTC',
+      currency: propertyData.currency || 'USD',
+      phone: propertyData.phone,
+      email: propertyData.email,
+      is_active: true,
+      group_id: propertyData.group_id,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 // ==================== GROUP BENCHMARKING ====================
 
 export async function getGroupBenchmarks(

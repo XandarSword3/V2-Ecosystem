@@ -1,0 +1,857 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+ [31mΓ¥»[39m tests/unit/modules/restaurant/order.service.test.ts [2m([22m[2m60 tests[22m[2m | [22m[31m18 failed[39m[2m)[22m[32m 43[2mms[22m[39m
+[31m       [31m├ù[31m should create an order with valid data[39m[32m 6[2mms[22m[39m
+[31m       [31m├ù[31m should resolve table ID from table number[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should calculate modifier totals correctly[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should apply coupon discount[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should apply gift card redemption[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should apply loyalty points redemption[39m[32m 0[2mms[22m[39m
+[31m       [31m├ù[31m should earn loyalty points for logged in customers[39m[32m 0[2mms[22m[39m
+[31m       [31m├ù[31m should handle delivery orders with delivery fee[39m[32m 0[2mms[22m[39m
+[31m       [31m├ù[31m should handle room service orders[39m[32m 0[2mms[22m[39m
+[31m       [31m├ù[31m should handle tax exempt orders[39m[32m 0[2mms[22m[39m
+[31m       [31m├ù[31m should include special instructions[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return order with items[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return null for non-existent order[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should transform items with menu_item property[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return full order details[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return null for non-existent order[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return orders for customer[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return empty array for customer with no orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should order results by created_at descending[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return all orders with no filters[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should filter by status[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by multiple statuses[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should filter by date[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should filter by moduleId[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should apply multiple filters[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should return active orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by moduleId when provided[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return empty array when no active orders[32m 0[2mms[22m[39m
+[31m       [31m├ù[31m should update order status[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should set actual_ready_time when status is ready[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should set served_at when status is served[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should set completed_at and payment_status when status is completed[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should set cancelled_at and cancellation_reason when status is cancelled[39m[32m 0[2mms[22m[39m
+[31m       [31m├ù[31m should record status history[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should include notes in status history[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return daily report for today[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return daily report for specific date[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by moduleId[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should calculate total orders[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should calculate completed orders count[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should calculate cancelled orders count[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate total revenue from completed orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate total tax from completed orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate average order value[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return zero averageOrderValue when no completed orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return sales report for date range[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by moduleId[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate total orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate total revenue[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate average order value[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return zero averageOrderValue when no orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should export createOrder function[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should export getOrderById function[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should export getOrderStatus function[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should export getOrdersByCustomer function[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should export getOrders function[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should export getLiveOrders function[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should export updateOrderStatus function[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should export getDailyReport function[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should export getSalesReport function[32m 0[2mms[22m[39m
+node.exe : 
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteExce 
+   ption
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 18 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould create an 
+order with valid data
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m208:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[1/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould resolve 
+table ID from table number
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m223:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[2/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould calculate 
+modifier totals correctly
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m250:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[3/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould apply 
+coupon discount
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m266:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[4/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould apply 
+gift card redemption
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m281:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[5/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould apply 
+loyalty points redemption
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m298:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[6/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould earn 
+loyalty points for logged in customers
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m313:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[7/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould handle 
+delivery orders with delivery fee
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m325:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[8/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould handle 
+room service orders
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m337:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[9/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould handle 
+tax exempt orders
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m350:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[10/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mcreateOrder[2m > [22mshould include 
+special instructions
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.createOrder 
+src/modules/restaurant/services/order.service.ts:[2m231:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m367:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[11/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould 
+update order status
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m584:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m505:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[12/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould set 
+actual_ready_time when status is ready
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m584:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m512:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[13/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould set 
+served_at when status is served
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m584:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m518:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[14/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould set 
+completed_at and payment_status when status is completed
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m584:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m524:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[15/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould set 
+cancelled_at and cancellation_reason when status is cancelled
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m18 failed[39m[22m[2m | [22m[1m[32m42 passed[39m[22m[90m (60)[39m
+[2m   Start at [22m 10:00:12
+[2m   Duration [22m 369ms[2m (transform 152ms, setup 0ms, import 188ms, tests 43ms, environment 0ms)[22m
+
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m584:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m530:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[16/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould 
+record status history
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m584:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m536:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[17/18]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould 
+include notes in status history
+[31m[1mError[22m: [vitest] No "TaxService" export is defined on 
+the "../../../../src/services/tax.service" mock. Did you forget to 
+return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" 
+helper inside:
+[39m
+vi.mock(import("../../../../src/services/tax.service"), async 
+(importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+[36m [2mΓ¥»[22m new EngineService 
+src/engines/engine-service.ts:[2m50:28[22m[39m
+    [90m 48| [39m  
+[34mconstructor[39m(deps[33m?[39m[33m:[39m [33mPartial[39m[3
+3m<[39m[33mPricingPipelineDeps[39m[33m>[39m) {
+    [90m 49| [39m    [90m// Create pricing pipeline with default 
+or injected dependencies[39m
+    [90m 50| [39m    [35mconst[39m taxService [33m=[39m 
+[35mnew[39m [33mTaxService[39m()[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 51| [39m    [35mconst[39m orderConfigService 
+[33m=[39m [35mnew[39m [33mOrderConfigService[39m()[33m;[39m
+    [90m 52| [39m    [35mconst[39m resolvers [33m=[39m 
+[34mcreateDiscountResolvers[39m()[33m;[39m
+[90m [2mΓ¥»[22m getEngineService 
+src/engines/engine-service.ts:[2m268:22[22m[39m
+[90m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m584:25[22m[39m
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m542:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[18/18]ΓÄ»[22m[39m
+

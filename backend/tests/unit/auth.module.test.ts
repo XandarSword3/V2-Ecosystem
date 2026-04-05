@@ -26,6 +26,10 @@ vi.mock('../../src/services/email.service.js', () => ({
   },
 }));
 
+vi.mock('../../src/services/password-policy.service.js', () => ({
+  validatePassword: vi.fn().mockResolvedValue({ valid: true, errors: [] }),
+}));
+
 vi.mock('../../src/config/index.js', () => ({
   config: {
     env: 'test',
@@ -123,6 +127,7 @@ describe('Auth Service', () => {
         email: 'test@example.com',
         password_hash: '$2a$12$hashedpassword',
         is_active: true,
+        email_verified: true,
         full_name: 'Test User'
       };
       const mockRoles = [{ role_id: 'r-1', roles: { id: 'r-1', name: 'customer', display_name: 'Customer' } }];
@@ -213,34 +218,60 @@ describe('Auth Service', () => {
     });
   });
 
-  describe('refreshTokens', () => {
-    it('should generate new tokens for valid refresh token', async () => {
+  describe('refreshAccessToken', () => {
+    it('should generate new tokens and invalidate old refresh token', async () => {
       const mockSession = {
         id: 'session-1',
         user_id: 'user-1',
-        is_valid: true,
-        refresh_token_hash: 'hash'
+        is_active: true,
       };
-      const mockUser = { id: 'user-1', email: 'test@example.com', is_active: true };
+      const mockUser = {
+        id: 'user-1',
+        email: 'test@example.com',
+        is_active: true,
+        full_name: 'Test User',
+        token_version: 0,
+      };
       const mockRoles = [{ roles: { name: 'customer' } }];
-      
-      vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn()
-          .mockReturnValueOnce(createChainableMock(mockSession))
-          .mockReturnValueOnce(createChainableMock(mockUser))
-          .mockReturnValueOnce(createChainableMock(mockRoles))
-          .mockReturnValueOnce(createChainableMock(null)) // Update session
-      } as any);
 
-      const { refreshTokens } = await import('../../src/modules/auth/auth.service.js');
-      
-      // Note: This may throw due to JWT verification - that's expected
-      // The test verifies the function signature and initial DB calls
-      try {
-        await refreshTokens('valid-refresh-token', {});
-      } catch (e) {
-        // Expected - JWT verification will fail with mock
-      }
+      const sessionLookupBuilder = createChainableMock(mockSession);
+      const userLookupBuilder = createChainableMock(mockUser);
+      const rolesLookupBuilder = createChainableMock(mockRoles);
+      const sessionUpdateBuilder = createChainableMock(null);
+
+      const fromMock = vi.fn()
+        .mockReturnValueOnce(sessionLookupBuilder)
+        .mockReturnValueOnce(userLookupBuilder)
+        .mockReturnValueOnce(rolesLookupBuilder)
+        .mockReturnValueOnce(sessionUpdateBuilder);
+
+      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+      const { generateTokens } = await import('../../src/modules/auth/auth.utils.js');
+      const { refreshAccessToken } = await import('../../src/modules/auth/auth.service.js');
+
+      const existingTokenBundle = generateTokens({
+        userId: 'user-1',
+        email: 'test@example.com',
+        roles: ['customer'],
+        tokenVersion: 0,
+      });
+
+      const result = await refreshAccessToken(existingTokenBundle.refreshToken);
+
+      expect(result.tokens.accessToken).toEqual(expect.any(String));
+      expect(result.tokens.refreshToken).toEqual(expect.any(String));
+      expect(result.tokens.accessToken.length).toBeGreaterThan(20);
+      expect(result.tokens.refreshToken.length).toBeGreaterThan(20);
+
+      expect(sessionLookupBuilder.eq).toHaveBeenCalledWith('refresh_token', existingTokenBundle.refreshToken);
+      expect(sessionUpdateBuilder.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          token: result.tokens.accessToken,
+          refresh_token: expect.any(String),
+        })
+      );
+      expect(sessionUpdateBuilder.eq).toHaveBeenCalledWith('id', 'session-1');
     });
   });
 });
