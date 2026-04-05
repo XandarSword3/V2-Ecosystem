@@ -27,31 +27,31 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: |
-            v2-resort/backend/package-lock.json
-            v2-resort/frontend/package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
       
       - name: Install backend dependencies
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm ci
       
       - name: Install frontend dependencies
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npm ci
       
       - name: Lint backend
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm run lint
       
       - name: Lint frontend
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npm run lint
       
       - name: Typecheck backend
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npx tsc --noEmit
       
       - name: Typecheck frontend
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npx tsc --noEmit
 
   backend-unit:
@@ -68,14 +68,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: v2-resort/backend/package-lock.json
+          cache-dependency-path: backend/package-lock.json
       
       - name: Install dependencies
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm ci
       
       - name: Run unit tests
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm run test:ci
         env:
           NODE_ENV: test
@@ -88,7 +88,7 @@ jobs:
         if: always()
         with:
           name: backend-coverage
-          path: v2-resort/backend/coverage/
+          path: backend/coverage/
           retention-days: 7
 
   frontend-unit:
@@ -105,20 +105,20 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: v2-resort/frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
       
       - name: Install dependencies
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npm ci
       
       - name: Run unit tests
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npm test
         env:
           NODE_ENV: test
 
       - name: Run critical route coverage gate
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npm run test:cov:critical
         env:
           NODE_ENV: test
@@ -129,8 +129,8 @@ jobs:
         with:
           name: frontend-coverage
           path: |
-            v2-resort/frontend/coverage/
-            v2-resort/frontend/coverage-critical/
+            frontend/coverage/
+            frontend/coverage-critical/
           retention-days: 7
 
   backend-integration:
@@ -172,14 +172,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: v2-resort/backend/package-lock.json
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm ci
 
       - name: Run integration tests
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm run test:integration
         env:
           NODE_ENV: test
@@ -197,7 +197,7 @@ jobs:
         if: always()
         with:
           name: backend-integration-results
-          path: v2-resort/backend/test-results/
+          path: backend/test-results/
           retention-days: 7
 
   build:
@@ -215,23 +215,23 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: |
-            v2-resort/backend/package-lock.json
-            v2-resort/frontend/package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
       
       - name: Install backend dependencies
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm ci
       
       - name: Build backend
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm run build
       
       - name: Install frontend dependencies
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npm ci
       
       - name: Build frontend
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npm run build
         env:
           NEXT_PUBLIC_API_URL: https://api.example.com
@@ -251,26 +251,26 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: v2-resort/package-lock.json
+          cache-dependency-path: package-lock.json
       
       - name: Install dependencies
-        working-directory: v2-resort
+        working-directory: .
         run: npm ci
 
       - name: Install backend dependencies
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm ci
 
       - name: Install frontend dependencies
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npm ci
       
       - name: Install Playwright browsers
-        working-directory: v2-resort
+        working-directory: .
         run: npx playwright install --with-deps chromium
       
       - name: Start backend and frontend
-        working-directory: v2-resort
+        working-directory: .
         run: |
           npm run dev > /tmp/v2-resort-dev.log 2>&1 &
           echo "Started app services"
@@ -289,7 +289,7 @@ jobs:
           exit 1
 
       - name: Run smoke Playwright tests
-        working-directory: v2-resort
+        working-directory: .
         run: npx playwright test -c playwright.all.config.ts --project=chromium --grep "@smoke"
         env:
           CI: true
@@ -304,8 +304,8 @@ jobs:
         with:
           name: playwright-report
           path: |
-            v2-resort/playwright-report/
-            v2-resort/test-results/
+            playwright-report/
+            test-results/
           retention-days: 7
 
   e2e-phase3:
@@ -324,28 +324,28 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: |
-            v2-resort/package-lock.json
-            v2-resort/backend/package-lock.json
-            v2-resort/frontend/package-lock.json
+            package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: Install root dependencies
-        working-directory: v2-resort
+        working-directory: .
         run: npm ci
 
       - name: Install backend dependencies
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm ci
 
       - name: Install frontend dependencies
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npm ci
 
       - name: Install Playwright browsers
-        working-directory: v2-resort
+        working-directory: .
         run: npx playwright install --with-deps chromium
 
       - name: Start backend and frontend
-        working-directory: v2-resort
+        working-directory: .
         run: |
           npm run dev > /tmp/v2-resort-dev.log 2>&1 &
           echo "Started app services"
@@ -365,7 +365,7 @@ jobs:
 
       - name: Run Phase 3 critical-path specs (PR)
         if: github.event_name == 'pull_request'
-        working-directory: v2-resort
+        working-directory: .
         run: >
           npx playwright test -c playwright.config.ts
           tests/phase3/00-public-pages.spec.ts
@@ -380,7 +380,7 @@ jobs:
 
       - name: Run full Phase 3 suite (Nightly/manual)
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        working-directory: v2-resort
+        working-directory: .
         run: npx playwright test -c playwright.config.ts --project=chromium
         env:
           CI: true
@@ -391,8 +391,8 @@ jobs:
         with:
           name: playwright-phase3-report
           path: |
-            v2-resort/playwright-report/
-            v2-resort/test-results/
+            playwright-report/
+            test-results/
           retention-days: 14
 
   e2e-full-nightly:
@@ -411,28 +411,28 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: |
-            v2-resort/package-lock.json
-            v2-resort/backend/package-lock.json
-            v2-resort/frontend/package-lock.json
+            package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: Install root dependencies
-        working-directory: v2-resort
+        working-directory: .
         run: npm ci
 
       - name: Install backend dependencies
-        working-directory: v2-resort/backend
+        working-directory: backend
         run: npm ci
 
       - name: Install frontend dependencies
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         run: npm ci
 
       - name: Install Playwright browsers
-        working-directory: v2-resort
+        working-directory: .
         run: npx playwright install --with-deps chromium
 
       - name: Start backend and frontend
-        working-directory: v2-resort
+        working-directory: .
         run: |
           npm run dev > /tmp/v2-resort-dev.log 2>&1 &
           echo "Started app services"
@@ -451,7 +451,7 @@ jobs:
           exit 1
 
       - name: Run full Playwright suite
-        working-directory: v2-resort
+        working-directory: .
         run: npx playwright test -c playwright.all.config.ts --project=chromium
         env:
           CI: true
@@ -462,8 +462,8 @@ jobs:
         with:
           name: playwright-full-report
           path: |
-            v2-resort/playwright-report/
-            v2-resort/test-results/
+            playwright-report/
+            test-results/
           retention-days: 14
       
   deploy-staging:
@@ -481,13 +481,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: v2-resort/frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
 
       - name: Deploy frontend to Vercel (staging)
-        working-directory: v2-resort/frontend
+        working-directory: frontend
         continue-on-error: true
         run: |
           if [ -z "${VERCEL_TOKEN:-}" ]; then
