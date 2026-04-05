@@ -32,7 +32,6 @@ import managerRoutes from '../modules/manager/manager.routes.js';
 import moduleStaffRoutes from '../modules/staff/module-staff.routes.js';
 import devicesRoutes from '../modules/devices/devices.routes.js';
 import promotionsRoutes from '../modules/promotions/promotions.routes.js';
-import reportsRoutes from '../modules/reports/reports.routes.js';
 import { requireModule } from '../middleware/moduleGuard.middleware.js';
 
 // NEW: Generic Routes & Terminology
@@ -101,6 +100,5 @@ router.use('/devices', devicesRoutes);
 
 // New advanced routes
 router.use('/promotions', promotionsRoutes);
-router.use('/reports', reportsRoutes);
 
 export default router;

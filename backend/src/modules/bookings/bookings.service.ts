@@ -9,6 +9,8 @@
 import dayjs from 'dayjs';
 import { getSupabase } from '../../database/connection';
 import { logger } from '../../utils/logger';
+import { getEngineService } from '../../engines/engine-service.js';
+import type { PricingLineItem } from '../../engines/types.js';
 
 // =============================================
 // ERROR TYPES
@@ -602,18 +604,28 @@ export async function cancelBooking(
     throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
   }
 
-  if (booking.status === 'cancelled') {
-    throw new BookingServiceError('Booking is already cancelled', 'ALREADY_CANCELLED', 400);
-  }
+  // === ENGINE-POWERED STATE TRANSITION (Engine B: time_exclusive_reservation) ===
+  const engineService = getEngineService();
+  const actor = userId ? 'staff' : 'customer'; // Could be refined with actual role lookup
+  const transitionResult = await engineService.transitionState(
+    'multi_day_booking',
+    booking.status,
+    'cancel',
+    actor
+  );
 
-  if (booking.status === 'checked_out') {
-    throw new BookingServiceError('Cannot cancel a completed booking', 'CANNOT_CANCEL', 400);
+  if (!transitionResult.allowed) {
+    throw new BookingServiceError(
+      transitionResult.error || `Cannot cancel booking with status: ${booking.status}`,
+      'CANNOT_CANCEL',
+      400
+    );
   }
 
   const { data, error } = await supabase
     .from('chalet_bookings')
     .update({
-      status: 'cancelled',
+      status: transitionResult.targetState,
       cancelled_at: new Date().toISOString(),
       cancellation_reason: reason,
       updated_at: new Date().toISOString(),
@@ -647,9 +659,18 @@ export async function checkIn(bookingId: string, staffId: string): Promise<Booki
     throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
   }
 
-  if (booking.status !== 'confirmed' && booking.status !== 'pending') {
+  // === ENGINE-POWERED STATE TRANSITION (Engine B: time_exclusive_reservation) ===
+  const engineService = getEngineService();
+  const transitionResult = await engineService.transitionState(
+    'multi_day_booking',
+    booking.status,
+    'check_in',
+    'staff'
+  );
+
+  if (!transitionResult.allowed) {
     throw new BookingServiceError(
-      `Cannot check in a booking with status: ${booking.status}`,
+      transitionResult.error || `Cannot check in a booking with status: ${booking.status}`,
       'INVALID_STATUS',
       400
     );
@@ -658,7 +679,7 @@ export async function checkIn(bookingId: string, staffId: string): Promise<Booki
   const { data, error } = await supabase
     .from('chalet_bookings')
     .update({
-      status: 'checked_in',
+      status: transitionResult.targetState,
       checked_in_at: new Date().toISOString(),
       checked_in_by: staffId,
       updated_at: new Date().toISOString(),
@@ -688,9 +709,18 @@ export async function checkOut(bookingId: string, staffId: string): Promise<Book
     throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
   }
 
-  if (booking.status !== 'checked_in') {
+  // === ENGINE-POWERED STATE TRANSITION (Engine B: time_exclusive_reservation) ===
+  const engineService = getEngineService();
+  const transitionResult = await engineService.transitionState(
+    'multi_day_booking',
+    booking.status,
+    'check_out',
+    'staff'
+  );
+
+  if (!transitionResult.allowed) {
     throw new BookingServiceError(
-      `Cannot check out a booking with status: ${booking.status}`,
+      transitionResult.error || `Cannot check out a booking with status: ${booking.status}`,
       'INVALID_STATUS',
       400
     );
@@ -699,7 +729,7 @@ export async function checkOut(bookingId: string, staffId: string): Promise<Book
   const { data, error } = await supabase
     .from('chalet_bookings')
     .update({
-      status: 'checked_out',
+      status: transitionResult.targetState,
       checked_out_at: new Date().toISOString(),
       checked_out_by: staffId,
       updated_at: new Date().toISOString(),

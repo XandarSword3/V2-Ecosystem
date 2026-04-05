@@ -24,6 +24,8 @@
                 "argsIgnorePattern": "^_"
             }
         ],
+        "@typescript-eslint/ban-ts-comment": "warn",
+        "@typescript-eslint/no-require-imports": "off",
         "no-console": [
             "warn",
             {
@@ -33,6 +35,11 @@
                     "info"
                 ]
             }
-        ]
+        ],
+        "prefer-const": "warn",
+        "no-useless-escape": "warn",
+        "no-case-declarations": "warn",
+        "no-useless-catch": "warn",
+        "no-prototype-builtins": "warn"
     }
 }

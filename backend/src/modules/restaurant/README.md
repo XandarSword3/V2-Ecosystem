@@ -1,110 +1,36 @@
-# Restaurant Module
+# Restaurant Module — Detailed Service Specification
 
-Restaurant ordering and kitchen management system.
+## Overview
+The Restaurant module is the largest operational component. It handles dynamic, multi-lingual menus, order lifecycles (with modifiers & discounts), waitlists, and kitchen operations.
 
-## Features
+## Menu Management (`menu.controller.ts`)
 
-- **Menu Management** - Categories, items, pricing
-- **Order Flow** - Cart → Checkout → Kitchen → Delivery
-- **Kitchen Display** - Real-time order queue
-- **Status Tracking** - Live order updates via WebSocket
+### `POST /api/v1/restaurant/menu/items` & `POST /api/v1/restaurant/categories`
+- **Request Payload**: Accepts both `camelCase` and `snake_case` input for flexibility (e.g. `categoryId` or `category_id`). Captures dietary flags (`is_vegetarian`, `is_vegan`, `is_gluten_free`, `is_halal`, `is_dairy_free`, `is_spicy`).
+- **Auto-Translation**: When `name` or `description` are provided without explicit Arabic/French counterparts (`name_ar` / `name_fr`), the controller **automagically invokes the `translateText` service** to generate Arabic and French translations on the fly before persisting to the database.
+- **Cache Management**: Instantly triggers `invalidateMenuCache()` on mutation.
 
-## API Endpoints
+### `GET /api/v1/restaurant/menu/full`
+- **Performance**: High-traffic endpoint used by guests and POS. Attempts to serve from Redis Cache (`getCachedMenuItems`) via the `moduleId` key. If a cache miss occurs, fetches all items, groups them by category in-memory, saves to Redis, and returns the nested structure.
 
-### Menu
+## Order Flow (`order.controller.ts`)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/restaurant/menu` | Get full menu |
-| `GET` | `/restaurant/menu/:moduleId` | Module-specific menu |
-| `GET` | `/restaurant/categories` | List categories |
-| `POST` | `/restaurant/categories` | Create category (admin) |
-| `GET` | `/restaurant/items` | List items |
-| `POST` | `/restaurant/items` | Create item (admin) |
+### `POST /api/v1/restaurant/orders`
+- **Request Payload**: Items array containing `menuItemId, quantity, notes, selectedModifiers, modifierTotal`. Discount fields like `couponCode` and `loyaltyPointsToRedeem` are also integrated.
+- **Business Logic**: 
+  - Passes complete modifier data to calculate exact totals.
+  - Generates comprehensive `logActivity` event under `order_created`.
+- **Security Check**: Accepts authenticated `userId` or defaults to `'Guest'` for unauthorized kiosk/table orders.
 
-### Orders
+### `GET /api/v1/restaurant/orders/:id`
+- **Access Control Strategy**: 
+  1. The explicit owner (`userId === customer_id`) sees the full order.
+  2. Any user with Admin or Staff-like roles (`admin, staff, restaurant_staff, snack_bar_staff, etc`) sees the full order.
+  3. **Guest Orders**: Orders lacking a `customer_id` (created anonymously) can be viewed by anyone holding the `order_id` (used for guest receipt screens).
+  4. **Unauthorized Fallback**: If a logged-in user requests another user's order, they only receive a stripped status payload: `{ status, created_at, estimated_ready_time }`.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/restaurant/orders` | Create order |
-| `GET` | `/restaurant/orders` | User's orders |
-| `GET` | `/restaurant/orders/:id` | Order details |
-| `PUT` | `/restaurant/orders/:id/status` | Update status (staff) |
-| `GET` | `/restaurant/kitchen` | Kitchen queue (staff) |
+### `PUT /api/v1/restaurant/orders/:id/status`
+- Modifies order pipeline state and logs the mutation to the activity stream (`order_status_changed`).
 
-## Order Status Flow
-
-```
-pending → confirmed → preparing → ready → delivered
-                                       ↘ cancelled
-```
-
-## WebSocket Events
-
-| Event | Direction | Payload |
-|-------|-----------|---------|
-| `new-order` | Server → Kitchen | `{ orderId, items, customerName }` |
-| `order-status-updated` | Server → Client | `{ orderId, status }` |
-
-## Data Models
-
-### MenuCategory
-
-```typescript
-{
-  id: UUID,
-  moduleId: UUID,
-  name: string,
-  name_ar?: string,
-  name_fr?: string,
-  sortOrder: number,
-  isActive: boolean
-}
-```
-
-### MenuItem
-
-```typescript
-{
-  id: UUID,
-  categoryId: UUID,
-  name: string,
-  name_ar?: string,
-  description?: string,
-  price: number,
-  imageUrl?: string,
-  isAvailable: boolean,
-  allergens?: string[]
-}
-```
-
-### Order
-
-```typescript
-{
-  id: UUID,
-  userId: UUID,
-  moduleId: UUID,
-  status: OrderStatus,
-  items: OrderItem[],
-  totalAmount: number,
-  deliveryType: 'pickup' | 'delivery' | 'dine-in',
-  tableNumber?: string,
-  notes?: string,
-  createdAt: Date
-}
-```
-
-## Kitchen Display
-
-Real-time kitchen interface for staff:
-
-1. Orders appear automatically via WebSocket
-2. Staff accepts order (confirmed)
-3. Staff starts preparing (preparing)
-4. Order complete (ready)
-5. Customer picks up/delivery (delivered)
-
----
-
-See [frontend/src/components/modules/restaurant](../../frontend/src/components/modules/restaurant) for UI components.
+## Status in Browser (Local Simulation)
+- Tested Flow: *Pending verification via subagent*

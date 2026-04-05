@@ -5,8 +5,8 @@
 CREATE TABLE IF NOT EXISTS product_reviews (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  order_item_id UUID REFERENCES order_items(id) ON DELETE SET NULL,
+  product_id UUID NOT NULL,
+  order_item_id UUID,
   rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
   text TEXT NOT NULL,
   is_approved BOOLEAN DEFAULT false,
@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS product_reviews (
 CREATE TABLE IF NOT EXISTS booking_reviews (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-  unit_id UUID REFERENCES units(id) ON DELETE SET NULL,
+  booking_id UUID NOT NULL,
+  unit_id UUID,
   rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
   text TEXT NOT NULL,
   cleanliness_rating INTEGER CHECK (cleanliness_rating >= 1 AND cleanliness_rating <= 5),
@@ -46,6 +46,92 @@ CREATE TABLE IF NOT EXISTS session_reviews (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, session_id)
 );
+
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'product_reviews'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'products'
+    ) THEN
+      ALTER TABLE product_reviews DROP CONSTRAINT IF EXISTS product_reviews_product_id_fkey;
+      ALTER TABLE product_reviews
+        ADD CONSTRAINT product_reviews_product_id_fkey
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'menu_items'
+    ) THEN
+      ALTER TABLE product_reviews DROP CONSTRAINT IF EXISTS product_reviews_product_id_fkey;
+      ALTER TABLE product_reviews
+        ADD CONSTRAINT product_reviews_product_id_fkey
+        FOREIGN KEY (product_id) REFERENCES menu_items(id) ON DELETE CASCADE;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'order_items'
+    ) THEN
+      ALTER TABLE product_reviews DROP CONSTRAINT IF EXISTS product_reviews_order_item_id_fkey;
+      ALTER TABLE product_reviews
+        ADD CONSTRAINT product_reviews_order_item_id_fkey
+        FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE SET NULL;
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'restaurant_order_items'
+    ) THEN
+      ALTER TABLE product_reviews DROP CONSTRAINT IF EXISTS product_reviews_order_item_id_fkey;
+      ALTER TABLE product_reviews
+        ADD CONSTRAINT product_reviews_order_item_id_fkey
+        FOREIGN KEY (order_item_id) REFERENCES restaurant_order_items(id) ON DELETE SET NULL;
+    END IF;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'booking_reviews'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'bookings'
+    ) THEN
+      ALTER TABLE booking_reviews DROP CONSTRAINT IF EXISTS booking_reviews_booking_id_fkey;
+      ALTER TABLE booking_reviews
+        ADD CONSTRAINT booking_reviews_booking_id_fkey
+        FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE;
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'chalet_bookings'
+    ) THEN
+      ALTER TABLE booking_reviews DROP CONSTRAINT IF EXISTS booking_reviews_booking_id_fkey;
+      ALTER TABLE booking_reviews
+        ADD CONSTRAINT booking_reviews_booking_id_fkey
+        FOREIGN KEY (booking_id) REFERENCES chalet_bookings(id) ON DELETE CASCADE;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'units'
+    ) THEN
+      ALTER TABLE booking_reviews DROP CONSTRAINT IF EXISTS booking_reviews_unit_id_fkey;
+      ALTER TABLE booking_reviews
+        ADD CONSTRAINT booking_reviews_unit_id_fkey
+        FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL;
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'chalets'
+    ) THEN
+      ALTER TABLE booking_reviews DROP CONSTRAINT IF EXISTS booking_reviews_unit_id_fkey;
+      ALTER TABLE booking_reviews
+        ADD CONSTRAINT booking_reviews_unit_id_fkey
+        FOREIGN KEY (unit_id) REFERENCES chalets(id) ON DELETE SET NULL;
+    END IF;
+  END IF;
+END $$;
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_product_reviews_product ON product_reviews(product_id);
@@ -110,9 +196,11 @@ CREATE POLICY product_reviews_admin ON product_reviews
   FOR ALL TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM users 
-      WHERE users.id = auth.uid() 
-      AND users.roles @> '["admin"]'
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin')
     )
   );
 
@@ -132,9 +220,11 @@ CREATE POLICY booking_reviews_admin ON booking_reviews
   FOR ALL TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM users 
-      WHERE users.id = auth.uid() 
-      AND users.roles @> '["admin"]'
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin')
     )
   );
 
@@ -154,9 +244,11 @@ CREATE POLICY session_reviews_admin ON session_reviews
   FOR ALL TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM users 
-      WHERE users.id = auth.uid() 
-      AND users.roles @> '["admin"]'
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin')
     )
   );
 

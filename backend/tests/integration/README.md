@@ -1,197 +1,51 @@
-# Integration Tests
+﻿# Backend Integration Tests
 
-End-to-end integration tests for the V2 Resort backend API.
+Integration tests validate API behavior with real dependency wiring.
 
-## Overview
+## Runner
 
-These tests exercise real API endpoints against a test database, validating complete user flows:
+1. Command: npm run test:integration
+2. Config file: backend/vitest.integration.config.ts
+3. Setup file: backend/tests/integration/setup.ts
 
-| Scenario | Description |
-|----------|-------------|
-| **Order Lifecycle** | Customer orders → Staff processes → Complete |
-| **Auth Flow** | Register → Login → Refresh → Password change → Logout |
-| **Booking Cycle** | Check availability → Book → Check-in → Check-out |
-| **Pool Tickets** | Browse → Purchase → Staff validates → Use |
-| **Admin Operations** | Dashboard → User management → Reports |
+## Required Environment Variables
 
-## Prerequisites
+1. DATABASE_URL
+2. SUPABASE_URL
+3. SUPABASE_SERVICE_KEY
+4. SUPABASE_ANON_KEY
+5. JWT_SECRET
 
-- Docker & Docker Compose
-- Node.js 18+
-- Backend dependencies installed (`npm install`)
+## Dependency Expectations
 
-## Quick Start
+By default, integration setup expects:
 
-```bash
-# 1. Start test database
-npm run test:integration:setup
+1. PostgreSQL at port 5433 (v2resort_test database profile)
+2. Redis at port 6380
+3. Reachable test API URL (defaults to `http://localhost:3006/api/v1`)
 
-# 2. Run integration tests
-npm run test:integration
-
-# 3. Cleanup
-npm run test:integration:teardown
-```
-
-## Test Database
-
-Integration tests use an isolated PostgreSQL instance:
-
-| Setting | Value |
-|---------|-------|
-| Host | localhost |
-| Port | **5433** (not 5432!) |
-| User | v2resort_test |
-| Password | v2resort_test_secret |
-| Database | v2resort_test |
-
-Redis test instance runs on port **6380**.
-
-### Manual Docker Commands
+## Local Dependency Bootstrap
 
 ```bash
-# Start services
+# From backend/
 docker-compose -f docker-compose.test.yml up -d
-
-# Check status
-docker-compose -f docker-compose.test.yml ps
-
-# View logs
-docker-compose -f docker-compose.test.yml logs -f
-
-# Stop and remove volumes
+npm run test:integration
 docker-compose -f docker-compose.test.yml down -v
 ```
 
-## Test Structure
+## CI Dependency Bootstrap
 
-```
-tests/integration/
-├── config.ts           # Environment configuration
-├── setup.ts            # Database seeding, cleanup
-├── api-client.ts       # HTTP client with auth handling
-├── assertions.ts       # Common assertion helpers
-├── index.ts            # Re-exports all utilities
-└── scenarios/
-    ├── order-lifecycle.test.ts
-    ├── auth-flow.test.ts
-    ├── booking-cycle.test.ts
-    ├── pool-tickets.test.ts
-    └── admin-operations.test.ts
-```
+CI now provisions explicit service containers in the backend-integration job:
 
-## Configuration
+1. Postgres 15 (postgres:15-alpine)
+2. Redis 7 (redis:7-alpine)
 
-Integration tests are controlled by environment variables:
+with ports aligned to setup defaults:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RUN_INTEGRATION_TESTS` | `false` | Enable integration tests |
-| `TEST_DB_HOST` | `localhost` | Test database host |
-| `TEST_DB_PORT` | `5433` | Test database port |
-| `TEST_API_URL` | `http://localhost:3001/api` | Backend API URL |
+1. 5433:5432 for Postgres
+2. 6380:6379 for Redis
 
-## Writing New Tests
+## Notes
 
-### Create a new scenario
-
-```typescript
-// tests/integration/scenarios/my-feature.test.ts
-import { describe, it, beforeAll } from 'vitest';
-import { createGuestClient, createStaffClient } from '../api-client';
-import { assertSuccess, assertHasData } from '../assertions';
-import { waitForServices, resetTestContext } from '../setup';
-
-const runIntegration = process.env.RUN_INTEGRATION_TESTS === 'true';
-const describeIf = runIntegration ? describe : describe.skip;
-
-describeIf('My Feature Integration', () => {
-  let client;
-
-  beforeAll(async () => {
-    const services = await waitForServices();
-    if (!services.database) return;
-    
-    resetTestContext();
-    client = createGuestClient();
-  });
-
-  it('should do something', async () => {
-    const response = await client.someEndpoint();
-    assertSuccess(response);
-    assertHasData(response, (data) => {
-      expect(data.field).toBeDefined();
-    });
-  });
-});
-```
-
-### Available Clients
-
-| Client | Usage |
-|--------|-------|
-| `createGuestClient()` | Unauthenticated requests |
-| `createCustomerClient()` | Customer role |
-| `createStaffClient()` | Staff role |
-| `createAdminClient()` | Admin role |
-
-### Available Assertions
-
-| Assertion | Description |
-|-----------|-------------|
-| `assertSuccess(response)` | Response is 2xx |
-| `assertFailure(response, status?)` | Response is error |
-| `assertHasData(response, validator?)` | Has data with optional validation |
-| `assertUnauthorized(response)` | Is 401 |
-| `assertForbidden(response)` | Is 403 |
-| `assertNotFound(response)` | Is 404 |
-| `waitFor(condition, options)` | Poll until condition |
-
-## CI/CD Integration
-
-GitHub Actions example:
-
-```yaml
-integration-tests:
-  runs-on: ubuntu-latest
-  services:
-    postgres:
-      image: postgres:15-alpine
-      env:
-        POSTGRES_USER: v2resort_test
-        POSTGRES_PASSWORD: v2resort_test_secret
-        POSTGRES_DB: v2resort_test
-      ports:
-        - 5433:5432
-    redis:
-      image: redis:7-alpine
-      ports:
-        - 6380:6379
-  steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version: 20
-    - run: npm ci
-    - run: npm run test:integration
-      env:
-        RUN_INTEGRATION_TESTS: true
-```
-
-## Troubleshooting
-
-### Tests skip immediately
-- Check `RUN_INTEGRATION_TESTS=true` is set
-- Verify Docker containers are running
-
-### Database connection errors
-- Ensure port 5433 is available
-- Check `docker-compose -f docker-compose.test.yml ps`
-
-### Tests timeout
-- Increase `testTimeout` in `vitest.integration.config.ts`
-- Check API server is running on port 3001
-
-### Cleanup issues
-- Run `npm run test:integration:teardown`
-- Manually: `docker-compose -f docker-compose.test.yml down -v`
+1. setup.ts performs lifecycle coordination, optional migration/seed, and cleanup.
+2. setup.ts now filters only known non-actionable warning noise while preserving real failures.

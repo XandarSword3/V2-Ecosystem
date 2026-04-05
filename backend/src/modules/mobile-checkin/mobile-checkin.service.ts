@@ -4,7 +4,7 @@
  * Refactored to use Supabase instead of Prisma
  */
 
-import { format, addDays } from 'date-fns';
+import dayjs from 'dayjs';
 import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { getSupabase } from '../../database/connection.js';
@@ -115,7 +115,7 @@ export class MobileCheckinService {
 
     // Generate access token
     const accessToken = crypto.randomBytes(32).toString('hex');
-    const tokenExpires = addDays(new Date(booking.check_in), 1);
+    const tokenExpires = dayjs(booking.check_in).add(1, 'day').toDate();
 
     const guest = booking.guests as any;
     const { data: registration, error } = await this.supabase
@@ -204,7 +204,7 @@ export class MobileCheckinService {
 
     if (data.legalFirstName) updateData.legal_first_name = data.legalFirstName;
     if (data.legalLastName) updateData.legal_last_name = data.legalLastName;
-    if (data.dateOfBirth) updateData.date_of_birth = format(data.dateOfBirth, 'yyyy-MM-dd');
+    if (data.dateOfBirth) updateData.date_of_birth = dayjs(data.dateOfBirth).format('YYYY-MM-DD');
     if (data.nationality) updateData.nationality = data.nationality;
     if (data.addressLine1) updateData.address_line1 = data.addressLine1;
     if (data.addressLine2) updateData.address_line2 = data.addressLine2;
@@ -373,8 +373,8 @@ export class MobileCheckinService {
         document_type: document.documentType,
         document_number: document.documentNumber,
         issuing_country: document.issuingCountry,
-        issue_date: document.issueDate ? format(document.issueDate, 'yyyy-MM-dd') : null,
-        expiry_date: document.expiryDate ? format(document.expiryDate, 'yyyy-MM-dd') : null,
+        issue_date: document.issueDate ? dayjs(document.issueDate).format('YYYY-MM-DD') : null,
+        expiry_date: document.expiryDate ? dayjs(document.expiryDate).format('YYYY-MM-DD') : null,
         file_url: document.fileUrl,
         file_name: document.fileName,
         file_type: document.fileType,
@@ -433,7 +433,7 @@ export class MobileCheckinService {
     }
 
     // Calculate document hash if content provided
-    const documentHash = signature.documentHash || 
+    const documentHash = signature.documentHash ||
       crypto.createHash('sha256').update(signature.signatureType + Date.now()).digest('hex');
 
     const { data: sig, error } = await this.supabase
@@ -593,7 +593,7 @@ export class MobileCheckinService {
   private async issueMobileKey(keyId: string): Promise<void> {
     // In production, this would call the lock provider API
     // (ASSA ABLOY, Salto, dormakaba, OpenKey, etc.)
-    
+
     // Simulating credential issuance
     const providerCredential = {
       credentialId: crypto.randomBytes(16).toString('hex'),

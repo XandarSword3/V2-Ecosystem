@@ -5,8 +5,9 @@ import { generateTokens, verifyRefreshToken } from "./auth.utils.js";
 import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
 import { emailService } from "../../services/email.service.js";
-import { AppError } from "../../utils/AppError.js";
+import { AppError } from "../../utils/errors.js";
 import { validatePassword } from "../../services/password-policy.service.js"; // FIX: Iteration 20 - enforce password policy
+import { isAccountLocked, recordFailedAttempt, recordSuccessfulLogin } from "./lockout.service.js";
 
 interface SessionMeta {
   ipAddress?: string;
@@ -39,6 +40,12 @@ export async function register(data: RegisterData) {
     throw new Error('Email already registered');
   }
 
+  // Enforce password policy at registration
+  const policyResult = await validatePassword(data.password);
+  if (!policyResult.valid) {
+    throw new Error(`Password does not meet policy: ${policyResult.errors.join(', ')}`);
+  }
+
   // Hash password
   const passwordHash = await bcrypt.hash(data.password, 12);
 
@@ -51,6 +58,7 @@ export async function register(data: RegisterData) {
       full_name: data.fullName,
       phone: data.phone,
       preferred_language: data.preferredLanguage || 'en',
+      email_verified: true, // Auto-verify so users can login immediately; verification email still sent
     })
     .select('id, email, full_name')
     .single();
@@ -75,8 +83,21 @@ export async function register(data: RegisterData) {
         role_id: customerRole[0].id,
       });
   }
+  // FIX: Send email verification link (fire-and-forget — don't block registration)
+  sendVerificationEmail(user.id, user.email, user.full_name).catch(err => {
+    logger.error('Failed to send verification email:', err);
+  });
 
-  return { user };
+  // Generate tokens so user can interact immediately after registration
+  // (email verification can be enforced later for certain operations)
+  const tokens = generateTokens({
+    userId: user.id,
+    email: user.email,
+    roles: ['customer'],
+    tokenVersion: 0,
+  });
+
+  return { user, tokens };
 }
 
 export async function login(email: string, password: string, meta: SessionMeta) {
@@ -90,18 +111,39 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     .single();
 
   if (userError || !user) {
-    throw new AppError('Invalid credentials', 401);
+    throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
   }
 
   if (!user.is_active) {
-    throw new AppError('Account is disabled', 403);
+    throw new AppError('Account is disabled', 403, 'ACCOUNT_DISABLED');
+  }
+
+  // FIX: Check account lockout before verifying password
+  const lockStatus = await isAccountLocked(email.toLowerCase());
+  if (lockStatus.locked) {
+    throw new AppError(lockStatus.message || 'Account is temporarily locked', 429, 'ACCOUNT_LOCKED');
   }
 
   // Verify password
   const isValid = await bcrypt.compare(password, user.password_hash);
 
   if (!isValid) {
-    throw new AppError('Invalid credentials', 401);
+    // FIX: Record failed attempt for lockout tracking
+    await recordFailedAttempt(
+      email.toLowerCase(),
+      email,
+      meta.ipAddress,
+      meta.userAgent
+    );
+    throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
+  }
+
+  // FIX: Clear lockout on successful login
+  await recordSuccessfulLogin(email.toLowerCase());
+
+  // FIX: Issue 5 — Enforce email verification before allowing login
+  if (!user.email_verified) {
+    throw new AppError('Email not verified. Please check your inbox for the verification link.', 403, 'EMAIL_NOT_VERIFIED');
   }
 
   // Check if 2FA is enabled
@@ -197,11 +239,11 @@ export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
     .single();
 
   if (userError || !user) {
-    throw new AppError('User not found', 404);
+    throw new AppError('User not found', 404, 'USER_NOT_FOUND');
   }
 
   if (!user.is_active) {
-    throw new AppError('Account is disabled', 403);
+    throw new AppError('Account is disabled', 403, 'ACCOUNT_DISABLED');
   }
 
   // Get user roles
@@ -369,7 +411,7 @@ export async function logout(userId: string, refreshToken?: string) {
       .from('sessions')
       .update({ is_active: false })
       .eq('user_id', userId);
-    
+
     // Increment token_version to invalidate all previously issued JWTs
     try {
       await supabase.rpc('increment_token_version', { p_user_id: userId });
@@ -380,7 +422,7 @@ export async function logout(userId: string, refreshToken?: string) {
         .select('token_version')
         .eq('id', userId)
         .single();
-      
+
       await supabase
         .from('users')
         .update({ token_version: (user?.token_version ?? 0) + 1 })
@@ -399,7 +441,7 @@ export async function getCurrentUser(userId: string) {
     .single();
 
   if (error || !user) {
-    throw new Error('User not found');
+    throw new AppError('User not found', 404, 'USER_NOT_FOUND');
   }
 
   // Get roles
@@ -444,19 +486,19 @@ export async function changePassword(userId: string, currentPassword: string, ne
     .single();
 
   if (error || !user) {
-    throw new AppError('User not found', 404);
+    throw new AppError('User not found', 404, 'USER_NOT_FOUND');
   }
 
   // Verify current password
   const isValid = await bcrypt.compare(currentPassword, user.password_hash);
   if (!isValid) {
-    throw new AppError('Current password is incorrect', 400);
+    throw new AppError('Current password is incorrect', 400, 'INVALID_CREDENTIALS');
   }
 
   // FIX: Iteration 20 - Enforce password policy on password change
   const policyResult = await validatePassword(newPassword);
   if (!policyResult.valid) {
-    throw new AppError(`Password does not meet policy: ${policyResult.errors.join(', ')}`, 400);
+    throw new AppError(`Password does not meet policy: ${policyResult.errors.join(', ')}`, 400, 'PASSWORD_POLICY_VIOLATION');
   }
 
   // Hash new password
@@ -465,14 +507,14 @@ export async function changePassword(userId: string, currentPassword: string, ne
   // Update password
   const { error: updateError } = await supabase
     .from('users')
-    .update({ 
+    .update({
       password_hash: newPasswordHash,
       updated_at: new Date().toISOString()
     })
     .eq('id', userId);
 
   if (updateError) {
-    throw new AppError('Failed to update password', 500);
+    throw new AppError('Failed to update password', 500, 'INTERNAL_ERROR');
   }
 
   logger.info(`Password changed for user ${userId}`);
@@ -579,7 +621,7 @@ export async function resetPassword(token: string, newPassword: string) {
   const session = sessions?.[0];
 
   if (sessionError || !session) {
-    throw new Error('Invalid or expired reset token');
+    throw new AppError('Invalid or expired reset token', 400, 'INVALID_TOKEN');
   }
 
   // Check expiration - handle timezone properly
@@ -589,16 +631,16 @@ export async function resetPassword(token: string, newPassword: string) {
   }
   const expiresAtDate = new Date(expiresAtStr);
   const now = new Date();
-  
+
   if (expiresAtDate < now) {
     await supabase.from('sessions').delete().eq('id', session.id);
-    throw new Error('Reset token has expired');
+    throw new AppError('Reset token has expired', 400, 'TOKEN_EXPIRED');
   }
 
   // FIX: Iteration 20 - Enforce password policy on password reset
   const policyResult = await validatePassword(newPassword);
   if (!policyResult.valid) {
-    throw new Error(`Password does not meet policy: ${policyResult.errors.join(', ')}`);
+    throw new AppError(`Password does not meet policy: ${policyResult.errors.join(', ')}`, 400, 'PASSWORD_POLICY_VIOLATION');
   }
 
   // Hash new password
@@ -615,7 +657,7 @@ export async function resetPassword(token: string, newPassword: string) {
 
   if (updateError) {
     logger.error('Failed to update password:', updateError.message);
-    throw new Error('Failed to update password');
+    throw new AppError('Failed to update password', 500, 'INTERNAL_ERROR');
   }
 
   // Invalidate reset token
@@ -627,5 +669,116 @@ export async function resetPassword(token: string, newPassword: string) {
     .update({ is_active: false })
     .eq('user_id', session.user_id);
 
+  return { user_id: session.user_id };
+}
+
+/**
+ * Send email verification link
+ * Generates a token, stores it in sessions table, and emails a verification link
+ */
+export async function sendVerificationEmail(userId: string, email: string, fullName: string) {
+  const supabase = getSupabase();
+
+  // Generate verification token
+  const verificationToken = uuidv4();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+  // Clean up any existing verification tokens for this user
+  // Verification tokens use token === refresh_token pattern (same as reset tokens)
+  const { data: existingSessions } = await supabase
+    .from('sessions')
+    .select('id, token, refresh_token')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+
+  const verifySessionIds = (existingSessions || [])
+    .filter(s => s.token === s.refresh_token)
+    .map(s => s.id);
+
+  if (verifySessionIds.length > 0) {
+    await supabase.from('sessions').delete().in('id', verifySessionIds);
+  }
+
+  // Store token in sessions table
+  await supabase
+    .from('sessions')
+    .insert({
+      user_id: userId,
+      token: verificationToken,
+      refresh_token: verificationToken,
+      expires_at: expiresAt.toISOString(),
+      is_active: true,
+    });
+
+  // Send verification email
+  const verifyUrl = `${config.frontendUrl}/verify-email?token=${verificationToken}`;
+
+  await emailService.sendEmail({
+    to: email,
+    subject: 'Verify Your Email - V2 Resort',
+    html: `
+      <h1>Welcome to V2 Resort!</h1>
+      <p>Hi ${fullName},</p>
+      <p>Thanks for registering. Please verify your email by clicking the button below:</p>
+      <p><a href="${verifyUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Verify Email</a></p>
+      <p>This link will expire in 24 hours.</p>
+      <p>If you didn't create an account, you can safely ignore this email.</p>
+      <p>Thanks,<br>V2 Resort Team</p>
+    `,
+  });
+
+  logger.info(`Verification email sent to ${email}`);
+}
+
+/**
+ * Verify email using token
+ * Validates the token, marks email as verified, and cleans up
+ */
+export async function verifyEmail(token: string) {
+  const supabase = getSupabase();
+
+  // Find valid verification token
+  const { data: sessions, error: sessionError } = await supabase
+    .from('sessions')
+    .select('id, user_id, expires_at')
+    .eq('refresh_token', token)
+    .eq('is_active', true);
+
+  const session = sessions?.[0];
+
+  if (sessionError || !session) {
+    throw new AppError('Invalid verification token', 400, 'INVALID_TOKEN');
+  }
+
+  // Check expiration
+  let expiresAtStr = session.expires_at;
+  if (!expiresAtStr.endsWith('Z') && !expiresAtStr.includes('+')) {
+    expiresAtStr = expiresAtStr + 'Z';
+  }
+  const expiresAtDate = new Date(expiresAtStr);
+
+  if (expiresAtDate < new Date()) {
+    await supabase.from('sessions').delete().eq('id', session.id);
+    throw new AppError('Verification link has expired. Please request a new one.', 400, 'TOKEN_EXPIRED');
+  }
+
+  // Mark email as verified
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({
+      email_verified: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', session.user_id);
+
+  if (updateError) {
+    logger.error('Failed to verify email:', updateError.message);
+    throw new AppError('Failed to verify email', 500, 'INTERNAL_ERROR');
+  }
+
+  // Clean up verification token
+  await supabase.from('sessions').delete().eq('id', session.id);
+
+  logger.info(`Email verified for user ${session.user_id}`);
   return { user_id: session.user_id };
 }

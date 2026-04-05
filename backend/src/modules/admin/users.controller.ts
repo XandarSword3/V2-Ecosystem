@@ -359,6 +359,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     if (validatedData.fullName !== undefined) updateData.full_name = validatedData.fullName;
     if (validatedData.phone !== undefined) updateData.phone = validatedData.phone;
     if (validatedData.isActive !== undefined) updateData.is_active = validatedData.isActive;
+    if (validatedData.emailVerified !== undefined) updateData.email_verified = validatedData.emailVerified;
     if (validatedData.preferredLanguage !== undefined) updateData.preferred_language = validatedData.preferredLanguage;
 
     const { data: user, error } = await supabase

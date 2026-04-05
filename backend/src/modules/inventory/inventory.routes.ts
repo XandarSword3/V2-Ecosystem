@@ -12,6 +12,7 @@ const adminAuth: RequestHandler[] = [authenticate, authorize('admin', 'super_adm
 // Recipe / BOM routes (must be before /items/:id to avoid matching)
 router.get('/items/recipe/:menuItemId', ...staffAuth, inventoryAdvancedController.getRecipe.bind(inventoryAdvancedController));
 router.post('/items/recipe/:menuItemId', ...adminAuth, inventoryAdvancedController.createRecipe.bind(inventoryAdvancedController));
+router.put('/items/recipe/:menuItemId', ...adminAuth, inventoryAdvancedController.updateRecipe.bind(inventoryAdvancedController));
 router.get('/sessions/recipe/:sessionId', ...staffAuth, inventoryAdvancedController.getRecipe.bind(inventoryAdvancedController));
 router.post('/sessions/recipe/:sessionId', ...adminAuth, inventoryAdvancedController.createRecipe.bind(inventoryAdvancedController));
 
@@ -44,5 +45,31 @@ router.get('/report', ...adminAuth, inventoryController.generateReport.bind(inve
 
 // Cron endpoints
 router.post('/check-expiring', ...adminAuth, inventoryController.checkExpiringItems.bind(inventoryController));
+
+// ── Advanced: Wastage ──
+router.post('/wastage', ...staffAuth, inventoryAdvancedController.recordWastage.bind(inventoryAdvancedController));
+router.post('/wastage/:id/approve', ...adminAuth, inventoryAdvancedController.approveWastage.bind(inventoryAdvancedController));
+
+// ── Advanced: Physical Counts & Variance ──
+router.post('/physical-count', ...staffAuth, inventoryAdvancedController.recordPhysicalCount.bind(inventoryAdvancedController));
+router.get('/variance-report', ...adminAuth, inventoryAdvancedController.getVarianceReport.bind(inventoryAdvancedController));
+
+// ── Advanced: Purchase Orders ──
+router.post('/purchase-orders', ...adminAuth, inventoryAdvancedController.createPurchaseOrder.bind(inventoryAdvancedController));
+router.post('/purchase-orders/:id/receive', ...adminAuth, inventoryAdvancedController.receivePurchaseOrder.bind(inventoryAdvancedController));
+
+// ── Advanced: Suppliers ──
+router.get('/suppliers', ...staffAuth, inventoryAdvancedController.getSuppliers.bind(inventoryAdvancedController));
+router.post('/suppliers', ...adminAuth, inventoryAdvancedController.createSupplier.bind(inventoryAdvancedController));
+
+// ── Advanced: Batches ──
+router.get('/items/:itemId/batches', ...staffAuth, inventoryAdvancedController.getItemBatches.bind(inventoryAdvancedController));
+
+// ── Advanced: Order deduction ──
+router.post('/deduct-for-order', ...staffAuth, inventoryAdvancedController.deductForOrder.bind(inventoryAdvancedController));
+
+// ── Advanced: Cost Analysis & Dashboard ──
+router.get('/menu-cost-analysis/:menuItemId', ...adminAuth, inventoryAdvancedController.getMenuItemCostAnalysis.bind(inventoryAdvancedController));
+router.get('/dashboard-stats', ...adminAuth, inventoryAdvancedController.getDashboardStats.bind(inventoryAdvancedController));
 
 export default router;

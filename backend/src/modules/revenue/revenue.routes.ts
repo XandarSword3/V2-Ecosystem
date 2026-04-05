@@ -6,16 +6,26 @@
 import { Router } from 'express';
 import { revenueController } from './revenue.controller';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { validatePropertyAccess } from '../../middleware/propertyAccess.middleware.js';
+import { createRateLimiter } from '../../middleware/api-security.middleware.js';
 
 const router = Router();
 
-// All routes require authentication
+// Rate limiter for expensive computation endpoints
+const expensiveRateLimit = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5,
+  message: 'Too many requests to this resource-intensive endpoint',
+});
+
+// All routes require authentication and property access validation
 router.use(authenticate);
+router.use(validatePropertyAccess);
 
 // =============================================
 // DEMAND FORECASTING
 // =============================================
-router.post('/forecasts/generate', authorize('admin', 'manager'), revenueController.generateForecasts.bind(revenueController));
+router.post('/forecasts/generate', authorize('admin', 'manager'), expensiveRateLimit, revenueController.generateForecasts.bind(revenueController));
 router.get('/forecasts', revenueController.getForecasts.bind(revenueController));
 
 // =============================================
@@ -37,12 +47,12 @@ router.get('/calculate-rates-range', revenueController.calculateRatesForRange.bi
 // =============================================
 router.get('/calendar', revenueController.getPricingCalendar.bind(revenueController));
 router.put('/calendar/:roomTypeId/:date', authorize('admin', 'manager'), revenueController.updatePricingCalendar.bind(revenueController));
-router.post('/calendar/bulk', authorize('admin', 'manager'), revenueController.bulkUpdatePricingCalendar.bind(revenueController));
+router.post('/calendar/bulk', authorize('admin', 'manager'), expensiveRateLimit, revenueController.bulkUpdatePricingCalendar.bind(revenueController));
 
 // =============================================
 // RATE RECOMMENDATIONS
 // =============================================
-router.post('/recommendations/generate', authorize('admin', 'manager'), revenueController.generateRecommendations.bind(revenueController));
+router.post('/recommendations/generate', authorize('admin', 'manager'), expensiveRateLimit, revenueController.generateRecommendations.bind(revenueController));
 router.get('/recommendations', revenueController.getRecommendations.bind(revenueController));
 router.post('/recommendations/:id/respond', authorize('admin', 'manager'), revenueController.respondToRecommendation.bind(revenueController));
 

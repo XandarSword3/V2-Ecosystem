@@ -14,6 +14,10 @@ describe('Modifiers Controller', () => {
   describe('createGroup', () => {
     it('should create a modifier group with options', async () => {
       const mockGroup = { id: 'group-1', name: 'Size' };
+      const mockOptions = [
+        { id: 'opt-1', name: 'Small', price_adjustment: 0 },
+        { id: 'opt-2', name: 'Large', price_adjustment: 2.5 },
+      ];
 
       const mockSupabase = {
         from: vi.fn().mockImplementation((table: string) => {
@@ -27,7 +31,9 @@ describe('Modifiers Controller', () => {
             };
           } else {
             return {
-              insert: vi.fn().mockResolvedValue({ error: null })
+              insert: vi.fn().mockReturnValue({
+                select: vi.fn().mockResolvedValue({ data: mockOptions, error: null })
+              })
             };
           }
         })
@@ -51,7 +57,13 @@ describe('Modifiers Controller', () => {
       await modifiersController.createGroup(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(201);
-      expect(res.json).toHaveBeenCalledWith({ success: true, data: mockGroup });
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: {
+          ...mockGroup,
+          options: mockOptions,
+        },
+      });
     });
 
     it('should create a modifier group without options', async () => {
@@ -79,6 +91,31 @@ describe('Modifiers Controller', () => {
       await modifiersController.createGroup(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(201);
+    });
+
+    it('should call next on missing required field', async () => {
+      const error = new Error('null value in column "name" violates not-null constraint');
+      const mockSupabase = {
+        from: vi.fn().mockReturnValue({
+          insert: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: null, error })
+            })
+          })
+        })
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      const { req, res, next } = createMockReqRes({
+        body: {
+          minSelections: 0,
+          maxSelections: 1,
+        }
+      });
+
+      await modifiersController.createGroup(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(error);
     });
 
     it('should call next on error', async () => {
@@ -180,6 +217,26 @@ describe('Modifiers Controller', () => {
       await modifiersController.deleteGroup(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({ success: true });
+    });
+
+    it('should call next on delete failure', async () => {
+      const error = new Error('Delete failed');
+      const mockSupabase = {
+        from: vi.fn().mockReturnValue({
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ error })
+          })
+        })
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      const { req, res, next } = createMockReqRes({
+        params: { id: 'group-1' }
+      });
+
+      await modifiersController.deleteGroup(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(error);
     });
   });
 

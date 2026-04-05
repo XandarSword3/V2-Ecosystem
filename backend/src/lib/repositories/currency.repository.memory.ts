@@ -1,140 +1,83 @@
 /**
  * In-Memory Currency Repository
- * 
- * Test double implementation for currency and exchange rate operations.
+ * Test double for CurrencyRepository using in-memory data structures.
  */
 
-import { randomUUID } from 'crypto';
-import type { 
-  CurrencyRepository, 
-  Currency, 
-  ExchangeRate, 
-  CurrencyConversion 
-} from '../container/types';
+import type {
+  CurrencyRepository,
+  Currency,
+  ExchangeRate,
+  CurrencyConversion,
+} from '../container/types.js';
 
 export class InMemoryCurrencyRepository implements CurrencyRepository {
-  private currencies: Map<string, Currency> = new Map();
-  private exchangeRates: Map<string, ExchangeRate> = new Map();
-  private conversions: Map<string, CurrencyConversion> = new Map();
+  private currencies = new Map<string, Currency>();
+  private exchangeRates: ExchangeRate[] = [];
+  private conversions: CurrencyConversion[] = [];
 
+  reset() {
+    this.currencies.clear();
+    this.exchangeRates = [];
+    this.conversions = [];
+  }
+
+  // Currency operations
   async getCurrencies(): Promise<Currency[]> {
-    return Array.from(this.currencies.values()).filter(c => c.isActive);
+    return [...this.currencies.values()];
   }
 
   async getCurrency(code: string): Promise<Currency | null> {
-    return this.currencies.get(code.toUpperCase()) || null;
+    return this.currencies.get(code) ?? null;
   }
 
   async createCurrency(data: Omit<Currency, 'createdAt' | 'updatedAt'>): Promise<Currency> {
-    const currency: Currency = {
-      ...data,
-      code: data.code.toUpperCase(),
-      createdAt: new Date().toISOString(),
-      updatedAt: null,
-    };
-    this.currencies.set(currency.code, currency);
+    const currency: Currency = { ...data, createdAt: new Date().toISOString(), updatedAt: null };
+    this.currencies.set(data.code, currency);
     return currency;
   }
 
   async updateCurrency(code: string, data: Partial<Currency>): Promise<Currency> {
-    const existing = this.currencies.get(code.toUpperCase());
-    if (!existing) throw new Error('Currency not found');
-    
-    const updated: Currency = {
-      ...existing,
-      ...data,
-      code: existing.code,
-      createdAt: existing.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    this.currencies.set(code.toUpperCase(), updated);
+    const existing = this.currencies.get(code);
+    if (!existing) throw new Error(`Currency ${code} not found`);
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
+    this.currencies.set(code, updated);
     return updated;
   }
 
   async deleteCurrency(code: string): Promise<void> {
-    this.currencies.delete(code.toUpperCase());
+    this.currencies.delete(code);
   }
 
+  // Exchange rate operations
   async getExchangeRate(baseCurrency: string, targetCurrency: string): Promise<ExchangeRate | null> {
-    const base = baseCurrency.toUpperCase();
-    const target = targetCurrency.toUpperCase();
-    
-    // Find the most recent valid rate
-    const rates = Array.from(this.exchangeRates.values())
-      .filter(r => r.baseCurrency === base && r.targetCurrency === target)
-      .filter(r => {
-        const now = new Date();
-        const validFrom = new Date(r.validFrom);
-        const validTo = r.validTo ? new Date(r.validTo) : null;
-        return validFrom <= now && (!validTo || validTo >= now);
-      })
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    
-    return rates[0] || null;
+    const rates = this.exchangeRates.filter(
+      r => r.baseCurrency === baseCurrency && r.targetCurrency === targetCurrency
+    );
+    return rates.length > 0 ? rates[rates.length - 1] : null;
   }
 
   async getExchangeRates(baseCurrency: string): Promise<ExchangeRate[]> {
-    const base = baseCurrency.toUpperCase();
-    const now = new Date();
-    
-    return Array.from(this.exchangeRates.values())
-      .filter(r => r.baseCurrency === base)
-      .filter(r => {
-        const validFrom = new Date(r.validFrom);
-        const validTo = r.validTo ? new Date(r.validTo) : null;
-        return validFrom <= now && (!validTo || validTo >= now);
-      });
+    return this.exchangeRates.filter(r => r.baseCurrency === baseCurrency);
   }
 
   async saveExchangeRate(data: Omit<ExchangeRate, 'id' | 'createdAt'>): Promise<ExchangeRate> {
-    const rate: ExchangeRate = {
-      ...data,
-      baseCurrency: data.baseCurrency.toUpperCase(),
-      targetCurrency: data.targetCurrency.toUpperCase(),
-      id: randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
-    this.exchangeRates.set(rate.id, rate);
+    const rate: ExchangeRate = { ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    this.exchangeRates.push(rate);
     return rate;
   }
 
+  // Conversion operations
   async logConversion(data: Omit<CurrencyConversion, 'id' | 'createdAt'>): Promise<CurrencyConversion> {
-    const conversion: CurrencyConversion = {
-      ...data,
-      fromCurrency: data.fromCurrency.toUpperCase(),
-      toCurrency: data.toCurrency.toUpperCase(),
-      id: randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
-    this.conversions.set(conversion.id, conversion);
+    const conversion: CurrencyConversion = { ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    this.conversions.push(conversion);
     return conversion;
   }
 
   async getConversions(filters: { fromDate?: string; toDate?: string; currency?: string }): Promise<CurrencyConversion[]> {
-    let result = Array.from(this.conversions.values());
-    
-    if (filters.fromDate) {
-      const from = new Date(filters.fromDate).getTime();
-      result = result.filter(c => new Date(c.createdAt).getTime() >= from);
-    }
-    
-    if (filters.toDate) {
-      const to = new Date(filters.toDate).getTime();
-      result = result.filter(c => new Date(c.createdAt).getTime() <= to);
-    }
-    
-    if (filters.currency) {
-      const curr = filters.currency.toUpperCase();
-      result = result.filter(c => c.fromCurrency === curr || c.toCurrency === curr);
-    }
-    
-    return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  // Test utility method
-  clear(): void {
-    this.currencies.clear();
-    this.exchangeRates.clear();
-    this.conversions.clear();
+    let result = [...this.conversions];
+    if (filters.fromDate) result = result.filter(c => c.createdAt >= filters.fromDate!);
+    if (filters.toDate) result = result.filter(c => c.createdAt <= filters.toDate!);
+    if (filters.currency) result = result.filter(c => c.fromCurrency === filters.currency || c.toCurrency === filters.currency);
+    return result;
   }
 }

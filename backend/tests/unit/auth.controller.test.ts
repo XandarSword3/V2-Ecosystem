@@ -177,10 +177,11 @@ describe('Auth Controller', () => {
 
       await login(req, res, next);
 
-      expect(res.json).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
         data: mockResult,
-      });
+        csrfToken: expect.any(String),
+      }));
       expect(authService.login).toHaveBeenCalledWith(
         'user@example.com',
         'correctPassword',
@@ -278,7 +279,7 @@ describe('Auth Controller', () => {
       });
     });
 
-    it('should call next with error on refresh failure', async () => {
+    it('should return 401 with invalid refresh token code on refresh failure', async () => {
       const refreshError = new Error('Invalid refresh token');
       vi.mocked(authService.refreshAccessToken).mockRejectedValue(refreshError);
 
@@ -289,7 +290,13 @@ describe('Auth Controller', () => {
 
       await refreshToken(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(refreshError);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Invalid refresh token',
+        code: 'INVALID_REFRESH_TOKEN',
+      });
+      expect(next).not.toHaveBeenCalled();
     });
   });
 
@@ -349,7 +356,7 @@ describe('Auth Controller', () => {
 
       await logout(req, res, next);
 
-      expect(authService.logout).toHaveBeenCalledWith('valid-token');
+      expect(authService.logout).toHaveBeenCalledWith('user-123', undefined);
       expect(logActivity).toHaveBeenCalledWith(expect.objectContaining({
         user_id: 'user-123',
         action: 'LOGOUT',
@@ -361,7 +368,28 @@ describe('Auth Controller', () => {
       });
     });
 
+    it('should logout with refreshToken for single-session logout', async () => {
+      vi.mocked(authService.logout).mockResolvedValue(undefined);
+
+      const { logout } = await import('../../src/modules/auth/auth.controller.js');
+      const { req, res, next } = createMockReqRes({
+        body: { refreshToken: 'refresh-token-123' },
+      });
+      req.headers = { authorization: 'Bearer valid-token' };
+      req.user = { userId: 'user-123', role: 'customer' };
+
+      await logout(req, res, next);
+
+      expect(authService.logout).toHaveBeenCalledWith('user-123', 'refresh-token-123');
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Logged out successfully',
+      });
+    });
+
     it('should succeed even without authorization header', async () => {
+      vi.mocked(authService.logout).mockResolvedValue(undefined);
+
       const { logout } = await import('../../src/modules/auth/auth.controller.js');
       const { req, res, next } = createMockReqRes();
       req.headers = {};
@@ -369,6 +397,7 @@ describe('Auth Controller', () => {
 
       await logout(req, res, next);
 
+      expect(authService.logout).toHaveBeenCalledWith('user-123', undefined);
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         message: 'Logged out successfully',

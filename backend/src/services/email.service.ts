@@ -154,12 +154,12 @@ class EmailService {
     if (options.template && !options.html) {
       const templateData = await this.getTemplate(options.template);
       if (templateData) {
-        const variables = { 
-          ...(await this.getSiteSettings()), 
-          ...(options.data || options.context || {}) 
+        const variables = {
+          ...(await this.getSiteSettings()),
+          ...(options.data || options.context || {})
         };
         options.html = this.replaceVariables(templateData.html_body, variables as TemplateVariables);
-        
+
         // Use template subject if not provided in options
         if (!options.subject || options.subject === '') {
           options.subject = this.replaceVariables(templateData.subject, variables as TemplateVariables);
@@ -168,10 +168,10 @@ class EmailService {
         logger.warn(`Template '${options.template}' not found, utilizing provided options`);
       }
     }
-    
+
     if (!options.html) {
-        logger.error('Email not sent - missing content (HTML or valid template)');
-        return false;
+      logger.error('Email not sent - missing content (HTML or valid template)');
+      return false;
     }
 
     const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@ironparadisegym.com';
@@ -205,10 +205,10 @@ class EmailService {
       logger.warn(`Template '${templateName}' not found`);
       return false;
     }
-    
+
     const html = this.replaceVariables(template.html_body, variables as TemplateVariables);
     const subject = this.replaceVariables(template.subject, variables as TemplateVariables);
-    
+
     return this.sendEmail({ to, subject, html });
   }
 
@@ -220,7 +220,7 @@ class EmailService {
       logger.warn('Cannot send pool ticket confirmation - no email provided');
       return false;
     }
-    
+
     return this.sendTemplatedEmail('pool_ticket_confirmation', ticket.guest_email, {
       ticketNumber: ticket.ticket_number,
       guestName: ticket.guest_name,
@@ -693,6 +693,33 @@ class EmailService {
     return this.sendEmail({
       to: data.recipientEmail,
       subject,
+      html,
+    });
+  }
+
+  /**
+   * Send notification that an account already exists (Security fix for enumeration)
+   */
+  async sendAccountExistsNotification(email: string, fullName: string): Promise<boolean> {
+    const siteUrl = config.frontendUrl || 'https://ironparadisegym.com';
+    const settings = await this.getSiteSettings();
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h2 style="color: #1e293b;">Registration Attempt</h2>
+        <p>Hello ${fullName},</p>
+        <p>Someone recently tried to register an account on <strong>${settings.company_name}</strong> with this email address.</p>
+        <p>If this was you, you already have an account! You can sign in using your existing credentials.</p>
+        <p>If you've forgotten your password, you can reset it here: <a href="${siteUrl}/forgot-password">${siteUrl}/forgot-password</a></p>
+        <p>If you didn't attempt to register, you can safely ignore this email. Your account remains secure.</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+        <p style="font-size: 12px; color: #64748b;">Best regards,<br>${settings.company_name} Team</p>
+      </div>
+    `;
+
+    return this.sendEmail({
+      to: email,
+      subject: `Account registration at ${settings.company_name}`,
       html,
     });
   }

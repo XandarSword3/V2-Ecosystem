@@ -257,7 +257,7 @@ describe('PaymentController', () => {
     });
 
     it('should skip duplicate webhook via idempotency check', async () => {
-      tableData.payment_ledger = [{ id: 'ledger-1', webhook_id: 'evt_dup' }];
+      tableData.payment_ledger = [{ id: 'ledger-1', webhook_id: 'evt_dup', status: 'success' }];
       setupSupabase();
 
       const stripeEvent = {
@@ -366,6 +366,8 @@ describe('PaymentController', () => {
 
   describe('recordCashPayment', () => {
     it('should record a cash payment', async () => {
+      // Clear existing payments so idempotency check doesn't trigger
+      tableData.payments = [];
       setupSupabase();
       const req = mockReq({
         body: { referenceType: 'restaurant_order', referenceId: 'order-1', amount: 30, notes: 'Exact change' },
@@ -375,6 +377,22 @@ describe('PaymentController', () => {
 
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+    });
+
+    it('should reject duplicate cash payment', async () => {
+      // Existing completed cash payment in the mock data
+      tableData.payments = [{ ...PAYMENT, method: 'cash', status: 'completed' }];
+      setupSupabase();
+      const req = mockReq({
+        body: { referenceType: 'restaurant_order', referenceId: 'order-1', amount: 30 },
+      });
+      const res = mockRes();
+      await (recordCashPayment as Function)(req, res, mockNext());
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      const body = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(body.success).toBe(false);
+      expect(body.error).toMatch(/already been recorded/i);
     });
   });
 

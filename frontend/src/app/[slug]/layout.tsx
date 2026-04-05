@@ -38,46 +38,6 @@ export default function SlugModuleLayout({
     <>
       <JsonLd data={[breadcrumbSchema]} />
       
-      {/* Semantic HTML content for Bots/LLMs/Screen Readers */}
-      <div className="sr-only">
-        <article>
-          <h1>{title} at V2 Resort</h1>
-          <section>
-            <h2>About {title}</h2>
-            <p>
-              Welcome to {title} at V2 Resort. We offer a premium experience with 
-              online booking, real-time availability, and seamless service.
-            </p>
-          </section>
-          
-          <section>
-            <h2>How to Book</h2>
-            <ol>
-              <li>Browse available offerings</li>
-              <li>Select your preferred option</li>
-              <li>Enter your details</li>
-              <li>Complete your booking</li>
-            </ol>
-          </section>
-
-          <section>
-            <h2>Service Options</h2>
-            <ul>
-              <li>Online Booking</li>
-              <li>Walk-in Service</li>
-              <li>Cash and Card Payment</li>
-            </ul>
-          </section>
-
-          <nav>
-            <a href="/">Home</a> | 
-            <a href={`/${slug}`}>{title}</a> | 
-            <a href={`/${slug}/cart`}>Cart</a> | 
-            <a href={`/${slug}/reserve`}>Reservations</a>
-          </nav>
-        </article>
-      </div>
-
       <div className="flex flex-col min-h-screen">
         {children}
       </div>

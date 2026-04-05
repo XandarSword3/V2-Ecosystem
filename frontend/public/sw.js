@@ -148,18 +148,13 @@ async function cacheFirst(request) {
   }
 }
 
-// Navigation handler with offline fallback
+// Navigation handler - pass through to network for same-origin navigation
+// Only show offline fallback when genuinely offline AND network request fails
 async function navigationHandler(request) {
   try {
-    // Try to preload the page
-    const preloadResponse = await event.preloadResponse;
-    if (preloadResponse) {
-      return preloadResponse;
-    }
-
     const networkResponse = await fetch(request);
     
-    // Cache successful navigation responses
+    // Cache successful navigation responses 
     if (networkResponse.ok) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone());
@@ -167,21 +162,24 @@ async function navigationHandler(request) {
     
     return networkResponse;
   } catch (error) {
-    // Try cache first
+    // Try to serve a cached version of the SAME page first
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
       return cachedResponse;
     }
     
-    // Return offline page
-    const offlineResponse = await caches.match(OFFLINE_URL);
-    if (offlineResponse) {
-      return offlineResponse;
+    // Only serve the generic offline page if truly no network available
+    // Do NOT show offline page if the server is just slow or recompiling
+    if (!self.navigator?.onLine) {
+      const offlineResponse = await caches.match(OFFLINE_URL);
+      if (offlineResponse) {
+        return offlineResponse;
+      }
     }
     
     // Last resort: basic offline response
     return new Response(
-      '<!DOCTYPE html><html><head><title>Offline</title></head><body><h1>You are offline</h1><p>Please check your internet connection.</p></body></html>',
+      '<!DOCTYPE html><html><head><title>Offline</title></head><body><h1>You are offline</h1><p>Please check your internet connection and try again.</p><button onclick="location.reload()">Retry</button></body></html>',
       { headers: { 'Content-Type': 'text/html' } }
     );
   }

@@ -2,7 +2,8 @@
 -- State machine: pending → assigned → in_progress → completed → pending_inspection → inspected/rework_needed
 
 -- Add missing columns to housekeeping_tasks if they don't exist
-ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS booking_id UUID REFERENCES bookings(id);
+ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS booking_id UUID;
+ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS task_type VARCHAR(50);
 ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS sla_due TIMESTAMPTZ;
 ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS sla_status VARCHAR(20);
 ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS inspection_id UUID;
@@ -35,13 +36,34 @@ CREATE TABLE IF NOT EXISTS housekeeping_sla (
 );
 
 -- Insert default SLA configs
-INSERT INTO housekeeping_sla (task_type, target_minutes, warning_minutes, critical_minutes) VALUES
-  ('standard_cleaning', 45, 35, 50),
-  ('deep_cleaning', 120, 90, 150),
-  ('turnover', 60, 45, 75),
-  ('inspection', 15, 10, 20),
-  ('maintenance', 90, 60, 120)
-ON CONFLICT (task_type) DO NOTHING;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'housekeeping_sla' AND column_name = 'target_minutes'
+  ) THEN
+    INSERT INTO housekeeping_sla (task_type, target_minutes, warning_minutes, critical_minutes) VALUES
+      ('standard_cleaning', 45, 35, 50),
+      ('deep_cleaning', 120, 90, 150),
+      ('turnover', 60, 45, 75),
+      ('inspection', 15, 10, 20),
+      ('maintenance', 90, 60, 120)
+    ON CONFLICT DO NOTHING;
+  ELSIF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'housekeeping_sla' AND column_name = 'max_duration_minutes'
+  ) THEN
+    INSERT INTO housekeeping_sla (task_type, priority, max_duration_minutes, warning_threshold_minutes, escalation_after_minutes) VALUES
+      ('standard_cleaning', 'normal', 45, 35, 50),
+      ('deep_cleaning', 'high', 120, 90, 150),
+      ('turnover', 'high', 60, 45, 75),
+      ('inspection', 'normal', 15, 10, 20),
+      ('maintenance', 'normal', 90, 60, 120)
+    ON CONFLICT DO NOTHING;
+  END IF;
+END $$;
 
 -- Inspections table
 CREATE TABLE IF NOT EXISTS housekeeping_inspections (
@@ -78,6 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_inspections_chalet ON housekeeping_inspections(ch
 CREATE INDEX IF NOT EXISTS idx_supplies_task_type ON housekeeping_supplies(task_type);
 
 -- Function to check if chalet can accept check-in
+DROP FUNCTION IF EXISTS can_check_in(UUID);
 CREATE OR REPLACE FUNCTION can_check_in(p_chalet_id UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
@@ -116,21 +139,34 @@ $$ LANGUAGE plpgsql;
 -- Function to auto-trigger housekeeping on checkout (can be called by booking service)
 CREATE OR REPLACE FUNCTION trigger_checkout_housekeeping()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_new_status TEXT;
+  v_old_status TEXT;
+  v_chalet_id UUID;
+  v_booking_id UUID;
 BEGIN
+  v_new_status := COALESCE(to_jsonb(NEW)->>'status', '');
+  v_old_status := COALESCE(to_jsonb(OLD)->>'status', '');
+  v_chalet_id := COALESCE(
+    NULLIF(to_jsonb(NEW)->>'unit_id', '')::UUID,
+    NULLIF(to_jsonb(NEW)->>'chalet_id', '')::UUID
+  );
+  v_booking_id := NULLIF(to_jsonb(NEW)->>'id', '')::UUID;
+
   -- Only trigger when booking status changes to 'checked_out'
-  IF NEW.status = 'checked_out' AND (OLD.status IS NULL OR OLD.status != 'checked_out') THEN
+  IF v_new_status = 'checked_out' AND v_old_status IS DISTINCT FROM 'checked_out' AND v_chalet_id IS NOT NULL THEN
     -- Update chalet status to dirty
     UPDATE chalets 
     SET cleaning_status = 'dirty', updated_at = NOW()
-    WHERE id = NEW.unit_id;
+    WHERE id = v_chalet_id;
     
     -- Create turnover task
     INSERT INTO housekeeping_tasks (
       chalet_id, task_type, priority, status, 
       notes, booking_id, created_at
     ) VALUES (
-      NEW.unit_id, 'turnover', 'high', 'pending',
-      'Auto-generated from checkout', NEW.id, NOW()
+      v_chalet_id, 'turnover', 'high', 'pending',
+      'Auto-generated from checkout', v_booking_id, NOW()
     );
   END IF;
   
@@ -139,11 +175,28 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger for auto-housekeeping on checkout
-DROP TRIGGER IF EXISTS booking_checkout_housekeeping ON bookings;
-CREATE TRIGGER booking_checkout_housekeeping
-  AFTER UPDATE ON bookings
-  FOR EACH ROW
-  EXECUTE FUNCTION trigger_checkout_housekeeping();
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'bookings'
+  ) THEN
+    DROP TRIGGER IF EXISTS booking_checkout_housekeeping ON bookings;
+    CREATE TRIGGER booking_checkout_housekeeping
+      AFTER UPDATE ON bookings
+      FOR EACH ROW
+      EXECUTE FUNCTION trigger_checkout_housekeeping();
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'chalet_bookings'
+  ) THEN
+    DROP TRIGGER IF EXISTS booking_checkout_housekeeping ON chalet_bookings;
+    CREATE TRIGGER booking_checkout_housekeeping
+      AFTER UPDATE ON chalet_bookings
+      FOR EACH ROW
+      EXECUTE FUNCTION trigger_checkout_housekeeping();
+  END IF;
+END $$;
 
 -- Row Level Security
 ALTER TABLE housekeeping_sla ENABLE ROW LEVEL SECURITY;
@@ -157,8 +210,32 @@ CREATE POLICY housekeeping_supplies_read ON housekeeping_supplies FOR SELECT TO 
 
 -- Modify policies for admin/staff
 CREATE POLICY housekeeping_sla_modify ON housekeeping_sla FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND roles && ARRAY['admin', 'super_admin']));
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin')
+    )
+  );
 CREATE POLICY housekeeping_inspections_modify ON housekeeping_inspections FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND roles && ARRAY['admin', 'super_admin']));
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin')
+    )
+  );
 CREATE POLICY housekeeping_supplies_modify ON housekeeping_supplies FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND roles && ARRAY['admin', 'super_admin']));
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM user_roles ur
+      JOIN roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+        AND r.name IN ('admin', 'super_admin')
+    )
+  );

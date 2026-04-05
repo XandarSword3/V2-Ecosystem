@@ -9,6 +9,24 @@ ALTER TABLE IF EXISTS chalet_add_ons RENAME TO accommodation_add_ons;
 ALTER TABLE IF EXISTS chalet_price_rules RENAME TO accommodation_price_rules;
 ALTER TABLE IF EXISTS chalet_booking_add_ons RENAME TO accommodation_booking_add_ons;
 
+-- Keep legacy chalet table available for downstream migrations and legacy modules.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'accommodation_units'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'chalets'
+  ) THEN
+    CREATE TABLE chalets (LIKE accommodation_units INCLUDING ALL);
+    INSERT INTO chalets SELECT * FROM accommodation_units;
+  END IF;
+END $$;
+
 -- 2. Rename Columns
 -- accommodation_bookings
 DO $$

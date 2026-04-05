@@ -1,472 +1,302 @@
 /**
- * Reports Controller
- * Handles report generation and export
+ * Admin Reports Controller
+ * Provides simplified report endpoints for the admin dashboard
  */
-
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
+import { getSupabase } from '../../../database/connection.js';
 import { asyncHandler } from '../../../middleware/async-handler.js';
-import { getSupabase } from '../../../database/connection';
-import dayjs from 'dayjs';
 
-interface OrderItemWithJoins {
-  quantity?: number;
-  unit_price?: number;
-  menu_items?: { name: string } | null;
-  snack_items?: { name: string } | null;
+function getDateRange(range: string): { start: Date; end: Date } {
+  const end = new Date();
+  const start = new Date();
+  switch (range) {
+    case 'today':
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      break;
+    case 'week':
+      start.setDate(end.getDate() - 7);
+      break;
+    case 'year':
+      start.setFullYear(end.getFullYear() - 1);
+      break;
+    case 'month':
+    default:
+      start.setMonth(end.getMonth() - 1);
+      break;
+  }
+  return { start, end };
+}
+
+function getPreviousDateRange(range: string): { start: Date; end: Date } {
+  const current = getDateRange(range);
+  const duration = current.end.getTime() - current.start.getTime();
+  return {
+    start: new Date(current.start.getTime() - duration),
+    end: new Date(current.start.getTime())
+  };
 }
 
 export const getOverviewReport = asyncHandler(async (req: Request, res: Response) => {
-    const supabase = getSupabase();
-    const { range = 'month' } = req.query;
+  const supabase = getSupabase();
+  const range = (req.query.range as string) || 'month';
+  const { start, end } = getDateRange(range);
+  const prev = getPreviousDateRange(range);
+  const startISO = start.toISOString();
+  const endISO = end.toISOString();
+  const prevStartISO = prev.start.toISOString();
+  const prevEndISO = prev.end.toISOString();
 
-    // Calculate date range based on range parameter
-    let start: string;
-    const end: string = dayjs().endOf('day').toISOString();
+  // Current period queries
+  const [ordersRes, chaletBookingsRes, poolTicketsRes, snackOrdersRes, usersRes] = await Promise.all([
+    supabase.from('restaurant_orders').select('id, total_amount, created_at').gte('created_at', startISO).lte('created_at', endISO),
+    supabase.from('chalet_bookings').select('id, total_amount, created_at').gte('created_at', startISO).lte('created_at', endISO),
+    supabase.from('pool_tickets').select('id, total_amount, created_at').gte('created_at', startISO).lte('created_at', endISO),
+    supabase.from('snack_orders').select('id, total_amount, created_at').gte('created_at', startISO).lte('created_at', endISO),
+    supabase.from('users').select('id', { count: 'exact' }),
+  ]);
 
-    if (range === 'week') {
-      start = dayjs().subtract(7, 'day').startOf('day').toISOString();
-    } else if (range === 'year') {
-      start = dayjs().subtract(1, 'year').startOf('day').toISOString();
-    } else {
-      start = dayjs().subtract(1, 'month').startOf('day').toISOString();
-    }
+  // Previous period for change calculation
+  const [prevOrdersRes, prevChaletRes, prevPoolRes, prevSnackRes] = await Promise.all([
+    supabase.from('restaurant_orders').select('id, total_amount').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+    supabase.from('chalet_bookings').select('id, total_amount').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+    supabase.from('pool_tickets').select('id, total_amount').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+    supabase.from('snack_orders').select('id, total_amount').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+  ]);
 
-    // Get all orders/bookings in period - run queries in parallel
-    const [
-      restaurantResult,
-      snackResult,
-      chaletResult,
-      poolResult,
-      usersResult,
-      restItemsResult,
-      snackItemsResult
-    ] = await Promise.all([
-      supabase.from('restaurant_orders')
-        .select('*')
-        .gte('created_at', start)
-        .lte('created_at', end),
-      supabase.from('snack_orders')
-        .select('*')
-        .gte('created_at', start)
-        .lte('created_at', end),
-      supabase.from('chalet_bookings')
-        .select('*')
-        .gte('created_at', start)
-        .lte('created_at', end),
-      supabase.from('pool_tickets')
-        .select('*')
-        .gte('created_at', start)
-        .lte('created_at', end),
-      supabase.from('users')
-        .select('id', { count: 'exact', head: true }),
-      supabase.from('restaurant_order_items')
-        .select('quantity, unit_price, menu_items(name), restaurant_orders!inner(created_at, status)')
-        .gte('restaurant_orders.created_at', start)
-        .lte('restaurant_orders.created_at', end)
-        .eq('restaurant_orders.status', 'completed'),
-      supabase.from('snack_order_items')
-        .select('quantity, unit_price, snack_items(name), snack_orders!inner(created_at, status)')
-        .gte('snack_orders.created_at', start)
-        .lte('snack_orders.created_at', end)
-        .eq('snack_orders.status', 'completed')
-    ]);
+  const orders = ordersRes.data || [];
+  const chaletBookings = chaletBookingsRes.data || [];
+  const poolTickets = poolTicketsRes.data || [];
+  const snackOrders = snackOrdersRes.data || [];
 
-    const restaurantOrdersList = restaurantResult.data || [];
-    const snackOrdersList = snackResult.data || [];
-    const chaletBookingsList = chaletResult.data || [];
-    const poolTicketsList = poolResult.data || [];
-    const totalUsers = usersResult.count || 0;
+  const restaurantRevenue = orders.reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0);
+  const chaletRevenue = chaletBookings.reduce((sum: number, b: any) => sum + (Number(b.total_amount) || 0), 0);
+  const poolRevenue = poolTickets.reduce((sum: number, t: any) => sum + (Number(t.total_amount) || 0), 0);
+  const snackRevenue = snackOrders.reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0);
+  const totalRevenue = restaurantRevenue + chaletRevenue + poolRevenue + snackRevenue;
+  const totalOrders = orders.length + snackOrders.length;
+  const totalBookings = chaletBookings.length + poolTickets.length;
 
-    // Calculate revenues
-    const restaurantRevenue = restaurantOrdersList
-      .filter(o => o.status === 'completed')
-      .reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
-    const snackRevenue = snackOrdersList
-      .filter(o => o.status === 'completed')
-      .reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
-    const chaletRevenue = chaletBookingsList
-      .filter(b => b.payment_status === 'paid')
-      .reduce((sum, b) => sum + parseFloat(b.total_amount || '0'), 0);
-    const poolRevenue = poolTicketsList
-      .filter(t => t.payment_status === 'paid')
-      .reduce((sum, t) => sum + parseFloat(t.total_amount || '0'), 0);
+  // Previous period revenue
+  const prevRevenue = [
+    ...(prevOrdersRes.data || []),
+    ...(prevChaletRes.data || []),
+    ...(prevPoolRes.data || []),
+    ...(prevSnackRes.data || []),
+  ].reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
+  const prevOrders = (prevOrdersRes.data || []).length + (prevSnackRes.data || []).length;
 
-    const totalRevenue = restaurantRevenue + snackRevenue + chaletRevenue + poolRevenue;
-    const totalOrders = restaurantOrdersList.length + snackOrdersList.length;
-    const totalBookings = chaletBookingsList.length + poolTicketsList.length;
+  const revenueChange = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
+  const ordersChange = prevOrders > 0 ? ((totalOrders - prevOrders) / prevOrders) * 100 : 0;
 
-    // Process Top Items
-    const topItemsMap = new Map<string, { name: string, quantity: number, revenue: number }>();
+  // Revenue by month (last 6 months)
+  const revenueByMonth: Array<{ month: string; revenue: number }> = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
+    const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+    const monthLabel = monthStart.toLocaleDateString('en', { month: 'short', year: 'numeric' });
 
-    const processItems = (items: OrderItemWithJoins[]) => {
-      items.forEach(item => {
-        const name = item.menu_items?.name || item.snack_items?.name || 'Unknown Item';
-        const current = topItemsMap.get(name) || { name, quantity: 0, revenue: 0 };
-        current.quantity += (item.quantity || 0);
-        current.revenue += (item.quantity || 0) * (item.unit_price || 0);
-        topItemsMap.set(name, current);
-      });
-    };
-
-    processItems((restItemsResult.data || []) as unknown as OrderItemWithJoins[]);
-    processItems((snackItemsResult.data || []) as unknown as OrderItemWithJoins[]);
-
-    const topItems = Array.from(topItemsMap.values())
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5);
-
-    // Revenue By Month (or Period)
-    const monthlyRevenueMap = new Map<string, number>();
-    const addToMonth = (date: string, amount: number) => {
-      const month = dayjs(date).format('MMM YYYY');
-      monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + parseFloat(String(amount)));
-    };
-
-    restaurantOrdersList.filter(o => o.status === 'completed').forEach(o => addToMonth(o.created_at, o.total_amount));
-    snackOrdersList.filter(o => o.status === 'completed').forEach(o => addToMonth(o.created_at, o.total_amount));
-    chaletBookingsList.filter(b => b.payment_status === 'paid').forEach(b => addToMonth(b.created_at, b.total_amount));
-    poolTicketsList.filter(t => t.payment_status === 'paid').forEach(t => addToMonth(t.created_at, t.total_amount));
-
-    const revenueByMonth = Array.from(monthlyRevenueMap.entries())
-      .map(([month, revenue]) => ({ month, revenue }))
-      .sort((a, b) => dayjs(a.month, 'MMM YYYY').valueOf() - dayjs(b.month, 'MMM YYYY').valueOf());
-
-    res.json({
-      success: true,
-      data: {
-        overview: {
-          totalRevenue,
-          totalOrders,
-          totalBookings,
-          totalUsers,
-          revenueChange: 0,
-          ordersChange: 0,
-        },
-        revenueByService: {
-          restaurant: restaurantRevenue,
-          snackBar: snackRevenue,
-          chalets: chaletRevenue,
-          pool: poolRevenue,
-        },
-        revenueByMonth,
-        topItems,
-      },
-    });
-});
-
-export const exportReport = asyncHandler(async (req: Request, res: Response) => {
-    const supabase = getSupabase();
-    const { type, format = 'csv', range = 'month' } = req.query;
-
-    if (!type) {
-      return res.status(400).json({ success: false, error: 'Report type is required' });
-    }
-
-    // Calculate date range
-    let start: string;
-    const end: string = dayjs().endOf('day').toISOString();
-
-    if (range === 'week') {
-      start = dayjs().subtract(7, 'day').startOf('day').toISOString();
-    } else if (range === 'year') {
-      start = dayjs().subtract(1, 'year').startOf('day').toISOString();
-    } else {
-      start = dayjs().subtract(1, 'month').startOf('day').toISOString();
-    }
-
-    let data: Record<string, unknown>[] = [];
-    let filename = '';
-
-    switch (type) {
-      case 'restaurant': {
-        const { data: orders, error } = await supabase
-          .from('restaurant_orders')
-          .select('order_number, customer_name, order_type, status, subtotal, tax_amount, total_amount, payment_status, payment_method, created_at')
-          .gte('created_at', start)
-          .lte('created_at', end)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        data = (orders || []).map(o => ({
-          'Order Number': o.order_number,
-          'Customer': o.customer_name,
-          'Type': o.order_type,
-          'Status': o.status,
-          'Subtotal': o.subtotal,
-          'Tax': o.tax_amount,
-          'Total': o.total_amount,
-          'Payment Status': o.payment_status,
-          'Payment Method': o.payment_method,
-          'Date': dayjs(o.created_at).format('YYYY-MM-DD HH:mm'),
-        }));
-        filename = `restaurant-orders-${dayjs().format('YYYY-MM-DD')}`;
-        break;
-      }
-
-      case 'chalets': {
-        const { data: bookings, error } = await supabase
-          .from('chalet_bookings')
-          .select('booking_number, customer_name, customer_email, check_in_date, check_out_date, number_of_guests, number_of_nights, base_amount, total_amount, status, payment_status, created_at')
-          .gte('created_at', start)
-          .lte('created_at', end)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        data = (bookings || []).map(b => ({
-          'Booking Number': b.booking_number,
-          'Customer': b.customer_name,
-          'Email': b.customer_email,
-          'Check-in': dayjs(b.check_in_date).format('YYYY-MM-DD'),
-          'Check-out': dayjs(b.check_out_date).format('YYYY-MM-DD'),
-          'Guests': b.number_of_guests,
-          'Nights': b.number_of_nights,
-          'Base Amount': b.base_amount,
-          'Total': b.total_amount,
-          'Status': b.status,
-          'Payment': b.payment_status,
-          'Booked On': dayjs(b.created_at).format('YYYY-MM-DD HH:mm'),
-        }));
-        filename = `chalet-bookings-${dayjs().format('YYYY-MM-DD')}`;
-        break;
-      }
-
-      case 'pool': {
-        const { data: tickets, error } = await supabase
-          .from('pool_tickets')
-          .select('ticket_number, customer_name, ticket_date, number_of_guests, total_amount, status, payment_status, created_at')
-          .gte('created_at', start)
-          .lte('created_at', end)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        data = (tickets || []).map(t => ({
-          'Ticket Number': t.ticket_number,
-          'Customer': t.customer_name,
-          'Date': dayjs(t.ticket_date).format('YYYY-MM-DD'),
-          'Guests': t.number_of_guests,
-          'Total': t.total_amount,
-          'Status': t.status,
-          'Payment': t.payment_status,
-          'Purchased': dayjs(t.created_at).format('YYYY-MM-DD HH:mm'),
-        }));
-        filename = `pool-tickets-${dayjs().format('YYYY-MM-DD')}`;
-        break;
-      }
-
-      case 'snack': {
-        const { data: orders, error } = await supabase
-          .from('snack_orders')
-          .select('order_number, customer_name, status, subtotal, total_amount, payment_status, created_at')
-          .gte('created_at', start)
-          .lte('created_at', end)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        data = (orders || []).map(o => ({
-          'Order Number': o.order_number,
-          'Customer': o.customer_name,
-          'Status': o.status,
-          'Subtotal': o.subtotal,
-          'Total': o.total_amount,
-          'Payment': o.payment_status,
-          'Date': dayjs(o.created_at).format('YYYY-MM-DD HH:mm'),
-        }));
-        filename = `snack-orders-${dayjs().format('YYYY-MM-DD')}`;
-        break;
-      }
-
-      case 'users': {
-        const { data: users, error } = await supabase
-          .from('users')
-          .select('name, email, phone, created_at, last_login, is_active')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        data = (users || []).map(u => ({
-          'Name': u.name,
-          'Email': u.email,
-          'Phone': u.phone || '',
-          'Registered': dayjs(u.created_at).format('YYYY-MM-DD'),
-          'Last Login': u.last_login ? dayjs(u.last_login).format('YYYY-MM-DD HH:mm') : 'Never',
-          'Active': u.is_active ? 'Yes' : 'No',
-        }));
-        filename = `users-${dayjs().format('YYYY-MM-DD')}`;
-        break;
-      }
-
-      default:
-        return res.status(400).json({ success: false, error: 'Invalid report type' });
-    }
-
-    if (format === 'json') {
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
-      return res.json(data);
-    }
-
-    // CSV format
-    if (data.length === 0) {
-      return res.status(200).json({ success: true, data: [], message: 'No data for the selected period' });
-    }
-
-    const headers = Object.keys(data[0]);
-    const csvRows = [
-      headers.join(','),
-      ...data.map(row => headers.map(h => {
-        const val = String(row[h] || '').replace(/"/g, '""');
-        return `"${val}"`;
-      }).join(',')),
+    const allItems = [
+      ...orders.filter((o: any) => new Date(o.created_at) >= monthStart && new Date(o.created_at) <= monthEnd),
+      ...chaletBookings.filter((b: any) => new Date(b.created_at) >= monthStart && new Date(b.created_at) <= monthEnd),
+      ...poolTickets.filter((t: any) => new Date(t.created_at) >= monthStart && new Date(t.created_at) <= monthEnd),
+      ...snackOrders.filter((o: any) => new Date(o.created_at) >= monthStart && new Date(o.created_at) <= monthEnd),
     ];
-    const csv = csvRows.join('\n');
+    const monthRevenue = allItems.reduce((sum: number, item: any) => sum + (Number(item.total_amount) || 0), 0);
+    revenueByMonth.push({ month: monthLabel, revenue: monthRevenue });
+  }
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
-    return res.send(csv);
+  // Top items from restaurant orders
+  const { data: topItemsData } = await supabase
+    .from('restaurant_order_items')
+    .select('menu_item_id, quantity, unit_price, menu_items(name)')
+    .order('quantity', { ascending: false })
+    .limit(5);
+
+  const topItems = (topItemsData || []).map((item: any) => ({
+    name: item.menu_items?.name || 'Unknown',
+    quantity: item.quantity,
+    revenue: (item.quantity || 0) * (Number(item.unit_price) || 0),
+  }));
+
+  res.json({
+    success: true,
+    data: {
+      overview: {
+        totalRevenue,
+        totalOrders,
+        totalBookings,
+        totalUsers: usersRes.count || 0,
+        revenueChange: Math.round(revenueChange * 10) / 10,
+        ordersChange: Math.round(ordersChange * 10) / 10,
+      },
+      revenueByService: {
+        restaurant: restaurantRevenue,
+        snackBar: snackRevenue,
+        chalets: chaletRevenue,
+        pool: poolRevenue,
+      },
+      revenueByMonth,
+      topItems,
+    },
+  });
 });
 
 export const getOccupancyReport = asyncHandler(async (req: Request, res: Response) => {
-    const supabase = getSupabase();
-    const { range = 'month' } = req.query;
+  const supabase = getSupabase();
+  const range = (req.query.range as string) || 'month';
+  const { start, end } = getDateRange(range);
+  const startISO = start.toISOString();
+  const endISO = end.toISOString();
 
-    let start: dayjs.Dayjs;
-    const end = dayjs().endOf('day');
+  // Chalets occupancy
+  const [chaletsRes, chaletBookingsRes] = await Promise.all([
+    supabase.from('chalets').select('id', { count: 'exact' }).eq('is_active', true),
+    supabase.from('chalet_bookings').select('id, check_in_date, check_out_date').gte('check_in_date', startISO).lte('check_in_date', endISO),
+  ]);
+  const activeChalets = chaletsRes.count || 0;
+  const chaletBookings = chaletBookingsRes.data || [];
+  const totalNights = chaletBookings.reduce((sum: number, b: any) => {
+    const checkIn = new Date(b.check_in_date);
+    const checkOut = new Date(b.check_out_date);
+    return sum + Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
+  }, 0);
+  const daysInRange = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  const chaletCapacity = activeChalets * daysInRange;
+  const chaletOccupancy = chaletCapacity > 0 ? (totalNights / chaletCapacity) * 100 : 0;
 
-    if (range === 'week') {
-      start = dayjs().subtract(7, 'day').startOf('day');
-    } else if (range === 'year') {
-      start = dayjs().subtract(1, 'year').startOf('day');
-    } else {
-      start = dayjs().subtract(1, 'month').startOf('day');
-    }
+  // Pool occupancy
+  const { data: poolSettings } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'pool')
+    .single();
+  const dailyPoolCapacity = poolSettings?.value?.maxCapacity || poolSettings?.value?.max_capacity || 100;
+  const { data: poolTickets } = await supabase
+    .from('pool_tickets')
+    .select('id, number_of_guests')
+    .gte('ticket_date', startISO)
+    .lte('ticket_date', endISO);
+  const totalTickets = (poolTickets || []).reduce((sum: number, t: any) => sum + (Number(t.number_of_guests) || 0), 0);
+  const totalPoolCapacity = dailyPoolCapacity * daysInRange;
+  const poolOccupancy = totalPoolCapacity > 0 ? (totalTickets / totalPoolCapacity) * 100 : 0;
 
-    const daysInRange = end.diff(start, 'day') + 1;
-
-    // 1. Chalet Occupancy
-    const [chaletsResult, bookingsResult] = await Promise.all([
-      supabase.from('chalets').select('id', { count: 'exact', head: true }).eq('is_active', true).is('deleted_at', null),
-      supabase.from('chalet_bookings')
-        .select('number_of_nights, check_in_date, status')
-        .gte('check_in_date', start.toISOString())
-        .lte('check_in_date', end.toISOString())
-    ]);
-
-    const totalChalets = chaletsResult.count || 0;
-    const totalChaletCapacity = totalChalets * daysInRange;
-    const activeBookings = (bookingsResult.data || []).filter(b => !['cancelled', 'no_show'].includes(b.status));
-    const bookedNights = activeBookings.reduce((sum, b) => sum + (b.number_of_nights || 0), 0);
-    const chaletOccupancyRate = totalChaletCapacity > 0 ? (bookedNights / totalChaletCapacity) * 100 : 0;
-
-    // 2. Pool Occupancy
-    const [sessionsResult, ticketsResult] = await Promise.all([
-      supabase.from('pool_sessions').select('max_capacity').eq('is_active', true),
-      supabase.from('pool_tickets')
-        .select('number_of_guests, status')
-        .gte('ticket_date', start.toISOString())
-        .lte('ticket_date', end.toISOString())
-    ]);
-
-    const dailyPoolCapacity = (sessionsResult.data || []).reduce((sum, s) => sum + (s.max_capacity || 0), 0);
-    const totalPoolCapacity = dailyPoolCapacity * daysInRange;
-    const activeTickets = (ticketsResult.data || []).filter(t => !['cancelled', 'no_show'].includes(t.status));
-    const ticketsSold = activeTickets.reduce((sum, t) => sum + (t.number_of_guests || 0), 0);
-    const poolOccupancyRate = totalPoolCapacity > 0 ? (ticketsSold / totalPoolCapacity) * 100 : 0;
-
-    res.json({
-      success: true,
-      data: {
-        chalets: {
-          occupancyRate: Math.round(chaletOccupancyRate * 10) / 10,
-          bookedNights,
-          totalCapacity: totalChaletCapacity,
-          activeUnits: totalChalets
-        },
-        pool: {
-          occupancyRate: Math.round(poolOccupancyRate * 10) / 10,
-          ticketsSold,
-          totalCapacity: totalPoolCapacity,
-          dailyCapacity: dailyPoolCapacity
-        }
-      }
-    });
+  res.json({
+    success: true,
+    data: {
+      chalets: {
+        occupancyRate: Math.round(chaletOccupancy * 10) / 10,
+        bookedNights: totalNights,
+        totalCapacity: chaletCapacity,
+        activeUnits: activeChalets,
+      },
+      pool: {
+        occupancyRate: Math.round(poolOccupancy * 10) / 10,
+        ticketsSold: totalTickets,
+        totalCapacity: totalPoolCapacity,
+        dailyCapacity: dailyPoolCapacity,
+      },
+    },
+  });
 });
 
-export const getCustomerAnalytics = asyncHandler(async (req: Request, res: Response) => {
-    const supabase = getSupabase();
-    const { range = 'month' } = req.query;
+export const getCustomersReport = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const range = (req.query.range as string) || 'month';
+  const { start, end } = getDateRange(range);
+  const startISO = start.toISOString();
+  const endISO = end.toISOString();
 
-    let start: dayjs.Dayjs;
-    const end = dayjs().endOf('day');
+  // Get orders with user info to find top customers
+  const { data: orderData } = await supabase
+    .from('restaurant_orders')
+    .select('customer_id, customer_name, total_amount')
+    .gte('created_at', startISO)
+    .lte('created_at', endISO);
 
-    if (range === 'week') {
-      start = dayjs().subtract(7, 'day').startOf('day');
-    } else if (range === 'year') {
-      start = dayjs().subtract(1, 'year').startOf('day');
-    } else {
-      start = dayjs().subtract(1, 'month').startOf('day');
+  // Aggregate by customer
+  const customerMap = new Map<string, { name: string; revenue: number; count: number }>();
+  (orderData || []).forEach((order: any) => {
+    const customerKey = order.customer_id || `guest:${order.customer_name || 'Guest'}`;
+    const existing = customerMap.get(customerKey) || { name: order.customer_name || 'Guest', revenue: 0, count: 0 };
+    existing.revenue += Number(order.total_amount) || 0;
+    existing.count += 1;
+    customerMap.set(customerKey, existing);
+  });
+
+  const topCustomers = Array.from(customerMap.entries())
+    .map(([id, data]) => ({ id, ...data }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 10);
+
+  // Customer retention (new vs returning)
+  const { data: prevUsers } = await supabase
+    .from('restaurant_orders')
+    .select('customer_id')
+    .lt('created_at', startISO)
+    .not('customer_id', 'is', null);
+
+  const previousUserIds = new Set((prevUsers || []).map((o: any) => o.customer_id).filter(Boolean));
+  const currentUserIds = new Set((orderData || []).map((o: any) => o.customer_id).filter(Boolean));
+  const returningCount = Array.from(currentUserIds).filter(id => previousUserIds.has(id)).length;
+  const newCount = currentUserIds.size - returningCount;
+
+  res.json({
+    success: true,
+    data: {
+      topCustomers,
+      customerRetention: {
+        new: newCount,
+        returning: returningCount,
+        total: currentUserIds.size,
+        newRatio: currentUserIds.size > 0 ? Math.round((newCount / currentUserIds.size) * 100) : 0,
+      },
+    },
+  });
+});
+
+export const exportReport = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const range = (req.query.range as string) || 'month';
+  const type = (req.query.type as string) || 'restaurant';
+  const { start, end } = getDateRange(range);
+  const startISO = start.toISOString();
+  const endISO = end.toISOString();
+
+  let csvData = '';
+  const filename = `${type}-report.csv`;
+
+  switch (type) {
+    case 'restaurant': {
+      const { data } = await supabase.from('restaurant_orders').select('id, order_number, total_amount, status, created_at').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
+      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.order_number || ''},${o.total_amount},${o.status},${o.created_at}`).join('\n');
+      break;
     }
+    case 'chalets': {
+      const { data } = await supabase.from('chalet_bookings').select('id, chalet_id, total_amount, status, check_in_date, check_out_date, created_at').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
+      csvData = 'ID,Chalet,Total,Status,Check In,Check Out,Created\n' + (data || []).map((b: any) => `${b.id},${b.chalet_id},${b.total_amount},${b.status},${b.check_in_date},${b.check_out_date},${b.created_at}`).join('\n');
+      break;
+    }
+    case 'pool': {
+      const { data } = await supabase.from('pool_tickets').select('id, ticket_number, total_amount, status, number_of_guests, ticket_date').gte('ticket_date', startISO).lte('ticket_date', endISO).order('ticket_date', { ascending: false });
+      csvData = 'ID,Ticket,Total,Status,Guests,Date\n' + (data || []).map((t: any) => `${t.id},${t.ticket_number || ''},${t.total_amount},${t.status},${t.number_of_guests},${t.ticket_date}`).join('\n');
+      break;
+    }
+    case 'snack': {
+      const { data } = await supabase.from('snack_orders').select('id, order_number, total_amount, status, created_at').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
+      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.order_number || ''},${o.total_amount},${o.status},${o.created_at}`).join('\n');
+      break;
+    }
+    case 'users': {
+      const { data } = await supabase.from('users').select('id, full_name, email, role, created_at').order('created_at', { ascending: false });
+      csvData = 'ID,Name,Email,Role,Joined\n' + (data || []).map((u: any) => `${u.id},${u.full_name || ''},${u.email},${u.role},${u.created_at}`).join('\n');
+      break;
+    }
+  }
 
-    // Fetch transactions from all units to identify top customers
-    const [restOrders, snackOrders, chaletBookings, poolTickets] = await Promise.all([
-      supabase.from('restaurant_orders').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('status', 'completed'),
-      supabase.from('snack_orders').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('status', 'completed'),
-      supabase.from('chalet_bookings').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('payment_status', 'paid'),
-      supabase.from('pool_tickets').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('payment_status', 'paid')
-    ]);
-
-    const allTransactions = [
-      ...(restOrders.data || []),
-      ...(snackOrders.data || []),
-      ...(chaletBookings.data || []),
-      ...(poolTickets.data || [])
-    ];
-
-    // Group by customer
-    const customerStats = new Map<string, { name: string, revenue: number, count: number, firstDate: string }>();
-
-    allTransactions.forEach(t => {
-      const stats = customerStats.get(t.customer_id) || { name: t.customer_name, revenue: 0, count: 0, firstDate: t.created_at };
-      stats.revenue += parseFloat(t.total_amount);
-      stats.count += 1;
-      if (dayjs(t.created_at).isBefore(dayjs(stats.firstDate))) {
-        stats.firstDate = t.created_at;
-      }
-      customerStats.set(t.customer_id, stats);
-    });
-
-    const customersInRange = Array.from(customerStats.entries()).map(([id, stats]) => ({ id, ...stats }));
-
-    // Top Customers
-    const topCustomers = [...customersInRange]
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10);
-
-    // New vs Returning logic for the selected range
-    let newCustomers = 0;
-    let returningCustomers = 0;
-
-    customersInRange.forEach(c => {
-      // Check if they had ANY transaction in the selected range
-      const hasTransactionInRange = allTransactions.some(t => t.customer_id === c.id && dayjs(t.created_at).isAfter(start) && dayjs(t.created_at).isBefore(end));
-
-      if (hasTransactionInRange) {
-        if (dayjs(c.firstDate).isBefore(start)) {
-          returningCustomers++;
-        } else {
-          newCustomers++;
-        }
-      }
-    });
-
-    res.json({
-      success: true,
-      data: {
-        topCustomers,
-        customerRetention: {
-          new: newCustomers,
-          returning: returningCustomers,
-          total: newCustomers + returningCustomers,
-          newRatio: returningCustomers + newCustomers > 0 ? Math.round((newCustomers / (newCustomers + returningCustomers)) * 100) : 0
-        }
-      }
-    });
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(csvData);
 });

@@ -1,9 +1,10 @@
 import { getSupabase } from '../../database/connection.js';
-import { createWriteStream, unlink, readFile } from 'fs';
+import { createWriteStream, unlink, readFile, mkdirSync, existsSync } from 'fs';
 import { promisify } from 'util';
 import { join } from 'path';
 import archiver from 'archiver';
 import crypto from 'crypto';
+import os from 'os';
 
 // Lazy-initialized Supabase client - use proxy to defer getSupabase() call
 const supabase = new Proxy({} as ReturnType<typeof getSupabase>, {
@@ -62,7 +63,7 @@ export interface RetentionPolicy {
 }
 
 const EXPORT_FILE_TTL_HOURS = 72; // Files expire after 72 hours
-const EXPORT_DIR = process.env.GDPR_EXPORT_DIR || '/tmp/gdpr-exports';
+const EXPORT_DIR = process.env.GDPR_EXPORT_DIR || join(os.tmpdir(), 'gdpr-exports');
 
 // ==================== DATA EXPORT ====================
 
@@ -229,6 +230,15 @@ async function collectUserData(userId: string): Promise<Record<string, any>> {
 
 async function createExportArchive(requestId: string, userData: Record<string, any>): Promise<string> {
   const fileName = `gdpr-export-${requestId}-${Date.now()}.zip`;
+
+  if (!existsSync(EXPORT_DIR)) {
+    try {
+      mkdirSync(EXPORT_DIR, { recursive: true });
+    } catch (e) {
+      console.error('Failed to create export directory:', e);
+    }
+  }
+
   const filePath = join(EXPORT_DIR, fileName);
 
   return new Promise((resolve, reject) => {
@@ -296,7 +306,7 @@ export async function getExportFile(requestId: string, userId: string): Promise<
 
   try {
     const fileContent = await readFileAsync(request.file_path);
-    
+
     // Mark as downloaded
     await supabase
       .from('gdpr_export_requests')

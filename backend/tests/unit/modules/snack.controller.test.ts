@@ -21,6 +21,26 @@ vi.mock('../../../src/validation/schemas.js', () => ({
   validateBody: vi.fn((schema, body) => body)
 }));
 
+// Mock engine service for state machine and pricing
+const mockEngineService = {
+  calculatePricing: vi.fn().mockResolvedValue({
+    subtotal: 10, taxAmount: 1.1, totalAmount: 11.1,
+    discounts: [], lineItems: [], serviceCharge: 0, deliveryFee: 0,
+    preDiscountTotal: 11.1, totalDiscount: 0, taxRate: 0.11,
+    serviceChargeRate: 0, loyaltyPointsEarned: 0, depositAmount: 0,
+  }),
+  getInitialState: vi.fn().mockReturnValue('pending'),
+  transitionState: vi.fn().mockResolvedValue({ allowed: true, targetState: 'preparing' }),
+  canTransition: vi.fn().mockReturnValue(true),
+  getAvailableActions: vi.fn().mockReturnValue([]),
+  isTerminalState: vi.fn().mockReturnValue(false),
+  getStates: vi.fn().mockReturnValue([]),
+};
+
+vi.mock('../../../src/engines/engine-service.js', () => ({
+  getEngineService: vi.fn(() => mockEngineService),
+}));
+
 import { getSupabase } from '../../../src/database/connection.js';
 import { emitToUnit } from '../../../src/socket/index.js';
 import { validateBody } from '../../../src/validation/schemas.js';
@@ -694,20 +714,39 @@ describe('Snack Controller', () => {
   // ============ updateOrderStatus ============
   describe('updateOrderStatus', () => {
     it('should update order status', async () => {
-      const mockOrder = { id: 'order-1', status: 'preparing', order_number: 'S-001' };
-      
-      const updateMock = createQueryMock(() => []);
-      updateMock.update = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: mockOrder, error: null })
+      const currentOrder = { id: 'order-1', status: 'pending' };
+      const updatedOrder = { id: 'order-1', status: 'preparing', order_number: 'S-001' };
+
+      // First call: select to get current status
+      const selectMock = {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: currentOrder, error: null })
           })
         })
-      });
+      };
+
+      // Second call: update
+      const updateMockChain = {
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: updatedOrder, error: null })
+            })
+          })
+        })
+      };
+
+      const fromMock = vi.fn()
+        .mockReturnValueOnce(selectMock)
+        .mockReturnValueOnce(updateMockChain);
       
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(updateMock)
+        from: fromMock
       } as unknown as ReturnType<typeof getSupabase>);
+
+      // Configure engine mock for this transition
+      mockEngineService.transitionState.mockResolvedValue({ allowed: true, targetState: 'preparing' });
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'order-1' },
@@ -718,7 +757,7 @@ describe('Snack Controller', () => {
 
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        data: mockOrder
+        data: updatedOrder
       });
       expect(emitToUnit).toHaveBeenCalledWith(
         'snack_bar',
@@ -728,20 +767,36 @@ describe('Snack Controller', () => {
     });
 
     it('should mark as paid when completed', async () => {
-      const mockOrder = { id: 'order-1', status: 'completed', order_number: 'S-001', payment_status: 'paid' };
-      
-      const updateMock = createQueryMock(() => []);
-      updateMock.update = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: mockOrder, error: null })
+      const currentOrder = { id: 'order-1', status: 'ready' };
+      const updatedOrder = { id: 'order-1', status: 'completed', order_number: 'S-001', payment_status: 'paid' };
+
+      const selectMock = {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: currentOrder, error: null })
           })
         })
-      });
+      };
+
+      const updateMockChain = {
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: updatedOrder, error: null })
+            })
+          })
+        })
+      };
+
+      const fromMock = vi.fn()
+        .mockReturnValueOnce(selectMock)
+        .mockReturnValueOnce(updateMockChain);
       
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(updateMock)
+        from: fromMock
       } as unknown as ReturnType<typeof getSupabase>);
+
+      mockEngineService.transitionState.mockResolvedValue({ allowed: true, targetState: 'completed' });
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'order-1' },
@@ -757,20 +812,36 @@ describe('Snack Controller', () => {
     });
 
     it('should emit socket event on status update', async () => {
-      const mockOrder = { id: 'order-1', status: 'ready', order_number: 'S-001' };
-      
-      const updateMock = createQueryMock(() => []);
-      updateMock.update = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: mockOrder, error: null })
+      const currentOrder = { id: 'order-1', status: 'preparing' };
+      const updatedOrder = { id: 'order-1', status: 'ready', order_number: 'S-001' };
+
+      const selectMock = {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: currentOrder, error: null })
           })
         })
-      });
+      };
+
+      const updateMockChain = {
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: updatedOrder, error: null })
+            })
+          })
+        })
+      };
+
+      const fromMock = vi.fn()
+        .mockReturnValueOnce(selectMock)
+        .mockReturnValueOnce(updateMockChain);
       
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(updateMock)
+        from: fromMock
       } as unknown as ReturnType<typeof getSupabase>);
+
+      mockEngineService.transitionState.mockResolvedValue({ allowed: true, targetState: 'ready' });
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'order-1' },
@@ -787,13 +858,12 @@ describe('Snack Controller', () => {
     });
 
     it('should handle database errors', async () => {
+      // First query (select) fails
       vi.mocked(getSupabase).mockReturnValue({
         from: vi.fn().mockReturnValue({
-          update: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              select: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({ data: null, error: { message: 'Update failed' } })
-              })
+              single: vi.fn().mockResolvedValue({ data: null, error: { message: 'Update failed' } })
             })
           })
         })

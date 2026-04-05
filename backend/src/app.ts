@@ -38,12 +38,16 @@ import userRoutes from './modules/users/user.routes.js';
 import bookingModRoutes from './modules/bookings/booking-modification.controller.js';
 
 // White-Label & AI Accessibility Routes
+import publicRoutes from './modules/public/public.routes.js';
 import terminologyRoutes from './routes/terminology.routes.js';
 import genericRoutes from './routes/generic.routes.js';
 import translationRoutes from './routes/translation.routes.js';
 import docsRoutes from './routes/docs.routes.js';
 
 const app = express();
+
+// SECURITY FIX: Raw SQL execution endpoint removed (CRITICAL-001)
+// Use proper migration scripts via `npm run migrate` instead.
 
 // Initialize Sentry
 initSentry(app);
@@ -108,226 +112,19 @@ app.get('/health/ready', async (req, res) => {
   }
 });
 
-// Public settings - read from database for themes, contact info, homepage, footer etc
-app.get('/api/settings', async (req, res) => {
-  try {
-    const { getSupabase } = await import('./database/connection.js');
-    const supabase = getSupabase();
-    const { data: settings } = await supabase
-      .from('site_settings')
-      .select('key, value');
-
-    // Build response from database settings
-    const result: Record<string, unknown> = {
-      theme: 'default',
-      contact: { email: 'info@ironparadisegym.com' }
-    };
-
-    if (settings) {
-      for (const setting of settings) {
-        if (setting.key === 'appearance' && setting.value && typeof setting.value === 'object') {
-          const appearance = setting.value as Record<string, unknown>;
-          if (appearance.theme) result.theme = appearance.theme;
-          if (appearance.themeColors) result.themeColors = appearance.themeColors;
-          if (appearance.weatherEffect) result.weatherEffect = appearance.weatherEffect;
-          if (appearance.showWeatherWidget !== undefined) result.showWeatherWidget = appearance.showWeatherWidget;
-          if (appearance.weatherLocation) result.weatherLocation = appearance.weatherLocation;
-          if (appearance.animationsEnabled !== undefined) result.animationsEnabled = appearance.animationsEnabled;
-          if (appearance.reducedMotion !== undefined) result.reducedMotion = appearance.reducedMotion;
-          if (appearance.soundEnabled !== undefined) result.soundEnabled = appearance.soundEnabled;
-        }
-        if (setting.key === 'contact' && setting.value && typeof setting.value === 'object') {
-          const contact = setting.value as Record<string, unknown>;
-          result.contact = setting.value;
-          // Also flatten contact fields for direct access
-          if (contact.phone) result.phone = contact.phone;
-          if (contact.email) result.email = contact.email;
-          if (contact.address) result.address = contact.address;
-        }
-        if (setting.key === 'general' && setting.value && typeof setting.value === 'object') {
-          const general = setting.value as Record<string, unknown>;
-          if (general.resortName) result.resortName = general.resortName;
-          if (general.tagline) result.tagline = general.tagline;
-          if (general.description) result.description = general.description;
-        }
-        // Homepage CMS settings
-        if (setting.key === 'homepage' && setting.value) {
-          result.homepage = setting.value;
-        }
-        // Footer CMS settings
-        if (setting.key === 'footer' && setting.value) {
-          result.footer = setting.value;
-        }
-        // Navbar CMS settings
-        if (setting.key === 'navbar' && setting.value) {
-          result.navbar = setting.value;
-        }
-        // Hours settings
-        if (setting.key === 'hours' && setting.value && typeof setting.value === 'object') {
-          const hours = setting.value as Record<string, unknown>;
-          result.hours = setting.value;
-          // Also flatten for direct access
-          if (hours.poolHours) result.poolHours = hours.poolHours;
-          if (hours.restaurantHours) result.restaurantHours = hours.restaurantHours;
-          if (hours.receptionHours) result.receptionHours = hours.receptionHours;
-        }
-        // FIX: Iteration 8 - Expose taxRate, serviceChargeRate, deliveryFee from their config keys
-        if (setting.key === 'tax_configuration' && setting.value && typeof setting.value === 'object') {
-          const taxConfig = setting.value as Record<string, unknown>;
-          if (taxConfig.global_rate !== undefined) {
-            result.taxRate = Number(taxConfig.global_rate);
-          } else if (taxConfig.default_rate !== undefined) {
-            result.taxRate = Number(taxConfig.default_rate) / 100;
-          }
-        }
-        if (setting.key === 'order_configuration' && setting.value && typeof setting.value === 'object') {
-          const orderConfig = setting.value as Record<string, unknown>;
-          if (orderConfig.serviceChargeRate !== undefined) result.serviceChargeRate = Number(orderConfig.serviceChargeRate);
-          if (orderConfig.deliveryFee !== undefined) result.deliveryFee = Number(orderConfig.deliveryFee);
-        }
-      }
-    }
-
-    res.json(result);
-  } catch (error) {
-    // Fallback to defaults on error
-    res.json({
-      theme: 'default',
-      contact: { email: 'info@ironparadisegym.com' }
-    });
-  }
-});
-// Public modules
-app.get('/api/modules', getModules);
-
-// Public weather endpoint
-app.get('/api/weather', async (req, res) => {
-  try {
-    const location = req.query.location as string || 'New York';
-    const apiKey = process.env.OPENWEATHER_API_KEY || process.env.WEATHER_API_KEY;
-
-    // If no API key configured, return demo data
-    if (!apiKey) {
-      return res.json({
-        success: true,
-        data: {
-          temperature: 24,
-          feels_like: 26,
-          humidity: 65,
-          wind_speed: 12,
-          visibility: 10,
-          condition: 'Partly Cloudy',
-          description: 'Demo weather data - configure OPENWEATHER_API_KEY for live data',
-          icon: 'cloud-sun',
-          location: location
-        }
-      });
-    }
-
-    // Try OpenWeather API
-    const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${apiKey}&units=metric`;
-    const weatherRes = await fetch(weatherUrl);
-
-    if (!weatherRes.ok) {
-      throw new Error('Weather API request failed');
-    }
-
-    const data = await weatherRes.json() as any;
-
-    res.json({
-      success: true,
-      data: {
-        temperature: data.main?.temp || 20,
-        feels_like: data.main?.feels_like || 20,
-        humidity: data.main?.humidity || 50,
-        wind_speed: data.wind?.speed ? data.wind.speed * 3.6 : 0, // Convert m/s to km/h
-        visibility: data.visibility ? data.visibility / 1000 : 10, // Convert m to km
-        condition: data.weather?.[0]?.main || 'Unknown',
-        description: data.weather?.[0]?.description || '',
-        icon: data.weather?.[0]?.icon || '',
-        location: data.name || location
-      }
-    });
-  } catch (error) {
-    console.error('Weather API error:', error);
-    // Return demo data on error
-    res.json({
-      success: true,
-      data: {
-        temperature: 24,
-        feels_like: 26,
-        humidity: 65,
-        wind_speed: 12,
-        visibility: 10,
-        condition: 'Partly Cloudy',
-        description: 'Weather data temporarily unavailable',
-        icon: 'cloud-sun',
-        location: (req.query.location as string) || 'Resort Location'
-      }
-    });
-  }
-});
+// Public API Routes
+app.use('/api', publicRoutes);
+app.use('/api/modules', getModules);
 
 // API Routes
 const apiRouter = express.Router();
 // Add health check to API router
 apiRouter.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
-// Settings routes (tax, etc.)
-// FIX: Iteration 8 - Unified DB key 'tax_configuration' (was split: admin used 'tax', TaxService used 'tax_configuration')
-apiRouter.get('/settings/tax', async (req, res) => {
-  try {
-    const supabase = getSupabase();
-    const { data } = await supabase.from('site_settings').select('value').eq('key', 'tax_configuration').single();
-    
-    if (data?.value) {
-      const stored = data.value;
-      // If data has global_rate (TaxService format) but no default_rate (admin format), convert
-      if (stored.global_rate !== undefined && stored.default_rate === undefined) {
-        stored.default_rate = Math.round(stored.global_rate * 100);
-      }
-      res.json({ success: true, data: stored });
-    } else {
-      res.json({ 
-        success: true, 
-        data: {
-          // FIX: Iteration 4 - Align default to 11% (matches backend tax.service.ts DEFAULT_TAX_RATE)
-          default_rate: 11,
-          global_rate: 0.11,
-          taxIncluded: false,
-          taxName: 'VAT',
-          taxCategories: []
-        }
-      });
-    }
-  } catch {
-    res.json({ 
-      success: true, 
-      // FIX: Iteration 4 - Align default to 11%
-      data: { default_rate: 11, global_rate: 0.11, taxIncluded: false, taxName: 'VAT', taxCategories: [] }
-    });
-  }
-});
-apiRouter.put('/settings/tax', authenticate, authorize('super_admin', 'admin'), async (req, res) => {
-  try {
-    const supabase = getSupabase();
-    const body = req.body;
-    // FIX: Iteration 8 - Always compute global_rate (decimal) from default_rate (percentage) for TaxService compatibility
-    if (body.default_rate !== undefined && body.global_rate === undefined) {
-      body.global_rate = Number(body.default_rate) / 100;
-    }
-    body.updated_at = new Date().toISOString();
-    await supabase.from('site_settings').upsert({ key: 'tax_configuration', value: body }, { onConflict: 'key' });
-    res.json({ success: true, data: body });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to save tax settings' });
-  }
-});
-
+// API Module Routes mount points
 apiRouter.use('/admin', adminRoutes);
 apiRouter.use('/auth', authRoutes);
-// FIX: Iteration 5 - Mount booking modification routes (cancellation, date changes, rescheduling)
-apiRouter.use('/bookings', bookingModRoutes);
+apiRouter.use('/bookings', bookingModRoutes); // FIX: Iteration 5 - Mount missing bookings routes
 apiRouter.use('/chalets', chaletRoutes);
 apiRouter.use('/coupons', couponRoutes);
 apiRouter.use('/devices', deviceRoutes);
@@ -356,6 +153,7 @@ import financeRoutes from './modules/finance/finance.routes.js';
 import modifiersRoutes from './modules/restaurant/modifiers.routes.js';
 import waitlistRoutes from './modules/restaurant/waitlist.routes.js';
 import customizationRoutes from './modules/customization/routes/customization.routes.js';
+import paymentPlatformRoutes from './modules/payments/payment.v1.routes.js';
 
 // Integrations - DISABLED: Uses PrismaClient, needs Supabase refactor
 // import { quickbooksRoutes } from './modules/integrations/index.js';
@@ -399,6 +197,9 @@ apiRouter.use('/customizations', customizationRoutes);
 
 // POS Hardware Routes
 apiRouter.use('/pos', posHardwareRoutes);
+
+// Platform-aware payment routes (Apple Pay, Google Pay, mobile SDK)
+apiRouter.use('/payments/platform', paymentPlatformRoutes);
 
 // GDPR Routes - FIXED
 apiRouter.use('/gdpr', gdprRoutes);
@@ -482,5 +283,9 @@ app.use((err: Error & { statusCode?: number; code?: string; isOperational?: bool
 
   res.status(status).json(response);
 });
+
+export async function createApp() {
+  return app;
+}
 
 export default app;

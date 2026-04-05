@@ -10,7 +10,8 @@ import { Request, Response, NextFunction } from 'express';
 // Redis client for rate limiting
 let redis: Redis | null = null;
 
-const getRedis = (): Redis => {
+const getRedis = (): Redis | null => {
+  if (process.env.REDIS_ENABLED === 'false') return null;
   if (!redis) {
     redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
       maxRetriesPerRequest: 3,
@@ -72,6 +73,7 @@ class EmailRateLimiter {
   }> {
     const limits = DEFAULT_LIMITS[category];
     const redis = getRedis();
+    if (!redis) return { allowed: true };
     const now = Math.floor(Date.now() / 1000);
 
     // Check burst limit (10 second window)
@@ -151,6 +153,7 @@ class EmailRateLimiter {
       : USER_LIMITS;
 
     const redis = getRedis();
+    if (!redis) return { allowed: true };
     const now = Math.floor(Date.now() / 1000);
 
     // Check minute limit
@@ -212,6 +215,7 @@ class EmailRateLimiter {
     const emailHash = Buffer.from(email.toLowerCase()).toString('base64');
     const limits = USER_LIMITS;
     const redis = getRedis();
+    if (!redis) return { allowed: true };
     const now = Math.floor(Date.now() / 1000);
 
     // Check hour limit for this email
@@ -308,6 +312,13 @@ class EmailRateLimiter {
   }> {
     const limits = DEFAULT_LIMITS[category];
     const redis = getRedis();
+    if (!redis) {
+      return {
+        minute: { used: 0, limit: limits.maxPerMinute },
+        hour: { used: 0, limit: limits.maxPerHour },
+        day: { used: 0, limit: limits.maxPerDay },
+      };
+    }
     const now = Math.floor(Date.now() / 1000);
 
     const minuteKey = `${this.prefix}:global:${category}:minute:${Math.floor(now / 60)}`;
@@ -337,6 +348,9 @@ class EmailRateLimiter {
     limits: RateLimitConfig;
   }> {
     const redis = getRedis();
+    if (!redis) {
+      return { minute: 0, hour: 0, day: 0, limits: USER_LIMITS };
+    }
     const now = Math.floor(Date.now() / 1000);
 
     const minuteKey = `${this.prefix}:user:${userId}:minute:${Math.floor(now / 60)}`;
@@ -364,11 +378,15 @@ class EmailRateLimiter {
     const redis = getRedis();
 
     if (target === 'global') {
+      const redis = getRedis();
+      if (!redis) return;
       const keys = await redis.keys(`${this.prefix}:global:*`);
       if (keys.length > 0) {
         await redis.del(...keys);
       }
     } else if (target === 'user' && identifier) {
+      const redis = getRedis();
+      if (!redis) return;
       const keys = await redis.keys(`${this.prefix}:user:${identifier}:*`);
       if (keys.length > 0) {
         await redis.del(...keys);
