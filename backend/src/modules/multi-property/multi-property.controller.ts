@@ -340,3 +340,45 @@ export async function calculateBenchmarks(req: Request, res: Response): Promise<
     res.status(500).json({ error: message });
   }
 }
+
+// ==================== CREATE PROPERTY ====================
+
+export async function createProperty(req: Request, res: Response): Promise<void> {
+  try {
+    const { name, property_code, property_type, address, city, country, timezone, currency, phone, email, total_rooms, group_id } = req.body;
+
+    if (!name) {
+      res.status(400).json({ error: 'Property name is required' });
+      return;
+    }
+
+    const property = await multiPropertyService.createProperty({
+      name,
+      property_code,
+      property_type,
+      address,
+      city,
+      country,
+      timezone,
+      currency,
+      phone,
+      email,
+      total_rooms,
+      group_id,
+    });
+
+    // Grant the creating user admin access to the new property
+    const userId = req.user?.id;
+    if (userId) {
+      await multiPropertyService.grantPropertyAccess(userId, property.id, 'admin', userId, { isPrimary: true });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: property,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to create property';
+    res.status(400).json({ error: message });
+  }
+}

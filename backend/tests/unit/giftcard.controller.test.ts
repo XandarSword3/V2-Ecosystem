@@ -50,12 +50,21 @@ const createChainableMock = (defaultResponse: { data: any; error: any } = { data
 
 let mockBuilder: ReturnType<typeof createChainableMock>;
 const mockFrom = vi.fn();
+const mockRpc = vi.fn();
+const sendGiftCardMock = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 
 // Mock the database connection module
 vi.mock('../../src/database/connection.js', () => ({
   getSupabase: vi.fn(() => ({
     from: mockFrom,
+    rpc: mockRpc,
   })),
+}));
+
+vi.mock('../../src/services/email.service.js', () => ({
+  emailService: {
+    sendGiftCard: sendGiftCardMock,
+  },
 }));
 
 import { GiftCardController } from '../../src/modules/giftcards/giftcard.controller';
@@ -138,9 +147,6 @@ describe('Gift Card Controller', () => {
   });
 
   describe('purchaseGiftCard', () => {
-    // SKIP REASON: The controller makes multiple database calls (template lookup, code uniqueness check,
-    // insert, transaction log, purchaser lookup) and the mock queue pattern doesn't handle this well.
-    // The actual controller is tested via integration tests.
     it('should purchase a gift card from template', async () => {
       mockRequest.body = {
         templateId: '550e8400-e29b-41d4-a716-446655440050',
@@ -165,6 +171,7 @@ describe('Gift Card Controller', () => {
         status: 'active',
         recipient_email: 'friend@example.com',
         recipient_name: 'John',
+        expires_at: '2027-04-05T00:00:00.000Z',
       };
 
       // Queue responses in order
@@ -172,6 +179,7 @@ describe('Gift Card Controller', () => {
       mockBuilder.queueResponse(null, null);          // Check code uniqueness
       mockBuilder.queueResponse(createdGiftCard, null); // Insert gift card
       mockBuilder.queueResponse(null, null);          // Insert transaction
+      mockBuilder.queueResponse({ full_name: 'Test Sender' }, null); // Purchaser lookup for email
 
       await controller.purchaseGiftCard(
         mockRequest as Request,
@@ -179,7 +187,29 @@ describe('Gift Card Controller', () => {
       );
 
       expect(mockResponse.status).toHaveBeenCalledWith(201);
-      expect(responseJson.success).toBe(true);
+      expect(responseJson).toEqual({
+        success: true,
+        data: {
+          id: 'gc-123',
+          code: expect.any(String),
+          amount: 50,
+          recipientEmail: 'friend@example.com',
+          recipientName: 'John',
+          expiresAt: expect.any(String),
+        },
+        message: 'Gift card created successfully',
+      });
+
+      expect(mockFrom).toHaveBeenCalledWith('gift_card_templates');
+      expect(mockFrom).toHaveBeenCalledWith('gift_cards');
+      expect(mockFrom).toHaveBeenCalledWith('gift_card_transactions');
+      expect(sendGiftCardMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientEmail: 'friend@example.com',
+          recipientName: 'John',
+          amount: 50,
+        })
+      );
     });
 
     it('should reject missing required fields', async () => {
@@ -261,17 +291,18 @@ describe('Gift Card Controller', () => {
         amount: 20,
       };
 
-      const mockGiftCard = {
+      mockBuilder.queueResponse({
         id: 'gc-redeem',
-        code: 'GIFT-REDEEM1',
         current_balance: 50,
         status: 'active',
-      };
+        expires_at: '2099-12-31T23:59:59Z',
+      }, null);
 
-      // Get gift card, update balance, log transaction
-      mockBuilder.queueResponse(mockGiftCard, null);
-      mockBuilder.queueResponse({ ...mockGiftCard, current_balance: 30 }, null);
-      mockBuilder.queueResponse({ id: 'txn-1' }, null);
+      // Mock the atomic RPC returning a successful redemption
+      mockRpc.mockResolvedValue({
+        data: [{ success: true, amount_redeemed: 20, new_balance: 30, gift_card_id: 'gc-redeem', error_message: null }],
+        error: null,
+      });
 
       await controller.redeemGiftCard(
         mockRequest as Request,
@@ -279,6 +310,8 @@ describe('Gift Card Controller', () => {
       );
 
       expect(responseJson.success).toBe(true);
+      expect(responseJson.data.amountRedeemed).toBe(20);
+      expect(responseJson.data.remainingBalance).toBe(30);
     });
 
     it('should reject invalid gift card', async () => {
@@ -287,7 +320,7 @@ describe('Gift Card Controller', () => {
         amount: 20,
       };
 
-      mockBuilder.queueResponse(null, null);
+      mockBuilder.queueResponse(null, { message: 'not found' });
 
       await controller.redeemGiftCard(
         mockRequest as Request,
@@ -305,9 +338,9 @@ describe('Gift Card Controller', () => {
 
       mockBuilder.queueResponse({
         id: 'gc-inactive',
-        code: 'GIFT-INACTIVE',
         current_balance: 50,
-        status: 'expired',
+        status: 'inactive',
+        expires_at: '2099-12-31T23:59:59Z',
       }, null);
 
       await controller.redeemGiftCard(
@@ -326,10 +359,9 @@ describe('Gift Card Controller', () => {
 
       mockBuilder.queueResponse({
         id: 'gc-low',
-        code: 'GIFT-LOW',
-        current_balance: 25,
+        current_balance: 50,
         status: 'active',
-        expires_at: '2025-12-31T23:59:59Z',
+        expires_at: '2099-12-31T23:59:59Z',
       }, null);
 
       await controller.redeemGiftCard(
@@ -343,23 +375,41 @@ describe('Gift Card Controller', () => {
 
   describe('getMyGiftCards', () => {
     it('should return user purchased gift cards', async () => {
-      const mockGiftCards = [
-        { id: 'gc-1', code: 'GIFT-AAA', current_balance: 50, status: 'active', created_at: '2023-01-01' },
+      const purchasedCards = [
+        { id: 'gc-1', code: 'GIFT-AAA', current_balance: 50, status: 'active', created_at: '2023-01-01T10:00:00Z' },
+      ];
+      const receivedCards = [
+        { id: 'gc-2', code: 'GIFT-BBB', current_balance: 30, status: 'active', created_at: '2023-01-02T10:00:00Z' },
       ];
 
       // Queue separate responses for purchased and received calls
-      mockBuilder.queueResponse(mockGiftCards, null); // Purchased
-      mockBuilder.queueResponse([], null);            // Received
+      mockBuilder.queueResponse(purchasedCards, null); // Purchased
+      mockBuilder.queueResponse(receivedCards, null);  // Received
 
       await controller.getMyGiftCards(
         mockRequest as Request,
         mockResponse as Response
       );
 
-      expect(responseJson.success).toBe(true);
-      expect(responseJson.data).toBeDefined();
-      expect(Array.isArray(responseJson.data)).toBe(true);
-      expect(responseJson.data[0].type).toBe('purchased');
+      expect(responseJson).toEqual({
+        success: true,
+        data: [
+          expect.objectContaining({
+            id: 'gc-2',
+            code: 'GIFT-BBB',
+            current_balance: 30,
+            status: 'active',
+            type: 'received',
+          }),
+          expect.objectContaining({
+            id: 'gc-1',
+            code: 'GIFT-AAA',
+            current_balance: 50,
+            status: 'active',
+            type: 'purchased',
+          }),
+        ],
+      });
     });
   });
 

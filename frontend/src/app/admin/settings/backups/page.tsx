@@ -220,7 +220,7 @@ export default function BackupsPage() {
     };
 
     const formatSize = (bytes: number) => {
-        if (bytes === 0) return '0 B';
+        if (!bytes || bytes <= 0) return '0 B';
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -301,7 +301,7 @@ export default function BackupsPage() {
                                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
                                     <div className="bg-blue-600 h-full" style={{ width: `${Math.min(backups.length * 10, 100)}%` }} />
                                 </div>
-                                <p className="text-xs text-slate-500 mt-2">Storage usage: {formatSize(backups.reduce((acc, curr) => acc + curr.size_bytes, 0))}</p>
+                                <p className="text-xs text-slate-500 mt-2">Storage usage: {formatSize(backups.reduce((acc, curr) => acc + (curr.size_bytes || 0), 0))}</p>
                             </div>
 
                             <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800 rounded-lg">

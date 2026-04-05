@@ -228,9 +228,15 @@ vi.mock('nodemailer', () => ({
   }
 }));
 
-vi.mock('node-cron', () => ({
-  schedule: vi.fn()
+const { cronScheduleMock } = vi.hoisted(() => ({
+  cronScheduleMock: vi.fn(),
 }));
+vi.mock('node-cron', () => {
+  return {
+    default: { schedule: cronScheduleMock },
+    schedule: cronScheduleMock,
+  };
+});
 
 import { marketingAutomationService, MarketingAutomationService } from '../../../../src/modules/marketing/marketing.service';
 
@@ -552,10 +558,12 @@ describe('MarketingAutomationService', () => {
       mockFromFn.mockImplementation((table) => {
         if (table === 'journey_enrollments') {
           const mock = createQueryMock(() => []);
+          const innerChain = {
+            eq: vi.fn().mockResolvedValue({ count: 5, data: null, error: null })
+          };
           mock.select = vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ count: 5, data: null, error: null })
-            })
+            in: vi.fn().mockReturnValue(innerChain),
+            eq: vi.fn().mockReturnValue(innerChain),
           });
           return mock;
         }

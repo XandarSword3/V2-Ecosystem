@@ -72,7 +72,7 @@ export class LoyaltyController {
 
       // Get account with tier info
       const { data: account, error } = await supabase
-        .from('loyalty_accounts')
+        .from('loyalty_members')
         .select(`
           *,
           tier:loyalty_tiers(*)
@@ -102,15 +102,18 @@ export class LoyaltyController {
         const signupBonus = settings?.signup_bonus || 0;
 
         const { data: newAccount, error: createError } = await supabase
-          .from('loyalty_accounts')
+          .from('loyalty_members')
           .insert({
             user_id: userId,
             tier_id: defaultTier?.id,
-            available_points: signupBonus,
-            total_points: signupBonus,
-            lifetime_points: signupBonus,
+            available_points: settings?.signupBonus || 0,
+            lifetime_points: settings?.signupBonus || 0,
+            total_points: settings?.signupBonus || 0,
           })
-          .select(`*, tier:loyalty_tiers(*)`)
+          .select(`
+            *,
+            tier:loyalty_tiers(*)
+          `)
           .single();
 
         if (createError) throw createError;
@@ -170,7 +173,7 @@ export class LoyaltyController {
   }
 
   /**
-   * Earn points for a user
+   * Earn points for a user (ATOMIC via RPC + Mutex)
    */
   async earnPoints(req: Request, res: Response) {
     try {
@@ -184,104 +187,44 @@ export class LoyaltyController {
       }
 
       const { userId, points, description, referenceType, referenceId } = validation.data;
+
       const supabase = getSupabase();
 
-      // Get or create account
-      let { data: account } = await supabase
-        .from('loyalty_accounts')
-        .select(`*, tier:loyalty_tiers(*)`)
-        .eq('user_id', userId)
-        .single();
+      // Use atomic RPC to prevent lost-update race conditions
+      // This is now protected by pg_advisory_xact_lock in Postgres
+      const { data: result, error: rpcError } = await supabase.rpc(
+        'earn_loyalty_points_atomic',
+        {
+          p_user_id: userId,
+          p_order_total: points,
+          p_order_id: referenceId || '00000000-0000-0000-0000-000000000000',
+          p_points_per_dollar: 1,
+        }
+      );
 
-      if (!account) {
-        const { data: defaultTier } = await supabase
-          .from('loyalty_tiers')
-          .select('id')
-          .order('min_points', { ascending: true })
-          .limit(1)
-          .single();
+      if (rpcError) throw rpcError;
 
-        const { data: newAccount, error } = await supabase
-          .from('loyalty_accounts')
-          .insert({
-            user_id: userId,
-            tier_id: defaultTier?.id,
-            available_points: 0,
-            total_points: 0,
-            lifetime_points: 0,
-          })
-          .select(`*, tier:loyalty_tiers(*)`)
-          .single();
-
-        if (error) throw error;
-        account = newAccount;
-      }
-
-      // Get settings
-      const { data: settings } = await supabase
-        .from('loyalty_settings')
-        .select('*')
-        .limit(1)
-        .single();
-
-      const multiplier = (account.tier as any)?.points_multiplier || 1;
-      const earnedPoints = Math.floor(points * multiplier);
-      const newBalance = (account.available_points || 0) + earnedPoints;
-      const newLifetime = (account.lifetime_points || 0) + earnedPoints;
-
-      // Update account
-      const { error: updateError } = await supabase
-        .from('loyalty_accounts')
-        .update({
-          available_points: newBalance,
-          total_points: newBalance,
-          lifetime_points: newLifetime,
-          last_activity: new Date().toISOString(),
-        })
-        .eq('id', account.id);
-
-      if (updateError) throw updateError;
-
-      // Log transaction
-      await supabase.from('loyalty_transactions').insert({
-        member_id: account.id,
-        type: 'earn',
-        points: earnedPoints,
-        balance_after: newBalance,
-        description: description || 'Points earned',
-        reference_type: referenceType,
-        reference_id: referenceId,
-        created_by: req.user?.id,
-      });
-
-      // Check for tier upgrade
-      const { data: newTier } = await supabase
-        .from('loyalty_tiers')
-        .select('*')
-        .lte('min_points', newLifetime)
-        .order('min_points', { ascending: false })
-        .limit(1)
-        .single();
-
-      let tierUpgrade = null;
-      if (newTier && newTier.id !== account.tier_id) {
-        await supabase
-          .from('loyalty_accounts')
-          .update({ tier_id: newTier.id })
-          .eq('id', account.id);
-        tierUpgrade = newTier.name;
+      const row = result?.[0];
+      if (!row?.success) {
+        return res.status(400).json({
+          success: false,
+          error: row?.error_message || 'Failed to earn points',
+        });
       }
 
       res.json({
         success: true,
         data: {
-          pointsEarned: earnedPoints,
-          multiplier,
-          newBalance,
-          newTier: tierUpgrade,
+          pointsEarned: row.points_earned,
+          multiplier: parseFloat(row.tier_multiplier) || 1,
+          newBalance: row.new_balance,
+          newTier: null,
         },
       });
     } catch (error: any) {
+      // Check if response was already sent
+      if (res.headersSent) return;
+
       console.error('Error earning points:', error);
       res.status(500).json({
         success: false,
@@ -292,7 +235,7 @@ export class LoyaltyController {
   }
 
   /**
-   * Redeem points for a user
+   * Redeem points for a user (ATOMIC via RPC + Mutex)
    */
   async redeemPoints(req: Request, res: Response) {
     try {
@@ -306,20 +249,10 @@ export class LoyaltyController {
       }
 
       const { userId, points, description, referenceType, referenceId } = validation.data;
+
       const supabase = getSupabase();
 
-      // Get account
-      const { data: account, error } = await supabase
-        .from('loyalty_accounts')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (error || !account) {
-        return res.status(404).json({ success: false, error: 'Loyalty account not found' });
-      }
-
-      // Get settings for min redemption
+      // Get settings for min redemption and rate
       const { data: settings } = await supabase
         .from('loyalty_settings')
         .select('*')
@@ -336,48 +269,43 @@ export class LoyaltyController {
         });
       }
 
-      if ((account.available_points || 0) < points) {
-        return res.status(400).json({
-          success: false,
-          error: 'Insufficient points',
-          available: account.available_points || 0,
-        });
-      }
-
-      const newBalance = (account.available_points || 0) - points;
       const dollarValue = points * redemptionRate;
 
-      // Update account
-      await supabase
-        .from('loyalty_accounts')
-        .update({
-          available_points: newBalance,
-          total_points: newBalance,
-          last_activity: new Date().toISOString(),
-        })
-        .eq('id', account.id);
+      // Use atomic RPC to prevent lost-update race conditions
+      // This is now protected by pg_advisory_xact_lock in Postgres
+      const { data: result, error: rpcError } = await supabase.rpc(
+        'redeem_loyalty_points_atomic',
+        {
+          p_user_id: userId,
+          p_points: points,
+          p_order_id: referenceId || '00000000-0000-0000-0000-000000000000',
+          p_dollar_value: dollarValue,
+        }
+      );
 
-      // Log transaction
-      await supabase.from('loyalty_transactions').insert({
-        member_id: account.id,
-        type: 'redeem',
-        points: -points,
-        balance_after: newBalance,
-        description: description || 'Points redeemed',
-        reference_type: referenceType,
-        reference_id: referenceId,
-        created_by: req.user?.id,
-      });
+      if (rpcError) throw rpcError;
+
+      const row = result?.[0];
+      if (!row?.success) {
+        const errMsg = row?.error_message || 'Failed to redeem points';
+        const status = errMsg.includes('Insufficient') ? 400 : errMsg.includes('not found') ? 404 : 400;
+        return res.status(status).json({
+          success: false,
+          error: errMsg,
+          available: row?.new_balance,
+        });
+      }
 
       res.json({
         success: true,
         data: {
-          pointsRedeemed: points,
+          pointsRedeemed: row.points_redeemed,
           dollarValue,
-          newBalance,
+          newBalance: row.new_balance,
         },
       });
     } catch (error: any) {
+      if (res.headersSent) return;
       console.error('Error redeeming points:', error);
       res.status(500).json({
         success: false,
@@ -388,7 +316,7 @@ export class LoyaltyController {
   }
 
   /**
-   * Adjust points (admin only)
+   * Adjust points (admin only) (ATOMIC via RPC + Mutex)
    */
   async adjustPoints(req: Request, res: Response) {
     try {
@@ -402,70 +330,42 @@ export class LoyaltyController {
       }
 
       const { userId, points, reason } = validation.data;
+
       const supabase = getSupabase();
 
-      const { data: account, error } = await supabase
-        .from('loyalty_accounts')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (error || !account) {
-        return res.status(404).json({ success: false, error: 'Loyalty account not found' });
-      }
-
-      const newBalance = Math.max(0, (account.available_points || 0) + points);
-      const newLifetime = points > 0 ? (account.lifetime_points || 0) + points : (account.lifetime_points || 0);
-
-      await supabase
-        .from('loyalty_accounts')
-        .update({
-          available_points: newBalance,
-          total_points: newBalance,
-          lifetime_points: newLifetime,
-        })
-        .eq('id', account.id);
-
-      await supabase.from('loyalty_transactions').insert({
-        member_id: account.id,
-        type: 'adjust',
-        points: points,
-        balance_after: newBalance,
-        description: reason,
-        created_by: req.user?.id,
-      });
-
-      // FIX: Iteration 18 - Check tier upgrade after positive point adjustment
-      // Previously adjustPoints skipped this, so admin bonus grants never triggered tier promotions
-      let tierChange = null;
-      if (points > 0) {
-        const { data: newTier } = await supabase
-          .from('loyalty_tiers')
-          .select('*')
-          .lte('min_points', newLifetime)
-          .order('min_points', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (newTier && newTier.id !== account.tier_id) {
-          await supabase
-            .from('loyalty_accounts')
-            .update({ tier_id: newTier.id })
-            .eq('id', account.id);
-          tierChange = newTier.name;
+      // Use atomic RPC to prevent lost-update race conditions
+      // This is now protected by pg_advisory_xact_lock in Postgres
+      const { data: result, error: rpcError } = await supabase.rpc(
+        'adjust_loyalty_points_atomic',
+        {
+          p_user_id: userId,
+          p_points: points,
+          p_reason: reason || 'Admin adjustment',
+          p_admin_id: req.user?.id || null,
         }
+      );
+
+      if (rpcError) throw rpcError;
+
+      const row = result?.[0];
+      if (!row?.success) {
+        return res.status(404).json({
+          success: false,
+          error: row?.error_message || 'Loyalty account not found',
+        });
       }
 
       res.json({
         success: true,
         data: {
-          adjustment: points,
-          newBalance,
+          adjustment: row.adjustment,
+          newBalance: row.new_balance,
           reason,
-          newTier: tierChange,
+          newTier: row.tier_name,
         },
       });
     } catch (error: any) {
+      if (res.headersSent) return;
       console.error('Error adjusting points:', error);
       res.status(500).json({
         success: false,
@@ -476,7 +376,7 @@ export class LoyaltyController {
   }
 
   /**
-   * Adjust points by account ID (admin only)
+   * Adjust points by account ID (admin only) (ATOMIC via RPC)
    * This route accepts accountId in URL path instead of userId in body
    */
   async adjustPointsByAccountId(req: Request, res: Response) {
@@ -494,64 +394,34 @@ export class LoyaltyController {
       const { points, reason } = validation.data;
       const supabase = getSupabase();
 
-      const { data: account, error } = await supabase
-        .from('loyalty_accounts')
-        .select('*')
-        .eq('id', accountId)
-        .single();
-
-      if (error || !account) {
-        return res.status(404).json({ success: false, error: 'Loyalty account not found' });
-      }
-
-      const newBalance = Math.max(0, (account.available_points || 0) + points);
-      const newLifetime = points > 0 ? (account.lifetime_points || 0) + points : (account.lifetime_points || 0);
-
-      await supabase
-        .from('loyalty_accounts')
-        .update({
-          available_points: newBalance,
-          total_points: newBalance,
-          lifetime_points: newLifetime,
-        })
-        .eq('id', account.id);
-
-      await supabase.from('loyalty_transactions').insert({
-        member_id: account.id,
-        type: 'adjust',
-        points: points,
-        balance_after: newBalance,
-        description: reason,
-        created_by: req.user?.id,
-      });
-
-      // FIX: Iteration 18 - Check tier upgrade after positive adjustment (same as adjustPoints)
-      let tierChange = null;
-      if (points > 0) {
-        const { data: newTier } = await supabase
-          .from('loyalty_tiers')
-          .select('*')
-          .lte('min_points', newLifetime)
-          .order('min_points', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (newTier && newTier.id !== account.tier_id) {
-          await supabase
-            .from('loyalty_accounts')
-            .update({ tier_id: newTier.id })
-            .eq('id', account.id);
-          tierChange = newTier.name;
+      // Use atomic RPC to prevent lost-update race conditions
+      const { data: result, error: rpcError } = await supabase.rpc(
+        'adjust_loyalty_points_by_account_atomic',
+        {
+          p_account_id: accountId,
+          p_points: points,
+          p_reason: reason || 'Admin adjustment',
+          p_admin_id: req.user?.id || null,
         }
+      );
+
+      if (rpcError) throw rpcError;
+
+      const row = result?.[0];
+      if (!row?.success) {
+        return res.status(404).json({
+          success: false,
+          error: row?.error_message || 'Loyalty account not found',
+        });
       }
 
       res.json({
         success: true,
         data: {
-          adjustment: points,
-          newBalance,
+          adjustment: row.adjustment,
+          newBalance: row.new_balance,
           reason,
-          newTier: tierChange,
+          newTier: row.tier_name,
         },
       });
     } catch (error: any) {
@@ -575,7 +445,7 @@ export class LoyaltyController {
 
       // First get account
       const { data: account } = await supabase
-        .from('loyalty_accounts')
+        .from('loyalty_members')
         .select('id')
         .eq('user_id', userId)
         .single();
@@ -818,13 +688,17 @@ export class LoyaltyController {
       const offset = (pageNum - 1) * limitNum;
 
       let query = supabase
-        .from('loyalty_accounts')
+        .from('loyalty_members')
         .select(`
           *,
-          user:users(id, full_name, email),
-          tier:loyalty_tiers(id, name, color)
+          user:users (
+            id,
+            email,
+            full_name
+          ),
+          tier:loyalty_tiers(*)
         `, { count: 'exact' })
-        .order('lifetime_points', { ascending: false })
+        .order('created_at', { ascending: false })
         .range(offset, offset + limitNum - 1);
 
       if (tier) {
@@ -862,23 +736,30 @@ export class LoyaltyController {
     try {
       const supabase = getSupabase();
 
-      // Get summary stats
-      const { data: accounts } = await supabase
-        .from('loyalty_accounts')
+      // Get basic stats
+      const { count: totalMembers } = await supabase
+        .from('loyalty_members')
+        .select('*', { count: 'exact', head: true });
+
+      const { data: tierStats } = await supabase
+        .from('loyalty_members')
+        .select('tier_id, loyalty_tiers(name)')
+        .not('tier_id', 'is', null);
+
+      const { data: pointsData } = await supabase
+        .from('loyalty_members')
         .select('available_points, lifetime_points');
 
-      const totalMembers = accounts?.length || 0;
-      const totalOutstanding = accounts?.reduce((sum, a) => sum + (a.available_points || 0), 0) || 0;
-      const totalLifetime = accounts?.reduce((sum, a) => sum + (a.lifetime_points || 0), 0) || 0;
+      const totalOutstanding = pointsData?.reduce((sum, row) => sum + (row.available_points || 0), 0) || 0;
+      const totalLifetime = pointsData?.reduce((sum, row) => sum + (row.lifetime_points || 0), 0) || 0;
 
       // Get tier distribution
       const { data: tierAccounts } = await supabase
-        .from('loyalty_accounts')
+        .from('loyalty_members')
         .select(`
           tier_id,
           tier:loyalty_tiers(name, color)
-        `)
-        .eq('is_active', true);
+        `);
 
       const tierCounts: Record<string, { name: string; color: string; count: number }> = {};
       tierAccounts?.forEach((account: any) => {
@@ -922,7 +803,7 @@ export class LoyaltyController {
             total_members: totalMembers,
             total_outstanding_points: totalOutstanding,
             total_lifetime_points: totalLifetime,
-            avg_points_per_member: totalMembers > 0 ? Math.round(totalOutstanding / totalMembers) : 0,
+            avg_points_per_member: (totalMembers || 0) > 0 ? Math.round(totalOutstanding / (totalMembers || 0)) : 0,
           },
           tierDistribution: Object.values(tierCounts),
           recentActivity: Object.entries(activityByDate).map(([date, data]) => ({
@@ -973,7 +854,7 @@ export class LoyaltyController {
       if (userId) {
         const { data: account } = await supabase
           .from('loyalty_accounts')
-          .select(`tier:loyalty_tiers(points_multiplier)`)
+          .select(`tier: loyalty_tiers(points_multiplier)`)
           .eq('user_id', userId)
           .single();
         multiplier = (account?.tier as any)?.points_multiplier || 1;
@@ -1037,7 +918,7 @@ export class LoyaltyController {
       const data = validation.data;
       const supabase = getSupabase();
 
-      const { data: tier, error } = await supabase
+      let { data: tier, error } = await supabase
         .from('loyalty_tiers')
         .insert({
           name: data.name,
@@ -1050,6 +931,31 @@ export class LoyaltyController {
         })
         .select()
         .single();
+
+      // Compatibility fallback: legacy loyalty_tiers schema may not have is_active.
+      if (error && /is_active|schema cache|column/i.test(String(error.message || error.details || ''))) {
+        ({ data: tier, error } = await supabase
+          .from('loyalty_tiers')
+          .insert({
+            name: data.name,
+            min_points: data.min_points,
+            points_multiplier: data.points_multiplier,
+            benefits: data.benefits,
+            color: data.color,
+            icon: data.icon,
+          })
+          .select()
+          .single());
+      }
+
+      // Idempotent behavior for repeated setup runs.
+      if (error && error.code === '23505') {
+        ({ data: tier, error } = await supabase
+          .from('loyalty_tiers')
+          .select('*')
+          .eq('name', data.name)
+          .single());
+      }
 
       if (error) throw error;
 

@@ -27,6 +27,11 @@ export const Roles = {
   BAR_STAFF: 'bar_staff',
   KITCHEN_STAFF: 'kitchen_staff',
   
+  // Specialized staff roles (used in authorize() calls across the system)
+  CHEF: 'chef',
+  SERVER: 'server',
+  FRONT_DESK: 'front_desk',
+  
   // Admin roles - module-specific elevated privileges
   RESTAURANT_ADMIN: 'restaurant_admin',
   SNACK_BAR_ADMIN: 'snack_bar_admin',
@@ -279,6 +284,54 @@ export const RolePermissions: Record<Role, (Permission | '*')[]> = {
     Permissions.HOUSEKEEPING_TASK_READ,
     Permissions.HOUSEKEEPING_TASK_UPDATE,
     Permissions.CHALET_READ,
+    Permissions.DEVICE_REGISTER,
+  ],
+
+  // Chef - kitchen management (elevated kitchen_staff with menu read/write)
+  [Roles.CHEF]: [
+    Permissions.USER_READ_SELF,
+    Permissions.USER_UPDATE_SELF,
+    Permissions.RESTAURANT_MENU_READ,
+    Permissions.RESTAURANT_MENU_WRITE,
+    Permissions.RESTAURANT_ORDER_READ_ALL,
+    Permissions.RESTAURANT_ORDER_UPDATE,
+    Permissions.SNACK_MENU_READ,
+    Permissions.SNACK_ORDER_READ_ALL,
+    Permissions.INVENTORY_READ,
+    Permissions.INVENTORY_UPDATE,
+    Permissions.DEVICE_REGISTER,
+  ],
+
+  // Server - front-of-house restaurant staff (order handling + cash payments)
+  [Roles.SERVER]: [
+    Permissions.USER_READ_SELF,
+    Permissions.USER_UPDATE_SELF,
+    Permissions.RESTAURANT_MENU_READ,
+    Permissions.RESTAURANT_ORDER_CREATE,
+    Permissions.RESTAURANT_ORDER_READ_ALL,
+    Permissions.RESTAURANT_ORDER_UPDATE,
+    Permissions.PAYMENT_CREATE,
+    Permissions.PAYMENT_RECORD_CASH,
+    Permissions.LOYALTY_EARN,
+    Permissions.DEVICE_REGISTER,
+  ],
+
+  // Front Desk - reception/kiosk operations (bookings + check-in + payments)
+  [Roles.FRONT_DESK]: [
+    Permissions.USER_READ_SELF,
+    Permissions.USER_UPDATE_SELF,
+    Permissions.CHALET_READ,
+    Permissions.CHALET_BOOKING_CREATE,
+    Permissions.CHALET_BOOKING_READ_ALL,
+    Permissions.CHALET_BOOKING_UPDATE,
+    Permissions.POOL_SESSION_READ,
+    Permissions.POOL_TICKET_CREATE,
+    Permissions.POOL_TICKET_READ_ALL,
+    Permissions.POOL_TICKET_VALIDATE,
+    Permissions.PAYMENT_CREATE,
+    Permissions.PAYMENT_READ_ALL,
+    Permissions.PAYMENT_RECORD_CASH,
+    Permissions.LOYALTY_EARN,
     Permissions.DEVICE_REGISTER,
   ],
 

@@ -153,7 +153,7 @@ export function createCurrencyService(container: Container) {
       return { success: false, error: 'Invalid currency code' };
     }
 
-    const currency = await currencyRepository.getCurrency(code);
+    const currency = await currencyRepository.getCurrency(code.toUpperCase());
     
     if (!currency) {
       return { success: false, error: 'Currency not found' };

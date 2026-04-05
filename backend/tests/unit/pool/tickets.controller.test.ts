@@ -44,9 +44,10 @@ const createChainableMock = () => {
 
 let mockBuilder: ReturnType<typeof createChainableMock>;
 const mockFrom = vi.fn();
+const mockRpc = vi.fn();
 
 vi.mock('../../../src/database/connection.js', () => ({
-  getSupabase: vi.fn(() => ({ from: mockFrom })),
+  getSupabase: vi.fn(() => ({ from: mockFrom, rpc: mockRpc })),
 }));
 
 vi.mock('../../../src/utils/logger.js', () => ({
@@ -107,22 +108,24 @@ describe('Pool Tickets Controller', () => {
 
   describe('purchaseTicket', () => {
     it('should purchase a pool ticket successfully', async () => {
-      const mockSession = {
-        id: 'session-1',
-        price: '25.00',
-        max_capacity: 100,
-        adult_price: '25.00',
-        child_price: '15.00',
-      };
       const mockTicket = {
         id: 'ticket-1',
         ticket_number: 'P-240101-0001',
+        session_id: 'session-1',
         status: 'valid',
+        total_amount: '40.00',
       };
 
-      mockBuilder.queueResponse(mockSession); // Get session
-      mockBuilder.queueResponse([]); // Existing tickets (none)
-      mockBuilder.queueResponse(mockTicket); // Create ticket
+      // Mock the atomic RPC call
+      mockRpc.mockResolvedValue({
+        data: [{ success: true, ticket_id: 'ticket-1', total_amount: 40.00, available_capacity: 98, error_message: null }],
+        error: null,
+      });
+
+      // Mock fetching the created ticket
+      mockBuilder.queueResponse(mockTicket);
+      // Mock fetching session info for email
+      mockBuilder.queueResponse({ name: 'Morning Session', start_time: '09:00', end_time: '12:00' });
 
       const { req, res, next } = createMockReqRes({
         body: {
@@ -139,13 +142,21 @@ describe('Pool Tickets Controller', () => {
 
       await ticketsController.purchaseTicket(req, res, next);
 
+      expect(mockRpc).toHaveBeenCalledWith('purchase_pool_ticket_atomic', expect.objectContaining({
+        p_session_id: 'session-1',
+        p_number_of_guests: 2,
+      }));
       const resJsonCalled = (res.json as any).mock.calls.length > 0;
       const nextCalled = (next as any).mock.calls.length > 0;
       expect(resJsonCalled || nextCalled).toBe(true);
     });
 
     it('should return 404 for invalid session', async () => {
-      mockBuilder.queueResponse(null, { code: 'PGRST116' });
+      // Mock RPC returning session not found
+      mockRpc.mockResolvedValue({
+        data: [{ success: false, ticket_id: null, total_amount: 0, available_capacity: 0, error_message: 'Session not found' }],
+        error: null,
+      });
 
       const { req, res, next } = createMockReqRes({
         body: {
@@ -158,13 +169,15 @@ describe('Pool Tickets Controller', () => {
 
       await ticketsController.purchaseTicket(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.status).toHaveBeenCalledWith(400);
     });
 
     it('should return 400 when capacity exceeded', async () => {
-      const mockSession = { id: 'session-1', max_capacity: 10 };
-      mockBuilder.queueResponse(mockSession);
-      mockBuilder.queueResponse([{ number_of_guests: 8 }]); // Already 8 guests
+      // Mock RPC returning capacity exceeded
+      mockRpc.mockResolvedValue({
+        data: [{ success: false, ticket_id: null, total_amount: 0, available_capacity: 2, error_message: 'Not enough capacity available' }],
+        error: null,
+      });
 
       const { req, res, next } = createMockReqRes({
         body: {

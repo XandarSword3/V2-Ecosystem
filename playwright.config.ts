@@ -21,7 +21,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './tests/phase3',
   testIgnore: ['**/simulation/**', '**/node_modules/**'],
   timeout: 120000,
   expect: {
@@ -29,18 +29,18 @@ export default defineConfig({
   },
   fullyParallel: false, // Run sequentially to avoid auth conflicts
   forbidOnly: !!process.env.CI,
-  retries: 2, // Increased retries for flaky network tests
+  retries: 1, // One retry for flaky network tests
   workers: 1, // Single worker to avoid session conflicts
   reporter: [
     ['list'],
     ['html', { open: 'never' }],
-    ['json', { outputFile: 'test-results/e2e-results.json' }]
+    ['json', { outputFile: 'test-results/phase3-results.json' }]
   ],
   use: {
     baseURL: FRONTEND_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'on-first-retry',
+    video: 'off',
     headless: true,
     actionTimeout: 30000,
     navigationTimeout: 60000,

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSocket } from '@/lib/socket';
+import { io } from 'socket.io-client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -147,28 +147,51 @@ function formatPagePath(path?: string): string {
 
 export default function LiveUsersPage() {
   const t = useTranslations();
-  const { socket, isConnected } = useSocket();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [adminSocket, setAdminSocket] = useState<ReturnType<typeof io> | null>(null);
 
-  // Mark as mounted to avoid hydration mismatch
+  // Create a dedicated admin-namespace socket connection
   useEffect(() => {
     setIsMounted(true);
     setLastRefresh(new Date());
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) return;
+
+    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3005').replace(/\/api\/?$/, '');
+    const socket = io(`${socketUrl}/admin`, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      timeout: 30000,
+      auth: { token },
+    });
+
+    socket.on('connect', () => setIsConnected(true));
+    socket.on('disconnect', () => setIsConnected(false));
+    
+    setAdminSocket(socket);
+
+    return () => {
+      socket.disconnect();
+      setAdminSocket(null);
+    };
   }, []);
 
   const fetchOnlineUsers = useCallback(() => {
-    if (socket && isConnected) {
-      socket.emit('request:online_users_detailed');
+    if (adminSocket && isConnected) {
+      adminSocket.emit('request:online_users_detailed');
       setLastRefresh(new Date());
     }
-  }, [socket, isConnected]);
+  }, [adminSocket, isConnected]);
 
   useEffect(() => {
-    if (socket && isConnected) {
+    if (adminSocket && isConnected) {
       // Request initial data
       fetchOnlineUsers();
 
@@ -178,7 +201,7 @@ export default function LiveUsersPage() {
         setLoading(false);
       };
 
-      socket.on('stats:online_users_detailed', handleOnlineUsersDetailed);
+      adminSocket.on('stats:online_users_detailed', handleOnlineUsersDetailed);
 
       // Auto-refresh every 10 seconds if enabled
       let interval: NodeJS.Timeout | null = null;
@@ -189,11 +212,11 @@ export default function LiveUsersPage() {
       }
 
       return () => {
-        socket.off('stats:online_users_detailed', handleOnlineUsersDetailed);
+        adminSocket.off('stats:online_users_detailed', handleOnlineUsersDetailed);
         if (interval) clearInterval(interval);
       };
     }
-  }, [socket, isConnected, fetchOnlineUsers, autoRefresh]);
+  }, [adminSocket, isConnected, fetchOnlineUsers, autoRefresh]);
 
   // Update duration display every second
   useEffect(() => {

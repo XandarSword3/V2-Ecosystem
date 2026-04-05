@@ -762,7 +762,12 @@
       "addFirstTable": "Aggiungi il primo tavolo",
       "addTable": "Aggiungi tavolo",
       "editTable": "Modifica tavolo",
-      "deleteConfirm": "Sei sicuro di voler eliminare questo tavolo?"
+      "deleteConfirm": "Sei sicuro di voler eliminare questo tavolo?",
+      "confirmDelete": "Sei sicuro di voler eliminare questo tavolo?",
+      "location": "Posizione",
+      "markedOccupied": "Tavolo segnato come occupato",
+      "markedAvailable": "Tavolo segnato come disponibile",
+      "tableNumberRequired": "Il numero del tavolo è obbligatorio"
     },
     "pagination": {
       "previous": "Precedente",

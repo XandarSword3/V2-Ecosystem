@@ -44,12 +44,13 @@ interface DynamicModule {
 }
 
 export class CustomerBot {
-  private api: ApiClient;
-  private logger: Logger;
-  private botId: number;
-  private isRunning = false;
+  public api: ApiClient;
+  public userData: any;
+  protected logger: Logger;
+  protected botId: number;
+  protected isRunning = false;
   private cart: CartItem[] = [];
-  
+
   // Cached data for realistic behavior
   private menuItems: any[] = [];
   private snackItems: any[] = [];
@@ -59,7 +60,7 @@ export class CustomerBot {
   private myOrders: string[] = [];
   private myBookings: string[] = [];
   private myTickets: string[] = [];
-  
+
   // Lifecycle state for realistic behavior
   private phase: 'browsing' | 'ordering' | 'waiting' | 'done' = 'browsing';
   private trackedOrders: TrackedOrder[] = [];
@@ -73,30 +74,30 @@ export class CustomerBot {
   }
 
   async initialize(): Promise<boolean> {
-    const userData = generateCustomerData(this.botId);
-    
+    this.userData = generateCustomerData(this.botId);
+
     // Try to login first, if fails, register
-    let success = await this.api.login(userData.email, userData.password);
-    
+    let success = await this.api.login(this.userData.email, this.userData.password);
+
     if (!success) {
       this.logger.info(`Registering new account...`);
-      success = await this.api.register(userData.email, userData.password, userData.full_name, userData.phone);
-      
+      success = await this.api.register(this.userData.email, this.userData.password, this.userData.full_name, this.userData.phone);
+
       if (!success) {
         // Account might exist with different password, try logging in again
-        success = await this.api.login(userData.email, 'TestPass123!');
+        success = await this.api.login(this.userData.email, 'TestPass123!');
       }
     }
 
     if (success) {
-      this.logger.success(`Logged in as ${userData.email}`);
+      this.logger.success(`Logged in as ${this.userData.email}`);
     } else {
       this.logger.warn(`Auth failed, continuing as guest`);
     }
 
     // Pre-fetch data for browsing
     await this.refreshCatalogData();
-    
+
     return true;
   }
 
@@ -140,9 +141,9 @@ export class CustomerBot {
       const modules = Array.isArray(modulesRes.data) ? modulesRes.data : (modulesRes.data.modules || []);
       // Filter to menu_service type modules that aren't the built-in ones
       this.dynamicModules = modules
-        .filter((m: any) => 
-          m.template_type === 'menu_service' && 
-          m.is_active && 
+        .filter((m: any) =>
+          m.template_type === 'menu_service' &&
+          m.is_active &&
           !['restaurant', 'snack-bar'].includes(m.slug)
         )
         .map((m: any) => ({
@@ -165,9 +166,9 @@ export class CustomerBot {
       // 2. Place an order
       // 3. Browse while waiting, check order status periodically
       // 4. Once order is ready/completed, might order again or leave
-      
+
       let action: string;
-      
+
       if (!this.hasPlacedOrder && this.browseCount < randomInt(2, 4)) {
         // Phase 1: Initial browsing
         action = this.getBrowsingAction();
@@ -192,7 +193,7 @@ export class CustomerBot {
           action = weightedRandom(CONFIG.CUSTOMER_ACTIONS);
         }
       }
-      
+
       await this.performAction(action);
       await randomDelay(CONFIG.CUSTOMER_ACTION_INTERVAL.min, CONFIG.CUSTOMER_ACTION_INTERVAL.max);
     }
@@ -201,7 +202,7 @@ export class CustomerBot {
   private getBrowsingAction(): string {
     const browsingActions = [
       'BROWSE_RESTAURANT_MENU',
-      'BROWSE_SNACK_MENU', 
+      'BROWSE_SNACK_MENU',
       'VIEW_CHALETS',
       'VIEW_POOL_SESSIONS',
       'ADD_TO_CART',
@@ -215,7 +216,12 @@ export class CustomerBot {
     this.logger.info('Stopping...');
   }
 
-  private async performAction(action: string): Promise<void> {
+  public async performRandomAction(): Promise<void> {
+    const action = weightedRandom(CONFIG.CUSTOMER_ACTIONS);
+    await this.performAction(action);
+  }
+
+  protected async performAction(action: string): Promise<void> {
     const startTime = Date.now();
     let success = false;
 
@@ -278,6 +284,41 @@ export class CustomerBot {
         case 'VIEW_PROFILE':
           success = await this.viewProfile();
           break;
+        // --- Gift Cards ---
+        case 'BROWSE_GIFT_CARDS':
+          success = await this.browseGiftCards();
+          break;
+        case 'PURCHASE_GIFT_CARD':
+          success = await this.purchaseGiftCard();
+          break;
+        case 'CHECK_GIFT_CARD_BALANCE':
+          success = await this.checkGiftCardBalance();
+          break;
+        // --- Loyalty ---
+        case 'VIEW_LOYALTY':
+          success = await this.viewLoyalty();
+          break;
+        case 'ENROLL_LOYALTY':
+          success = await this.enrollLoyalty();
+          break;
+        // --- GDPR / Privacy ---
+        case 'VIEW_PRIVACY_DASHBOARD':
+          success = await this.viewPrivacyDashboard();
+          break;
+        case 'REQUEST_DATA_EXPORT':
+          success = await this.requestDataExport();
+          break;
+        // --- Coupons ---
+        case 'BROWSE_COUPONS':
+          success = await this.browseCoupons();
+          break;
+        case 'APPLY_COUPON':
+          success = await this.applyCoupon();
+          break;
+        // --- Dynamic Modules ---
+        case 'PLACE_DYNAMIC_MODULE_ORDER':
+          success = await this.placeModuleOrder();
+          break;
         default:
           this.logger.warn(`Unknown action: ${action}`);
           return;
@@ -299,7 +340,7 @@ export class CustomerBot {
   private async browseRestaurantMenu(): Promise<boolean> {
     this.logger.action('Browsing restaurant menu...');
     const result = await this.api.getRestaurantMenu();
-    
+
     if (result.success) {
       // Sometimes look at a specific item
       if (this.menuItems.length > 0 && Math.random() > 0.5) {
@@ -336,10 +377,10 @@ export class CustomerBot {
 
     // Get module info (menu endpoint may not exist for dynamic modules)
     const moduleRes = await this.api.getModuleBySlug(module.slug);
-    
+
     if (moduleRes.success && moduleRes.data) {
       this.logger.success(`Viewed module: ${module.name}`);
-      
+
       // Try to get menu if endpoint exists
       const menuRes = await this.api.getModuleMenu(module.slug);
       if (menuRes.success && menuRes.data) {
@@ -357,10 +398,10 @@ export class CustomerBot {
   private async placeModuleOrder(): Promise<boolean> {
     // Dynamic module orders not supported in backend yet
     // Just clear any dynamic module items from cart
-    const moduleItems = this.cart.filter(i => 
+    const moduleItems = this.cart.filter(i =>
       i.module !== 'restaurant' && i.module !== 'snack'
     );
-    
+
     if (moduleItems.length > 0) {
       this.logger.info(`Dynamic module orders not supported yet - clearing ${moduleItems.length} items`);
       this.cart = this.cart.filter(i => i.module === 'restaurant' || i.module === 'snack');
@@ -371,7 +412,7 @@ export class CustomerBot {
   private async viewChalets(): Promise<boolean> {
     this.logger.action('Viewing chalets...');
     const result = await this.api.getChalets();
-    
+
     if (result.success && this.chalets.length > 0) {
       // Sometimes view a specific chalet
       if (Math.random() > 0.5) {
@@ -392,10 +433,10 @@ export class CustomerBot {
     const chalet = randomElement(this.chalets);
     const checkIn = futureDate(randomInt(1, 30));
     const checkOut = futureDate(randomInt(31, 45));
-    
+
     this.logger.action(`Checking availability for ${chalet.name || 'chalet'}...`);
     const result = await this.api.checkChaletAvailability(chalet.id, checkIn, checkOut);
-    
+
     if (result.success) {
       this.logger.success(`Availability checked: ${result.data?.available ? 'Available' : 'Not available'}`);
     }
@@ -415,7 +456,7 @@ export class CustomerBot {
     // Decide which menu to add from
     const useSnack = Math.random() > 0.6;
     const items = useSnack ? this.snackItems : this.menuItems;
-    
+
     if (items.length === 0) {
       await this.refreshCatalogData();
       return false;
@@ -430,7 +471,7 @@ export class CustomerBot {
 
     const item = randomElement(validItems);
     const quantity = randomInt(1, 3);
-    
+
     this.cart.push({
       menuItemId: item.id,
       name: item.name || 'Unknown Item',
@@ -445,13 +486,13 @@ export class CustomerBot {
 
   private async placeRestaurantOrder(): Promise<boolean> {
     let restaurantItems = this.cart.filter(i => i.module === 'restaurant');
-    
+
     if (restaurantItems.length === 0) {
       // Try to get fresh menu data if none cached
       if (this.menuItems.length === 0) {
         await this.refreshCatalogData();
       }
-      
+
       // Filter to only items with valid IDs
       const validItems = this.menuItems.filter(item => item.id);
       if (validItems.length > 0) {
@@ -479,7 +520,7 @@ export class CustomerBot {
     }
 
     this.logger.action(`Placing restaurant order with ${validOrderItems.length} items...`);
-    
+
     const result = await this.api.createRestaurantOrder({
       customerName: randomName(),
       customerPhone: randomPhone(),
@@ -519,13 +560,13 @@ export class CustomerBot {
 
   private async placeSnackOrder(): Promise<boolean> {
     let snackItems = this.cart.filter(i => i.module === 'snack');
-    
+
     if (snackItems.length === 0) {
       // Try to get fresh snack data if none cached
       if (this.snackItems.length === 0) {
         await this.refreshCatalogData();
       }
-      
+
       // Filter to only items with valid IDs
       const validItems = this.snackItems.filter(item => item.id);
       if (validItems.length > 0) {
@@ -553,7 +594,7 @@ export class CustomerBot {
     }
 
     this.logger.action(`Placing snack order with ${validOrderItems.length} items...`);
-    
+
     const result = await this.api.createSnackOrder({
       customerName: randomName(),
       customerPhone: randomPhone(),
@@ -596,9 +637,9 @@ export class CustomerBot {
     // Book for today or tomorrow so it shows in daily dashboard
     const checkInDays = randomInt(0, 1);
     const stayLength = randomInt(1, 3);
-    
+
     this.logger.action(`Booking chalet: ${chalet.name || chalet.id}...`);
-    
+
     const result = await this.api.createChaletBooking({
       chaletId: chalet.id,
       checkInDate: futureDate(checkInDays),
@@ -629,9 +670,9 @@ export class CustomerBot {
 
     const session = randomElement(this.poolSessions);
     const numGuests = randomInt(1, 4);
-    
+
     this.logger.action(`Buying pool ticket for session: ${session.name || session.id}...`);
-    
+
     const result = await this.api.buyPoolTicket({
       sessionId: session.id,
       // Book for today or tomorrow so it shows in daily dashboard
@@ -669,7 +710,7 @@ export class CustomerBot {
   private async checkOrderStatus(): Promise<boolean> {
     // Check status of tracked orders
     const activeOrders = this.trackedOrders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
-    
+
     if (activeOrders.length === 0) {
       this.logger.info('No active orders to track');
       return true;
@@ -679,22 +720,22 @@ export class CustomerBot {
     const order = activeOrders[0];
     const timeSincePlaced = Math.round((Date.now() - order.placedAt) / 1000);
     const expectedTime = Math.round((order.expectedReadyAt - order.placedAt) / 1000 / 60);
-    
+
     this.logger.action(`Checking order ${order.id.slice(0, 8)}... (placed ${timeSincePlaced}s ago)`);
-    
+
     // Get order status from API
-    const result = order.module === 'restaurant' 
+    const result = order.module === 'restaurant'
       ? await this.api.getRestaurantOrderStatus(order.id)
       : await this.api.getSnackOrderStatus(order.id);
-    
+
     if (result.success && result.data) {
       const newStatus = result.data.status || result.data;
       const previousStatus = order.status;
-      
+
       if (newStatus !== previousStatus) {
         order.status = newStatus;
         order.lastChecked = Date.now();
-        
+
         // Log status change with realistic customer reactions
         if (newStatus === 'confirmed') {
           this.logger.success(`📋 Order confirmed! Staff received my order.`);
@@ -714,7 +755,7 @@ export class CustomerBot {
     } else {
       this.logger.warn(`Could not check order status: ${result.error}`);
     }
-    
+
     return result.success;
   }
 
@@ -744,9 +785,9 @@ export class CustomerBot {
       this.logger.warn('Cannot submit review - not authenticated');
       return false;
     }
-    
+
     this.logger.action('Submitting a review...');
-    
+
     const result = await this.api.submitReview({
       service_type: randomElement(['restaurant', 'chalets', 'pool', 'snack_bar', 'general']),
       rating: randomInt(3, 5), // Mostly positive reviews
@@ -763,7 +804,7 @@ export class CustomerBot {
 
   private async contactSupport(): Promise<boolean> {
     this.logger.action('Contacting support...');
-    
+
     const result = await this.api.submitContactForm({
       name: randomName(),
       email: randomEmail(),
@@ -784,5 +825,146 @@ export class CustomerBot {
       this.logger.success('Profile loaded');
     }
     return result.success;
+  }
+
+  // ============ GIFT CARD ACTIONS ============
+
+  private async browseGiftCards(): Promise<boolean> {
+    this.logger.action('🎁 Browsing gift card templates...');
+    const result = await this.api.getGiftCardTemplates();
+    if (result.success) {
+      this.logger.success('Browsed gift card templates');
+    }
+    return result.success;
+  }
+
+  private async purchaseGiftCard(): Promise<boolean> {
+    if (!this.api.isAuthenticated) {
+      this.logger.warn('Cannot purchase gift card - not authenticated');
+      return false;
+    }
+
+    this.logger.action('🎁 Purchasing gift card...');
+    const amounts = [25, 50, 100, 200, 500];
+    const result = await this.api.purchaseGiftCard({
+      templateId: 'default',
+      amount: randomElement(amounts),
+      recipientName: randomName(),
+      recipientEmail: randomEmail(),
+      message: randomElement(['Happy Birthday!', 'Enjoy your stay!', 'A gift for you!', 'Thank you!']),
+      paymentMethod: randomElement(['cash', 'card']),
+    });
+
+    if (result.success) {
+      this.logger.success('Gift card purchased!');
+    }
+    return result.success;
+  }
+
+  private async checkGiftCardBalance(): Promise<boolean> {
+    this.logger.action('🎁 Checking gift card balance...');
+    // Use a dummy code — we're testing the endpoint, not the card
+    const result = await this.api.checkGiftCardBalance('GIFT-TEST-' + randomInt(1000, 9999));
+    // Even 404s are valid responses (card not found)
+    this.logger.info('Gift card balance check completed');
+    return true;
+  }
+
+  // ============ LOYALTY ACTIONS ============
+
+  private async viewLoyalty(): Promise<boolean> {
+    if (!this.api.isAuthenticated) {
+      // Non-auth: browse tiers
+      const result = await this.api.getLoyaltyTiers();
+      this.logger.info('Browsed loyalty tiers (guest)');
+      return result.success;
+    }
+
+    this.logger.action('⭐ Viewing my loyalty account...');
+    const result = await this.api.getMyLoyalty();
+    if (result.success) {
+      this.logger.success('Loyalty account loaded');
+      // Also view transactions sometimes
+      if (Math.random() > 0.5) {
+        await this.api.getMyLoyaltyTransactions();
+        this.logger.info('Viewed loyalty transactions');
+      }
+    }
+    return result.success;
+  }
+
+  private async enrollLoyalty(): Promise<boolean> {
+    if (!this.api.isAuthenticated) {
+      this.logger.warn('Cannot enroll in loyalty - not authenticated');
+      return false;
+    }
+
+    this.logger.action('⭐ Enrolling in loyalty program...');
+    const result = await this.api.enrollLoyalty();
+    if (result.success) {
+      this.logger.success('Enrolled in loyalty program!');
+    } else {
+      this.logger.info('Already enrolled or enrollment failed');
+    }
+    return true; // Not an error if already enrolled
+  }
+
+  // ============ GDPR / PRIVACY ACTIONS ============
+
+  private async viewPrivacyDashboard(): Promise<boolean> {
+    if (!this.api.isAuthenticated) {
+      this.logger.warn('Cannot view privacy dashboard - not authenticated');
+      return false;
+    }
+
+    this.logger.action('🔒 Viewing privacy dashboard...');
+    const result = await this.api.getPrivacyDashboard();
+    if (result.success) {
+      this.logger.success('Privacy dashboard loaded');
+      // Sometimes view consents too
+      if (Math.random() > 0.5) {
+        await this.api.getConsents();
+        this.logger.info('Viewed consent settings');
+      }
+    }
+    return result.success;
+  }
+
+  private async requestDataExport(): Promise<boolean> {
+    if (!this.api.isAuthenticated) {
+      this.logger.warn('Cannot request data export - not authenticated');
+      return false;
+    }
+
+    this.logger.action('🔒 Requesting data export...');
+    const result = await this.api.requestDataExport();
+    if (result.success) {
+      this.logger.success('Data export requested!');
+    }
+    return result.success;
+  }
+
+  // ============ COUPON ACTIONS ============
+
+  private async browseCoupons(): Promise<boolean> {
+    this.logger.action('🏷️ Browsing active coupons...');
+    const result = await this.api.getActiveCoupons();
+    if (result.success) {
+      this.logger.success('Active coupons loaded');
+    }
+    return result.success;
+  }
+
+  private async applyCoupon(): Promise<boolean> {
+    if (!this.api.isAuthenticated) {
+      this.logger.warn('Cannot apply coupon - not authenticated');
+      return false;
+    }
+
+    this.logger.action('🏷️ Applying coupon to order...');
+    // Try with a dummy coupon code — testing the endpoint
+    const result = await this.api.validateCoupon('WELCOME10');
+    this.logger.info('Coupon validation attempted');
+    return true; // Not an error if coupon doesn't exist
   }
 }

@@ -1,8 +1,0 @@
-﻿src/modules/inventory/inventory.service.ts(70,28): error TS2551: Property 'catch' does not exist on type 'PostgrestFilterBuilder<any, any, any, null, "inventory_transactions", unknown, "POST">'. Did you mean 'match'?
-src/modules/inventory/inventory.service.ts(114,63): error TS2339: Property 'inventory_item_id' does not exist on type 'ParserError<`Expected identifier at \`${string}, inventory_item_id, quantity_required\``>'.
-src/modules/inventory/inventory.service.ts(115,42): error TS2339: Property 'inventory_item_id' does not exist on type 'ParserError<`Expected identifier at \`${string}, inventory_item_id, quantity_required\``>'.
-src/modules/inventory/inventory.service.ts(115,84): error TS2339: Property 'quantity_required' does not exist on type 'ParserError<`Expected identifier at \`${string}, inventory_item_id, quantity_required\``>'.
-src/scripts/test_module_builder_e2e.ts(10,1): error TS2304: Cannot find name 'jest'.
-src/scripts/test_module_builder_e2e.ts(11,16): error TS2304: Cannot find name 'jest'.
-src/scripts/test_module_builder_e2e.ts(12,17): error TS2304: Cannot find name 'jest'.
-src/scripts/test_module_builder_e2e_draft.ts(4,59): error TS2307: Cannot find module '../modules/modules/modules.controller' or its corresponding type declarations.

@@ -22,6 +22,26 @@ vi.mock('../../src/utils/logger.js', () => ({
   },
 }));
 
+// Mock engine service for state machine and pricing
+const mockEngineService = {
+  calculatePricing: vi.fn().mockResolvedValue({
+    subtotal: 10, taxAmount: 1.1, totalAmount: 11.1,
+    discounts: [], lineItems: [], serviceCharge: 0, deliveryFee: 0,
+    preDiscountTotal: 11.1, totalDiscount: 0, taxRate: 0.11,
+    serviceChargeRate: 0, loyaltyPointsEarned: 0, depositAmount: 0,
+  }),
+  getInitialState: vi.fn().mockReturnValue('pending'),
+  transitionState: vi.fn().mockResolvedValue({ allowed: true, targetState: 'preparing' }),
+  canTransition: vi.fn().mockReturnValue(true),
+  getAvailableActions: vi.fn().mockReturnValue([]),
+  isTerminalState: vi.fn().mockReturnValue(false),
+  getStates: vi.fn().mockReturnValue([]),
+};
+
+vi.mock('../../src/engines/engine-service.js', () => ({
+  getEngineService: vi.fn(() => mockEngineService),
+}));
+
 import { getSupabase } from '../../src/database/connection.js';
 import { Request, Response, NextFunction } from 'express';
 

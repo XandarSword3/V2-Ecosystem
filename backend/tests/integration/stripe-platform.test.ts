@@ -20,21 +20,23 @@ import {
 // Mock Stripe
 vi.mock('stripe', () => {
   return {
-    default: vi.fn().mockImplementation(() => ({
-      customers: {
+    default: class MockStripe {
+      customers = {
         search: vi.fn().mockResolvedValue({ data: [] }),
-        create: vi.fn().mockResolvedValue({ 
+        create: vi.fn().mockResolvedValue({
           id: 'cus_test123',
           metadata: { userId: 'user-123' }
         }),
-      },
-      ephemeralKeys: {
-        create: vi.fn().mockResolvedValue({ 
+      };
+
+      ephemeralKeys = {
+        create: vi.fn().mockResolvedValue({
           id: 'ek_test123',
           secret: 'ek_test_secret'
         }),
-      },
-      paymentIntents: {
+      };
+
+      paymentIntents = {
         create: vi.fn().mockResolvedValue({
           id: 'pi_test123',
           client_secret: 'pi_test_secret_123',
@@ -50,15 +52,16 @@ vi.mock('stripe', () => {
           id: 'pi_test123',
           status: 'canceled',
         }),
-      },
-      refunds: {
+      };
+
+      refunds = {
         create: vi.fn().mockResolvedValue({
           id: 're_test123',
           status: 'succeeded',
           amount: 1000,
         }),
-      },
-    })),
+      };
+    },
   };
 });
 

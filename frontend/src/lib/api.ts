@@ -50,6 +50,14 @@ interface PurchaseTicketData {
   paymentMethod: 'cash' | 'card' | 'online';
 }
 
+interface CreateMembershipData {
+  type: 'INDIVIDUAL' | 'FAMILY' | 'CORPORATE' | 'VIP';
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY';
+  memberEmails?: string[];
+  corporateName?: string;
+  paymentMethodId?: string;
+}
+
 interface CreateModuleData {
   template_type: string;
   name: string;
@@ -379,6 +387,8 @@ export const chaletsApi = {
   getChalet: (id: string) => api.get(`/chalets/${id}`),
   getAvailability: (chaletId: string, checkIn: string, checkOut: string) =>
     api.get(`/chalets/${chaletId}/availability`, { params: { checkIn, checkOut } }),
+  getDailyPrices: (chaletId: string, startDate: string, endDate: string) =>
+    api.get(`/chalets/${chaletId}/daily-prices`, { params: { startDate, endDate } }),
   getAddOns: (moduleId?: string) => api.get('/chalets/add-ons', { params: { moduleId } }),
   createBooking: (data: CreateBookingData) => api.post('/chalets/bookings', data),
   getMyBookings: () => api.get('/chalets/my-bookings'),
@@ -398,6 +408,11 @@ export const poolApi = {
   purchaseTicket: (data: PurchaseTicketData) => api.post('/pool/tickets', data),
   getMyTickets: () => api.get('/pool/my-tickets'),
   getTicket: (id: string) => api.get(`/pool/tickets/${id}`),
+  getMembershipPlans: () => api.get('/pool/memberships/plans'),
+  getMyMembership: () => api.get('/pool/memberships/my-membership'),
+  createMembership: (data: CreateMembershipData) => api.post('/pool/memberships', data),
+  cancelMembership: (membershipId: string, data?: { reason?: string; immediate?: boolean }) =>
+    api.delete(`/pool/memberships/${membershipId}`, { data }),
 };
 
 // Modules API

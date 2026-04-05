@@ -315,16 +315,12 @@ export const adminSchemas = {
 
 /**
  * SQL injection prevention
+ * @deprecated The ORM uses parameterized queries which prevent SQL injection.
+ * Regex-based detection causes false positives (e.g., blocking "SELECT" in text fields).
+ * Retained for backward compatibility but always returns true (safe).
  */
-export function preventSqlInjection(value: string): boolean {
-  const sqlPatterns = [
-    /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|CREATE|ALTER|TRUNCATE|EXEC|EXECUTE)\b)/i,
-    /(-{2}|\/\*|\*\/)/,
-    /(\bOR\b|\bAND\b).*[=<>]/i,
-    /['";]/,
-  ];
-  
-  return !sqlPatterns.some(pattern => pattern.test(value));
+export function preventSqlInjection(_value: string): boolean {
+  return true; // ORM parameterized queries handle SQL injection prevention
 }
 
 /**

@@ -200,7 +200,7 @@ export async function getModuleBookings(req: Request, res: Response) {
       .from('chalet_bookings')
       .select(`
         id, booking_number, customer_id, chalet_id, check_in_date, check_out_date, status,
-        total_price, guests, special_requests, created_at, customer_name, customer_email,
+        total_amount, number_of_guests, special_requests, created_at, customer_name, customer_email,
         chalet:chalets!chalet_id(id, name, capacity),
         user:users!customer_id(id, full_name, email, phone)
       `);
@@ -236,8 +236,8 @@ export async function getModuleBookings(req: Request, res: Response) {
       checkIn: booking.check_in_date,
       checkOut: booking.check_out_date,
       status: booking.status,
-      totalPrice: booking.total_price,
-      guestCount: (booking as any).guests || (booking as any).guest_count,
+      totalPrice: (booking as any).total_amount,
+      guestCount: (booking as any).number_of_guests,
       specialRequests: booking.special_requests,
       createdAt: booking.created_at,
     }));
@@ -415,9 +415,8 @@ export async function validateModuleTicket(req: Request, res: Response) {
     const { data: ticket, error } = await supabase
       .from('pool_tickets')
       .select(`
-        id, ticket_number, status, user_id, session_id, entry_time, exit_time,
-        session:pool_sessions!session_id(id, name, capacity, current_count),
-        user:users!user_id(id, full_name)
+        id, ticket_number, status, customer_id, customer_name, session_id, entry_time, exit_time,
+        session:pool_sessions!session_id(id, name, max_capacity)
       `)
       .eq('ticket_number', ticketNumber)
       .single();
@@ -447,14 +446,6 @@ export async function validateModuleTicket(req: Request, res: Response) {
       });
     }
 
-    // Check capacity
-    if (session && session.current_count >= session.capacity) {
-      return res.json({
-        success: true,
-        data: { valid: false, reason: 'Session is at capacity', ticket }
-      });
-    }
-
     res.json({
       success: true,
       data: {
@@ -463,7 +454,7 @@ export async function validateModuleTicket(req: Request, res: Response) {
           id: ticket.id,
           ticketNumber: ticket.ticket_number,
           status: ticket.status,
-          guestName: (Array.isArray(ticket.user) ? ticket.user[0] : ticket.user)?.full_name || 'Guest',
+          guestName: ticket.customer_name || 'Guest',
           sessionName: session?.name,
           entryTime: ticket.entry_time,
           exitTime: ticket.exit_time,
@@ -508,19 +499,10 @@ export async function recordEntry(req: Request, res: Response) {
         status: 'used',
       })
       .eq('id', ticketId)
-      .select('*, session:pool_sessions!session_id(id, name, current_count)')
+      .select('*, session:pool_sessions!session_id(id, name)')
       .single();
 
     if (error) throw error;
-
-    // Increment session current_count
-    const session = Array.isArray(ticket.session) ? ticket.session[0] : ticket.session;
-    if (session) {
-      await supabase
-        .from('pool_sessions')
-        .update({ current_count: (session.current_count || 0) + 1 })
-        .eq('id', session.id);
-    }
 
     res.json({ success: true, data: ticket });
   } catch (error: any) {
@@ -556,19 +538,10 @@ export async function recordExit(req: Request, res: Response) {
         exit_time: new Date().toISOString(),
       })
       .eq('id', ticketId)
-      .select('*, session:pool_sessions!session_id(id, name, current_count)')
+      .select('*, session:pool_sessions!session_id(id, name)')
       .single();
 
     if (error) throw error;
-
-    // Decrement session current_count
-    const session = Array.isArray(ticket.session) ? ticket.session[0] : ticket.session;
-    if (session && (session.current_count || 0) > 0) {
-      await supabase
-        .from('pool_sessions')
-        .update({ current_count: (session.current_count || 0) - 1 })
-        .eq('id', session.id);
-    }
 
     res.json({ success: true, data: ticket });
   } catch (error: any) {
@@ -600,30 +573,30 @@ export async function getModuleCapacity(req: Request, res: Response) {
 
     const { data: sessions, error } = await supabase
       .from('pool_sessions')
-      .select('id, name, capacity, current_count, start_time, end_time')
-      .eq('date', targetDate)
+      .select('id, name, max_capacity, start_time, end_time')
+      .eq('module_id', module.id)
+      .eq('is_active', true)
       .order('start_time', { ascending: true });
 
     if (error) throw error;
 
-    const totalCapacity = (sessions || []).reduce((sum, s) => sum + (s.capacity || 0), 0);
-    const totalOccupancy = (sessions || []).reduce((sum, s) => sum + (s.current_count || 0), 0);
+    const totalCapacity = (sessions || []).reduce((sum, s) => sum + (s.max_capacity || 0), 0);
 
     res.json({
       success: true,
       data: {
         date: targetDate,
         totalCapacity,
-        totalOccupancy,
-        utilizationPercent: totalCapacity > 0 ? Math.round((totalOccupancy / totalCapacity) * 100) : 0,
+        totalOccupancy: 0,
+        utilizationPercent: 0,
         sessions: (sessions || []).map(s => ({
           id: s.id,
           name: s.name,
-          capacity: s.capacity,
-          currentCount: s.current_count || 0,
+          capacity: s.max_capacity,
+          currentCount: 0,
           startTime: s.start_time,
           endTime: s.end_time,
-          utilizationPercent: s.capacity > 0 ? Math.round(((s.current_count || 0) / s.capacity) * 100) : 0,
+          utilizationPercent: 0,
         })),
       }
     });
@@ -661,6 +634,7 @@ export async function getTodaysTickets(req: Request, res: Response) {
         status, payment_status, entry_time, exit_time, total_amount,
         session:pool_sessions!session_id(id, name, start_time, end_time)
       `)
+      .eq('module_id', module.id)
       .eq('ticket_date', targetDate)
       .order('created_at', { ascending: false });
 

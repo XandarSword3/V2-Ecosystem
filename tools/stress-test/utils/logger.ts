@@ -17,19 +17,22 @@ const colors = {
 };
 
 export class Logger {
-  private botType: 'Customer' | 'Staff' | 'Admin' | 'System';
+  private botType: 'Customer' | 'Staff' | 'Admin' | 'Manager' | 'System' | 'Chaos' | 'Malicious';
   private botId: string;
   private color: string;
 
-  constructor(botType: 'Customer' | 'Staff' | 'Admin' | 'System', botId: string | number) {
+  constructor(botType: 'Customer' | 'Staff' | 'Admin' | 'Manager' | 'System' | 'Chaos' | 'Malicious', botId: string | number) {
     this.botType = botType;
     this.botId = String(botId);
-    
+
     switch (botType) {
       case 'Customer': this.color = colors.cyan; break;
       case 'Staff': this.color = colors.yellow; break;
       case 'Admin': this.color = colors.magenta; break;
+      case 'Manager': this.color = colors.blue; break;
       case 'System': this.color = colors.white; break;
+      case 'Chaos': this.color = colors.red; break;
+      case 'Malicious': this.color = colors.bgRed + colors.white; break;
     }
   }
 
@@ -77,7 +80,7 @@ export class MetricsTracker {
       this.requests.failure++;
     }
     this.latencies.push(latencyMs);
-    
+
     // Cap latencies array to avoid memory issues
     if (this.latencies.length > 10000) {
       this.latencies = this.latencies.slice(-5000);
@@ -105,17 +108,17 @@ export class MetricsTracker {
     const uptime = Date.now() - this.startTime;
     const totalRequests = this.requests.success + this.requests.failure;
     const sortedLatencies = [...this.latencies].sort((a, b) => a - b);
-    
+
     return {
       uptime,
       totalRequests,
       successRate: totalRequests > 0 ? this.requests.success / totalRequests : 1,
       requestsPerSecond: uptime > 0 ? totalRequests / (uptime / 1000) : 0,
-      avgLatency: this.latencies.length > 0 
-        ? this.latencies.reduce((a, b) => a + b, 0) / this.latencies.length 
+      avgLatency: this.latencies.length > 0
+        ? this.latencies.reduce((a, b) => a + b, 0) / this.latencies.length
         : 0,
-      p95Latency: sortedLatencies.length > 0 
-        ? sortedLatencies[Math.floor(sortedLatencies.length * 0.95)] 
+      p95Latency: sortedLatencies.length > 0
+        ? sortedLatencies[Math.floor(sortedLatencies.length * 0.95)]
         : 0,
       errorCount: this.errors.length,
     };

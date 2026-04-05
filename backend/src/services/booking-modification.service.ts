@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js';
 import { stripeClient } from '../config/stripe.js';
 import { emailService } from './email.service.js';
 import { logActivity } from '../utils/activityLogger.js'; // FIX: Iteration 9 - Audit trail for cancellations
+import { seasonalPricingService } from './seasonal-pricing.service.js';
 
 export enum BookingStatus {
   PENDING = 'PENDING',
@@ -174,9 +175,9 @@ export async function cancelChaletBooking(
           });
           stripeRefundId = refund.id;
         } catch (stripeError: any) {
-          logger.error('Stripe refund failed', { 
-            bookingId, 
-            error: stripeError.message 
+          logger.error('Stripe refund failed', {
+            bookingId,
+            error: stripeError.message
           });
           // Continue with cancellation even if refund fails
         }
@@ -284,8 +285,8 @@ export async function modifyChaletBookingDates(
       return { success: false, message: 'Unauthorized to modify this booking' };
     }
 
-    if (booking.status !== BookingStatus.CONFIRMED && 
-        booking.status !== BookingStatus.PENDING) {
+    if (booking.status !== BookingStatus.CONFIRMED &&
+      booking.status !== BookingStatus.PENDING) {
       return { success: false, message: 'Booking cannot be modified in current state' };
     }
 
@@ -302,9 +303,9 @@ export async function modifyChaletBookingDates(
     if (conflictError) throw conflictError;
 
     if (conflictingBookings && conflictingBookings.length > 0) {
-      return { 
-        success: false, 
-        message: 'Selected dates are not available' 
+      return {
+        success: false,
+        message: 'Selected dates are not available'
       };
     }
 
@@ -312,7 +313,7 @@ export async function modifyChaletBookingDates(
     const nights = Math.ceil(
       (newCheckOut.getTime() - newCheckIn.getTime()) / (1000 * 60 * 60 * 24)
     );
-    const newTotalPrice = calculateChaletPrice(
+    const newTotalPrice = await calculateChaletPrice(
       booking.chalet,
       newCheckIn,
       newCheckOut,
@@ -415,7 +416,7 @@ export async function cancelPoolTicket(
     // Check if ticket date has passed
     const ticketDate = new Date(ticket.date || new Date());
     const now = new Date();
-    
+
     if (ticketDate < now) {
       return {
         success: false,
@@ -561,9 +562,9 @@ export async function reschedulePoolTicket(
     const dailyCapacity = capacitySetting ? parseInt(capacitySetting.value) : 100;
 
     if ((existingTicketsCount || 0) >= dailyCapacity) {
-      return { 
-        success: false, 
-        message: 'Selected date is fully booked' 
+      return {
+        success: false,
+        message: 'Selected date is fully booked'
       };
     }
 
@@ -649,7 +650,7 @@ export async function applyCreditToBooking(
       if (remainingToApply <= 0) break;
 
       const useAmount = Math.min(credit.amount, remainingToApply);
-      
+
       const { error: updateError } = await supabase
         .from('user_credits')
         .update({
@@ -657,7 +658,7 @@ export async function applyCreditToBooking(
           used_at: credit.amount - useAmount === 0 ? now.toISOString() : null,
         })
         .eq('id', credit.id);
-      
+
       if (updateError) {
         // Rollback all successful credit deductions
         for (const prev of successfulUpdates) {
@@ -693,31 +694,48 @@ export async function applyCreditToBooking(
 }
 
 /**
- * Helper: Calculate chalet price with weekend/weekday rates
+ * Helper: Calculate chalet price with weekend/weekday rates and seasonal pricing
  */
-function calculateChaletPrice(
+async function calculateChaletPrice(
   chalet: any,
   checkIn: Date,
   checkOut: Date,
   nights: number
-): number {
-  let totalPrice = 0;
-  const current = new Date(checkIn);
+): Promise<number> {
+  try {
+    const basePrice = chalet.base_price || chalet.basePrice || 0;
+    const priceResult = await seasonalPricingService.calculatePrice(
+      'chalets',
+      chalet.id,
+      basePrice,
+      checkIn,
+      checkOut
+    );
+    return priceResult.finalPrice;
+  } catch (err: any) {
+    logger.warn('Failed to calculate seasonal price for modification, falling back to base calculation', { err: err.message });
 
-  for (let i = 0; i < nights; i++) {
-    const dayOfWeek = current.getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6; // Fri, Sat, Sun
-    
-    if (isWeekend && chalet.weekendPrice) {
-      totalPrice += chalet.weekendPrice;
-    } else {
-      totalPrice += chalet.basePrice;
+    let totalPrice = 0;
+    const current = new Date(checkIn);
+
+    for (let i = 0; i < nights; i++) {
+      const dayOfWeek = current.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6; // Fri, Sat, Sun
+
+      const weekendPrice = chalet.weekend_price || chalet.weekendPrice;
+      const basePrice = chalet.base_price || chalet.basePrice;
+
+      if (isWeekend && weekendPrice) {
+        totalPrice += weekendPrice;
+      } else {
+        totalPrice += basePrice;
+      }
+
+      current.setDate(current.getDate() + 1);
     }
-    
-    current.setDate(current.getDate() + 1);
-  }
 
-  return totalPrice;
+    return totalPrice;
+  }
 }
 
 /**

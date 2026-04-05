@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { Orchestrator } from './orchestrator';
+import { HellModeOrchestrator } from './hell-mode';
+import { FinancialAuditor } from './utils/auditor';
 import { CONFIG } from './config';
 
 const orchestrator = new Orchestrator();
@@ -45,6 +47,9 @@ Options:
   --trainees <n>    Number of trainees to hire (default: ${CONFIG.STAFF_BOTS_TRAINEES})
   --admins <n>      Number of admin bots (default: ${CONFIG.ADMIN_BOTS})
   --duration <s>    Test duration in seconds (0 = infinite, default: 0)
+  --audit           Run financial and data integrity audit
+  --chaos           Enable chaos injection (latency, drops, etc.)
+  --hell-mode <sc>  Run a high-concurrency "Hell Mode" scenario
 
 Environment Variables:
   STRESS_TEST_URL         Base URL for the API
@@ -91,16 +96,58 @@ if (durationIndex !== -1 && args[durationIndex + 1]) {
   testDuration = parseInt(args[durationIndex + 1], 10);
 }
 
+
+// Parse Chaos Mode
+if (args.includes('--chaos')) {
+  console.log('🌪️ CHAOS MODE ENABLED: Expect latency, drops, and unruly bots.');
+  CONFIG.CHAOS_CONFIG.ENABLED = true;
+}
+
+// Parse Hell Mode
+const hellModeIndex = args.indexOf('--hell-mode');
+let hellModeScenario = '';
+if (hellModeIndex !== -1 && args[hellModeIndex + 1]) {
+  hellModeScenario = args[hellModeIndex + 1];
+}
+
 async function main() {
+  if (args.includes('--audit')) {
+    const auditor = new FinancialAuditor();
+    const success = await auditor.runAudit();
+    process.exit(success ? 0 : 1);
+  }
+
+  if (hellModeScenario) {
+    console.log(`
+🔥 V2 Resort HELL MODE Starting...
+   Scenario: ${hellModeScenario}
+`);
+    const hellOrchestrator = new HellModeOrchestrator();
+    // Handle shutdown for hell orchestrator
+    process.on('SIGINT', () => { console.log('🛑 Stopping Hell Mode...'); hellOrchestrator.stop(); process.exit(0); });
+
+    const availableScenarios = hellOrchestrator.getAvailableScenarios();
+    if (availableScenarios.includes(hellModeScenario)) {
+      await hellOrchestrator.startScenario(hellModeScenario);
+    } else {
+      console.error(`❌ Unknown Hell Mode scenario: "${hellModeScenario}"`);
+      console.error(`Available: ${availableScenarios.join(', ')}`);
+      process.exit(1);
+    }
+
+    process.exit(0);
+  }
+
   console.log(`
 🚀 V2 Resort Stress Test Starting...
 
 Configuration:
   - Base URL: ${CONFIG.BASE_URL}
+  - Chaos Mode: ${CONFIG.CHAOS_CONFIG.ENABLED ? 'ON 🌪️' : 'OFF'}
   - Customer Bots: ${CONFIG.CUSTOMER_BOTS}
   - Staff Bots: ${CONFIG.STAFF_BOTS_INITIAL} + ${CONFIG.STAFF_BOTS_TRAINEES} trainees
   - Admin Bots: ${CONFIG.ADMIN_BOTS}
-  - Duration: ${testDuration > 0 ? testDuration + 's' : 'Until stopped (Ctrl+C)'}
+  - Duration: ${testDuration > 0 ? testDuration + 'ss' : 'Until stopped (Ctrl+C)'}
 `);
 
   // Start the test

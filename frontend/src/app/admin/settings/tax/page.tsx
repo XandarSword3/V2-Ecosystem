@@ -122,7 +122,7 @@ export default function TaxConfigurationPage() {
     queryKey: ['tax-configuration'],
     queryFn: async () => {
       try {
-        const res = await api.get('/settings/tax');
+        const res = await api.get('/admin/settings/tax');
         return res.data?.data || defaultConfig;
       } catch {
         return defaultConfig;
@@ -143,7 +143,7 @@ export default function TaxConfigurationPage() {
   // Save configuration
   const saveMutation = useMutation({
     mutationFn: async (data: TaxConfiguration) => {
-      const res = await api.put('/settings/tax', data);
+      const res = await api.put('/admin/settings/tax', data);
       return res.data;
     },
     onSuccess: () => {

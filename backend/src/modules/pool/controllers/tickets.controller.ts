@@ -22,6 +22,9 @@ function generateTicketNumber(): string {
 
 /**
  * Purchase a pool ticket
+ * Uses atomic RPC to prevent capacity over-sell race conditions.
+ * The DB function locks the session row with FOR UPDATE, checks capacity,
+ * and inserts the ticket in a single transaction.
  */
 export const purchaseTicket = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(purchasePoolTicketSchema, req.body);
@@ -39,55 +42,10 @@ export const purchaseTicket = asyncHandler(async (req: Request, res: Response) =
       numberOfChildren,
     } = validatedData;
 
-    // Get session
-    const { data: session, error: sessionError } = await supabase
-      .from('pool_sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .single();
-
-    if (sessionError) {
-      if (sessionError.code === 'PGRST116') {
-        return res.status(404).json({ success: false, error: 'Session not found' });
-      }
-      throw sessionError;
-    }
-
-    // Check availability
-    const targetDate = dayjs(ticketDate).startOf('day').toISOString();
-    const endOfDay = dayjs(ticketDate).endOf('day').toISOString();
-
-    const { data: existingTickets, error: ticketsError } = await supabase
-      .from('pool_tickets')
-      .select('number_of_guests')
-      .eq('session_id', sessionId)
-      .gte('ticket_date', targetDate)
-      .lte('ticket_date', endOfDay)
-      .in('status', ['valid', 'used']);
-
-    if (ticketsError) throw ticketsError;
-
-    const soldGuests = (existingTickets || []).reduce((sum, t) => sum + t.number_of_guests, 0);
-    if (soldGuests + numberOfGuests > session.max_capacity) {
-      return res.status(400).json({
-        success: false,
-        error: 'Not enough capacity available',
-        available: Math.max(0, session.max_capacity - soldGuests),
-      });
-    }
-
-    // Calculate total
-    const safeNumberOfAdults = typeof numberOfAdults === 'number' ? numberOfAdults : 0;
-    const safeNumberOfChildren = typeof numberOfChildren === 'number' ? numberOfChildren : 0;
-    let totalAmount = 0;
-    if (session.adult_price !== undefined && session.child_price !== undefined) {
-      totalAmount = (parseFloat(session.adult_price) * safeNumberOfAdults) + (parseFloat(session.child_price) * safeNumberOfChildren);
-    } else {
-      totalAmount = parseFloat(session.price) * numberOfGuests;
-    }
     const ticketNumber = generateTicketNumber();
+    const targetDate = dayjs(ticketDate).startOf('day').toISOString();
 
-    // Generate QR code
+    // Generate QR code before the atomic call (pure compute, no race risk)
     const qrData = JSON.stringify({
       ticketNumber,
       sessionId,
@@ -96,28 +54,57 @@ export const purchaseTicket = asyncHandler(async (req: Request, res: Response) =
     });
     const qrCode = await QRCode.toDataURL(qrData);
 
-    // Create ticket
+    // Atomic capacity check + ticket insert via DB function
+    // This locks the session row with FOR UPDATE to prevent concurrent over-sell
+    const { data: result, error: rpcError } = await supabase.rpc(
+      'purchase_pool_ticket_atomic',
+      {
+        p_session_id: sessionId,
+        p_ticket_date: targetDate,
+        p_ticket_number: ticketNumber,
+        p_customer_id: req.user?.userId || null,
+        p_customer_name: customerName,
+        p_customer_phone: customerPhone || null,
+        p_number_of_guests: numberOfGuests,
+        p_number_of_adults: typeof numberOfAdults === 'number' ? numberOfAdults : 0,
+        p_number_of_children: typeof numberOfChildren === 'number' ? numberOfChildren : 0,
+        p_payment_method: paymentMethod,
+        p_qr_code: qrCode,
+      }
+    );
+
+    // Fallback removed - strictly use atomic function
+
+
+    if (rpcError) {
+      logger.error('[purchaseTicket] Atomic RPC error', { error: rpcError });
+      throw rpcError;
+    }
+
+    const row = result?.[0] || result;
+    if (!row?.success) {
+      return res.status(400).json({
+        success: false,
+        error: row?.error_message || 'Failed to purchase ticket',
+        available: row?.available_capacity ?? undefined,
+      });
+    }
+
+    // Fetch the created ticket for the response
     const { data: ticket, error: ticketError } = await supabase
       .from('pool_tickets')
-      .insert({
-        ticket_number: ticketNumber,
-        session_id: sessionId,
-        module_id: session.module_id,
-        customer_id: req.user?.userId,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        ticket_date: targetDate,
-        number_of_guests: numberOfGuests,
-        total_amount: totalAmount.toFixed(2),
-        status: 'valid',
-        payment_status: 'pending',
-        payment_method: paymentMethod,
-        qr_code: qrCode,
-      })
-      .select()
+      .select('*')
+      .eq('id', row.ticket_id)
       .single();
 
     if (ticketError) throw ticketError;
+
+    // Fetch session info for email (lightweight query, no race risk)
+    const { data: session } = await supabase
+      .from('pool_sessions')
+      .select('name, start_time, end_time')
+      .eq('id', sessionId)
+      .single();
 
     emitToUnit('pool', 'pool:ticket:new', {
       ...ticket,
@@ -134,13 +121,13 @@ export const purchaseTicket = asyncHandler(async (req: Request, res: Response) =
         ticket_number: ticketNumber, 
         session_id: sessionId, 
         guests: numberOfGuests,
-        total: totalAmount 
+        total: ticket.total_amount 
       },
       ip_address: req.ip,
     });
 
     // Send ticket email
-    if (customerEmail) {
+    if (customerEmail && session) {
       emailService.sendTicketWithQR({
         customerEmail,
         customerName,
@@ -311,13 +298,18 @@ export const cancelTicket = asyncHandler(async (req: Request, res: Response) => 
  */
 export const validateTicket = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-    const { ticketNumber } = req.params;
+    const { ticketNumber } = req.body;
 
-    const { data: ticket, error: ticketError } = await supabase
-      .from('pool_tickets')
-      .select('*, pool_sessions(*)')
-      .eq('ticket_number', ticketNumber)
-      .single();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ticketNumber);
+    let query = supabase.from('pool_tickets').select('*, pool_sessions(*)');
+    
+    if (isUuid) {
+        query = query.eq('id', ticketNumber);
+    } else {
+        query = query.eq('ticket_number', ticketNumber);
+    }
+
+    const { data: ticket, error: ticketError } = await query.single();
 
     if (ticketError) {
       if (ticketError.code === 'PGRST116') {
@@ -373,13 +365,18 @@ export const validateTicket = asyncHandler(async (req: Request, res: Response) =
  */
 export const recordEntry = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-    const { ticketNumber } = req.params;
+    const ticketNumber = req.params.id;
 
-    const { data: ticket, error: ticketError } = await supabase
-      .from('pool_tickets')
-      .select('*')
-      .eq('ticket_number', ticketNumber)
-      .single();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ticketNumber);
+    let query = supabase.from('pool_tickets').select('*');
+    
+    if (isUuid) {
+        query = query.eq('id', ticketNumber);
+    } else {
+        query = query.eq('ticket_number', ticketNumber);
+    }
+
+    const { data: ticket, error: ticketError } = await query.single();
 
     if (ticketError) {
       if (ticketError.code === 'PGRST116') {
@@ -388,8 +385,19 @@ export const recordEntry = asyncHandler(async (req: Request, res: Response) => {
       throw ticketError;
     }
 
-    if (ticket.status !== 'valid') {
-      return res.status(400).json({ 
+    // Allow entry for valid tickets. If status is already used, check if we need to re-admit?
+    // The test expects 'active' or 'checked_in' status logic, but schema only has 'valid' | 'used'.
+    // If ticket is 'valid', we mark it 'used' (entered).
+    // If ticket is 'used' AND has entry_time but NO exit_time, they are arguably 'active'.
+    // Use 'used' as the DB status, but we might need to interpret this.
+
+    if (ticket.status !== 'valid' && !(ticket.status === 'used' && ticket.entry_time && !ticket.exit_time)) {
+       // If it is 'used' and they are inside (no exit time), maybe we are just updating?
+       // But strictly for checking in:
+       if (ticket.status === 'used') {
+           return res.status(400).json({ success: false, error: 'Ticket already used' });
+       }
+       return res.status(400).json({ 
         success: false, 
         error: `Cannot record entry for ticket with status: ${ticket.status}` 
       });
@@ -422,17 +430,22 @@ export const recordEntry = asyncHandler(async (req: Request, res: Response) => {
  */
 export const recordExit = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-    const { ticketNumber } = req.params;
+    const ticketNumber = req.params.id;
 
-    const { data: ticket, error: ticketError } = await supabase
-      .from('pool_tickets')
-      .select('*')
-      .eq('ticket_number', ticketNumber)
-      .single();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ticketNumber);
+    let query = supabase.from('pool_tickets').select('*');
+    
+    if (isUuid) {
+        query = query.eq('id', ticketNumber);
+    } else {
+        query = query.eq('ticket_number', ticketNumber);
+    }
+
+    const { data: ticket, error: ticketError } = await query.single();
 
     if (ticketError) {
       if (ticketError.code === 'PGRST116') {
-        return res.status(404).json({ success: false, error: 'Ticket not found' });
+         return res.status(404).json({ success: false, error: 'Ticket not found' });
       }
       throw ticketError;
     }

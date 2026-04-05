@@ -103,19 +103,33 @@ describe('Chalet Pricing Logic', () => {
     // ChainableMock helper usually returns same obj if not configured specific.
     // We'll create a smart mock for `from`.
     
+    // Track calls to chalet_bookings to differentiate availability check vs post-RPC fetch
+    let bookingsCallCount = 0;
     const mockSupabase = {
         from: vi.fn((table) => {
             if (table === 'chalets') {
                 return createChainableMock(mockChalet);
             }
             if (table === 'chalet_bookings') {
-                // If checking availability (select), return empty array
-                // If inserting, return new booking with calculated price
-                const builder = createChainableMock([]);
-                builder.insert = vi.fn().mockImplementation((data) => {
-                    return createChainableMock({ ...data, id: 'new-booking' });
+                bookingsCallCount++;
+                if (bookingsCallCount === 1) {
+                    // Availability check — no overlapping bookings
+                    return createChainableMock([]);
+                }
+                // Post-RPC: fetch the created booking (controller re-reads it after atomic insert)
+                return createChainableMock({
+                    id: 'new-booking',
+                    booking_number: 'C-260101-001',
+                    chalet_id: chaletId,
+                    total_amount: 200,
+                    base_amount: 200,
+                    add_ons_amount: 0,
+                    check_in_date: '2026-01-01',
+                    check_out_date: '2026-01-02',
+                    status: 'pending',
+                    payment_status: 'pending',
+                    payment_method: 'cash',
                 });
-                return builder;
             }
             if (table === 'chalet_price_rules') {
                 return createChainableMock(priceRules);
@@ -123,8 +137,13 @@ describe('Chalet Pricing Logic', () => {
             if (table === 'chalet_add_ons') {
                 return createChainableMock([]);
             }
-            return createChainableMock([]);
-        })
+            return createChainableMock(null);
+        }),
+        // createBooking now uses supabase.rpc('create_chalet_booking_with_addons')
+        rpc: vi.fn().mockResolvedValue({
+            data: { booking_id: 'new-booking' },
+            error: null,
+        }),
     };
 
     vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
@@ -136,43 +155,24 @@ describe('Chalet Pricing Logic', () => {
     await createBooking(req, res, next);
 
     // Assertions
-    // Check what was inserted into 'chalet_bookings'
-    const insertCall = mockSupabase.from('chalet_bookings').insert.mock.calls[0];
-    // If availability check also called insert (unlikely), valid index is 0 if avail check uses select.
-    
-    // Actually, `createChainableMock` mockImplementation on insert is tricky if the builder is reused.
-    // But `from` is called anew each time.
-    // 4th call to `from` is the insert.
-    // Let's inspect the `insert` arguments of the specific call.
-    
-    // Find the call to insert
-    let insertData;
-    const bookingsCalls = mockSupabase.from.mock.calls.filter(c => c[0] === 'chalet_bookings');
-    // We expect at least one call that invokes .insert
-    // But since we return a new mock builder each time, we need to inspect the builder returned by the INSERT call.
-    // Wait, I defined `builder.insert` mock above.
-    // If `from` is called multiple times, that definition is reused IF I return same object or redefine.
-    // I returned a NEW builder each time in the factory function.
-    // So I can't inspect "the" builder unless I capture it or inspect calls to the spy methods if I attached them.
-    
-    // Easier way: Spy on the insert method that was executed.
-    // But I don't have access to the instance created inside the function.
-    
-    // Alternative: Assert `res.json` argument.
-    // The controller returns `res.json({ success: true, data: booking })`.
-    // The `booking` object comes from the `insert(...).select().single()` result.
-    // The `insert` mock I preserved returns `{...data}`.
-    // So `res.json` should contain the data passed to insert, including total_amount.
-    
+    // Verify the RPC was called with the correct total_amount (pricing logic result)
+    // Expected Price: 1 night (Jan 1).
+    // Rules: Season ($150, 31 days), Holiday ($200, 2 days).
+    // Sorting: Holiday (shorter duration) wins over Season.
+    // So Holiday price applies → total = 200.
+    expect(mockSupabase.rpc).toHaveBeenCalledWith(
+        'create_chalet_booking_with_addons',
+        expect.objectContaining({
+            p_booking: expect.objectContaining({
+                total_amount: 200,
+            }),
+        })
+    );
+
+    expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
         data: expect.objectContaining({
-            // Expected Price:
-            // 1 night (Jan 1).
-            // Rules: Season ($150), Holiday ($200).
-            // Logic should Sort Holiday (2 days) < Season (31 days).
-            // So Holiday applies.
-            // Expected Total: 200.
             total_amount: 200
         })
     }));

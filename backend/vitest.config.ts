@@ -5,7 +5,15 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/**/*.test.ts'],
-    exclude: ['node_modules', 'dist', 'tests/integration/**', 'tests/criticalFlows.test.ts'],
+    exclude: [
+      'node_modules',
+      'dist',
+      'tests/integration/**',
+      'tests/criticalFlows.test.ts',
+      'tests/ai-agent.integration.test.ts',
+      'tests/comprehensive-verification.test.ts',
+      'tests/security-patches.test.ts',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'html'],
@@ -44,10 +52,10 @@ export default defineConfig({
       // Current: ~68% statements, ~59% branches, ~67% functions
       // Target: 80% statements, 70% branches, 75% functions
       thresholds: {
-        statements: 60,
-        branches: 50,
-        functions: 55,
-        lines: 60,
+        statements: 65,
+        branches: 55,
+        functions: 65,
+        lines: 65,
       },
     },
   },

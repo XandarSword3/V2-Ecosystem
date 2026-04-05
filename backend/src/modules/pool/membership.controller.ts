@@ -134,9 +134,10 @@ router.post(
       });
 
       if (!result.success) {
-        return res.status(400).json({
+        return res.status(result.statusCode || 400).json({
           success: false,
           error: result.message,
+          ...(result.code ? { code: result.code } : {}),
         });
       }
 
@@ -171,9 +172,10 @@ router.delete(
       const result = await cancelMembership(id, userId, reason, immediate);
 
       if (!result.success) {
-        return res.status(400).json({
+        return res.status(result.statusCode || 400).json({
           success: false,
           error: result.message,
+          ...(result.code ? { code: result.code } : {}),
         });
       }
 

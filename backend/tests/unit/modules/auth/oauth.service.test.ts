@@ -114,7 +114,7 @@ const mockFacebookUserInfo = {
 
 // Mock Apple ID token payload (base64url encoded)
 function createMockAppleIdToken(payload: object): string {
-  const header = { alg: 'RS256', typ: 'JWT' };
+  const header = { alg: 'RS256', typ: 'JWT', kid: 'apple-test-kid' };
   const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const mockSignature = 'mock-signature';
@@ -187,10 +187,32 @@ vi.mock('crypto', () => ({
       end: vi.fn(),
       sign: vi.fn().mockReturnValue(Buffer.from([0x30, 0x44, 0x02, 0x20, ...Array(32).fill(0x01), 0x02, 0x20, ...Array(32).fill(0x02)])),
     }),
+    createPublicKey: vi.fn().mockReturnValue('mock-public-key'),
   },
   randomBytes: vi.fn().mockReturnValue({
     toString: vi.fn().mockReturnValue('a'.repeat(64)),
   }),
+}));
+
+// Mock jsonwebtoken for Apple JWKS verification
+vi.mock('jsonwebtoken', () => ({
+  default: {
+    verify: vi.fn().mockImplementation((token: string, _key: any, options: any) => {
+      const parts = token.split('.');
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+      if (options?.issuer && payload.iss !== options.issuer) {
+        throw new Error('Invalid Apple ID token issuer');
+      }
+      if (options?.audience && payload.aud !== options.audience) {
+        throw new Error('Invalid Apple ID token audience');
+      }
+      if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+        throw new Error('Apple ID token expired');
+      }
+      return payload;
+    }),
+    sign: vi.fn().mockReturnValue('mock-client-secret'),
+  },
 }));
 
 // Global fetch mock
@@ -589,6 +611,25 @@ describe('OAuthService', () => {
       hasEmail?: boolean;
     } = {}) {
       const { existingUser = false, hasEmail = true } = options;
+
+      // Mock fetch for Apple JWKS endpoint
+      mockFetch.mockImplementation((url: string) => {
+        if (url === 'https://appleid.apple.com/auth/keys') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              keys: [{
+                kty: 'RSA',
+                kid: 'apple-test-kid',
+                alg: 'RS256',
+                n: 'test-n-value',
+                e: 'AQAB',
+              }],
+            }),
+          });
+        }
+        return Promise.resolve({ ok: false, status: 404 });
+      });
 
       let queryCall = 0;
       mockFrom.mockImplementation((table: string) => {
