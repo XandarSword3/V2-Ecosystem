@@ -125,6 +125,15 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
     return next();
   }
 
+  // Bearer-authenticated APIs are not vulnerable to classic CSRF because
+  // the Authorization header is set by client code, not automatically by browsers.
+  // This keeps cross-domain deployments (Vercel frontend + Render backend) functional
+  // when third-party cookies are unavailable.
+  const authHeader = req.headers.authorization;
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
   // Get tokens from cookie and header
   const cookieToken = getCsrfTokenFromCookie(req);
   const headerToken = getCsrfTokenFromHeader(req);
