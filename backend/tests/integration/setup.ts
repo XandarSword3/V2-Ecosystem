@@ -19,6 +19,11 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
 
 // Set test environment variables before any imports
 process.env.NODE_ENV = 'test';
+// Integration suites exercise business flows and do not attach CSRF cookies/tokens.
+// Keep CSRF strict in unit tests, but explicitly bypass it for integration test runs.
+if (!process.env.CSRF_BYPASS_IN_TESTS) {
+  process.env.CSRF_BYPASS_IN_TESTS = 'true';
+}
 // Don't override DATABASE_URL if it's already set from .env
 if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = getTestDatabaseUrl();

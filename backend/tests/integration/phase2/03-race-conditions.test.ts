@@ -355,9 +355,8 @@ describe('R-06: Cash Payment Double-Record', () => {
 describe('R-07: Booking Created Without Add-ons (Orphan)', () => {
   it('should create a booking with multiple add-ons and verify all are present', async () => {
     const alice = client(requireState('aliceToken'));
-    const offset = 140 + (Date.now() % 30);
-    const checkIn = futureDate(offset);
-    const checkOut = futureDate(offset + 2);
+    const baseOffset = 140 + (Date.now() % 30);
+    const bookingWindows = [baseOffset, baseOffset + 30, baseOffset + 60, baseOffset + 90];
 
     const addOns: any[] = [];
     if (state.bbqAddonId) addOns.push({ addOnId: state.bbqAddonId, quantity: 1 });
@@ -381,17 +380,25 @@ describe('R-07: Booking Created Without Add-ons (Orphan)', () => {
       return;
     }
 
-    const res = await alice.createBooking({
-      chaletId: requireState('chaletCId'),
-      checkInDate: checkIn,
-      checkOutDate: checkOut,
-      customerName: 'Add-on Orphan Test',
-      customerEmail: 'addon@test.com',
-      customerPhone: '+1-555-0007',
-      numberOfGuests: 2,
-      paymentMethod: 'cash',
-      addOns: validAddOns,
-    });
+    let res: any;
+    for (const offset of bookingWindows) {
+      const attempt = await alice.createBooking({
+        chaletId: requireState('chaletCId'),
+        checkInDate: futureDate(offset),
+        checkOutDate: futureDate(offset + 2),
+        customerName: 'Add-on Orphan Test',
+        customerEmail: 'addon@test.com',
+        customerPhone: '+1-555-0007',
+        numberOfGuests: 2,
+        paymentMethod: 'cash',
+        addOns: validAddOns,
+      });
+
+      res = attempt;
+      if (attempt.success || !/already booked/i.test(String(attempt.error || ''))) {
+        break;
+      }
+    }
 
     expect(res.success, `Booking failed: ${res.error}`).toBe(true);
 
