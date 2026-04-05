@@ -42,7 +42,6 @@ import StripePayment from '@/components/payments/StripePayment';
 
 export default function RestaurantCartPage() {
   const t = useTranslations('restaurant');
-  const tCommon = useTranslations('common');
   const router = useRouter();
   const currency = useSettingsStore((s) => s.currency);
   // FIX: Iteration 4 - Get dynamic tax rate from settings
@@ -367,7 +366,7 @@ export default function RestaurantCartPage() {
                               {item.name}
                             </h3>
                             <p className="text-orange-600 dark:text-orange-400 font-medium">
-                              {formatCurrency(item.price, currency)} {tCommon('items') === 'items' ? 'each' : 'each'}
+                              {formatCurrency(item.price, currency)} each
                             </p>
                             {/* Display selected modifiers */}
                             {item.selectedModifiers && item.selectedModifiers.length > 0 && (

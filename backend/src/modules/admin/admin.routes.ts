@@ -70,17 +70,17 @@ router.get('/roles/:id/permissions', authorize('super_admin'), permissionsContro
 router.put('/roles/:id/permissions', authorize('super_admin'), permissionsController.updateRolePermissions);
 router.get('/permissions', authorize('super_admin'), permissionsController.getAllPermissions);
 
-// Settings (using refactored controller) - SUPER ADMIN ONLY
-router.get('/settings', authorize('super_admin'), settingsController.getSettings);
-router.put('/settings', authorize('super_admin'), settingsController.updateSettings);
+// Settings (using refactored controller) - ADMIN and SUPER ADMIN
+router.get('/settings', authorize('admin'), settingsController.getSettings);
+router.put('/settings', authorize('admin'), settingsController.updateSettings);
 
 // FIX: Iteration 26 - Dedicated homepage settings endpoint (frontend calls /admin/settings/homepage which 404'd)
-router.get('/settings/homepage', authorize('super_admin'), settingsController.getHomepageSettings);
-router.put('/settings/homepage', authorize('super_admin'), settingsController.updateHomepageSettings);
+router.get('/settings/homepage', authorize('admin'), settingsController.getHomepageSettings);
+router.put('/settings/homepage', authorize('admin'), settingsController.updateHomepageSettings);
 
 // Tax settings
-router.get('/settings/tax', authorize('super_admin'), settingsController.getTaxSettings);
-router.put('/settings/tax', authorize('super_admin'), settingsController.updateTaxSettings);
+router.get('/settings/tax', authorize('admin'), settingsController.getTaxSettings);
+router.put('/settings/tax', authorize('admin'), settingsController.updateTaxSettings);
 
 // File Uploads (branding assets) - MANAGER
 router.get('/uploads', authorizeManager, uploadController.listFiles);

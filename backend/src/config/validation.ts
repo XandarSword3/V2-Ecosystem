@@ -21,6 +21,20 @@ interface EnvVar {
   validatorMessage?: string;
 }
 
+function isValidCorsOrigin(value: string): boolean {
+  return value === '*' || value.startsWith('http://') || value.startsWith('https://');
+}
+
+function isValidCorsOriginList(value: string): boolean {
+  const origins = value
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  if (origins.length === 0) return false;
+  return origins.every(isValidCorsOrigin);
+}
+
 // Environment variable definitions
 const ENV_VARS: EnvVar[] = [
   // Server
@@ -65,12 +79,19 @@ const ENV_VARS: EnvVar[] = [
   { name: 'STRIPE_WEBHOOK_SECRET', required: false, description: 'Stripe webhook signing secret' },
   
   // Security
-  { 
-    name: 'CORS_ORIGIN', 
-    required: false, 
-    description: 'Allowed CORS origins',
-    validator: (v) => v.startsWith('http://') || v.startsWith('https://') || v === '*',
-    validatorMessage: 'Must be a valid URL or *'
+  {
+    name: 'CORS_ORIGINS',
+    required: false,
+    description: 'Allowed CORS origins (comma-separated)',
+    validator: isValidCorsOriginList,
+    validatorMessage: 'Must be a comma-separated list of valid URLs or *'
+  },
+  {
+    name: 'CORS_ORIGIN',
+    required: false,
+    description: 'Legacy allowed CORS origin(s)',
+    validator: isValidCorsOriginList,
+    validatorMessage: 'Must be a valid URL, * or comma-separated list of valid URLs'
   },
   
   // Optional Services
@@ -146,9 +167,15 @@ export function validateEnvironment(): ValidationResult {
       errors.push('STRIPE_SECRET_KEY is required in production');
     }
     
+    const corsOriginsRaw = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || '';
+    const corsOrigins = corsOriginsRaw
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(Boolean);
+
     // CORS should not be wildcard in production
-    if (process.env.CORS_ORIGIN === '*') {
-      warnings.push('CORS_ORIGIN should not be * in production');
+    if (corsOrigins.includes('*')) {
+      warnings.push('CORS_ORIGINS should not include * in production');
     }
     
     // JWT secret should be strong
@@ -268,9 +295,15 @@ export async function runStartupValidation(): Promise<void> {
   // 4. Additional production checks
   if (process.env.NODE_ENV === 'production') {
     // Verify HTTPS in CORS origin
-    const corsOrigin = process.env.CORS_ORIGIN || '';
-    if (corsOrigin && !corsOrigin.includes('https://') && corsOrigin !== '*') {
-      logger.warn('⚠️  CORS_ORIGIN should use HTTPS in production');
+    const corsOriginsRaw = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || '';
+    const hasNonHttpsOrigin = corsOriginsRaw
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(Boolean)
+      .some(origin => origin !== '*' && !origin.startsWith('https://'));
+
+    if (hasNonHttpsOrigin) {
+      logger.warn('⚠️  CORS_ORIGINS should use HTTPS in production');
     }
   }
   
