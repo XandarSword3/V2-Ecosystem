@@ -6,6 +6,41 @@ BEGIN;
 -- Keep this table lean but compatible with later ALTER TABLE and RLS/policy logic.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- Supabase compatibility shim for plain Postgres CI runs.
+-- Many later migrations reference auth.users/auth.uid()/auth.role()/auth.jwt().
+CREATE SCHEMA IF NOT EXISTS auth;
+
+CREATE TABLE IF NOT EXISTS auth.users (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	email TEXT,
+	created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+	updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE OR REPLACE FUNCTION auth.jwt()
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+AS $$
+	SELECT COALESCE(NULLIF(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+$$;
+
+CREATE OR REPLACE FUNCTION auth.uid()
+RETURNS uuid
+LANGUAGE sql
+STABLE
+AS $$
+	SELECT NULLIF(auth.jwt() ->> 'sub', '')::uuid
+$$;
+
+CREATE OR REPLACE FUNCTION auth.role()
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+	SELECT COALESCE(NULLIF(auth.jwt() ->> 'role', ''), 'anon')
+$$;
+
 DO $$ BEGIN
 	CREATE TYPE business_unit AS ENUM ('restaurant', 'snack_bar', 'chalets', 'pool', 'admin');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
