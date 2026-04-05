@@ -521,3 +521,50 @@ jobs:
           echo "Author: ${{ github.actor }}"
           echo "Frontend: Vercel deployment initiated"
           echo "Backend: Render deploy hook triggered"
+
+  production-smoke:
+    name: Stage 7 - Production Smoke
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install root dependencies
+        working-directory: .
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: .
+        run: npx playwright install --with-deps chromium
+
+      - name: Run production connectivity smoke tests
+        working-directory: .
+        run: >
+          npx playwright test -c playwright.all.config.ts
+          tests/smoke/production-connectivity.spec.ts
+          --project=chromium
+          --grep "@production"
+        env:
+          CI: true
+          PRODUCTION_FRONTEND_URL: https://v2-ecosystem.vercel.app
+          PRODUCTION_API_URL: https://v2-resort-backend.onrender.com
+
+      - name: Upload production smoke artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-smoke-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

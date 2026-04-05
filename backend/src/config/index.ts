@@ -6,6 +6,20 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
 const isTest = process.env.NODE_ENV === 'test';
 
+const DEFAULT_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3005'];
+
+export function resolveCorsOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
+  const rawOrigins = env.CORS_ORIGINS || env.CORS_ORIGIN || env.FRONTEND_URL;
+  if (!rawOrigins) return DEFAULT_CORS_ORIGINS;
+
+  const origins = rawOrigins
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  return origins.length > 0 ? origins : DEFAULT_CORS_ORIGINS;
+}
+
 /**
  * Validate that required environment variables are set.
  * Called at application startup, NOT at import time.
@@ -56,9 +70,7 @@ export const config = {
   port: parseInt(process.env.PORT || '3005', 10),
   apiUrl: process.env.API_URL || 'http://localhost:3005',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-  corsOrigins: process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',')
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3005'],
+  corsOrigins: resolveCorsOrigins(),
 
   database: {
     url: process.env.DATABASE_URL || '',

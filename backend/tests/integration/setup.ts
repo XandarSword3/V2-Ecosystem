@@ -44,7 +44,8 @@ if (!process.env.JWT_REFRESH_SECRET) {
 }
 process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 process.env.JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
-process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
+process.env.CORS_ORIGINS = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:3000';
+process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS;
 
 interface IntegrationLifecycleState {
   initialized: boolean;
