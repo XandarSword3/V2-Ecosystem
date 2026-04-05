@@ -28,6 +28,25 @@ BEGIN
     END IF;
 
     ALTER TABLE restaurant_tables ADD COLUMN IF NOT EXISTS number INTEGER DEFAULT 0;
+
+    -- Legacy schemas may have restaurant_tables.number as VARCHAR (e.g. 'T1').
+    -- Normalize to integer so numeric comparisons and inserts do not fail.
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'restaurant_tables'
+          AND column_name = 'number'
+          AND data_type IN ('character varying', 'text')
+    ) THEN
+        ALTER TABLE restaurant_tables
+            ALTER COLUMN number TYPE INTEGER
+            USING CASE
+                WHEN number::text ~ '^[0-9]+$' THEN number::INTEGER
+                WHEN number::text ~ '^[A-Za-z]+[0-9]+$' THEN SUBSTRING(number::text FROM '([0-9]+)$')::INTEGER
+                ELSE NULL
+            END;
+    END IF;
+
     ALTER TABLE restaurant_tables ADD COLUMN IF NOT EXISTS name VARCHAR(100) DEFAULT 'Table';
     ALTER TABLE restaurant_tables ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 4;
     ALTER TABLE restaurant_tables ADD COLUMN IF NOT EXISTS min_capacity INTEGER NOT NULL DEFAULT 1;
@@ -132,7 +151,7 @@ FROM (VALUES
     (9, 'Table 9', 4, 2, 'Terrace', '{"x": 580, "y": 50, "rotation": 0, "width": 60, "height": 60, "shape": "square"}', '["outdoor"]'),
     (10, 'Table 10', 2, 1, 'Bar', '{"x": 500, "y": 200, "rotation": 0, "width": 40, "height": 40, "shape": "circle"}', '["bar"]')
 ) AS v(number, name, capacity, min_capacity, section, position, features)
-WHERE NOT EXISTS (SELECT 1 FROM restaurant_tables WHERE number = v.number);
+WHERE NOT EXISTS (SELECT 1 FROM restaurant_tables WHERE number::text = v.number::text);
 
 -- Insert restaurant settings
 INSERT INTO system_settings (key, value, category, description)
