@@ -32,7 +32,6 @@ export default defineConfig({
       reporter: ['text', 'json-summary'],
       include: criticalRouteFiles,
       reportsDirectory: './coverage-critical',
-      all: true,
       reportOnFailure: true,
       thresholds: {
         lines: 46,
