@@ -97,6 +97,7 @@ export async function migrate() {
 
       CREATE TABLE IF NOT EXISTS permissions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        slug VARCHAR(100),
         name VARCHAR(100) NOT NULL UNIQUE,
         description TEXT,
         resource VARCHAR(50) NOT NULL,
@@ -123,6 +124,21 @@ export async function migrate() {
         last_activity TIMESTAMP DEFAULT NOW(),
         created_at TIMESTAMP DEFAULT NOW() NOT NULL
       );
+    `);
+
+    // Compatibility shim: older bootstrap schemas created permissions without slug.
+    // Later SQL migrations and module logic rely on this column and a unique index.
+    await pool.query(`
+      ALTER TABLE permissions ADD COLUMN IF NOT EXISTS slug VARCHAR(100);
+
+      UPDATE permissions
+      SET slug = COALESCE(
+        slug,
+        'perm_' || REPLACE(id::text, '-', '')
+      )
+      WHERE slug IS NULL OR slug = '';
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_permissions_slug ON permissions(slug);
     `);
 
     // Restaurant tables
