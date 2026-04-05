@@ -106,8 +106,9 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
     return next();
   }
 
-  // Integration tests rely on direct API calls and do not perform a browser cookie handshake.
-  if (process.env.NODE_ENV === 'test') {
+  // Some integration tests may need to bypass CSRF when simulating non-browser clients.
+  // Keep CSRF enabled in test mode unless explicitly opted out.
+  if (process.env.NODE_ENV === 'test' && process.env.CSRF_BYPASS_IN_TESTS === 'true') {
     return next();
   }
 
