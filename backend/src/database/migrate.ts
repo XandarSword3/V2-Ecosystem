@@ -445,14 +445,20 @@ export async function migrate() {
 
       CREATE TABLE IF NOT EXISTS notifications (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID REFERENCES users(id) NOT NULL,
-        type VARCHAR(50) NOT NULL,
+        user_id UUID REFERENCES users(id),
+        type VARCHAR(50) NOT NULL DEFAULT 'info',
         title VARCHAR(255) NOT NULL,
         message TEXT NOT NULL,
-        data TEXT,
+        target_type VARCHAR(50) NOT NULL DEFAULT 'user',
+        channel VARCHAR(20) NOT NULL DEFAULT 'in_app',
+        priority VARCHAR(20) NOT NULL DEFAULT 'normal',
+        data JSONB DEFAULT '{}'::jsonb,
+        actions JSONB DEFAULT '[]'::jsonb,
         is_read BOOLEAN DEFAULT false,
         read_at TIMESTAMP,
-        sent_via TEXT[],
+        scheduled_for TIMESTAMP WITH TIME ZONE,
+        sent_at TIMESTAMP WITH TIME ZONE,
+        expires_at TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP DEFAULT NOW() NOT NULL
       );
 
@@ -578,6 +584,46 @@ export async function migrate() {
       UPDATE payments
       SET reference_type = COALESCE(reference_type, 'legacy')
       WHERE reference_type IS NULL;
+    `);
+
+    // Compatibility shim: older bootstrap schemas created notifications without
+    // scheduling and delivery columns used by notification jobs.
+    await pool.query(`
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_type VARCHAR(50) DEFAULT 'user';
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS channel VARCHAR(20) DEFAULT 'in_app';
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'normal';
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS actions JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMPTZ;
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ;
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+
+      ALTER TABLE notifications ALTER COLUMN user_id DROP NOT NULL;
+      ALTER TABLE notifications ALTER COLUMN type SET DEFAULT 'info';
+
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'notifications'
+            AND column_name = 'data'
+            AND udt_name IN ('text', 'varchar')
+        ) THEN
+          ALTER TABLE notifications
+          ALTER COLUMN data TYPE JSONB
+          USING CASE
+            WHEN data IS NULL OR BTRIM(data) = '' THEN '{}'::jsonb
+            WHEN LEFT(BTRIM(data), 1) IN ('{', '[') THEN data::jsonb
+            ELSE to_jsonb(data)
+          END;
+        END IF;
+      EXCEPTION
+        WHEN invalid_text_representation OR data_exception THEN
+          -- Keep legacy data type if conversion fails; critical scheduling columns
+          -- are still present from the ALTER TABLE statements above.
+          NULL;
+      END $$;
     `);
 
     // Create indexes
