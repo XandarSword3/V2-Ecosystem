@@ -86,22 +86,59 @@ describeIntegration('Double Booking Prevention (Integration)', () => {
       return;
     }
 
-    const bookingPayload = {
-      chaletId: chalet.id,
-      checkInDate: '2026-01-10',
-      checkOutDate: '2026-01-12',
-      customerName: 'Test User',
-      customerEmail: 'test@example.com',
-      customerPhone: '+1234567890',
-      numberOfGuests: 2,
-      paymentMethod: 'cash'
-    };
-    // First booking should succeed
-    const res1 = await request(app)
-      .post('/api/v1/chalets/bookings')
-      .send(bookingPayload);
+    const baseDate = new Date();
+    baseDate.setUTCHours(0, 0, 0, 0);
+    const toIsoDate = (date: Date) => date.toISOString().slice(0, 10);
 
-    expect([200, 201]).toContain(res1.status);
+    let bookingPayload: {
+      chaletId: string;
+      checkInDate: string;
+      checkOutDate: string;
+      customerName: string;
+      customerEmail: string;
+      customerPhone: string;
+      numberOfGuests: number;
+      paymentMethod: string;
+    } | null = null;
+    let res1: { status: number; body: any } | null = null;
+
+    // Probe future weekly windows until we find one available in this environment.
+    for (let offsetDays = 90; offsetDays <= 360; offsetDays += 7) {
+      const checkIn = new Date(baseDate);
+      checkIn.setUTCDate(baseDate.getUTCDate() + offsetDays);
+      const checkOut = new Date(checkIn);
+      checkOut.setUTCDate(checkOut.getUTCDate() + 2);
+
+      const candidatePayload = {
+        chaletId: chalet.id,
+        checkInDate: toIsoDate(checkIn),
+        checkOutDate: toIsoDate(checkOut),
+        customerName: 'Test User',
+        customerEmail: 'test@example.com',
+        customerPhone: '+1234567890',
+        numberOfGuests: 2,
+        paymentMethod: 'cash',
+      };
+
+      const candidate = await request(app)
+        .post('/api/v1/chalets/bookings')
+        .send(candidatePayload);
+
+      if ([200, 201].includes(candidate.status)) {
+        bookingPayload = candidatePayload;
+        res1 = candidate;
+        break;
+      }
+
+      // Unavailable/conflicting dates are expected while probing for a free slot.
+      expect([400, 409, 422]).toContain(candidate.status);
+    }
+
+    expect(res1, 'Could not find an available date window for double-booking validation').toBeTruthy();
+    if (!res1 || !bookingPayload) {
+      return;
+    }
+
     expect(res1.body.success).toBe(true);
 
     // Second booking for same dates should fail

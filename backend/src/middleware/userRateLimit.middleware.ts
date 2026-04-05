@@ -49,6 +49,16 @@ export function userRateLimit(config: RateLimitConfig) {
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Integration tests explicitly mark requests to avoid cross-test throttling noise.
+      const integrationTestHeader = req.get('X-Integration-Test');
+      const isIntegrationTestRequest =
+        integrationTestHeader === 'true' &&
+        (process.env.NODE_ENV === 'test' || process.env.RUN_INTEGRATION_TESTS === 'true');
+
+      if (isIntegrationTestRequest) {
+        return next();
+      }
+
       // Determine the rate limit key
       // Use user ID if authenticated, otherwise fall back to IP
       const userId = (req as { user?: { userId: string } }).user?.userId;
