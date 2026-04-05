@@ -6,11 +6,21 @@
 import { Router } from 'express';
 import { reportingController } from './reporting.controller';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { validatePropertyAccess } from '../../middleware/propertyAccess.middleware.js';
+import { createRateLimiter } from '../../middleware/api-security.middleware.js';
 
 const router = Router();
 
-// All routes require authentication
+// Rate limiter for expensive report execution endpoints
+const reportRateLimit = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  message: 'Too many report execution requests',
+});
+
+// All routes require authentication and property access validation
 router.use(authenticate);
+router.use(validatePropertyAccess);
 
 // =============================================
 // REPORT TEMPLATES
@@ -24,8 +34,8 @@ router.delete('/templates/:id', authorize('admin', 'manager'), reportingControll
 // =============================================
 // REPORT EXECUTION
 // =============================================
-router.post('/execute/:templateId', reportingController.executeReport.bind(reportingController));
-router.post('/export/:templateId', reportingController.exportReport.bind(reportingController));
+router.post('/execute/:templateId', reportRateLimit, reportingController.executeReport.bind(reportingController));
+router.post('/export/:templateId', reportRateLimit, reportingController.exportReport.bind(reportingController));
 
 // =============================================
 // SAVED REPORTS

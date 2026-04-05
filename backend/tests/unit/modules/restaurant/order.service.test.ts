@@ -16,6 +16,9 @@ vi.mock('../../../../src/services/email.service', () => ({
 
 // Mock tax service
 vi.mock('../../../../src/services/tax.service', () => ({
+  TaxService: class {
+    getTaxRate = vi.fn().mockResolvedValue(0.1);
+  },
   taxService: {
     getTaxRate: vi.fn().mockResolvedValue(0.1),
   },
@@ -185,10 +188,10 @@ import { emitToUnit } from '../../../../src/socket/index';
 describe('OrderService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockTables = [mockTable];
-    mockMenuItems = [mockMenuItem];
-    mockOrders = [mockOrder];
-    mockOrderItems = [mockOrderItem];
+    mockTables = [{ ...mockTable }];
+    mockMenuItems = [{ ...mockMenuItem }];
+    mockOrders = [{ ...mockOrder }];
+    mockOrderItems = [{ ...mockOrderItem }];
     mockRpcResults = {};
   });
 
@@ -509,18 +512,39 @@ describe('OrderService', () => {
     });
 
     it('should set actual_ready_time when status is ready', async () => {
+      // Must transition through intermediate states: pending → confirmed → preparing → ready
+      await orderService.updateOrderStatus('order-1', 'confirmed', 'staff-1');
+      (mockOrders[0] as any).status = 'confirmed';
+      await orderService.updateOrderStatus('order-1', 'preparing', 'staff-1');
+      (mockOrders[0] as any).status = 'preparing';
       const result = await orderService.updateOrderStatus('order-1', 'ready', 'staff-1');
 
       expect(result).toBeDefined();
     });
 
     it('should set served_at when status is served', async () => {
+      // Must transition through intermediate states: pending → confirmed → preparing → ready → served
+      await orderService.updateOrderStatus('order-1', 'confirmed', 'staff-1');
+      (mockOrders[0] as any).status = 'confirmed';
+      await orderService.updateOrderStatus('order-1', 'preparing', 'staff-1');
+      (mockOrders[0] as any).status = 'preparing';
+      await orderService.updateOrderStatus('order-1', 'ready', 'staff-1');
+      (mockOrders[0] as any).status = 'ready';
       const result = await orderService.updateOrderStatus('order-1', 'served', 'staff-1');
 
       expect(result).toBeDefined();
     });
 
     it('should set completed_at and payment_status when status is completed', async () => {
+      // Must transition through intermediate states: pending → confirmed → preparing → ready → delivered → completed
+      await orderService.updateOrderStatus('order-1', 'confirmed', 'staff-1');
+      (mockOrders[0] as any).status = 'confirmed';
+      await orderService.updateOrderStatus('order-1', 'preparing', 'staff-1');
+      (mockOrders[0] as any).status = 'preparing';
+      await orderService.updateOrderStatus('order-1', 'ready', 'staff-1');
+      (mockOrders[0] as any).status = 'ready';
+      await orderService.updateOrderStatus('order-1', 'delivered', 'staff-1');
+      (mockOrders[0] as any).status = 'delivered';
       const result = await orderService.updateOrderStatus('order-1', 'completed', 'staff-1');
 
       expect(result).toBeDefined();
@@ -533,12 +557,18 @@ describe('OrderService', () => {
     });
 
     it('should record status history', async () => {
+      // Must transition through proper states: pending → confirmed → preparing
+      await orderService.updateOrderStatus('order-1', 'confirmed', 'staff-1');
+      (mockOrders[0] as any).status = 'confirmed';
       const result = await orderService.updateOrderStatus('order-1', 'preparing', 'staff-1');
 
       expect(result).toBeDefined();
     });
 
     it('should include notes in status history', async () => {
+      // Must transition through proper states: pending → confirmed → preparing
+      await orderService.updateOrderStatus('order-1', 'confirmed', 'staff-1');
+      (mockOrders[0] as any).status = 'confirmed';
       const result = await orderService.updateOrderStatus('order-1', 'preparing', 'staff-1', 'Started cooking');
 
       expect(result).toBeDefined();

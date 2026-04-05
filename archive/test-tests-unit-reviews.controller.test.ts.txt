@@ -1,0 +1,413 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+node.exe : [90mstderr[2m | 
+tests/unit/reviews.controller.test.ts[2m > [22m[2mReviews 
+Controller[2m > [22m[2mgetApprovedReviews[2m > [22m[2mshould 
+handle database error
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([90mstderr[2m... data 
+   base error:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[22m[39m[Reviews] Query failed (table may not exist): Database 
+connection failed
+
+[90mstderr[2m | tests/unit/reviews.controller.test.ts[2m > 
+[22m[2mReviews Controller[2m > [22m[2mgetAllReviews[2m > 
+[22m[2mshould handle database error
+[22m[39m[Reviews Admin] Query error: Database error 
+[90mundefined[39m
+
+ [31mΓ¥»[39m tests/unit/reviews.controller.test.ts [2m([22m[2m20 tests[22m[2m | [22m[31m9 failed[39m[2m)[22m[32m 65[2mms[22m[39m
+[31m       [31m├ù[31m should return approved reviews with stats[39m[32m 39[2mms[22m[39m
+[31m       [31m├ù[31m should filter reviews by service type[39m[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should not filter by service type when type is "all"[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should handle database error[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return zero average rating when no reviews exist[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should create a new review successfully[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should reject if user already has a review for this service[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle database error on insert[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should default service_type to general[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should return all reviews for admin[39m[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should filter by pending status[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should filter by approved status[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should filter by service type[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should handle database error[39m[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should approve a review[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject a review[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return 404 if review not found[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle database error[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should delete a review successfully[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle database error on delete[32m 1[2mms[22m[39m
+
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 9 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m tests/unit/reviews.controller.test.ts[2m 
+> [22mReviews Controller[2m > [22mgetApprovedReviews[2m > 
+[22mshould return approved reviews with stats
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, data: { ΓÇª(2) } } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[33m@@ -4,22 +4,22 @@[90m
+[2m        "reviews": [[22m
+[2m          {[22m
+[2m            "created_at": "2024-01-01T00:00:00Z",[22m
+[2m            "id": "review-1",[22m
+[2m            "rating": 5,[22m
+[32m-           "service_type": "general",[90m
+[31m+           "service_type": undefined,[90m
+[2m            "text": "Excellent service!",[22m
+[2m            "users": {[22m
+[2m              "full_name": "John Doe",[22m
+[2m              "profile_image_url": null,[22m
+[2m            },[22m
+[2m          },[22m
+[2m          {[22m
+[2m            "created_at": "2024-01-02T00:00:00Z",[22m
+[2m            "id": "review-2",[22m
+[2m            "rating": 4,[22m
+[32m-           "service_type": "restaurant",[90m
+[31m+           "service_type": undefined,[90m
+[2m            "text": "Great experience",[22m
+[2m            "users": {[22m
+[2m              "full_name": "Jane Smith",[22m
+[2m              "profile_image_url": null,[22m
+[2m            },[22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/reviews.controller.test.ts:[2m87:24[22m[39m
+    [90m 85| [39m      [35mawait[39m 
+[34mgetApprovedReviews[39m(req[33m,[39m res[33m,[39m 
+next)[33m;[39m
+    [90m 86| [39m
+    [90m 87| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m 88| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m 89| [39m        data[33m:[39m {
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/9]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/reviews.controller.test.ts[2m 
+> [22mReviews Controller[2m > [22mgetApprovedReviews[2m > 
+[22mshould filter reviews by service type
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 'service_type', 'restaurant' ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   "service_type",[90m
+[32m-   "restaurant",[90m
+[31m+   "status",[90m
+[31m+   "approved",[90m
+[2m  ][22m
+
+[1m  2nd vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   "service_type",[90m
+[31m+   "module_id",[90m
+[2m    "restaurant",[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m2[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/reviews.controller.test.ts:[2m129:35[22m[39m
+    [90m127| [39m      [35mawait[39m 
+[34mgetApprovedReviews[39m(req[33m,[39m res[33m,[39m 
+next)[33m;[39m
+    [90m128| [39m
+    [90m129| [39m      
+expect(reviewsQueryMock.eq).toHaveBeenCalledWith('service_type',ΓÇª
+    [90m   | [39m                                  [31m^[39m
+    [90m130| [39m    })[33m;[39m
+    [90m131| [39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/9]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/reviews.controller.test.ts[2m 
+> [22mReviews Controller[2m > [22mgetApprovedReviews[2m > 
+[22mshould handle database error
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ Error: Database connection failed ][90m
+
+Number of calls: [1m0[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/reviews.controller.test.ts:[2m171:20[22m[39m
+    [90m169| [39m      [35mawait[39m 
+[34mgetApprovedReviews[39m(req[33m,[39m res[33m,[39m 
+next)[33m;[39m
+    [90m170| [39m
+    [90m171| [39m      [34mexpect[39m(next)[33m.[39m[34mtoHave
+BeenCalledWith[39m(dbError)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m172| [39m    })[33m;[39m
+    [90m173| [39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[3/9]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/reviews.controller.test.ts[2m 
+> [22mReviews Controller[2m > [22mgetAllReviews[2m > [22mshould 
+return all reviews for admin
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, data: [ ΓÇª(2) ] } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[33m@@ -2,32 +2,30 @@[90m
+[2m    {[22m
+[2m      "data": [[22m
+[2m        {[22m
+[2m          "created_at": "2024-01-01T00:00:00Z",[22m
+[2m          "id": "review-1",[22m
+[32m-         "is_approved": true,[90m
+[31m+         "is_approved": false,[90m
+[2m          "rating": 5,[22m
+[32m-         "service_type": "general",[90m
+[31m+         "service_type": undefined,[90m
+[2m          "text": "Great!",[22m
+[2m          "users": {[22m
+[32m-           "email": "john@test.com",[90m
+[32m-           "full_name": "John",[90m
+[32m-           "id": "user-1",[90m
+[31m+           "email": "",[90m
+[31m+           "full_name": "Unknown",[90m
+[2m            "profile_image_url": null,[22m
+[2m          },[22m
+[2m        },[22m
+[2m        {[22m
+[2m          "created_at": "2024-01-02T00:00:00Z",[22m
+[2m          "id": "review-2",[22m
+[2m          "is_approved": false,[22m
+[2m          "rating": 3,[22m
+[32m-         "service_type": "restaurant",[90m
+[31m+         "service_type": undefined,[90m
+[2m          "text": "Okay",[22m
+[2m          "users": {[22m
+[32m-           "email": "jane@test.com",[90m
+[32m-           "full_name": "Jane",[90m
+[32m-           "id": "user-2",[90m
+[31m+           "email": "",[90m
+[31m+           "full_name": "Unknown",[90m
+[2m            "profile_image_url": null,[22m
+[2m          },[22m
+[2m        },[22m
+[2m      ],[22m
+[2m      "success": true,[22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/reviews.controller.test.ts:[2m384:24[22m[39m
+    [90m382| [39m      [35mawait[39m 
+[34mgetAllReviews[39m(req[33m,[39m res[33m,[39m 
+next)[33m;[39m
+    [90m383| [39m
+    [90m384| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m385| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m386| [39m        data[33m:[39m mockReviews[33m,[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[4/9]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/reviews.controller.test.ts[2m 
+> [22mReviews Controller[2m > [22mgetAllReviews[2m > [22mshould 
+filter by pending status
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 'is_approved', false ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   "is_approved",[90m
+[32m-   false,[90m
+[31m+   "status",[90m
+[31m+   "pending",[90m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/reviews.controller.test.ts:[2m407:28[22m[39m
+    [90m405| [39m      [35mawait[39m 
+[34mgetAllReviews[39m(req[33m,[39m res[33m,[39m 
+next)[33m;[39m
+    [90m406| [39m
+    [90m407| [39m      [34mexpect[39m(queryMock[33m.[39meq)[33
+m.[39m[34mtoHaveBeenCalledWith[39m([32m'is_approved'[39m[33m,[
+39m [35mfalse[39m)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m408| [39m    })[33m;[39m
+    [90m409| [39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[5/9]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/reviews.controller.test.ts[2m 
+> [22mReviews Controller[2m > [22mgetAllReviews[2m > [22mshould 
+filter by approved status
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 'is_approved', true ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   "is_approved",[90m
+[32m-   true,[90m
+[31m+   "status",[90m
+[31m+   "approved",[90m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/reviews.controller.test.ts:[2m427:28[22m[39m
+    [90m425| [39m      [35mawait[39m 
+[34mgetAllReviews[39m(req[33m,[39m res[33m,[39m 
+next)[33m;[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m9 failed[39m[22m[2m | [22m[1m[32m11 passed[39m[22m[90m (20)[39m
+[2m   Start at [22m 10:03:23
+[2m   Duration [22m 273ms[2m (transform 74ms, setup 0ms, import 70ms, tests 65ms, environment 0ms)[22m
+
+    [90m426| [39m
+    [90m427| [39m      [34mexpect[39m(queryMock[33m.[39meq)[33
+m.[39m[34mtoHaveBeenCalledWith[39m([32m'is_approved'[39m[33m,[
+39m [35mtrue[39m)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m428| [39m    })[33m;[39m
+    [90m429| [39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[6/9]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/reviews.controller.test.ts[2m 
+> [22mReviews Controller[2m > [22mgetAllReviews[2m > [22mshould 
+filter by service type
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 'service_type', 'chalets' ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   "service_type",[90m
+[31m+   "module_id",[90m
+[2m    "chalets",[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/reviews.controller.test.ts:[2m443:28[22m[39m
+    [90m441| [39m      [35mawait[39m 
+[34mgetAllReviews[39m(req[33m,[39m res[33m,[39m 
+next)[33m;[39m
+    [90m442| [39m
+    [90m443| [39m      
+expect(queryMock.eq).toHaveBeenCalledWith('service_type', 'chaleΓÇª
+    [90m   | [39m                           [31m^[39m
+    [90m444| [39m    })[33m;[39m
+    [90m445| [39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[7/9]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/reviews.controller.test.ts[2m 
+> [22mReviews Controller[2m > [22mgetAllReviews[2m > [22mshould 
+handle database error
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ Error: Database error ][90m
+
+Number of calls: [1m0[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/reviews.controller.test.ts:[2m458:20[22m[39m
+    [90m456| [39m      [35mawait[39m 
+[34mgetAllReviews[39m(req[33m,[39m res[33m,[39m 
+next)[33m;[39m
+    [90m457| [39m
+    [90m458| [39m      [34mexpect[39m(next)[33m.[39m[34mtoHave
+BeenCalledWith[39m(dbError)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m459| [39m    })[33m;[39m
+    [90m460| [39m  })[33m;[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[8/9]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/reviews.controller.test.ts[2m 
+> [22mReviews Controller[2m > [22mupdateReviewStatus[2m > 
+[22mshould approve a review
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { is_approved: true } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "is_approved": true,[90m
+[31m+     "status": "approved",[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/reviews.controller.test.ts:[2m486:32[22m[39m
+    [90m484| [39m      [35mawait[39m 
+[34mupdateReviewStatus[39m(req[33m,[39m res[33m,[39m 
+next)[33m;[39m
+    [90m485| [39m
+    [90m486| [39m      
+expect(queryMock.update).toHaveBeenCalledWith({ is_approved: truΓÇª
+    [90m   | [39m                               [31m^[39m
+    [90m487| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m488| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[9/9]ΓÄ»[22m[39m
+

@@ -72,6 +72,10 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN null; END $$;
 
 DO $$ BEGIN
+    ALTER TABLE modules ADD COLUMN IF NOT EXISTS settings_version INTEGER DEFAULT 1;
+EXCEPTION WHEN duplicate_column THEN null; END $$;
+
+DO $$ BEGIN
     ALTER TABLE modules ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 EXCEPTION WHEN duplicate_column THEN null; END $$;
 

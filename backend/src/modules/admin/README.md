@@ -1,175 +1,34 @@
-# Admin Module
+# Admin Module — Detailed Service Specification
 
-Super admin dashboard and system management APIs.
+## Overview
+The Admin module handles multi-tenant, Role-Based Access Control (RBAC) platform supervision, dynamic module activation, and analytics retrieval.
 
-## Features
+## Dynamic Modules Architecture (`modules.controller.ts`)
 
-- **Dashboard** - Analytics, KPIs, live monitoring
-- **User Management** - CRUD, roles, permissions
-- **Module Management** - Enable/disable, configure
-- **Settings** - System-wide configuration
-- **Audit Logs** - Activity tracking
-- **Reports** - Business intelligence
+The V2 Resort is composed of togglable "Modules" defined in the `modules` database table. The Admin API regulates them.
 
-## API Endpoints
+### `GET /api/v1/admin/modules`
+- **Features**: Supports filtering via `?activeOnly=true` and `?showInMain=true`.
+- **Sort**: Ascending via `sort_order`. Returns all system features (Restaurants, Chalets, etc).
 
-### Dashboard
+### `POST /api/v1/admin/modules`
+- **Request**: `{ template_type, name, slug, description, settings }`
+- **Business Logic**: 
+  - Creates the module and enforces a `settings_version: 1` structure.
+  - **Dynamic Permission Injection**: Automatically generates CRUD action permissions (`module:{slug}:read`, `module:{slug}:manage`) and upserts them into `app_permissions`.
+  - Links permissions to `super_admin` in `app_role_permissions`.
+  - **Navbar Integration**: Scans `site_settings` and auto-embeds standard icons (`UtensilsCrossed`, `Waves`, or `Home`) to the CMS navigation array.
+  - **Staff Generation**: Auto-provisions generic staff roles (`{slug}_admin` and `{slug}_staff`) and creates a dummy Staff user accounts (`staff.{slug}@v2resort.com`).
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/admin/dashboard` | Dashboard statistics |
-| `GET` | `/admin/dashboard/revenue` | Revenue chart data |
-| `GET` | `/admin/dashboard/orders` | Order volume data |
-| `GET` | `/admin/dashboard/live-users` | Connected users |
+### `PUT /api/v1/admin/modules/:id`
+- **Request**: `{ ...updates, settings_version (optional) }`
+- **Optimistic Concurrency Control**: Checks `settings_version`. If a version collision occurs (another admin saved first), returns a HTTP 409 Conflict.
+- **Cache**: Calls `clearModuleCache(slug)` to ensure changes are propagated instantly. Raises `modules.updated` websocket event via Socket.IO.
+- **RBAC Check**: Bypasses check if `super_admin`. Otherwise requires `module:{slug}:manage` permission.
 
-### Users
+### `DELETE /api/v1/admin/modules/:id`
+- **Request**: `?force=true` (hard delete) or omitted (soft delete `is_active = false`).
+- **Cascade Deletion logic (Force)**: Safely iterates through `menu_items`, `snack_items`, `pool_tickets`, `chalets`, and cleans orphaned `app_permissions` and `role` entries. Also removes the module out of the website's `site_settings` navbar.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/admin/users` | List users |
-| `GET` | `/admin/users/:id` | User details |
-| `POST` | `/admin/users` | Create user |
-| `PUT` | `/admin/users/:id` | Update user |
-| `DELETE` | `/admin/users/:id` | Soft delete user |
-| `PUT` | `/admin/users/:id/roles` | Update user roles |
-
-### Modules
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/admin/modules` | List all modules |
-| `POST` | `/admin/modules` | Create module |
-| `PUT` | `/admin/modules/:id` | Update module |
-| `DELETE` | `/admin/modules/:id` | Delete module |
-| `PUT` | `/admin/modules/:id/toggle` | Enable/disable |
-
-### Settings
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/admin/settings` | Get all settings |
-| `PUT` | `/admin/settings` | Update settings |
-| `GET` | `/admin/settings/:key` | Get specific setting |
-
-### Audit
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/admin/audit` | List audit entries |
-| `GET` | `/admin/audit/:id` | Entry details |
-
-### Reports
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/admin/reports/sales` | Sales report |
-| `GET` | `/admin/reports/bookings` | Booking report |
-| `GET` | `/admin/reports/users` | User analytics |
-| `GET` | `/admin/reports/export` | Export to PDF/Excel |
-
-## Required Permissions
-
-| Action | Permission |
-|--------|------------|
-| View dashboard | `admin.access` |
-| View users | `admin.users.view` |
-| Manage users | `admin.users.manage` |
-| View modules | `admin.modules.view` |
-| Manage modules | `admin.modules.manage` |
-| View settings | `admin.settings.view` |
-| Manage settings | `admin.settings.manage` |
-| View audit | `admin.audit.view` |
-| View reports | `admin.reports.view` |
-
-## Dashboard Statistics
-
-```typescript
-interface DashboardStats {
-  todayRevenue: number;
-  weeklyRevenue: number;
-  monthlyRevenue: number;
-  ordersToday: number;
-  bookingsToday: number;
-  activeUsers: number;
-  pendingOrders: number;
-  revenueChange: number;      // % vs last period
-}
-```
-
-## Audit Logging
-
-All admin actions are logged:
-
-```typescript
-interface AuditEntry {
-  id: UUID;
-  userId: UUID;
-  action: string;             // 'user.create', 'module.update'
-  resource: string;           // 'users', 'modules'
-  resourceId?: UUID;
-  changes?: Record<string, { old: unknown; new: unknown }>;
-  ipAddress: string;
-  userAgent: string;
-  createdAt: Date;
-}
-```
-
-## Settings Schema
-
-```typescript
-interface SystemSettings {
-  general: {
-    siteName: string;
-    siteDescription: string;
-    timezone: string;
-    dateFormat: string;
-  };
-  branding: {
-    logo: string;
-    favicon: string;
-    primaryColor: string;
-    accentColor: string;
-  };
-  localization: {
-    defaultLanguage: 'en' | 'ar' | 'fr';
-    supportedLanguages: string[];
-    defaultCurrency: string;
-  };
-  payments: {
-    stripeEnabled: boolean;
-    stripePublicKey: string;
-    // Secret key in env only
-  };
-  notifications: {
-    emailEnabled: boolean;
-    smsEnabled: boolean;
-    pushEnabled: boolean;
-  };
-}
-```
-
-## Live Users Tracking
-
-WebSocket-based user tracking:
-
-```typescript
-interface LiveUser {
-  socketId: string;
-  userId?: string;
-  email?: string;
-  fullName?: string;
-  roles: string[];
-  currentPath: string;
-  connectedAt: Date;
-  lastActivity: Date;
-}
-```
-
-Events:
-- `user:connect` - New connection
-- `page:navigate` - Page change
-- `user:disconnect` - Disconnection
-
----
-
-See [frontend/src/components/admin](../../frontend/src/components/admin) for dashboard UI.
+## Status in Browser (Local Simulation)
+- Tested Flow: *Pending verification via subagent*

@@ -143,6 +143,19 @@ export default function MultiPropertyPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [newProperty, setNewProperty] = useState({
+    name: '',
+    code: '',
+    type: 'hotel',
+    address: '',
+    city: '',
+    country: '',
+    timezone: 'America/New_York',
+    currency: 'USD',
+    total_rooms: '',
+    phone: '',
+    email: '',
+  });
 
   // Fetch properties
   const { data: properties = [], isLoading } = useQuery({
@@ -152,7 +165,21 @@ export default function MultiPropertyPage() {
         // Use my-properties endpoint which returns properties accessible to current user
         const res = await api.get('/multi-property/my-properties');
         setFetchError(null);
-        return res.data?.data || [];
+        const rawProperties = res.data?.properties || [];
+        return rawProperties.map((p: any) => ({
+          ...p,
+          code: p.code ?? p.property_code ?? '',
+          type: p.type ?? p.property_type ?? 'hotel',
+          status: p.status ?? (p.is_active ? 'active' : 'inactive'),
+          address: p.address ?? p.address_line1 ?? '',
+          total_rooms: Number(p.total_rooms ?? 0),
+          available_rooms: Number(p.available_rooms ?? 0),
+          occupancy_rate: Number(p.occupancy_rate ?? 0),
+          revenue_today: Number(p.revenue_today ?? 0),
+          revenue_mtd: Number(p.revenue_mtd ?? 0),
+          reservations_today: Number(p.reservations_today ?? 0),
+          staff_count: Number(p.staff_count ?? 0),
+        }));
       } catch (error) {
         setFetchError('Could not connect to server');
         return [];
@@ -172,6 +199,35 @@ export default function MultiPropertyPage() {
     },
     onError: () => {
       toast.error('Failed to switch property');
+    }
+  });
+
+  // Create property
+  const createPropertyMutation = useMutation({
+    mutationFn: async (data: typeof newProperty) => {
+      const res = await api.post('/multi-property/properties', {
+        name: data.name,
+        property_code: data.code,
+        property_type: data.type,
+        address: data.address,
+        city: data.city,
+        country: data.country,
+        timezone: data.timezone,
+        currency: data.currency,
+        total_rooms: data.total_rooms ? parseInt(data.total_rooms) : undefined,
+        phone: data.phone,
+        email: data.email,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['properties'] });
+      setShowAddModal(false);
+      setNewProperty({ name: '', code: '', type: 'hotel', address: '', city: '', country: '', timezone: 'America/New_York', currency: 'USD', total_rooms: '', phone: '', email: '' });
+      toast.success('Property created');
+    },
+    onError: () => {
+      toast.error('Failed to create property');
     }
   });
 
@@ -412,7 +468,14 @@ export default function MultiPropertyPage() {
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
               Add New Property
             </h2>
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={(e) => {
+              e.preventDefault();
+              if (!newProperty.name) {
+                toast.error('Property name is required');
+                return;
+              }
+              createPropertyMutation.mutate(newProperty);
+            }}>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -421,6 +484,8 @@ export default function MultiPropertyPage() {
                   <input
                     type="text"
                     placeholder="e.g., Iron Paradise Gym Downtown"
+                    value={newProperty.name}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, name: e.target.value }))}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -431,6 +496,8 @@ export default function MultiPropertyPage() {
                   <input
                     type="text"
                     placeholder="e.g., V2-DTN"
+                    value={newProperty.code}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, code: e.target.value }))}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -438,7 +505,11 @@ export default function MultiPropertyPage() {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Property Type
                   </label>
-                  <select className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
+                  <select
+                    value={newProperty.type}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, type: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  >
                     <option value="hotel">Hotel</option>
                     <option value="resort">Resort</option>
                     <option value="villa">Villa</option>
@@ -453,6 +524,8 @@ export default function MultiPropertyPage() {
                   <input
                     type="text"
                     placeholder="Street address"
+                    value={newProperty.address}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, address: e.target.value }))}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -462,6 +535,8 @@ export default function MultiPropertyPage() {
                   </label>
                   <input
                     type="text"
+                    value={newProperty.city}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, city: e.target.value }))}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -471,6 +546,8 @@ export default function MultiPropertyPage() {
                   </label>
                   <input
                     type="text"
+                    value={newProperty.country}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, country: e.target.value }))}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -478,7 +555,11 @@ export default function MultiPropertyPage() {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Timezone
                   </label>
-                  <select className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
+                  <select
+                    value={newProperty.timezone}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, timezone: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  >
                     <option value="America/New_York">Eastern (ET)</option>
                     <option value="America/Chicago">Central (CT)</option>
                     <option value="America/Denver">Mountain (MT)</option>
@@ -490,7 +571,11 @@ export default function MultiPropertyPage() {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Currency
                   </label>
-                  <select className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
+                  <select
+                    value={newProperty.currency}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, currency: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  >
                     <option value="USD">USD ($)</option>
                     <option value="EUR">EUR (€)</option>
                     <option value="GBP">GBP (£)</option>
@@ -504,6 +589,8 @@ export default function MultiPropertyPage() {
                   <input
                     type="number"
                     min="1"
+                    value={newProperty.total_rooms}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, total_rooms: e.target.value }))}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -513,6 +600,8 @@ export default function MultiPropertyPage() {
                   </label>
                   <input
                     type="tel"
+                    value={newProperty.phone}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, phone: e.target.value }))}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -522,6 +611,8 @@ export default function MultiPropertyPage() {
                   </label>
                   <input
                     type="email"
+                    value={newProperty.email}
+                    onChange={(e) => setNewProperty(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -536,8 +627,10 @@ export default function MultiPropertyPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+                  disabled={createPropertyMutation.isPending}
+                  className="flex-1 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
+                  {createPropertyMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   Add Property
                 </button>
               </div>

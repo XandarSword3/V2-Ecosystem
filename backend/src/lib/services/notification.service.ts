@@ -259,7 +259,7 @@ export function createNotificationService(deps: NotificationServiceDependencies)
       const isScheduled = !!input.scheduledFor;
       
       const notification = await notificationRepository.create({
-        user_id: input.userId,
+        user_id: input.userId ?? null,
         title: input.title.trim(),
         message: input.message.trim(),
         type,

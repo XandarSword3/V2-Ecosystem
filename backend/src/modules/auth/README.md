@@ -1,171 +1,46 @@
-# Auth Module
+# Auth Module — Detailed Service Specification
 
-Authentication and authorization system.
+## Overview
+The Authentication module provides robust user lifecycle management via JWT tokens, OAuth 2.0 integrations, and 2FA.
 
-## Features
+## API Endpoints & Payload Contracts
 
-- **Email/Password Login** - Traditional authentication
-- **JWT Tokens** - Access and refresh tokens
-- **Password Reset** - Email-based recovery
-- **Two-Factor Auth** - TOTP-based 2FA
-- **OAuth** - Google/Apple sign-in (optional)
-- **Session Management** - Active session tracking
+### `POST /api/v1/auth/register`
+- **Request**: `{ email, password, fullName, phone (optional), role (optional) }`
+- **Business Logic**: 
+  - Validates payload via Zod schemas (`registerSchema`).
+  - Implements anti-enumeration protection (returns success even if email exists but triggers an internal "account exists" email notification).
+  - Creates the user in Supabase and logs the `REGISTER` action.
 
-## API Endpoints
+### `POST /api/v1/auth/login`
+- **Request**: `{ email, password }`
+- **Business Logic**:
+  - Validates credentials and checks for `requiresTwoFactor` flags.
+  - Returns `requiresTwoFactor: true` if 2FA is mandated for the account before issuing the JWT.
+  - Returns `{ accessToken, refreshToken }` inside `data` property.
+  - **Security**: Rotates the CSRF token on successful login to prevent session fixation headers.
+  - Returns `EMAIL_NOT_VERIFIED` error with a `resendUrl` if the user has not confirmed their email.
 
-### Authentication
+### `POST /api/v1/auth/refresh`
+- **Request**: `{ refreshToken }`
+- **Business Logic**: Exchanges a valid `refreshToken` (valid for 30d as per `.env`) for a fresh `accessToken` (valid for 7d).
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/auth/register` | Create account |
-| `POST` | `/auth/login` | Login (get tokens) |
-| `POST` | `/auth/refresh` | Refresh access token |
-| `POST` | `/auth/logout` | Invalidate session |
+### `POST /api/v1/auth/logout`
+- **Request**: `{ refreshToken (optional) }`
+- **Business Logic**: Invalidates tokens and logs the user out. Logs `LOGOUT` to activity streams.
 
-### Password
+### `GET /api/v1/auth/oauth/google` & `.../apple`
+- **Business Logic**: Integrates social login. Handled via `oauth.controller.ts`.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/auth/forgot-password` | Request reset email |
-| `POST` | `/auth/reset-password` | Reset with token |
-| `PUT` | `/auth/change-password` | Change password (logged in) |
+### Additional Endpoints
+- `POST /api/v1/auth/forgot-password` — Fire-and-forget password reset link. Anti-enumeration applied.
+- `POST /api/v1/auth/reset-password` — `{ token, newPassword }` payload accepted to reset.
+- `GET /api/v1/auth/verify-email?token=...` — Verifies email.
+- `POST /api/v1/auth/resend-verification` — Validates user state before re-sending verify payload.
 
-### Email Verification
+## Core Middleware Usage
+- **CSRF Token Generation**: Applied dynamically in `login`.
+- **Zod Validation**: Applied globally on auth body payloads before service execution.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/auth/verify-email` | Verify email token |
-| `POST` | `/auth/resend-verification` | Resend email |
-
-### Two-Factor Authentication
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/auth/2fa/setup` | Generate 2FA secret |
-| `POST` | `/auth/2fa/verify` | Verify and enable |
-| `POST` | `/auth/2fa/disable` | Disable 2FA |
-| `POST` | `/auth/2fa/validate` | Validate code (login) |
-
-## Token Flow
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Login Flow                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  1. POST /auth/login                                        │
-│     { email, password }                                      │
-│                                                              │
-│  2. If 2FA enabled:                                         │
-│     Response: { requires2FA: true, tempToken }              │
-│     POST /auth/2fa/validate { tempToken, code }             │
-│                                                              │
-│  3. Success Response:                                        │
-│     {                                                        │
-│       accessToken: "eyJ...",   // 15 min expiry             │
-│       refreshToken: "eyJ...",  // 7 day expiry              │
-│       expiresIn: 900,                                        │
-│       user: { id, email, fullName, roles }                  │
-│     }                                                        │
-│                                                              │
-│  4. Token Refresh:                                          │
-│     POST /auth/refresh { refreshToken }                     │
-│     → New accessToken                                        │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Request Types
-
-### Register
-
-```typescript
-interface RegisterRequest {
-  email: string;
-  password: string;           // Min 8 chars, 1 uppercase, 1 number
-  fullName: string;
-  phone?: string;
-  preferredLanguage?: 'en' | 'ar' | 'fr';
-}
-```
-
-### Login
-
-```typescript
-interface LoginRequest {
-  email: string;
-  password: string;
-}
-```
-
-### Password Reset
-
-```typescript
-interface ForgotPasswordRequest {
-  email: string;
-}
-
-interface ResetPasswordRequest {
-  token: string;
-  password: string;
-}
-```
-
-## Token Configuration
-
-```env
-JWT_SECRET=your-256-bit-secret
-JWT_EXPIRES_IN=15m
-REFRESH_TOKEN_SECRET=different-256-bit-secret
-REFRESH_TOKEN_EXPIRES_IN=7d
-```
-
-## Password Requirements
-
-- Minimum 8 characters
-- At least 1 uppercase letter
-- At least 1 lowercase letter
-- At least 1 number
-- No common passwords (checked against list)
-
-## Security Measures
-
-1. **Rate Limiting** - 5 attempts per minute for login
-2. **Password Hashing** - bcrypt with cost 12
-3. **Token Rotation** - Refresh tokens are single-use
-4. **Session Tracking** - Multiple sessions allowed, can revoke
-5. **IP Logging** - Login attempts logged with IP
-
-## Middleware
-
-```typescript
-import { authenticate, authorize, optionalAuth } from '@/middleware/auth';
-
-// Require authentication
-router.get('/profile', authenticate, profileController);
-
-// Require specific permission
-router.delete('/users/:id', 
-  authenticate, 
-  authorize('admin.users.manage'),
-  deleteUser
-);
-
-// Optional auth (for public pages with user features)
-router.get('/menu', optionalAuth, menuController);
-```
-
-## Error Responses
-
-| Code | Message |
-|------|---------|
-| `AUTH_INVALID_CREDENTIALS` | Email or password incorrect |
-| `AUTH_EMAIL_NOT_VERIFIED` | Email verification required |
-| `AUTH_ACCOUNT_DISABLED` | Account has been disabled |
-| `AUTH_2FA_REQUIRED` | Two-factor code required |
-| `AUTH_TOKEN_EXPIRED` | Access token expired |
-| `AUTH_TOKEN_INVALID` | Token is malformed |
-
----
-
-See [frontend/src/app/[locale]/(public)/login](../../frontend/src/app/[locale]/(public)/login) for login UI.
+## Status in Browser (Local Simulation)
+- Tested Flow: *Pending verification via subagent*

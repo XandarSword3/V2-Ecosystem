@@ -106,7 +106,7 @@ const mockSupabase = {
         return createQueryMock(() => mockConsents);
       case 'gdpr_retention_policies':
         return createQueryMock(() => mockRetentionPolicies);
-      case 'gdpr_processing_log':
+      case 'gdpr_processing_activities':
         return createQueryMock(() => mockProcessingLogs);
       case 'gdpr_data_sharing_log':
         return createQueryMock(() => mockDataSharingLogs);
@@ -376,7 +376,7 @@ describe('GDPRService', () => {
     it('should log a processing activity', async () => {
       await gdprService.logProcessingActivity('user-1', 'data_access', 'User profile viewed', 'admin-1');
 
-      expect(mockSupabase.from).toHaveBeenCalledWith('gdpr_processing_log');
+      expect(mockSupabase.from).toHaveBeenCalledWith('gdpr_processing_activities');
     });
   });
 
@@ -392,7 +392,7 @@ describe('GDPRService', () => {
       const logs = await gdprService.getProcessingLog('user-1', startDate, endDate);
 
       expect(logs).toBeDefined();
-      expect(mockSupabase.from).toHaveBeenCalledWith('gdpr_processing_log');
+      expect(mockSupabase.from).toHaveBeenCalledWith('gdpr_processing_activities');
     });
   });
 

@@ -48,8 +48,8 @@ const defaultConfig: SecurityHeadersConfig = {
   contentSecurityPolicy: {
     directives: {
       'default-src': ["'self'"],
-      'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://js.stripe.com'],
-      'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      'script-src': ["'self'", "'strict-dynamic'", 'https://js.stripe.com'],
+      'style-src': ["'self'", 'https://fonts.googleapis.com'],
       'img-src': ["'self'", 'data:', 'https:', 'blob:'],
       'font-src': ["'self'", 'https://fonts.gstatic.com'],
       'connect-src': ["'self'", 'https://api.stripe.com', 'wss:', 'https:'],

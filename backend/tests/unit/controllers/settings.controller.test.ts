@@ -65,10 +65,21 @@ describe('SettingsController', () => {
       const { req, res, next } = createMockReqRes();
       await getSettings(req, res, next);
 
-      expect(res.json).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
-        data: {}
-      });
+        data: expect.objectContaining({
+          resortName: 'V2 Resort',
+          currency: 'USD',
+          general: expect.objectContaining({
+            resortName: 'V2 Resort',
+            businessName: 'V2 Resort',
+            currency: 'USD',
+          }),
+          payments: expect.objectContaining({
+            currency: 'USD',
+          }),
+        }),
+      }));
     });
 
     it('should handle database errors', async () => {
@@ -128,15 +139,13 @@ describe('SettingsController', () => {
   describe('updateSettings', () => {
     it('should update appearance settings', async () => {
       const existingAppearance = { theme: 'dark' };
-      const singleQueryBuilder = createChainableMock({ value: existingAppearance });
-      const upsertQueryBuilder = createChainableMock([{ key: 'appearance', value: { theme: 'light', animationsEnabled: true } }]);
 
       const fromMock = vi.fn().mockImplementation((table: string) => {
         const mock = {
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
           single: vi.fn().mockImplementation(() => Promise.resolve({ data: { value: existingAppearance }, error: null })),
-          upsert: vi.fn().mockReturnValue(upsertQueryBuilder)
+          upsert: vi.fn().mockReturnValue(createChainableMock([]))
         };
         return mock;
       });
@@ -153,9 +162,15 @@ describe('SettingsController', () => {
 
       await updateSettings(req, res, next);
 
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true
-      }));
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Settings saved successfully',
+        data: {
+          theme: 'light',
+          animationsEnabled: true,
+        },
+        updatedCategories: ['appearance'],
+      });
     });
 
     it('should update general settings', async () => {
@@ -178,9 +193,15 @@ describe('SettingsController', () => {
 
       await updateSettings(req, res, next);
 
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true
-      }));
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Settings saved successfully',
+        data: {
+          resortName: 'New Resort Name',
+          tagline: 'New Tagline',
+        },
+        updatedCategories: ['general'],
+      });
     });
 
     it('should update contact settings', async () => {
@@ -204,9 +225,16 @@ describe('SettingsController', () => {
 
       await updateSettings(req, res, next);
 
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true
-      }));
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Settings saved successfully',
+        data: {
+          phone: '+9876543210',
+          email: 'new@email.com',
+          address: '123 Main St',
+        },
+        updatedCategories: ['contact'],
+      });
     });
 
     it('should handle errors during update', async () => {

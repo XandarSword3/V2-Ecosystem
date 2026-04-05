@@ -1,86 +1,56 @@
 /**
- * In-memory Settings Repository for testing
- * Provides a test double for SettingsRepository
+ * In-Memory Settings Repository
+ * Test double for SettingsRepository using in-memory data structures.
  */
 
-import type { Setting, SettingCategory, SettingsRepository } from '../container/types.js';
+import type { SettingsRepository, Setting, SettingCategory } from '../container/types.js';
 
-function generateId(): string {
-  return `setting-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+export interface InMemorySettingsRepo extends SettingsRepository {
+  addSetting(setting: Setting): void;
+  reset(): void;
 }
 
-export function createInMemorySettingsRepository(): SettingsRepository & {
-  // Test helpers
-  addSetting(setting: Setting): void;
-  clear(): void;
-  getAllSettingsRaw(): Setting[];
-} {
-  const settings: Map<string, Setting> = new Map();
+export function createInMemorySettingsRepository(): InMemorySettingsRepo {
+  const settings = new Map<string, Setting>();
 
   return {
-    async getAllSettings(): Promise<Setting[]> {
-      return Array.from(settings.values());
-    },
-
-    async getSettingsByCategory(category: SettingCategory): Promise<Setting[]> {
-      return Array.from(settings.values()).filter(s => s.category === category);
-    },
-
-    async getSettingByKey(key: string): Promise<Setting | null> {
-      return settings.get(key) || null;
-    },
-
-    async upsertSetting(data: {
-      key: string;
-      value: unknown;
-      category?: SettingCategory;
-      description?: string;
-    }): Promise<Setting> {
-      const existing = settings.get(data.key);
-      const now = new Date().toISOString();
-
-      if (existing) {
-        // Update existing
-        const updated: Setting = {
-          ...existing,
-          value: data.value,
-          category: data.category || existing.category,
-          description: data.description !== undefined ? data.description : existing.description,
-          updated_at: now
-        };
-        settings.set(data.key, updated);
-        return updated;
-      }
-
-      // Create new
-      const newSetting: Setting = {
-        id: generateId(),
-        key: data.key,
-        value: data.value,
-        category: data.category || 'general',
-        description: data.description || null,
-        created_at: now,
-        updated_at: now
-      };
-      settings.set(data.key, newSetting);
-      return newSetting;
-    },
-
-    async deleteSetting(key: string): Promise<void> {
-      settings.delete(key);
-    },
-
-    // Test helpers
-    addSetting(setting: Setting): void {
+    addSetting(setting: Setting) {
       settings.set(setting.key, setting);
     },
-
-    clear(): void {
+    reset() {
       settings.clear();
     },
 
-    getAllSettingsRaw(): Setting[] {
-      return Array.from(settings.values());
-    }
+    async getAllSettings() {
+      return [...settings.values()];
+    },
+
+    async getSettingsByCategory(category: SettingCategory) {
+      return [...settings.values()].filter(s => s.category === category);
+    },
+
+    async getSettingByKey(key: string) {
+      return settings.get(key) ?? null;
+    },
+
+    async upsertSetting(data) {
+      const existing = settings.get(data.key);
+      const now = new Date().toISOString();
+      const setting: Setting = {
+        id: existing?.id ?? crypto.randomUUID(),
+        key: data.key,
+        value: data.value,
+        category: data.category ?? existing?.category ?? 'general',
+        description: data.description ?? existing?.description ?? null,
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+      };
+      settings.set(data.key, setting);
+      return setting;
+    },
+
+    async deleteSetting(key: string) {
+      settings.delete(key);
+    },
   };
 }

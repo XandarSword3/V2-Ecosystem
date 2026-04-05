@@ -49,7 +49,24 @@ export const getSessions = asyncHandler(async (req: Request, res: Response) => {
       query = query.or(`gender_restriction.eq.mixed,gender_restriction.eq.${gender}`);
     }
 
-    const { data: sessions, error } = await query;
+    let { data: sessions, error } = await query;
+
+    // Compatibility fallback for schemas without module_id support.
+    if (error && moduleId && /module_id|schema cache|column/i.test(String(error.message || error.details || ''))) {
+      let fallbackQuery = supabase
+        .from('pool_sessions')
+        .select('*')
+        .eq('is_active', true);
+
+      if (gender && ['male', 'female'].includes(gender as string)) {
+        fallbackQuery = fallbackQuery.or(`gender_restriction.eq.mixed,gender_restriction.eq.${gender}`);
+      }
+
+      const fallback = await fallbackQuery;
+      sessions = fallback.data;
+      error = fallback.error;
+    }
+
     if (error) throw error;
 
     const sessionsWithPrices = (sessions || []).map(normalizeSession);
@@ -107,7 +124,27 @@ export const getAvailability = asyncHandler(async (req: Request, res: Response) 
       sessionsQuery = sessionsQuery.or(`gender_restriction.eq.mixed,gender_restriction.eq.${gender}`);
     }
 
-    const { data: sessions, error: sessErr } = await sessionsQuery;
+    let { data: sessions, error: sessErr } = await sessionsQuery;
+
+    // Compatibility fallback for schemas without module_id support.
+    if (sessErr && moduleId && /module_id|schema cache|column/i.test(String(sessErr.message || sessErr.details || ''))) {
+      let fallbackQuery = supabase
+        .from('pool_sessions')
+        .select('*')
+        .eq('is_active', true);
+
+      if (sessionId) {
+        fallbackQuery = fallbackQuery.eq('id', sessionId);
+      }
+      if (gender && ['male', 'female'].includes(gender as string)) {
+        fallbackQuery = fallbackQuery.or(`gender_restriction.eq.mixed,gender_restriction.eq.${gender}`);
+      }
+
+      const fallback = await fallbackQuery;
+      sessions = fallback.data;
+      sessErr = fallback.error;
+    }
+
     if (sessErr) throw sessErr;
 
     // Get tickets for the date
@@ -175,8 +212,8 @@ export const createSession = asyncHandler(async (req: Request, res: Response) =>
       });
     }
 
-    // Use RPC function to bypass PostgREST schema cache issues (PGRST204)
-    const { data: session, error } = await supabase.rpc('insert_pool_session', {
+    // Prefer RPC function, with compatibility fallbacks for legacy schemas.
+    let { data: session, error } = await supabase.rpc('insert_pool_session', {
       p_name: name,
       p_start_time: start_time,
       p_end_time: end_time,
@@ -186,6 +223,47 @@ export const createSession = asyncHandler(async (req: Request, res: Response) =>
       p_gender_restriction: gender_restriction || 'mixed',
       p_module_id: module_id || null,
     });
+
+    if (error) {
+      const baseInsert: Record<string, unknown> = {
+        name,
+        start_time,
+        end_time,
+        max_capacity: Number(capacity ?? 100),
+        adult_price: Number(adult_price ?? price ?? 0),
+        child_price: Number(child_price ?? price ?? 0),
+        gender_restriction: gender_restriction || 'mixed',
+        module_id: module_id || null,
+      };
+
+      let insertResult = await supabase
+        .from('pool_sessions')
+        .insert(baseInsert)
+        .select()
+        .single();
+
+      if (insertResult.error && /module_id|schema cache|column/i.test(String(insertResult.error.message || insertResult.error.details || ''))) {
+        const { module_id: _ignored, ...withoutModule } = baseInsert;
+        insertResult = await supabase
+          .from('pool_sessions')
+          .insert(withoutModule)
+          .select()
+          .single();
+      }
+
+      if (insertResult.error && insertResult.error.code === '23505') {
+        insertResult = await supabase
+          .from('pool_sessions')
+          .select('*')
+          .eq('name', name)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+      }
+
+      session = insertResult.data;
+      error = insertResult.error;
+    }
 
     if (error) throw error;
 

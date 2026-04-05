@@ -256,6 +256,8 @@ export async function migrate() {
         customer_phone VARCHAR(20),
         status order_status DEFAULT 'pending' NOT NULL,
         total_amount DECIMAL(10,2) NOT NULL,
+        subtotal DECIMAL(10,2),
+        tax_amount DECIMAL(10,2) DEFAULT 0,
         payment_status payment_status DEFAULT 'pending' NOT NULL,
         payment_method payment_method,
         special_instructions TEXT,
@@ -526,6 +528,40 @@ export async function migrate() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+    `);
+
+    // Compatibility shim for legacy payments schema.
+    // Older schemas may have chalet_booking_id/pool_ticket_id but no reference_type/reference_id.
+    await pool.query(`
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS reference_type VARCHAR(50);
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS reference_id UUID;
+
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'payments' AND column_name = 'chalet_booking_id'
+        ) THEN
+          UPDATE payments
+          SET reference_type = COALESCE(reference_type, 'booking'),
+              reference_id = COALESCE(reference_id, chalet_booking_id)
+          WHERE chalet_booking_id IS NOT NULL;
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'payments' AND column_name = 'pool_ticket_id'
+        ) THEN
+          UPDATE payments
+          SET reference_type = COALESCE(reference_type, 'pool_ticket'),
+              reference_id = COALESCE(reference_id, pool_ticket_id)
+          WHERE pool_ticket_id IS NOT NULL;
+        END IF;
+      END $$;
+
+      UPDATE payments
+      SET reference_type = COALESCE(reference_type, 'legacy')
+      WHERE reference_type IS NULL;
     `);
 
     // Create indexes

@@ -15,6 +15,7 @@ vi.mock('../../src/services/email.service.js', () => ({
   emailService: {
     sendBookingConfirmation: vi.fn().mockResolvedValue(true),
     sendBookingReminder: vi.fn().mockResolvedValue(true),
+    sendBookingCancellation: vi.fn().mockResolvedValue(true),
   },
 }));
 
@@ -144,110 +145,136 @@ describe('Chalet Controller', () => {
   });
 
   describe('createBooking', () => {
-     it('should create a booking', async () => {
-         const mockChalet = { id: 'c-1', price_per_night: 100 };
-         const mockBooking = { id: 'b-1', status: 'pending' };
-         
-         const mockSupabase = {
-             from: vi.fn((table) => {
-                 if (table === 'chalets') return createChainableMock(mockChalet);
-                 if (table === 'chalet_bookings') {
-                     // Need to handle 'select' (check existing) and 'insert'
-                     // This is tricky with one builder.
-                     // But createChainableMock returns a builder that works for both insert and select if we don't care about sequence return values
-                     // However, check existing uses `.or()` and returns list. Insert returns single object.
-                     // If we return [], `check existing` sees no conflicts.
-                     // The insert chain also calls .single() probably.
-                     
-                     // Let's use mockImplementationOnce for the sequences if needed, or make builder smart.
-                     // Simple approach: Return [] for first call (check), Return obj for second (insert)
-                     // But `from` is called multiple times.
-                     return createChainableMock(mockBooking); 
-                 }
-                 return createChainableMock([]);
-             })
-         };
-         
-         // Sequence for 'chalet_bookings': 
-         // 1. check existing (select... or) -> return []
-         // 2. insert -> return mockBooking
-         
-         const bookingsBuilderCheck = createChainableMock([]);
-         const bookingsBuilderInsert = createChainableMock(mockBooking);
-         
-         vi.mocked(getSupabase).mockReturnValue({
-             from: vi.fn((table) => {
-                 if (table === 'chalets') return createChainableMock(mockChalet);
-                 if (table === 'chalet_bookings') {
-                      // simple heuristic: if already called, return insert logic? 
-                      // Hard to track state inside functional mock without closure.
-                      // Let's use mockReturnValueOnce on the `from` spy if we can.
-                      return bookingsBuilderInsert; // Default
-                 }
-                 return createChainableMock([]);
-             })
-         } as any);
-         
-         // Override for robustness
-         const mb = vi.fn();
-         mb.mockImplementation((table) => {
-             if (table === 'chalets') return createChainableMock(mockChalet);
-             if (table === 'chalet_bookings') {
-                 // Return empty list for conflict check, then object for insert
-                 // But validation logic might call other things.
-                 // Let's rely on standard mock.
-                 return createChainableMock(mockBooking); // If conflict check returns this, it might look like conflict?
-                 // Conflict check expects array. If we return object, might crash or be seen as 1 conflict.
-             }
-             return createChainableMock([]);
-         });
-         
-         // Let's force the conflict check to return [] and insert to return object.
-         // Conflict check uses .select()...
-         // Insert uses .insert()...
-         // We can distinct by method call on the builder? No, builder has all methods.
-         
-         // Best way: return a builder where `select` returns [] and `insert` returns object.
-         const smartBuilder = createChainableMock();
-         smartBuilder.select = vi.fn().mockReturnThis();
-         smartBuilder.insert = vi.fn().mockReturnThis();
-         smartBuilder.or = vi.fn().mockReturnThis();
-         
-         // When purely selecting (conflict), it ends with .then() -> resolve data
-         // This is hard to distiguish.
-         
-         // Let's just assume no conflict.
-         // Refine mock:
-         const noConflictBuilder = createChainableMock([]);
-         const insertBuilder = createChainableMock(mockBooking);
-         
-         const supabaseMock = {
-             from: vi.fn()
-               .mockReturnValueOnce(createChainableMock(mockChalet)) // getChalet
-               .mockReturnValueOnce(noConflictBuilder) // check availability
-               .mockReturnValueOnce(insertBuilder) // insert booking
-         };
-         
-         vi.mocked(getSupabase).mockReturnValue(supabaseMock as any);
+    it('should create a booking with exact 201 response payload', async () => {
+      const mockChalet = {
+        id: '550e8400-e29b-41d4-a716-446655440001',
+        name: 'Palm Chalet',
+        base_price: 200,
+        weekend_price: 250,
+      };
+      const createdBooking = {
+        id: 'b-1',
+        booking_number: 'C-260405-001',
+        chalet_id: mockChalet.id,
+        customer_name: 'John Guest',
+        customer_email: 'john@example.com',
+        customer_phone: '70112233',
+        check_in_date: '2026-09-10T00:00:00.000Z',
+        check_out_date: '2026-09-12T00:00:00.000Z',
+        number_of_guests: 2,
+        number_of_nights: 2,
+        status: 'pending',
+        payment_status: 'pending',
+        payment_method: 'card',
+        total_amount: 500,
+      };
 
-         const { createBooking } = await import('../../src/modules/chalets/chalet.controller.js');
-         const { req, res, next } = createMockReqRes({ 
-             body: { 
-                 chalet_id: 'c-1', 
-                 start_date: '2025-01-01', 
-                 end_date: '2025-01-05',
-                 guest_name: 'John',
-                 guest_email: 'j@d.com',
-                 guest_phone: '123',
-                 guests: 2
-             } 
-         });
-         
-         await createBooking(req, res, next);
-         
-         // Booking validation may fail with mock data - verify it processed
-         expect(next).toHaveBeenCalled();
-     }) 
+      let chaletBookingsCallCount = 0;
+      const fromMock = vi.fn((table: string) => {
+        if (table === 'chalets') return createChainableMock(mockChalet);
+        if (table === 'chalet_bookings') {
+          chaletBookingsCallCount += 1;
+          if (chaletBookingsCallCount === 1) {
+            return createChainableMock([]); // availability check
+          }
+          return createChainableMock(createdBooking); // fetch created booking
+        }
+        if (table === 'chalet_price_rules') return createChainableMock([]);
+        if (table === 'site_settings') {
+          return createChainableMock({ value: { chaletDepositType: 'percentage', chaletDeposit: 30 } });
+        }
+        if (table === 'chalet_add_ons') return createChainableMock([]);
+        return createChainableMock([]);
+      });
+
+      const rpcMock = vi.fn().mockResolvedValue({
+        data: [{ booking_id: 'b-1' }],
+        error: null,
+      });
+
+      vi.mocked(getSupabase).mockReturnValue({ from: fromMock, rpc: rpcMock } as any);
+
+      const { createBooking } = await import('../../src/modules/chalets/chalet.controller.js');
+      const { req, res, next } = createMockReqRes({
+        body: {
+          chaletId: mockChalet.id,
+          customerName: 'John Guest',
+          customerEmail: 'john@example.com',
+          customerPhone: '70112233',
+          checkInDate: '2026-09-10',
+          checkOutDate: '2026-09-12',
+          numberOfGuests: 2,
+          paymentMethod: 'card',
+        },
+      });
+
+      await createBooking(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: createdBooking,
+        message: 'Booking created successfully',
+      });
+      expect(rpcMock).toHaveBeenCalledWith(
+        'create_chalet_booking_with_addons',
+        expect.objectContaining({
+          p_booking: expect.objectContaining({ chalet_id: mockChalet.id, customer_name: 'John Guest' }),
+          p_add_ons: [],
+        })
+      );
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 conflict when booking dates overlap', async () => {
+      const mockChalet = {
+        id: '550e8400-e29b-41d4-a716-446655440001',
+        name: 'Palm Chalet',
+        base_price: 200,
+        weekend_price: 250,
+      };
+      const existingBooking = [
+        {
+          id: 'existing-1',
+          check_in_date: '2026-09-11T00:00:00.000Z',
+          check_out_date: '2026-09-13T00:00:00.000Z',
+          status: 'confirmed',
+        },
+      ];
+
+      const fromMock = vi.fn((table: string) => {
+        if (table === 'chalets') return createChainableMock(mockChalet);
+        if (table === 'chalet_bookings') return createChainableMock(existingBooking);
+        return createChainableMock([]);
+      });
+      const rpcMock = vi.fn();
+
+      vi.mocked(getSupabase).mockReturnValue({ from: fromMock, rpc: rpcMock } as any);
+
+      const { createBooking } = await import('../../src/modules/chalets/chalet.controller.js');
+      const { req, res, next } = createMockReqRes({
+        body: {
+          chaletId: mockChalet.id,
+          customerName: 'Conflict Guest',
+          customerEmail: 'conflict@example.com',
+          customerPhone: '70119988',
+          checkInDate: '2026-09-10',
+          checkOutDate: '2026-09-12',
+          numberOfGuests: 2,
+          paymentMethod: 'cash',
+        },
+      });
+
+      await createBooking(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Chalet is already booked for the selected dates',
+      });
+      expect(rpcMock).not.toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalled();
+    });
   });
 
   describe('getMyBookings', () => {
@@ -265,49 +292,147 @@ describe('Chalet Controller', () => {
 
         expect(res.json).toHaveBeenCalledWith({
             success: true,
-            data: mockBookings
+          data: [{ ...mockBookings[0], chalet: null }]
         });
     });
   });
 
   describe('cancelBooking', () => {
-     it('should cancel booking', async () => {
-         // user_id must match req.user.userId for authorization
-         const mockBooking = { id: 'b-1', user_id: 'admin-1', status: 'pending' };
-         // Update calls update() then select? or just update
-         // Controller: .update({ status: 'cancelled' }).eq(...)
-         const queryBuilder = createChainableMock(mockBooking);
-         
-         vi.mocked(getSupabase).mockReturnValue({
-             from: vi.fn().mockReturnValue(queryBuilder)
-         } as any);
-         
-         const { cancelBooking } = await import('../../src/modules/chalets/chalet.controller.js');
-         const { req, res, next } = createMockReqRes({ params: { id: 'b-1' }});
-         
-         await cancelBooking(req, res, next);
-         
-         expect(res.json).toHaveBeenCalled();
-     });
+    it('should cancel booking and return exact success payload', async () => {
+      const fetchedBooking = {
+        id: 'b-1',
+        customer_id: 'admin-1',
+        status: 'pending',
+        customer_email: null,
+        customer_name: 'Owner Guest',
+        booking_number: 'C-260405-002',
+        chalet_id: '550e8400-e29b-41d4-a716-446655440010',
+      };
+      const cancelledBooking = {
+        id: 'b-1',
+        status: 'cancelled',
+        cancellation_reason: 'Guest request',
+      };
+
+      let chaletBookingCallCount = 0;
+      const fromMock = vi.fn((table: string) => {
+        if (table === 'chalet_bookings') {
+          chaletBookingCallCount += 1;
+          if (chaletBookingCallCount === 1) return createChainableMock(fetchedBooking);
+          return createChainableMock(cancelledBooking);
+        }
+        if (table === 'chalets') return createChainableMock({ name: 'Palm Chalet' });
+        return createChainableMock([]);
+      });
+
+      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+      const { cancelBooking } = await import('../../src/modules/chalets/chalet.controller.js');
+      const { req, res, next } = createMockReqRes({
+        params: { id: 'b-1' },
+        body: { reason: 'Guest request' },
+      });
+
+      await cancelBooking(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: cancelledBooking,
+        message: 'Booking cancelled',
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should return 403 when non-owner tries to cancel booking', async () => {
+      const fetchedBooking = {
+        id: 'b-1',
+        customer_id: 'another-user',
+        status: 'pending',
+        customer_email: null,
+        customer_name: 'Another Guest',
+        booking_number: 'C-260405-003',
+        chalet_id: '550e8400-e29b-41d4-a716-446655440010',
+      };
+
+      vi.mocked(getSupabase).mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === 'chalet_bookings') return createChainableMock(fetchedBooking);
+          return createChainableMock([]);
+        }),
+      } as any);
+
+      const { cancelBooking } = await import('../../src/modules/chalets/chalet.controller.js');
+      const { req, res, next } = createMockReqRes({ params: { id: 'b-1' } });
+
+      await cancelBooking(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'Not authorized to cancel this booking',
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
   });
 
-    describe('createChalet', () => {
-        it('should create chalet', async () => {
-            const mockChalet = { id: 'c-new' };
-            const queryBuilder = createChainableMock(mockChalet);
-            vi.mocked(getSupabase).mockReturnValue({
-                from: vi.fn().mockReturnValue(queryBuilder)
-            } as any);
-            
-            const { createChalet } = await import('../../src/modules/chalets/chalet.controller.js');
-            const { req, res, next } = createMockReqRes({ body: { name: 'New C', price_per_night: 100, capacity: 4, module_id: 'mod-1', description: 'A chalet' }});
-            
-            await createChalet(req, res, next);
-            
-            // May return 400 for validation - verify it processed
-            expect(res.status).toHaveBeenCalled();
-        });
+  describe('createChalet', () => {
+    it('should create chalet with exact 201 response payload', async () => {
+      const mockChalet = {
+        id: 'c-new',
+        name: 'New C',
+        base_price: 100,
+        weekend_price: 120,
+        capacity: 4,
+        is_active: true,
+      };
+      const queryBuilder = createChainableMock(mockChalet);
+
+      vi.mocked(getSupabase).mockReturnValue({
+        from: vi.fn().mockReturnValue(queryBuilder),
+      } as any);
+
+      const { createChalet } = await import('../../src/modules/chalets/chalet.controller.js');
+      const { req, res, next } = createMockReqRes({
+        body: {
+          name: 'New C',
+          base_price: 100,
+          weekend_price: 120,
+          capacity: 4,
+          description: 'A chalet',
+          module_id: 'mod-1',
+        },
+      });
+
+      await createChalet(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockChalet,
+      });
+      expect(next).not.toHaveBeenCalled();
     });
+
+    it('should return 400 when chalet name is missing', async () => {
+      const { createChalet } = await import('../../src/modules/chalets/chalet.controller.js');
+      const { req, res, next } = createMockReqRes({
+        body: {
+          base_price: 100,
+          weekend_price: 120,
+          capacity: 4,
+        },
+      });
+
+      await createChalet(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'Chalet name is required',
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+  });
 
     describe('updateChalet', () => {
         it('should update chalet', async () => {

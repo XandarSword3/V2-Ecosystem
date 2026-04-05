@@ -1,14 +1,17 @@
 import { CustomerBot } from './bots/customer-bot';
+import { ChaosCustomerBot } from './bots/chaos-customer-bot';
+import { MaliciousBot } from './bots/malicious-bot';
 import { StaffBot } from './bots/staff-bot';
 import { AdminBot } from './bots/admin-bot';
+import { ManagerBot } from './bots/manager-bot';
 import { CONFIG } from './config';
 import { Logger, globalMetrics } from './utils/logger';
 import { randomDelay } from './utils/helpers';
 
 interface BotInstance {
-  type: 'customer' | 'staff' | 'admin';
+  type: 'customer' | 'staff' | 'admin' | 'manager';
   id: number;
-  bot: CustomerBot | StaffBot | AdminBot;
+  bot: CustomerBot | StaffBot | AdminBot | ManagerBot;
   promise?: Promise<void>;
 }
 
@@ -25,9 +28,9 @@ export class Orchestrator {
 
   async start(): Promise<void> {
     this.isRunning = true;
-    
+
     this.printBanner();
-    
+
     // Start metrics reporter
     this.startMetricsReporter();
 
@@ -45,6 +48,11 @@ export class Orchestrator {
     this.logger.info(`\n👷 Phase 2: Starting ${CONFIG.STAFF_BOTS_INITIAL} Staff bots...\n`);
     await this.startStaffBots(CONFIG.STAFF_BOTS_INITIAL, false);
     await randomDelay(2000, 3000);
+
+    // Phase 2.5: Start Manager bots
+    this.logger.info(`\n🏢 Phase 2.5: Starting ${CONFIG.MANAGER_BOTS} Manager bots...\n`);
+    await this.startManagerBots();
+    await randomDelay(1000, 2000);
 
     // Phase 3: Start Customer bots in waves
     this.logger.info(`\n🧑‍💻 Phase 3: Starting ${CONFIG.CUSTOMER_BOTS} Customer bots in waves...\n`);
@@ -80,8 +88,9 @@ export class Orchestrator {
     console.log(`
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                         V2 RESORT STRESS TEST                                 ║
+║   Full 637-Feature Coverage • 4 Roles • All Modules                            ║
 ║                                                                               ║
-║   🧑‍💻 Customer Bots: ${String(CONFIG.CUSTOMER_BOTS).padEnd(4)}     👷 Staff Bots: ${String(CONFIG.STAFF_BOTS_INITIAL + CONFIG.STAFF_BOTS_TRAINEES).padEnd(4)}      🔧 Admin Bots: ${String(CONFIG.ADMIN_BOTS).padEnd(4)}   ║
+║   🧑‍💻 Customers: ${String(CONFIG.CUSTOMER_BOTS).padEnd(4)}  👷 Staff: ${String(CONFIG.STAFF_BOTS_INITIAL + CONFIG.STAFF_BOTS_TRAINEES).padEnd(4)}  🏢 Managers: ${String(CONFIG.MANAGER_BOTS).padEnd(4)}  🔧 Admins: ${String(CONFIG.ADMIN_BOTS).padEnd(4)}   ║
 ║                                                                               ║
 ║   Target: ${CONFIG.BASE_URL.padEnd(65)}║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -91,21 +100,21 @@ export class Orchestrator {
   private startMetricsReporter(): void {
     this.metricsInterval = setInterval(() => {
       const stats = globalMetrics.getStats();
-      
+
       console.log('\n' + '─'.repeat(80));
-      console.log(`📊 METRICS | Uptime: ${Math.floor(stats.uptime / 1000)}s | Bots: ${this.bots.length}`);
-      console.log(`   Total Requests: ${stats.totalRequests} | Success Rate: ${(stats.successRate * 100).toFixed(1)}%`);
-      console.log(`   Avg Latency: ${stats.avgLatency.toFixed(0)}ms | Req/s: ${stats.requestsPerSecond.toFixed(2)}`);
+      console.log(`📊 METRICS | Uptime: ${Math.floor(stats.uptime / 1000)} s | Bots: ${this.bots.length} `);
+      console.log(`   Total Requests: ${stats.totalRequests} | Success Rate: ${(stats.successRate * 100).toFixed(1)}% `);
+      console.log(`   Avg Latency: ${stats.avgLatency.toFixed(0)} ms | Req / s: ${stats.requestsPerSecond.toFixed(2)} `);
       console.log(`   Errors: ${stats.errorCount} | Trainees Hired: ${this.traineesHired}/${CONFIG.STAFF_BOTS_TRAINEES}`);
       console.log('─'.repeat(80) + '\n');
-      
+
     }, CONFIG.METRICS_INTERVAL);
   }
 
   private async startAdminBots(): Promise<void> {
     for (let i = 1; i <= CONFIG.ADMIN_BOTS; i++) {
       const adminBot = new AdminBot(i, (traineeData) => this.onTraineeHired(traineeData));
-      
+
       const initialized = await adminBot.initialize();
       if (initialized) {
         const instance: BotInstance = {
@@ -113,13 +122,37 @@ export class Orchestrator {
           id: i,
           bot: adminBot,
         };
-        
+
         // Start the bot in the background
         instance.promise = adminBot.start();
         this.bots.push(instance);
         this.logger.success(`Admin Bot #${i} started`);
       } else {
         this.logger.error(`Admin Bot #${i} failed to initialize`);
+      }
+
+      await randomDelay(500, 1000);
+    }
+  }
+
+  private async startManagerBots(): Promise<void> {
+    for (let i = 0; i < CONFIG.MANAGER_BOTS; i++) {
+      const managerBot = new ManagerBot(i);
+
+      const initialized = await managerBot.initialize();
+      if (initialized) {
+        const instance: BotInstance = {
+          type: 'manager',
+          id: i,
+          bot: managerBot,
+        };
+
+        // Start the bot in the background
+        instance.promise = managerBot.start();
+        this.bots.push(instance);
+        this.logger.success(`Manager Bot #${i} started`);
+      } else {
+        this.logger.error(`Manager Bot #${i} failed to initialize`);
       }
 
       await randomDelay(500, 1000);
@@ -136,7 +169,7 @@ export class Orchestrator {
 
     const adminBot = adminInstance.bot as AdminBot;
     this.staffAccounts = await adminBot.createStaffAccounts(CONFIG.STAFF_BOTS_INITIAL);
-    
+
     this.logger.success(`Created ${this.staffAccounts.length} staff accounts`);
   }
 
@@ -146,9 +179,9 @@ export class Orchestrator {
     for (let i = 1; i <= count; i++) {
       const staffId = isTrainee ? 1000 + this.traineesHired : i;
       const staffBot = new StaffBot(staffId);
-      
+
       let initialized = false;
-      
+
       if (isTrainee && traineeData) {
         // For trainees, use the credentials created by admin
         initialized = await staffBot.initializeWithCredentials(
@@ -166,14 +199,14 @@ export class Orchestrator {
         // Fallback to generated credentials
         initialized = await staffBot.initialize();
       }
-      
+
       if (initialized) {
         const instance: BotInstance = {
           type: 'staff',
           id: staffId,
           bot: staffBot,
         };
-        
+
         instance.promise = staffBot.start();
         this.bots.push(instance);
         this.logger.success(`Staff Bot #${staffId} ${isTrainee ? '(Trainee)' : ''} started`);
@@ -197,8 +230,21 @@ export class Orchestrator {
       this.logger.info(`Wave ${wave}/${waves}: Starting customers ${start}-${end}...`);
 
       for (let i = start; i <= end; i++) {
-        const customerBot = new CustomerBot(i);
-        
+        let customerBot: CustomerBot;
+
+        if (CONFIG.CHAOS_CONFIG.ENABLED) {
+          const typeRoll = Math.random();
+          if (typeRoll < CONFIG.BOT_RATIOS.MALICIOUS) {
+            customerBot = new MaliciousBot(i);
+          } else if (typeRoll < CONFIG.BOT_RATIOS.MALICIOUS + CONFIG.BOT_RATIOS.CHAOS_CUSTOMER) {
+            customerBot = new ChaosCustomerBot(i);
+          } else {
+            customerBot = new CustomerBot(i);
+          }
+        } else {
+          customerBot = new CustomerBot(i);
+        }
+
         const initialized = await customerBot.initialize();
         if (initialized) {
           const instance: BotInstance = {
@@ -206,7 +252,7 @@ export class Orchestrator {
             id: i,
             bot: customerBot,
           };
-          
+
           instance.promise = customerBot.start();
           this.bots.push(instance);
         } else {
@@ -231,19 +277,19 @@ export class Orchestrator {
 
     // Create a new staff bot for the trainee
     const traineeBot = new StaffBot(1000 + this.traineesHired);
-    
+
     const initialized = await traineeBot.initializeWithCredentials(
       traineeData.email,
       traineeData.password
     );
-    
+
     if (initialized) {
       const instance: BotInstance = {
         type: 'staff',
         id: 1000 + this.traineesHired,
         bot: traineeBot,
       };
-      
+
       instance.promise = traineeBot.start();
       this.bots.push(instance);
       this.logger.success(`🎓 Trainee Bot #${1000 + this.traineesHired} is now working!`);
@@ -270,10 +316,11 @@ export class Orchestrator {
    └─ Total Errors: ${stats.errorCount}
 
 🤖 BOT SUMMARY
-   ├─ Customer Bots: ${this.bots.filter(b => b.type === 'customer').length}
-   ├─ Staff Bots: ${this.bots.filter(b => b.type === 'staff').length}
-   ├─ Admin Bots: ${this.bots.filter(b => b.type === 'admin').length}
-   └─ Trainees Hired: ${this.traineesHired}
+║   🧑‍💻 Customers: ${this.bots.filter(b => b.type === 'customer').length}
+║   👷 Staff: ${this.bots.filter(b => b.type === 'staff').length}
+║   🏢 Managers: ${this.bots.filter(b => b.type === 'manager').length}
+║   🔧 Admins: ${this.bots.filter(b => b.type === 'admin').length}
+║   🎓 Trainees Hired: ${this.traineesHired}
 
 📈 ACTION DISTRIBUTION
 `);
@@ -281,6 +328,7 @@ export class Orchestrator {
     // Group actions by bot type
     const customerActions = Object.entries(actionStats).filter(([k]) => k.startsWith('Customer.'));
     const staffActions = Object.entries(actionStats).filter(([k]) => k.startsWith('Staff.'));
+    const managerActions = Object.entries(actionStats).filter(([k]) => k.startsWith('Manager.'));
     const adminActions = Object.entries(actionStats).filter(([k]) => k.startsWith('Admin.'));
 
     console.log('   CUSTOMER ACTIONS:');
@@ -291,6 +339,11 @@ export class Orchestrator {
     console.log('\n   STAFF ACTIONS:');
     staffActions.forEach(([action, count]) => {
       console.log(`     ${action.replace('Staff.', '')}: ${count}`);
+    });
+
+    console.log('\n   MANAGER ACTIONS:');
+    managerActions.forEach(([action, count]) => {
+      console.log(`     ${action.replace('Manager.', '')}: ${count}`);
     });
 
     console.log('\n   ADMIN ACTIONS:');

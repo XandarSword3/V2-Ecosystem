@@ -17,21 +17,8 @@ export { getSettings, updateSettings } from './settings.controller.js';
 // Audit Logs
 export { getAuditLogs, getAuditLogsByResource } from './audit.controller.js';
 
-// Reports & Analytics
-export { getOverviewReport, exportReport, getOccupancyReport, getCustomerAnalytics } from './reports.controller.js';
-
 // Notifications
-export { getNotifications, markNotificationRead, markAllNotificationsRead } from './notifications.controller.js';
+export { getNotifications, markNotificationRead, markAllNotificationsRead, getBroadcasts, getValidPriorities, broadcastNotification, deleteMultipleNotifications, processScheduledNotifications, deleteNotification, getTemplates, getTemplateById, createTemplate, updateTemplate, deleteTemplate, sendFromTemplate } from './notifications.controller.js';
 
 // File Uploads
 export { uploadFile, deleteFile, listFiles, getBranding } from './upload.controller.js';
-
-// Scheduled Reports
-export { 
-  getScheduledReports, 
-  createScheduledReport, 
-  updateScheduledReport, 
-  deleteScheduledReport, 
-  sendReportNow,
-  previewReport 
-} from './scheduled-reports.controller.js';

@@ -121,6 +121,18 @@ export default function KioskAdminPage() {
     onError: () => toast.error('Failed to refill keys')
   });
 
+  const deactivateMutation = useMutation({
+    mutationFn: async (deviceId: string) => {
+      const res = await api.delete(`/kiosk/devices/${deviceId}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-kiosks'] });
+      toast.success('Kiosk deactivated');
+    },
+    onError: () => toast.error('Failed to deactivate kiosk')
+  });
+
   const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newKioskForm.name.trim()) {
@@ -349,6 +361,11 @@ export default function KioskAdminPage() {
                         <Wrench className="h-4 w-4" />
                       </button>
                       <button
+                        onClick={() => {
+                          if (confirm('Are you sure you want to deactivate this kiosk?')) {
+                            deactivateMutation.mutate(kiosk.id);
+                          }
+                        }}
                         className="p-2 text-gray-400 hover:text-red-600"
                         title="Deactivate"
                       >
