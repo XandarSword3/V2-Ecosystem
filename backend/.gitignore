@@ -22,8 +22,12 @@ yarn-error.log*
 
 # Testing
 coverage/
+coverage-*/
 .nyc_output/
 test-results/
+test-results*.json
+playwright-report/
+screenshots/
 
 # IDE
 .vscode/
