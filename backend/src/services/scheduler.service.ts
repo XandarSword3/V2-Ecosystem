@@ -97,14 +97,14 @@ export class SchedulerService {
       try {
         const supabase = getSupabase();
         
-        // Delete sessions older than 7 days (refresh token lifetime)
+        // Delete sessions that have expired (using expires_at) or are older than 7 days
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - 7);
         
         const { data: deletedSessions, error } = await supabase
           .from('sessions')
           .delete()
-          .lt('created_at', cutoffDate.toISOString())
+          .or(`expires_at.lt.${new Date().toISOString()},created_at.lt.${cutoffDate.toISOString()}`)
           .select('id');
         
         if (error) {

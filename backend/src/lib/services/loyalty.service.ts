@@ -178,22 +178,19 @@ export function createLoyaltyService(container: Container): LoyaltyService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + POINTS_EXPIRATION_DAYS);
 
+    // Atomic update of account points
+    const updatedAccount = await loyaltyRepository.adjustPointsAtomic(account.id, points);
+
     // Record transaction
     const transaction = await loyaltyRepository.addTransaction({
       accountId: account.id,
       type: 'earn',
       points,
+      balanceAfter: updatedAccount.availablePoints,
       description: input.description || `Earned ${points} points for $${input.amount.toFixed(2)} purchase`,
       referenceType: input.referenceType || null,
       referenceId: input.referenceId || null,
       expiresAt: expiresAt.toISOString(),
-    });
-
-    // Update account
-    await loyaltyRepository.updateAccount(account.id, {
-      totalPoints: account.totalPoints + points,
-      availablePoints: account.availablePoints + points,
-      lifetimePoints: account.lifetimePoints + points,
     });
 
     // Check for tier upgrade
@@ -232,21 +229,19 @@ export function createLoyaltyService(container: Container): LoyaltyService {
       );
     }
 
+    // Atomic update of account points
+    const updatedAccount = await loyaltyRepository.adjustPointsAtomic(account.id, -input.points);
+
     // Record transaction
     const transaction = await loyaltyRepository.addTransaction({
       accountId: account.id,
       type: 'redeem',
       points: -input.points, // Negative for redemption
+      balanceAfter: updatedAccount.availablePoints,
       description: input.description || `Redeemed ${input.points} points`,
       referenceType: input.referenceType || null,
       referenceId: input.referenceId || null,
       expiresAt: null,
-    });
-
-    // Update account
-    await loyaltyRepository.updateAccount(account.id, {
-      totalPoints: account.totalPoints - input.points,
-      availablePoints: account.availablePoints - input.points,
     });
 
     logger.info(`User ${input.userId} redeemed ${input.points} points`);
@@ -276,22 +271,19 @@ export function createLoyaltyService(container: Container): LoyaltyService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + expirationDays);
 
+    // Atomic update of account points
+    const updatedAccount = await loyaltyRepository.adjustPointsAtomic(account.id, input.points);
+
     // Record transaction
     const transaction = await loyaltyRepository.addTransaction({
       accountId: account.id,
       type: 'bonus',
       points: input.points,
+      balanceAfter: updatedAccount.availablePoints,
       description: input.description.trim(),
       referenceType: null,
       referenceId: null,
       expiresAt: expiresAt.toISOString(),
-    });
-
-    // Update account
-    await loyaltyRepository.updateAccount(account.id, {
-      totalPoints: account.totalPoints + input.points,
-      availablePoints: account.availablePoints + input.points,
-      lifetimePoints: account.lifetimePoints + input.points,
     });
 
     logger.info(`User ${input.userId} received ${input.points} bonus points`);
@@ -311,36 +303,33 @@ export function createLoyaltyService(container: Container): LoyaltyService {
       throw new LoyaltyServiceError('Reason is required for adjustments', 'MISSING_REASON');
     }
 
+    // We use the new atomic adjustment method in the repository
     const account = await loyaltyRepository.getAccountByUserId(userId);
     if (!account) {
       throw new LoyaltyServiceError('Loyalty account not found', 'ACCOUNT_NOT_FOUND');
     }
 
-    // Ensure we don't go negative
-    const newAvailable = account.availablePoints + points;
-    if (newAvailable < 0) {
+    // Still check locally for immediate feedback, but the atomic update is the source of truth
+    if (account.availablePoints + points < 0) {
       throw new LoyaltyServiceError(
         `Adjustment would result in negative balance`,
         'NEGATIVE_BALANCE'
       );
     }
 
+    // Update account ATOMICALLY
+    const updatedAccount = await loyaltyRepository.adjustPointsAtomic(account.id, points);
+
     // Record transaction
     const transaction = await loyaltyRepository.addTransaction({
       accountId: account.id,
       type: 'adjust',
       points,
+      balanceAfter: updatedAccount.availablePoints,
       description: reason.trim(),
       referenceType: null,
       referenceId: null,
       expiresAt: null,
-    });
-
-    // Update account
-    await loyaltyRepository.updateAccount(account.id, {
-      totalPoints: account.totalPoints + points,
-      availablePoints: newAvailable,
-      lifetimePoints: points > 0 ? account.lifetimePoints + points : account.lifetimePoints,
     });
 
     logger.info(`User ${userId} points adjusted by ${points}: ${reason}`);
@@ -440,16 +429,19 @@ export function createLoyaltyService(container: Container): LoyaltyService {
       return 0;
     }
 
+    let currentBalance = account.availablePoints;
     let totalExpired = 0;
     for (const txn of expiring) {
       if (txn.points > 0) {
         totalExpired += txn.points;
+        currentBalance -= txn.points;
 
         // Record expiration transaction
         await loyaltyRepository.addTransaction({
           accountId: account.id,
           type: 'expire',
           points: -txn.points,
+          balanceAfter: Math.max(0, currentBalance),
           description: `Points expired from: ${txn.description}`,
           referenceType: null,
           referenceId: null,

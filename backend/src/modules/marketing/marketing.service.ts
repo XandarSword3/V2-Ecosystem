@@ -4,8 +4,8 @@
  */
 
 import { getSupabase } from '../../database/connection.js';
-import { format, addDays, addHours, differenceInDays, parseISO } from 'date-fns';
-import * as cron from 'node-cron';
+import dayjs from 'dayjs';
+import cron from 'node-cron';
 import nodemailer from 'nodemailer';
 
 // Types
@@ -574,9 +574,9 @@ export class MarketingAutomationService {
           const value = parseInt(match[1]);
           const unit = match[2].toLowerCase();
           if (unit.startsWith('day')) {
-            return addDays(now, value);
+            return dayjs(now).add(value, 'day').toDate();
           } else if (unit.startsWith('hour')) {
-            return addHours(now, value);
+            return dayjs(now).add(value, 'hour').toDate();
           }
         }
       }
@@ -878,9 +878,9 @@ export class MarketingAutomationService {
         const value = parseInt(match[1]);
         const unit = match[2].toLowerCase();
         if (unit.startsWith('day')) {
-          scheduledAt = addDays(scheduledAt, value);
+          scheduledAt = dayjs(scheduledAt).add(value, 'day').toDate();
         } else if (unit.startsWith('hour')) {
-          scheduledAt = addHours(scheduledAt, value);
+          scheduledAt = dayjs(scheduledAt).add(value, 'hour').toDate();
         }
       }
     }
@@ -981,7 +981,7 @@ export class MarketingAutomationService {
     for (const email of queuedEmails || []) {
       try {
         const htmlContent = email.metadata?.html_content || '';
-        
+
         const info = await this.transporter.sendMail({
           from: process.env.EMAIL_FROM || '"Resort" <noreply@resort.com>',
           to: email.to_email,
@@ -1301,17 +1301,17 @@ export class MarketingAutomationService {
     }
 
     // Calculate rates
-    const openRate = campaign.sent_count > 0 
-      ? (campaign.opened_count / campaign.sent_count) * 100 
+    const openRate = campaign.sent_count > 0
+      ? (campaign.opened_count / campaign.sent_count) * 100
       : 0;
-    const clickRate = campaign.opened_count > 0 
-      ? (campaign.clicked_count / campaign.opened_count) * 100 
+    const clickRate = campaign.opened_count > 0
+      ? (campaign.clicked_count / campaign.opened_count) * 100
       : 0;
-    const deliveryRate = campaign.sent_count > 0 
-      ? ((campaign.sent_count - campaign.bounced_count) / campaign.sent_count) * 100 
+    const deliveryRate = campaign.sent_count > 0
+      ? ((campaign.sent_count - campaign.bounced_count) / campaign.sent_count) * 100
       : 0;
-    const unsubscribeRate = campaign.sent_count > 0 
-      ? (campaign.unsubscribed_count / campaign.sent_count) * 100 
+    const unsubscribeRate = campaign.sent_count > 0
+      ? (campaign.unsubscribed_count / campaign.sent_count) * 100
       : 0;
 
     // Get click breakdown using RPC or manual join
@@ -1385,10 +1385,10 @@ export class MarketingAutomationService {
 
     const stepPerformance = (stepsData || []).map((step: any) => ({
       ...step,
-      open_rate: step.sends_count > 0 
+      open_rate: step.sends_count > 0
         ? ((step.opens_count / step.sends_count) * 100).toFixed(2)
         : 0,
-      click_rate: step.opens_count > 0 
+      click_rate: step.opens_count > 0
         ? ((step.clicks_count / step.opens_count) * 100).toFixed(2)
         : 0
     }));

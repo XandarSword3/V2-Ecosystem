@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
+import { logger } from '../../utils/logger.js';
 
 // Validation schemas
 // Helper to parse date or datetime strings - accepts YYYY-MM-DD or ISO datetime
@@ -216,7 +217,7 @@ export class CouponController {
   }
 
   /**
-   * Apply a coupon to an order (during checkout)
+   * Apply a coupon to an order (during checkout) (ATOMIC via RPC)
    */
   async applyCoupon(req: Request, res: Response) {
     try {
@@ -230,62 +231,33 @@ export class CouponController {
       }
 
       const { code, orderType, orderAmount, userId, orderId } = validation.data;
-
-      // Reuse validation logic
-      const normalizedCode = code.toUpperCase().trim();
       const supabase = getSupabase();
 
-      const { data: c, error: couponError } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('code', normalizedCode)
-        .eq('is_active', true)
-        .single();
-
-      if (couponError || !c) {
-        return res.status(404).json({ success: false, error: 'Invalid coupon code' });
-      }
-
-      // Calculate discount
-      let discountAmount = 0;
-      if (c.discount_type === 'percentage') {
-        discountAmount = orderAmount * (c.discount_value / 100);
-        if (c.max_discount_amount && discountAmount > c.max_discount_amount) {
-          discountAmount = parseFloat(c.max_discount_amount);
+      // Use atomic RPC to prevent double-use race conditions
+      const { data: result, error: rpcError } = await supabase.rpc(
+        'apply_coupon_atomic',
+        {
+          p_code: code.toUpperCase().trim(),
+          p_user_id: userId || null,
+          p_order_total: orderAmount,
+          p_order_id: orderId,
+          p_module_type: orderType || 'all',
         }
-      } else if (c.discount_type === 'fixed') {
-        discountAmount = Math.min(parseFloat(c.discount_value), orderAmount);
-      }
+      );
 
-      // Record usage (Note: order_type column doesn't exist in coupon_usage table)
-      const { error: usageInsertError } = await supabase
-        .from('coupon_usage')
-        .insert({
-          coupon_id: c.id,
-          user_id: userId,
-          order_id: orderId,
-          discount_applied: discountAmount,
+      if (rpcError) throw rpcError;
+
+      const row = result?.[0];
+      if (!row?.success) {
+        return res.status(400).json({
+          success: false,
+          error: row?.error_message || 'Invalid coupon code',
         });
-
-      if (usageInsertError) {
-        throw usageInsertError;
       }
 
-      // Update usage count
-      const { error: updateError } = await supabase
-        .from('coupons')
-        .update({
-          usage_count: c.usage_count + 1,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', c.id);
-
-      if (updateError) {
-        throw updateError;
-      }
+      const discountAmount = parseFloat(row.discount_amount) || 0;
 
       // Also update the order with coupon discount (Bug #7 fix)
-      // Determine the correct orders table based on orderType
       let ordersTable = 'restaurant_orders';
       if (orderType === 'snack') {
         ordersTable = 'snack_orders';
@@ -295,7 +267,6 @@ export class CouponController {
         ordersTable = 'pool_tickets';
       }
 
-      // Update the order with coupon info and recalculate total
       if (orderType === 'restaurant' || orderType === 'snack') {
         const { data: currentOrder } = await supabase
           .from(ordersTable)
@@ -314,8 +285,8 @@ export class CouponController {
           const { error: orderUpdateError } = await supabase
             .from(ordersTable)
             .update({
-              coupon_id: c.id,
-              coupon_code: c.code,
+              coupon_id: row.coupon_id,
+              coupon_code: code.toUpperCase().trim(),
               coupon_discount: discountAmount,
               discount_amount: discountAmount,
               total_amount: Math.max(0, newTotalAmount),
@@ -324,8 +295,37 @@ export class CouponController {
             .eq('id', orderId);
 
           if (orderUpdateError) {
-            console.error('Error updating order with coupon:', orderUpdateError);
-            // Don't fail the whole request, just log the error
+            // CRITICAL: Order update failed but coupon usage was already consumed.
+            // Compensate by reversing the coupon usage to prevent phantom coupon consumption.
+            logger.error('Order update failed after coupon consumed, reversing coupon usage:', orderUpdateError);
+            try {
+              const { error: reverseErr } = await supabase.rpc('reverse_coupon_usage', {
+                p_coupon_id: row.coupon_id,
+                p_user_id: userId || null,
+                p_order_id: orderId,
+              });
+
+              if (reverseErr) {
+                logger.error('CRITICAL: Failed to reverse coupon usage after order update failure', {
+                  couponId: row.coupon_id,
+                  orderId,
+                  userId,
+                  reverseError: reverseErr,
+                });
+              }
+            } catch (reverseErr: unknown) {
+              logger.error('CRITICAL: Failed to reverse coupon usage after order update failure', {
+                couponId: row.coupon_id,
+                orderId,
+                userId,
+                reverseError: reverseErr,
+              });
+            }
+
+            return res.status(500).json({
+              success: false,
+              error: 'Failed to apply discount to order. Coupon was not consumed.',
+            });
           }
         }
       }
@@ -333,7 +333,7 @@ export class CouponController {
       res.json({
         success: true,
         data: {
-          couponId: c.id,
+          couponId: row.coupon_id,
           discountApplied: Math.round(discountAmount * 100) / 100,
           finalAmount: Math.max(0, orderAmount - discountAmount),
         },

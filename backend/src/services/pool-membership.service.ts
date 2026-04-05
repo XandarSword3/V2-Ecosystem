@@ -114,6 +114,33 @@ interface MembershipResult {
   membership?: any;
   subscriptionId?: string;
   clientSecret?: string;
+  statusCode?: number;
+  code?: string;
+}
+
+function isStripeConfigured(): boolean {
+  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.trim());
+}
+
+function isStripeAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const stripeError = error as { type?: string; message?: string };
+  return (
+    stripeError.type === 'StripeAuthenticationError' ||
+    (typeof stripeError.message === 'string' && /api key|authentication/i.test(stripeError.message))
+  );
+}
+
+function billingUnavailableResult(message = 'Membership billing is currently unavailable. Please try again later.'): MembershipResult {
+  return {
+    success: false,
+    message,
+    statusCode: 503,
+    code: 'BILLING_UNAVAILABLE',
+  };
 }
 
 /**
@@ -142,6 +169,11 @@ export async function createMembership(
   input: CreateMembershipInput
 ): Promise<MembershipResult> {
   try {
+    if (!isStripeConfigured()) {
+      logger.warn('Membership creation blocked: Stripe secret key is not configured');
+      return billingUnavailableResult();
+    }
+
     const pricing = getMembershipPricing(input.type, input.billingCycle);
     
     if (!pricing) {
@@ -285,6 +317,13 @@ export async function createMembership(
       clientSecret: paymentIntent?.client_secret || undefined,
     };
   } catch (error: any) {
+    if (isStripeAuthError(error)) {
+      logger.error('Failed to create membership due to Stripe authentication error', {
+        error: error?.message,
+      });
+      return billingUnavailableResult();
+    }
+
     logger.error('Failed to create membership', { error: error.message });
     throw error;
   }
@@ -322,6 +361,14 @@ export async function cancelMembership(
 
     // Cancel Stripe subscription
     if (membership.stripe_subscription_id) {
+      if (!isStripeConfigured()) {
+        logger.warn('Membership cancellation blocked: Stripe secret key is not configured', {
+          membershipId,
+          userId,
+        });
+        return billingUnavailableResult('Membership billing is currently unavailable. Unable to cancel subscription right now.');
+      }
+
       await stripeClient.subscriptions.update(membership.stripe_subscription_id, {
         cancel_at_period_end: !immediate,
       });
@@ -356,6 +403,15 @@ export async function cancelMembership(
         : 'Membership will be cancelled at the end of the billing period',
     };
   } catch (error: any) {
+    if (isStripeAuthError(error)) {
+      logger.error('Failed to cancel membership due to Stripe authentication error', {
+        membershipId,
+        userId,
+        error: error?.message,
+      });
+      return billingUnavailableResult('Membership billing is currently unavailable. Unable to cancel subscription right now.');
+    }
+
     logger.error('Failed to cancel membership', { error: error.message });
     throw error;
   }

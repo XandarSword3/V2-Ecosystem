@@ -1,25 +1,33 @@
 /**
  * In-Memory Loyalty Repository
- *
- * Test double implementation for loyalty/rewards operations.
- * Stores data in memory for fast, isolated testing.
+ * Test double for LoyaltyRepository using in-memory data structures.
  */
 
 import type {
+  LoyaltyRepository,
   LoyaltyAccount,
   LoyaltyTransaction,
   LoyaltyFilters,
-  LoyaltyRepository,
-} from '../container/types';
+} from '../container/types.js';
 
 export class InMemoryLoyaltyRepository implements LoyaltyRepository {
-  private accounts: Map<string, LoyaltyAccount> = new Map();
-  private transactions: Map<string, LoyaltyTransaction> = new Map();
-  private transactionIdCounter = 1;
+  private accounts = new Map<string, LoyaltyAccount>();
+  private transactions: LoyaltyTransaction[] = [];
 
-  // ============================================
-  // ACCOUNT OPERATIONS
-  // ============================================
+  /** Test helper: directly insert an account */
+  addAccount(account: LoyaltyAccount): void {
+    this.accounts.set(account.id, account);
+  }
+
+  /** Test helper: directly insert a transaction */
+  addTestTransaction(tx: LoyaltyTransaction): void {
+    this.transactions.push(tx);
+  }
+
+  reset() {
+    this.accounts.clear();
+    this.transactions = [];
+  }
 
   async createAccount(userId: string): Promise<LoyaltyAccount> {
     const id = crypto.randomUUID();
@@ -35,122 +43,65 @@ export class InMemoryLoyaltyRepository implements LoyaltyRepository {
       updatedAt: null,
     };
     this.accounts.set(id, account);
-    return { ...account };
+    return account;
   }
 
   async getAccountByUserId(userId: string): Promise<LoyaltyAccount | null> {
-    for (const account of this.accounts.values()) {
-      if (account.userId === userId) {
-        return { ...account };
-      }
+    for (const a of this.accounts.values()) {
+      if (a.userId === userId) return a;
     }
     return null;
   }
 
   async getAccountById(id: string): Promise<LoyaltyAccount | null> {
-    const account = this.accounts.get(id);
-    return account ? { ...account } : null;
+    return this.accounts.get(id) ?? null;
   }
 
   async updateAccount(id: string, data: Partial<LoyaltyAccount>): Promise<LoyaltyAccount | null> {
     const existing = this.accounts.get(id);
     if (!existing) return null;
-
-    const updated: LoyaltyAccount = {
-      ...existing,
-      ...data,
-      id, // Ensure ID is not changed
-      updatedAt: new Date().toISOString(),
-    };
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
     this.accounts.set(id, updated);
-    return { ...updated };
+    return updated;
   }
 
-  // ============================================
-  // TRANSACTION OPERATIONS
-  // ============================================
-
-  async addTransaction(
-    transaction: Omit<LoyaltyTransaction, 'id' | 'createdAt'>
-  ): Promise<LoyaltyTransaction> {
-    const id = `txn-${this.transactionIdCounter++}`;
-    const newTransaction: LoyaltyTransaction = {
-      ...transaction,
-      id,
-      createdAt: new Date().toISOString(),
-    };
-    this.transactions.set(id, newTransaction);
-    return { ...newTransaction };
+  async addTransaction(data: Omit<LoyaltyTransaction, 'id' | 'createdAt'>): Promise<LoyaltyTransaction> {
+    const tx: LoyaltyTransaction = { ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    this.transactions.push(tx);
+    return tx;
   }
 
   async getTransactions(accountId: string, limit?: number): Promise<LoyaltyTransaction[]> {
-    const results: LoyaltyTransaction[] = [];
-    for (const txn of this.transactions.values()) {
-      if (txn.accountId === accountId) {
-        results.push({ ...txn });
-      }
-    }
-    // Sort by createdAt descending
-    results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    return limit ? results.slice(0, limit) : results;
+    let result = this.transactions.filter(t => t.accountId === accountId);
+    if (limit) result = result.slice(-limit);
+    return result;
   }
 
   async getExpiringPoints(accountId: string, beforeDate: string): Promise<LoyaltyTransaction[]> {
-    const results: LoyaltyTransaction[] = [];
-    for (const txn of this.transactions.values()) {
-      if (
-        txn.accountId === accountId &&
-        txn.type === 'earn' &&
-        txn.expiresAt &&
-        txn.expiresAt <= beforeDate
-      ) {
-        results.push({ ...txn });
-      }
-    }
-    return results;
+    return this.transactions.filter(
+      t => t.accountId === accountId && t.expiresAt && t.expiresAt <= beforeDate
+    );
   }
 
   async listAccounts(filters?: LoyaltyFilters): Promise<LoyaltyAccount[]> {
-    let results = Array.from(this.accounts.values());
-
-    if (filters?.userId) {
-      results = results.filter((a) => a.userId === filters.userId);
-    }
-
-    if (filters?.tier) {
-      results = results.filter((a) => a.tier === filters.tier);
-    }
-
-    if (filters?.minPoints !== undefined) {
-      results = results.filter((a) => a.totalPoints >= filters.minPoints!);
-    }
-
-    return results.map((a) => ({ ...a }));
+    let result = [...this.accounts.values()];
+    if (filters?.userId) result = result.filter(a => a.userId === filters.userId);
+    if (filters?.tier) result = result.filter(a => a.tier === filters.tier);
+    if (filters?.minPoints !== undefined) result = result.filter(a => a.availablePoints >= filters.minPoints!);
+    return result;
   }
 
-  // ============================================
-  // TEST HELPERS
-  // ============================================
-
-  addAccount(account: LoyaltyAccount): void {
-    this.accounts.set(account.id, { ...account });
-  }
-
-  addTestTransaction(transaction: LoyaltyTransaction): void {
-    this.transactions.set(transaction.id, { ...transaction });
-  }
-
-  clear(): void {
-    this.accounts.clear();
-    this.transactions.clear();
-    this.transactionIdCounter = 1;
-  }
-
-  getAll(): LoyaltyAccount[] {
-    return Array.from(this.accounts.values()).map((a) => ({ ...a }));
-  }
-
-  getAllTransactions(): LoyaltyTransaction[] {
-    return Array.from(this.transactions.values()).map((t) => ({ ...t }));
+  async adjustPointsAtomic(id: string, points: number): Promise<LoyaltyAccount> {
+    const existing = this.accounts.get(id);
+    if (!existing) throw new Error(`Account ${id} not found`);
+    const updated = {
+      ...existing,
+      availablePoints: existing.availablePoints + points,
+      totalPoints: existing.totalPoints + (points > 0 ? points : 0),
+      lifetimePoints: existing.lifetimePoints + (points > 0 ? points : 0),
+      updatedAt: new Date().toISOString(),
+    };
+    this.accounts.set(id, updated);
+    return updated;
   }
 }

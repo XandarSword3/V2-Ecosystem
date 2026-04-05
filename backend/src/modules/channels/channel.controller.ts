@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import * as channelService from './channel.service.js';
 
 // ==================== CONNECTIONS ====================
@@ -368,9 +369,34 @@ export async function handleSiteMinderWebhook(req: Request, res: Response): Prom
     const { property_id, channel } = req.params;
     const payload = req.body;
 
-    // Verify webhook signature if provided
-    const signature = req.headers['x-siteminder-signature'];
-    // TODO: Implement signature verification
+    // SECURITY FIX (HIGH-007): Verify webhook signature
+    const signature = req.headers['x-siteminder-signature'] as string;
+    const webhookSecret = process.env.SITEMINDER_WEBHOOK_SECRET;
+
+    if (webhookSecret) {
+      if (!signature) {
+        console.error('SiteMinder webhook missing signature header');
+        res.status(401).json({ error: 'Missing webhook signature' });
+        return;
+      }
+
+      // Compute expected HMAC-SHA256 signature
+      const rawBody = JSON.stringify(payload);
+      const expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(rawBody)
+        .digest('hex');
+
+      // Timing-safe comparison to prevent timing attacks
+      const sigBuffer = Buffer.from(signature);
+      const expectedBuffer = Buffer.from(expectedSignature);
+      if (sigBuffer.length !== expectedBuffer.length ||
+          !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+        console.error('SiteMinder webhook signature mismatch');
+        res.status(401).json({ error: 'Invalid webhook signature' });
+        return;
+      }
+    }
 
     await channelService.handleSiteMinderWebhook(property_id, channel, payload);
 

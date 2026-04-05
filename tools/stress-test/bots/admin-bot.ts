@@ -24,11 +24,11 @@ export class AdminBot {
   private botId: number;
   private isRunning = false;
   private hiredTrainees = 0;
-  
+
   // Test mode flag - when true, performs full CRUD testing
   private testMode = false;
   private testResults: CRUDTestResult[] = [];
-  
+
   // Cached admin data
   private users: any[] = [];
   private modules: any[] = [];
@@ -76,17 +76,17 @@ export class AdminBot {
   async initialize(): Promise<boolean> {
     // Use the main admin account
     const success = await this.api.login(CONFIG.ADMIN_EMAIL, CONFIG.ADMIN_PASSWORD);
-    
+
     if (!success) {
       this.logger.error('Failed to login as admin!');
       return false;
     }
 
     this.logger.success(`Logged in as Super Admin`);
-    
+
     // Load initial admin data
     await this.refreshAdminData();
-    
+
     return true;
   }
 
@@ -113,12 +113,12 @@ export class AdminBot {
   // Pre-create staff accounts before starting staff bots
   async createStaffAccounts(count: number): Promise<{ email: string; password: string }[]> {
     const createdAccounts: { email: string; password: string }[] = [];
-    
+
     for (let i = 1; i <= count; i++) {
       const staffData = generateStaffData(i, false);
-      
+
       this.logger.action(`Creating staff account #${i}: ${staffData.full_name}...`);
-      
+
       const result = await this.api.createUser({
         email: staffData.email,
         password: staffData.password,
@@ -135,41 +135,41 @@ export class AdminBot {
         this.logger.info(`Staff account may already exist: ${staffData.email}`);
         createdAccounts.push({ email: staffData.email, password: staffData.password });
       }
-      
+
       await randomDelay(200, 500);
     }
-    
+
     return createdAccounts;
   }
 
   async start(): Promise<void> {
     this.isRunning = true;
-    
+
     // If test mode, run comprehensive tests instead of random actions
     if (this.testMode) {
       this.logger.info('🧪 Running comprehensive admin feature tests...');
       await this.runComprehensiveTests();
       return;
     }
-    
+
     this.logger.info('🔐 Starting admin monitoring simulation...');
 
     // Monitoring actions take priority
     const monitoringActions = [
       'VIEW_DASHBOARD',
-      'VIEW_REVENUE_STATS', 
+      'VIEW_REVENUE_STATS',
       'VIEW_REPORTS',
       'VIEW_REVIEWS',
       'VIEW_AUDIT_LOGS',
       'VIEW_USERS',
       'VIEW_MODULES',
     ];
-    
+
     let monitoringCycle = 0;
 
     while (this.isRunning) {
       let action: string;
-      
+
       // Every 3 cycles, do a full monitoring sweep
       if (monitoringCycle % 3 === 0) {
         action = monitoringActions[monitoringCycle % monitoringActions.length];
@@ -178,9 +178,9 @@ export class AdminBot {
         // Otherwise pick from weighted actions (may include management tasks)
         action = weightedRandom(CONFIG.ADMIN_ACTIONS);
       }
-      
+
       await this.performAction(action);
-      
+
       monitoringCycle++;
       await randomDelay(CONFIG.ADMIN_ACTION_INTERVAL.min, CONFIG.ADMIN_ACTION_INTERVAL.max);
     }
@@ -263,6 +263,46 @@ export class AdminBot {
         case 'MANAGE_POOL_SESSION':
           success = await this.managePoolSession();
           break;
+        // --- Inventory ---
+        case 'MANAGE_INVENTORY':
+          success = await this.manageInventory();
+          break;
+        // --- Housekeeping ---
+        case 'MANAGE_HOUSEKEEPING':
+          success = await this.manageHousekeeping();
+          break;
+        // --- Loyalty (Admin) ---
+        case 'MANAGE_LOYALTY':
+          success = await this.manageLoyalty();
+          break;
+        // --- Gift Cards (Admin) ---
+        case 'MANAGE_GIFT_CARDS':
+          success = await this.manageGiftCards();
+          break;
+        // --- Coupons (Admin) ---
+        case 'MANAGE_COUPONS':
+          success = await this.manageCoupons();
+          break;
+        // --- Channels ---
+        case 'MANAGE_CHANNELS':
+          success = await this.manageChannels();
+          break;
+        // --- Customizations ---
+        case 'MANAGE_CUSTOMIZATIONS':
+          success = await this.manageCustomizations();
+          break;
+        // --- Terminology ---
+        case 'MANAGE_TERMINOLOGY':
+          success = await this.manageTerminology();
+          break;
+        // --- Notifications ---
+        case 'MANAGE_NOTIFICATIONS':
+          success = await this.manageNotifications();
+          break;
+        // --- Kiosk ---
+        case 'MANAGE_KIOSK':
+          success = await this.manageKiosk();
+          break;
         default:
           this.logger.warn(`Unknown action: ${action}`);
           return;
@@ -283,9 +323,9 @@ export class AdminBot {
 
   private async viewDashboard(): Promise<boolean> {
     this.logger.action('Viewing dashboard...');
-    
+
     const result = await this.api.getDashboard();
-    
+
     if (result.success) {
       const stats = result.data;
       this.logger.success(`Dashboard: Revenue ${stats?.totalRevenue ?? 'N/A'}, Orders ${stats?.totalOrders ?? 'N/A'}`);
@@ -295,9 +335,9 @@ export class AdminBot {
 
   private async viewRevenueStats(): Promise<boolean> {
     this.logger.action('Checking revenue statistics...');
-    
+
     const result = await this.api.getRevenueStats();
-    
+
     if (result.success) {
       this.logger.success('Revenue stats loaded');
     }
@@ -307,9 +347,9 @@ export class AdminBot {
   private async viewReports(): Promise<boolean> {
     const reportType = randomElement(['overview', 'occupancy', 'customers']);
     this.logger.action(`Viewing ${reportType} report...`);
-    
+
     const result = await this.api.getReports(reportType);
-    
+
     if (result.success) {
       this.logger.success(`${reportType} report loaded`);
     }
@@ -319,10 +359,10 @@ export class AdminBot {
   private async viewUsers(): Promise<boolean> {
     const role = randomElement(['all', 'staff', 'customer', 'admin']);
     this.logger.action(`Viewing users (${role})...`);
-    
+
     const params = role !== 'all' ? { role } : undefined;
     const result = await this.api.getUsers(params);
-    
+
     if (result.success) {
       this.users = Array.isArray(result.data) ? result.data : (result.data?.users || []);
       this.logger.success(`Found ${this.users.length} users`);
@@ -338,7 +378,7 @@ export class AdminBot {
 
     // Otherwise create a random test user
     this.logger.action('Creating new user...');
-    
+
     const result = await this.api.createUser({
       email: `newuser${randomInt(1000, 9999)}@stresstest.local`,
       password: 'TestPass123!',
@@ -355,9 +395,9 @@ export class AdminBot {
   private async hireTrainee(): Promise<boolean> {
     const traineeIndex = this.hiredTrainees + 1;
     const traineeData = generateStaffData(traineeIndex, true);
-    
+
     this.logger.action(`🎓 Hiring trainee #${traineeIndex}: ${traineeData.full_name}...`);
-    
+
     const result = await this.api.createUser({
       email: traineeData.email,
       password: traineeData.password,
@@ -369,7 +409,7 @@ export class AdminBot {
     if (result.success) {
       this.hiredTrainees++;
       this.logger.success(`🎓 Trainee hired! ${traineeData.full_name} (${traineeData.email})`);
-      
+
       // Notify orchestrator to spawn a new trainee bot
       if (this.onTraineeHired) {
         this.onTraineeHired(traineeData);
@@ -385,8 +425,8 @@ export class AdminBot {
     }
 
     // Pick a non-admin user to update
-    const user = this.users.find(u => 
-      !u.roles?.includes('super_admin') && 
+    const user = this.users.find(u =>
+      !u.roles?.includes('super_admin') &&
       u.email?.includes('stresstest')
     );
 
@@ -396,7 +436,7 @@ export class AdminBot {
     }
 
     this.logger.action(`Updating user ${user.email}...`);
-    
+
     const result = await this.api.updateUser(user.id, {
       full_name: user.full_name + ' (Updated)',
     });
@@ -409,9 +449,9 @@ export class AdminBot {
 
   private async viewModules(): Promise<boolean> {
     this.logger.action('Viewing modules...');
-    
+
     const result = await this.api.getModules();
-    
+
     if (result.success) {
       this.modules = Array.isArray(result.data) ? result.data : (result.data?.modules || []);
       this.logger.success(`Found ${this.modules.length} modules`);
@@ -426,9 +466,9 @@ export class AdminBot {
     }
 
     const module = randomElement(this.modules);
-    
+
     this.logger.action(`Toggling module: ${module.name || module.slug}...`);
-    
+
     // Just toggle enabled status
     const result = await this.api.updateModule(module.id, {
       enabled: !module.enabled,
@@ -437,7 +477,7 @@ export class AdminBot {
     if (result.success) {
       module.enabled = !module.enabled;
       this.logger.success(`Module ${module.name || module.slug} is now ${module.enabled ? 'enabled' : 'disabled'}`);
-      
+
       // Toggle it back to avoid breaking things
       await this.api.updateModule(module.id, { enabled: !module.enabled });
     }
@@ -448,9 +488,9 @@ export class AdminBot {
     const moduleNum = randomInt(1, 9999);
     const moduleName = `Test Module ${moduleNum}`;
     const moduleSlug = `test-module-${moduleNum}`;
-    
+
     this.logger.action(`Creating new dynamic module: ${moduleName}...`);
-    
+
     const result = await this.api.createModule({
       name: moduleName,
       slug: moduleSlug,
@@ -469,7 +509,7 @@ export class AdminBot {
       const newModule = result.data;
       this.modules.push(newModule);
       this.logger.success(`✨ Created module: ${moduleName} (${moduleSlug})`);
-      
+
       // Create some menu items for the new module
       await this.createModuleMenuItems(newModule.id || newModule.data?.id);
     }
@@ -478,7 +518,7 @@ export class AdminBot {
 
   private async createModuleMenuItems(moduleId: string): Promise<void> {
     if (!moduleId) return;
-    
+
     const items = [
       { name: 'Module Special', price: randomInt(10000, 50000), description: 'House specialty' },
       { name: 'Daily Deal', price: randomInt(5000, 25000), description: 'Today\'s special' },
@@ -503,9 +543,9 @@ export class AdminBot {
 
   private async viewSettings(): Promise<boolean> {
     this.logger.action('Viewing site settings...');
-    
+
     const result = await this.api.getSettings();
-    
+
     if (result.success) {
       this.logger.success('Settings loaded');
     }
@@ -514,7 +554,7 @@ export class AdminBot {
 
   private async updateSettings(): Promise<boolean> {
     this.logger.action('Updating settings...');
-    
+
     // Get current settings first
     const current = await this.api.getSettings();
     if (!current.success || !current.data) return false;
@@ -533,9 +573,9 @@ export class AdminBot {
 
   private async viewReviews(): Promise<boolean> {
     this.logger.action('Viewing reviews...');
-    
+
     const result = await this.api.getAdminReviews();
-    
+
     if (result.success) {
       this.reviews = Array.isArray(result.data) ? result.data : (result.data?.reviews || []);
       const pending = this.reviews.filter(r => r.status === 'pending').length;
@@ -553,7 +593,7 @@ export class AdminBot {
     }
 
     this.logger.action(`Approving review ${pendingReview.id}...`);
-    
+
     const result = await this.api.approveReview(pendingReview.id);
 
     if (result.success) {
@@ -572,7 +612,7 @@ export class AdminBot {
     }
 
     this.logger.action(`Rejecting review ${pendingReview.id}...`);
-    
+
     const result = await this.api.rejectReview(pendingReview.id);
 
     if (result.success) {
@@ -584,9 +624,9 @@ export class AdminBot {
 
   private async viewAuditLogs(): Promise<boolean> {
     this.logger.action('Viewing audit logs...');
-    
+
     const result = await this.api.getAuditLogs();
-    
+
     if (result.success) {
       const count = Array.isArray(result.data) ? result.data.length : (result.data?.logs?.length || 0);
       this.logger.success(`Found ${count} audit log entries`);
@@ -596,9 +636,9 @@ export class AdminBot {
 
   private async createBackup(): Promise<boolean> {
     this.logger.action('Creating system backup...');
-    
+
     const result = await this.api.createBackup();
-    
+
     if (result.success) {
       this.logger.success(`Backup created: ${result.data?.filename || 'unknown'}`);
     }
@@ -607,9 +647,9 @@ export class AdminBot {
 
   private async manageMenuCategory(): Promise<boolean> {
     const module = randomElement(['restaurant', 'snack']) as 'restaurant' | 'snack';
-    
+
     this.logger.action(`Managing ${module} menu categories...`);
-    
+
     // Create a test category
     const result = await this.api.createMenuCategory(module, {
       name: `Test Category ${randomInt(1, 100)}`,
@@ -626,10 +666,10 @@ export class AdminBot {
 
   private async manageMenuItem(): Promise<boolean> {
     const module = randomElement(['restaurant', 'snack']) as 'restaurant' | 'snack';
-    
+
     // For now just toggle availability of an existing item
     this.logger.action(`Managing ${module} menu items...`);
-    
+
     // Get categories first
     const catResult = await this.api.getRestaurantCategories();
     if (!catResult.success || !catResult.data) return false;
@@ -655,10 +695,10 @@ export class AdminBot {
 
   private async manageChalet(): Promise<boolean> {
     this.logger.action('Managing chalets...');
-    
+
     // View chalets (don't create new ones during stress test)
     const result = await this.api.getChalets();
-    
+
     if (result.success) {
       this.chalets = Array.isArray(result.data) ? result.data : (result.data?.chalets || []);
       this.logger.success(`Found ${this.chalets.length} chalets`);
@@ -668,9 +708,9 @@ export class AdminBot {
 
   private async managePoolSession(): Promise<boolean> {
     this.logger.action('Managing pool sessions...');
-    
+
     const result = await this.api.getPoolSessions();
-    
+
     if (result.success) {
       this.poolSessions = Array.isArray(result.data) ? result.data : (result.data?.sessions || []);
       this.logger.success(`Found ${this.poolSessions.length} pool sessions`);
@@ -680,17 +720,17 @@ export class AdminBot {
 
   private async manageBackups(): Promise<boolean> {
     this.logger.action('Managing backups...');
-    
+
     // List backups
     const listResult = await this.api.getBackups();
     if (!listResult.success || !listResult.data) {
       this.logger.warn('Failed to list backups');
       return false;
     }
-    
+
     // Safely cast the list
-    const backups = Array.isArray(listResult.data) 
-      ? listResult.data 
+    const backups = Array.isArray(listResult.data)
+      ? listResult.data
       : (listResult.data.backups || []);
 
     this.logger.success(`Found ${backups.length} backups`);
@@ -707,18 +747,18 @@ export class AdminBot {
       // Create a backup if we don't have enough
       await this.createBackup();
     }
-    
+
     return true;
   }
 
   private async compareTranslations(): Promise<boolean> {
     this.logger.action('Comparing translations...');
-    
+
     const langs = ['en', 'fr', 'ar'];
     const targetLang = randomElement(langs);
-    
+
     const result = await this.api.compareTranslations(targetLang);
-    
+
     if (result.success) {
       const keys = result.data?.keys || [];
       const missingCount = result.data?.missing?.length || 0;
@@ -799,10 +839,10 @@ export class AdminBot {
   // ─────────────────────────────────────────────────────────────
   private async testDashboardAndReports(): Promise<void> {
     let start = Date.now();
-    
+
     // Dashboard
     const dashResult = await this.api.getDashboard();
-    this.recordTestResult('Dashboard', 'LOAD', dashResult.success, 
+    this.recordTestResult('Dashboard', 'LOAD', dashResult.success,
       dashResult.success ? `Loaded: ${JSON.stringify(dashResult.data).slice(0, 100)}...` : dashResult.error || 'Failed',
       Date.now() - start);
 
@@ -1097,7 +1137,7 @@ export class AdminBot {
     const chaletsResult = await this.api.getChalets();
     const chalets = Array.isArray(chaletsResult.data) ? chaletsResult.data : chaletsResult.data?.data || [];
     let chaletId = chalets[0]?.id;
-    
+
     // If no chalet exists, create one first
     if (!chaletId) {
       const createChaletResult = await this.api.createChalet({
@@ -1111,7 +1151,7 @@ export class AdminBot {
       });
       chaletId = createChaletResult.data?.id || createChaletResult.data?.data?.id;
     }
-    
+
     if (!chaletId) {
       this.recordTestResult('Chalet Pricing', 'CREATE', false, 'No chalet available for price rule', 0);
       return;
@@ -1458,7 +1498,7 @@ export class AdminBot {
         updateResult.success ? 'General settings updated' : updateResult.error || 'Failed',
         Date.now() - start);
     }
-    
+
     // Note: Homepage, footer, and appearance settings are stored within general settings
     // and don't have separate routes
   }
@@ -1519,7 +1559,7 @@ export class AdminBot {
     this.recordTestResult('Notifications', 'LIST', listResult.success,
       listResult.success ? `Found ${notifications.length} notifications` : listResult.error || 'Failed',
       Date.now() - start);
-    
+
     // Note: Send notification route doesn't exist - only listing is available
   }
 
@@ -1564,6 +1604,220 @@ export class AdminBot {
       const recentLog = logs[0];
       this.recordTestResult('Audit Logs', 'VERIFY_RECENT', true,
         `Most recent: ${recentLog.action || recentLog.event_type || 'unknown'} at ${recentLog.created_at || 'unknown'}`, 0);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // INVENTORY MANAGEMENT
+  // ─────────────────────────────────────────────────────────────
+  private async manageInventory(): Promise<boolean> {
+    const subAction = Math.random();
+
+    if (subAction < 0.3) {
+      // View categories
+      this.logger.action('📦 Viewing inventory categories...');
+      const result = await this.api.getInventoryCategories();
+      if (result.success) this.logger.success('Inventory categories loaded');
+      return result.success;
+    } else if (subAction < 0.6) {
+      // View items
+      this.logger.action('📦 Viewing inventory items...');
+      const result = await this.api.getInventoryItems();
+      if (result.success) this.logger.success('Inventory items loaded');
+      return result.success;
+    } else if (subAction < 0.8) {
+      // View alerts
+      this.logger.action('📦 Checking inventory alerts...');
+      const result = await this.api.getInventoryAlerts();
+      if (result.success) this.logger.success('Inventory alerts loaded');
+      return result.success;
+    } else {
+      // View stats
+      this.logger.action('📦 Viewing inventory stats...');
+      const result = await this.api.getInventoryStats();
+      if (result.success) this.logger.success('Inventory stats loaded');
+      return result.success;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // HOUSEKEEPING MANAGEMENT
+  // ─────────────────────────────────────────────────────────────
+  private async manageHousekeeping(): Promise<boolean> {
+    const subAction = Math.random();
+
+    if (subAction < 0.3) {
+      this.logger.action('🧹 Viewing housekeeping tasks...');
+      const result = await this.api.getHousekeepingTasks();
+      if (result.success) this.logger.success('Housekeeping tasks loaded');
+      return result.success;
+    } else if (subAction < 0.5) {
+      this.logger.action('🧹 Viewing housekeeping schedules...');
+      const result = await this.api.getHousekeepingSchedules();
+      if (result.success) this.logger.success('Housekeeping schedules loaded');
+      return result.success;
+    } else if (subAction < 0.7) {
+      this.logger.action('🧹 Viewing available housekeeping staff...');
+      const result = await this.api.getAvailableHousekeepingStaff();
+      if (result.success) this.logger.success('Available staff loaded');
+      return result.success;
+    } else {
+      this.logger.action('🧹 Viewing housekeeping stats...');
+      const result = await this.api.getHousekeepingStats();
+      if (result.success) this.logger.success('Housekeeping stats loaded');
+      return result.success;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // LOYALTY MANAGEMENT (ADMIN)
+  // ─────────────────────────────────────────────────────────────
+  private async manageLoyalty(): Promise<boolean> {
+    const subAction = Math.random();
+
+    if (subAction < 0.4) {
+      this.logger.action('⭐ Viewing all loyalty accounts...');
+      const result = await this.api.getAllLoyaltyAccounts();
+      if (result.success) this.logger.success('Loyalty accounts loaded');
+      return result.success;
+    } else if (subAction < 0.7) {
+      this.logger.action('⭐ Viewing loyalty stats...');
+      const result = await this.api.getLoyaltyStats();
+      if (result.success) this.logger.success('Loyalty stats loaded');
+      return result.success;
+    } else {
+      this.logger.action('⭐ Viewing loyalty tiers...');
+      const result = await this.api.getLoyaltyTiers();
+      if (result.success) this.logger.success('Loyalty tiers loaded');
+      return result.success;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // GIFT CARDS MANAGEMENT (ADMIN)
+  // ─────────────────────────────────────────────────────────────
+  private async manageGiftCards(): Promise<boolean> {
+    const subAction = Math.random();
+
+    if (subAction < 0.4) {
+      this.logger.action('🎁 Viewing all gift cards...');
+      const result = await this.api.getAllGiftCards();
+      if (result.success) this.logger.success('Gift cards loaded');
+      return result.success;
+    } else if (subAction < 0.7) {
+      this.logger.action('🎁 Viewing gift card stats...');
+      const result = await this.api.getGiftCardStats();
+      if (result.success) this.logger.success('Gift card stats loaded');
+      return result.success;
+    } else {
+      this.logger.action('🎁 Viewing gift card templates...');
+      const result = await this.api.getGiftCardTemplates();
+      if (result.success) this.logger.success('Gift card templates loaded');
+      return result.success;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // COUPONS MANAGEMENT (ADMIN)
+  // ─────────────────────────────────────────────────────────────
+  private async manageCoupons(): Promise<boolean> {
+    const subAction = Math.random();
+
+    if (subAction < 0.4) {
+      this.logger.action('🏷️ Viewing all coupons...');
+      const result = await this.api.getAllCoupons();
+      if (result.success) this.logger.success('Coupons loaded');
+      return result.success;
+    } else if (subAction < 0.7) {
+      this.logger.action('🏷️ Viewing coupon stats...');
+      const result = await this.api.getCouponStats();
+      if (result.success) this.logger.success('Coupon stats loaded');
+      return result.success;
+    } else {
+      this.logger.action('🏷️ Generating coupon code...');
+      const result = await this.api.generateCouponCode();
+      if (result.success) this.logger.success('Coupon code generated');
+      return result.success;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CHANNELS MANAGEMENT
+  // ─────────────────────────────────────────────────────────────
+  private async manageChannels(): Promise<boolean> {
+    this.logger.action('📡 Viewing channel connections...');
+    // Use a default property ID since we're testing the endpoint
+    const result = await this.api.getChannelConnections('default');
+    if (result.success) {
+      this.logger.success('Channel connections loaded');
+    }
+    return result.success;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CUSTOMIZATIONS MANAGEMENT
+  // ─────────────────────────────────────────────────────────────
+  private async manageCustomizations(): Promise<boolean> {
+    this.logger.action('🎨 Viewing customization groups...');
+    const result = await this.api.getCustomizationGroups();
+    if (result.success) {
+      this.logger.success('Customization groups loaded');
+    }
+    return result.success;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // TERMINOLOGY MANAGEMENT
+  // ─────────────────────────────────────────────────────────────
+  private async manageTerminology(): Promise<boolean> {
+    this.logger.action('📝 Viewing terminology...');
+    const result = await this.api.getTerminology();
+    if (result.success) {
+      this.logger.success('Terminology loaded');
+    }
+    return result.success;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // NOTIFICATIONS MANAGEMENT
+  // ─────────────────────────────────────────────────────────────
+  private async manageNotifications(): Promise<boolean> {
+    const subAction = Math.random();
+
+    if (subAction < 0.6) {
+      this.logger.action('🔔 Viewing notifications...');
+      const result = await this.api.getAdminNotifications();
+      if (result.success) this.logger.success('Notifications loaded');
+      return result.success;
+    } else {
+      this.logger.action('🔔 Sending notification...');
+      const result = await this.api.sendNotification({
+        title: 'Stress Test Alert',
+        message: 'Admin bot notification test',
+        type: 'info',
+        target_type: 'all',
+      });
+      if (result.success) this.logger.success('Notification sent');
+      return result.success;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // KIOSK MANAGEMENT
+  // ─────────────────────────────────────────────────────────────
+  private async manageKiosk(): Promise<boolean> {
+    const subAction = Math.random();
+
+    if (subAction < 0.5) {
+      this.logger.action('🖥️ Viewing kiosk devices...');
+      const result = await this.api.getKioskDevices();
+      if (result.success) this.logger.success('Kiosk devices loaded');
+      return result.success;
+    } else {
+      this.logger.action('🖥️ Viewing kiosk sessions...');
+      const result = await this.api.getKioskSessions();
+      if (result.success) this.logger.success('Kiosk sessions loaded');
+      return result.success;
     }
   }
 }

@@ -84,8 +84,6 @@ export type {
 export {
   SupabasePoolRepository,
   createPoolRepository,
-  InMemoryPoolRepository,
-  createInMemoryPoolRepository,
 } from './repositories/index.js';
 
 // Services

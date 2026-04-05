@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import hpp from 'hpp';
@@ -35,10 +36,10 @@ export const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      styleSrc: ["'self'", 'https://fonts.googleapis.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Adjust for prod
+      scriptSrc: ["'self'", "'strict-dynamic'", 'https://js.stripe.com'],
       connectSrc: ["'self'", 'https:', 'wss:'],
       frameSrc: ["'self'", 'https://js.stripe.com'],
       objectSrc: ["'none'"],
@@ -174,24 +175,21 @@ export function sqlInjectionDetector(
   if (suspicious) {
     securityAuditLogger.logSecurityEvent({
       eventType: securityAuditLogger.SecurityEventType.SUSPICIOUS_ACTIVITY,
-      severity: securityAuditLogger.SecurityEventSeverity.CRITICAL,
+      severity: securityAuditLogger.SecurityEventSeverity.WARNING,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
-      description: 'Potential SQL injection detected',
+      description: 'Potential SQL injection pattern detected (log-only)',
       metadata: {
-        outcome: 'blocked',
+        outcome: 'logged',
         details: {
-          reason: 'Potential SQL injection detected',
+          reason: 'Potential SQL injection pattern detected (log-only, ORM uses parameterized queries)',
           path: req.path,
           method: req.method,
         }
       },
     });
-
-    return res.status(400).json({
-      error: 'Bad Request',
-      message: 'Request contains invalid characters',
-    });
+    // Log only — do not block. The ORM uses parameterized queries,
+    // so regex-based detection causes false positives on legitimate inputs.
   }
 
   next();
@@ -316,36 +314,75 @@ export const passwordResetRateLimiter = createRateLimiter({
 /**
  * API key validation middleware
  */
-export function apiKeyValidator(
+export async function apiKeyValidator(
   req: Request,
   res: Response,
   next: NextFunction
-) {
+): Promise<void> {
   const apiKey = req.headers['x-api-key'] as string;
 
   if (!apiKey) {
     // Allow if user is authenticated via JWT
     if (req.user) {
-      return next();
+      next();
+      return;
     }
 
-    return res.status(401).json({
+    res.status(401).json({
       error: 'Unauthorized',
       message: 'API key required',
     });
+    return;
   }
 
   // Validate API key format
   if (!/^v2_[a-zA-Z0-9]{32,64}$/.test(apiKey)) {
-    return res.status(401).json({
+    res.status(401).json({
       error: 'Unauthorized',
       message: 'Invalid API key format',
     });
+    return;
   }
 
-  // API key validation would happen here against database
-  // For now, just pass through
-  next();
+  try {
+    // Validate API key against database
+    const { getSupabase } = await import('../database/connection.js');
+    const supabase = getSupabase();
+    const { data: keyRecord, error } = await supabase
+      .from('api_keys')
+      .select('id, user_id, scopes, is_active, expires_at')
+      .eq('key_hash', crypto.createHash('sha256').update(apiKey).digest('hex'))
+      .eq('is_active', true)
+      .single();
+
+    if (error || !keyRecord) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid API key',
+      });
+      return;
+    }
+
+    // Check expiry
+    if (keyRecord.expires_at && new Date(keyRecord.expires_at) < new Date()) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'API key expired',
+      });
+      return;
+    }
+
+    // Attach key info for downstream use
+    (req as any).apiKeyId = keyRecord.id;
+    (req as any).apiKeyUserId = keyRecord.user_id;
+    (req as any).apiKeyScopes = keyRecord.scopes;
+    next();
+  } catch {
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'API key validation failed',
+    });
+  }
 }
 
 /**
@@ -357,7 +394,7 @@ export function requestIdInjector(
   next: NextFunction
 ) {
   const requestId = req.headers['x-request-id'] as string ||
-    `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    `req_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
 
   req.requestId = requestId;
   res.setHeader('X-Request-ID', requestId);

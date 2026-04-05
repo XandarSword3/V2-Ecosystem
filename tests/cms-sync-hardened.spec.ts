@@ -412,7 +412,7 @@ test.describe('Footer CMS Sync', () => {
       }
     } else {
       // No description input found - verify footer settings page loads
-      await expect(page.getByText(/footer/i)).toBeVisible();
+      await expect(page.getByRole('heading', { name: /footer/i }).first()).toBeVisible();
     }
   });
 
@@ -421,34 +421,46 @@ test.describe('Footer CMS Sync', () => {
     
     await page.goto(`${FRONTEND_URL}/admin/settings/footer`, { waitUntil: 'networkidle' });
     
-    // Look for social link inputs
-    const socialInputs = page.locator('input[placeholder*="facebook"], input[placeholder*="twitter"], input[name*="social"]');
-    const socialCount = await socialInputs.count();
-    
-    if (socialCount > 0) {
+    // The footer settings page uses <select platform> + <input placeholder="URL"> rows.
+    const socialRow = page
+      .locator('div')
+      .filter({ has: page.locator('select') })
+      .filter({ has: page.getByPlaceholder('URL') })
+      .first();
+
+    if (await socialRow.isVisible().catch(() => false)) {
+      const platformSelect = socialRow.locator('select').first();
+      const urlInput = socialRow.getByPlaceholder('URL').first();
+      const saveButton = page.getByRole('button', { name: /save/i }).first();
       const testUrl = 'https://facebook.com/e2etest';
-      const originalUrl = await socialInputs.first().inputValue();
-      
-      await socialInputs.first().fill(testUrl);
-      
-      const saveButton = page.getByRole('button', { name: /save/i });
+
+      const originalPlatform = await platformSelect.inputValue();
+      const originalUrl = await urlInput.inputValue();
+
+      await platformSelect.selectOption('facebook');
+      await urlInput.fill(testUrl);
+
       if (await saveButton.isVisible()) {
         await saveButton.click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(1500);
       }
-      
-      // Check public page footer
+
       await page.goto(FRONTEND_URL, { waitUntil: 'networkidle' });
-      
-      const footerLinks = page.locator('footer a[href*="facebook"]');
-      if (await footerLinks.count() > 0) {
-        const href = await footerLinks.first().getAttribute('href');
-        expect(href).toContain('e2etest');
-      }
-      
-      // Restore
+      const propagated = await page.locator('footer a[href*="facebook.com/e2etest"]').count();
+      expect(propagated).toBeGreaterThan(0);
+
+      // Restore original value
       await page.goto(`${FRONTEND_URL}/admin/settings/footer`, { waitUntil: 'networkidle' });
-      await socialInputs.first().fill(originalUrl || '');
+      const restoreRow = page
+        .locator('div')
+        .filter({ has: page.locator('select') })
+        .filter({ has: page.getByPlaceholder('URL') })
+        .first();
+      const restorePlatform = restoreRow.locator('select').first();
+      const restoreUrl = restoreRow.getByPlaceholder('URL').first();
+
+      await restorePlatform.selectOption(originalPlatform || 'facebook');
+      await restoreUrl.fill(originalUrl || '');
       if (await saveButton.isVisible()) {
         await saveButton.click();
       }

@@ -66,6 +66,16 @@ export default function DynamicReservationsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newReservation, setNewReservation] = useState({
+    guest_name: '',
+    guest_email: '',
+    guest_phone: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '19:00',
+    party_size: 2,
+    special_requests: '',
+  });
 
   // Fetch reservations for selected date
   const { data: reservations = [], isLoading } = useQuery({
@@ -124,6 +134,34 @@ export default function DynamicReservationsPage() {
     }
   });
 
+  // Create reservation
+  const createReservationMutation = useMutation({
+    mutationFn: async (data: typeof newReservation) => {
+      const res = await api.post('/restaurant/reservations', {
+        ...data,
+        module_id: currentModule?.id,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      setShowCreateModal(false);
+      setNewReservation({
+        guest_name: '',
+        guest_email: '',
+        guest_phone: '',
+        date: new Date().toISOString().split('T')[0],
+        time: '19:00',
+        party_size: 2,
+        special_requests: '',
+      });
+      toast.success('Reservation created');
+    },
+    onError: () => {
+      toast.error('Failed to create reservation');
+    }
+  });
+
   // Filter reservations
   const filteredReservations = reservations.filter((r: Reservation) => {
     const matchesSearch = !searchTerm || 
@@ -173,7 +211,10 @@ export default function DynamicReservationsPage() {
           </h1>
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">Manage bookings</p>
         </div>
-        <button className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors w-full sm:w-auto">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors w-full sm:w-auto"
+        >
           <Plus className="w-4 h-4" />
           <span>New Reservation</span>
         </button>
@@ -383,6 +424,112 @@ export default function DynamicReservationsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Create Reservation Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+              New Reservation
+            </h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Guest Name *</label>
+                <input
+                  type="text"
+                  value={newReservation.guest_name}
+                  onChange={(e) => setNewReservation(prev => ({ ...prev, guest_name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  placeholder="John Doe"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={newReservation.guest_email}
+                    onChange={(e) => setNewReservation(prev => ({ ...prev, guest_email: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={newReservation.guest_phone}
+                    onChange={(e) => setNewReservation(prev => ({ ...prev, guest_phone: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Date *</label>
+                  <input
+                    type="date"
+                    value={newReservation.date}
+                    onChange={(e) => setNewReservation(prev => ({ ...prev, date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Time *</label>
+                  <input
+                    type="time"
+                    value={newReservation.time}
+                    onChange={(e) => setNewReservation(prev => ({ ...prev, time: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Party Size *</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={newReservation.party_size}
+                  onChange={(e) => setNewReservation(prev => ({ ...prev, party_size: parseInt(e.target.value) || 1 }))}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Special Requests</label>
+                <textarea
+                  value={newReservation.special_requests}
+                  onChange={(e) => setNewReservation(prev => ({ ...prev, special_requests: e.target.value }))}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  placeholder="Allergies, birthday, etc."
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!newReservation.guest_name || !newReservation.date || !newReservation.time) {
+                    toast.error('Please fill in required fields');
+                    return;
+                  }
+                  createReservationMutation.mutate(newReservation);
+                }}
+                disabled={createReservationMutation.isPending}
+                className="flex-1 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {createReservationMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                Create
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

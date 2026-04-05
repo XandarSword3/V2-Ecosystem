@@ -16,7 +16,17 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       menuItemId: item.menuItemId,
       quantity: item.quantity,
       specialInstructions: item.notes,
-      selectedModifiers: item.selectedModifiers,
+      selectedModifiers: item.selectedModifiers?.map(modifier => ({
+        optionId: modifier.optionId,
+        optionName: modifier.optionName ?? '',
+        groupId: modifier.groupId,
+        groupName: modifier.groupName ?? '',
+        modifierType: modifier.modifierType ?? 'add',
+        priceAdjustment: modifier.priceAdjustment ?? 0,
+        quantity: modifier.quantity ?? 1,
+        inventoryItemId: modifier.inventoryItemId,
+        inventoryQuantity: modifier.inventoryQuantity,
+      })),
       modifierTotal: item.modifierTotal,
     }));
 
@@ -66,7 +76,8 @@ export const getOrder = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const userRoles = req.user?.roles || [];
     const isOwner = order.customer_id === userId;
-    const isAdminOrStaff = userRoles.includes('admin') || userRoles.includes('staff');
+    const staffLikeRoles = ['admin', 'super_admin', 'staff', 'restaurant_staff', 'restaurant_admin', 'snack_bar_staff', 'snack_bar_admin'];
+    const isAdminOrStaff = userRoles.some(r => staffLikeRoles.includes(r));
     
     // Guest orders (no customer_id) can be viewed by anyone with the order ID
     // This allows guests to see their order confirmation page

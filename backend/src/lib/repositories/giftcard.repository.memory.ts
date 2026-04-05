@@ -1,53 +1,45 @@
 /**
- * In-Memory Gift Card Repository
- * 
- * Test double implementation for gift card operations.
+ * In-Memory GiftCard Repository
+ * Test double for GiftCardRepository using in-memory data structures.
  */
 
-import { randomUUID } from 'crypto';
-import type { 
-  GiftCardRepository, 
-  GiftCard, 
-  GiftCardTransaction 
-} from '../container/types';
+import type {
+  GiftCardRepository,
+  GiftCard,
+  GiftCardTransaction,
+} from '../container/types.js';
 
 export class InMemoryGiftCardRepository implements GiftCardRepository {
-  private giftCards: Map<string, GiftCard> = new Map();
-  private transactions: Map<string, GiftCardTransaction> = new Map();
+  private giftCards = new Map<string, GiftCard>();
+  private transactions: GiftCardTransaction[] = [];
+
+  reset() {
+    this.giftCards.clear();
+    this.transactions = [];
+  }
 
   async getById(id: string): Promise<GiftCard | null> {
-    return this.giftCards.get(id) || null;
+    return this.giftCards.get(id) ?? null;
   }
 
   async getByCode(code: string): Promise<GiftCard | null> {
-    const cards = Array.from(this.giftCards.values());
-    return cards.find(c => c.code === code.toUpperCase()) || null;
+    for (const gc of this.giftCards.values()) {
+      if (gc.code === code) return gc;
+    }
+    return null;
   }
 
   async create(data: Omit<GiftCard, 'id' | 'createdAt' | 'updatedAt'>): Promise<GiftCard> {
-    const giftCard: GiftCard = {
-      ...data,
-      code: data.code.toUpperCase(),
-      id: randomUUID(),
-      createdAt: new Date().toISOString(),
-      updatedAt: null,
-    };
-    this.giftCards.set(giftCard.id, giftCard);
+    const id = crypto.randomUUID();
+    const giftCard: GiftCard = { ...data, id, createdAt: new Date().toISOString(), updatedAt: null };
+    this.giftCards.set(id, giftCard);
     return giftCard;
   }
 
   async update(id: string, data: Partial<GiftCard>): Promise<GiftCard> {
     const existing = this.giftCards.get(id);
-    if (!existing) throw new Error('Gift card not found');
-    
-    const updated: GiftCard = {
-      ...existing,
-      ...data,
-      id: existing.id,
-      code: existing.code,
-      createdAt: existing.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
+    if (!existing) throw new Error(`GiftCard ${id} not found`);
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
     this.giftCards.set(id, updated);
     return updated;
   }
@@ -57,43 +49,26 @@ export class InMemoryGiftCardRepository implements GiftCardRepository {
   }
 
   async getByPurchaser(purchaserId: string): Promise<GiftCard[]> {
-    return Array.from(this.giftCards.values())
-      .filter(c => c.purchasedBy === purchaserId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return [...this.giftCards.values()].filter(gc => gc.purchasedBy === purchaserId);
   }
 
   async getByRecipient(recipientEmail: string): Promise<GiftCard[]> {
-    return Array.from(this.giftCards.values())
-      .filter(c => c.recipientEmail?.toLowerCase() === recipientEmail.toLowerCase())
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return [...this.giftCards.values()].filter(gc => gc.recipientEmail === recipientEmail);
   }
 
   async getExpiring(beforeDate: string): Promise<GiftCard[]> {
-    const before = new Date(beforeDate).getTime();
-    return Array.from(this.giftCards.values())
-      .filter(c => c.status === 'active' && new Date(c.expiresAt).getTime() <= before)
-      .sort((a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime());
+    return [...this.giftCards.values()].filter(
+      gc => gc.status === 'active' && gc.expiresAt <= beforeDate
+    );
   }
 
   async logTransaction(data: Omit<GiftCardTransaction, 'id' | 'createdAt'>): Promise<GiftCardTransaction> {
-    const transaction: GiftCardTransaction = {
-      ...data,
-      id: randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
-    this.transactions.set(transaction.id, transaction);
-    return transaction;
+    const tx: GiftCardTransaction = { ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    this.transactions.push(tx);
+    return tx;
   }
 
   async getTransactions(giftCardId: string): Promise<GiftCardTransaction[]> {
-    return Array.from(this.transactions.values())
-      .filter(t => t.giftCardId === giftCardId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  // Test utility method
-  clear(): void {
-    this.giftCards.clear();
-    this.transactions.clear();
+    return this.transactions.filter(t => t.giftCardId === giftCardId);
   }
 }

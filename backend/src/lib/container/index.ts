@@ -31,7 +31,6 @@ import { config as appConfig } from '../../config/index.js';
 import { getSupabase } from '../../database/connection.js';
 import QRCode from 'qrcode';
 
-import { createInMemoryNotificationRepository } from '../repositories/notification.repository.memory.js';
 import { createSupabaseNotificationRepository } from '../repositories/notification.repository.supabase.js';
 import { createNotificationService } from '../services/notification.service.js';
 
@@ -84,7 +83,7 @@ class WinstonLoggerAdapter implements LoggerService {
  * Activity logger that writes to database
  */
 class ActivityLoggerImpl implements ActivityLoggerService {
-  constructor(private readonly db: SupabaseClient) {}
+  constructor(private readonly db: SupabaseClient) { }
 
   async log(action: string, details: Record<string, unknown>, userId?: string): Promise<void> {
     try {
@@ -150,11 +149,11 @@ export function createContainer(overrides?: Partial<Container>): Container {
 
   // Default implementations
   const supabase = getSupabase();
-  
+
   // Core defaults - use Supabase for production, in-memory for tests
   // Use Supabase notification repository for persistent notifications
   const notificationRepo = createSupabaseNotificationRepository();
-  
+
   const defaults: Partial<Container> = {
     // Database client (Supabase adapter)
     database: supabase as unknown as DatabaseClient,

@@ -47,6 +47,27 @@ vi.mock('../../../src/utils/activityLogger.js', () => ({
   logActivity: vi.fn(),
 }));
 
+// Mock engine service for state transitions
+vi.mock('../../../src/engines/engine-service.js', () => ({
+  getEngineService: vi.fn(() => ({
+    transitionState: vi.fn().mockResolvedValue({ allowed: true, targetState: 'preparing' }),
+    getAvailableActions: vi.fn().mockReturnValue([]),
+    calculatePricing: vi.fn().mockResolvedValue({
+      subtotal: 20,
+      taxAmount: 2,
+      serviceCharge: 0,
+      deliveryFee: 0,
+      totalDiscount: 0,
+      totalAmount: 22,
+      discounts: [],
+      surcharges: [],
+      loyaltyPointsEarned: 0,
+      metadata: {},
+    }),
+    getInitialState: vi.fn().mockReturnValue('pending'),
+  })),
+}));
+
 import { getSupabase } from '../../../src/database/connection.js';
 import { emitToUnit } from '../../../src/socket/index.js';
 
@@ -131,6 +152,7 @@ describe('Order Controller', () => {
           }
           return { select: vi.fn() };
         }),
+        rpc: vi.fn().mockResolvedValue({ data: [{ base_items_deducted: 1, modifier_items_deducted: 0, skipped_removals: 0 }], error: null }),
       };
 
       vi.mocked(getSupabase).mockReturnValue(mockClient as any);

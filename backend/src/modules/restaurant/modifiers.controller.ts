@@ -46,6 +46,7 @@ export const modifiersController = {
             if (error) throw error;
 
             // Create Options with full modifier support
+            let createdOptions: any[] = [];
             if (options && options.length > 0) {
                 const optionsData = (options as ModifierOption[]).map((opt, idx: number) => ({
                     modifier_group_id: group.id,
@@ -59,14 +60,16 @@ export const modifiersController = {
                     display_order: idx
                 }));
 
-                const { error: optError } = await supabase
+                const { data: insertedOptions, error: optError } = await supabase
                     .from('menu_modifier_options')
-                    .insert(optionsData);
+                    .insert(optionsData)
+                    .select();
 
                 if (optError) throw optError;
+                createdOptions = insertedOptions || [];
             }
 
-            res.status(201).json({ success: true, data: group });
+            res.status(201).json({ success: true, data: { ...group, options: createdOptions } });
     }),
 
     updateGroup: asyncHandler(async (req: Request, res: Response) => {
@@ -95,7 +98,12 @@ export const modifiersController = {
             const supabase = getSupabase();
             const { id } = req.params;
             // Soft delete
-            await supabase.from('menu_modifier_groups').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+            const { error } = await supabase
+            .from('menu_modifier_groups')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', id);
+
+            if (error) throw error;
             res.json({ success: true });
     }),
 

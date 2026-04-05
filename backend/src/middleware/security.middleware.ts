@@ -5,6 +5,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -85,15 +86,13 @@ export function suspiciousRequestDetector(req: Request, res: Response, next: Nex
   }
   
   if (suspicious.length > 0) {
-    logger.warn('Suspicious request detected', {
+    logger.warn('Suspicious request pattern detected', {
       ip: req.ip,
       path: req.path,
       method: req.method,
       suspicious,
       userAgent: req.headers['user-agent'],
     });
-    
-    // Block suspicious requests to prevent SQL injection attacks
     res.status(400).json({ error: 'Invalid request' });
     return;
   }
@@ -106,7 +105,7 @@ export function suspiciousRequestDetector(req: Request, res: Response, next: Nex
  */
 export function requestId(req: Request, res: Response, next: NextFunction): void {
   const id = req.headers['x-request-id'] as string || 
-    `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    `${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
   
   req.requestId = id;
   res.setHeader('X-Request-Id', id);

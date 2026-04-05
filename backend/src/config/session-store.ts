@@ -10,6 +10,7 @@ import { RedisStore } from 'connect-redis';
 // Environment configuration
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const REDIS_CLUSTER_NODES = process.env.REDIS_CLUSTER_NODES?.split(',') || [];
+const REDIS_ENABLED = process.env.REDIS_ENABLED === 'true';
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
@@ -62,41 +63,34 @@ export const createRedisClient = () => {
 };
 
 export const getRedis = () => {
+  if (!REDIS_ENABLED) return null;
   if (!redisInstance) {
     redisInstance = createRedisClient();
   }
   return redisInstance;
 };
 
-
-
 // Session store for horizontal scaling
-export const redisClient = createRedisClient();
+export const redisClient = REDIS_ENABLED ? createRedisClient() : null;
 
-// Event handlers
-redisClient.on('connect', () => {
-  console.log('[Redis] Connected to session store');
-});
-
-redisClient.on('error', (err) => {
-  console.error('[Redis] Session store error:', err.message);
-});
-
-redisClient.on('ready', () => {
-  console.log('[Redis] Session store ready');
-});
-
-redisClient.on('reconnecting', () => {
-  console.log('[Redis] Reconnecting to session store...');
-});
+// Setup event handlers only if redis is enabled
+if (REDIS_ENABLED && redisClient) {
+  redisClient.on('connect', () => { console.log('[Redis] Connected to session store'); });
+  redisClient.on('error', (err: any) => { console.error('[Redis] Session store error:', err.message); });
+  redisClient.on('ready', () => { console.log('[Redis] Session store ready'); });
+  redisClient.on('reconnecting', () => { console.log('[Redis] Reconnecting to session store...'); });
+}
 
 // Create Redis session store
 export const createSessionStore = () => {
-  return new RedisStore({
-    client: redisClient,
-    prefix: 'v2resort:session:',
-    ttl: 86400, // 24 hours default
-  });
+  if (REDIS_ENABLED && redisClient) {
+    return new RedisStore({
+      client: redisClient,
+      prefix: 'v2resort:session:',
+      ttl: 86400, // 24 hours default
+    });
+  }
+  return undefined; // Use default MemoryStore
 };
 
 // Session middleware configuration
@@ -126,6 +120,7 @@ export const sessionUtils = {
    * Get session by ID (for debugging/admin)
    */
   async getSession(sessionId: string): Promise<any | null> {
+    if (!REDIS_ENABLED || !redisClient) return null;
     const data = await redisClient.get(`v2resort:session:${sessionId}`);
     return data ? JSON.parse(data) : null;
   },
@@ -134,6 +129,7 @@ export const sessionUtils = {
    * Destroy session by ID (force logout)
    */
   async destroySession(sessionId: string): Promise<boolean> {
+    if (!REDIS_ENABLED || !redisClient) return false;
     const result = await redisClient.del(`v2resort:session:${sessionId}`);
     return result > 0;
   },
@@ -142,6 +138,7 @@ export const sessionUtils = {
    * Destroy all sessions for a user (logout everywhere)
    */
   async destroyUserSessions(userId: string): Promise<number> {
+    if (!REDIS_ENABLED || !redisClient) return 0;
     const pattern = 'v2resort:session:*';
     let cursor = '0';
     let count = 0;
@@ -169,6 +166,7 @@ export const sessionUtils = {
    * Get active session count for a user
    */
   async getUserSessionCount(userId: string): Promise<number> {
+    if (!REDIS_ENABLED || !redisClient) return 0;
     const pattern = 'v2resort:session:*';
     let cursor = '0';
     let count = 0;
@@ -195,6 +193,7 @@ export const sessionUtils = {
    * Extend session TTL
    */
   async extendSession(sessionId: string, ttlSeconds: number): Promise<boolean> {
+    if (!REDIS_ENABLED || !redisClient) return false;
     const result = await redisClient.expire(`v2resort:session:${sessionId}`, ttlSeconds);
     return result === 1;
   },
@@ -203,6 +202,7 @@ export const sessionUtils = {
    * Get total active sessions (for monitoring)
    */
   async getTotalSessionCount(): Promise<number> {
+    if (!REDIS_ENABLED || !redisClient) return 0;
     const pattern = 'v2resort:session:*';
     let cursor = '0';
     let count = 0;
@@ -224,6 +224,9 @@ export const checkSessionStoreHealth = async (): Promise<{
   error?: string;
 }> => {
   const start = Date.now();
+  if (!REDIS_ENABLED || !redisClient) {
+    return { healthy: true, latencyMs: 0 };
+  }
   try {
     await redisClient.ping();
     return {
@@ -241,6 +244,7 @@ export const checkSessionStoreHealth = async (): Promise<{
 
 // Graceful shutdown
 export const closeSessionStore = async (): Promise<void> => {
+  if (!REDIS_ENABLED || !redisClient) return;
   console.log('[Redis] Closing session store connection...');
   await redisClient.quit();
   console.log('[Redis] Session store connection closed');

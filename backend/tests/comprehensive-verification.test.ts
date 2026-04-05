@@ -13,6 +13,7 @@ const shouldRunIntegrationTests = process.env.RUN_INTEGRATION_TESTS === 'true';
 vi.mock('../src/socket', () => ({
     emitToAll: vi.fn(),
     emitToUser: vi.fn(),
+    initializeSocketServer: vi.fn(),
     getIO: () => ({
         emit: vi.fn(),
         to: vi.fn().mockReturnThis(),

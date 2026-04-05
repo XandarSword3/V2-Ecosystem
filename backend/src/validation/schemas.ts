@@ -135,12 +135,12 @@ export const updatePoolTicketSchema = z.object({
 // Schema for selected modifiers in order items
 const selectedModifierSchema = z.object({
   optionId: uuidSchema,
-  optionName: z.string().max(100),
+  optionName: z.string().max(100).optional().default(''),
   groupId: uuidSchema,
-  groupName: z.string().max(100),
-  modifierType: z.enum(['add', 'remove', 'swap']),
-  priceAdjustment: z.number(),
-  quantity: z.number().int().min(1).max(10),
+  groupName: z.string().max(100).optional().default(''),
+  modifierType: z.enum(['add', 'remove', 'swap']).optional().default('add'),
+  priceAdjustment: z.number().optional().default(0),
+  quantity: z.number().int().min(1).max(10).optional().default(1),
   inventoryItemId: uuidSchema.optional(),
   inventoryQuantity: z.number().optional(),
 });
@@ -256,6 +256,7 @@ export const adminUpdateUserSchema = z.object({
   fullName: nameSchema.optional(),
   phone: phoneSchema,
   isActive: z.boolean().optional(),
+  emailVerified: z.boolean().optional(),
   preferredLanguage: z.enum(['en', 'ar', 'fr']).optional(),
 });
 

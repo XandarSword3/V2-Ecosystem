@@ -263,6 +263,7 @@ describe('BackupService', () => {
           return {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
             single: vi.fn().mockResolvedValue({ data: { id: 'backup-new' }, error: null }),
             insert: vi.fn().mockReturnValue({
               select: vi.fn().mockReturnThis(),
@@ -287,8 +288,26 @@ describe('BackupService', () => {
 
       const result = await BackupService.createBackup('user-123');
 
-      expect(result).toBeDefined();
-      expect(result.filename).toContain('backup-');
+      expect(result.filename).toMatch(/^backup-.*\.json$/);
+      expect(result.storagePath).toMatch(/^backups\/backup-.*\.json$/);
+      expect(result.storagePath).toBe(`backups/${result.filename}`);
+
+      expect(mockUpload).toHaveBeenCalledTimes(1);
+      const [uploadedPath, uploadedContent, uploadOptions] = mockUpload.mock.calls[0];
+
+      expect(uploadedPath).toBe(result.storagePath);
+      expect(Buffer.isBuffer(uploadedContent)).toBe(true);
+      expect(uploadOptions).toEqual(expect.objectContaining({
+        contentType: 'application/json',
+        upsert: true,
+      }));
+
+      const parsed = JSON.parse((uploadedContent as Buffer).toString('utf8'));
+      expect(parsed).toEqual(expect.objectContaining({
+        version: '2.0',
+        timestamp: expect.any(String),
+        tables: expect.any(Object),
+      }));
     });
   });
 });

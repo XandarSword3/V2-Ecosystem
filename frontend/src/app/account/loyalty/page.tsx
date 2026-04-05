@@ -70,6 +70,7 @@ export default function CustomerLoyaltyPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // FIX Iter-18: AbortController to prevent state updates on unmounted component
   useEffect(() => {
@@ -81,6 +82,7 @@ export default function CustomerLoyaltyPage() {
       const controller = new AbortController();
       const load = async () => {
         try {
+          setLoadError(null);
           // FIX: Iteration 3 - Use correct backend routes: /me not /account, /me/transactions not /transactions
           const [accountRes, transactionsRes, tiersRes] = await Promise.all([
             api.get('/loyalty/me', { signal: controller.signal }),
@@ -94,7 +96,7 @@ export default function CustomerLoyaltyPage() {
           if (tiersRes.data.success) setTiers(tiersRes.data.data);
         } catch (err: any) {
           if (err?.name === 'CanceledError' || controller.signal.aborted) return;
-          // User might not have a loyalty account yet
+          setLoadError('Unable to load loyalty account. Please try again later.');
         } finally {
           if (!controller.signal.aborted) setLoading(false);
         }
@@ -108,6 +110,17 @@ export default function CustomerLoyaltyPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <RefreshCw className="w-8 h-8 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+
+  if (loadError && !account) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12">
+        <Card className="text-center p-12">
+          <h2 className="text-2xl font-bold mb-2">Unable to load loyalty account</h2>
+          <p className="text-slate-500">Please try again later.</p>
+        </Card>
       </div>
     );
   }

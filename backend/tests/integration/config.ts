@@ -24,7 +24,7 @@ export const TEST_CONFIG = {
 
   // API configuration
   api: {
-    baseUrl: process.env.TEST_API_URL || 'http://localhost:3005/api/v1',
+    baseUrl: process.env.TEST_API_URL || 'http://localhost:3006/api/v1',
     timeout: 30000, // 30 seconds for slow operations
   },
 
@@ -56,6 +56,14 @@ export const TEST_CONFIG = {
 };
 
 /**
+ * Get API base URL for integration tests.
+ * Resolves dynamically so setup hooks can override TEST_API_URL at runtime.
+ */
+export function getTestApiBaseUrl(): string {
+  return process.env.TEST_API_URL || TEST_CONFIG.api.baseUrl;
+}
+
+/**
  * Get database connection string for integration tests
  * Uses DATABASE_URL env var if available (for live environment testing)
  */
@@ -63,6 +71,9 @@ export function getTestDatabaseUrl(): string {
   // Only use env var if specifically set for testing, ignore general DATABASE_URL to avoid prod leaks
   if (process.env.TEST_DATABASE_URL) {
     return process.env.TEST_DATABASE_URL;
+  }
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
   }
   const { host, port, user, password, database } = TEST_CONFIG.database;
   return `postgresql://${user}:${password}@${host}:${port}/${database}`;

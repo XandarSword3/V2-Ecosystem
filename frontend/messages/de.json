@@ -762,7 +762,12 @@
       "addFirstTable": "Fügen Sie Ihren ersten Tisch hinzu",
       "addTable": "Tisch hinzufügen",
       "editTable": "Tisch bearbeiten",
-      "deleteConfirm": "Sind Sie sicher, dass Sie diesen Tisch löschen möchten?"
+      "deleteConfirm": "Sind Sie sicher, dass Sie diesen Tisch löschen möchten?",
+      "confirmDelete": "Sind Sie sicher, dass Sie diesen Tisch löschen möchten?",
+      "location": "Standort",
+      "markedOccupied": "Tisch als besetzt markiert",
+      "markedAvailable": "Tisch als verfügbar markiert",
+      "tableNumberRequired": "Tischnummer ist erforderlich"
     },
     "pagination": {
       "previous": "Zurück",

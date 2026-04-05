@@ -291,7 +291,7 @@ export default function AdminNotificationsPage() {
     }
   };
 
-  const useTemplateForNotification = (template: NotificationTemplate) => {
+  const applyTemplateToNotification = (template: NotificationTemplate) => {
     setNewNotification({
       title: template.title,
       message: template.message,
@@ -656,7 +656,7 @@ export default function AdminNotificationsPage() {
                           <Send className="w-3 h-3 mr-1" />
                           Send
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => useTemplateForNotification(template)}>
+                        <Button size="sm" variant="outline" onClick={() => applyTemplateToNotification(template)}>
                           <Copy className="w-3 h-3 mr-1" />
                           Use
                         </Button>

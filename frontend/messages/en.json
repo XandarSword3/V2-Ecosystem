@@ -770,8 +770,14 @@
       "addTable": "Add Table",
       "editTable": "Edit Table",
       "deleteConfirm": "Are you sure you want to delete this table?",
+      "confirmDelete": "Are you sure you want to delete this table?",
+      "location": "Location",
+      "markedOccupied": "Table marked as occupied",
+      "markedAvailable": "Table marked as available",
+      "tableNumberRequired": "Table number is required",
       "total": "Total",
-      "amount": "Amount"
+      "amount": "Amount",
+      "totalAmount": "Total Amount"
     },
     "pagination": {
       "previous": "Previous",
@@ -857,7 +863,8 @@
       "failedToUpdate": "Failed to update booking",
       "unit": "Unit",
       "dates": "Dates",
-      "viewCalendar": "View booking calendar"
+      "viewCalendar": "View booking calendar",
+      "bookingDetails": "Booking Details"
     },
     "tickets": {
       "title": "Tickets",
@@ -962,7 +969,18 @@
       "addFirstRule": "Add your first pricing rule",
       "deleteConfirm": "Are you sure you want to delete this pricing rule?",
       "pricingRules": "Set pricing rules",
-      "setSeasonalRates": "Set seasonal rates"
+      "setSeasonalRates": "Set seasonal rates",
+      "manageRules": "Manage pricing rules",
+      "noRulesConfigured": "No pricing rules configured",
+      "base": "Base",
+      "weekend": "Weekend",
+      "holiday": "Holiday",
+      "confirmDelete": "Are you sure you want to delete this pricing rule?",
+      "editPricingRule": "Edit Pricing Rule",
+      "addPricingRule": "Add Pricing Rule",
+      "minGuests": "Min Guests",
+      "maxGuests": "Max Guests",
+      "ruleIsActive": "Active"
     },
     "addons": {
       "title": "Add-ons",

@@ -1,0 +1,2035 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+node.exe : [90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.controller.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mgetAccount[2m > 
+[22m[2mshould return 500 on unexpected database error
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([90mstderr[2m... data 
+   base error:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[22m[39mError fetching loyalty account: { code: 
+[32m'DB_ERR'[39m, message: [32m'connection lost'[39m }
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mgetAccount[2m > 
+[22m[2mshould handle database error
+[22m[39mError fetching loyalty account: { code: 
+[32m'DB_ERROR'[39m, message: [32m'Database connection 
+failed'[39m }
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.controller.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mgetTiers[2m > 
+[22m[2mshould return 500 on error
+[22m[39mError fetching tiers: { message: [32m'fail'[39m }
+
+ [31mΓ¥»[39m tests/unit/modules/loyalty/loyalty.controller.test.ts [2m([22m[2m22 tests[22m[2m | [22m[31m5 failed[39m[2m)[22m[32m 21[2mms[22m[39m
+       [32mΓ£ô[39m should return existing loyalty account[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should auto-create account with signup bonus when none exists[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return 500 on unexpected database error[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return 401 when user is not authenticated[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should delegate to getAccount using JWT userId[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid body (non-uuid, negative)[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should earn points with multiplier 1[39m[32m 5[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid body[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should reject insufficient points[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should redeem points and return dollar value[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject body without reason[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should adjust points correctly (negative)[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should clamp balance to 0 for large negative adjustment[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return loyalty tiers[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return 500 on error[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid settings values[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should update existing settings[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid amount[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return 0 when loyalty is disabled (settings not found)[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should calculate points from amount with multiplier[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return empty when no account found[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return paginated transactions[32m 0[2mms[22m[39m
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mearnPoints[2m > 
+[22m[2mshould earn points successfully
+[22m[39mError earning points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.earnPoints (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:195:64)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:310:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+    at Traces.$ [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code
+/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/d
+ist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2
+%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/dist
+/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mearnPoints[2m > 
+[22m[2mshould create account if not exists and earn points
+[22m[39mError earning points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.earnPoints (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:195:64)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:358:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+    at Traces.$ [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code
+/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/d
+ist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2
+%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/dist
+/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mearnPoints[2m > 
+[22m[2mshould apply tier multiplier to earned points
+[22m[39mError earning points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.earnPoints (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:195:64)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:388:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+    at Traces.$ [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code
+/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/d
+ist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2
+%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/dist
+/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mredeemPoints[2m > 
+[22m[2mshould redeem points successfully
+[22m[39mError redeeming points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.redeemPoints (C:/Alessandro/Work/Attempts 
+to Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.co
+ntroller.ts:276:64)
+[90m    at processTicksAndRejections 
+(node:internal/process/task_queues:105:5)[39m
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:466:7
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:20
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mredeemPoints[2m > 
+[22m[2mshould reject insufficient points
+[22m[39mError redeeming points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.redeemPoints (C:/Alessandro/Work/Attempts 
+to Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.co
+ntroller.ts:276:64)
+[90m    at processTicksAndRejections 
+(node:internal/process/task_queues:105:5)[39m
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:495:7
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:20
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mredeemPoints[2m > 
+[22m[2mshould return 404 if account not found
+[22m[39mError redeeming points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.redeemPoints (C:/Alessandro/Work/Attempts 
+to Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.co
+ntroller.ts:276:64)
+[90m    at processTicksAndRejections 
+(node:internal/process/task_queues:105:5)[39m
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:543:7
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:20
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2madjustPoints[2m > 
+[22m[2mshould add points successfully
+[22m[39mError adjusting points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.adjustPoints (C:/Alessandro/Work/Attempts 
+to Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.co
+ntroller.ts:338:64)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:579:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+    at Traces.$ [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code
+/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/d
+ist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2
+%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/dist
+/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2madjustPoints[2m > 
+[22m[2mshould deduct points successfully
+[22m[39mError adjusting points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.adjustPoints (C:/Alessandro/Work/Attempts 
+to Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.co
+ntroller.ts:338:64)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:613:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+    at Traces.$ [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code
+/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/d
+ist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2
+%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/dist
+/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2madjustPoints[2m > 
+[22m[2mshould not allow negative balance
+[22m[39mError adjusting points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.adjustPoints (C:/Alessandro/Work/Attempts 
+to Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.co
+ntroller.ts:338:64)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:646:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+    at Traces.$ [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code
+/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/d
+ist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2
+%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/dist
+/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2madjustPoints[2m > 
+[22m[2mshould return 404 if account not found
+[22m[39mError adjusting points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.adjustPoints (C:/Alessandro/Work/Attempts 
+to Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.co
+ntroller.ts:338:64)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:682:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+    at Traces.$ [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code
+/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/d
+ist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2
+%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/dist
+/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > 
+[22m[2madjustPointsByAccountId[2m > [22m[2mshould adjust points 
+by account ID
+[22m[39mError adjusting points by account ID: TypeError: 
+supabase.rpc is not a function
+    at LoyaltyController.adjustPointsByAccountId 
+(C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend/s
+rc/modules/loyalty/loyalty.controller.ts:398:64)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:711:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+    at Traces.$ [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code
+/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/d
+ist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2
+%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/dist
+/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > 
+[22m[2madjustPointsByAccountId[2m > [22m[2mshould return 404 
+for non-existent account ID
+[22m[39mError adjusting points by account ID: TypeError: 
+supabase.rpc is not a function
+    at LoyaltyController.adjustPointsByAccountId 
+(C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend/s
+rc/modules/loyalty/loyalty.controller.ts:398:64)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:735:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+    at Traces.$ [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code
+/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/d
+ist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2
+%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/dist
+/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mgetTiers[2m > 
+[22m[2mshould handle database error
+[22m[39mError fetching tiers: { message: [32m'Database 
+error'[39m }
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mError Handling[2m > 
+[22m[2mshould handle unexpected errors gracefully in getAccount
+[22m[39mError fetching loyalty account: Error: Connection failed
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1475:15
+    at Mock [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2%
+20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest/spy[24m/
+dist/index.js:285:34[90m)[39m
+    at LoyaltyController.getAccount (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:71:24)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1481:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mError Handling[2m > 
+[22m[2mshould handle unexpected errors gracefully in earnPoints
+[22m[39mError earning points: Error: Connection failed
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1491:15
+    at Mock [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2%
+20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest/spy[24m/
+dist/index.js:285:34[90m)[39m
+    at LoyaltyController.earnPoints (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:191:24)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1499:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mError Handling[2m > 
+[22m[2mshould handle unexpected errors gracefully in redeemPoints
+[22m[39mError redeeming points: Error: Connection failed
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1506:15
+    at Mock [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2%
+20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest/spy[24m/
+dist/index.js:285:34[90m)[39m
+    at LoyaltyController.redeemPoints (C:/Alessandro/Work/Attempts 
+to Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.co
+ntroller.ts:253:24)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1514:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mError Handling[2m > 
+[22m[2mshould handle unexpected errors gracefully in getStats
+[22m[39mError fetching stats: Error: Connection failed
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1521:15
+    at Mock [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2%
+20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest/spy[24m/
+dist/index.js:285:34[90m)[39m
+    at LoyaltyController.getStats (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:737:24)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1527:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mValidation Edge Cases[2m 
+> [22m[2mshould handle very large point values
+[22m[39mError redeeming points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.redeemPoints (C:/Alessandro/Work/Attempts 
+to Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.co
+ntroller.ts:276:64)
+[90m    at processTicksAndRejections 
+(node:internal/process/task_queues:105:5)[39m
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1556:7
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:20
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mValidation Edge Cases[2m 
+> [22m[2mshould handle special characters in description
+[22m[39mError earning points: TypeError: supabase.rpc is not a 
+function
+    at LoyaltyController.earnPoints (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:195:64)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1614:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+    at Traces.$ [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code
+/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/d
+ist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2
+%20Ecosystem/v2-resort/backend/[39mnode_modules/[4mvitest[24m/dist
+/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+
+ [31mΓ¥»[39m tests/unit/modules/loyalty/loyalty.service.test.ts [2m([22m[2m52 tests[22m[2m | [22m[31m19 failed[39m[2m)[22m[32m 109[2mms[22m[39m
+[31m       [31m├ù[31m should return existing loyalty account[39m[32m 10[2mms[22m[39m
+[31m       [31m├ù[31m should create account with signup bonus if not exists[39m[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should handle database error[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should return account for authenticated user[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return 401 if not authenticated[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should earn points successfully[39m[32m 6[2mms[22m[39m
+[31m       [31m├ù[31m should create account if not exists and earn points[39m[32m 4[2mms[22m[39m
+[31m       [31m├ù[31m should apply tier multiplier to earned points[39m[32m 6[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid user ID[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject negative points[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject zero points[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should redeem points successfully[39m[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should reject insufficient points[39m[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should reject below minimum redemption[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should return 404 if account not found[39m[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should add points successfully[39m[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should deduct points successfully[39m[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should not allow negative balance[39m[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should reject missing reason[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should return 404 if account not found[39m[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should adjust points by account ID[39m[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should return 404 for non-existent account ID[39m[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should return transaction history[39m[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return empty array for user without account[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should filter transactions by type[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return all tiers[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should handle database error[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should update tier successfully[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject empty update[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should update tier benefits[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return loyalty settings[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return empty object if no settings exist[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should update existing settings[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should create settings if not exist[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject empty update[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid values[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return paginated accounts[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by tier[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should return loyalty statistics[39m[32m 5[2mms[22m[39m
+[31m       [31m├ù[31m should handle empty stats[39m[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should calculate points for purchase[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return zero points when loyalty disabled[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should apply tier multiplier[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid amount[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject negative amount[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle unexpected errors gracefully in getAccount[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle unexpected errors gracefully in earnPoints[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle unexpected errors gracefully in redeemPoints[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should handle unexpected errors gracefully in getStats[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should handle very large point values[39m[32m 5[2mms[22m[39m
+       [32mΓ£ô[39m should handle decimal points (should floor)[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should handle special characters in description[39m[32m 3[2mms[22m[39m
+ [31mΓ¥»[39m tests/unit/modules/orders/order.controller.test.ts [2m([22m[2m32 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 18[2mms[22m[39m
+[31m       [31m├ù[31m creates an order and returns 201[39m[32m 5[2mms[22m[39m
+       [32mΓ£ô[39m returns error when validateBody throws (validation failure)[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m calls next when service throws a non-status error[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns 500 when order insert fails[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns full order for owner[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m returns full order for admin/staff even when not owner[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns full order for guest orders (no customer_id)[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns limited info for non-owner viewing non-guest order[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m returns 404 when order not found (PGRST116)[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns order data (delegates to getOrderById)[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards error to next on DB failure[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns orders for the authenticated user[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns empty array when user has no orders[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns transformed orders[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m passes status and date filters through[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns transformed live orders[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m accepts moduleId filter[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+[31m       [31m├ù[31m updates status and emits socket event[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m returns error when validateBody throws[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error when fetch fails[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error when update fails[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns aggregated report[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m returns zeros when no orders exist[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m accepts moduleId filter[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns sales summary for date range[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns zeros for empty range[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+ [31mΓ¥»[39m tests/unit/modules/restaurant/order.service.test.ts [2m([22m[2m60 tests[22m[2m | [22m[31m5 failed[39m[2m)[22m[32m 106[2mms[22m[39m
+       [32mΓ£ô[39m should create an order with valid data[32m 8[2mms[22m[39m
+       [32mΓ£ô[39m should resolve table ID from table number[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should calculate modifier totals correctly[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should apply coupon discount[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should apply gift card redemption[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should apply loyalty points redemption[32m 4[2mms[22m[39m
+       [32mΓ£ô[39m should earn loyalty points for logged in customers[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should handle delivery orders with delivery fee[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should handle room service orders[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should handle tax exempt orders[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should include special instructions[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should return order with items[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return null for non-existent order[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should transform items with menu_item property[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return full order details[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return null for non-existent order[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should return orders for customer[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return empty array for customer with no orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should order results by created_at descending[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return all orders with no filters[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by status[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by multiple statuses[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by date[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by moduleId[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should apply multiple filters[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return active orders[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should filter by moduleId when provided[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return empty array when no active orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should update order status[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should set actual_ready_time when status is ready[39m[32m 4[2mms[22m[39m
+[31m       [31m├ù[31m should set served_at when status is served[39m[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should set completed_at and payment_status when status is completed[39m[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should set cancelled_at and cancellation_reason when status is cancelled[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should record status history[39m[32m 2[2mms[22m[39m
+[31m       [31m├ù[31m should include notes in status history[39m[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should return daily report for today[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return daily report for specific date[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter by moduleId[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate total orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate completed orders count[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate cancelled orders count[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate total revenue from completed orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate total tax from completed orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate average order value[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return zero averageOrderValue when no completed orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return sales report for date range[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should filter by moduleId[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should calculate total orders[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should calculate total revenue[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should calculate average order value[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return zero averageOrderValue when no orders[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should export createOrder function[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should export getOrderById function[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should export getOrderStatus function[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should export getOrdersByCustomer function[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should export getOrders function[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should export getLiveOrders function[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should export updateOrderStatus function[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should export getDailyReport function[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should export getSalesReport function[32m 1[2mms[22m[39m
+
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 31 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.controller.test.ts[2m > 
+[22mLoyaltyController[2m > [22mearnPoints[2m > [22mshould earn 
+points with multiplier 1
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining{ΓÇª} ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   ObjectContaining {[90m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "multiplier": 1,[90m
+[32m-       "newBalance": 250,[90m
+[32m-       "pointsEarned": 50,[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+   {[90m
+[31m+     "error": "Failed to earn points",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.controller.test
+.ts:[2m149:24[22m[39m
+    [90m147| [39m
+    [90m148| [39m      [35mawait[39m 
+controller[33m.[39m[34mearnPoints[39m(req[33m,[39m 
+res)[33m;[39m
+    [90m149| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(expect[33m.[39m[34mobjectContain
+ing[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m150| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m151| [39m        data: expect.objectContaining({ 
+pointsEarned: 50, multiplier: ΓÇª
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[1/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.controller.test.ts[2m > 
+[22mLoyaltyController[2m > [22mredeemPoints[2m > [22mshould 
+reject insufficient points
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining{ΓÇª} ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   ObjectContaining {[90m
+[32m-     "error": "Insufficient points",[90m
+[31m+   {[90m
+[31m+     "available": undefined,[90m
+[31m+     "error": "Failed to redeem points",[90m
+[2m      "success": false,[22m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.controller.test
+.ts:[2m177:24[22m[39m
+    [90m175| [39m      [35mawait[39m 
+controller[33m.[39m[34mredeemPoints[39m(req[33m,[39m 
+res)[33m;[39m
+    [90m176| [39m      [34mexpect[39m(res[33m.[39mstatus)[33m.
+[39m[34mtoHaveBeenCalledWith[39m([34m400[39m)[33m;[39m
+    [90m177| [39m      
+expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ ΓÇª
+    [90m   | [39m                       [31m^[39m
+    [90m178| [39m    })[33m;[39m
+    [90m179| [39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[2/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.controller.test.ts[2m > 
+[22mLoyaltyController[2m > [22mredeemPoints[2m > [22mshould 
+redeem points and return dollar value
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining{ΓÇª} ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   ObjectContaining {[90m
+[32m-     "data": {[90m
+[32m-       "dollarValue": 2,[90m
+[32m-       "newBalance": 300,[90m
+[32m-       "pointsRedeemed": 200,[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+   {[90m
+[31m+     "available": undefined,[90m
+[31m+     "error": "Failed to redeem points",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.controller.test
+.ts:[2m192:24[22m[39m
+    [90m190| [39m      [35mconst[39m res [33m=[39m 
+[34mcreateRes[39m()[33m;[39m
+    [90m191| [39m      [35mawait[39m 
+controller[33m.[39m[34mredeemPoints[39m(req[33m,[39m 
+res)[33m;[39m
+    [90m192| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(expect[33m.[39m[34mobjectContain
+ing[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m193| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m194| [39m        data[33m:[39m { 
+pointsRedeemed[33m:[39m [34m200[39m[33m,[39m 
+dollarValue[33m:[39m [34m2[39m[33m,[39m newBalance[33m:[39m 
+[34m300[39m }[33m,[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[3/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.controller.test.ts[2m > 
+[22mLoyaltyController[2m > [22madjustPoints[2m > [22mshould 
+adjust points correctly (negative)
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining{ΓÇª} ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   ObjectContaining {[90m
+[32m-     "data": {[90m
+[32m-       "adjustment": -50,[90m
+[32m-       "newBalance": 150,[90m
+[32m-       "reason": "Correction",[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+   {[90m
+[31m+     "error": "Loyalty account not found",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.controller.test
+.ts:[2m222:24[22m[39m
+    [90m220| [39m      [35mconst[39m res [33m=[39m 
+[34mcreateRes[39m()[33m;[39m
+    [90m221| [39m      [35mawait[39m 
+controller[33m.[39m[34madjustPoints[39m(req[33m,[39m 
+res)[33m;[39m
+    [90m222| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(expect[33m.[39m[34mobjectContain
+ing[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m223| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m224| [39m        data: { adjustment: -50, newBalance: 150, 
+reason: 'Correction'ΓÇª
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[4/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.controller.test.ts[2m > 
+[22mLoyaltyController[2m > [22madjustPoints[2m > [22mshould 
+clamp balance to 0 for large negative adjustment
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining{ΓÇª} ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   ObjectContaining {[90m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "newBalance": 0,[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+   {[90m
+[31m+     "error": "Loyalty account not found",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.controller.test
+.ts:[2m239:24[22m[39m
+    [90m237| [39m      [35mconst[39m res [33m=[39m 
+[34mcreateRes[39m()[33m;[39m
+    [90m238| [39m      [35mawait[39m 
+controller[33m.[39m[34madjustPoints[39m(req[33m,[39m 
+res)[33m;[39m
+    [90m239| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(expect[33m.[39m[34mobjectContain
+ing[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m240| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m241| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({ newBalance[33m:[39m 
+[34m0[39m })[33m,[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[5/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mgetAccount[2m > [22mshould 
+return existing loyalty account
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, data: { ΓÇª(9) } } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[2m      "data": {[22m
+[32m-       "available_points": 500,[90m
+[32m-       "created_at": "2024-01-01T00:00:00Z",[90m
+[32m-       "id": "22222222-2222-2222-2222-222222222222",[90m
+[32m-       "is_active": true,[90m
+[32m-       "lifetime_points": 1000,[90m
+[32m-       "tier": {[90m
+[32m-         "benefits": [[90m
+[32m-           "5% discount",[90m
+[32m-         ],[90m
+[32m-         "color": "#C0C0C0",[90m
+[32m-         "id": "33333333-3333-3333-3333-333333333333",[90m
+[32m-         "min_points": 100,[90m
+[32m-         "name": "Silver",[90m
+[32m-         "points_multiplier": 1.25,[90m
+[32m-       },[90m
+[32m-       "tier_id": "33333333-3333-3333-3333-333333333333",[90m
+[32m-       "total_points": 500,[90m
+[31m+       "available_points": 0,[90m
+[31m+       "id": "new-1",[90m
+[31m+       "lifetime_points": 0,[90m
+[31m+       "tier_id": undefined,[90m
+[31m+       "total_points": 0,[90m
+[2m        "user_id": "11111111-1111-1111-1111-111111111111",[22m
+[2m      },[22m
+[2m      "success": true,[22m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m177:24[22m[39m
+    [90m175| [39m      [35mawait[39m 
+controller[33m.[39m[34mgetAccount[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m176| [39m
+    [90m177| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m178| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m179| [39m        data[33m:[39m mockAccount[33m,[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[6/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mgetAccount[2m > [22mshould 
+create account with signup bonus if not exists
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, data: { ΓÇª(9) } } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[2m      "data": {[22m
+[32m-       "available_points": 50,[90m
+[32m-       "created_at": "2024-01-01T00:00:00Z",[90m
+[32m-       "id": "22222222-2222-2222-2222-222222222222",[90m
+[32m-       "is_active": true,[90m
+[32m-       "lifetime_points": 50,[90m
+[32m-       "tier": {[90m
+[32m-         "benefits": [[90m
+[32m-           "5% discount",[90m
+[32m-         ],[90m
+[32m-         "color": "#C0C0C0",[90m
+[32m-         "id": "33333333-3333-3333-3333-333333333333",[90m
+[32m-         "min_points": 100,[90m
+[32m-         "name": "Silver",[90m
+[32m-         "points_multiplier": 1.25,[90m
+[32m-       },[90m
+[31m+       "available_points": 0,[90m
+[31m+       "id": "new-1",[90m
+[31m+       "lifetime_points": 0,[90m
+[2m        "tier_id": "33333333-3333-3333-3333-333333333333",[22m
+[32m-       "total_points": 50,[90m
+[31m+       "total_points": 0,[90m
+[2m        "user_id": "11111111-1111-1111-1111-111111111111",[22m
+[2m      },[22m
+[2m      "success": true,[22m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m216:24[22m[39m
+    [90m214| [39m      [35mawait[39m 
+controller[33m.[39m[34mgetAccount[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m215| [39m
+    [90m216| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m217| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m218| [39m        data[33m:[39m newAccount[33m,[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[7/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mearnPoints[2m > [22mshould earn 
+points successfully
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "multiplier": Any<Number>,[90m
+[32m-       "newBalance": Any<Number>,[90m
+[32m-       "pointsEarned": Any<Number>,[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+     "error": "Failed to earn points",[90m
+[31m+     "message": "supabase.rpc is not a function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m312:24[22m[39m
+    [90m310| [39m      [35mawait[39m 
+controller[33m.[39m[34mearnPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m311| [39m
+    [90m312| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m313| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m314| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[8/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mearnPoints[2m > [22mshould 
+create account if not exists and earn points
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining {"success": true} ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   ObjectContaining {[90m
+[32m-     "success": true,[90m
+[31m+   {[90m
+[31m+     "error": "Failed to earn points",[90m
+[31m+     "message": "supabase.rpc is not a function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m360:24[22m[39m
+    [90m358| [39m      [35mawait[39m 
+controller[33m.[39m[34mearnPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m359| [39m
+    [90m360| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(expect[33m.[39m[34mobjectContain
+ing[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m361| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m362| [39m      }))[33m;[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»[9/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mearnPoints[2m > [22mshould apply 
+tier multiplier to earned points
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "multiplier": 2,[90m
+[32m-       "pointsEarned": 200,[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+     "error": "Failed to earn points",[90m
+[31m+     "message": "supabase.rpc is not a function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m390:24[22m[39m
+    [90m388| [39m      [35mawait[39m 
+controller[33m.[39m[34mearnPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m389| [39m
+    [90m390| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m391| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m392| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[10/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mredeemPoints[2m > [22mshould 
+redeem points successfully
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "dollarValue": 5,[90m
+[32m-       "newBalance": 500,[90m
+[32m-       "pointsRedeemed": 500,[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+     "error": "Failed to redeem points",[90m
+[31m+     "message": "supabase.rpc is not a function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m468:24[22m[39m
+    [90m466| [39m      [35mawait[39m 
+controller[33m.[39m[34mredeemPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m467| [39m
+    [90m468| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m469| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m470| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[11/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mredeemPoints[2m > [22mshould 
+reject insufficient points
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 400 ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   400,[90m
+[31m+   500,[90m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m497:26[22m[39m
+    [90m495| [39m      [35mawait[39m 
+controller[33m.[39m[34mredeemPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m496| [39m
+    [90m497| [39m      [34mexpect[39m(res[33m.[39mstatus)[33m.
+[39m[34mtoHaveBeenCalledWith[39m([34m400[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m498| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(expect[33m.[39m[34mobjectContain
+ing[39m({
+    [90m499| [39m        success[33m:[39m 
+[35mfalse[39m[33m,[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[12/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mredeemPoints[2m > [22mshould 
+return 404 if account not found
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 404 ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   404,[90m
+[31m+   500,[90m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m545:26[22m[39m
+    [90m543| [39m      [35mawait[39m 
+controller[33m.[39m[34mredeemPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m544| [39m
+    [90m545| [39m      [34mexpect[39m(res[33m.[39mstatus)[33m.
+[39m[34mtoHaveBeenCalledWith[39m([34m404[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m546| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m547| [39m        success[33m:[39m 
+[35mfalse[39m[33m,[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[13/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22madjustPoints[2m > [22mshould add 
+points successfully
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "adjustment": 100,[90m
+[32m-       "newBalance": 600,[90m
+[32m-       "reason": "Goodwill adjustment",[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+     "error": "Failed to adjust points",[90m
+[31m+     "message": "supabase.rpc is not a function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m581:24[22m[39m
+    [90m579| [39m      [35mawait[39m 
+controller[33m.[39m[34madjustPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m580| [39m
+    [90m581| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m582| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m583| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[14/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22madjustPoints[2m > [22mshould 
+deduct points successfully
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "adjustment": -200,[90m
+[32m-       "newBalance": 300,[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+     "error": "Failed to adjust points",[90m
+[31m+     "message": "supabase.rpc is not a function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m615:24[22m[39m
+    [90m613| [39m      [35mawait[39m 
+controller[33m.[39m[34madjustPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m614| [39m
+    [90m615| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m616| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m617| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[15/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22madjustPoints[2m > [22mshould not 
+allow negative balance
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "newBalance": 0,[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+     "error": "Failed to adjust points",[90m
+[31m+     "message": "supabase.rpc is not a function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m649:24[22m[39m
+    [90m647| [39m
+    [90m648| [39m      [90m// Should set to 0, not negative[39m
+    [90m649| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m650| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m651| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[16/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22madjustPoints[2m > [22mshould 
+return 404 if account not found
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 404 ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   404,[90m
+[31m+   500,[90m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m684:26[22m[39m
+    [90m682| [39m      [35mawait[39m 
+controller[33m.[39m[34madjustPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m683| [39m
+    [90m684| [39m      [34mexpect[39m(res[33m.[39mstatus)[33m.
+[39m[34mtoHaveBeenCalledWith[39m([34m404[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m685| [39m    })[33m;[39m
+    [90m686| [39m  })[33m;[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[17/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22madjustPointsByAccountId[2m > 
+[22mshould adjust points by account ID
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "adjustment": 50,[90m
+[32m-       "newBalance": 550,[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+     "error": "Failed to adjust points",[90m
+[31m+     "message": "supabase.rpc is not a function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m713:24[22m[39m
+    [90m711| [39m      await 
+controller.adjustPointsByAccountId(req as never, res as neΓÇª
+    [90m712| [39m
+    [90m713| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m714| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m715| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[18/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22madjustPointsByAccountId[2m > 
+[22mshould return 404 for non-existent account ID
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 404 ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   404,[90m
+[31m+   500,[90m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m737:26[22m[39m
+    [90m735| [39m      await 
+controller.adjustPointsByAccountId(req as never, res as neΓÇª
+    [90m736| [39m
+    [90m737| [39m      [34mexpect[39m(res[33m.[39mstatus)[33m.
+[39m[34mtoHaveBeenCalledWith[39m([34m404[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m738| [39m    })[33m;[39m
+    [90m739| [39m  })[33m;[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[19/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mgetTransactions[2m > [22mshould 
+return transaction history
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining{ΓÇª} ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   ObjectContaining {[90m
+[32m-     "data": [[90m
+[2m    {[22m
+[32m-         "account_id": 
+"22222222-2222-2222-2222-222222222222",[90m
+[32m-         "balance_after": 600,[90m
+[32m-         "created_at": "2024-01-15T10:00:00Z",[90m
+[32m-         "description": "Points earned",[90m
+[32m-         "id": "txn-1",[90m
+[32m-         "points": 100,[90m
+[32m-         "reference_id": "order-123",[90m
+[32m-         "reference_type": "order",[90m
+[32m-         "type": "earn",[90m
+[32m-       },[90m
+[32m-       {[90m
+[32m-         "account_id": 
+"22222222-2222-2222-2222-222222222222",[90m
+[32m-         "balance_after": 600,[90m
+[32m-         "created_at": "2024-01-15T10:00:00Z",[90m
+[32m-         "description": "Points earned",[90m
+[32m-         "id": "txn-2",[90m
+[32m-         "points": -50,[90m
+[32m-         "reference_id": "order-123",[90m
+[32m-         "reference_type": "order",[90m
+[32m-         "type": "redeem",[90m
+[32m-       },[90m
+[32m-       {[90m
+[32m-         "account_id": 
+"22222222-2222-2222-2222-222222222222",[90m
+[32m-         "balance_after": 600,[90m
+[32m-         "created_at": "2024-01-15T10:00:00Z",[90m
+[32m-         "description": "Points earned",[90m
+[32m-         "id": "txn-3",[90m
+[32m-         "points": 25,[90m
+[32m-         "reference_id": "order-123",[90m
+[32m-         "reference_type": "order",[90m
+[32m-         "type": "bonus",[90m
+[32m-       },[90m
+[32m-     ],[90m
+[32m-     "pagination": ObjectContaining {[90m
+[32m-       "limit": 20,[90m
+[32m-       "page": 1,[90m
+[32m-       "total": 3,[90m
+[31m+     "data": [],[90m
+[31m+     "pagination": {[90m
+[31m+       "total": 0,[90m
+[2m      },[22m
+[2m      "success": true,[22m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m784:24[22m[39m
+    [90m782| [39m      [35mawait[39m 
+controller[33m.[39m[34mgetTransactions[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m783| [39m
+    [90m784| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(expect[33m.[39m[34mobjectContain
+ing[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m785| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m786| [39m        data[33m:[39m transactions[33m,[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[20/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mgetStats[2m > [22mshould return 
+loyalty statistics
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "summary": ObjectContaining {[90m
+[32m-         "total_lifetime_points": 3000,[90m
+[32m-         "total_members": 2,[90m
+[32m-         "total_outstanding_points": 1500,[90m
+[31m+     "data": {[90m
+[31m+       "recentActivity": [[90m
+[31m+         {[90m
+[31m+           "date": "2026-03-03",[90m
+[31m+           "points_earned": 100,[90m
+[31m+           "points_redeemed": 50,[90m
+[31m+           "transaction_count": 2,[90m
+[2m          },[22m
+[31m+       ],[90m
+[31m+       "summary": {[90m
+[31m+         "avg_points_per_member": 0,[90m
+[31m+         "total_lifetime_points": 0,[90m
+[31m+         "total_members": undefined,[90m
+[31m+         "total_outstanding_points": 0,[90m
+[31m+       },[90m
+[31m+       "tierDistribution": [],[90m
+[2m      },[22m
+[2m      "success": true,[22m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m1289:24[22m[39m
+    [90m1287| [39m      [35mawait[39m 
+controller[33m.[39m[34mgetStats[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m1288| [39m
+    [90m1289| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.
+[39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m1290| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m1291| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[21/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mgetStats[2m > [22mshould handle 
+empty stats
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "summary": ObjectContaining {[90m
+[31m+     "data": {[90m
+[31m+       "recentActivity": [],[90m
+[31m+       "summary": {[90m
+[2m          "avg_points_per_member": 0,[22m
+[32m-         "total_members": 0,[90m
+[31m+         "total_lifetime_points": 0,[90m
+[31m+         "total_members": undefined,[90m
+[2m          "total_outstanding_points": 0,[22m
+[2m        },[22m
+[31m+       "tierDistribution": [],[90m
+[2m      },[22m
+[2m      "success": true,[22m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m1344:24[22m[39m
+    [90m1342| [39m      [35mawait[39m 
+controller[33m.[39m[34mgetStats[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m1343| [39m
+    [90m1344| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.
+[39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m1345| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m1346| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[22/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mValidation Edge Cases[2m > 
+[22mshould handle very large point values
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining {"success": true} ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   ObjectContaining {[90m
+[32m-     "success": true,[90m
+[31m+   {[90m
+[31m+     "error": "Failed to redeem points",[90m
+[31m+     "message": "supabase.rpc is not a function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m1558:24[22m[39m
+    [90m1556| [39m      [35mawait[39m 
+controller[33m.[39m[34mredeemPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m1557| [39m
+    [90m1558| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.
+[39m[34mtoHaveBeenCalledWith[39m(expect[33m.[39m[34mobjectContai
+ning[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m1559| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m1560| [39m      }))[33m;[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[23/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mValidation Edge Cases[2m > 
+[22mshould handle special characters in description
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining {"success": true} ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   ObjectContaining {[90m
+[32m-     "success": true,[90m
+[31m+   {[90m
+[31m+     "error": "Failed to earn points",[90m
+[31m+     "message": "supabase.rpc is not a function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m1616:24[22m[39m
+    [90m1614| [39m      [35mawait[39m 
+controller[33m.[39m[34mearnPoints[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m1615| [39m
+    [90m1616| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.
+[39m[34mtoHaveBeenCalledWith[39m(expect[33m.[39m[34mobjectContai
+ning[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m1617| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m1618| [39m      }))[33m;[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[24/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/orders/order.controller.test.ts[2m > [22mOrder 
+Controller (restaurant)[2m > [22mcreateOrder[2m > [22mcreates an 
+order and returns 201
+
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 201 ][90m
+
+Number of calls: [1m0[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/orders/order.controller.test.ts
+:[2m214:26[22m[39m
+    [90m212| [39m      [35mawait[39m 
+[34mcreateOrder[39m(req[33m,[39m res[33m,[39m n)[33m;[39m
+    [90m213| [39m
+    [90m214| [39m      [34mexpect[39m(res[33m.[39mstatus)[33m.
+[39m[34mtoHaveBeenCalledWith[39m([34m201[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m215| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(
+    [90m216| [39m        expect.objectContaining({ success: true, 
+data: expect.objectCoΓÇª
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[25/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/orders/order.controller.test.ts[2m > [22mOrder 
+Controller (restaurant)[2m > [22mupdateOrderStatus[2m > 
+[22mupdates status and emits socket event
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining{ΓÇª} ][90m
+
+Number of calls: [1m0[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/orders/order.controller.test.ts
+:[2m594:24[22m[39m
+    [90m592| [39m      [35mawait[39m 
+[34mupdateOrderStatus[39m(req[33m,[39m res[33m,[39m 
+[34mnext[39m())[33m;[39m
+    [90m593| [39m
+    [90m594| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(
+    [90m   | [39m                       [31m^[39m
+    [90m595| [39m        expect.objectContaining({ success: true, 
+data: expect.objectCoΓÇª
+    [90m596| [39m      )[33m;[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[26/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould set 
+actual_ready_time when status is ready
+[31m[1mError[22m: Action 'start_preparing' is not valid from 
+state 'pending'. Available actions: 'confirm', 'cancel'[39m
+[36m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m609:15[22m[39m
+    [90m607| [39m
+    [90m608| [39m      [35mif[39m 
+([33m![39mtransitionResult[33m.[39mallowed) {
+    [90m609| [39m        throw new Error(transitionResult.error || 
+`Cannot transition fΓÇª
+    [90m   | [39m              [31m^[39m
+    [90m610| [39m      }
+    [90m611| [39m      // Use the engine's target state (may 
+differ from requested statΓÇª
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m517:7[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[27/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould set 
+served_at when status is served
+[31m[1mError[22m: Action 'start_preparing' is not valid from 
+state 'pending'. Available actions: 'confirm', 'cancel'[39m
+[36m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m609:15[22m[39m
+    [90m607| [39m
+    [90m608| [39m      [35mif[39m 
+([33m![39mtransitionResult[33m.[39mallowed) {
+    [90m609| [39m        throw new Error(transitionResult.error || 
+`Cannot transition fΓÇª
+    [90m   | [39m              [31m^[39m
+    [90m610| [39m      }
+    [90m611| [39m      // Use the engine's target state (may 
+differ from requested statΓÇª
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m526:7[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[28/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould set 
+completed_at and payment_status when status is completed
+[31m[1mError[22m: Action 'start_preparing' is not valid from 
+state 'pending'. Available actions: 'confirm', 'cancel'[39m
+[36m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m609:15[22m[39m
+    [90m607| [39m
+    [90m608| [39m      [35mif[39m 
+([33m![39mtransitionResult[33m.[39mallowed) {
+    [90m609| [39m        throw new Error(transitionResult.error || 
+`Cannot transition fΓÇª
+    [90m   | [39m              [31m^[39m
+    [90m610| [39m      }
+    [90m611| [39m      // Use the engine's target state (may 
+differ from requested statΓÇª
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m536:7[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[29/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould 
+record status history
+[31m[1mError[22m: Action 'start_preparing' is not valid from 
+state 'pending'. Available actions: 'confirm', 'cancel'[39m
+[36m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m609:15[22m[39m
+    [90m607| [39m
+    [90m608| [39m      [35mif[39m 
+([33m![39mtransitionResult[33m.[39mallowed) {
+    [90m609| [39m        throw new Error(transitionResult.error || 
+`Cannot transition fΓÇª
+    [90m   | [39m              [31m^[39m
+    [90m610| [39m      }
+    [90m611| [39m      // Use the engine's target state (may 
+differ from requested statΓÇª
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m553:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[30/31]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/restaurant/order.service.test.ts[2m > 
+[22mOrderService[2m > [22mupdateOrderStatus[2m > [22mshould 
+include notes in status history
+[31m[1mError[22m: Action 'start_preparing' is not valid from 
+state 'pending'. Available actions: 'confirm', 'cancel'[39m
+[36m [2mΓ¥»[22m Module.updateOrderStatus 
+src/modules/restaurant/services/order.service.ts:[2m609:15[22m[39m
+    [90m607| [39m
+    [90m608| [39m      [35mif[39m 
+([33m![39mtransitionResult[33m.[39mallowed) {
+    [90m609| [39m        throw new Error(transitionResult.error || 
+`Cannot transition fΓÇª
+    [90m   | [39m              [31m^[39m
+    [90m610| [39m      }
+    [90m611| [39m      // Use the engine's target state (may 
+differ from requested statΓÇª
+[90m [2mΓ¥»[22m tests/unit/modules/restaurant/order.service.test.t
+s:[2m561:22[22m[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»[31/31]ΓÄ»[22m[39m
+
+[2m Test Files [22m [1m[31m4 failed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[31m31 failed[39m[22m[2m | [22m[1m[32m135 passed[39m[22m[90m (166)[39m
+[2m   Start at [22m 10:03:48
+[2m   Duration [22m 527ms[2m (transform 716ms, setup 0ms, import 868ms, tests 254ms, environment 0ms)[22m
+
