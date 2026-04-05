@@ -329,14 +329,76 @@ INSERT INTO inventory_categories (name, description, color) VALUES
 ON CONFLICT DO NOTHING;
 
 -- Default Housekeeping Task Types
-INSERT INTO housekeeping_task_types (name, description, default_priority, estimated_duration, color) VALUES
-    ('Room Cleaning', 'Standard room cleaning and turnover', 'normal', 45, '#22C55E'),
-    ('Deep Cleaning', 'Thorough deep cleaning service', 'normal', 120, '#3B82F6'),
-    ('Laundry Service', 'Washing and folding linens', 'normal', 60, '#A855F7'),
-    ('Pool Maintenance', 'Pool cleaning and chemical balance', 'high', 90, '#06B6D4'),
-    ('Repair Request', 'General repairs and maintenance', 'high', 60, '#F59E0B'),
-    ('Guest Request', 'Special guest requests', 'high', 30, '#EC4899')
-ON CONFLICT DO NOTHING;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'housekeeping_task_types'
+          AND column_name = 'default_priority'
+    ) THEN
+        WITH defaults(name, description, priority_value, estimated_duration, color) AS (
+            VALUES
+                ('Room Cleaning', 'Standard room cleaning and turnover', 'normal', 45, '#22C55E'),
+                ('Deep Cleaning', 'Thorough deep cleaning service', 'normal', 120, '#3B82F6'),
+                ('Laundry Service', 'Washing and folding linens', 'normal', 60, '#A855F7'),
+                ('Pool Maintenance', 'Pool cleaning and chemical balance', 'high', 90, '#06B6D4'),
+                ('Repair Request', 'General repairs and maintenance', 'high', 60, '#F59E0B'),
+                ('Guest Request', 'Special guest requests', 'high', 30, '#EC4899')
+        )
+        INSERT INTO housekeeping_task_types (name, description, default_priority, estimated_duration, color)
+        SELECT d.name, d.description, d.priority_value, d.estimated_duration, d.color
+        FROM defaults d
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM housekeeping_task_types existing
+            WHERE existing.name = d.name
+        );
+    ELSIF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'housekeeping_task_types'
+          AND column_name = 'priority'
+    ) THEN
+        WITH defaults(name, description, priority_value, estimated_duration) AS (
+            VALUES
+                ('Room Cleaning', 'Standard room cleaning and turnover', 'normal', 45),
+                ('Deep Cleaning', 'Thorough deep cleaning service', 'normal', 120),
+                ('Laundry Service', 'Washing and folding linens', 'normal', 60),
+                ('Pool Maintenance', 'Pool cleaning and chemical balance', 'high', 90),
+                ('Repair Request', 'General repairs and maintenance', 'high', 60),
+                ('Guest Request', 'Special guest requests', 'high', 30)
+        )
+        INSERT INTO housekeeping_task_types (name, description, priority, estimated_duration, checklist, applies_to, is_active)
+        SELECT d.name, d.description, d.priority_value, d.estimated_duration, '[]'::jsonb, 'chalet', true
+        FROM defaults d
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM housekeeping_task_types existing
+            WHERE existing.name = d.name
+        );
+    ELSE
+        WITH defaults(name, description, estimated_duration) AS (
+            VALUES
+                ('Room Cleaning', 'Standard room cleaning and turnover', 45),
+                ('Deep Cleaning', 'Thorough deep cleaning service', 120),
+                ('Laundry Service', 'Washing and folding linens', 60),
+                ('Pool Maintenance', 'Pool cleaning and chemical balance', 90),
+                ('Repair Request', 'General repairs and maintenance', 60),
+                ('Guest Request', 'Special guest requests', 30)
+        )
+        INSERT INTO housekeeping_task_types (name, description, estimated_duration, is_active)
+        SELECT d.name, d.description, d.estimated_duration, true
+        FROM defaults d
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM housekeeping_task_types existing
+            WHERE existing.name = d.name
+        );
+    END IF;
+END $$;
 
 -- Default Gift Card Template
 INSERT INTO gift_card_templates (name, description, background_color, text_color) VALUES

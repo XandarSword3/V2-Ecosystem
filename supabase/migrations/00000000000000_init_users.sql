@@ -8,38 +8,61 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Supabase compatibility shim for plain Postgres CI runs.
 -- Many later migrations reference auth.users/auth.uid()/auth.role()/auth.jwt().
-CREATE SCHEMA IF NOT EXISTS auth;
+DO $$
+DECLARE
+	can_manage_auth BOOLEAN := true;
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'auth') THEN
+		BEGIN
+			CREATE SCHEMA auth;
+		EXCEPTION WHEN insufficient_privilege THEN
+			can_manage_auth := false;
+		END;
+	END IF;
 
-CREATE TABLE IF NOT EXISTS auth.users (
-	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	email TEXT,
-	created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-	updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
-);
+	IF can_manage_auth THEN
+		BEGIN
+			CREATE TABLE IF NOT EXISTS auth.users (
+				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+				email TEXT,
+				created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+				updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+			);
+		EXCEPTION WHEN insufficient_privilege THEN
+			can_manage_auth := false;
+		END;
+	END IF;
 
-CREATE OR REPLACE FUNCTION auth.jwt()
-RETURNS jsonb
-LANGUAGE sql
-STABLE
-AS $$
-	SELECT COALESCE(NULLIF(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
-$$;
+	IF can_manage_auth THEN
+		BEGIN
+			CREATE OR REPLACE FUNCTION auth.jwt()
+			RETURNS jsonb
+			LANGUAGE sql
+			STABLE
+			AS $auth_jwt$
+				SELECT COALESCE(NULLIF(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+			$auth_jwt$;
 
-CREATE OR REPLACE FUNCTION auth.uid()
-RETURNS uuid
-LANGUAGE sql
-STABLE
-AS $$
-	SELECT NULLIF(auth.jwt() ->> 'sub', '')::uuid
-$$;
+			CREATE OR REPLACE FUNCTION auth.uid()
+			RETURNS uuid
+			LANGUAGE sql
+			STABLE
+			AS $auth_uid$
+				SELECT NULLIF(auth.jwt() ->> 'sub', '')::uuid
+			$auth_uid$;
 
-CREATE OR REPLACE FUNCTION auth.role()
-RETURNS text
-LANGUAGE sql
-STABLE
-AS $$
-	SELECT COALESCE(NULLIF(auth.jwt() ->> 'role', ''), 'anon')
-$$;
+			CREATE OR REPLACE FUNCTION auth.role()
+			RETURNS text
+			LANGUAGE sql
+			STABLE
+			AS $auth_role$
+				SELECT COALESCE(NULLIF(auth.jwt() ->> 'role', ''), 'anon')
+			$auth_role$;
+		EXCEPTION WHEN insufficient_privilege THEN
+			NULL;
+		END;
+	END IF;
+END $$;
 
 DO $$ BEGIN
 	CREATE TYPE business_unit AS ENUM ('restaurant', 'snack_bar', 'chalets', 'pool', 'admin');

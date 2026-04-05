@@ -655,32 +655,53 @@ export async function migrate() {
       END $$;
     `);
 
-    // Apply SQL file migrations from supabase/migrations
-    logger.info('Applying SQL file migrations...');
-    const migrationsDir = path.join(__dirname, '../../../supabase/migrations');
-    
-    if (fs.existsSync(migrationsDir)) {
-      const files = fs.readdirSync(migrationsDir)
-        .filter(f => f.endsWith('.sql'))
-        .sort(); // Run in order
+    let shouldReplaySqlMigrations = true;
+    const supabaseMigrationTableResult = await pool.query<{ table_name: string | null }>(
+      "SELECT to_regclass('supabase_migrations.schema_migrations')::text AS table_name"
+    );
 
-      for (const file of files) {
-        logger.info(`Processing migration file: ${file}`);
-        const filePath = path.join(migrationsDir, file);
-        const sql = fs.readFileSync(filePath, 'utf8');
-        try {
-           await pool.query(sql); 
-           logger.info(`Applied: ${file}`);
-        } catch (e: any) {
-           logger.warn(`Error applying ${file}: ${e.message}`);
-           // Continue if error is likely harmless (e.g. object exists), otherwise throw
-           if (!e.message.includes('already exists')) {
-             throw e;
-           }
-        }
+    if (supabaseMigrationTableResult.rows[0]?.table_name) {
+      const appliedMigrationCountResult = await pool.query<{ count: string }>(
+        'SELECT COUNT(*)::text AS count FROM supabase_migrations.schema_migrations'
+      );
+      const appliedMigrationCount = Number(appliedMigrationCountResult.rows[0]?.count ?? '0');
+
+      if (appliedMigrationCount > 0) {
+        shouldReplaySqlMigrations = false;
+        logger.info(
+          `Detected ${appliedMigrationCount} pre-applied Supabase migrations; skipping SQL file replay.`
+        );
       }
-    } else {
-       logger.warn(`Migrations directory not found at ${migrationsDir}`);
+    }
+
+    // Apply SQL file migrations from supabase/migrations when migrations were not already applied.
+    if (shouldReplaySqlMigrations) {
+      logger.info('Applying SQL file migrations...');
+      const migrationsDir = path.join(__dirname, '../../../supabase/migrations');
+
+      if (fs.existsSync(migrationsDir)) {
+        const files = fs.readdirSync(migrationsDir)
+          .filter(f => f.endsWith('.sql'))
+          .sort(); // Run in order
+
+        for (const file of files) {
+          logger.info(`Processing migration file: ${file}`);
+          const filePath = path.join(migrationsDir, file);
+          const sql = fs.readFileSync(filePath, 'utf8');
+          try {
+             await pool.query(sql);
+             logger.info(`Applied: ${file}`);
+          } catch (e: any) {
+             logger.warn(`Error applying ${file}: ${e.message}`);
+             // Continue if error is likely harmless (e.g. object exists), otherwise throw
+             if (!e.message.includes('already exists')) {
+               throw e;
+             }
+          }
+        }
+      } else {
+         logger.warn(`Migrations directory not found at ${migrationsDir}`);
+      }
     }
 
     logger.info('Migrations completed successfully');
