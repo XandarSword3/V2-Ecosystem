@@ -10,6 +10,23 @@ END $$;
 -- Ensure users table has role column key for policies
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'customer';
 
+-- CI/test Postgres instances may not have Supabase roles pre-created.
+-- Create them idempotently so policy/GRANT statements don't fail.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+        CREATE ROLE authenticated NOLOGIN;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        CREATE ROLE anon NOLOGIN;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+        CREATE ROLE service_role NOLOGIN;
+    END IF;
+END $$;
+
 -- Add kitchen order items table
 CREATE TABLE IF NOT EXISTS kitchen_order_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
