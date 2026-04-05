@@ -68,8 +68,12 @@ export function KioskIdentifyStep({
           </div>
         </div>
 
-        <button className="w-full px-8 py-4 bg-slate-800 border border-slate-700 text-slate-300 text-lg rounded-xl hover:bg-slate-700 transition-colors">
-          Scan ID / Passport
+        <button
+          disabled
+          title="Requires connected ID scanner hardware"
+          className="w-full px-8 py-4 bg-slate-800 border border-slate-700 text-slate-500 text-lg rounded-xl cursor-not-allowed opacity-60"
+        >
+          Scan ID / Passport (Scanner not connected)
         </button>
       </div>
     </div>

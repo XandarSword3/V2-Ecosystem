@@ -195,17 +195,25 @@ export default function AdminCustomizationsPage() {
 
   // Fetch groups with options
   const { data: groups, isLoading: groupsLoading, refetch: refetchGroups } = useQuery({
-    queryKey: ['customization-groups', debouncedSearch],
+    queryKey: ['customization-groups'],
     queryFn: async () => {
       const response = await api.get('/customizations/groups', {
-        params: { 
-          includeOptions: true,
-          search: debouncedSearch || undefined
-        }
+        params: { includeOptions: true }
       });
       return response.data as CustomizationGroup[];
     },
   });
+
+  // Client-side search filtering
+  const filteredGroups = useMemo(() => {
+    if (!groups || !debouncedSearch) return groups;
+    const q = debouncedSearch.toLowerCase();
+    return groups.filter(g =>
+      g.name.toLowerCase().includes(q) ||
+      g.description?.toLowerCase().includes(q) ||
+      g.options?.some(o => o.name.toLowerCase().includes(q))
+    );
+  }, [groups, debouncedSearch]);
 
   // Fetch metrics
   const { data: metrics, isLoading: metricsLoading } = useQuery({
@@ -229,7 +237,7 @@ export default function AdminCustomizationsPage() {
 
   // Mutations
   const createGroupMutation = useMutation({
-    mutationFn: (data: Partial<CustomizationGroup>) => 
+    mutationFn: (data: Partial<CustomizationGroup>) =>
       api.post('/customizations/groups', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customization-groups'] });
@@ -471,7 +479,7 @@ export default function AdminCustomizationsPage() {
             <div className="space-y-3">
               {groupsLoading ? (
                 <div className="text-center py-8 text-muted-foreground">Loading...</div>
-              ) : groups?.length === 0 ? (
+              ) : filteredGroups?.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center">
                     <Layers className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -489,7 +497,7 @@ export default function AdminCustomizationsPage() {
                   </CardContent>
                 </Card>
               ) : (
-                groups?.map((group) => (
+                filteredGroups?.map((group) => (
                   <Card key={group.id} className="overflow-hidden">
                     <div
                       className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
@@ -886,9 +894,6 @@ function GroupDialog({
   onSubmit: (data: Partial<CustomizationGroup>) => void;
   isLoading: boolean;
 }) {
-  // Get the first available entity type for default, or menu_item as fallback
-  const defaultEntityType = Object.keys(availableEntityTypes)[0] || 'menu_item';
-  
   const [formData, setFormData] = useState<Partial<CustomizationGroup>>({
     name: '',
     nameAr: '',
@@ -897,7 +902,7 @@ function GroupDialog({
     minSelections: 0,
     maxSelections: 1,
     isRequired: false,
-    applicableEntityTypes: [defaultEntityType],
+    applicableEntityTypes: [],
     isGlobal: false,
     isAvailable: true,
   });
@@ -914,12 +919,12 @@ function GroupDialog({
         minSelections: 0,
         maxSelections: 1,
         isRequired: false,
-        applicableEntityTypes: [defaultEntityType],
+        applicableEntityTypes: [],
         isGlobal: false,
         isAvailable: true,
       });
     }
-  }, [group, open, defaultEntityType]);
+  }, [group, open]);
 
   const toggleEntityType = (type: string) => {
     const current = formData.applicableEntityTypes || [];
@@ -1064,7 +1069,7 @@ function GroupDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button 
             onClick={() => onSubmit(formData)} 
-            disabled={isLoading || !formData.name}
+            disabled={isLoading || !formData.name || !formData.applicableEntityTypes?.length}
           >
             {isLoading ? 'Saving...' : group ? 'Update' : 'Create'}
           </Button>

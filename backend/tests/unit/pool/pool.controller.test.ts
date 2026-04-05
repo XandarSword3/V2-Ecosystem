@@ -508,14 +508,10 @@ describe('Pool Controller', () => {
         child_price: '20'
       };
 
+      // createSession uses supabase.rpc() instead of from().insert()
       const mockSupabase = {
-        from: vi.fn().mockReturnValue({
-          insert: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: mockSession, error: null })
-            })
-          })
-        })
+        from: vi.fn().mockReturnValue(createChainableMock()),
+        rpc: vi.fn().mockResolvedValue({ data: mockSession, error: null }),
       };
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
 

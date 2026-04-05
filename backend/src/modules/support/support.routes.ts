@@ -66,7 +66,7 @@ router.post('/contact', async (req: Request, res: Response, next: NextFunction) 
     try {
       await emailService.sendEmail({
         to: validated.email,
-        subject: 'Thank you for contacting Iron Paradise Gym',
+        subject: 'Thank you for contacting V2 Resort',
         html: `
           <h2>Thank you for reaching out!</h2>
           <p>Dear ${validated.name},</p>
@@ -77,7 +77,7 @@ router.post('/contact', async (req: Request, res: Response, next: NextFunction) 
           <p><strong>Message:</strong></p>
           <p>${validated.message.replace(/\n/g, '<br>')}</p>
           <hr>
-          <p>Best regards,<br>Iron Paradise Gym Team</p>
+          <p>Best regards,<br>V2 Resort Team</p>
         `,
       });
     } catch (emailError) {

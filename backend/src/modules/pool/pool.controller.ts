@@ -10,6 +10,8 @@ import { config } from "../../config/index.js";
 import dayjs from 'dayjs';
 import { emitToUnit } from "../../socket/index.js";
 import { PoolSessionRow } from "../../types/index.js";
+import { getEngineService } from '../../engines/engine-service.js';
+import type { PricingLineItem, PricingContext } from '../../engines/types.js';
 
 function generateTicketNumber(): string {
   const date = dayjs().format('YYMMDD');
@@ -209,16 +211,42 @@ export const purchaseTicket = asyncHandler(async (req: Request, res: Response) =
       });
     }
 
-    // Calculate total using adult/child prices if provided
+    // === ENGINE-POWERED PRICING (Engine C: shared_capacity_access) ===
     const safeNumberOfAdults = typeof numberOfAdults === 'number' ? numberOfAdults : 0;
     const safeNumberOfChildren = typeof numberOfChildren === 'number' ? numberOfChildren : 0;
-    let totalAmount = 0;
+    
+    const engineService = getEngineService();
+    const pricingLineItems: PricingLineItem[] = [];
+    
     if (session.adult_price !== undefined && session.child_price !== undefined) {
-      totalAmount = (parseFloat(session.adult_price) * safeNumberOfAdults) + (parseFloat(session.child_price) * safeNumberOfChildren);
+      if (safeNumberOfAdults > 0) {
+        pricingLineItems.push({
+          name: 'Adult Ticket',
+          unitPrice: parseFloat(session.adult_price),
+          quantity: safeNumberOfAdults,
+        });
+      }
+      if (safeNumberOfChildren > 0) {
+        pricingLineItems.push({
+          name: 'Child Ticket',
+          unitPrice: parseFloat(session.child_price),
+          quantity: safeNumberOfChildren,
+        });
+      }
     } else {
-      totalAmount = parseFloat(session.price) * numberOfGuests;
+      pricingLineItems.push({
+        name: 'General Ticket',
+        unitPrice: parseFloat(session.price),
+        quantity: numberOfGuests,
+      });
     }
+
+    const pricing = await engineService.calculatePricing('session_access', pricingLineItems, {});
+    const totalAmount = pricing.totalAmount;
     const ticketNumber = generateTicketNumber();
+
+    // Use engine initial state
+    const initialState = engineService.getInitialState('session_access');
 
     // Generate QR code
     const qrData = JSON.stringify({
@@ -229,7 +257,7 @@ export const purchaseTicket = asyncHandler(async (req: Request, res: Response) =
     });
     const qrCode = await QRCode.toDataURL(qrData);
 
-    // Create ticket
+    // Create ticket (using engine initial state)
     const { data: ticket, error: ticketError } = await supabase
       .from('pool_tickets')
       .insert({
@@ -242,7 +270,9 @@ export const purchaseTicket = asyncHandler(async (req: Request, res: Response) =
         ticket_date: targetDate,
         number_of_guests: numberOfGuests,
         total_amount: totalAmount.toFixed(2),
-        status: 'valid',
+        subtotal: pricing.subtotal.toFixed(2),
+        tax_amount: pricing.taxAmount.toFixed(2),
+        status: initialState,
         payment_status: paymentMethod === 'cash' ? 'pending' : 'pending',
         payment_method: paymentMethod,
         qr_code: qrCode,
@@ -384,23 +414,25 @@ export const cancelTicket = asyncHandler(async (req: Request, res: Response) => 
       return res.status(403).json({ success: false, error: 'Not authorized to cancel this ticket' });
     }
 
-    // Check if ticket can be cancelled
-    if (ticket.status === 'cancelled') {
-      return res.status(400).json({ success: false, error: 'Ticket is already cancelled' });
-    }
+    // === ENGINE-POWERED STATE TRANSITION (Engine C: shared_capacity_access) ===
+    // Use state machine to validate cancellation instead of ad-hoc checks
+    const engineService = getEngineService();
+    const actor = req.user?.roles?.some((role: string) => 
+      ['admin', 'super_admin', 'pool_admin', 'pool_staff', 'staff'].includes(role)
+    ) ? 'staff' : 'customer';
 
-    if (ticket.status === 'used' || ticket.entry_time) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Cannot cancel a ticket that has already been used or validated' 
+    const transitionResult = await engineService.transitionState(
+      'session_access',
+      ticket.status,
+      'cancel',
+      actor
+    );
+
+    if (!transitionResult.allowed) {
+      return res.status(400).json({
+        success: false,
+        error: transitionResult.error || `Cannot cancel ticket with status ${ticket.status}`,
       });
-    }
-
-    // Check if ticket date has passed
-    const today = dayjs().startOf('day');
-    const ticketDay = dayjs(ticket.ticket_date).startOf('day');
-    if (ticketDay.isBefore(today)) {
-      return res.status(400).json({ success: false, error: 'Cannot cancel a ticket for a past date' });
     }
 
     // Cancel the ticket
@@ -572,14 +604,26 @@ export const recordEntry = asyncHandler(async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'Ticket not found' });
     }
 
-    if (['used', 'active', 'cancelled'].includes(ticket.status)) {
-      return res.status(400).json({ success: false, error: `Ticket status is ${ticket.status}` });
+    // === ENGINE-POWERED STATE TRANSITION (Engine C: shared_capacity_access) ===
+    const engineService = getEngineService();
+    const transitionResult = await engineService.transitionState(
+      'session_access',
+      ticket.status,
+      'validate_entry',
+      'staff'
+    );
+
+    if (!transitionResult.allowed) {
+      return res.status(400).json({
+        success: false,
+        error: transitionResult.error || `Cannot enter from status ${ticket.status}`,
+      });
     }
 
     const { data: updatedTicket, error: updateError } = await supabase
       .from('pool_tickets')
       .update({
-        status: 'active',
+        status: transitionResult.targetState,
         entry_time: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -609,10 +653,28 @@ export const recordExit = asyncHandler(async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'Ticket not found' });
     }
 
+    // === ENGINE-POWERED STATE TRANSITION (Engine C: shared_capacity_access) ===
+    // FIX: Previously had NO validation — could record exit for tickets that never entered.
+    // Engine C state machine enforces: only 'active' tickets can exit (valid→active→used).
+    const engineService = getEngineService();
+    const transitionResult = await engineService.transitionState(
+      'session_access',
+      ticket.status,
+      'record_exit',
+      'staff'
+    );
+
+    if (!transitionResult.allowed) {
+      return res.status(400).json({
+        success: false,
+        error: transitionResult.error || `Cannot exit from status ${ticket.status}`,
+      });
+    }
+
     const { data: updatedTicket, error: updateError } = await supabase
       .from('pool_tickets')
       .update({
-        status: 'used',
+        status: transitionResult.targetState,
         exit_time: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

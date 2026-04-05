@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { emailService } from '../../services/email.service.js';
 import { logger } from '../../utils/logger.js';
 
@@ -39,15 +40,38 @@ const redeemGiftCardSchema = z.object({
   referenceId: z.string().uuid().optional(),
 });
 
-// Generate unique gift card code
+// Generate unique gift card code using cryptographically secure random (SECURITY FIX: HIGH-006)
 function generateGiftCardCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars
   let code = '';
   for (let i = 0; i < 16; i++) {
     if (i > 0 && i % 4 === 0) code += '-';
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(crypto.randomInt(chars.length));
   }
   return code;
+}
+
+// In-process mutex fallback to prevent same-card concurrent redemption races.
+const giftCardLocks = new Map<string, Promise<void>>();
+
+async function acquireGiftCardLock(code: string): Promise<() => void> {
+  while (giftCardLocks.has(code)) {
+    await giftCardLocks.get(code);
+  }
+
+  let releaseLock: (() => void) | null = null;
+  const lockPromise = new Promise<void>((resolve) => {
+    releaseLock = resolve;
+  });
+
+  giftCardLocks.set(code, lockPromise);
+
+  return () => {
+    giftCardLocks.delete(code);
+    if (releaseLock) {
+      releaseLock();
+    }
+  };
 }
 
 export class GiftCardController {
@@ -57,7 +81,7 @@ export class GiftCardController {
   async getTemplates(req: Request, res: Response) {
     try {
       const supabase = getSupabase();
-      
+
       const { data: templates, error } = await supabase
         .from('gift_card_templates')
         .select('*')
@@ -104,15 +128,19 @@ export class GiftCardController {
       if (templateId) {
         const { data: template, error: templateError } = await supabase
           .from('gift_card_templates')
-          .select('amount')
+          .select('*')
           .eq('id', templateId)
           .eq('is_active', true)
           .single();
-        
+
         if (templateError || !template) {
           return res.status(404).json({ success: false, error: 'Gift card template not found' });
         }
-        finalAmount = template.amount;
+
+        // Only override if template has a fixed amount
+        if ((template as any).amount) {
+          finalAmount = (template as any).amount;
+        }
       }
 
       if (!finalAmount) {
@@ -293,6 +321,7 @@ export class GiftCardController {
 
   /**
    * Redeem gift card (at checkout)
+   * Uses atomic RPC with SELECT ... FOR UPDATE to prevent race conditions (H1 fix)
    */
   async redeemGiftCard(req: Request, res: Response) {
     try {
@@ -307,92 +336,83 @@ export class GiftCardController {
 
       const { code, amount, referenceType, referenceId } = validation.data;
       const upperCode = code.toUpperCase();
-      const normalizedCode = upperCode.replace(/-/g, '');
       const supabase = getSupabase();
 
-      // Get gift card - search both with and without dashes
-      const { data: card, error: fetchError } = await supabase
-        .from('gift_cards')
-        .select('*')
-        .or(`code.eq.${upperCode},code.eq.${normalizedCode}`)
-        .limit(1)
-        .single();
-
-      if (fetchError || !card) {
-        return res.status(404).json({ success: false, error: 'Gift card not found' });
-      }
-
-      // Validate card status
-      if (card.status !== 'active') {
-        return res.status(400).json({
-          success: false,
-          error: `Gift card is ${card.status}`,
-        });
-      }
-
-      // Check expiry
-      if (card.expires_at && new Date(card.expires_at) < new Date()) {
-        await supabase
+      const releaseLock = await acquireGiftCardLock(upperCode);
+      try {
+        const { data: card, error: cardError } = await supabase
           .from('gift_cards')
-          .update({ status: 'expired' })
-          .eq('id', card.id);
-        return res.status(400).json({
-          success: false,
-          error: 'Gift card has expired',
+          .select('id, current_balance, status, expires_at')
+          .eq('code', upperCode)
+          .single();
+
+        if (cardError || !card) {
+          return res.status(404).json({
+            success: false,
+            error: 'Gift card not found',
+          });
+        }
+
+        const currentBalance = Number(card.current_balance || 0);
+        if (card.status !== 'active') {
+          return res.status(400).json({
+            success: false,
+            error: `Gift card is ${card.status}`,
+          });
+        }
+
+        if (card.expires_at && new Date(card.expires_at) < new Date()) {
+          return res.status(400).json({
+            success: false,
+            error: 'Gift card has expired',
+          });
+        }
+
+        if (currentBalance < amount) {
+          return res.status(400).json({
+            success: false,
+            error: 'Insufficient gift card balance',
+          });
+        }
+
+        // Use the atomic RPC that performs SELECT ... FOR UPDATE inside a transaction
+        // This prevents the read-then-write race condition where two concurrent requests
+        // could both read the same balance and both succeed (double-spend)
+        const { data: result, error: rpcError } = await supabase.rpc(
+          'redeem_giftcard_atomic',
+          {
+            p_code: upperCode,
+            p_amount: amount,
+            p_order_id: referenceId || null,
+          }
+        );
+
+        if (rpcError) {
+          logger.error('Gift card atomic redemption RPC error:', rpcError);
+          throw rpcError;
+        }
+
+        const row = Array.isArray(result) ? result[0] : result;
+
+        if (!row?.success) {
+          return res.status(400).json({
+            success: false,
+            error: row?.error_message || 'Gift card redemption failed',
+          });
+        }
+
+        res.json({
+          success: true,
+          data: {
+            amountRedeemed: parseFloat(row.amount_redeemed),
+            remainingBalance: parseFloat(row.new_balance),
+            cardStatus: parseFloat(row.new_balance) <= 0 ? 'redeemed' : 'active',
+            giftCardId: row.gift_card_id,
+          },
         });
+      } finally {
+        releaseLock();
       }
-
-      // Check balance
-      const currentBalance = parseFloat(card.current_balance);
-      if (currentBalance <= 0) {
-        await supabase
-          .from('gift_cards')
-          .update({ status: 'used' })
-          .eq('id', card.id);
-        return res.status(400).json({
-          success: false,
-          error: 'Gift card has no remaining balance',
-        });
-      }
-
-      // Calculate redemption amount (can't exceed balance or requested amount)
-      const redeemAmount = Math.min(amount, currentBalance);
-      const newBalance = currentBalance - redeemAmount;
-
-      // Update gift card
-      const newStatus = newBalance <= 0 ? 'used' : 'active';
-      const { error: updateError } = await supabase
-        .from('gift_cards')
-        .update({ 
-          current_balance: newBalance, 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', card.id);
-
-      if (updateError) throw updateError;
-
-      // Log transaction
-      await supabase
-        .from('gift_card_transactions')
-        .insert({
-          gift_card_id: card.id,
-          type: 'redeem',
-          amount: -redeemAmount,
-          balance_after: newBalance,
-          reference_type: referenceType,
-          reference_id: referenceId,
-          created_by: req.user?.id,
-        });
-
-      res.json({
-        success: true,
-        data: {
-          amountRedeemed: redeemAmount,
-          remainingBalance: newBalance,
-          cardStatus: newStatus,
-        },
-      });
     } catch (error: any) {
       console.error('Error redeeming gift card:', error);
       res.status(500).json({
@@ -539,13 +559,13 @@ export class GiftCardController {
       // Get purchaser info for each card
       const purchaserIds = [...new Set((giftCards || []).map(gc => gc.purchased_by).filter(Boolean))];
       let purchasersMap: Record<string, any> = {};
-      
+
       if (purchaserIds.length > 0) {
         const { data: purchasers } = await supabase
           .from('users')
           .select('id, full_name')
           .in('id', purchaserIds);
-        
+
         purchasersMap = (purchasers || []).reduce((acc, p) => {
           acc[p.id] = p;
           return acc;
@@ -701,7 +721,7 @@ export class GiftCardController {
 
       const { data: result, error: updateError } = await supabase
         .from('gift_cards')
-        .update({ 
+        .update({
           status: 'disabled',
           updated_at: new Date().toISOString()
         })
@@ -761,15 +781,15 @@ export class GiftCardController {
       const outstandingBalance = cards
         .filter(c => c.status === 'active')
         .reduce((sum, c) => sum + parseFloat(c.current_balance || 0), 0);
-      const totalRedeemed = cards.reduce((sum, c) => 
+      const totalRedeemed = cards.reduce((sum, c) =>
         sum + (parseFloat(c.initial_value || 0) - parseFloat(c.current_balance || 0)), 0);
 
       // Get recent sales (last 30 days)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
+
       const recentCards = cards.filter(c => new Date(c.created_at) > thirtyDaysAgo);
-      
+
       // Group by date
       const salesByDate = recentCards.reduce((acc, card) => {
         const date = new Date(card.created_at).toISOString().split('T')[0];
@@ -781,7 +801,7 @@ export class GiftCardController {
         return acc;
       }, {} as Record<string, any>);
 
-      const recentSales = Object.values(salesByDate).sort((a: any, b: any) => 
+      const recentSales = Object.values(salesByDate).sort((a: any, b: any) =>
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
 

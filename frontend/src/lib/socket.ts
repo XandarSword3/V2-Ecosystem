@@ -276,6 +276,18 @@ export function useSnackBarOrders(onNewOrder: NewOrderCallback, onStatusUpdate: 
   }, [socket, onNewOrder, onStatusUpdate]);
 }
 
+// Hook for real-time waitlist updates
+export function useWaitlistUpdates(onUpdate: (data: { action: string; entry?: any; entryId?: string }) => void) {
+  const { socket } = useSocket();
+
+  useEffect(() => {
+    if (socket) {
+      socket.on('waitlist.updated', onUpdate);
+      return () => { socket.off('waitlist.updated', onUpdate); };
+    }
+  }, [socket, onUpdate]);
+}
+
 // Hook to track page navigation for live users monitoring
 export function usePageTracking() {
   const { socket, isConnected } = useSocket();

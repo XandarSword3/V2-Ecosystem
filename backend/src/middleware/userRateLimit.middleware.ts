@@ -10,6 +10,19 @@ import { Request, Response, NextFunction } from 'express';
 import { cache } from '../utils/cache.js';
 import { logger } from '../utils/logger.js';
 
+// In-memory fallback store for when Redis is unavailable
+const inMemoryFallback = new Map<string, RateLimitInfo>();
+
+// Clean up expired in-memory entries every 60 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, info] of inMemoryFallback.entries()) {
+    if (now > info.resetTime) {
+      inMemoryFallback.delete(key);
+    }
+  }
+}, 60 * 1000);
+
 interface RateLimitConfig {
   windowMs: number;      // Time window in milliseconds
   maxRequests: number;   // Max requests per window
@@ -52,9 +65,12 @@ export function userRateLimit(config: RateLimitConfig) {
           info = cached;
         }
       } catch {
-        // Redis unavailable, skip user-based limiting
-        // The IP-based express-rate-limit middleware will handle it
-        return next();
+        // SECURITY FIX (HIGH-010): When Redis is unavailable, fall back to
+        // in-memory rate limiting instead of silently allowing all requests.
+        // This uses a simple Map-based fallback that at least provides
+        // single-instance protection during Redis outages.
+        logger.warn('Redis unavailable for rate limiting, using in-memory fallback');
+        info = inMemoryFallback.get(key) || null;
       }
 
       // Initialize or update rate limit info
@@ -93,7 +109,12 @@ export function userRateLimit(config: RateLimitConfig) {
 
       // Store updated count
       const ttl = Math.ceil((info.resetTime - now) / 1000);
-      await cache.set(key, info, ttl);
+      try {
+        await cache.set(key, info, ttl);
+      } catch {
+        // Redis unavailable, store in memory fallback
+        inMemoryFallback.set(key, info);
+      }
 
       next();
     } catch (error) {

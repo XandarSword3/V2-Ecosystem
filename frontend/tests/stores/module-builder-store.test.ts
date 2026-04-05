@@ -105,6 +105,16 @@ describe('module-builder-store', () => {
       expect(useModuleBuilderStore.getState().history).toHaveLength(2);
     });
 
+    it('caps history at 50 entries', () => {
+      for (let i = 0; i < 55; i++) {
+        useModuleBuilderStore.getState().setLayout([
+          { id: `b-${i}`, type: 'hero' as any, props: {}, children: [] },
+        ]);
+      }
+
+      expect(useModuleBuilderStore.getState().history).toHaveLength(50);
+    });
+
     it('skips history when skipHistory=true', () => {
       const layout = [{ id: 'b1', type: 'hero' as any, props: {}, children: [] }];
       useModuleBuilderStore.getState().setLayout(layout, true);
@@ -197,6 +207,25 @@ describe('module-builder-store', () => {
       const ids = useModuleBuilderStore.getState().layout.map(b => b.id);
       expect(new Set(ids).size).toBe(2);
     });
+
+    it('adds type-specific default props for testimonials', () => {
+      useModuleBuilderStore.getState().addBlock('testimonials');
+      const added = useModuleBuilderStore.getState().layout[0];
+
+      expect(added.props.source).toBe('static');
+      expect(added.props.count).toBe(3);
+      expect(added.props.showRatings).toBe(true);
+    });
+
+    it('adds nested children container for form_container', () => {
+      useModuleBuilderStore.getState().addBlock('form_container');
+      const added = useModuleBuilderStore.getState().layout[0];
+
+      expect(Array.isArray(added.children)).toBe(true);
+      expect(added.children).toEqual([]);
+      expect(added.props.formAction).toBe('contact');
+      expect(added.props.submitText).toBe('Submit');
+    });
   });
 
   describe('removeBlock', () => {
@@ -205,6 +234,107 @@ describe('module-builder-store', () => {
       const blockId = useModuleBuilderStore.getState().layout[0].id;
       useModuleBuilderStore.getState().removeBlock(blockId);
       expect(useModuleBuilderStore.getState().layout).toHaveLength(0);
+    });
+
+    it('clears selectedBlockId when removing selected block', () => {
+      useModuleBuilderStore.getState().setLayout([
+        { id: 'hero-1', type: 'hero' as any, props: {}, children: [] },
+      ]);
+      useModuleBuilderStore.getState().selectBlock('hero-1');
+
+      useModuleBuilderStore.getState().removeBlock('hero-1');
+
+      expect(useModuleBuilderStore.getState().selectedBlockId).toBeNull();
+    });
+  });
+
+  describe('updateBlock', () => {
+    it('updates root block fields', () => {
+      useModuleBuilderStore.getState().setLayout([
+        { id: 'root-1', type: 'hero' as any, label: 'Old', props: {}, children: [] },
+      ]);
+
+      useModuleBuilderStore.getState().updateBlock('root-1', {
+        label: 'Updated label',
+        props: { title: 'Updated title' },
+      });
+
+      const updated = useModuleBuilderStore.getState().layout[0];
+      expect(updated.label).toBe('Updated label');
+      expect(updated.props.title).toBe('Updated title');
+    });
+
+    it('updates nested child block by id', () => {
+      useModuleBuilderStore.getState().setLayout([
+        {
+          id: 'parent',
+          type: 'container' as any,
+          props: {},
+          children: [
+            { id: 'child', type: 'text_block' as any, label: 'Child', props: { content: 'old' }, children: [] },
+          ],
+        },
+      ]);
+
+      useModuleBuilderStore.getState().updateBlock('child', {
+        label: 'Child updated',
+      });
+
+      const child = useModuleBuilderStore.getState().layout[0].children?.[0];
+      expect(child?.label).toBe('Child updated');
+      expect(child?.props.content).toBe('old');
+    });
+  });
+
+  describe('moveBlock', () => {
+    it('reorders blocks when both IDs exist', () => {
+      useModuleBuilderStore.getState().setLayout([
+        { id: 'a', type: 'hero' as any, props: {}, children: [] },
+        { id: 'b', type: 'text_block' as any, props: {}, children: [] },
+        { id: 'c', type: 'button' as any, props: {}, children: [] },
+      ]);
+
+      useModuleBuilderStore.getState().moveBlock('a', 'c');
+
+      expect(useModuleBuilderStore.getState().layout.map((b) => b.id)).toEqual(['b', 'c', 'a']);
+    });
+
+    it('does nothing when active or over IDs are not found', () => {
+      useModuleBuilderStore.getState().setLayout([
+        { id: 'a', type: 'hero' as any, props: {}, children: [] },
+        { id: 'b', type: 'text_block' as any, props: {}, children: [] },
+      ]);
+
+      useModuleBuilderStore.getState().moveBlock('missing', 'b');
+
+      expect(useModuleBuilderStore.getState().layout.map((b) => b.id)).toEqual(['a', 'b']);
+    });
+  });
+
+  describe('duplicateBlock', () => {
+    it('duplicates a block after its original', () => {
+      useModuleBuilderStore.getState().setLayout([
+        { id: 'first', type: 'hero' as any, label: 'Hero', props: { title: 'Welcome' }, children: [] },
+      ]);
+
+      useModuleBuilderStore.getState().duplicateBlock('first');
+
+      const layout = useModuleBuilderStore.getState().layout;
+      expect(layout).toHaveLength(2);
+      expect(layout[0].id).toBe('first');
+      expect(layout[1].id).not.toBe('first');
+      expect(layout[1].label).toBe('Hero (copy)');
+      expect(layout[1].props.title).toBe('Welcome');
+    });
+
+    it('does nothing when target block does not exist', () => {
+      useModuleBuilderStore.getState().setLayout([
+        { id: 'first', type: 'hero' as any, props: {}, children: [] },
+      ]);
+
+      useModuleBuilderStore.getState().duplicateBlock('missing');
+
+      expect(useModuleBuilderStore.getState().layout).toHaveLength(1);
     });
   });
 });

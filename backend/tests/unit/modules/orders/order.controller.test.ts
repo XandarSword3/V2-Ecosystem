@@ -84,6 +84,29 @@ vi.mock('../../../../src/services/tax.service.js', () => ({
   },
 }));
 
+// ─── Mock engine service ────────────────────────────────────────
+vi.mock('../../../../src/engines/engine-service.js', () => ({
+  getEngineService: () => ({
+    calculatePricing: vi.fn().mockResolvedValue({
+      subtotal: 10,
+      taxAmount: 1,
+      serviceCharge: 0,
+      deliveryFee: 0,
+      totalDiscount: 0,
+      totalAmount: 11,
+      discounts: [],
+      loyaltyPointsEarned: 0,
+    }),
+    transitionState: vi.fn().mockResolvedValue({ allowed: true, targetState: 'preparing' }),
+    getInitialState: vi.fn().mockReturnValue('pending'),
+  }),
+}));
+
+// ─── Mock order-config service ──────────────────────────────────
+vi.mock('../../../../src/services/order-config.service.js', () => ({
+  orderConfigService: {},
+}));
+
 // ─── Import controller (AFTER mocks) ────────────────────────────
 import {
   createOrder,

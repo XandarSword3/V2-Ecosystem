@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 import type { Request, Response } from 'express';
-import type { OrderService } from '../services/order.service.js';
+import type { OrderService } from '../services/index.js';
 import type { LoggerService } from '../container/types.js';
 import { isErrorWithStatusCode, getErrorMessage } from '../../types/index.js';
 

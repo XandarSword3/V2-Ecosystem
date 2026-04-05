@@ -30,13 +30,18 @@ const createChainableMock = () => {
 
 let mockBuilder: ReturnType<typeof createChainableMock>;
 const mockFrom = vi.fn();
+const mockRpc = vi.fn();
 
 vi.mock('../../../src/database/connection.js', () => ({
-  getSupabase: vi.fn(() => ({ from: mockFrom })),
+  getSupabase: vi.fn(() => ({ from: mockFrom, rpc: mockRpc })),
 }));
 
 vi.mock('../../../src/utils/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
+}));
+
+vi.mock('../../../src/utils/activityLogger.js', () => ({
+  logActivity: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../src/socket/index.js', () => ({
@@ -160,7 +165,8 @@ describe('Pool Sessions Controller', () => {
         start_time: '18:00',
         end_time: '21:00',
       };
-      mockBuilder.queueResponse(mockSession);
+      // createSession uses supabase.rpc()
+      mockRpc.mockResolvedValue({ data: mockSession, error: null });
 
       const { req, res, next } = createMockReqRes({
         body: {
@@ -198,7 +204,8 @@ describe('Pool Sessions Controller', () => {
   describe('updateSession', () => {
     it('should update an existing session', async () => {
       const mockSession = { id: 'session-1', name: 'Morning Updated' };
-      mockBuilder.queueResponse(mockSession);
+      // updateSession uses supabase.rpc()
+      mockRpc.mockResolvedValue({ data: mockSession, error: null });
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'session-1' },
@@ -211,7 +218,8 @@ describe('Pool Sessions Controller', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      mockBuilder.queueResponse(null, { code: 'PGRST116' });
+      // updateSession uses supabase.rpc()
+      mockRpc.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'Not found' } });
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'invalid' },

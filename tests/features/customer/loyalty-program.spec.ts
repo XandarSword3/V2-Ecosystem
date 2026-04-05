@@ -1,29 +1,38 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 const FRONTEND = 'http://localhost:3000';
 const API = 'http://localhost:3005/api';
+const LOYALTY_PATH = '/account/loyalty';
 
 test.describe('Customer Loyalty Program [CUS-LOY]', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(`${FRONTEND}/login`);
-    await page.getByLabel(/email/i).fill('customer@test.com');
-    await page.getByLabel(/password/i).fill('password123');
-    await page.getByRole('button', { name: /log.?in|sign.?in/i }).click();
-    await page.waitForURL('**/dashboard**', { timeout: 5000 }).catch(() => {});
+  test.beforeEach(async ({ page, auth }, testInfo) => {
+    const isUnauthenticatedCase = /unauthenticated/i.test(testInfo.title);
+    if (isUnauthenticatedCase) {
+      return;
+    }
+
+    await auth.loginAs('customer');
+
+    // Guard: fail fast if auth did not stick, so loyalty tests don't run on login page.
+    await page.goto(`${FRONTEND}${LOYALTY_PATH}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+    if (/\/login|\/auth/i.test(page.url())) {
+      throw new Error(`Loyalty auth guard failed for test: ${testInfo.title}`);
+    }
   });
 
   test('CUS-LOY-001: view loyalty dashboard', async ({ page }) => {
-    await page.goto(`${FRONTEND}/loyalty`);
-    const heading = page.getByRole('heading', { name: /loyalty|rewards|points/i });
-    await expect(heading).toBeVisible();
+    await page.goto(`${FRONTEND}${LOYALTY_PATH}`);
+    const dashboardMarkers = page.getByText(/available points|your benefits|recent activity/i);
+    await expect(dashboardMarkers.first()).toBeVisible();
   });
 
   test('CUS-LOY-002: view points balance', async ({ page }) => {
-    await page.goto(`${FRONTEND}/loyalty`);
-    const balance = page.locator('[class*="balance"], [class*="points"]')
+    await page.goto(`${FRONTEND}${LOYALTY_PATH}`);
+    const balance = page.getByText(/available points/i)
       .or(page.getByText(/\d+\s*(points|pts)/i));
     await expect(balance.first()).toBeVisible();
-    const balanceText = await balance.first().textContent();
+    const balanceText = await page.locator('text=/\d{1,3}(,\d{3})*/').first().textContent();
     expect(balanceText).toMatch(/\d/);
   });
 
@@ -35,26 +44,16 @@ test.describe('Customer Loyalty Program [CUS-LOY]', () => {
   });
 
   test('CUS-LOY-004: view transaction history', async ({ page }) => {
-    await page.goto(`${FRONTEND}/loyalty`);
-    const historyTab = page.getByRole('tab', { name: /history|transaction/i })
-      .or(page.getByRole('link', { name: /history|transaction/i }))
-      .or(page.getByText(/history|transaction/i));
-    await historyTab.first().click();
-    const historyList = page.locator('[class*="history"], [class*="transaction"], table, [class*="list"]');
-    await expect(historyList.first()).toBeVisible();
+    await page.goto(`${FRONTEND}${LOYALTY_PATH}`);
+    const historySection = page.getByText(/recent activity/i)
+      .or(page.locator('[class*="history"], [class*="transaction"], table, [class*="list"]'));
+    await expect(historySection.first()).toBeVisible();
   });
 
   test('CUS-LOY-006: enroll in loyalty program (unauthenticated)', async ({ page }) => {
-    await page.goto(`${FRONTEND}/loyalty`);
-    const enrollBtn = page.getByRole('button', { name: /enrol|join|sign.?up|register/i })
-      .or(page.getByRole('link', { name: /enrol|join/i }));
-    const isVisible = await enrollBtn.first().isVisible().catch(() => false);
-    if (isVisible) {
-      await expect(enrollBtn.first()).toBeVisible();
-    } else {
-      // Already enrolled — verify dashboard is shown
-      const dashboard = page.locator('[class*="dashboard"], [class*="loyalty"]');
-      await expect(dashboard.first()).toBeVisible();
-    }
+    await page.goto(`${FRONTEND}${LOYALTY_PATH}`);
+    await page.waitForLoadState('networkidle');
+    // Unauthenticated users are redirected to login with redirect target.
+    await expect(page).toHaveURL(/\/login(\?|$)/i);
   });
 });

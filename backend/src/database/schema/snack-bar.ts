@@ -34,6 +34,8 @@ export const snackOrders = pgTable('snack_orders', {
   userId: uuid('user_id').references(() => users.id),
   status: varchar('status', { length: 20 }).default('pending'),
   totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
+  subtotal: decimal('subtotal', { precision: 10, scale: 2 }),
+  taxAmount: decimal('tax_amount', { precision: 10, scale: 2 }).default('0'),
   deliveryLocation: varchar('delivery_location', { length: 255 }),
   locationType: varchar('location_type', { length: 50 }),
   locationId: uuid('location_id'),

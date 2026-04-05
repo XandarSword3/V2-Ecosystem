@@ -27,6 +27,7 @@
     "stress-test:full": "npx ts-node tools/stress-test/run.ts --customers 50 --staff 15 --trainees 5 --admins 2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "concurrently": "^8.2.2",
     "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
@@ -34,5 +35,11 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
+    "dotenv": "^17.3.1",
+    "pg": "^8.19.0",
+    "playwright": "^1.58.2"
   }
 }

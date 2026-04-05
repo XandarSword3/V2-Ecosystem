@@ -1,0 +1,105 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+ [31mΓ¥»[39m tests/unit/modules/orders/order.controller.test.ts [2m([22m[2m32 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 16[2mms[22m[39m
+[31m       [31m├ù[31m creates an order and returns 201[39m[32m 5[2mms[22m[39m
+       [32mΓ£ô[39m returns error when validateBody throws (validation failure)[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m calls next when service throws a non-status error[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns 500 when order insert fails[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns full order for owner[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns full order for admin/staff even when not owner[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns full order for guest orders (no customer_id)[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns limited info for non-owner viewing non-guest order[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m returns 404 when order not found (PGRST116)[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns order data (delegates to getOrderById)[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards error to next on DB failure[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns orders for the authenticated user[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns empty array when user has no orders[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns transformed orders[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m passes status and date filters through[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns transformed live orders[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m accepts moduleId filter[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+[31m       [31m├ù[31m updates status and emits socket event[39m[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m returns error when validateBody throws[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error when fetch fails[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error when update fails[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns aggregated report[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m returns zeros when no orders exist[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m accepts moduleId filter[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns sales summary for date range[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m returns zeros for empty range[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m forwards DB error to next()[32m 0[2mms[22m[39m
+node.exe : 
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteExce 
+   ption
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 2 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/orders/order.controller.test.ts[2m > [22mOrder 
+Controller (restaurant)[2m > [22mcreateOrder[2m > [22mcreates an 
+order and returns 201
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 201 ][90m
+
+Number of calls: [1m0[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/orders/order.controller.test.ts
+:[2m214:26[22m[39m
+    [90m212| [39m      [35mawait[39m 
+[34mcreateOrder[39m(req[33m,[39m res[33m,[39m n)[33m;[39m
+    [90m213| [39m
+    [90m214| [39m      [34mexpect[39m(res[33m.[39mstatus)[33m.
+[39m[34mtoHaveBeenCalledWith[39m([34m201[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m215| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(
+    [90m216| [39m        expect.objectContaining({ success: true, 
+data: expect.objectCoΓÇª
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/2]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/orders/order.controller.test.ts[2m > [22mOrder 
+Controller (restaurant)[2m > [22mupdateOrderStatus[2m > 
+[22mupdates status and emits socket event
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ ObjectContaining{ΓÇª} ][90m
+
+Number of calls: [1m0[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/orders/order.controller.test.ts
+:[2m594:24[22m[39m
+    [90m592| [39m      [35mawait[39m 
+[34mupdateOrderStatus[39m(req[33m,[39m res[33m,[39m 
+[34mnext[39m())[33m;[39m
+    [90m593| [39m
+    [90m594| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m(
+    [90m   | [39m                       [31m^[39m
+    [90m595| [39m        expect.objectContaining({ success: true, 
+data: expect.objectCoΓÇª
+    [90m596| [39m      )[33m;[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/2]ΓÄ»[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m30 passed[39m[22m[90m (32)[39m
+[2m   Start at [22m 10:03:38
+[2m   Duration [22m 378ms[2m (transform 183ms, setup 0ms, import 224ms, tests 16ms, environment 0ms)[22m
+
