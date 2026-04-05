@@ -168,6 +168,21 @@ describe('CSRF Protection Middleware', () => {
     expect(nextCalled).toBe(true);
   });
 
+  it('should skip validation for bearer-authenticated requests', () => {
+    const req = createMockRequest({
+      method: 'PUT',
+      path: '/api/v1/admin/settings',
+      headers: { authorization: 'Bearer test-access-token' },
+    });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    csrfProtection(req as any, res as any, () => { nextCalled = true; });
+
+    expect(nextCalled).toBe(true);
+    expect(res.statusCode).toBe(200);
+  });
+
   it('should reject POST without cookie token', () => {
     const req = createMockRequest({ method: 'POST' });
     const res = createMockResponse();
