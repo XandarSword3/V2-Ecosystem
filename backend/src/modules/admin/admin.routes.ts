@@ -13,20 +13,20 @@ import * as dashboardController from "./controllers/dashboard.controller";
 import * as rolesController from "./controllers/roles.controller";
 import * as settingsController from "./controllers/settings.controller";
 import * as auditController from "./controllers/audit.controller";
-import * as reportsController from "./controllers/reports.controller";
 import * as notificationsController from "./controllers/notifications.controller";
 import * as uploadController from "./controllers/upload.controller";
-import * as scheduledReportsController from "./controllers/scheduled-reports.controller";
 import * as deletePreviewController from "./controllers/delete-preview.controller";
 import pricingRoutes from "./pricing.controller";
 import * as softDeleteController from "./controllers/soft-delete.controller";
+import * as reportsController from "./controllers/reports.controller";
 
 const router = Router();
 
 // Management roles for general admin access (excluding basic staff)
 const MANAGEMENT_ROLES = [
+  'admin', 'manager',
   'restaurant_manager', 'restaurant_admin',
-  'pool_admin', 
+  'pool_admin',
   'chalet_manager', 'chalet_admin',
   'snack_bar_admin'
 ];
@@ -78,6 +78,10 @@ router.put('/settings', authorize('super_admin'), settingsController.updateSetti
 router.get('/settings/homepage', authorize('super_admin'), settingsController.getHomepageSettings);
 router.put('/settings/homepage', authorize('super_admin'), settingsController.updateHomepageSettings);
 
+// Tax settings
+router.get('/settings/tax', authorize('super_admin'), settingsController.getTaxSettings);
+router.put('/settings/tax', authorize('super_admin'), settingsController.updateTaxSettings);
+
 // File Uploads (branding assets) - MANAGER
 router.get('/uploads', authorizeManager, uploadController.listFiles);
 router.post('/uploads', authorizeManager, rateLimits.expensive, uploadController.uploadFile);
@@ -96,19 +100,13 @@ router.get('/backups/:id/download', authorize('super_admin'), backupsController.
 router.post('/backups/restore', authorize('super_admin'), rateLimits.expensive, backupsController.restoreBackup);
 router.delete('/backups/:id', authorize('super_admin'), backupsController.deleteBackup);
 
-// Reports (rate limited - expensive operations) - MANAGER
+// Legacy Reports and Scheduled Reports endpoints removed in favor of Unified Reporting Module
+
+// Admin Reports (dashboard-friendly endpoints)
 router.get('/reports/overview', authorizeManager, reportsController.getOverviewReport);
 router.get('/reports/occupancy', authorizeManager, reportsController.getOccupancyReport);
-router.get('/reports/customers', authorizeManager, reportsController.getCustomerAnalytics);
-router.get('/reports/export', authorizeManager, rateLimits.expensive, reportsController.exportReport);
-
-// Scheduled Reports - MANAGER
-router.get('/reports/scheduled', authorizeManager, scheduledReportsController.getScheduledReports);
-router.post('/reports/scheduled', authorizeManager, scheduledReportsController.createScheduledReport);
-router.put('/reports/scheduled/:id', authorizeManager, scheduledReportsController.updateScheduledReport);
-router.delete('/reports/scheduled/:id', authorizeManager, scheduledReportsController.deleteScheduledReport);
-router.post('/reports/scheduled/:id/send', authorizeManager, rateLimits.expensive, scheduledReportsController.sendReportNow);
-router.get('/reports/preview', authorizeManager, scheduledReportsController.previewReport);
+router.get('/reports/customers', authorizeManager, reportsController.getCustomersReport);
+router.get('/reports/export', authorizeManager, reportsController.exportReport);
 
 // Notifications (using refactored controller) - MANAGER
 router.get('/notifications', authorizeManager, notificationsController.getNotifications);

@@ -5,6 +5,8 @@ import { emitToUnit } from "../../socket/index.js";
 import { createSnackOrderSchema, validateBody } from "../../validation/schemas.js";
 import dayjs from 'dayjs';
 import { z } from 'zod';
+import { getEngineService } from '../../engines/engine-service.js';
+import type { PricingLineItem, PricingContext } from '../../engines/types.js';
 
 // Types from Zod schema
 type CreateSnackOrderInput = z.infer<typeof createSnackOrderSchema>;
@@ -108,28 +110,42 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
 
     const itemMap = new Map((snackItemsList || []).map(i => [i.id, i]));
 
-    // Calculate total
-    let totalAmount = 0;
+    // Build line items and validate availability
     const orderItems = items.map((item) => {
       const snackItem = itemMap.get(item.itemId);
       if (!snackItem) throw new Error(`Item ${item.itemId} not found`);
       if (!snackItem.is_available) throw new Error(`${snackItem.name} is not available`);
 
       const unitPrice = parseFloat(snackItem.price);
-      const subtotal = unitPrice * item.quantity;
-      totalAmount += subtotal;
 
       return {
         snack_item_id: item.itemId,
         quantity: item.quantity,
         unit_price: unitPrice,
-        subtotal,
+        subtotal: unitPrice * item.quantity,
       };
     });
 
+    // === ENGINE-POWERED PRICING ===
+    // Route through the unified pricing pipeline (Engine A: instant_transaction)
+    // This adds tax calculation that was previously missing from snack orders
+    const engineService = getEngineService();
+    const pricingLineItems: PricingLineItem[] = orderItems.map(item => ({
+      name: itemMap.get(item.snack_item_id)?.name || 'Unknown',
+      unitPrice: item.unit_price,
+      quantity: item.quantity,
+    }));
+    const pricingContext: PricingContext = {
+      conditions: { orderType: 'takeaway' }, // Snack bar is always takeaway (no dine-in / delivery)
+    };
+    const pricing = await engineService.calculatePricing('menu_service', pricingLineItems, pricingContext);
+
     const estimatedReadyTime = dayjs().add(10, 'minute').toISOString();
 
-    // Create order
+    // Use initial state from engine instead of hardcoding
+    const initialState = engineService.getInitialState('menu_service');
+
+    // Create order with engine-calculated totals
     const { data: order, error: orderError } = await supabase
       .from('snack_orders')
       .insert({
@@ -137,8 +153,10 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
         customer_id: req.user?.userId,
         customer_name: customerName,
         customer_phone: customerPhone,
-        status: 'pending',
-        total_amount: totalAmount.toFixed(2),
+        status: initialState,
+        total_amount: pricing.totalAmount.toFixed(2),
+        subtotal: pricing.subtotal.toFixed(2),
+        tax_amount: pricing.taxAmount.toFixed(2),
         payment_status: 'pending',
         payment_method: paymentMethod,
         estimated_ready_time: estimatedReadyTime,
@@ -380,13 +398,59 @@ export const updateOrderStatus = asyncHandler(async (req: Request, res: Response
     const supabase = getSupabase();
     const { status } = req.body;
 
+    // Get current order to know the current state
+    const { data: currentOrder, error: fetchError } = await supabase
+      .from('snack_orders')
+      .select('status')
+      .eq('id', req.params.id)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return res.status(404).json({ success: false, error: 'Order not found' });
+      }
+      throw fetchError;
+    }
+
+    // === ENGINE-POWERED STATE TRANSITION ===
+    // Use state machine to validate transition instead of allowing any status
+    const engineService = getEngineService();
+    const actor = req.user?.roles?.includes('admin') ? 'admin' : 'staff';
+    
+    // Derive action from target status (the engine uses action names, not raw states)
+    const statusToAction: Record<string, string> = {
+      confirmed: 'confirm',
+      preparing: 'start_preparing',
+      ready: 'mark_ready',
+      delivered: 'deliver',
+      completed: currentOrder.status === 'ready' ? 'complete' : 'deliver',
+      cancelled: 'cancel',
+    };
+    const action = statusToAction[status];
+    if (!action) {
+      return res.status(400).json({ success: false, error: `Invalid target status: ${status}` });
+    }
+
+    const transitionResult = await engineService.transitionState(
+      'menu_service',
+      currentOrder.status,
+      action,
+      actor
+    );
+
+    if (!transitionResult.allowed) {
+      return res.status(400).json({
+        success: false,
+        error: transitionResult.error || `Cannot transition from ${currentOrder.status} to ${status}`,
+      });
+    }
+
     const updateData: Record<string, unknown> = { 
-      status, 
+      status: transitionResult.targetState, 
       updated_at: new Date().toISOString() 
     };
-    if (status === 'completed') {
+    if (transitionResult.targetState === 'completed') {
       updateData.completed_at = new Date().toISOString();
-      // Mark as paid when order is completed (for stress testing & realistic flow)
       updateData.payment_status = 'paid';
     }
 

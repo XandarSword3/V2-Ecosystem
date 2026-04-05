@@ -1,0 +1,348 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+node.exe : [90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mgetAccount[2m > 
+[22m[2mshould handle database error
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([90mstderr[2m... data 
+   base error:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[22m[39mError fetching loyalty account: { code: 
+[32m'DB_ERROR'[39m, message: [32m'Database connection 
+failed'[39m }
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mgetTiers[2m > 
+[22m[2mshould handle database error
+[22m[39mError fetching tiers: { message: [32m'Database 
+error'[39m }
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mgetStats[2m > 
+[22m[2mshould return loyalty statistics
+[22m[39mError fetching stats: TypeError: 
+supabase.from(...).select(...).not is not a function
+    at LoyaltyController.getStats (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:747:10)
+[90m    at processTicksAndRejections 
+(node:internal/process/task_queues:105:5)[39m
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1381:7
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:20
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mgetStats[2m > 
+[22m[2mshould handle empty stats
+[22m[39mError fetching stats: TypeError: 
+supabase.from(...).select(...).not is not a function
+    at LoyaltyController.getStats (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:747:10)
+[90m    at processTicksAndRejections 
+(node:internal/process/task_queues:105:5)[39m
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1437:7
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:20
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mError Handling[2m > 
+[22m[2mshould handle unexpected errors gracefully in getAccount
+[22m[39mError fetching loyalty account: Error: Connection failed
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1573:15
+    at Mock [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2%
+20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest/spy[24m/
+dist/index.js:285:34[90m)[39m
+    at LoyaltyController.getAccount (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:71:24)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1579:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mError Handling[2m > 
+[22m[2mshould handle unexpected errors gracefully in earnPoints
+[22m[39mError earning points: Error: Connection failed
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1589:15
+    at Mock [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2%
+20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest/spy[24m/
+dist/index.js:285:34[90m)[39m
+    at LoyaltyController.earnPoints (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:191:24)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1597:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mError Handling[2m > 
+[22m[2mshould handle unexpected errors gracefully in redeemPoints
+[22m[39mError redeeming points: Error: Connection failed
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1604:15
+    at Mock [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2%
+20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest/spy[24m/
+dist/index.js:285:34[90m)[39m
+    at LoyaltyController.redeemPoints (C:/Alessandro/Work/Attempts 
+to Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.co
+ntroller.ts:253:24)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1612:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+
+[90mstderr[2m | 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22m[2mLoyaltyController[2m > [22m[2mError Handling[2m > 
+[22m[2mshould handle unexpected errors gracefully in getStats
+[22m[39mError fetching stats: Error: Connection failed
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1619:15
+    at Mock [90m(file:///C:/Alessandro/Work/Attempts%20to%20Code/V2%
+20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest/spy[24m/
+dist/index.js:285:34[90m)[39m
+    at LoyaltyController.getStats (C:/Alessandro/Work/Attempts to 
+Code/V2 Ecosystem/v2-resort/backend/src/modules/loyalty/loyalty.contr
+oller.ts:737:24)
+    at C:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/bac
+kend/tests/unit/modules/loyalty/loyalty.service.test.ts:1625:24
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:145:11
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:915:26
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Alessandro/Work/Attempts%20to%
+20Code/V2%20Ecosystem/v2-resort/backend/[39mnode_modules/[4m@vitest
+/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///C:/Alessandro/Work/Attempts%20to%20Code/V2%20Ecos
+ystem/v2-resort/backend/[39mnode_modules/[4m@vitest/runner[24m/dis
+t/index.js:1653:37
+
+ [31mΓ¥»[39m tests/unit/modules/loyalty/loyalty.service.test.ts [2m([22m[2m52 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 64[2mms[22m[39m
+       [32mΓ£ô[39m should return existing loyalty account[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should create account with signup bonus if not exists[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should handle database error[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return account for authenticated user[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return 401 if not authenticated[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should earn points successfully[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should create account if not exists and earn points[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should apply tier multiplier to earned points[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid user ID[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject negative points[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should reject zero points[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should redeem points successfully[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should reject insufficient points[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject below minimum redemption[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return 404 if account not found[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should add points successfully[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should deduct points successfully[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should not allow negative balance[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject missing reason[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return 404 if account not found[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should adjust points by account ID[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return 404 for non-existent account ID[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return transaction history[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return empty array for user without account[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should filter transactions by type[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return all tiers[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle database error[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should update tier successfully[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject empty update[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should update tier benefits[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return loyalty settings[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return empty object if no settings exist[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should update existing settings[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should create settings if not exist[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject empty update[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid values[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return paginated accounts[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should filter by tier[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should return loyalty statistics[39m[32m 8[2mms[22m[39m
+[31m       [31m├ù[31m should handle empty stats[39m[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should calculate points for purchase[32m 2[2mms[22m[39m
+       [32mΓ£ô[39m should return zero points when loyalty disabled[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should apply tier multiplier[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject invalid amount[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should reject negative amount[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should handle unexpected errors gracefully in getAccount[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle unexpected errors gracefully in earnPoints[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle unexpected errors gracefully in redeemPoints[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle unexpected errors gracefully in getStats[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should handle very large point values[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle decimal points (should floor)[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should handle special characters in description[32m 1[2mms[22m[39m
+
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 2 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mgetStats[2m > [22mshould return 
+loyalty statistics
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "summary": ObjectContaining {[90m
+[32m-         "total_lifetime_points": 3000,[90m
+[32m-         "total_members": 2,[90m
+[32m-         "total_outstanding_points": 1500,[90m
+[32m-       },[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+     "error": "Failed to fetch statistics",[90m
+[31m+     "message": "supabase.from(...).select(...).not is not a 
+function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m1383:24[22m[39m
+    [90m1381| [39m      [35mawait[39m 
+controller[33m.[39m[34mgetStats[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m1382| [39m
+    [90m1383| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.
+[39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m1384| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m1385| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/2]ΓÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/modules/loyalty/loyalty.service.test.ts[2m > 
+[22mLoyaltyController[2m > [22mgetStats[2m > [22mshould handle 
+empty stats
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ { success: true, ΓÇª(1) } ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    {[22m
+[32m-     "data": ObjectContaining {[90m
+[32m-       "summary": ObjectContaining {[90m
+[32m-         "avg_points_per_member": 0,[90m
+[32m-         "total_members": 0,[90m
+[32m-         "total_outstanding_points": 0,[90m
+[32m-       },[90m
+[32m-     },[90m
+[32m-     "success": true,[90m
+[31m+     "error": "Failed to fetch statistics",[90m
+[31m+     "message": "supabase.from(...).select(...).not is not a 
+function",[90m
+[31m+     "success": false,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2mΓ¥»[22m tests/unit/modules/loyalty/loyalty.service.test.ts
+:[2m1439:24[22m[39m
+    [90m1437| [39m      [35mawait[39m 
+controller[33m.[39m[34mgetStats[39m(req [35mas[39m 
+never[33m,[39m res [35mas[39m never)[33m;[39m
+    [90m1438| [39m
+    [90m1439| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.
+[39m[34mtoHaveBeenCalledWith[39m({
+    [90m   | [39m                       [31m^[39m
+    [90m1440| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+    [90m1441| [39m        data[33m:[39m 
+expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/2]ΓÄ»[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m50 passed[39m[22m[90m (52)[39m
+[2m   Start at [22m 10:19:58
+[2m   Duration [22m 332ms[2m (transform 101ms, setup 0ms, import 130ms, tests 64ms, environment 0ms)[22m
+

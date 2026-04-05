@@ -601,7 +601,7 @@ export function createWeatherService(container: Container) {
     const R = humidity;
 
     // Rothfusz regression
-    let HI = -8.78469475556 + 
+    const HI = -8.78469475556 + 
              1.61139411 * T + 
              2.33854883889 * R +
              -0.14611605 * T * R +

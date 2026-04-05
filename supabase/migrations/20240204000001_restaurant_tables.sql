@@ -119,7 +119,7 @@ CREATE INDEX IF NOT EXISTS idx_kitchen_orders_priority ON kitchen_orders(priorit
 
 -- Insert default tables
 INSERT INTO restaurant_tables (number, name, capacity, min_capacity, section, position, features)
-SELECT v.number::text, v.name, v.capacity, v.min_capacity, v.section, v.position::jsonb, v.features::jsonb
+SELECT v.number, v.name, v.capacity, v.min_capacity, v.section, v.position::jsonb, v.features::jsonb
 FROM (VALUES 
     (1, 'Table 1', 2, 1, 'Main', '{"x": 50, "y": 50, "rotation": 0, "width": 50, "height": 50, "shape": "circle"}', '["window"]'),
     (2, 'Table 2', 2, 1, 'Main', '{"x": 150, "y": 50, "rotation": 0, "width": 50, "height": 50, "shape": "circle"}', '["window"]'),
@@ -132,7 +132,7 @@ FROM (VALUES
     (9, 'Table 9', 4, 2, 'Terrace', '{"x": 580, "y": 50, "rotation": 0, "width": 60, "height": 60, "shape": "square"}', '["outdoor"]'),
     (10, 'Table 10', 2, 1, 'Bar', '{"x": 500, "y": 200, "rotation": 0, "width": 40, "height": 40, "shape": "circle"}', '["bar"]')
 ) AS v(number, name, capacity, min_capacity, section, position, features)
-WHERE NOT EXISTS (SELECT 1 FROM restaurant_tables WHERE number::text = v.number::text);
+WHERE NOT EXISTS (SELECT 1 FROM restaurant_tables WHERE number = v.number);
 
 -- Insert restaurant settings
 INSERT INTO system_settings (key, value, category, description)

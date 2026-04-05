@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { giftCardController } from './giftcard.controller.js';
-import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { authenticate, authorize, optionalAuth } from '../../middleware/auth.middleware.js';
 
 const router = Router();
 
@@ -8,8 +8,8 @@ const router = Router();
 router.get('/templates', giftCardController.getTemplates.bind(giftCardController));
 router.get('/check/:code', giftCardController.checkBalance.bind(giftCardController));
 
-// Customer routes
-router.post('/purchase', authenticate, giftCardController.purchaseGiftCard.bind(giftCardController));
+// Customer routes (purchase is open to guests; optionalAuth attaches user when logged in)
+router.post('/purchase', optionalAuth, giftCardController.purchaseGiftCard.bind(giftCardController));
 router.get('/my', authenticate, giftCardController.getMyGiftCards.bind(giftCardController));
 
 // Checkout integration (requires auth for tracking)

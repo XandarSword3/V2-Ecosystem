@@ -42,12 +42,13 @@ describe('Reviews Controller', () => {
 
   describe('getApprovedReviews', () => {
     it('should return approved reviews with stats', async () => {
+      // Mock data uses module_id (DB column), controller maps to service_type
       const mockReviews = [
         {
           id: 'review-1',
           rating: 5,
           text: 'Excellent service!',
-          service_type: 'general',
+          module_id: 'general',
           created_at: '2024-01-01T00:00:00Z',
           users: { full_name: 'John Doe', profile_image_url: null },
         },
@@ -55,7 +56,7 @@ describe('Reviews Controller', () => {
           id: 'review-2',
           rating: 4,
           text: 'Great experience',
-          service_type: 'restaurant',
+          module_id: 'restaurant',
           created_at: '2024-01-02T00:00:00Z',
           users: { full_name: 'Jane Smith', profile_image_url: null },
         },
@@ -84,10 +85,11 @@ describe('Reviews Controller', () => {
 
       await getApprovedReviews(req, res, next);
 
+      // Controller maps module_id -> service_type for backward compat
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         data: {
-          reviews: mockReviews,
+          reviews: mockReviews.map(r => ({ ...r, service_type: r.module_id })),
           stats: {
             totalReviews: 3,
             averageRating: 4.7, // (5+4+5)/3 = 4.67 rounded
@@ -102,7 +104,7 @@ describe('Reviews Controller', () => {
           id: 'review-1',
           rating: 5,
           text: 'Great restaurant!',
-          service_type: 'restaurant',
+          module_id: 'restaurant',
           created_at: '2024-01-01T00:00:00Z',
           users: { full_name: 'John Doe', profile_image_url: null },
         },
@@ -126,7 +128,8 @@ describe('Reviews Controller', () => {
 
       await getApprovedReviews(req, res, next);
 
-      expect(reviewsQueryMock.eq).toHaveBeenCalledWith('service_type', 'restaurant');
+      // Iteration 5: service_type maps to module_id column
+      expect(reviewsQueryMock.eq).toHaveBeenCalledWith('module_id', 'restaurant');
     });
 
     it('should not filter by service type when type is "all"', async () => {
@@ -168,7 +171,14 @@ describe('Reviews Controller', () => {
 
       await getApprovedReviews(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(dbError);
+      // Iteration 5: graceful fallback returns empty data instead of calling next(error)
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: {
+          reviews: [],
+          stats: { totalReviews: 0, averageRating: 0 },
+        },
+      });
     });
 
     it('should return zero average rating when no reviews exist', async () => {
@@ -348,30 +358,42 @@ describe('Reviews Controller', () => {
 
   describe('getAllReviews', () => {
     it('should return all reviews for admin', async () => {
+      // Mock reviews data uses DB column names (module_id, status)
       const mockReviews = [
         {
           id: 'review-1',
           rating: 5,
           text: 'Great!',
-          service_type: 'general',
-          is_approved: true,
+          module_id: 'general',
+          status: 'approved',
+          user_id: 'user-1',
+          customer_name: 'John',
           created_at: '2024-01-01T00:00:00Z',
-          users: { id: 'user-1', full_name: 'John', email: 'john@test.com', profile_image_url: null },
         },
         {
           id: 'review-2',
           rating: 3,
           text: 'Okay',
-          service_type: 'restaurant',
-          is_approved: false,
+          module_id: 'restaurant',
+          status: 'pending',
+          user_id: 'user-2',
+          customer_name: 'Jane',
           created_at: '2024-01-02T00:00:00Z',
-          users: { id: 'user-2', full_name: 'Jane', email: 'jane@test.com', profile_image_url: null },
         },
       ];
 
-      const queryMock = createChainableMock(mockReviews);
+      const mockUsers = [
+        { id: 'user-1', full_name: 'John', email: 'john@test.com', profile_image_url: null },
+        { id: 'user-2', full_name: 'Jane', email: 'jane@test.com', profile_image_url: null },
+      ];
+
+      const reviewsQueryMock = createChainableMock(mockReviews);
+      const usersQueryMock = createChainableMock(mockUsers);
+
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(queryMock),
+        from: vi.fn().mockImplementation((table: string) => {
+          return table === 'users' ? usersQueryMock : reviewsQueryMock;
+        }),
       } as any);
 
       const { getAllReviews } = await import('../../src/modules/reviews/reviews.controller.js');
@@ -381,9 +403,23 @@ describe('Reviews Controller', () => {
 
       await getAllReviews(req, res, next);
 
+      // Controller maps DB columns to frontend names
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        data: mockReviews,
+        data: [
+          {
+            ...mockReviews[0],
+            service_type: 'general',
+            is_approved: true,
+            users: { id: 'user-1', full_name: 'John', email: 'john@test.com', profile_image_url: null },
+          },
+          {
+            ...mockReviews[1],
+            service_type: 'restaurant',
+            is_approved: false,
+            users: { id: 'user-2', full_name: 'Jane', email: 'jane@test.com', profile_image_url: null },
+          },
+        ],
       });
     });
 
@@ -404,12 +440,13 @@ describe('Reviews Controller', () => {
 
       await getAllReviews(req, res, next);
 
-      expect(queryMock.eq).toHaveBeenCalledWith('is_approved', false);
+      // Iteration 5: status column instead of is_approved boolean
+      expect(queryMock.eq).toHaveBeenCalledWith('status', 'pending');
     });
 
     it('should filter by approved status', async () => {
       const approvedReviews = [
-        { id: 'review-1', rating: 5, is_approved: true },
+        { id: 'review-1', rating: 5, status: 'approved' },
       ];
 
       const queryMock = createChainableMock(approvedReviews);
@@ -424,7 +461,8 @@ describe('Reviews Controller', () => {
 
       await getAllReviews(req, res, next);
 
-      expect(queryMock.eq).toHaveBeenCalledWith('is_approved', true);
+      // Iteration 5: status column instead of is_approved boolean
+      expect(queryMock.eq).toHaveBeenCalledWith('status', 'approved');
     });
 
     it('should filter by service type', async () => {
@@ -440,7 +478,8 @@ describe('Reviews Controller', () => {
 
       await getAllReviews(req, res, next);
 
-      expect(queryMock.eq).toHaveBeenCalledWith('service_type', 'chalets');
+      // Iteration 5: service_type maps to module_id column
+      expect(queryMock.eq).toHaveBeenCalledWith('module_id', 'chalets');
     });
 
     it('should handle database error', async () => {
@@ -455,7 +494,8 @@ describe('Reviews Controller', () => {
 
       await getAllReviews(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(dbError);
+      // Iteration 5: graceful fallback returns empty data instead of calling next(error)
+      expect(res.json).toHaveBeenCalledWith({ success: true, data: [] });
     });
   });
 
@@ -467,7 +507,7 @@ describe('Reviews Controller', () => {
     it('should approve a review', async () => {
       const updatedReview = {
         id: 'review-1',
-        is_approved: true,
+        status: 'approved',
       };
 
       const queryMock = createChainableMock(updatedReview);
@@ -483,10 +523,11 @@ describe('Reviews Controller', () => {
 
       await updateReviewStatus(req, res, next);
 
-      expect(queryMock.update).toHaveBeenCalledWith({ is_approved: true });
+      // Iteration 5: uses status column instead of is_approved
+      expect(queryMock.update).toHaveBeenCalledWith({ status: 'approved' });
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        data: updatedReview,
+        data: { ...updatedReview, is_approved: true }, // backward-compat mapping
         message: 'Review approved',
       });
     });

@@ -1,0 +1,72 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+ [31mΓ¥»[39m tests/unit/pool/pool.controller.test.ts [2m([22m[2m24 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 19[2mms[22m[39m
+       [32mΓ£ô[39m should return all active pool sessions[32m 4[2mms[22m[39m
+       [32mΓ£ô[39m should call next on error[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return a specific session[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return 404 for non-existent session[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return 400 if date is missing[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return availability for a date[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return a ticket by ID[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return 404 for non-existent ticket[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return user tickets[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should cancel a ticket[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should validate a ticket with ticketNumber[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should return 404 if ticket not found[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should record pool entry[32m 1[2mms[22m[39m
+       [32mΓ£ô[39m should record pool exit[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return current pool capacity[32m 0[2mms[22m[39m
+[31m       [31m├ù[31m should create a new pool session[39m[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should return 400 for missing required fields[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should update a pool session[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should soft-delete a pool session[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return pool settings[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should update pool settings[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should reset pool occupancy[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return maintenance logs[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should create a maintenance log[32m 0[2mms[22m[39m
+node.exe : 
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteExce 
+   ption
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 1 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/pool/pool.controller.test.ts[2m > [22mPool 
+Controller[2m > [22mcreateSession[2m > [22mshould create a new 
+pool session
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 201 ][90m
+
+Number of calls: [1m0[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/pool/pool.controller.test.ts:[2m536:26[22m[39m
+    [90m534| [39m      [35mawait[39m 
+poolController[33m.[39m[34mcreateSession[39m(req[33m,[39m 
+res[33m,[39m next)[33m;[39m
+    [90m535| [39m
+    [90m536| [39m      [34mexpect[39m(res[33m.[39mstatus)[33m.
+[39m[34mtoHaveBeenCalledWith[39m([34m201[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m537| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalled[39m()[33m;[39m
+    [90m538| [39m    })[33m;[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m23 passed[39m[22m[90m (24)[39m
+[2m   Start at [22m 10:03:20
+[2m   Duration [22m 443ms[2m (transform 227ms, setup 0ms, import 289ms, tests 19ms, environment 0ms)[22m
+

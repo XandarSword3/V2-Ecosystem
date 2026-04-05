@@ -1,46 +1,34 @@
 /**
  * In-Memory Waitlist Repository
- *
- * Test double for WaitlistRepository used in unit tests.
+ * Test double for WaitlistRepository using in-memory data structures.
  */
 
-import { randomUUID } from 'crypto';
-import type { WaitlistEntry, WaitlistFilters, WaitlistRepository } from "../container/types.js";
+import type {
+  WaitlistRepository,
+  WaitlistEntry,
+  WaitlistFilters,
+} from '../container/types.js';
 
 export class InMemoryWaitlistRepository implements WaitlistRepository {
-  private entries: Map<string, WaitlistEntry> = new Map();
+  private entries = new Map<string, WaitlistEntry>();
 
-  async create(
-    entry: Omit<WaitlistEntry, 'id' | 'createdAt' | 'updatedAt'>
-  ): Promise<WaitlistEntry> {
-    const id = randomUUID();
-    const now = new Date().toISOString();
+  reset() {
+    this.entries.clear();
+  }
 
-    const newEntry: WaitlistEntry = {
-      id,
-      ...entry,
-      createdAt: now,
-      updatedAt: null,
-    };
-
-    this.entries.set(id, newEntry);
-    return { ...newEntry };
+  async create(data: Omit<WaitlistEntry, 'id' | 'createdAt' | 'updatedAt'>): Promise<WaitlistEntry> {
+    const id = crypto.randomUUID();
+    const entry: WaitlistEntry = { ...data, id, createdAt: new Date().toISOString(), updatedAt: null };
+    this.entries.set(id, entry);
+    return entry;
   }
 
   async update(id: string, data: Partial<WaitlistEntry>): Promise<WaitlistEntry | null> {
-    const entry = this.entries.get(id);
-    if (!entry) return null;
-
-    const updated: WaitlistEntry = {
-      ...entry,
-      ...data,
-      id: entry.id,
-      createdAt: entry.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-
+    const existing = this.entries.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
     this.entries.set(id, updated);
-    return { ...updated };
+    return updated;
   }
 
   async delete(id: string): Promise<boolean> {
@@ -48,82 +36,55 @@ export class InMemoryWaitlistRepository implements WaitlistRepository {
   }
 
   async getById(id: string): Promise<WaitlistEntry | null> {
-    const entry = this.entries.get(id);
-    return entry ? { ...entry } : null;
+    return this.entries.get(id) ?? null;
   }
 
   async getByPhone(phone: string): Promise<WaitlistEntry[]> {
-    return Array.from(this.entries.values())
-      .filter((e) => e.guestPhone === phone)
-      .map((e) => ({ ...e }));
+    return [...this.entries.values()].filter(e => e.guestPhone === phone);
   }
 
   async list(filters?: WaitlistFilters): Promise<WaitlistEntry[]> {
-    let results = Array.from(this.entries.values());
-
-    if (filters) {
-      if (filters.status) {
-        results = results.filter((e) => e.status === filters.status);
-      }
-      if (filters.priority) {
-        results = results.filter((e) => e.priority === filters.priority);
-      }
-      if (filters.minPartySize !== undefined) {
-        results = results.filter((e) => e.partySize >= filters.minPartySize!);
-      }
-      if (filters.maxPartySize !== undefined) {
-        results = results.filter((e) => e.partySize <= filters.maxPartySize!);
-      }
-      if (filters.fromDate) {
-        results = results.filter((e) => e.createdAt >= filters.fromDate!);
-      }
-      if (filters.toDate) {
-        results = results.filter((e) => e.createdAt <= filters.toDate!);
-      }
-    }
-
-    // Sort by priority (vip first, then reservation, then normal) and then by creation time
+    let result = [...this.entries.values()];
+    if (filters?.status) result = result.filter(e => e.status === filters.status);
+    if (filters?.priority) result = result.filter(e => e.priority === filters.priority);
+    if (filters?.minPartySize !== undefined) result = result.filter(e => e.partySize >= filters.minPartySize!);
+    if (filters?.maxPartySize !== undefined) result = result.filter(e => e.partySize <= filters.maxPartySize!);
     const priorityOrder: Record<string, number> = { vip: 0, reservation: 1, normal: 2 };
-    results.sort((a, b) => {
-      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-      if (priorityDiff !== 0) return priorityDiff;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    result.sort((a, b) => {
+      const pa = priorityOrder[a.priority] ?? 2;
+      const pb = priorityOrder[b.priority] ?? 2;
+      if (pa !== pb) return pa - pb;
+      return a.createdAt.localeCompare(b.createdAt);
     });
-
-    return results.map((e) => ({ ...e }));
+    return result;
   }
 
   async getPosition(id: string): Promise<number> {
-    const entry = this.entries.get(id);
-    if (!entry || entry.status !== 'waiting') return -1;
-
-    const waiting = await this.list({ status: 'waiting' });
-    const index = waiting.findIndex((e) => e.id === id);
-    return index + 1; // 1-indexed position
+    const priorityOrder: Record<string, number> = { vip: 0, reservation: 1, normal: 2 };
+    const waiting = [...this.entries.values()]
+      .filter(e => e.status === 'waiting')
+      .sort((a, b) => {
+        const pa = priorityOrder[a.priority] ?? 2;
+        const pb = priorityOrder[b.priority] ?? 2;
+        if (pa !== pb) return pa - pb;
+        return a.createdAt.localeCompare(b.createdAt);
+      });
+    const idx = waiting.findIndex(e => e.id === id);
+    return idx >= 0 ? idx + 1 : 0;
   }
 
   async getWaitingCount(): Promise<number> {
-    return Array.from(this.entries.values()).filter((e) => e.status === 'waiting').length;
+    return [...this.entries.values()].filter(e => e.status === 'waiting').length;
   }
 
   async getNextInQueue(): Promise<WaitlistEntry | null> {
-    const waiting = await this.list({ status: 'waiting' });
-    return waiting.length > 0 ? waiting[0] : null;
-  }
-
-  // ==========================================
-  // TEST HELPERS
-  // ==========================================
-
-  addEntry(entry: WaitlistEntry): void {
-    this.entries.set(entry.id, { ...entry });
-  }
-
-  clear(): void {
-    this.entries.clear();
-  }
-
-  getAll(): WaitlistEntry[] {
-    return Array.from(this.entries.values()).map((e) => ({ ...e }));
+    const waiting = [...this.entries.values()]
+      .filter(e => e.status === 'waiting')
+      .sort((a, b) => {
+        if (a.priority === 'vip' && b.priority !== 'vip') return -1;
+        if (b.priority === 'vip' && a.priority !== 'vip') return 1;
+        return a.createdAt.localeCompare(b.createdAt);
+      });
+    return waiting[0] ?? null;
   }
 }

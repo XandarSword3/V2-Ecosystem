@@ -151,7 +151,7 @@ export default function ChannelManagerPage() {
         const data = res.data;
         setFetchError(null);
         // Transform backend data to frontend format
-        return (data.data || []).map((conn: any) => ({
+        return (data.connections || []).map((conn: any) => ({
           id: conn.id,
           name: channelNames[conn.channel_code?.toLowerCase()] || conn.channel_name,
           type: conn.channel_code?.toLowerCase() || 'custom',
@@ -183,7 +183,7 @@ export default function ChannelManagerPage() {
         // Get logs for each connection
         const propertyId = getPropertyId();
         const res = await api.get(`/channels/properties/${propertyId}/connections`);
-        const connections = res.data?.data || [];
+        const connections = res.data?.connections || [];
         
         // For now, return empty - full implementation would aggregate from all connections
         return [];

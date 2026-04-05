@@ -84,6 +84,50 @@ CREATE TABLE IF NOT EXISTS menu_items (
     is_spicy BOOLEAN DEFAULT false
 );
 
+-- Restaurant Orders
+CREATE TABLE IF NOT EXISTS restaurant_orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_number VARCHAR(20) UNIQUE,
+    customer_id UUID REFERENCES users(id),
+    customer_name VARCHAR(255),
+    customer_phone VARCHAR(20),
+    table_id UUID,
+    order_type VARCHAR(50),
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    subtotal DECIMAL(10,2) DEFAULT 0,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    service_charge DECIMAL(10,2) DEFAULT 0,
+    delivery_fee DECIMAL(10,2) DEFAULT 0,
+    discount_amount DECIMAL(10,2) DEFAULT 0,
+    total_amount DECIMAL(10,2) DEFAULT 0,
+    special_instructions TEXT,
+    estimated_ready_time TIMESTAMPTZ,
+    actual_ready_time TIMESTAMPTZ,
+    payment_status VARCHAR(50) DEFAULT 'pending',
+    payment_method VARCHAR(50),
+    assigned_to_staff UUID REFERENCES users(id),
+    module_id UUID,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    completed_at TIMESTAMPTZ,
+    cancelled_at TIMESTAMPTZ,
+    cancellation_reason TEXT,
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS restaurant_order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID REFERENCES restaurant_orders(id) ON DELETE CASCADE,
+    menu_item_id UUID REFERENCES menu_items(id),
+    quantity INTEGER NOT NULL DEFAULT 1,
+    unit_price DECIMAL(10,2) DEFAULT 0,
+    subtotal DECIMAL(10,2) DEFAULT 0,
+    special_instructions TEXT,
+    status VARCHAR(50),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS snack_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
@@ -95,10 +139,21 @@ CREATE TABLE IF NOT EXISTS snack_items (
 CREATE TABLE IF NOT EXISTS inventory_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
-    sku VARCHAR(50),
+    sku VARCHAR(100) UNIQUE,
+    description TEXT,
+    category_id UUID,
     quantity DECIMAL(10,2) DEFAULT 0,
-    unit VARCHAR(20) DEFAULT 'unit',
-    min_stock_level DECIMAL(10,2) DEFAULT 10
+    unit VARCHAR(50) NOT NULL DEFAULT 'piece',
+    current_stock DECIMAL(10,2) DEFAULT 0,
+    min_stock_level DECIMAL(10,2) DEFAULT 0,
+    max_stock_level DECIMAL(10,2),
+    reorder_point DECIMAL(10,2) DEFAULT 10,
+    cost_per_unit DECIMAL(10,2),
+    supplier VARCHAR(255),
+    location VARCHAR(255),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Credits

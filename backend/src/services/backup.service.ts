@@ -135,6 +135,9 @@ export class BackupService {
 
             if (recordError) throw recordError;
 
+            // 5. Enforce retention policy - keep max 10 completed backups
+            await BackupService.enforceRetention(supabase);
+
             return {
                 id: insertedRec.id,
                 filename,
@@ -290,5 +293,28 @@ export class BackupService {
             .eq('id', id);
 
         if (dbError) throw dbError;
+    }
+
+    /**
+     * Enforces backup retention policy - keeps max 10 completed backups
+     */
+    private static async enforceRetention(supabase: ReturnType<typeof getSupabase>) {
+        const MAX_BACKUPS = 10;
+        const { data: allBackups } = await supabase
+            .from('backups')
+            .select('id')
+            .eq('status', 'completed')
+            .order('created_at', { ascending: false });
+
+        if (allBackups && allBackups.length > MAX_BACKUPS) {
+            const toDelete = allBackups.slice(MAX_BACKUPS);
+            for (const old of toDelete) {
+                try {
+                    await BackupService.deleteBackup(old.id);
+                } catch (e) {
+                    logger.warn(`Failed to delete old backup ${old.id} during retention cleanup`);
+                }
+            }
+        }
     }
 }

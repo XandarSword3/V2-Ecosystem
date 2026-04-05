@@ -1,7 +1,15 @@
 -- Phase 2 Schema Updates: Module Versioning, Payment Ledger, Translations governance
 
 -- 1. Add settings_version to modules table
-ALTER TABLE modules ADD COLUMN IF NOT EXISTS settings_version INTEGER DEFAULT 1;
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'modules'
+  ) THEN
+    ALTER TABLE modules ADD COLUMN IF NOT EXISTS settings_version INTEGER DEFAULT 1;
+  END IF;
+END $$;
 
 -- 2. Payment Ledger for Idempotency & Audit
 CREATE TABLE IF NOT EXISTS payment_ledger (

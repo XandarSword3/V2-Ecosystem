@@ -39,6 +39,44 @@ const nextConfig = {
       // now handled by [slug] dynamic routes - no redirects needed
     ];
   },
+
+  // Security headers for all pages
+  // Note: CSP script-src requires 'unsafe-inline' and 'unsafe-eval' for Next.js
+  // (inline scripts for page data, webpack HMR in dev). In production, use
+  // a middleware with nonces for stricter CSP.
+  async headers() {
+    const isDev = process.env.NODE_ENV === 'development';
+    const scriptSrc = isDev
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com"
+      : "script-src 'self' 'unsafe-inline' https://js.stripe.com";
+    
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              scriptSrc,
+              "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: https: blob:",
+              "connect-src 'self' https: wss: ws: http://localhost:3005",
+              "frame-src 'self' https://js.stripe.com",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join('; '),
+          },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self), payment=(self)' },
+        ],
+      },
+    ];
+  },
 };
 
 // Sentry configuration options

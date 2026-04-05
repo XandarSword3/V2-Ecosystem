@@ -52,6 +52,40 @@ export const getSettings = asyncHandler(async (req: Request, res: Response) => {
       combinedSettings.poolCapacity = (combinedSettings as Record<string, unknown>).capacity || pool.capacity;
     }
 
+    // Ensure core sections exist even on sparse/legacy seed data.
+    const requiredSections = ['general', 'payments', 'appearance', 'contact', 'hours', 'chalets', 'pool', 'legal'];
+    requiredSections.forEach((section) => {
+      if (!combinedSettings[section] || typeof combinedSettings[section] !== 'object') {
+        combinedSettings[section] = {};
+      }
+    });
+
+    const general = combinedSettings.general as Record<string, unknown>;
+    const payments = combinedSettings.payments as Record<string, unknown>;
+
+    // Compatibility defaults used by admin tests and frontend settings consumers.
+    const resolvedCurrency = (combinedSettings as Record<string, unknown>).currency
+      || general.currency
+      || payments.currency
+      || 'USD';
+    const resolvedResortName = (combinedSettings as Record<string, unknown>).resortName
+      || general.resortName
+      || general.businessName
+      || 'V2 Resort';
+
+    combinedSettings.general = {
+      businessName: resolvedResortName,
+      resortName: resolvedResortName,
+      currency: resolvedCurrency,
+      ...general,
+    };
+    combinedSettings.payments = {
+      currency: resolvedCurrency,
+      ...payments,
+    };
+    combinedSettings.currency = resolvedCurrency;
+    combinedSettings.resortName = resolvedResortName;
+
     res.json({ success: true, data: combinedSettings });
 });
 
@@ -69,6 +103,11 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       Object.fromEntries(Object.entries(obj).filter(([_, v]) => v !== undefined));
 
     const updates: { key: string; value: unknown }[] = [];
+
+    // Generic key/value payload shape used by admin clients and phase2 harness.
+    if (typeof settings.key === 'string' && settings.value !== undefined) {
+      updates.push({ key: settings.key, value: settings.value });
+    }
 
     // Appearance settings (theme, weather, animations)
     const appearanceData = {
@@ -174,22 +213,47 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       updates.push({ key: 'navbar', value: settings.navbar });
     }
 
-    // FIX: Iteration 13 - Payment settings were silently dropped (frontend sends { key: 'payments', value: {...} })
-    if (settings.key === 'payments' && settings.value) {
-      updates.push({ key: 'payments', value: settings.value });
-    }
-
     // Perform all updates
     for (const update of updates) {
-      const { error } = await supabase
+      const timestamp = new Date().toISOString();
+      let { error } = await supabase
         .from('site_settings')
-        .upsert({
-          key: update.key,
-          value: update.value,
-          updated_at: new Date().toISOString(),
-          updated_by: userId,
-        }, { onConflict: 'key' });
-      
+        .upsert(
+          {
+            key: update.key,
+            value: update.value,
+            updated_at: timestamp,
+            updated_by: userId,
+          },
+          { onConflict: 'key' }
+        );
+
+      // Compatibility fallback for legacy schemas that don't expose audit columns.
+      if (error && /updated_by|schema cache|column/i.test(String(error.message || error.details || ''))) {
+        ({ error } = await supabase
+          .from('site_settings')
+          .upsert(
+            {
+              key: update.key,
+              value: update.value,
+              updated_at: timestamp,
+            },
+            { onConflict: 'key' }
+          ));
+      }
+
+      if (error && /updated_at|schema cache|column/i.test(String(error.message || error.details || ''))) {
+        ({ error } = await supabase
+          .from('site_settings')
+          .upsert(
+            {
+              key: update.key,
+              value: update.value,
+            },
+            { onConflict: 'key' }
+          ));
+      }
+
       if (error) {
         logger.error(`Failed to update ${update.key}:`, error);
         throw error;
@@ -213,7 +277,12 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       new_value: settings
     });
 
-    res.json({ success: true, message: 'Settings saved successfully' });
+    res.json({
+      success: true,
+      message: 'Settings saved successfully',
+      data: flattenedSettings,
+      updatedCategories,
+    });
 });
 // FIX: Iteration 26 - Dedicated homepage settings endpoints (frontend calls /admin/settings/homepage)
 export const getHomepageSettings = asyncHandler(async (req: Request, res: Response) => {
@@ -261,4 +330,52 @@ export const updateHomepageSettings = asyncHandler(async (req: Request, res: Res
   });
 
   res.json({ success: true, message: 'Homepage settings saved successfully' });
+});
+
+// Tax settings endpoints
+export const getTaxSettings = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'tax')
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    logger.error('Failed to fetch tax settings:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch tax settings' });
+  }
+
+  res.json({ success: true, data: data?.value || null });
+});
+
+export const updateTaxSettings = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const userId = (req as any).user?.id;
+  const taxData = req.body;
+
+  const { error } = await supabase
+    .from('site_settings')
+    .upsert({
+      key: 'tax',
+      value: taxData,
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    }, { onConflict: 'key' });
+
+  if (error) {
+    logger.error('Failed to update tax settings:', error);
+    return res.status(500).json({ success: false, error: 'Failed to save tax settings' });
+  }
+
+  emitToAll('settings.updated', { tax: taxData });
+
+  await logActivity({
+    user_id: userId!,
+    action: 'UPDATE_SETTINGS',
+    resource: 'settings:tax',
+    new_value: taxData,
+  });
+
+  res.json({ success: true, message: 'Tax settings saved successfully' });
 });

@@ -3,6 +3,7 @@ import { authenticate, authorize, optionalAuth } from "../../middleware/auth.mid
 import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
 // Import from refactored controllers
 import * as poolController from "./controllers/index";
+import membershipRoutes from './membership.controller';
 
 const router = Router();
 
@@ -44,5 +45,8 @@ router.post('/admin/sessions', authenticate, authorize(...adminRoles), poolContr
 router.put('/admin/sessions/:id', authenticate, authorize(...adminRoles), poolController.updateSession);
 router.delete('/admin/sessions/:id', authenticate, authorize(...adminRoles), poolController.deleteSession);
 router.get('/admin/reports/daily', authenticate, authorize(...adminRoles), poolController.getDailyReport);
+
+// Membership routes (mount entire membership sub-router)
+router.use('/memberships', membershipRoutes);
 
 export default router;

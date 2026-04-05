@@ -183,9 +183,10 @@ describe('NotificationsController', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      const fromMock = vi.fn().mockImplementation(() => {
-        throw new Error('DB Error');
-      });
+      // notificationService.getForUser is NOT wrapped in try-catch,
+      // so throwing here will propagate through asyncHandler to next()
+      mockNotificationService.getForUser.mockRejectedValue(new Error('DB Error'));
+      const fromMock = vi.fn().mockImplementation(() => createChainableMock([]));
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
 
       const { req, res, next } = createMockReqRes();

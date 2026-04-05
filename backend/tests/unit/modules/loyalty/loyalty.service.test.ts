@@ -98,6 +98,7 @@ function createMockResponse(): { json: ReturnType<typeof vi.fn>; status: ReturnT
 
 describe('LoyaltyController', () => {
   let controller: LoyaltyController;
+  let rpcMockFn: ReturnType<typeof vi.fn>;
   const mockUserId = '11111111-1111-1111-1111-111111111111';
   const mockAccountId = '22222222-2222-2222-2222-222222222222';
   const mockTierId = '33333333-3333-3333-3333-333333333333';
@@ -155,6 +156,31 @@ describe('LoyaltyController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     controller = new LoyaltyController();
+    // Default rpc mock that handles all loyalty atomic operations
+    rpcMockFn = vi.fn().mockImplementation((funcName: string, params: Record<string, unknown>) => {
+      if (funcName === 'earn_loyalty_points_atomic') {
+        const pts = (params.p_order_total as number) || 0;
+        return Promise.resolve({
+          data: [{ success: true, points_earned: pts, tier_multiplier: '1', new_balance: 500 + pts }],
+          error: null,
+        });
+      }
+      if (funcName === 'redeem_loyalty_points_atomic') {
+        const pts = (params.p_points as number) || 0;
+        return Promise.resolve({
+          data: [{ success: true, points_redeemed: pts, new_balance: 500 - pts }],
+          error: null,
+        });
+      }
+      if (funcName === 'adjust_loyalty_points_atomic' || funcName === 'adjust_loyalty_points_by_account_atomic') {
+        const pts = (params.p_points as number) || 0;
+        return Promise.resolve({
+          data: [{ success: true, adjustment: pts, new_balance: Math.max(0, 500 + pts), tier_name: 'Silver' }],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
   });
 
   // ============================================
@@ -164,9 +190,11 @@ describe('LoyaltyController', () => {
     it('should return existing loyalty account', async () => {
       const tableMocks: Record<string, ReturnType<typeof createQueryMock>> = {
         loyalty_accounts: createQueryMock(() => [mockAccount]),
+        loyalty_members: createQueryMock(() => [mockAccount]),
       };
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({ params: { userId: mockUserId } });
@@ -196,6 +224,11 @@ describe('LoyaltyController', () => {
           mock.insert = insertMock;
           return mock;
         })(),
+        loyalty_members: (() => {
+          const mock = createQueryMock(() => accountExists ? [newAccount] : []);
+          mock.insert = insertMock;
+          return mock;
+        })(),
         loyalty_settings: createQueryMock(() => [mockSettings]),
         loyalty_tiers: createQueryMock(() => [{ id: mockTierId }]),
         loyalty_transactions: createQueryMock(() => []),
@@ -205,7 +238,8 @@ describe('LoyaltyController', () => {
       }));
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({ params: { userId: mockUserId } });
@@ -228,6 +262,7 @@ describe('LoyaltyController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({
         from: () => mockQuery,
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({ params: { userId: mockUserId } });
@@ -252,7 +287,8 @@ describe('LoyaltyController', () => {
         loyalty_accounts: createQueryMock(() => [mockAccount]),
       };
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({ user: { userId: mockUserId } });
@@ -293,7 +329,8 @@ describe('LoyaltyController', () => {
       }));
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -344,7 +381,8 @@ describe('LoyaltyController', () => {
       }));
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -376,8 +414,14 @@ describe('LoyaltyController', () => {
         then: (resolve: (arg: { data: unknown; error: unknown }) => void) => resolve({ data: null, error: null })
       }));
 
+      rpcMockFn = vi.fn().mockResolvedValue({
+        data: [{ success: true, points_earned: 200, tier_multiplier: '2.0', new_balance: 700 }],
+        error: null,
+      });
+
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -450,8 +494,14 @@ describe('LoyaltyController', () => {
         then: (resolve: (arg: { data: unknown; error: unknown }) => void) => resolve({ data: null, error: null })
       }));
 
+      rpcMockFn = vi.fn().mockResolvedValue({
+        data: [{ success: true, points_redeemed: 500, new_balance: 500 }],
+        error: null,
+      });
+
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -483,8 +533,14 @@ describe('LoyaltyController', () => {
         loyalty_settings: createQueryMock(() => [mockSettings]),
       };
 
+      rpcMockFn = vi.fn().mockResolvedValue({
+        data: [{ success: false, error_message: 'Insufficient points', new_balance: 100 }],
+        error: null,
+      });
+
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -510,7 +566,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -531,8 +588,14 @@ describe('LoyaltyController', () => {
         loyalty_accounts: createQueryMock(() => []),
       };
 
+      rpcMockFn = vi.fn().mockResolvedValue({
+        data: [{ success: false, error_message: 'Loyalty account not found' }],
+        error: null,
+      });
+
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -564,7 +627,8 @@ describe('LoyaltyController', () => {
       }));
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -598,7 +662,8 @@ describe('LoyaltyController', () => {
       }));
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -631,7 +696,8 @@ describe('LoyaltyController', () => {
       }));
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -670,8 +736,14 @@ describe('LoyaltyController', () => {
         loyalty_accounts: createQueryMock(() => []),
       };
 
+      rpcMockFn = vi.fn().mockResolvedValue({
+        data: [{ success: false, error_message: 'Loyalty account not found' }],
+        error: null,
+      });
+
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -699,7 +771,8 @@ describe('LoyaltyController', () => {
       }));
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -722,8 +795,14 @@ describe('LoyaltyController', () => {
     it('should return 404 for non-existent account ID', async () => {
       const mockQuery = createQueryMock(() => []);
 
+      rpcMockFn = vi.fn().mockResolvedValue({
+        data: [{ success: false, error_message: 'Loyalty account not found' }],
+        error: null,
+      });
+
       vi.mocked(getSupabase).mockReturnValue({
         from: () => mockQuery,
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -766,11 +845,13 @@ describe('LoyaltyController', () => {
 
       const tableMocks: Record<string, ReturnType<typeof createQueryMock>> = {
         loyalty_accounts: accountMock,
+        loyalty_members: accountMock,
         loyalty_transactions: transactionMock,
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -798,7 +879,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -843,7 +925,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -877,7 +960,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest();
@@ -900,6 +984,7 @@ describe('LoyaltyController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({
         from: () => mockQuery,
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest();
@@ -935,7 +1020,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -984,6 +1070,7 @@ describe('LoyaltyController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({
         from: () => tierMock,
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -1011,7 +1098,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest();
@@ -1034,6 +1122,7 @@ describe('LoyaltyController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({
         from: () => mockQuery,
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest();
@@ -1067,6 +1156,7 @@ describe('LoyaltyController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({
         from: () => settingsMock,
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -1098,6 +1188,7 @@ describe('LoyaltyController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({
         from: () => settingsMock,
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -1161,6 +1252,7 @@ describe('LoyaltyController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({
         from: () => accountMock,
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -1203,6 +1295,7 @@ describe('LoyaltyController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({
         from: () => accountMock,
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -1242,22 +1335,28 @@ describe('LoyaltyController', () => {
           let callCount = 0;
           (mock as Record<string, unknown>).select = vi.fn().mockImplementation(() => {
             callCount++;
-            if (callCount === 1) {
-              return {
-                then: (resolve: (value: { data: unknown; error: unknown }) => void) => {
-                  resolve({ data: accounts, error: null });
-                  return Promise.resolve({ data: accounts, error: null });
-                },
-              };
-            }
-            return {
-              eq: vi.fn().mockReturnValue({
-                then: (resolve: (value: { data: unknown; error: unknown }) => void) => {
+            const resolvable = (val: unknown) => ({
+              then: (resolve: (value: unknown) => void) => {
+                resolve(val);
+                return Promise.resolve(val);
+              },
+              not: vi.fn().mockReturnValue({
+                then: (resolve: (value: unknown) => void) => {
                   resolve({ data: tierAccounts, error: null });
                   return Promise.resolve({ data: tierAccounts, error: null });
                 },
               }),
-            };
+            });
+            if (callCount === 1) {
+              // count query
+              return resolvable({ count: 2, data: null, error: null });
+            }
+            if (callCount === 2) {
+              // tier_id query with .not()
+              return resolvable({ data: tierAccounts, error: null });
+            }
+            // points data and tier distribution
+            return resolvable({ data: accounts, error: null });
           });
           return mock;
         })(),
@@ -1278,7 +1377,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest();
@@ -1299,21 +1399,28 @@ describe('LoyaltyController', () => {
     });
 
     it('should handle empty stats', async () => {
+      const emptyResolvable = {
+        then: (resolve: (value: { data: unknown; error: unknown; count?: number }) => void) => {
+          resolve({ data: [], error: null, count: 0 });
+          return Promise.resolve({ data: [], error: null, count: 0 });
+        },
+        not: vi.fn().mockReturnValue({
+          then: (resolve: (value: { data: unknown; error: unknown }) => void) => {
+            resolve({ data: [], error: null });
+            return Promise.resolve({ data: [], error: null });
+          },
+        }),
+        eq: vi.fn().mockReturnValue({
+          then: (resolve: (value: { data: unknown; error: unknown }) => void) => {
+            resolve({ data: [], error: null });
+            return Promise.resolve({ data: [], error: null });
+          },
+        }),
+      };
       const tableMocks: Record<string, ReturnType<typeof createQueryMock>> = {
         loyalty_accounts: (() => {
           const mock = createQueryMock(() => []);
-          (mock as Record<string, unknown>).select = vi.fn().mockReturnValue({
-            then: (resolve: (value: { data: unknown; error: unknown }) => void) => {
-              resolve({ data: [], error: null });
-              return Promise.resolve({ data: [], error: null });
-            },
-            eq: vi.fn().mockReturnValue({
-              then: (resolve: (value: { data: unknown; error: unknown }) => void) => {
-                resolve({ data: [], error: null });
-                return Promise.resolve({ data: [], error: null });
-              },
-            }),
-          });
+          (mock as Record<string, unknown>).select = vi.fn().mockReturnValue(emptyResolvable);
           return mock;
         })(),
         loyalty_transactions: (() => {
@@ -1333,7 +1440,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest();
@@ -1365,7 +1473,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -1392,7 +1501,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -1420,7 +1530,8 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -1544,8 +1655,14 @@ describe('LoyaltyController', () => {
         then: (resolve: (arg: { data: unknown; error: unknown }) => void) => resolve({ data: null, error: null })
       }));
 
+      rpcMockFn = vi.fn().mockResolvedValue({
+        data: [{ success: true, points_redeemed: 999999, new_balance: 1 }],
+        error: null,
+      });
+
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({
@@ -1572,7 +1689,8 @@ describe('LoyaltyController', () => {
       }));
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       // Note: The schema uses z.number().int().positive(), so decimal would fail validation
@@ -1599,7 +1717,8 @@ describe('LoyaltyController', () => {
       }));
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        rpc: rpcMockFn,
       } as never);
 
       const req = createMockRequest({

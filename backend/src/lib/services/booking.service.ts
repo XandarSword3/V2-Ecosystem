@@ -1,13 +1,11 @@
 /**
  * Booking Service
- * 
- * Business logic for chalet bookings with dependency injection.
- * Handles booking creation, availability checks, pricing calculations,
- * check-in/check-out, and cancellations.
+ *
+ * Business logic for chalet booking operations with dependency injection.
+ * Handles booking creation, check-in/check-out, cancellations, and availability.
  */
 
 import dayjs from 'dayjs';
-import { cache } from "../../utils/cache.js";
 import type {
   ChaletRepository,
   ChaletBooking,
@@ -51,13 +49,12 @@ export interface CreateBookingInput {
   numberOfGuests: number;
   addOns?: Array<{ addOnId: string; quantity: number }>;
   specialRequests?: string;
-  paymentMethod?: 'cash' | 'card' | 'whish' | 'online';
+  paymentMethod?: string;
 }
 
 export interface BookingResult {
   booking: ChaletBooking;
   chalet: Chalet;
-  addOns: ChaletBookingAddOn[];
 }
 
 export interface BookingServiceDeps {
@@ -69,24 +66,30 @@ export interface BookingServiceDeps {
   config: AppConfig;
 }
 
+// ============================================
+// SERVICE INTERFACE
+// ============================================
+
 export interface BookingService {
-  // Booking operations
   createBooking(input: CreateBookingInput): Promise<BookingResult>;
   getBookingById(id: string): Promise<ChaletBooking | null>;
   getBookingByNumber(bookingNumber: string): Promise<ChaletBooking | null>;
-  getBookings(filters: { chaletId?: string; status?: string; startDate?: string; endDate?: string }): Promise<ChaletBooking[]>;
   getBookingsByCustomer(customerId: string): Promise<ChaletBooking[]>;
+  getBookings(filters: { status?: string; chaletId?: string }): Promise<ChaletBooking[]>;
   getTodayBookings(): Promise<{ checkIns: ChaletBooking[]; checkOuts: ChaletBooking[] }>;
-  
-  // Status operations
-  checkIn(bookingId: string, staffId: string): Promise<ChaletBooking>;
-  checkOut(bookingId: string, staffId: string): Promise<ChaletBooking>;
-  updateStatus(bookingId: string, status: ChaletBooking['status'], userId?: string): Promise<ChaletBooking>;
-  cancelBooking(bookingId: string, reason: string, userId?: string): Promise<ChaletBooking>;
-  
-  // Availability
-  getAvailability(chaletId: string, startDate: string, endDate: string): Promise<{ blockedDates: string[] }>;
+  updateStatus(id: string, status: string, userId?: string): Promise<ChaletBooking>;
+  checkIn(id: string, staffId: string): Promise<ChaletBooking>;
+  checkOut(id: string, staffId: string): Promise<ChaletBooking>;
+  cancelBooking(id: string, reason: string, userId?: string): Promise<ChaletBooking>;
   checkAvailability(chaletId: string, checkIn: string, checkOut: string): Promise<boolean>;
+  getAvailability(chaletId: string, startDate: string, endDate: string): Promise<{ blockedDates: string[] }>;
+}
+
+function generateBookingNumber(): string {
+  const date = new Date();
+  const dateStr = date.toISOString().slice(2, 10).replace(/-/g, '');
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `C-${dateStr}-${random}`;
 }
 
 // ============================================
@@ -94,311 +97,247 @@ export interface BookingService {
 // ============================================
 
 export function createBookingService(deps: BookingServiceDeps): BookingService {
-  const { chaletRepository, emailService, logger, activityLogger, socketEmitter } = deps;
+  const { chaletRepository, emailService, logger, activityLogger, socketEmitter, config } = deps;
 
-  function generateBookingNumber(): string {
-    const date = dayjs().format('YYMMDD');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `C-${date}-${random}`;
+  // Helper to check date overlap
+  function datesOverlap(
+    start1: string,
+    end1: string,
+    start2: string,
+    end2: string
+  ): boolean {
+    return start1 < end2 && start2 < end1;
   }
 
-  async function calculatePricing(
+  // Calculate nightly price for a specific date
+  function getNightlyPrice(
     chalet: Chalet,
-    checkIn: dayjs.Dayjs,
-    checkOut: dayjs.Dayjs,
-    selectedAddOns: Array<{ addOnId: string; quantity: number }> = []
-  ): Promise<{
-    baseAmount: number;
-    addOnsAmount: number;
-    depositAmount: number;
-    totalAmount: number;
-    numberOfNights: number;
-    addOnItems: Array<{ add_on_id: string; quantity: number; unit_price: number; subtotal: number }>;
-  }> {
-    const numberOfNights = checkOut.diff(checkIn, 'day');
-    
-    // Get price rules for this chalet
-    const priceRules = await chaletRepository.getPriceRules(chalet.id);
-    
-    // Calculate base amount night-by-night
-    let baseAmount = 0;
-    let current = checkIn;
-    
-    while (current.isBefore(checkOut)) {
-      // Find applicable price rule for this night
-      const activeRule = priceRules.find(rule => {
-        if (!rule.is_active) return false;
-        const start = dayjs(rule.start_date).startOf('day');
-        const end = dayjs(rule.end_date).endOf('day');
-        return (current.isSame(start) || current.isAfter(start)) &&
-          (current.isSame(end) || current.isBefore(end));
-      });
-
-      let nightPrice: number;
-      if (activeRule) {
-        if (activeRule.price) {
-          nightPrice = parseFloat(activeRule.price);
-        } else if (activeRule.price_multiplier) {
-          const base = current.day() === 5 || current.day() === 6
-            ? parseFloat(chalet.weekend_price)
-            : parseFloat(chalet.base_price);
-          nightPrice = base * parseFloat(activeRule.price_multiplier);
-        } else {
-          const isWeekend = current.day() === 5 || current.day() === 6;
-          nightPrice = isWeekend ? parseFloat(chalet.weekend_price) : parseFloat(chalet.base_price);
-        }
-      } else {
-        const isWeekend = current.day() === 5 || current.day() === 6;
-        nightPrice = isWeekend ? parseFloat(chalet.weekend_price) : parseFloat(chalet.base_price);
-      }
-
-      baseAmount += nightPrice;
-      current = current.add(1, 'day');
-    }
-
-    // Calculate add-ons amount
-    let addOnsAmount = 0;
-    const addOnItems: Array<{ add_on_id: string; quantity: number; unit_price: number; subtotal: number }> = [];
-
-    if (selectedAddOns.length > 0) {
-      const addOnsList = await chaletRepository.getAddOnsByIds(
-        selectedAddOns.map(a => a.addOnId)
-      );
-      const addOnMap = new Map(addOnsList.map(a => [a.id, a]));
-
-      for (const item of selectedAddOns) {
-        const addOn = addOnMap.get(item.addOnId);
-        if (addOn && addOn.is_active) {
-          const unitPrice = parseFloat(addOn.price);
-          const multiplier = addOn.price_type === 'per_night' ? numberOfNights : 1;
-          const subtotal = unitPrice * item.quantity * multiplier;
-          addOnsAmount += subtotal;
-          addOnItems.push({
-            add_on_id: item.addOnId,
-            quantity: item.quantity,
-            unit_price: unitPrice,
-            subtotal,
-          });
-        }
-      }
-    }
-
-    // Get deposit settings
-    const settings = await chaletRepository.getChaletSettings();
-    let depositAmount: number;
-    
-    if (settings.deposit_type === 'fixed') {
-      depositAmount = settings.deposit_fixed || 100;
-    } else {
-      depositAmount = (baseAmount * (settings.deposit_percentage || 30)) / 100;
-    }
-
-    const totalAmount = baseAmount + addOnsAmount;
-
-    return { baseAmount, addOnsAmount, depositAmount, totalAmount, numberOfNights, addOnItems };
+    date: dayjs.Dayjs,
+  ): number {
+    const dayOfWeek = date.day();
+    // Friday (5) and Saturday (6) are weekend days
+    const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+    return parseFloat(isWeekend ? chalet.weekend_price : chalet.base_price);
   }
 
   return {
-    async createBooking(input) {
-      const {
-        chaletId,
-        customerId,
-        customerName,
-        customerEmail,
-        customerPhone,
-        checkInDate,
-        checkOutDate,
-        numberOfGuests,
-        addOns: selectedAddOns = [],
-        specialRequests,
-        paymentMethod,
-      } = input;
-
-      // Get chalet
-      const chalet = await chaletRepository.getChaletById(chaletId);
+    async createBooking(input: CreateBookingInput): Promise<BookingResult> {
+      // Validate chalet exists
+      const chalet = await chaletRepository.getChaletById(input.chaletId);
       if (!chalet) {
         throw new BookingServiceError('Chalet not found', 'CHALET_NOT_FOUND', 404);
       }
 
       if (!chalet.is_active) {
-        throw new BookingServiceError('Chalet is not available', 'CHALET_UNAVAILABLE', 400);
+        throw new BookingServiceError('Chalet is not available', 'CHALET_INACTIVE');
       }
 
-      const checkIn = dayjs(checkInDate);
-      const checkOut = dayjs(checkOutDate);
+      // Validate dates
+      const checkIn = dayjs(input.checkInDate);
+      const checkOut = dayjs(input.checkOutDate);
       const numberOfNights = checkOut.diff(checkIn, 'day');
 
-      if (numberOfNights < 1) {
-        throw new BookingServiceError('Invalid date range', 'INVALID_DATE_RANGE', 400);
+      if (numberOfNights <= 0) {
+        throw new BookingServiceError('Invalid date range', 'INVALID_DATE_RANGE');
       }
 
-      // Check capacity
-      if (numberOfGuests > chalet.capacity) {
+      // Validate capacity
+      if (input.numberOfGuests > chalet.capacity) {
         throw new BookingServiceError(
           `Chalet capacity is ${chalet.capacity} guests`,
-          'CAPACITY_EXCEEDED',
-          400
+          'CAPACITY_EXCEEDED'
         );
       }
 
-      const lockKey = `booking_lock:${chaletId}`;
-      const hasLock = await cache.acquireLock(lockKey, 10);
-      if (!hasLock) {
-        throw new BookingServiceError('System busy, please try again', 'CONCURRENCY_ERROR', 409);
+      // Check availability (no overlapping bookings)
+      const existingBookings = await chaletRepository.getBookingsForChalet(
+        input.chaletId,
+        input.checkInDate,
+        input.checkOutDate
+      );
+      if (existingBookings.length > 0) {
+        throw new BookingServiceError(
+          'Chalet is already booked for the selected dates',
+          'DATES_UNAVAILABLE'
+        );
       }
 
+      // Calculate base amount (sum of nightly prices)
+      let baseAmount = 0;
+      for (let i = 0; i < numberOfNights; i++) {
+        const nightDate = checkIn.add(i, 'day');
+        baseAmount += getNightlyPrice(chalet, nightDate);
+      }
 
-      // Declare outside try for scope
-      let booking: ChaletBooking;
-      let bookingAddOns: ChaletBookingAddOn[] = [];
-      let pricing: Awaited<ReturnType<typeof calculatePricing>>;
-      try {
-        // Check availability
-        const isAvailable = await this.checkAvailability(chaletId, checkInDate, checkOutDate);
-        if (!isAvailable) {
-          throw new BookingServiceError(
-            'Chalet is already booked for the selected dates',
-            'NOT_AVAILABLE',
-            400
-          );
+      // Calculate add-ons
+      let addOnsAmount = 0;
+      const addOnDetails: Array<{ addOnId: string; quantity: number; unitPrice: string; subtotal: string }> = [];
+
+      if (input.addOns && input.addOns.length > 0) {
+        const addOnIds = input.addOns.map(a => a.addOnId);
+        const addOns = await chaletRepository.getAddOnsByIds(addOnIds);
+        const addOnMap = new Map<string, ChaletAddOn>();
+        for (const ao of addOns) {
+          addOnMap.set(ao.id, ao);
         }
 
-        // Calculate pricing
-        pricing = await calculatePricing(chalet, checkIn, checkOut, selectedAddOns);
+        for (const addOnInput of input.addOns) {
+          const addOn = addOnMap.get(addOnInput.addOnId);
+          if (!addOn) continue;
 
-        // Create booking
-        booking = await chaletRepository.createBooking({
-          booking_number: generateBookingNumber(),
-          chalet_id: chaletId,
-          customer_id: customerId,
-          customer_name: customerName,
-          customer_email: customerEmail,
-          customer_phone: customerPhone,
-          check_in_date: checkIn.toISOString(),
-          check_out_date: checkOut.toISOString(),
-          number_of_guests: numberOfGuests,
-          number_of_nights: pricing.numberOfNights,
-          base_amount: pricing.baseAmount.toFixed(2),
-          add_ons_amount: pricing.addOnsAmount.toFixed(2),
-          deposit_amount: pricing.depositAmount.toFixed(2),
-          total_amount: pricing.totalAmount.toFixed(2),
-          status: 'pending',
-          payment_status: 'pending',
-          payment_method: paymentMethod,
-          special_requests: specialRequests,
-        });
+          const unitPrice = parseFloat(addOn.price);
+          let subtotal: number;
 
-        // Create booking add-ons
-        if (pricing.addOnItems.length > 0) {
-          bookingAddOns = await chaletRepository.createBookingAddOns(
-            pricing.addOnItems.map(item => ({
-              booking_id: booking.id,
-              add_on_id: item.add_on_id,
-              quantity: item.quantity,
-              unit_price: item.unit_price.toFixed(2),
-              subtotal: item.subtotal.toFixed(2),
-            }))
-          );
+          if (addOn.price_type === 'per_night') {
+            subtotal = unitPrice * addOnInput.quantity * numberOfNights;
+          } else {
+            subtotal = unitPrice * addOnInput.quantity;
+          }
+
+          addOnsAmount += subtotal;
+          addOnDetails.push({
+            addOnId: addOnInput.addOnId,
+            quantity: addOnInput.quantity,
+            unitPrice: addOn.price,
+            subtotal: subtotal.toFixed(2),
+          });
         }
-      } finally {
-        await cache.releaseLock(lockKey);
       }
 
-      // Send confirmation email
-      if (customerEmail) {
-        emailService.sendBookingConfirmation({
-          customerEmail,
-          customerName,
-          bookingNumber: booking.booking_number,
-          chaletName: chalet.name,
-          checkInDate: checkIn.format('MMMM D, YYYY'),
-          checkOutDate: checkOut.format('MMMM D, YYYY'),
-          numberOfGuests,
-          numberOfNights: pricing.numberOfNights,
-          totalAmount: pricing.totalAmount,
-          paymentStatus: booking.payment_status,
-        }).catch(err => logger.warn('Failed to send booking confirmation email', err));
+      const totalAmount = baseAmount + addOnsAmount;
+
+      // Calculate deposit
+      const settings = await chaletRepository.getChaletSettings();
+      let depositAmount: number;
+      if (settings.deposit_type === 'fixed' && settings.deposit_fixed) {
+        depositAmount = settings.deposit_fixed;
+      } else {
+        depositAmount = Math.round(totalAmount * (settings.deposit_percentage / 100) * 100) / 100;
       }
 
-      // Log activity
-      await activityLogger.log('CREATE_BOOKING', {
-        bookingNumber: booking.booking_number,
-        chaletId,
-        checkIn: checkInDate,
-        checkOut: checkOutDate,
-        total: booking.total_amount,
-      }, customerId);
+      const bookingNumber = generateBookingNumber();
+
+      // Create the booking
+      const booking = await chaletRepository.createBooking({
+        booking_number: bookingNumber,
+        chalet_id: input.chaletId,
+        customer_id: input.customerId,
+        customer_name: input.customerName,
+        customer_email: input.customerEmail,
+        customer_phone: input.customerPhone,
+        check_in_date: input.checkInDate,
+        check_out_date: input.checkOutDate,
+        number_of_guests: input.numberOfGuests,
+        number_of_nights: numberOfNights,
+        base_amount: baseAmount.toFixed(2),
+        add_ons_amount: addOnsAmount.toFixed(2),
+        deposit_amount: depositAmount.toFixed(2),
+        total_amount: totalAmount.toFixed(2),
+        status: 'pending',
+        payment_status: 'pending',
+        payment_method: input.paymentMethod as ChaletBooking['payment_method'],
+        special_requests: input.specialRequests,
+      } as Omit<ChaletBooking, 'id' | 'created_at' | 'updated_at'>);
+
+      // Create booking add-ons
+      if (addOnDetails.length > 0) {
+        await chaletRepository.createBookingAddOns(
+          addOnDetails.map(d => ({
+            booking_id: booking.id,
+            add_on_id: d.addOnId,
+            quantity: d.quantity,
+            unit_price: d.unitPrice,
+            subtotal: d.subtotal,
+          })) as Omit<ChaletBookingAddOn, 'id' | 'created_at'>[]
+        );
+      }
 
       // Emit socket event
       socketEmitter.emitToUnit('chalets', 'booking:new', {
-        id: booking.id,
+        bookingId: booking.id,
         bookingNumber: booking.booking_number,
+        customerName: input.customerName,
         chaletName: chalet.name,
-        customerName,
-        checkInDate,
-        checkOutDate,
-        status: booking.status,
-        totalAmount: booking.total_amount,
+        checkIn: input.checkInDate,
+        checkOut: input.checkOutDate,
       });
 
-      return { booking, chalet, addOns: bookingAddOns };
+      // Log activity
+      await activityLogger.log(
+        'CREATE_BOOKING',
+        {
+          bookingId: booking.id,
+          bookingNumber: booking.booking_number,
+          chaletId: input.chaletId,
+          totalAmount,
+        },
+        input.customerId
+      );
+
+      logger.info('Booking created', { bookingId: booking.id, bookingNumber: booking.booking_number });
+
+      return { booking, chalet };
     },
 
-    async getBookingById(id) {
+    async getBookingById(id: string): Promise<ChaletBooking | null> {
       return chaletRepository.getBookingById(id);
     },
 
-    async getBookingByNumber(bookingNumber) {
+    async getBookingByNumber(bookingNumber: string): Promise<ChaletBooking | null> {
       return chaletRepository.getBookingByNumber(bookingNumber);
     },
 
-    async getBookings(filters) {
-      return chaletRepository.getBookings(filters);
-    },
-
-    async getBookingsByCustomer(customerId) {
+    async getBookingsByCustomer(customerId: string): Promise<ChaletBooking[]> {
       return chaletRepository.getBookingsByCustomer(customerId);
     },
 
-    async getTodayBookings() {
+    async getBookings(filters: { status?: string; chaletId?: string }): Promise<ChaletBooking[]> {
+      return chaletRepository.getBookings(filters);
+    },
+
+    async getTodayBookings(): Promise<{ checkIns: ChaletBooking[]; checkOuts: ChaletBooking[] }> {
       return chaletRepository.getTodayBookings();
     },
 
-    async checkIn(bookingId, staffId) {
-      const booking = await chaletRepository.getBookingById(bookingId);
+    async updateStatus(id: string, status: string, userId?: string): Promise<ChaletBooking> {
+      const booking = await chaletRepository.getBookingById(id);
+      if (!booking) {
+        throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
+      }
+      return chaletRepository.updateBooking(id, { status: status as ChaletBooking['status'] });
+    },
+
+    async checkIn(id: string, staffId: string): Promise<ChaletBooking> {
+      const booking = await chaletRepository.getBookingById(id);
       if (!booking) {
         throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
       }
 
-      if (booking.status !== 'confirmed' && booking.status !== 'pending') {
+      if (booking.status !== 'pending' && booking.status !== 'confirmed') {
         throw new BookingServiceError(
           `Cannot check in a booking with status: ${booking.status}`,
-          'INVALID_STATUS',
-          400
+          'INVALID_CHECK_IN'
         );
       }
 
-      const updated = await chaletRepository.updateBooking(bookingId, {
+      const updated = await chaletRepository.updateBooking(id, {
         status: 'checked_in',
         checked_in_at: new Date().toISOString(),
         checked_in_by: staffId,
       });
 
-      await activityLogger.log('CHECK_IN', {
-        bookingId,
-        bookingNumber: booking.booking_number,
-      }, staffId);
-
-      socketEmitter.emitToUnit('chalets', 'booking:checkedIn', {
-        id: bookingId,
-        bookingNumber: booking.booking_number,
+      socketEmitter.emitToUnit('chalets', 'booking:checked_in', {
+        bookingId: id,
+        staffId,
       });
+
+      logger.info('Guest checked in', { bookingId: id, staffId });
 
       return updated;
     },
 
-    async checkOut(bookingId, staffId) {
-      const booking = await chaletRepository.getBookingById(bookingId);
+    async checkOut(id: string, staffId: string): Promise<ChaletBooking> {
+      const booking = await chaletRepository.getBookingById(id);
       if (!booking) {
         throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
       }
@@ -406,124 +345,85 @@ export function createBookingService(deps: BookingServiceDeps): BookingService {
       if (booking.status !== 'checked_in') {
         throw new BookingServiceError(
           `Cannot check out a booking with status: ${booking.status}`,
-          'INVALID_STATUS',
-          400
+          'INVALID_CHECK_OUT'
         );
       }
 
-      const updated = await chaletRepository.updateBooking(bookingId, {
+      const updated = await chaletRepository.updateBooking(id, {
         status: 'checked_out',
         checked_out_at: new Date().toISOString(),
         checked_out_by: staffId,
       });
 
-      await activityLogger.log('CHECK_OUT', {
-        bookingId,
-        bookingNumber: booking.booking_number,
-      }, staffId);
-
-      socketEmitter.emitToUnit('chalets', 'booking:checkedOut', {
-        id: bookingId,
-        bookingNumber: booking.booking_number,
+      socketEmitter.emitToUnit('chalets', 'booking:checked_out', {
+        bookingId: id,
+        staffId,
       });
+
+      logger.info('Guest checked out', { bookingId: id, staffId });
 
       return updated;
     },
 
-    async updateStatus(bookingId, status, userId) {
-      const booking = await chaletRepository.getBookingById(bookingId);
-      if (!booking) {
-        throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
-      }
-
-      const updated = await chaletRepository.updateBooking(bookingId, { status });
-
-      await activityLogger.log('UPDATE_BOOKING_STATUS', {
-        bookingId,
-        from: booking.status,
-        to: status,
-      }, userId);
-
-      socketEmitter.emitToUnit('chalets', 'booking:statusChanged', {
-        id: bookingId,
-        status,
-        previousStatus: booking.status,
-      });
-
-      return updated;
-    },
-
-    async cancelBooking(bookingId, reason, userId) {
-      const booking = await chaletRepository.getBookingById(bookingId);
+    async cancelBooking(id: string, reason: string, userId?: string): Promise<ChaletBooking> {
+      const booking = await chaletRepository.getBookingById(id);
       if (!booking) {
         throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
       }
 
       if (booking.status === 'cancelled') {
-        throw new BookingServiceError('Booking is already cancelled', 'ALREADY_CANCELLED', 400);
+        throw new BookingServiceError('Booking is already cancelled', 'ALREADY_CANCELLED');
       }
 
       if (booking.status === 'checked_out') {
-        throw new BookingServiceError('Cannot cancel a completed booking', 'CANNOT_CANCEL', 400);
+        throw new BookingServiceError('Cannot cancel a completed booking', 'CANNOT_CANCEL');
       }
 
-      const updated = await chaletRepository.updateBooking(bookingId, {
+      const updated = await chaletRepository.updateBooking(id, {
         status: 'cancelled',
-        cancelled_at: new Date().toISOString(),
         cancellation_reason: reason,
+        cancelled_at: new Date().toISOString(),
       });
-
-      await activityLogger.log('CANCEL_BOOKING', {
-        bookingId,
-        bookingNumber: booking.booking_number,
-        reason,
-      }, userId);
 
       socketEmitter.emitToUnit('chalets', 'booking:cancelled', {
-        id: bookingId,
-        bookingNumber: booking.booking_number,
+        bookingId: id,
         reason,
       });
+
+      await activityLogger.log(
+        'CANCEL_BOOKING',
+        { bookingId: id, reason },
+        userId
+      );
+
+      logger.info('Booking cancelled', { bookingId: id, reason });
 
       return updated;
     },
 
-    async getAvailability(chaletId, startDate, endDate) {
+    async checkAvailability(chaletId: string, checkInDate: string, checkOutDate: string): Promise<boolean> {
+      const existing = await chaletRepository.getBookingsForChalet(chaletId, checkInDate, checkOutDate);
+      return existing.length === 0;
+    },
+
+    async getAvailability(chaletId: string, startDate: string, endDate: string): Promise<{ blockedDates: string[] }> {
       const bookings = await chaletRepository.getBookingsForChalet(chaletId, startDate, endDate);
-      
       const blockedDates: string[] = [];
-      
+
       for (const booking of bookings) {
-        if (['cancelled', 'no_show'].includes(booking.status)) continue;
-        
-        let current = dayjs(booking.check_in_date);
-        const checkout = dayjs(booking.check_out_date);
-        
-        while (current.isBefore(checkout)) {
-          blockedDates.push(current.format('YYYY-MM-DD'));
+        const start = dayjs(booking.check_in_date);
+        const end = dayjs(booking.check_out_date);
+        let current = start;
+        while (current.isBefore(end)) {
+          const dateStr = current.format('YYYY-MM-DD');
+          if (!blockedDates.includes(dateStr)) {
+            blockedDates.push(dateStr);
+          }
           current = current.add(1, 'day');
         }
       }
-      
-      return { blockedDates };
-    },
 
-    async checkAvailability(chaletId, checkInDate, checkOutDate) {
-      const bookings = await chaletRepository.getBookingsForChalet(chaletId);
-      const checkIn = dayjs(checkInDate);
-      const checkOut = dayjs(checkOutDate);
-      
-      const activeBookings = bookings.filter(
-        b => !['cancelled', 'no_show'].includes(b.status)
-      );
-      
-      const hasOverlap = activeBookings.some(booking => {
-        const bIn = dayjs(booking.check_in_date);
-        const bOut = dayjs(booking.check_out_date);
-        return checkIn.isBefore(bOut) && checkOut.isAfter(bIn);
-      });
-      
-      return !hasOverlap;
+      return { blockedDates };
     },
   };
 }

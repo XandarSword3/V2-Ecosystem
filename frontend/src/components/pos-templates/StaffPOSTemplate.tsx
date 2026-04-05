@@ -123,8 +123,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
       try {
         const [tablesRes, ordersRes, shiftRes] = await Promise.all([
           api.get(`/staff/modules/${moduleSlug}/tables`),
-          api.get(`/staff/modules/${moduleSlug}/orders`, { 
-            params: { status: 'pending,confirmed,preparing,ready' } 
+          api.get(`/staff/modules/${moduleSlug}/orders`, {
+            params: { status: 'pending,confirmed,preparing,ready' }
           }),
           api.get('/staff/shifts/me/current'),
         ]);
@@ -146,7 +146,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
   // Real-time updates
   useEffect(() => {
     if (socket) {
-      socket.emit('join:staff', moduleId);
+      socket.emit('join:unit', 'restaurant');
 
       const handleNewOrder = (order: Order) => {
         setOrders(prev => [order, ...prev]);
@@ -156,11 +156,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
         toast.info(`New order #${order.orderNumber}`, { description: order.customerName });
         // Play notification sound
         const audio = new Audio('/notification.mp3');
-        audio.play().catch(() => {});
+        audio.play().catch(() => { });
       };
 
       const handleStatusUpdate = (update: { orderId: string; status: string }) => {
-        setOrders(prev => prev.map(o => 
+        setOrders(prev => prev.map(o =>
           o.id === update.orderId ? { ...o, status: update.status } : o
         ));
         setKitchenOrders(prev => {
@@ -180,12 +180,12 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
       };
 
       socket.on('order:new', handleNewOrder);
-      socket.on('order:status', handleStatusUpdate);
+      socket.on('order:updated', handleStatusUpdate);
       socket.on('table:update', handleTableUpdate);
 
       return () => {
         socket.off('order:new', handleNewOrder);
-        socket.off('order:status', handleStatusUpdate);
+        socket.off('order:updated', handleStatusUpdate);
         socket.off('table:update', handleTableUpdate);
       };
     }
@@ -195,7 +195,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
   const updateOrderStatus = async (orderId: string, status: string) => {
     try {
       await api.patch(`/staff/modules/${moduleSlug}/orders/${orderId}/status`, { status });
-      setOrders(prev => prev.map(o => 
+      setOrders(prev => prev.map(o =>
         o.id === orderId ? { ...o, status } : o
       ));
       toast.success(`Order updated to ${status}`);
@@ -223,9 +223,9 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
   // Split/merge tables
   const splitTable = async (tableId: string, newTableId: string, itemIds: string[]) => {
     try {
-      await api.post(`/staff/modules/${moduleSlug}/tables/${tableId}/split`, { 
-        newTableId, 
-        itemIds 
+      await api.post(`/staff/modules/${moduleSlug}/tables/${tableId}/split`, {
+        newTableId,
+        itemIds
       });
       toast.success('Table split successfully');
     } catch (error) {
@@ -235,8 +235,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
 
   const mergeTables = async (sourceTableId: string, targetTableId: string) => {
     try {
-      await api.post(`/staff/modules/${moduleSlug}/tables/${sourceTableId}/merge`, { 
-        targetTableId 
+      await api.post(`/staff/modules/${moduleSlug}/tables/${sourceTableId}/merge`, {
+        targetTableId
       });
       toast.success('Tables merged successfully');
     } catch (error) {
@@ -329,8 +329,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                   id="openingCash"
                 />
               </div>
-              <Button 
-                className="w-full" 
+              <Button
+                className="w-full"
                 onClick={() => {
                   const input = document.getElementById('openingCash') as HTMLInputElement;
                   startShift(parseFloat(input.value) || 0);
@@ -368,11 +368,10 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition ${
-                  viewMode === mode
+                className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition ${viewMode === mode
                     ? 'bg-primary text-white'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
+                  }`}
               >
                 <Icon className="h-4 w-4" />
                 {label}
@@ -405,15 +404,14 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                   <button
                     key={table.id}
                     onClick={() => setSelectedTable(table)}
-                    className={`aspect-square rounded-xl flex flex-col items-center justify-center p-4 transition ${
-                      table.status === 'available' 
+                    className={`aspect-square rounded-xl flex flex-col items-center justify-center p-4 transition ${table.status === 'available'
                         ? 'bg-green-100 dark:bg-green-900/30 border-2 border-green-500' :
-                      table.status === 'occupied'
-                        ? 'bg-red-100 dark:bg-red-900/30 border-2 border-red-500' :
-                      table.status === 'reserved'
-                        ? 'bg-yellow-100 dark:bg-yellow-900/30 border-2 border-yellow-500' :
-                        'bg-gray-100 dark:bg-gray-700 border-2 border-gray-300'
-                    }`}
+                        table.status === 'occupied'
+                          ? 'bg-red-100 dark:bg-red-900/30 border-2 border-red-500' :
+                          table.status === 'reserved'
+                            ? 'bg-yellow-100 dark:bg-yellow-900/30 border-2 border-yellow-500' :
+                            'bg-gray-100 dark:bg-gray-700 border-2 border-gray-300'
+                      }`}
                   >
                     <span className="text-2xl font-bold">{table.number}</span>
                     <span className="text-xs text-gray-500 mt-1">
@@ -443,10 +441,9 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                     <div className="space-y-4">
                       <div className="flex justify-between text-sm">
                         <span>Order #{selectedTable.currentOrder.orderNumber}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${
-                          selectedTable.currentOrder.status === 'ready' ? 'bg-green-100 text-green-800' :
-                          'bg-blue-100 text-blue-800'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${selectedTable.currentOrder.status === 'ready' ? 'bg-green-100 text-green-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
                           {selectedTable.currentOrder.status}
                         </span>
                       </div>
@@ -466,7 +463,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                         <Button variant="outline" size="sm">
                           <Plus className="h-4 w-4 mr-1" /> Add Item
                         </Button>
-                        <Button 
+                        <Button
                           size="sm"
                           onClick={() => {
                             setSelectedOrder(selectedTable.currentOrder!);
@@ -502,11 +499,10 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                 <button
                   key={filter}
                   onClick={() => setStatusFilter(filter)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize ${
-                    statusFilter === filter
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize ${statusFilter === filter
                       ? 'bg-primary text-white'
                       : 'bg-white dark:bg-gray-800 text-gray-600'
-                  }`}
+                    }`}
                 >
                   {filter}
                   {filter === 'pending' && (
@@ -522,19 +518,18 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
             <div className="flex-1 overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {orders
-                  .filter(o => statusFilter === 'active' 
+                  .filter(o => statusFilter === 'active'
                     ? ['pending', 'confirmed', 'preparing', 'ready'].includes(o.status)
                     : o.status === statusFilter
                   )
                   .map(order => (
-                    <Card 
-                      key={order.id} 
-                      className={`${
-                        order.status === 'pending' ? 'border-l-4 border-l-yellow-500' :
-                        order.status === 'preparing' ? 'border-l-4 border-l-blue-500' :
-                        order.status === 'ready' ? 'border-l-4 border-l-green-500 animate-pulse' :
-                        ''
-                      }`}
+                    <Card
+                      key={order.id}
+                      className={`${order.status === 'pending' ? 'border-l-4 border-l-yellow-500' :
+                          order.status === 'preparing' ? 'border-l-4 border-l-blue-500' :
+                            order.status === 'ready' ? 'border-l-4 border-l-green-500 animate-pulse' :
+                              ''
+                        }`}
                     >
                       <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
@@ -545,12 +540,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                             </p>
                           </div>
                           <div className="text-right">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              order.status === 'preparing' ? 'bg-blue-100 text-blue-800' :
-                              order.status === 'ready' ? 'bg-green-100 text-green-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                order.status === 'preparing' ? 'bg-blue-100 text-blue-800' :
+                                  order.status === 'ready' ? 'bg-green-100 text-green-800' :
+                                    'bg-gray-100 text-gray-800'
+                              }`}>
                               {order.status}
                             </span>
                             <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
@@ -580,16 +574,16 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                         <div className="flex gap-2">
                           {order.status === 'pending' && (
                             <>
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 className="flex-1"
                                 onClick={() => updateOrderStatus(order.id, 'cancelled')}
                               >
                                 <X className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 className="flex-1"
                                 onClick={() => acceptOrder(order.id)}
                               >
@@ -598,8 +592,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                             </>
                           )}
                           {order.status === 'confirmed' && (
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               className="w-full"
                               onClick={() => startPreparing(order.id)}
                             >
@@ -607,8 +601,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                             </Button>
                           )}
                           {order.status === 'preparing' && (
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               className="w-full bg-green-600 hover:bg-green-700"
                               onClick={() => markReady(order.id)}
                             >
@@ -617,16 +611,16 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                           )}
                           {order.status === 'ready' && (
                             <>
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 className="flex-1"
                                 onClick={() => printReceipt(order.id)}
                               >
                                 <Printer className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 className="flex-1"
                                 onClick={() => {
                                   setSelectedOrder(order);
@@ -654,24 +648,22 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                 const orderTime = getOrderTime(order.createdAt);
                 const isUrgent = orderTime > 15;
                 const isLate = orderTime > 20;
-                
+
                 return (
-                  <Card 
+                  <Card
                     key={order.id}
-                    className={`${
-                      isLate ? 'bg-red-50 dark:bg-red-900/20 border-red-500' :
-                      isUrgent ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500' :
-                      'bg-white dark:bg-gray-800'
-                    } border-2`}
+                    className={`${isLate ? 'bg-red-50 dark:bg-red-900/20 border-red-500' :
+                        isUrgent ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500' :
+                          'bg-white dark:bg-gray-800'
+                      } border-2`}
                   >
                     <CardHeader className="pb-2">
                       <div className="flex justify-between items-start">
                         <CardTitle className="text-xl font-mono">#{order.orderNumber}</CardTitle>
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-lg font-bold ${
-                          isLate ? 'bg-red-500 text-white' :
-                          isUrgent ? 'bg-yellow-500 text-white' :
-                          'bg-gray-200 dark:bg-gray-700'
-                        }`}>
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-lg font-bold ${isLate ? 'bg-red-500 text-white' :
+                            isUrgent ? 'bg-yellow-500 text-white' :
+                              'bg-gray-200 dark:bg-gray-700'
+                          }`}>
                           <Timer className="h-5 w-5" />
                           {orderTime}m
                         </div>
@@ -683,13 +675,12 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                     <CardContent>
                       <div className="space-y-2 mb-4">
                         {order.items.map(item => (
-                          <div 
-                            key={item.id} 
-                            className={`p-2 rounded-lg ${
-                              item.status === 'ready' 
-                                ? 'bg-green-100 dark:bg-green-900/30 line-through' 
+                          <div
+                            key={item.id}
+                            className={`p-2 rounded-lg ${item.status === 'ready'
+                                ? 'bg-green-100 dark:bg-green-900/30 line-through'
                                 : 'bg-gray-50 dark:bg-gray-700'
-                            }`}
+                              }`}
                           >
                             <div className="flex justify-between items-start">
                               <span className="font-bold text-lg">{item.quantity}x {item.name}</span>
@@ -712,12 +703,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                           </div>
                         ))}
                       </div>
-                      <Button 
-                        className={`w-full ${
-                          order.status === 'confirmed' 
-                            ? 'bg-blue-600 hover:bg-blue-700' 
+                      <Button
+                        className={`w-full ${order.status === 'confirmed'
+                            ? 'bg-blue-600 hover:bg-blue-700'
                             : 'bg-green-600 hover:bg-green-700'
-                        }`}
+                          }`}
                         onClick={() => {
                           if (order.status === 'confirmed') {
                             startPreparing(order.id);
@@ -762,7 +752,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                 {orders
                   .filter(o => ['ready', 'served'].includes(o.status))
                   .map(order => (
-                    <div 
+                    <div
                       key={order.id}
                       className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
                     >
@@ -848,8 +838,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                       </span>
                     </div>
                   </div>
-                  <Button 
-                    className="w-full mt-4" 
+                  <Button
+                    className="w-full mt-4"
                     variant="outline"
                     onClick={() => setShowShiftModal(true)}
                   >
@@ -889,8 +879,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                   </button>
                 ))}
               </div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full mt-4"
                 onClick={() => {
                   setShowPaymentModal(false);
@@ -924,14 +914,14 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                   />
                 </div>
                 <div className="flex gap-3">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="flex-1"
                     onClick={() => setShowShiftModal(false)}
                   >
                     Cancel
                   </Button>
-                  <Button 
+                  <Button
                     className="flex-1"
                     onClick={() => {
                       const input = document.getElementById('closingCash') as HTMLInputElement;

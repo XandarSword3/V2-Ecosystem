@@ -15,6 +15,9 @@ router.get('/my-properties', multiPropertyController.getMyProperties);
 // Switch active property
 router.post('/switch-property', multiPropertyController.switchProperty);
 
+// Create a new property
+router.post('/properties', authorize('super_admin'), multiPropertyController.createProperty);
+
 // ==================== PROPERTY GROUPS (Admin) ====================
 
 // Get all property groups

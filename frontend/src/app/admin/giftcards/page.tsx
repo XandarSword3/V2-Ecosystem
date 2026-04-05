@@ -97,7 +97,18 @@ export default function GiftCardsAdminPage() {
 
       if (cardsRes.data.success) setGiftCards(cardsRes.data.data);
       if (templatesRes.data.success) setTemplates(templatesRes.data.data);
-      if (statsRes.data.success) setStats(statsRes.data.data);
+      if (statsRes.data.success) {
+        const s = statsRes.data.data.summary;
+        if (s) {
+          setStats({
+            totalCards: s.total_cards || 0,
+            activeCards: s.active_cards || 0,
+            totalValueSold: s.total_sold || 0,
+            totalValueRedeemed: s.total_redeemed || 0,
+            unredeeemedValue: s.outstanding_balance || 0,
+          });
+        }
+      }
     } catch (error) {
       toast.error('Failed to load gift card data');
     } finally {

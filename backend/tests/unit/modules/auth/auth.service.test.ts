@@ -155,6 +155,11 @@ vi.mock('../../../../src/utils/logger', () => ({
   },
 }));
 
+// Mock password policy service
+vi.mock('../../../../src/services/password-policy.service', () => ({
+  validatePassword: vi.fn().mockResolvedValue({ valid: true }),
+}));
+
 import * as authService from '../../../../src/modules/auth/auth.service';
 
 describe('AuthService', () => {
@@ -222,6 +227,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         password_hash: 'hashed_password',
         is_active: true,
+        email_verified: true,
         two_factor_enabled: false,
         token_version: 0
       }];
@@ -242,6 +248,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         password_hash: 'hashed_password',
         is_active: true,
+        email_verified: true,
         two_factor_enabled: true,
         token_version: 0
       }];

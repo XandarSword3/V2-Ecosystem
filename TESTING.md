@@ -1,292 +1,112 @@
-# Testing Strategy
+# Testing Guide
 
-V2 Resort employs a multi-layer testing approach combining unit tests, integration tests, and stress testing bots.
+This repository uses a layered strategy:
 
-## Testing Philosophy
+1. Backend unit and contract tests (Vitest)
+2. Backend integration tests (Vitest + Postgres/Redis)
+3. Frontend unit and route behavior tests (Vitest + Testing Library)
+4. Frontend critical-route coverage gate (Vitest critical config)
+5. End-to-end suites (Playwright)
+6. Optional stress simulations (tools/stress-test)
 
-| Layer | Purpose | Tools |
-|-------|---------|-------|
-| **Unit Tests** | Isolated component/function testing | Vitest, Jest |
-| **E2E Tests** | User flow verification | Playwright |
-| **Stress Tests** | Realistic load simulation | Custom Bots |
+## Test Layers and Locations
 
-## Directory Structure
+| Layer | Location | Primary Command |
+| ----- | -------- | --------------- |
+| Backend unit | backend/tests/unit | npm run test:unit |
+| Backend contract | backend/tests/contract | npm run test:unit |
+| Backend integration | backend/tests/integration | npm run test:integration |
+| Frontend unit | frontend/tests and frontend/src | npm test |
+| Frontend critical routes | frontend/tests/high-impact | npm run test:cov:critical |
+| E2E phase 3 | tests/phase3 | npx playwright test -c playwright.config.ts |
+| E2E broad suite | tests | npx playwright test -c playwright.all.config.ts |
 
-```
-v2-resort/
-├── backend/
-│   └── tests/
-│       ├── unit/           # Unit tests
-│       ├── integration/    # API integration tests
-│       └── e2e/            # End-to-end tests
-├── frontend/
-│   └── tests/
-│       ├── components/     # Component tests
-│       └── e2e/            # Playwright tests
-├── tools/
-│   └── stress-test/        # Stress testing bots
-└── tests/                   # Root-level Playwright tests
-    └── seed.spec.ts
-```
+## Verified Commands
 
-## Running Tests
-
-### Backend Tests
+### Root
 
 ```bash
-cd v2-resort/backend
+npm run test
+npm run test:backend
+npm run test:frontend
+```
 
-# Unit tests
-npm test
+### Backend
 
-# Watch mode
-npm run test:watch
-
-# Coverage report
+```bash
+cd backend
+npm run test:unit
+npm run test:ci
 npm run test:coverage
+npm run test:integration
+npm run test:all
 ```
 
-### Frontend Tests
+### Frontend
 
 ```bash
-cd v2-resort/frontend
-
-# Component tests
+cd frontend
 npm test
-
-# E2E with Playwright
-npm run test:e2e
-
-# E2E with UI
-npm run test:e2e:ui
+npm run test:cov
+npm run test:cov:critical
 ```
 
-### Stress Tests
+### Playwright (root)
 
 ```bash
-cd v2-resort/tools/stress-test
-
-# Run all bots
-npx ts-node run.ts
-
-# Admin tests only
-npx ts-node run-admin-only.ts
+npx playwright test -c playwright.config.ts --project=chromium
+npx playwright test -c playwright.all.config.ts --project=chromium
+npx playwright test -c playwright.rebrand.config.ts --project=chromium
 ```
 
-## Unit Testing
+## Coverage Thresholds (Current)
 
-### Backend Example
+### Backend (backend/vitest.config.ts)
 
-```typescript
-// tests/unit/services/order.service.test.ts
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { OrderService } from '@/services/order.service';
+- statements: 65
+- branches: 55
+- functions: 65
+- lines: 65
 
-describe('OrderService', () => {
-  let orderService: OrderService;
+### Frontend default (frontend/vitest.config.ts)
 
-  beforeEach(() => {
-    orderService = new OrderService();
-  });
+- statements: 45
+- branches: 25
 
-  it('should calculate order total correctly', () => {
-    const items = [
-      { price: 10, quantity: 2 },
-      { price: 15, quantity: 1 }
-    ];
-    
-    expect(orderService.calculateTotal(items)).toBe(35);
-  });
+### Frontend critical routes (frontend/vitest.critical.config.ts)
 
-  it('should apply discount for orders over $50', () => {
-    const total = 60;
-    const discounted = orderService.applyDiscount(total);
-    
-    expect(discounted).toBe(54); // 10% discount
-  });
-});
-```
+- lines: 46
+- branches: 31
 
-### Frontend Component Example
+## CI Gates (.github/workflows/ci.yml)
 
-```typescript
-// tests/components/Button.test.tsx
-import { render, screen, fireEvent } from '@testing-library/react';
-import { Button } from '@/components/ui/Button';
+The pipeline is staged and blocking:
 
-describe('Button', () => {
-  it('renders with correct text', () => {
-    render(<Button>Click me</Button>);
-    expect(screen.getByText('Click me')).toBeInTheDocument();
-  });
+1. Stage 1 - Quality Gate
+2. Stage 2 - Backend Unit (coverage artifact uploaded)
+3. Stage 2 - Frontend Unit
+4. Stage 2 - Frontend Critical Route Coverage Gate (required)
+5. Stage 3 - Backend Integration (with Postgres 15 and Redis 7 services)
+6. Stage 4 - Build
+7. Stage 5+ - E2E jobs by event type
 
-  it('calls onClick when clicked', () => {
-    const handleClick = vi.fn();
-    render(<Button onClick={handleClick}>Click</Button>);
-    
-    fireEvent.click(screen.getByText('Click'));
-    expect(handleClick).toHaveBeenCalledTimes(1);
-  });
+Frontend coverage artifacts are uploaded from:
 
-  it('is disabled when loading', () => {
-    render(<Button loading>Submit</Button>);
-    expect(screen.getByRole('button')).toBeDisabled();
-  });
-});
-```
+- frontend/coverage
+- frontend/coverage-critical
 
-## E2E Testing (Playwright)
+## Integration Test Dependency Expectations
 
-```typescript
-// tests/e2e/order-flow.spec.ts
-import { test, expect } from '@playwright/test';
+Backend integration tests expect:
 
-test.describe('Order Flow', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-  });
+1. PostgreSQL on port 5433 with database v2resort_test
+2. Redis on port 6380
+3. Valid integration env values (DATABASE_URL, SUPABASE_URL, keys, JWT_SECRET)
 
-  test('customer can complete an order', async ({ page }) => {
-    // Login
-    await page.click('text=Login');
-    await page.fill('[name="email"]', 'test@example.com');
-    await page.fill('[name="password"]', 'password123');
-    await page.click('button[type="submit"]');
-    
-    // Browse menu
-    await page.click('text=Restaurant');
-    await expect(page.locator('h1')).toContainText('Menu');
-    
-    // Add item
-    await page.click('text=Add to Cart', { first: true });
-    await expect(page.locator('.cart-count')).toContainText('1');
-    
-    // Checkout
-    await page.click('text=View Cart');
-    await page.click('text=Checkout');
-    
-    // Confirm order
-    await expect(page.locator('.order-confirmation')).toBeVisible();
-  });
-});
-```
+These are now provisioned directly in CI for Stage 3.
 
-## Stress Testing Bots
+## Notes
 
-### Overview
-
-Stress test bots simulate realistic user behavior:
-
-- **Customer Bot**: Browses, orders, tracks delivery
-- **Staff Bot**: Processes orders, manages bookings
-- **Admin Bot**: Manages users, updates settings
-
-### Sample Bot Code
-
-```typescript
-// tools/stress-test/bots/customer-bot.ts
-export class CustomerBot {
-  private api: ApiClient;
-  
-  async run() {
-    // Register or login
-    await this.authenticate();
-    
-    // Browse menu
-    const menu = await this.api.get('/restaurant/menu');
-    
-    // Add random items to cart
-    const items = this.selectRandomItems(menu.data, 3);
-    
-    // Create order
-    const order = await this.api.post('/orders', { items });
-    
-    // Connect to socket and track order
-    await this.trackOrder(order.id);
-    
-    // Leave review after completion
-    await this.leaveReview(order.id);
-  }
-}
-```
-
-## Test Configuration
-
-### Vitest Config (Backend)
-
-```typescript
-// vitest.config.ts
-import { defineConfig } from 'vitest/config';
-
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'node',
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-    },
-  },
-});
-```
-
-### Playwright Config
-
-```typescript
-// playwright.config.ts
-import { defineConfig } from '@playwright/test';
-
-export default defineConfig({
-  testDir: './tests',
-  timeout: 30000,
-  use: {
-    baseURL: 'http://localhost:3000',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-  },
-  projects: [
-    { name: 'chromium', use: { browserName: 'chromium' } },
-    { name: 'firefox', use: { browserName: 'firefox' } },
-  ],
-});
-```
-
-## Coverage Goals
-
-| Module | Target | Current |
-|--------|--------|---------|
-| Core Services | 80% | ~45% |
-| API Routes | 70% | ~40% |
-| Components | 60% | ~30% |
-| Utilities | 90% | ~65% |
-
-## Best Practices
-
-1. **Test Behavior, Not Implementation** - Focus on what, not how
-2. **Isolate Dependencies** - Mock external services
-3. **Fast Feedback** - Run unit tests before commit
-4. **Realistic Data** - Use fixtures that mirror production
-5. **Clean Up** - Reset state between tests
-
-## CI Integration
-
-Tests run automatically on push:
-
-```yaml
-# .github/workflows/test.yml
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install dependencies
-        run: npm ci
-      - name: Run tests
-        run: npm test
-      - name: Run E2E tests
-        run: npm run test:e2e
-```
-
----
-
-For stress testing documentation, see [tools/stress-test/STRESS_TESTING.md](../../tools/stress-test/STRESS_TESTING.md).
+1. Use backend/test:ci for full backend quality gate behavior including coverage output.
+2. Use frontend/test:cov:critical for PR-safe coverage gating of highest-risk routes.
+3. Use frontend/test:cov for broad trend tracking only; it measures the whole source tree.

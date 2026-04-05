@@ -237,7 +237,7 @@ export function createPackageService(container: Container): PackageService {
     }
 
     // Recalculate final price if base price or discount changed
-    let updates: Partial<Package> = { ...input };
+    const updates: Partial<Package> = { ...input };
     const basePrice = input.basePrice ?? pkg.basePrice;
     const discount = input.discountPercentage ?? pkg.discountPercentage;
     updates.finalPrice = Math.round(basePrice * (1 - discount / 100) * 100) / 100;

@@ -1,0 +1,55 @@
+﻿
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+ [31mΓ¥»[39m tests/unit/restaurant/order.controller.test.ts [2m([22m[2m6 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 149[2mms[22m[39m
+       [32mΓ£ô[39m should create a valid order[32m 142[2mms[22m[39m
+       [32mΓ£ô[39m should return order details for owner[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return user orders[32m 0[2mms[22m[39m
+       [32mΓ£ô[39m should return active orders[32m 1[2mms[22m[39m
+[31m       [31m├ù[31m should update status and emit event[39m[32m 3[2mms[22m[39m
+       [32mΓ£ô[39m should return daily stats[32m 1[2mms[22m[39m
+node.exe : 
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteExce 
+   ption
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 1 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m 
+tests/unit/restaurant/order.controller.test.ts[2m > [22mOrder 
+Controller[2m > [22mupdateOrderStatus[2m > [22mshould update 
+status and emit event
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with 
+arguments: [ 'restaurant', 'order:updated', ΓÇª(1) ][90m
+
+Number of calls: [1m0[22m
+[31m[39m
+[36m [2mΓ¥»[22m 
+tests/unit/restaurant/order.controller.test.ts:[2m297:26[22m[39m
+    [90m295| [39m      [35mawait[39m 
+[34mupdateOrderStatus[39m(req[33m,[39m res[33m,[39m 
+next)[33m;[39m
+    [90m296| [39m
+    [90m297| [39m      
+expect(emitToUnit).toHaveBeenCalledWith('restaurant', 'order:updΓÇª
+    [90m   | [39m                         [31m^[39m
+    [90m298| [39m      [34mexpect[39m(res[33m.[39mjson)[33m.[
+39m[34mtoHaveBeenCalledWith[39m({
+    [90m299| [39m        success[33m:[39m 
+[35mtrue[39m[33m,[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 10:03:28
+[2m   Duration [22m 363ms[2m (transform 181ms, setup 0ms, import 82ms, tests 149ms, environment 0ms)[22m
+

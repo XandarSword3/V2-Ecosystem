@@ -326,7 +326,7 @@ export default function DynamicTablesPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-                Table {qrModal.table.table_number}
+                Table {qrModal.table.table_number ?? qrModal.table.id}
               </h2>
               <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
                 Scan to order from this table
@@ -336,7 +336,7 @@ export default function DynamicTablesPage() {
                 {qrModal.table.qr_code ? (
                   <img 
                     src={qrModal.table.qr_code} 
-                    alt={`QR Code for Table ${qrModal.table.table_number}`}
+                    alt={`QR Code for Table ${qrModal.table.table_number ?? qrModal.table.id}`}
                     className="w-48 h-48"
                   />
                 ) : (

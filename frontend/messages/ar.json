@@ -689,6 +689,11 @@
       "addTable": "Add Table",
       "editTable": "Edit Table",
       "deleteConfirm": "Are you sure you want to delete this table?",
+      "confirmDelete": "هل أنت متأكد أنك تريد حذف هذه الطاولة؟",
+      "location": "الموقع",
+      "markedOccupied": "تم تحديد الطاولة كمشغولة",
+      "markedAvailable": "تم تحديد الطاولة كمتاحة",
+      "tableNumberRequired": "رقم الطاولة مطلوب",
       "total": "Total",
       "amount": "Amount"
     },

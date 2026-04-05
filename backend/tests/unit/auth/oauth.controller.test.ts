@@ -124,12 +124,17 @@ describe('OAuth Controller', () => {
       await oauthController.googleCallback(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.clearCookie).toHaveBeenCalledWith('oauth_state');
-      expect(mockRes.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('http://localhost:3000/')
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'accessToken',
+        'access-token-123',
+        expect.any(Object)
       );
-      expect(mockRes.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('accessToken=access-token-123')
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'refreshToken',
+        'refresh-token-456',
+        expect.any(Object)
       );
+      expect(mockRes.redirect).toHaveBeenCalledWith('http://localhost:3000/?oauth=success');
     });
 
     it('should redirect admin to admin dashboard', async () => {

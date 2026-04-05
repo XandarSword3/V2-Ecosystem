@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { 
   Users, 
@@ -14,6 +14,7 @@ import {
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { useWaitlistUpdates } from '@/lib/socket';
 
 interface WaitlistEntry {
   id: string;
@@ -50,8 +51,16 @@ function WaitlistContent() {
       return res.data;
     },
     enabled: !!(entryId || submittedEntry?.id),
-    refetchInterval: 30000 // Poll every 30 seconds
   });
+
+  // Real-time waitlist updates via Socket.IO
+  const handleWaitlistUpdate = useCallback((data: any) => {
+    const currentId = entryId || submittedEntry?.id;
+    if (currentId && (data.entry?.id === currentId || data.entryId === currentId)) {
+      refetchStatus();
+    }
+  }, [entryId, submittedEntry?.id, refetchStatus]);
+  useWaitlistUpdates(handleWaitlistUpdate);
 
   // Join waitlist mutation
   const joinMutation = useMutation({
@@ -73,10 +82,10 @@ function WaitlistContent() {
     }
   });
 
-  // Leave waitlist mutation
+  // Leave waitlist mutation (public - no auth needed)
   const leaveMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await api.delete(`/restaurant/waitlist/${id}`);
+      const res = await api.delete(`/restaurant/waitlist/${id}/leave`);
       return res.data;
     },
     onSuccess: () => {

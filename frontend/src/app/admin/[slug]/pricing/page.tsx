@@ -30,6 +30,7 @@ interface PricingRule {
   name: string;
   chalet_id?: string;
   base_price: number;
+  price?: number;
   weekend_price?: number;
   holiday_price?: number;
   per_guest_price?: number;
@@ -121,7 +122,7 @@ export default function DynamicPricingPage() {
     setEditing(rule);
     setFormData({
       name: rule.name,
-      base_price: rule.base_price,
+      base_price: rule.base_price || rule.price || 0,
       weekend_price: rule.weekend_price || 0,
       holiday_price: rule.holiday_price || 0,
       per_guest_price: rule.per_guest_price || 0,
@@ -265,7 +266,7 @@ export default function DynamicPricingPage() {
                   <div className="grid grid-cols-3 gap-3 text-sm">
                     <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2">
                       <p className="text-xs text-slate-500">{tc('pricing.base')}</p>
-                      <p className="font-bold text-green-600">{formatCurrency(rule.base_price)}</p>
+                      <p className="font-bold text-green-600">{formatCurrency(rule.base_price || rule.price || 0)}</p>
                     </div>
                     <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2">
                       <p className="text-xs text-slate-500">{tc('pricing.weekend')}</p>
@@ -279,7 +280,7 @@ export default function DynamicPricingPage() {
 
                   <div className="flex items-center gap-2 mt-3 text-sm text-slate-500">
                     <Users className="w-4 h-4" />
-                    {rule.min_guests} - {rule.max_guests} guests
+                    {rule.min_guests || 0} - {rule.max_guests || 0} guests
                   </div>
                 </CardContent>
               </Card>

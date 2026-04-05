@@ -1,0 +1,22 @@
+CREATE OR REPLACE FUNCTION redeem_loyalty_points_atomic(p_user_id UUID, p_points INTEGER, p_order_id UUID, p_dollar_value DECIMAL)
+RETURNS TABLE(success BOOLEAN, points_redeemed INTEGER, new_balance INTEGER, member_id UUID, error_message TEXT)
+LANGUAGE plpgsql SECURITY DEFINER AS $func$
+DECLARE
+    v_member RECORD;
+BEGIN
+    PERFORM pg_advisory_xact_lock(hashtext('loyalty_member_' || p_user_id::text));
+    SELECT * INTO v_member FROM loyalty_members WHERE user_id = p_user_id;
+    IF NOT FOUND THEN
+        RETURN QUERY SELECT false, 0, 0, NULL::UUID, 'User does not have a loyalty account'::TEXT;
+        RETURN;
+    END IF;
+    IF v_member.available_points < p_points THEN
+        RETURN QUERY SELECT false, 0, v_member.available_points::INTEGER, v_member.id, 'Insufficient points balance'::TEXT;
+        RETURN;
+    END IF;
+    UPDATE loyalty_members SET available_points = available_points - p_points, last_activity = NOW(), updated_at = NOW() WHERE id = v_member.id
+    RETURNING available_points INTO v_member.available_points;
+    INSERT INTO loyalty_transactions(member_id, transaction_type, points, balance_after, description) VALUES (v_member.id, 'redeem', -p_points, v_member.available_points, 'Redeemed ' || p_points || ' points for $' || p_dollar_value || ' discount for order ' || p_order_id);
+    RETURN QUERY SELECT true, p_points, v_member.available_points::INTEGER, v_member.id, NULL::TEXT;
+END;
+$func$;

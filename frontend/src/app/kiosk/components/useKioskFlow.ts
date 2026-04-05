@@ -43,19 +43,16 @@ export function useKioskFlow(deviceId: string) {
       const data = res.data;
       
       if (!data.success) {
-        console.warn('Session creation failed, using demo mode:', data.error);
-        setSessionId(`demo-${Date.now()}`);
-      } else {
-        setSessionId(data.data?.id || data.data?.sessionId);
+        setError(data.error || 'Failed to start session. Please try again.');
+        return;
       }
-      
+      setSessionId(data.data?.id || data.data?.sessionId);
       setMode(type);
       setStep('identify');
     } catch (err) {
-      console.warn('Kiosk API unavailable, using demo mode');
-      setSessionId(`demo-${Date.now()}`);
-      setMode(type);
-      setStep('identify');
+      console.error('Kiosk session creation failed:', err);
+      setError('Kiosk service unavailable. Please contact reception.');
+      return;
     } finally {
       setLoading(false);
     }
@@ -93,26 +90,13 @@ export function useKioskFlow(deviceId: string) {
         setSessionId(booking.sessionId || booking.id || sessionId);
         setStep('confirm');
       } else {
-        console.warn('Booking lookup failed:', data.error);
-        setGuestInfo({
-          name: 'Demo Guest',
-          room: '101',
-          checkInDate: new Date().toLocaleDateString(),
-          checkOutDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-          balance: mode === 'checkout' ? 125.50 : 0
-        });
-        setStep('confirm');
+        setError(data.error || 'Reservation not found. Please check your details and try again.');
+        return;
       }
     } catch (err) {
-      console.warn('Reservation lookup error, using demo mode:', err);
-      setGuestInfo({
-        name: 'Demo Guest',
-        room: '101',
-        checkInDate: new Date().toLocaleDateString(),
-        checkOutDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        balance: mode === 'checkout' ? 125.50 : 0
-      });
-      setStep('confirm');
+      console.error('Reservation lookup failed:', err);
+      setError('Unable to look up reservation. Please contact reception.');
+      return;
     } finally {
       setLoading(false);
     }
@@ -135,24 +119,47 @@ export function useKioskFlow(deviceId: string) {
   }, [mode, guestInfo]);
 
   const processPayment = useCallback(async () => {
+    if (!sessionId || !deviceId) return;
     setLoading(true);
+    setError(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const res = await api.post(`/kiosk/transactions/${sessionId}/${deviceId}/payment`, {
+        amount: guestInfo?.balance || 0,
+        method: 'card'
+      });
+      if (!res.data.success) {
+        setError(res.data.error || 'Payment failed. Please try again or contact reception.');
+        return;
+      }
       setStep('complete');
+    } catch (err) {
+      console.error('Payment processing failed:', err);
+      setError('Payment processing failed. Please contact reception.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sessionId, deviceId, guestInfo]);
 
   const encodeKey = useCallback(async () => {
+    if (!sessionId || !deviceId) return;
     setLoading(true);
+    setError(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2500));
+      const res = await api.post(`/kiosk/transactions/${sessionId}/${deviceId}/key-encode`, {
+        roomNumber: guestInfo?.room
+      });
+      if (!res.data.success) {
+        setError(res.data.error || 'Key encoding failed. Please contact reception.');
+        return;
+      }
       setStep('complete');
+    } catch (err) {
+      console.error('Key encoding failed:', err);
+      setError('Key encoding failed. Please contact reception.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sessionId, deviceId, guestInfo]);
 
   return {
     mode,

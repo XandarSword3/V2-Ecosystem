@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSiteSettings } from '@/lib/settings-context';
 import { api } from '@/lib/api';
+import { useWaitlistUpdates } from '@/lib/socket';
 import {
   Users,
   Clock,
@@ -62,8 +63,13 @@ export default function DynamicWaitlistPage() {
       return res.data.data || [];
     },
     enabled: !!currentModule,
-    refetchInterval: 15000 // Auto-refresh every 15 seconds
   });
+
+  // Real-time waitlist updates via Socket.IO
+  const handleWaitlistUpdate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['waitlist'] });
+  }, [queryClient]);
+  useWaitlistUpdates(handleWaitlistUpdate);
 
   // Add to waitlist
   const addMutation = useMutation({

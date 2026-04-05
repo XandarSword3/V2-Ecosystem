@@ -472,7 +472,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main
+      <div
         className={cn(
           'min-h-screen transition-all duration-300 pt-16 lg:pt-0',
           sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'
@@ -574,7 +574,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             {children}
           </motion.div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
