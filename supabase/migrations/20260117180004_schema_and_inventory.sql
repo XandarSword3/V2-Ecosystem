@@ -25,6 +25,8 @@ CREATE INDEX IF NOT EXISTS idx_order_gift_card_usage_order ON order_gift_card_us
 CREATE INDEX IF NOT EXISTS idx_order_gift_card_usage_gift_card ON order_gift_card_usage(gift_card_id);
 
 -- 4. Inventory Deduction Function
+DROP FUNCTION IF EXISTS deduct_inventory_for_order(UUID);
+
 CREATE OR REPLACE FUNCTION deduct_inventory_for_order(p_order_id UUID)
 RETURNS TABLE(success BOOLEAN, items_deducted INTEGER, error_message TEXT)
 LANGUAGE plpgsql SECURITY DEFINER AS $$
