@@ -109,13 +109,13 @@ async function networkFirst(request) {
     }
     
     return networkResponse;
-  } catch (error) {
+  } catch {
     // Fallback to cache
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
       return cachedResponse;
     }
-    throw error;
+    return offlineFallbackResponse(request);
   }
 }
 
@@ -136,7 +136,7 @@ async function cacheFirst(request) {
     }
     
     return networkResponse;
-  } catch (error) {
+  } catch {
     // Return offline placeholder for images
     if (request.destination === 'image') {
       return new Response(
@@ -144,8 +144,37 @@ async function cacheFirst(request) {
         { headers: { 'Content-Type': 'image/svg+xml' } }
       );
     }
-    throw error;
+    return offlineFallbackResponse(request);
   }
+}
+
+async function offlineFallbackResponse(request) {
+  const accept = request.headers.get('accept') || '';
+  const isApiRequest = request.url.includes('/api/') || accept.includes('application/json');
+
+  if (request.mode === 'navigate' || accept.includes('text/html')) {
+    const offlinePage = await caches.match(OFFLINE_URL);
+    if (offlinePage) {
+      return offlinePage;
+    }
+
+    return new Response(
+      '<!DOCTYPE html><html><head><title>Offline</title></head><body><h1>You are offline</h1><p>Please check your internet connection and try again.</p><button onclick="location.reload()">Retry</button></body></html>',
+      { status: 503, headers: { 'Content-Type': 'text/html' } }
+    );
+  }
+
+  if (isApiRequest) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Service unavailable while offline' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return new Response('Service unavailable while offline', {
+    status: 503,
+    headers: { 'Content-Type': 'text/plain' },
+  });
 }
 
 // Navigation handler - pass through to network for same-origin navigation
