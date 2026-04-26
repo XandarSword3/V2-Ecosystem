@@ -1,4 +1,4 @@
-# Docker Compose for Integration Tests
+# Isolated integration-test compose for backend Postgres/Redis dependencies.
 # Uses isolated database to prevent data conflicts with development
 #
 # Usage:

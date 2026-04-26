@@ -1,3 +1,4 @@
+# Local full-stack compose for Postgres + Redis + API + frontend development.
 version: '3.8'
 
 services:
