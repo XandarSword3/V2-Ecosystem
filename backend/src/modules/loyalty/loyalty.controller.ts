@@ -473,9 +473,55 @@ export class LoyaltyController {
 
       if (error) throw error;
 
+      const referenceIdsByType = (transactions || []).reduce((acc: Record<string, string[]>, row: any) => {
+        if (row.reference_type && row.reference_id) {
+          if (!acc[row.reference_type]) acc[row.reference_type] = [];
+          acc[row.reference_type].push(row.reference_id);
+        }
+        return acc;
+      }, {});
+
+      const [restaurantRefs, snackRefs, chaletRefs, poolRefs] = await Promise.all([
+        referenceIdsByType.restaurant_order?.length
+          ? supabase.from('restaurant_orders').select('id, order_number, total_amount, status').in('id', referenceIdsByType.restaurant_order)
+          : Promise.resolve({ data: [] as any[] }),
+        referenceIdsByType.snack_order?.length
+          ? supabase.from('snack_orders').select('id, order_number, total_amount, status').in('id', referenceIdsByType.snack_order)
+          : Promise.resolve({ data: [] as any[] }),
+        referenceIdsByType.chalet_booking?.length
+          ? supabase.from('chalet_bookings').select('id, booking_number, total_amount, status').in('id', referenceIdsByType.chalet_booking)
+          : Promise.resolve({ data: [] as any[] }),
+        referenceIdsByType.pool_ticket?.length
+          ? supabase.from('pool_tickets').select('id, ticket_number, total_amount, status').in('id', referenceIdsByType.pool_ticket)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+
+      const sourceLookup = new Map<string, any>();
+      (restaurantRefs.data || []).forEach((row: any) => sourceLookup.set(`restaurant_order:${row.id}`, row));
+      (snackRefs.data || []).forEach((row: any) => sourceLookup.set(`snack_order:${row.id}`, row));
+      (chaletRefs.data || []).forEach((row: any) => sourceLookup.set(`chalet_booking:${row.id}`, row));
+      (poolRefs.data || []).forEach((row: any) => sourceLookup.set(`pool_ticket:${row.id}`, row));
+
+      const enrichedTransactions = (transactions || []).map((row: any) => {
+        const key = row.reference_type && row.reference_id ? `${row.reference_type}:${row.reference_id}` : '';
+        const source = sourceLookup.get(key);
+        if (!source) return row;
+
+        return {
+          ...row,
+          source_summary: {
+            type: row.reference_type,
+            id: row.reference_id,
+            number: source.order_number || source.booking_number || source.ticket_number || null,
+            total_amount: source.total_amount || null,
+            status: source.status || null,
+          },
+        };
+      });
+
       res.json({
         success: true,
-        data: transactions,
+        data: enrichedTransactions,
         pagination: {
           page: pageNum,
           limit: limitNum,

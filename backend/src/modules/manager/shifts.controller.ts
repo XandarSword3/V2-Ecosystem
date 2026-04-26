@@ -21,6 +21,24 @@ const clockInOutSchema = z.object({
 });
 
 export class ShiftsController {
+  private async calculateShiftFinancials(staffId: string, start: string, end: string): Promise<{ ordersProcessed: number; revenueHandled: number }> {
+    const supabase = getSupabase();
+    const sumRows = (rows: Array<{ total_amount?: string | number | null }> | null | undefined) =>
+      (rows || []).reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
+
+    const [restaurantRes, snackRes, chaletRes, poolRes] = await Promise.all([
+      supabase.from('restaurant_orders').select('id,total_amount').eq('created_by', staffId).gte('created_at', start).lte('created_at', end),
+      supabase.from('snack_orders').select('id,total_amount').eq('created_by', staffId).gte('created_at', start).lte('created_at', end),
+      supabase.from('chalet_bookings').select('id,total_amount').eq('created_by', staffId).gte('created_at', start).lte('created_at', end),
+      supabase.from('pool_tickets').select('id,total_amount').eq('created_by', staffId).gte('created_at', start).lte('created_at', end),
+    ]);
+
+    const rows = [restaurantRes.data, snackRes.data, chaletRes.data, poolRes.data];
+    const ordersProcessed = rows.reduce((sum, batch) => sum + (batch?.length || 0), 0);
+    const revenueHandled = sumRows(restaurantRes.data as any[]) + sumRows(snackRes.data as any[]) + sumRows(chaletRes.data as any[]) + sumRows(poolRes.data as any[]);
+    return { ordersProcessed, revenueHandled };
+  }
+
   /**
    * Get shifts with filters
    */
@@ -398,16 +416,37 @@ export class ShiftsController {
       const scheduledEnd = new Date(`${shift.shift_date}T${shift.end_time}`);
       const isEarly = now < new Date(scheduledEnd.getTime() - 15 * 60 * 1000); // 15 min before
 
-      const { data: updatedShift, error } = await supabase
+      const startTime = String(shift.actual_start);
+      const endTime = now.toISOString();
+      const { ordersProcessed, revenueHandled } = await this.calculateShiftFinancials(String(shift.staff_id), startTime, endTime);
+
+      let { data: updatedShift, error } = await supabase
         .from('staff_shifts')
         .update({
-          actual_end: now.toISOString(),
+          actual_end: endTime,
           status: 'completed',
           early_leave_reason: isEarly ? req.body.notes || 'Left early' : null,
+          orders_processed: ordersProcessed,
+          revenue_handled: Number(revenueHandled.toFixed(2)),
         })
         .eq('id', id)
         .select()
         .single();
+
+      if (error && /orders_processed|revenue_handled|column/i.test(String(error.message || ''))) {
+        const fallback = await supabase
+          .from('staff_shifts')
+          .update({
+            actual_end: endTime,
+            status: 'completed',
+            early_leave_reason: isEarly ? req.body.notes || 'Left early' : null,
+          })
+          .eq('id', id)
+          .select()
+          .single();
+        updatedShift = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) throw error;
 
@@ -423,6 +462,55 @@ export class ShiftsController {
         error: 'Failed to clock out',
         message: error.message,
       });
+    }
+  }
+
+  async getManagerSummary(req: Request, res: Response) {
+    try {
+      const supabase = getSupabase();
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      const startIso = todayStart.toISOString();
+      const endIso = todayEnd.toISOString();
+
+      const [restaurant, snack, chalets, pool, activeShifts] = await Promise.all([
+        supabase.from('restaurant_orders').select('id,total_amount,status,created_at'),
+        supabase.from('snack_orders').select('id,total_amount,status,created_at'),
+        supabase.from('chalet_bookings').select('id,total_amount,status,created_at'),
+        supabase.from('pool_tickets').select('id,total_amount,status,created_at'),
+        supabase.from('staff_shifts').select('id,status,department').eq('status', 'active'),
+      ]);
+
+      const withinToday = (createdAt?: string | null) => {
+        if (!createdAt) return false;
+        const ts = new Date(createdAt).getTime();
+        return ts >= todayStart.getTime() && ts <= todayEnd.getTime();
+      };
+      const sumAmount = (rows: any[]) => rows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
+      const activeStatuses = new Set(['pending', 'confirmed', 'preparing', 'ready', 'checked_in', 'valid', 'active']);
+
+      const modules = [
+        { name: 'restaurant', rows: restaurant.data || [] },
+        { name: 'snack', rows: snack.data || [] },
+        { name: 'chalets', rows: chalets.data || [] },
+        { name: 'pool', rows: pool.data || [] },
+      ].map((module) => {
+        const todays = module.rows.filter((row: any) => withinToday(row.created_at));
+        return {
+          module: module.name,
+          todays_order_count: todays.length,
+          todays_revenue: Number(sumAmount(todays).toFixed(2)),
+          active_orders_count: module.rows.filter((row: any) => activeStatuses.has(String(row.status))).length,
+          staff_on_shift: (activeShifts.data || []).filter((s: any) => !s.department || String(s.department).toLowerCase().includes(module.name)).length,
+        };
+      });
+
+      res.json({ success: true, data: modules, date_range: { start: startIso, end: endIso } });
+    } catch (error: any) {
+      logger.error('Error fetching manager summary:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch manager summary', message: error.message });
     }
   }
 
