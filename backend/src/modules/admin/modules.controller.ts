@@ -8,6 +8,8 @@ import { createModuleSchema, updateModuleSchema, validateBody } from "../../vali
 import { logActivity } from "../../utils/activityLogger";
 import { logger } from "../../utils/logger.js";
 import { loadDynamicModules } from "../../routes/dynamic-modules.loader.js";
+import { buildModulePermissionRows } from "../../security/template-permission-presets.js";
+import { permissionCache } from "../../security/permission-cache.service.js";
 
 export async function getModules(req: Request, res: Response, next: NextFunction) {
   try {
@@ -99,24 +101,33 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
 
     if (error) throw error;
 
-    // Dynamic Permission Generation (P0) using new app_permissions
+    // Dynamic Permission Generation using template presets.
     try {
-        const permsToCreate = [
-            { slug: `module:${finalSlug}:read`, description: `Read access for module ${name}`, module_slug: finalSlug },
-            { slug: `module:${finalSlug}:manage`, description: `Management access for module ${name}`, module_slug: finalSlug },
-            { slug: `module:${finalSlug}:publish`, description: `Publish access for module ${name}`, module_slug: finalSlug },
-        ];
-        
+        const modulePermissionSlugs = buildModulePermissionRows(finalSlug, template_type);
+        const permsToCreate = modulePermissionSlugs.map((slug) => ({
+          slug,
+          description: `Auto-generated permission for module ${name}`,
+          module_slug: finalSlug,
+        }));
+
         await supabase.from('app_permissions').upsert(permsToCreate, { onConflict: 'slug' });
 
-        // Assign to super_admin
-        const rolePerms = [
-            { role_name: 'super_admin', permission_slug: `module:${finalSlug}:read` },
-            { role_name: 'super_admin', permission_slug: `module:${finalSlug}:manage` },
-            { role_name: 'super_admin', permission_slug: `module:${finalSlug}:publish` },
-        ];
+        // Assign based on template preset policy.
+        const rolePerms: Array<{ role_name: string; permission_slug: string }> = [];
+        modulePermissionSlugs.forEach((slug) => {
+          if (slug.endsWith(':view')) {
+            ['customer', 'staff', 'manager', 'admin', 'super_admin'].forEach((role) => rolePerms.push({ role_name: role, permission_slug: slug }));
+          } else if (slug.endsWith(':order')) {
+            rolePerms.push({ role_name: 'customer', permission_slug: slug });
+          } else if (slug.endsWith(':manage')) {
+            ['staff', 'manager', 'admin', 'super_admin'].forEach((role) => rolePerms.push({ role_name: role, permission_slug: slug }));
+          } else if (slug.endsWith(':admin')) {
+            ['admin', 'super_admin'].forEach((role) => rolePerms.push({ role_name: role, permission_slug: slug }));
+          }
+        });
 
         await supabase.from('app_role_permissions').upsert(rolePerms, { onConflict: 'role_name,permission_slug' });
+        await permissionCache.refreshCache();
         
     } catch (permError) {
         logger.error(`Failed to generate permissions for ${finalSlug}`, permError);
@@ -169,11 +180,12 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
 
       if (!rolesError && rolesData) {
         // 2. Create Module Permissions (granular)
-        const modulePermissions = [
-          { slug: `${finalSlug}:view`, description: `View ${name}`, module_slug: finalSlug },
-          { slug: `${finalSlug}:manage`, description: `Manage ${name}`, module_slug: finalSlug },
-          // ... add others as needed, matching the colon convention better
-        ];
+        const modulePermissionSlugs = buildModulePermissionRows(finalSlug, template_type);
+        const modulePermissions = modulePermissionSlugs.map((permissionSlug) => ({
+          slug: permissionSlug,
+          description: `Auto-generated permission for module ${name}`,
+          module_slug: finalSlug,
+        }));
 
         await supabase.from('app_permissions').upsert(modulePermissions, { onConflict: 'slug' });
 
@@ -195,6 +207,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         if (rolePermissions.length > 0) {
             await supabase.from('app_role_permissions').upsert(rolePermissions, { onConflict: 'role_name,permission_slug' });
             logger.info(`[Modules] Created ${rolePermissions.length} role-permission links for ${finalSlug}`);
+            await permissionCache.refreshCache();
         }
 
         // 4. Create Default Staff User

@@ -6,6 +6,7 @@ import { initializeSocketServer, closeSocketServer } from './socket/index.js';
 import { initSentry } from './utils/sentry.js';
 import { SchedulerService } from './services/scheduler.service.js';
 import http from 'http';
+import { permissionCache } from './security/permission-cache.service.js';
 
 // Track server state for graceful shutdown
 let isShuttingDown = false;
@@ -28,8 +29,14 @@ async function main() {
 
     // Initialize database in background (don't block startup)
     initializeDatabase()
-      .then(() => logger.info('Database connected successfully'))
-      .catch((error) => logger.error('Database connection failed:', error));
+      .then(async () => {
+        logger.info('Database connected successfully');
+        await permissionCache.initialize();
+      })
+      .catch(async (error) => {
+        logger.error('Database connection failed:', error);
+        await permissionCache.initialize();
+      });
 
     // Initialize WebSocket
     initializeSocketServer(server);

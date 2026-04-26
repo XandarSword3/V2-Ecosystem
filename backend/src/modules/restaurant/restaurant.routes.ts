@@ -9,6 +9,7 @@ import { getSupabase } from '../../database/connection.js';
 import { emailService } from '../../services/email.service.js';
 import { logger } from '../../utils/logger.js';
 import { z } from 'zod';
+import { requireModulePropertyAccess } from '../../middleware/propertyAccess.middleware.js';
 
 // FIX: Issue 11 — Zod validation for reservation updates
 const updateReservationSchema = z.object({
@@ -23,6 +24,7 @@ const updateReservationSchema = z.object({
 }).strict();
 
 const router = Router();
+const restaurantPropertyScope = requireModulePropertyAccess('restaurant');
 
 // ============================================
 // Public Routes (Menu)
@@ -46,7 +48,7 @@ router.post('/orders', optionalAuth, rateLimits.write, orderController.createOrd
 // router.get('/orders/:id/status', orderController.getOrderStatus); // Moved to end
 
 // Authenticated customer routes
-router.get('/my-orders', authenticate, orderController.getMyOrders);
+router.get('/my-orders', authenticate, restaurantPropertyScope, orderController.getMyOrders);
 
 // ============================================
 // Staff Routes
@@ -59,10 +61,10 @@ const staffRoles = [
   'super_admin'
 ];
 
-router.get('/staff/orders', authenticate, authorize(...staffRoles), orderController.getStaffOrders);
-router.get('/staff/orders/live', authenticate, authorize(...staffRoles), orderController.getLiveOrders);
-router.patch('/staff/orders/:id/status', authenticate, authorize(...staffRoles), orderController.updateOrderStatus);
-router.put('/staff/orders/:id/status', authenticate, authorize(...staffRoles), orderController.updateOrderStatus);
+router.get('/staff/orders', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.getStaffOrders);
+router.get('/staff/orders/live', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.getLiveOrders);
+router.patch('/staff/orders/:id/status', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.updateOrderStatus);
+router.put('/staff/orders/:id/status', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.updateOrderStatus);
 
 // Tables - Public (for reservations)
 router.get('/tables', tableController.getTables);
@@ -70,15 +72,15 @@ router.get('/tables/available', tableController.getTables); // Simplified: retur
 router.get('/tables/:id/qr', tableController.getTableQRCode); // Generate QR code for table ordering
 
 // Tables - Staff
-router.get('/staff/tables', authenticate, authorize(...staffRoles), tableController.getTables);
-router.patch('/staff/tables/:id', authenticate, authorize(...staffRoles), tableController.updateTable);
+router.get('/staff/tables', authenticate, restaurantPropertyScope, authorize(...staffRoles), tableController.getTables);
+router.patch('/staff/tables/:id', authenticate, restaurantPropertyScope, authorize(...staffRoles), tableController.updateTable);
 
 // ============================================
 // Reservations Routes (Real implementation)
 // ============================================
 
 // Get all reservations (staff/admin only)
-router.get('/reservations', authenticate, authorize(...staffRoles), async (req: Request, res: Response) => {
+router.get('/reservations', authenticate, restaurantPropertyScope, authorize(...staffRoles), async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     const { date, status, table_id } = req.query;
@@ -264,7 +266,7 @@ router.post('/reservations', rateLimits.write, async (req: Request, res: Respons
 });
 
 // Update reservation status (staff only)
-router.patch('/reservations/:id', authenticate, authorize(...staffRoles), async (req: Request, res: Response) => {
+router.patch('/reservations/:id', authenticate, restaurantPropertyScope, authorize(...staffRoles), async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     const { id } = req.params;
@@ -325,7 +327,7 @@ router.patch('/reservations/:id', authenticate, authorize(...staffRoles), async 
 });
 
 // Assign table to reservation (staff only)
-router.post('/reservations/:id/assign-table', authenticate, authorize(...staffRoles), async (req: Request, res: Response) => {
+router.post('/reservations/:id/assign-table', authenticate, restaurantPropertyScope, authorize(...staffRoles), async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     const { id } = req.params;
@@ -355,7 +357,7 @@ router.post('/reservations/:id/assign-table', authenticate, authorize(...staffRo
 });
 
 // Get single reservation
-router.get('/reservations/:id', authenticate, authorize(...staffRoles), async (req: Request, res: Response) => {
+router.get('/reservations/:id', authenticate, restaurantPropertyScope, authorize(...staffRoles), async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     const { id } = req.params;
@@ -406,28 +408,28 @@ router.get('/orders/:id', optionalAuth, orderController.getOrder);
 router.get('/orders/:id/status', optionalAuth, orderController.getOrderStatus);
 
 // Categories
-router.post('/admin/categories', authenticate, authorize(...adminRoles), menuController.createCategory);
-router.put('/admin/categories/:id', authenticate, authorize(...adminRoles), menuController.updateCategory);
-router.delete('/admin/categories/:id', authenticate, authorize(...adminRoles), menuController.deleteCategory);
+router.post('/admin/categories', authenticate, restaurantPropertyScope, authorize(...adminRoles), menuController.createCategory);
+router.put('/admin/categories/:id', authenticate, restaurantPropertyScope, authorize(...adminRoles), menuController.updateCategory);
+router.delete('/admin/categories/:id', authenticate, restaurantPropertyScope, authorize(...adminRoles), menuController.deleteCategory);
 
 // Menu Items
-router.post('/admin/items', authenticate, authorize(...adminRoles), menuController.createMenuItem);
-router.put('/admin/items/:id', authenticate, authorize(...adminRoles), menuController.updateMenuItem);
-router.delete('/admin/items/:id', authenticate, authorize(...adminRoles), menuController.deleteMenuItem);
-router.patch('/admin/items/:id/availability', authenticate, authorize(...adminRoles), menuController.toggleAvailability);
+router.post('/admin/items', authenticate, restaurantPropertyScope, authorize(...adminRoles), menuController.createMenuItem);
+router.put('/admin/items/:id', authenticate, restaurantPropertyScope, authorize(...adminRoles), menuController.updateMenuItem);
+router.delete('/admin/items/:id', authenticate, restaurantPropertyScope, authorize(...adminRoles), menuController.deleteMenuItem);
+router.patch('/admin/items/:id/availability', authenticate, restaurantPropertyScope, authorize(...adminRoles), menuController.toggleAvailability);
 
 // Admin Orders (for admin dashboard)
-router.get('/admin/orders', authenticate, authorize(...adminRoles), orderController.getStaffOrders);
-router.put('/admin/orders/:id/status', authenticate, authorize(...adminRoles), orderController.updateOrderStatus);
-router.patch('/admin/orders/:id/status', authenticate, authorize(...adminRoles), orderController.updateOrderStatus);
+router.get('/admin/orders', authenticate, restaurantPropertyScope, authorize(...adminRoles), orderController.getStaffOrders);
+router.put('/admin/orders/:id/status', authenticate, restaurantPropertyScope, authorize(...adminRoles), orderController.updateOrderStatus);
+router.patch('/admin/orders/:id/status', authenticate, restaurantPropertyScope, authorize(...adminRoles), orderController.updateOrderStatus);
 
 // Tables
-router.post('/admin/tables', authenticate, authorize(...adminRoles), tableController.createTable);
-router.delete('/admin/tables/:id', authenticate, authorize(...adminRoles), tableController.deleteTable);
+router.post('/admin/tables', authenticate, restaurantPropertyScope, authorize(...adminRoles), tableController.createTable);
+router.delete('/admin/tables/:id', authenticate, restaurantPropertyScope, authorize(...adminRoles), tableController.deleteTable);
 
 // Reports
-router.get('/admin/reports/daily', authenticate, authorize(...adminRoles), orderController.getDailyReport);
-router.get('/admin/reports/sales', authenticate, authorize(...adminRoles), orderController.getSalesReport);
+router.get('/admin/reports/daily', authenticate, restaurantPropertyScope, authorize(...adminRoles), orderController.getDailyReport);
+router.get('/admin/reports/sales', authenticate, restaurantPropertyScope, authorize(...adminRoles), orderController.getSalesReport);
 
 // ============================================
 // Modifier Routes (Public + Admin)
@@ -436,21 +438,21 @@ router.get('/admin/reports/sales', authenticate, authorize(...adminRoles), order
 router.get('/menu/items/:menuItemId/modifiers', modifiersController.getItemModifiers);
 
 // Admin - Modifier Groups CRUD
-router.get('/admin/modifiers/groups', authenticate, authorize(...adminRoles), modifiersController.getGroups);
-router.post('/admin/modifiers/groups', authenticate, authorize(...adminRoles), modifiersController.createGroup);
-router.put('/admin/modifiers/groups/:id', authenticate, authorize(...adminRoles), modifiersController.updateGroup);
-router.delete('/admin/modifiers/groups/:id', authenticate, authorize(...adminRoles), modifiersController.deleteGroup);
+router.get('/admin/modifiers/groups', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.getGroups);
+router.post('/admin/modifiers/groups', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.createGroup);
+router.put('/admin/modifiers/groups/:id', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.updateGroup);
+router.delete('/admin/modifiers/groups/:id', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.deleteGroup);
 
 // Admin - Modifier Options CRUD
-router.post('/admin/modifiers/groups/:groupId/options', authenticate, authorize(...adminRoles), modifiersController.createOption);
-router.put('/admin/modifiers/options/:optionId', authenticate, authorize(...adminRoles), modifiersController.updateOption);
-router.delete('/admin/modifiers/options/:optionId', authenticate, authorize(...adminRoles), modifiersController.deleteOption);
+router.post('/admin/modifiers/groups/:groupId/options', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.createOption);
+router.put('/admin/modifiers/options/:optionId', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.updateOption);
+router.delete('/admin/modifiers/options/:optionId', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.deleteOption);
 
 // Admin - Link modifiers to menu items
-router.get('/admin/items/:menuItemId/modifiers', authenticate, authorize(...adminRoles), modifiersController.getItemModifiers);
-router.post('/admin/items/:menuItemId/modifiers', authenticate, authorize(...adminRoles), modifiersController.setItemModifiers);
+router.get('/admin/items/:menuItemId/modifiers', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.getItemModifiers);
+router.post('/admin/items/:menuItemId/modifiers', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.setItemModifiers);
 
 // Admin - Inventory items for linking (helper)
-router.get('/admin/modifiers/inventory-items', authenticate, authorize(...adminRoles), modifiersController.getInventoryItems);
+router.get('/admin/modifiers/inventory-items', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.getInventoryItems);
 
 export default router;

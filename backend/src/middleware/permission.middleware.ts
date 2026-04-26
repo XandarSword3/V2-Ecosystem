@@ -8,8 +8,10 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { Permission, hasPermission, getPermissionsForRoles } from '../security/permissions.js';
 import { logger } from '../utils/logger.js';
+import { permissionCache } from '../security/permission-cache.service.js';
+
+type Permission = string;
 
 /**
  * Middleware to require a specific permission
@@ -31,8 +33,8 @@ export function requirePermission(permission: Permission) {
     }
 
     const userRoles = req.user.roles || [];
-    
-    if (!hasPermission(userRoles, permission)) {
+    const granted = userRoles.some((role) => permissionCache.hasPermission(role, permission));
+    if (!granted) {
       logger.warn(`Permission denied: ${permission}`, {
         userId: req.user.userId,
         roles: userRoles,
@@ -66,7 +68,7 @@ export function requireAnyPermission(permissions: Permission[]) {
     }
 
     const userRoles = req.user.roles || [];
-    const hasAny = permissions.some(perm => hasPermission(userRoles, perm));
+    const hasAny = permissions.some((perm) => userRoles.some((role) => permissionCache.hasPermission(role, perm)));
     
     if (!hasAny) {
       logger.warn(`Permission denied: none of ${permissions.join(', ')}`, {
@@ -100,10 +102,10 @@ export function requireAllPermissions(permissions: Permission[]) {
     }
 
     const userRoles = req.user.roles || [];
-    const hasAll = permissions.every(perm => hasPermission(userRoles, perm));
+    const hasAll = permissions.every((perm) => userRoles.some((role) => permissionCache.hasPermission(role, perm)));
     
     if (!hasAll) {
-      const missing = permissions.filter(perm => !hasPermission(userRoles, perm));
+      const missing = permissions.filter((perm) => !userRoles.some((role) => permissionCache.hasPermission(role, perm)));
       logger.warn(`Permission denied: missing ${missing.join(', ')}`, {
         userId: req.user.userId,
         roles: userRoles,
@@ -126,7 +128,7 @@ export function requireAllPermissions(permissions: Permission[]) {
  */
 export function attachPermissions(req: Request, res: Response, next: NextFunction) {
   if (req.user && req.user.roles) {
-    req.user.permissions = getPermissionsForRoles(req.user.roles);
+    req.user.permissions = permissionCache.getPermissionsForRoles(req.user.roles);
   }
   next();
 }
@@ -137,7 +139,7 @@ export function attachPermissions(req: Request, res: Response, next: NextFunctio
  */
 export function canAccess(req: Request, permission: Permission): boolean {
   if (!req.user || !req.user.roles) return false;
-  return hasPermission(req.user.roles, permission);
+  return req.user.roles.some((role) => permissionCache.hasPermission(role, permission));
 }
 
 /**
@@ -159,7 +161,7 @@ export function ownerOrAdmin(ownerIdParam: string, adminPermission: Permission =
 
     const ownerId = req.params[ownerIdParam] || req.body[ownerIdParam];
     const isOwner = req.user.userId === ownerId;
-    const isAdmin = hasPermission(req.user.roles || [], adminPermission);
+    const isAdmin = (req.user.roles || []).some((role) => permissionCache.hasPermission(role, adminPermission));
     
     if (!isOwner && !isAdmin) {
       logger.warn(`Owner/Admin access denied`, {

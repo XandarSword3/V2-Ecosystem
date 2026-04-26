@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { authenticate, authorize, optionalAuth } from "../../middleware/auth.middleware";
 import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
+import { requireModulePropertyAccess } from '../../middleware/propertyAccess.middleware.js';
 import * as chaletController from "./chalet.controller";
 
 const router = Router();
+const chaletsPropertyScope = requireModulePropertyAccess('chalets');
 
 // Public routes - specific routes BEFORE parameterized routes
 router.get('/add-ons', chaletController.getAddOns);
@@ -17,40 +19,40 @@ router.get('/bookings/:id', optionalAuth, chaletController.getBooking);
 router.post('/bookings/:id/cancel', optionalAuth, rateLimits.write, chaletController.cancelBooking);
 
 // Authenticated customer routes
-router.get('/my-bookings', authenticate, chaletController.getMyBookings);
+router.get('/my-bookings', authenticate, chaletsPropertyScope, chaletController.getMyBookings);
 
 // Staff routes
 const staffRoles = ['staff', 'chalet_staff', 'chalet_admin', 'super_admin'];
-router.get('/staff/bookings', authenticate, authorize(...staffRoles), chaletController.getStaffBookings);
-router.get('/staff/bookings/today', authenticate, authorize(...staffRoles), chaletController.getTodayBookings);
-router.patch('/staff/bookings/:id/check-in', authenticate, authorize(...staffRoles), chaletController.checkIn);
-router.patch('/staff/bookings/:id/check-out', authenticate, authorize(...staffRoles), chaletController.checkOut);
-router.patch('/staff/bookings/:id/status', authenticate, authorize(...staffRoles), chaletController.updateBookingStatus);
+router.get('/staff/bookings', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.getStaffBookings);
+router.get('/staff/bookings/today', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.getTodayBookings);
+router.patch('/staff/bookings/:id/check-in', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.checkIn);
+router.patch('/staff/bookings/:id/check-out', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.checkOut);
+router.patch('/staff/bookings/:id/status', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.updateBookingStatus);
 
 // Admin routes
 const adminRoles = ['chalet_admin', 'super_admin'];
-router.get('/admin/add-ons', authenticate, authorize(...adminRoles), chaletController.getAdminAddOns);
-router.post('/admin/chalets', authenticate, authorize(...adminRoles), chaletController.createChalet);
-router.put('/admin/chalets/:id', authenticate, authorize(...adminRoles), chaletController.updateChalet);
-router.delete('/admin/chalets/:id', authenticate, authorize(...adminRoles), chaletController.deleteChalet);
+router.get('/admin/add-ons', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.getAdminAddOns);
+router.post('/admin/chalets', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.createChalet);
+router.put('/admin/chalets/:id', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.updateChalet);
+router.delete('/admin/chalets/:id', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.deleteChalet);
 
-router.post('/admin/add-ons', authenticate, authorize(...adminRoles), chaletController.createAddOn);
-router.put('/admin/add-ons/:id', authenticate, authorize(...adminRoles), chaletController.updateAddOn);
-router.delete('/admin/add-ons/:id', authenticate, authorize(...adminRoles), chaletController.deleteAddOn);
+router.post('/admin/add-ons', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.createAddOn);
+router.put('/admin/add-ons/:id', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.updateAddOn);
+router.delete('/admin/add-ons/:id', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.deleteAddOn);
 
-router.get('/admin/price-rules', authenticate, authorize(...adminRoles), chaletController.getPriceRules);
-router.post('/admin/price-rules', authenticate, authorize(...adminRoles), chaletController.createPriceRule);
-router.put('/admin/price-rules/:id', authenticate, authorize(...adminRoles), chaletController.updatePriceRule);
-router.delete('/admin/price-rules/:id', authenticate, authorize(...adminRoles), chaletController.deletePriceRule);
+router.get('/admin/price-rules', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.getPriceRules);
+router.post('/admin/price-rules', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.createPriceRule);
+router.put('/admin/price-rules/:id', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.updatePriceRule);
+router.delete('/admin/price-rules/:id', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.deletePriceRule);
 
 // Settings
-router.get('/admin/settings', authenticate, authorize(...adminRoles), chaletController.getChaletSettings);
-router.put('/admin/settings', authenticate, authorize(...adminRoles), chaletController.updateChaletSettings);
+router.get('/admin/settings', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.getChaletSettings);
+router.put('/admin/settings', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.updateChaletSettings);
 
 // Admin calendar & date blocking
-router.get('/admin/chalets/:id/calendar', authenticate, authorize(...adminRoles), chaletController.getAdminCalendar);
-router.post('/admin/chalets/:id/block-dates', authenticate, authorize(...adminRoles), chaletController.blockDates);
-router.post('/admin/chalets/:id/unblock-dates', authenticate, authorize(...adminRoles), chaletController.unblockDates);
+router.get('/admin/chalets/:id/calendar', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.getAdminCalendar);
+router.post('/admin/chalets/:id/block-dates', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.blockDates);
+router.post('/admin/chalets/:id/unblock-dates', authenticate, chaletsPropertyScope, authorize(...adminRoles), chaletController.unblockDates);
 
 // Public routes (Moved to end to avoid conflict with specific routes)
 router.get('/', chaletController.getChalets);
