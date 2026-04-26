@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Primary Playwright profile for phase3 E2E coverage.
+// Default config for local development. Runs smoke tests only.
 
 /**
  * E2E Test Configuration

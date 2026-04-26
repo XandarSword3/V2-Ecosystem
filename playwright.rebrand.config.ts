@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Dedicated profile for long-running rebrand scenarios.
+// Use this to test white-label/rebrand scenarios specifically.
 
 export default defineConfig({
   testDir: './tests/rebrand',
