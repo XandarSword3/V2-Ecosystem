@@ -14,6 +14,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Application from 'expo-application';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { API_BASE_URL } from '../config/env';
 
 // Storage keys
@@ -80,6 +81,7 @@ let failedQueue: Array<{
 }> = [];
 
 const OFFLINE_QUEUE_KEY = 'v2_offline_request_queue';
+const OFFLINE_CACHE_PREFIX = 'v2_offline_get_cache:';
 
 type OfflineQueuedRequest = {
   id: string;
@@ -134,6 +136,12 @@ async function flushOfflineQueue(client: AxiosInstance): Promise<void> {
   await writeOfflineQueue(remaining);
 }
 
+function buildCacheKey(url?: string, params?: any): string {
+  return `${OFFLINE_CACHE_PREFIX}${url || ''}:${JSON.stringify(params || {})}`;
+}
+
+let isOfflineListenerAttached = false;
+
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach((promise) => {
     if (error) {
@@ -181,6 +189,45 @@ function createApiClient(): AxiosInstance {
       // This keeps offline writes eventually consistent once connectivity returns.
       flushOfflineQueue(client).catch(() => undefined);
 
+      const method = (config.method || 'get').toLowerCase();
+      const isWriteMethod = ['post', 'put', 'patch', 'delete'].includes(method);
+      const isReadMethod = ['get', 'head', 'options'].includes(method);
+      const net = await NetInfo.fetch();
+      const offline = net.isConnected === false;
+
+      if (offline && isWriteMethod && config.url) {
+        await enqueueOfflineRequest({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          method: method as OfflineQueuedRequest['method'],
+          url: config.url,
+          data: config.data,
+          params: config.params,
+          headers: (config.headers || {}) as Record<string, string>,
+          createdAt: new Date().toISOString(),
+        });
+
+        config.adapter = async () => ({
+          data: { success: true, queued: true, offline: true },
+          status: 202,
+          statusText: 'Accepted',
+          headers: {},
+          config,
+          request: {},
+        });
+      } else if (offline && isReadMethod && config.url) {
+        const cacheKey = buildCacheKey(config.url, config.params);
+        const cachedRaw = await AsyncStorage.getItem(cacheKey);
+        const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
+        config.adapter = async () => ({
+          data: cached ?? { success: false, offline: true, error: 'No cached response' },
+          status: cached ? 200 : 503,
+          statusText: cached ? 'OK' : 'Service Unavailable',
+          headers: {},
+          config,
+          request: {},
+        });
+      }
+
       return config;
     },
     (error) => Promise.reject(error)
@@ -188,7 +235,14 @@ function createApiClient(): AxiosInstance {
 
   // Response interceptor - handle token refresh
   client.interceptors.response.use(
-    (response) => response,
+    async (response) => {
+      const method = (response.config.method || 'get').toLowerCase();
+      if (method === 'get' && response.config.url) {
+        const cacheKey = buildCacheKey(response.config.url, response.config.params);
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(response.data));
+      }
+      return response;
+    },
     async (error: AxiosError<ApiResponse>) => {
       const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -276,6 +330,15 @@ function createApiClient(): AxiosInstance {
       return Promise.reject(error);
     }
   );
+
+  if (!isOfflineListenerAttached) {
+    isOfflineListenerAttached = true;
+    NetInfo.addEventListener((state) => {
+      if (state.isConnected) {
+        flushOfflineQueue(client).catch(() => undefined);
+      }
+    });
+  }
 
   return client;
 }
