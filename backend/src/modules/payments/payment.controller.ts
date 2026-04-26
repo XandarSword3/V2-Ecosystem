@@ -487,6 +487,23 @@ export const getTransactions = asyncHandler(async (req: Request, res: Response) 
   res.json({ success: true, data: transactions || [] });
 });
 
+export const getMyPayments = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Authentication required' });
+  }
+
+  const supabase = getSupabase();
+  const { data: transactions, error } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('customer_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  res.json({ success: true, data: transactions || [] });
+});
+
 export const getTransaction = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
   const { data: payment, error } = await supabase

@@ -378,3 +378,40 @@ export const updateUserRoles = asyncHandler(async (req: Request, res: Response) 
       data: { roles: roles.map(r => r.name) }
     });
 });
+
+export const getMyStatement = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: 'Authentication required' });
+      return;
+    }
+
+    const { from, to } = req.query as { from?: string; to?: string };
+    const supabase = getSupabase();
+    const applyDateFilters = <T extends { gte: Function; lte: Function }>(query: T) => {
+      let q = query;
+      if (from) q = q.gte('created_at', from);
+      if (to) q = q.lte('created_at', to);
+      return q;
+    };
+
+    const [restaurant, pool, chalets, snack, loyalty, giftcards] = await Promise.all([
+      applyDateFilters(supabase.from('restaurant_orders').select('id,order_number,total_amount,status,created_at').eq('customer_id', userId)),
+      applyDateFilters(supabase.from('pool_tickets').select('id,ticket_number,total_amount,status,created_at,session_id').eq('customer_id', userId)),
+      applyDateFilters(supabase.from('chalet_bookings').select('id,booking_number,total_amount,status,created_at,chalet_id').eq('customer_id', userId)),
+      applyDateFilters(supabase.from('snack_orders').select('id,order_number,total_amount,status,created_at').eq('customer_id', userId)),
+      applyDateFilters(supabase.from('loyalty_transactions').select('id,points,type,created_at,reference_id,reference_type').eq('user_id', userId)),
+      applyDateFilters(supabase.from('gift_card_transactions').select('id,amount,created_at').eq('user_id', userId)),
+    ]);
+
+    const rows = [
+      ...(restaurant.data || []).map((row: any) => ({ type: 'restaurant_order', ...row })),
+      ...(pool.data || []).map((row: any) => ({ type: 'pool_ticket', ...row })),
+      ...(chalets.data || []).map((row: any) => ({ type: 'chalet_booking', ...row })),
+      ...(snack.data || []).map((row: any) => ({ type: 'snack_order', ...row })),
+      ...(loyalty.data || []).map((row: any) => ({ type: 'loyalty_transaction', ...row })),
+      ...(giftcards.data || []).map((row: any) => ({ type: 'gift_card_transaction', ...row })),
+    ].sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime());
+
+    res.json({ success: true, data: rows });
+});

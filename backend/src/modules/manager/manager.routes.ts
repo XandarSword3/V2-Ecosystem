@@ -56,6 +56,11 @@ router.get(
   authorize('admin', 'super_admin', 'manager', 'restaurant_manager', 'chalet_manager', 'pool_manager'),
   shiftsController.getTodaySchedule.bind(shiftsController)
 );
+router.get(
+  '/summary',
+  authorize('admin', 'super_admin', 'manager', 'restaurant_manager', 'chalet_manager', 'pool_manager'),
+  shiftsController.getManagerSummary.bind(shiftsController)
+);
 
 router.post(
   '/shifts',

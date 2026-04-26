@@ -1089,7 +1089,8 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
       start = dayjs().subtract(1, 'month').startOf('day').toISOString();
     }
 
-    // Get all orders/bookings in period - run queries in parallel
+    // Query only required fields and keep each result set bounded.
+    // This prevents loading unbounded rows into Node memory.
     const [
       restaurantResult,
       snackResult,
@@ -1100,21 +1101,25 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
       snackItemsResult
     ] = await Promise.all([
       supabase.from('restaurant_orders')
-        .select('*')
+        .select('id, status, total_amount, created_at')
         .gte('created_at', start)
-        .lte('created_at', end),
+        .lte('created_at', end)
+        .limit(1000),
       supabase.from('snack_orders')
-        .select('*')
+        .select('id, status, total_amount, created_at')
         .gte('created_at', start)
-        .lte('created_at', end),
+        .lte('created_at', end)
+        .limit(1000),
       supabase.from('chalet_bookings')
-        .select('*')
+        .select('id, payment_status, total_amount, created_at')
         .gte('created_at', start)
-        .lte('created_at', end),
+        .lte('created_at', end)
+        .limit(1000),
       supabase.from('pool_tickets')
-        .select('*')
+        .select('id, payment_status, total_amount, created_at')
         .gte('created_at', start)
-        .lte('created_at', end),
+        .lte('created_at', end)
+        .limit(1000),
       supabase.from('users')
         .select('id', { count: 'exact', head: true }),
       // Fetch details for Top Items
@@ -1135,6 +1140,22 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
     const chaletBookingsList = chaletResult.data || [];
     const poolTicketsList = poolResult.data || [];
     const totalUsers = usersResult.count || 0;
+
+    if (
+      restaurantOrdersList.length >= 1000 ||
+      snackOrdersList.length >= 1000 ||
+      chaletBookingsList.length >= 1000 ||
+      poolTicketsList.length >= 1000
+    ) {
+      logger.warn('Admin overview report hit 1000-row safety limit for one or more datasets', {
+        restaurant: restaurantOrdersList.length,
+        snack: snackOrdersList.length,
+        chalets: chaletBookingsList.length,
+        pool: poolTicketsList.length,
+        start,
+        end,
+      });
+    }
 
     // Calculate revenues
     const restaurantRevenue = restaurantOrdersList

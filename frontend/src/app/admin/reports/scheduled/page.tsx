@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -29,25 +28,19 @@ import Link from 'next/link';
 interface ScheduledReport {
   id: string;
   name: string;
-  type: 'daily' | 'weekly' | 'monthly';
-  report_type: string;
-  recipients: string[];
-  enabled: boolean;
-  last_sent_at: string | null;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  template_id: string;
+  template?: { name?: string; category?: string };
+  recipients: Array<{ type: string; address?: string }>;
+  is_active: boolean;
+  last_run_at: string | null;
   next_run_at: string | null;
+  last_run_status?: string | null;
+  export_format?: string;
   created_at: string;
 }
 
-type ReportType = 'revenue' | 'occupancy' | 'orders' | 'customers' | 'overview';
 type ScheduleType = 'daily' | 'weekly' | 'monthly';
-
-const REPORT_TYPES: { value: ReportType; label: string; description: string }[] = [
-  { value: 'overview', label: 'Overview', description: 'Complete business overview' },
-  { value: 'revenue', label: 'Revenue', description: 'Revenue breakdown by service' },
-  { value: 'occupancy', label: 'Occupancy', description: 'Chalet & pool utilization' },
-  { value: 'orders', label: 'Orders', description: 'Order statistics and trends' },
-  { value: 'customers', label: 'Customers', description: 'Customer analytics' },
-];
 
 const SCHEDULE_TYPES: { value: ScheduleType; label: string; icon: string }[] = [
   { value: 'daily', label: 'Daily', icon: '📅' },
@@ -56,10 +49,8 @@ const SCHEDULE_TYPES: { value: ScheduleType; label: string; icon: string }[] = [
 ];
 
 export default function ScheduledReportsPage() {
-  const t = useTranslations('adminReports');
-  const tc = useTranslations('adminCommon');
-  
   const [reports, setReports] = useState<ScheduledReport[]>([]);
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; category?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingReport, setEditingReport] = useState<ScheduledReport | null>(null);
@@ -69,17 +60,23 @@ export default function ScheduledReportsPage() {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    type: 'daily' as ScheduleType,
-    reportType: 'overview' as ReportType,
+    frequency: 'daily' as ScheduleType,
+    templateId: '',
+    exportFormat: 'pdf',
+    hour: 8,
+    minute: 0,
     recipients: '',
     enabled: true,
   });
 
   const fetchReports = useCallback(async () => {
     try {
-      const response = await api.get('/admin/reports/scheduled');
-      const data = response.data?.data ?? response.data ?? [];
-      setReports(Array.isArray(data) ? data : []);
+      const [reportsRes, templatesRes] = await Promise.all([
+        api.get('/reporting/scheduled'),
+        api.get('/reporting/templates'),
+      ]);
+      setReports((reportsRes.data?.reports || []) as ScheduledReport[]);
+      setTemplates((templatesRes.data?.templates || []) as Array<{ id: string; name: string; category?: string }>);
     } catch (error) {
       toast.error('Failed to load scheduled reports');
     } finally {
@@ -95,8 +92,11 @@ export default function ScheduledReportsPage() {
     setEditingReport(null);
     setFormData({
       name: '',
-      type: 'daily',
-      reportType: 'overview',
+      frequency: 'daily',
+      templateId: templates[0]?.id || '',
+      exportFormat: 'pdf',
+      hour: 8,
+      minute: 0,
       recipients: '',
       enabled: true,
     });
@@ -107,10 +107,13 @@ export default function ScheduledReportsPage() {
     setEditingReport(report);
     setFormData({
       name: report.name,
-      type: report.type,
-      reportType: report.report_type as ReportType,
-      recipients: report.recipients.join(', '),
-      enabled: report.enabled,
+      frequency: report.frequency,
+      templateId: report.template_id,
+      exportFormat: report.export_format || 'pdf',
+      hour: 8,
+      minute: 0,
+      recipients: report.recipients.map((r) => r.address).filter(Boolean).join(', '),
+      enabled: report.is_active,
     });
     setShowModal(true);
   };
@@ -134,21 +137,27 @@ export default function ScheduledReportsPage() {
     setSaving(true);
     try {
       if (editingReport) {
-        await api.put(`/admin/reports/scheduled/${editingReport.id}`, {
+        await api.put(`/reporting/scheduled/${editingReport.id}`, {
           name: formData.name,
-          type: formData.type,
-          reportType: formData.reportType,
-          recipients: recipientsList,
-          enabled: formData.enabled,
+          frequency: formData.frequency,
+          templateId: formData.templateId,
+          exportFormat: formData.exportFormat,
+          hour: formData.hour,
+          minute: formData.minute,
+          recipients: recipientsList.map((address) => ({ type: 'email', address })),
+          isActive: formData.enabled,
         });
         toast.success('Report updated successfully');
       } else {
-        await api.post('/admin/reports/scheduled', {
+        await api.post('/reporting/scheduled', {
           name: formData.name,
-          type: formData.type,
-          reportType: formData.reportType,
-          recipients: recipientsList,
-          enabled: formData.enabled,
+          frequency: formData.frequency,
+          templateId: formData.templateId,
+          params: {},
+          exportFormat: formData.exportFormat,
+          hour: formData.hour,
+          minute: formData.minute,
+          recipients: recipientsList.map((address) => ({ type: 'email', address })),
         });
         toast.success('Report created successfully');
       }
@@ -167,7 +176,7 @@ export default function ScheduledReportsPage() {
     }
     
     try {
-      await api.delete(`/admin/reports/scheduled/${id}`);
+      await api.delete(`/reporting/scheduled/${id}`);
       toast.success('Report deleted');
       fetchReports();
     } catch (error) {
@@ -177,10 +186,10 @@ export default function ScheduledReportsPage() {
 
   const handleToggleEnabled = async (report: ScheduledReport) => {
     try {
-      await api.put(`/admin/reports/scheduled/${report.id}`, {
-        enabled: !report.enabled,
+      await api.put(`/reporting/scheduled/${report.id}`, {
+        isActive: !report.is_active,
       });
-      toast.success(report.enabled ? 'Report disabled' : 'Report enabled');
+      toast.success(report.is_active ? 'Report disabled' : 'Report enabled');
       fetchReports();
     } catch (error) {
       toast.error('Failed to update report');
@@ -190,7 +199,7 @@ export default function ScheduledReportsPage() {
   const handleSendNow = async (id: string) => {
     setSendingId(id);
     try {
-      await api.post(`/admin/reports/scheduled/${id}/send`);
+      await api.post(`/reporting/scheduled/${id}/run`);
       toast.success('Report sent successfully');
       fetchReports();
     } catch (error) {
@@ -203,10 +212,6 @@ export default function ScheduledReportsPage() {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Never';
     return new Date(dateString).toLocaleString();
-  };
-
-  const getReportTypeInfo = (type: string) => {
-    return REPORT_TYPES.find(rt => rt.value === type) || { label: type, description: '' };
   };
 
   if (loading) {
@@ -270,16 +275,14 @@ export default function ScheduledReportsPage() {
       ) : (
         <motion.div variants={fadeInUp} className="grid gap-4">
           {reports.map((report) => {
-            const typeInfo = getReportTypeInfo(report.report_type);
-            
             return (
-              <Card key={report.id} className={`transition-opacity ${!report.enabled ? 'opacity-60' : ''}`}>
+              <Card key={report.id} className={`transition-opacity ${!report.is_active ? 'opacity-60' : ''}`}>
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold">{report.name}</h3>
-                        {report.enabled ? (
+                        {report.is_active ? (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
                             <CheckCircle className="h-3 w-3" /> Active
                           </span>
@@ -293,11 +296,11 @@ export default function ScheduledReportsPage() {
                       <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
                         <span className="inline-flex items-center gap-1">
                           <Clock className="h-4 w-4" />
-                          {SCHEDULE_TYPES.find(st => st.value === report.type)?.icon} {report.type}
+                          {SCHEDULE_TYPES.find(st => st.value === report.frequency)?.icon} {report.frequency}
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <FileText className="h-4 w-4" />
-                          {typeInfo.label}
+                          {report.template?.name || 'Template'}
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <Mail className="h-4 w-4" />
@@ -307,7 +310,7 @@ export default function ScheduledReportsPage() {
                       
                       <div className="flex gap-6 text-xs text-muted-foreground">
                         <span>
-                          <strong>Last sent:</strong> {formatDate(report.last_sent_at)}
+                          <strong>Last run:</strong> {formatDate(report.last_run_at)}
                         </span>
                         <span>
                           <strong>Next run:</strong> {formatDate(report.next_run_at)}
@@ -336,7 +339,7 @@ export default function ScheduledReportsPage() {
                         size="icon"
                         onClick={() => handleToggleEnabled(report)}
                       >
-                        {report.enabled ? (
+                        {report.is_active ? (
                           <XCircle className="h-4 w-4 text-muted-foreground" />
                         ) : (
                           <CheckCircle className="h-4 w-4 text-green-600" />
@@ -396,6 +399,22 @@ export default function ScheduledReportsPage() {
                 />
               </div>
               
+              {/* Template */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Template</label>
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  value={formData.templateId}
+                  onChange={(e) => setFormData({ ...formData, templateId: e.target.value })}
+                >
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
               {/* Schedule Type */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Schedule</label>
@@ -404,9 +423,9 @@ export default function ScheduledReportsPage() {
                     <button
                       key={st.value}
                       type="button"
-                      onClick={() => setFormData({ ...formData, type: st.value })}
+                      onClick={() => setFormData({ ...formData, frequency: st.value })}
                       className={`p-3 rounded-lg border text-center transition-colors ${
-                        formData.type === st.value
+                        formData.frequency === st.value
                           ? 'border-primary bg-primary/5 text-primary'
                           : 'hover:bg-muted/50'
                       }`}
@@ -414,35 +433,6 @@ export default function ScheduledReportsPage() {
                       <div className="text-xl mb-1">{st.icon}</div>
                       <div className="text-sm font-medium">{st.label}</div>
                     </button>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Report Type */}
-              <div>
-                <label className="text-sm font-medium mb-2 block">Report Type</label>
-                <div className="space-y-2">
-                  {REPORT_TYPES.map((rt) => (
-                    <label
-                      key={rt.value}
-                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                        formData.reportType === rt.value
-                          ? 'border-primary bg-primary/5'
-                          : 'hover:bg-muted/50'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="reportType"
-                        checked={formData.reportType === rt.value}
-                        onChange={() => setFormData({ ...formData, reportType: rt.value })}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm">{rt.label}</div>
-                        <div className="text-xs text-muted-foreground">{rt.description}</div>
-                      </div>
-                    </label>
                   ))}
                 </div>
               </div>
