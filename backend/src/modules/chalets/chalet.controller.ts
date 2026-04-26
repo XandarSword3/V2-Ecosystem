@@ -8,6 +8,8 @@ import { logActivity } from "../../utils/activityLogger.js";
 import { emitToUnit } from "../../socket/index.js";
 import dayjs from 'dayjs';
 import { getRedis } from '../../config/session-store.js';
+import { config } from '../../config/index.js';
+import Stripe from 'stripe';
 
 // Distributed booking lock using Redis (falls back to in-memory for non-Redis environments)
 // Ensures only one booking request per chalet is processed at a time, even across server instances
@@ -1262,7 +1264,142 @@ export const checkOut = asyncHandler(async (req: Request, res: Response) => {
   }
 
   if (error) throw error;
+
+  // Trigger housekeeping workflow after successful checkout transition.
+  const { data: booking } = await supabase
+    .from('chalet_bookings')
+    .select('id, chalet_id')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (booking?.chalet_id) {
+    const { data: assignment } = await supabase
+      .from('housekeeping_assignments')
+      .select('staff_id')
+      .eq('chalet_id', booking.chalet_id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    const { data: task } = await supabase
+      .from('housekeeping_tasks')
+      .insert({
+        chalet_id: booking.chalet_id,
+        booking_id: booking.id,
+        status: 'pending',
+        requested_at: new Date().toISOString(),
+        assigned_to: assignment?.staff_id || null,
+        title: 'Post-checkout cleaning',
+        notes: assignment?.staff_id ? 'Auto-created on checkout' : 'Auto-created on checkout (unassigned)',
+      })
+      .select()
+      .single();
+
+    emitToUnit('housekeeping', 'housekeeping:task:new', task || {
+      chalet_id: booking.chalet_id,
+      booking_id: booking.id,
+      status: 'pending',
+    });
+  }
   res.json({ success: true, data, message: 'Guest checked out' });
+});
+
+export const chargeDeposit = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const amount = Number(req.body?.amount || 0);
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ success: false, error: 'amount is required and must be > 0' });
+  }
+
+  const { data: booking, error: bookingError } = await supabase
+    .from('chalet_bookings')
+    .select('id, customer_id')
+    .eq('id', req.params.id)
+    .single();
+  if (bookingError || !booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+
+  let stripePaymentIntentId: string | null = null;
+  if (config.stripe.secretKey) {
+    const stripe = new Stripe(config.stripe.secretKey, { apiVersion: '2023-10-16' });
+    const pi = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100),
+      currency: 'usd',
+      metadata: { booking_id: booking.id, type: 'chalet_deposit' },
+      capture_method: 'automatic',
+    });
+    stripePaymentIntentId = pi.id;
+  }
+
+  const { data: payment, error } = await supabase
+    .from('payments')
+    .insert({
+      reference_type: 'chalet_booking',
+      reference_id: booking.id,
+      amount: amount.toFixed(2),
+      currency: 'USD',
+      method: 'card',
+      status: stripePaymentIntentId ? 'pending' : 'completed',
+      stripe_payment_intent_id: stripePaymentIntentId,
+      processed_by: req.user?.userId,
+      processed_at: new Date().toISOString(),
+      notes: 'Security deposit charge',
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  res.status(201).json({ success: true, data: payment });
+});
+
+export const releaseDeposit = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const amount = Number(req.body?.amount || 0);
+  const reason = String(req.body?.reason || '');
+  if (!amount || amount <= 0 || !reason) {
+    return res.status(400).json({ success: false, error: 'amount and reason are required' });
+  }
+
+  const { data: lastDeposit } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('reference_type', 'chalet_booking')
+    .eq('reference_id', req.params.id)
+    .ilike('notes', '%deposit%')
+    .order('created_at', { ascending: false })
+    .maybeSingle();
+
+  if (!lastDeposit) {
+    return res.status(404).json({ success: false, error: 'Deposit payment not found' });
+  }
+
+  if (config.stripe.secretKey && lastDeposit.stripe_payment_intent_id) {
+    const stripe = new Stripe(config.stripe.secretKey, { apiVersion: '2023-10-16' });
+    await stripe.refunds.create({
+      payment_intent: String(lastDeposit.stripe_payment_intent_id),
+      amount: Math.round(amount * 100),
+      reason: 'requested_by_customer',
+      metadata: { booking_id: req.params.id, reason },
+    });
+  }
+
+  const { data: refundRow, error } = await supabase
+    .from('payments')
+    .insert({
+      reference_type: 'chalet_booking',
+      reference_id: req.params.id,
+      amount: amount.toFixed(2),
+      currency: 'USD',
+      method: 'deposit_release',
+      status: 'refunded',
+      processed_by: req.user?.userId,
+      processed_at: new Date().toISOString(),
+      notes: `Deposit release: ${reason}`,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  res.status(201).json({ success: true, data: refundRow });
 });
 
 export const updateBookingStatus = asyncHandler(async (req: Request, res: Response) => {

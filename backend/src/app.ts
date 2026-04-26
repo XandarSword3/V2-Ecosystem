@@ -43,6 +43,7 @@ import terminologyRoutes from './routes/terminology.routes.js';
 import genericRoutes from './routes/generic.routes.js';
 import translationRoutes from './routes/translation.routes.js';
 import docsRoutes from './routes/docs.routes.js';
+import searchRoutes from './routes/search.routes.js';
 import { getDynamicModulesRouter, loadDynamicModules as reloadDynamicModules } from './routes/dynamic-modules.loader.js';
 
 const app = express();
@@ -143,6 +144,7 @@ apiRouter.use('/staff', staffRoutes);
 apiRouter.use('/staff', moduleStaffRoutes); // FIX: Mount dynamic module staff routes (room-service, hotel-rooms, spa, etc.)
 apiRouter.use('/support', supportRoutes);
 apiRouter.use('/users', userRoutes);
+apiRouter.use('/search', searchRoutes);
 
 // White-Label Routes
 apiRouter.use('/terminology', terminologyRoutes);

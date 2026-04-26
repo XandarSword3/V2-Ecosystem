@@ -41,6 +41,7 @@ export {
   resetOccupancy,
   getMaintenanceLogs,
   createMaintenanceLog,
+  overrideSessionCapacity,
 } from './admin.controller.js';
 
 // Bracelet management

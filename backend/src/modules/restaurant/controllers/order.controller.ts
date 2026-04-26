@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../../middleware/async-handler.js';
 import * as orderService from "../services/order.service.js";
 import { logActivity } from "../../../utils/activityLogger.js";
+import { getSupabase } from '../../../database/connection.js';
 
 import { createRestaurantOrderSchema, updateOrderStatusSchema, validateBody } from "../../../validation/schemas.js";
 import { isErrorWithStatusCode, RestaurantOrderRow, OrderItemRow } from "../../../types/index.js";
@@ -272,4 +273,63 @@ export const getSalesReport = asyncHandler(async (req: Request, res: Response) =
       moduleId as string
     );
     res.json({ success: true, data: report });
+});
+
+export const splitOrder = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { method, parts } = req.body as { method: 'equal' | 'item' | 'amount' | 'seat'; parts: number };
+
+    if (method !== 'equal') {
+      return res.status(501).json({
+        success: false,
+        error: `Split method "${method}" is not_implemented. Only "equal" is supported right now.`,
+      });
+    }
+    if (!parts || parts < 2) {
+      return res.status(400).json({ success: false, error: 'parts must be at least 2' });
+    }
+
+    const supabase = getSupabase();
+    const { data: order, error: orderError } = await supabase
+      .from('restaurant_orders')
+      .select('id, total_amount, status')
+      .eq('id', id)
+      .single();
+    if (orderError || !order) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    const total = parseFloat(String(order.total_amount || 0));
+    const each = Number((total / parts).toFixed(2));
+    const splitPayments = Array.from({ length: parts }).map((_, idx) => ({
+      reference_type: 'restaurant_order',
+      reference_id: id,
+      amount: idx === parts - 1 ? Number((total - each * (parts - 1)).toFixed(2)).toFixed(2) : each.toFixed(2),
+      currency: 'USD',
+      method: 'split',
+      status: 'pending',
+      notes: `Split bill part ${idx + 1}/${parts}`,
+      processed_by: req.user?.userId,
+      processed_at: new Date().toISOString(),
+    }));
+    const { error: paymentError } = await supabase.from('payments').insert(splitPayments);
+    if (paymentError) throw paymentError;
+
+    const { data: updatedOrder, error: updateError } = await supabase
+      .from('restaurant_orders')
+      .update({ status: 'split', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (updateError) throw updateError;
+
+    res.json({
+      success: true,
+      data: {
+        order: updatedOrder,
+        method,
+        parts,
+        per_part_amount: each,
+      },
+    });
 });
