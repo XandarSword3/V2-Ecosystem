@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 test.describe('Chalet Operations [STF-CHAL]', () => {
   test.beforeEach(async ({ page }) => {
@@ -25,7 +25,7 @@ test.describe('Chalet Operations [STF-CHAL]', () => {
     const search = page.locator('input[type="search"], input[placeholder*="earch"], [class*="search"] input');
     await expect(search.first()).toBeVisible();
     await search.first().fill('test');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     const resultArea = page.locator('[class*="list"], [class*="table"], [class*="result"], tbody');
     await expect(resultArea.first()).toBeVisible();
   });
@@ -36,7 +36,7 @@ test.describe('Chalet Operations [STF-CHAL]', () => {
     const count = await toggle.count();
     expect(count).toBeGreaterThanOrEqual(2);
     await toggle.last().click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
   });
 
   test('STF-CHAL-004: Booking list with guest info', async ({ page }) => {

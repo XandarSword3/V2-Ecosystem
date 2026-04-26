@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Admin Complete Feature Coverage E2E Test
  * 
  * This test has the admin bot systematically try out EVERY admin feature.
@@ -20,7 +20,7 @@
  * - Audit Logs
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
@@ -176,9 +176,7 @@ async function clickButton(page: Page, text: string): Promise<boolean> {
 // SECTION 1: DASHBOARD
 // ============================================
 test.describe('1. Dashboard Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -226,9 +224,7 @@ test.describe('1. Dashboard Features', () => {
 // SECTION 2: USER MANAGEMENT
 // ============================================
 test.describe('2. User Management Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -331,9 +327,7 @@ test.describe('2. User Management Features', () => {
 // SECTION 3: RESTAURANT MANAGEMENT
 // ============================================
 test.describe('3. Restaurant Management Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -472,9 +466,7 @@ test.describe('3. Restaurant Management Features', () => {
 // SECTION 4: POOL MANAGEMENT
 // ============================================
 test.describe('4. Pool Management Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -549,9 +541,7 @@ test.describe('4. Pool Management Features', () => {
 // SECTION 5: CHALET MANAGEMENT
 // ============================================
 test.describe('5. Chalet Management Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -607,9 +597,7 @@ test.describe('5. Chalet Management Features', () => {
 // SECTION 6: REVIEWS MANAGEMENT
 // ============================================
 test.describe('6. Reviews Management Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -665,9 +653,7 @@ test.describe('6. Reviews Management Features', () => {
 // SECTION 7: REPORTS & ANALYTICS
 // ============================================
 test.describe('7. Reports & Analytics Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -732,9 +718,7 @@ test.describe('7. Reports & Analytics Features', () => {
 // SECTION 8: SETTINGS
 // ============================================
 test.describe('8. Settings Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -815,9 +799,7 @@ test.describe('8. Settings Features', () => {
 // SECTION 9: NOTIFICATIONS
 // ============================================
 test.describe('9. Notification Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -934,9 +916,7 @@ test.describe('9. Notification Features', () => {
 // SECTION 10: TRANSLATIONS
 // ============================================
 test.describe('10. Translations Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -988,9 +968,7 @@ test.describe('10. Translations Features', () => {
 // SECTION 11: BACKUPS
 // ============================================
 test.describe('11. Backups Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -1031,9 +1009,7 @@ test.describe('11. Backups Features', () => {
 // SECTION 12: MODULES
 // ============================================
 test.describe('12. Modules Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -1079,9 +1055,7 @@ test.describe('12. Modules Features', () => {
 // SECTION 13: AUDIT LOGS
 // ============================================
 test.describe('13. Audit Log Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -1134,9 +1108,7 @@ test.describe('13. Audit Log Features', () => {
 // SECTION 14: ORDERS (GLOBAL)
 // ============================================
 test.describe('14. Global Orders Features', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -1189,4 +1161,3 @@ test.describe('15. Final Verification', () => {
     }
   });
 });
-

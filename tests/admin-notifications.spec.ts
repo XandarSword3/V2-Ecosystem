@@ -11,37 +11,13 @@
  * - Bulk operations
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com';
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'admin123';
-
-/**
- * Helper to login as admin
- */
-async function loginAsAdmin(page: Page): Promise<boolean> {
-  try {
-    await page.goto(`${FRONTEND_URL}/login`, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/admin/, { timeout: 30000 });
-    return true;
-  } catch (error) {
-    console.error('Login failed:', error);
-    return false;
-  }
-}
 
 test.describe('Admin Notifications System', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) {
-      test.skip(true, 'Login failed - backend may be down');
-    }
+test.beforeEach(async ({ page, auth }) => {
+    await auth.loginAs('admin');
     
     // Navigate to notifications page
     await page.goto(`${FRONTEND_URL}/admin/settings/notifications`);
@@ -79,15 +55,15 @@ test.describe('Admin Notifications System', () => {
   test('should switch between tabs', async ({ page }) => {
     // Click on broadcasts tab
     await page.click('button:has-text("broadcasts")');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Click on templates tab
     await page.click('button:has-text("templates")');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Click back to notifications tab
     await page.click('button:has-text("notifications")');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
   });
 
   // ============================================
@@ -109,14 +85,14 @@ test.describe('Admin Notifications System', () => {
   test('should validate required fields in notification modal', async ({ page }) => {
     // Open modal
     await page.click('button:has-text("Send Notification")');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Try to send without filling fields (should show error or be disabled)
     const sendButton = page.locator('button:has-text("Send Now"), button:has-text("Schedule")');
     await sendButton.click();
     
     // Should show error toast or remain on modal
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     const modalStillVisible = await page.getByRole('heading', { name: /Send Notification/i }).isVisible();
     expect(modalStillVisible).toBe(true);
   });
@@ -124,7 +100,7 @@ test.describe('Admin Notifications System', () => {
   test('should fill and close notification modal', async ({ page }) => {
     // Open modal
     await page.click('button:has-text("Send Notification")');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Fill in the form
     await page.fill('input[placeholder*="title" i]', 'Test Notification');
@@ -149,7 +125,7 @@ test.describe('Admin Notifications System', () => {
   test('should show scheduling option in notification modal', async ({ page }) => {
     // Open modal
     await page.click('button:has-text("Send Notification")');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Look for datetime-local input for scheduling
     const scheduleInput = page.locator('input[type="datetime-local"]');
@@ -159,7 +135,7 @@ test.describe('Admin Notifications System', () => {
   test('should allow adding action buttons', async ({ page }) => {
     // Open modal
     await page.click('button:has-text("Send Notification")');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Look for "Add Action" button
     const addActionButton = page.locator('button:has-text("Add Action")');
@@ -180,7 +156,7 @@ test.describe('Admin Notifications System', () => {
   test('should switch to templates tab', async ({ page }) => {
     // Click templates tab
     await page.click('button:has-text("templates")');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Should show templates content (either list or empty state)
     const templatesContent = page.locator('[class*="template"], :text("No templates"), :text("Create Template")');
@@ -190,7 +166,7 @@ test.describe('Admin Notifications System', () => {
   test('should open create template modal', async ({ page }) => {
     // Click "New Template" button
     await page.click('button:has-text("New Template")');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Modal should be visible
     await expect(page.getByRole('heading', { name: /Create Template/i })).toBeVisible();
@@ -202,7 +178,7 @@ test.describe('Admin Notifications System', () => {
   test('should fill and close template modal', async ({ page }) => {
     // Open template modal
     await page.click('button:has-text("New Template")');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Fill template form
     await page.locator('input[placeholder*="Template Name" i], input[placeholder*="Welcome" i]').first().fill('Welcome Template');
@@ -230,7 +206,7 @@ test.describe('Admin Notifications System', () => {
     // Soft check - filter may not be implemented yet
     const hasFilter = await typeFilter.isVisible().catch(() => false);
     if (!hasFilter) {
-      test.skip();
+      test.skip(true, "Test precondition failed (previously skipped)");
       return;
     }
     
@@ -244,7 +220,7 @@ test.describe('Admin Notifications System', () => {
     // Soft check - filter may not be implemented yet
     const hasFilter = await priorityFilter.isVisible().catch(() => false);
     if (!hasFilter) {
-      test.skip();
+      test.skip(true, "Test precondition failed (previously skipped)");
       return;
     }
     
@@ -256,13 +232,13 @@ test.describe('Admin Notifications System', () => {
     const typeFilterSelect = page.locator('select:has-text("All Types"), select:has-text("Type")').first();
     const hasFilter = await typeFilterSelect.isVisible().catch(() => false);
     if (!hasFilter) {
-      test.skip();
+      test.skip(true, "Test precondition failed (previously skipped)");
       return;
     }
     
     // Select a type filter
     await typeFilterSelect.selectOption('warning');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Filter should be applied (page should re-render)
     const selectedFilter = await typeFilterSelect.inputValue();
@@ -278,7 +254,7 @@ test.describe('Admin Notifications System', () => {
     const selectAll = page.locator('input[type="checkbox"]:near(:text("Select all")), input[type="checkbox"][aria-label*="select"]').first();
     const hasCheckbox = await selectAll.isVisible().catch(() => false);
     if (!hasCheckbox) {
-      test.skip();
+      test.skip(true, "Test precondition failed (previously skipped)");
       return;
     }
     await expect(selectAll).toBeVisible();
@@ -290,12 +266,12 @@ test.describe('Admin Notifications System', () => {
     const hasCheckbox = await selectAll.isVisible().catch(() => false);
     
     if (!hasCheckbox) {
-      test.skip();
+      test.skip(true, "Test precondition failed (previously skipped)");
       return;
     }
     
     await selectAll.check();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Just verify the select all worked
     const isChecked = await selectAll.isChecked();
@@ -310,7 +286,7 @@ test.describe('Admin Notifications System', () => {
     const refreshButton = page.locator('button:has-text("Refresh"), [aria-label*="refresh"]').first();
     const hasRefresh = await refreshButton.isVisible().catch(() => false);
     if (!hasRefresh) {
-      test.skip();
+      test.skip(true, "Test precondition failed (previously skipped)");
       return;
     }
     await expect(refreshButton).toBeVisible();
@@ -320,14 +296,14 @@ test.describe('Admin Notifications System', () => {
     const refreshButton = page.locator('button:has-text("Refresh"), [aria-label*="refresh"]').first();
     const hasRefresh = await refreshButton.isVisible().catch(() => false);
     if (!hasRefresh) {
-      test.skip();
+      test.skip(true, "Test precondition failed (previously skipped)");
       return;
     }
     
     await refreshButton.click();
     
     // Wait for refresh to complete
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     
     // Page should still be functional
     await expect(page.getByRole('heading', { name: /Notifications/i }).first()).toBeVisible();
@@ -391,11 +367,8 @@ test.describe('Admin Notifications System', () => {
 // INTEGRATION WITH OTHER ADMIN FEATURES
 // ============================================
 test.describe('Notifications Integration', () => {
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) {
-      test.skip(true, 'Login failed - backend may be down');
-    }
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('should access notifications from admin sidebar', async ({ page }) => {

@@ -9,7 +9,7 @@
  *   J-B3: Chalet booking cancellation → availability restored
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures/auth.fixture';
 import {
   URLS, CREDS, fullSetup,
   getCsrfToken, screenshot,
@@ -146,7 +146,7 @@ test.describe('ENGINE B — Chalet Booking Full Lifecycle', () => {
 
       // ── PHASE 1: Customer browses chalets page (FRONTEND) ──
       await customerPage.goto('/chalets', { waitUntil: 'domcontentloaded' });
-      await customerPage.waitForTimeout(3000);
+      await customerPage.waitForLoadState('networkidle');
       const chaletPageText = await customerPage.textContent('body');
       expect(chaletPageText!.length).toBeGreaterThan(50);
       await screenshot(customerPage, 'J-B1-01-customer-chalets-page');
@@ -217,7 +217,7 @@ test.describe('ENGINE B — Chalet Booking Full Lifecycle', () => {
 
       // ── PHASE 3: Admin sees booking in staff panel (FRONTEND + API) ──
       await adminPage.goto('/staff/chalets', { waitUntil: 'domcontentloaded' });
-      await adminPage.waitForTimeout(3000);
+      await adminPage.waitForLoadState('networkidle');
       await screenshot(adminPage, 'J-B1-02-admin-chalets-page');
 
       const staffBookingsResp = await apiCall(adminPage, 'GET', '/chalets/staff/bookings', {
@@ -317,7 +317,7 @@ test.describe('ENGINE B — Chalet Booking Full Lifecycle', () => {
 
       // ── PHASE 1: Customer browses reservation page (FRONTEND) ──
       await customerPage.goto('/restaurant/reserve', { waitUntil: 'domcontentloaded' });
-      await customerPage.waitForTimeout(2000);
+      await customerPage.waitForLoadState('networkidle');
       await screenshot(customerPage, 'J-B2-01-reservation-page');
 
       // ── PHASE 2: Get a table and create reservation (API) ──

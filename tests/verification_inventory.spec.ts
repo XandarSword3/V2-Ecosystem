@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -44,5 +44,5 @@ test('End-to-End Inventory & Ordering Check', async ({ page }) => {
 
   // 7. Wait and observe (for headed mode)
   console.log('Waiting 5 seconds for visual verification...');
-  await page.waitForTimeout(5000);
+  await page.waitForLoadState('networkidle');
 });

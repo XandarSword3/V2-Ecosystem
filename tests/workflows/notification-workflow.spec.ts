@@ -11,7 +11,7 @@
  * This tests the complete notification lifecycle.
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
@@ -50,14 +50,14 @@ async function login(page: Page, email: string, password: string): Promise<boole
     await page.locator('input[type="password"]').fill(password);
     
     // Wait for form to be ready
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Click login button
     const loginButton = page.getByRole('button', { name: /sign in|login/i });
     await loginButton.click();
     
     // Wait for redirect
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     return true;
   } catch (error) {
     console.error('Login failed:', error);
@@ -69,9 +69,7 @@ async function login(page: Page, email: string, password: string): Promise<boole
 // PHASE 1: ADMIN CREATES TEMPLATE
 // ============================================
 test.describe('Phase 1: Admin Creates Notification Template', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -92,7 +90,7 @@ test.describe('Phase 1: Admin Creates Notification Template', () => {
   test('Step 1.2: Admin navigates to notifications', async () => {
     await adminPage.goto(`${FRONTEND_URL}/admin/settings/notifications`);
     await adminPage.waitForLoadState('load');
-    await adminPage.waitForTimeout(1000);
+    await adminPage.waitForLoadState('networkidle');
     
     // Verify notification settings page loaded with relevant content
     await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
@@ -104,7 +102,7 @@ test.describe('Phase 1: Admin Creates Notification Template', () => {
     const templatesTab = adminPage.locator('button:has-text("templates"), a:has-text("templates")');
     if (await templatesTab.first().isVisible().catch(() => false)) {
       await templatesTab.first().click();
-      await adminPage.waitForTimeout(500);
+      await adminPage.waitForLoadState('networkidle');
     }
     // Verify notifications page remains functional
     await expect(adminPage.locator('main').first()).toBeVisible();
@@ -116,7 +114,7 @@ test.describe('Phase 1: Admin Creates Notification Template', () => {
     
     if (btnVisible) {
       await newTemplateBtn.first().click();
-      await adminPage.waitForTimeout(500);
+      await adminPage.waitForLoadState('networkidle');
       
       // Modal should be visible - but don't fail if UI is different
       const modalVisible = await adminPage.getByRole('heading', { name: /Create|Template|New/i }).first().isVisible({ timeout: 3000 }).catch(() => false);
@@ -174,7 +172,7 @@ test.describe('Phase 1: Admin Creates Notification Template', () => {
         console.log('Created template ID:', createdTemplateId);
       }
       
-      await adminPage.waitForTimeout(1000);
+      await adminPage.waitForLoadState('networkidle');
     }
     // Verify notifications page is still loaded and functional
     await expect(adminPage.locator('main').first()).toBeVisible();
@@ -201,9 +199,7 @@ test.describe('Phase 1: Admin Creates Notification Template', () => {
 // PHASE 2: ADMIN SENDS BROADCAST
 // ============================================
 test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -229,7 +225,7 @@ test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
     const sendBtn = adminPage.locator('button:has-text("Send Notification"), button:has-text("Send"), button:has-text("New")');
     if (await sendBtn.first().isVisible().catch(() => false)) {
       await sendBtn.first().click();
-      await adminPage.waitForTimeout(500);
+      await adminPage.waitForLoadState('networkidle');
     }
     await expect(adminPage.locator('main').first()).toBeVisible();
   });
@@ -280,7 +276,7 @@ test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
     
     if (await addActionBtn.isVisible()) {
       await addActionBtn.click();
-      await adminPage.waitForTimeout(300);
+      await adminPage.waitForLoadState('networkidle');
       
       // Fill action details
       const labelInput = adminPage.locator('input[placeholder*="Label" i]').first();
@@ -315,7 +311,7 @@ test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
         console.log('Sent notification ID:', sentNotificationId);
       }
       
-      await adminPage.waitForTimeout(1000);
+      await adminPage.waitForLoadState('networkidle');
     }
   });
 
@@ -329,7 +325,7 @@ test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
     const broadcastsTab = adminPage.locator('button:has-text("broadcasts"), a:has-text("broadcasts")');
     if (await broadcastsTab.first().isVisible().catch(() => false)) {
       await broadcastsTab.first().click();
-      await adminPage.waitForTimeout(1000);
+      await adminPage.waitForLoadState('networkidle');
       
       // Should see the broadcast in list
       const broadcastItem = adminPage.locator(`text=${testBroadcastTitle}`);
@@ -346,9 +342,7 @@ test.describe('Phase 2: Admin Sends Broadcast Notification', () => {
 // PHASE 3: ADMIN SCHEDULES NOTIFICATION
 // ============================================
 test.describe('Phase 3: Admin Schedules Future Notification', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -367,7 +361,7 @@ test.describe('Phase 3: Admin Schedules Future Notification', () => {
     const sendBtn = adminPage.locator('button:has-text("Send Notification")');
     if (await sendBtn.isVisible().catch(() => false)) {
       await sendBtn.click();
-      await adminPage.waitForTimeout(500);
+      await adminPage.waitForLoadState('networkidle');
     }
     // Verify notification page is still loaded
     await expect(adminPage.locator('main').first()).toBeVisible();
@@ -402,7 +396,7 @@ test.describe('Phase 3: Admin Schedules Future Notification', () => {
     
     if (await scheduleBtn.isVisible()) {
       await scheduleBtn.click();
-      await adminPage.waitForTimeout(1000);
+      await adminPage.waitForLoadState('networkidle');
     }
   });
 
@@ -427,9 +421,7 @@ test.describe('Phase 3: Admin Schedules Future Notification', () => {
 // PHASE 4: CUSTOMER RECEIVES NOTIFICATIONS
 // ============================================
 test.describe('Phase 4: Customer Receives & Views Notifications', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let customerPage: Page;
+let customerPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -468,7 +460,7 @@ test.describe('Phase 4: Customer Receives & Views Notifications', () => {
     
     if (await notificationBell.isVisible()) {
       await notificationBell.click();
-      await customerPage.waitForTimeout(1000);
+      await customerPage.waitForLoadState('networkidle');
     } else {
       // Navigate to notifications page
       await customerPage.goto(`${FRONTEND_URL}/notifications`);
@@ -490,7 +482,7 @@ test.describe('Phase 4: Customer Receives & Views Notifications', () => {
     if (await notification.isVisible()) {
       // Click to mark as read
       await notification.click();
-      await customerPage.waitForTimeout(500);
+      await customerPage.waitForLoadState('networkidle');
     }
   });
 

@@ -27,10 +27,10 @@ export default defineConfig({
   expect: {
     timeout: 15000
   },
-  fullyParallel: false, // Run sequentially to avoid auth conflicts
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 1, // One retry for flaky network tests
-  workers: 1, // Single worker to avoid session conflicts
+  workers: process.env.CI ? 4 : undefined,
   reporter: [
     ['list'],
     ['html', { open: 'never' }],

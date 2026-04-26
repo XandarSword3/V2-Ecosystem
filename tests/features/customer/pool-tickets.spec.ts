@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 const FRONTEND = 'http://localhost:3000';
 const API = 'http://localhost:3005/api';
@@ -14,10 +14,10 @@ const SESSION_CARD_SELECTOR = [
   'article:has-text("Session")'
 ].join(', ');
 
-const getSessionCards = (page: import('@playwright/test').Page) =>
+const getSessionCards = (page: import('../../fixtures/auth.fixture').Page) =>
   page.locator(SESSION_CARD_SELECTOR).filter({ hasText: /pool|session|swim|available|spots|am|pm/i });
 
-const openFirstSession = async (page: import('@playwright/test').Page) => {
+const openFirstSession = async (page: import('../../fixtures/auth.fixture').Page) => {
   const sessions = getSessionCards(page);
   await expect(sessions.first()).toBeVisible();
   await sessions.first().click();

@@ -12,7 +12,7 @@
  * 5. Midnight Luxe Hotel — Midnight Sky
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures/auth.fixture';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -311,7 +311,7 @@ async function cleanGoto(page: Page, url: string, waitUntil: 'domcontentloaded' 
     });
   } catch { /* no page context yet */ }
   await page.goto(url, { waitUntil });
-  await page.waitForTimeout(2000);
+  await page.waitForLoadState('networkidle');
 }
 
 /** Navigate to admin page.
@@ -335,7 +335,7 @@ async function expandSidebarAndClick(page: Page, targetHref: string): Promise<bo
   const targetLink = page.locator(`aside a[href="${targetHref}"]`).first();
   if (await targetLink.isVisible().catch(() => false)) {
     await targetLink.click();
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     console.log(`[nav] Clicked existing visible link: ${targetHref}`);
     return true;
   }
@@ -349,7 +349,7 @@ async function expandSidebarAndClick(page: Page, targetHref: string): Promise<bo
     const systemBtn = page.locator('aside button').filter({ hasText: /^System$/i }).first();
     if (await systemBtn.isVisible().catch(() => false)) {
       await systemBtn.click();
-      await page.waitForTimeout(600);
+      await page.waitForLoadState('networkidle');
     } else {
       console.log('[nav] System button not visible in sidebar');
       return false;
@@ -359,7 +359,7 @@ async function expandSidebarAndClick(page: Page, targetHref: string): Promise<bo
   // Check if target link is now visible (it's in System's direct children, not in Settings)
   if (await targetLink.isVisible().catch(() => false)) {
     await targetLink.click();
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     console.log(`[nav] Clicked link after System expand: ${targetHref}`);
     return true;
   }
@@ -372,14 +372,14 @@ async function expandSidebarAndClick(page: Page, targetHref: string): Promise<bo
     // Settings is collapsed — click to expand
     if (await settingsBtn.isVisible().catch(() => false)) {
       await settingsBtn.click();
-      await page.waitForTimeout(600);
+      await page.waitForLoadState('networkidle');
     }
   }
 
   // Final check for target link
   if (await targetLink.isVisible().catch(() => false)) {
     await targetLink.click();
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     console.log(`[nav] Clicked link after Settings expand: ${targetHref}`);
     return true;
   }
@@ -408,13 +408,13 @@ async function searchNav(page: Page, targetHref: string): Promise<boolean> {
   
   try {
     await searchInput.fill(searchTerm);
-    await page.waitForTimeout(800);
+    await page.waitForLoadState('networkidle');
 
     // Look for the target link in search results
     const resultLink = page.locator(`aside a[href="${targetHref}"]`).first();
     if (await resultLink.isVisible().catch(() => false)) {
       await resultLink.click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
       
       // Clear search query (sidebar might still show search results)
       try { await searchInput.fill(''); } catch { /* ignore */ }
@@ -442,7 +442,7 @@ async function adminNav(page: Page, url: string, tokens?: any, user?: any, waitF
   if (!initialAdminLoadDone) {
     // FIRST admin load: cleanGoto prevents hydration mismatch
     await cleanGoto(page, '/admin/settings');
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     initialAdminLoadDone = true;
 
     // If target is different from /admin/settings, navigate via sidebar
@@ -479,7 +479,7 @@ async function adminNav(page: Page, url: string, tokens?: any, user?: any, waitF
           const tryAgain = page.getByRole('button', { name: 'Try Again' });
           if (await tryAgain.isVisible().catch(() => false)) {
             await tryAgain.click();
-            await page.waitForTimeout(2000);
+            await page.waitForLoadState('networkidle');
           }
         } catch { /* no error boundary */ }
       }
@@ -504,7 +504,7 @@ async function step1_GeneralAndContact(page: Page, b: BrandConfig, n: number, au
   log.push(`### Step 1: General Settings & Contact`);
 
   await adminNav(page, '/admin/settings', auth.tokens, auth.user, 'Resort Name');
-  await page.waitForTimeout(1000);
+  await page.waitForLoadState('networkidle');
 
   const nameField = page.getByPlaceholder('Enter your resort name');
   await nameField.fill(b.name);
@@ -522,7 +522,7 @@ async function step1_GeneralAndContact(page: Page, b: BrandConfig, n: number, au
 
   const contactTab = page.getByRole('button', { name: 'Contact' });
   await contactTab.click();
-  await page.waitForTimeout(500);
+  await page.waitForLoadState('networkidle');
 
   const phoneField = page.getByPlaceholder('+1 (555) 123-4567');
   await phoneField.fill(b.phone);
@@ -540,7 +540,7 @@ async function step1_GeneralAndContact(page: Page, b: BrandConfig, n: number, au
 
   const saveBtn = page.getByRole('button', { name: 'Save' }).first();
   await saveBtn.click();
-  await page.waitForTimeout(3000);
+  await page.waitForLoadState('networkidle');
 
   const bodyText = await page.textContent('body');
   const saved = bodyText?.toLowerCase().includes('saved') || bodyText?.toLowerCase().includes('success');
@@ -591,7 +591,7 @@ async function step2_Appearance(page: Page, b: BrandConfig, n: number, auth: any
   } catch {
     log.push(`  - ⚠️ Theme button "${b.themeName}" not found`);
   }
-  await page.waitForTimeout(500);
+  await page.waitForLoadState('networkidle');
 
   // Weather location
   try {
@@ -626,13 +626,13 @@ async function step2_Appearance(page: Page, b: BrandConfig, n: number, auth: any
       const themeBtn2 = page.locator(`button:has-text("${b.themeName}")`).first();
       if (await themeBtn2.isVisible()) {
         await themeBtn2.click();
-        await page.waitForTimeout(300);
+        await page.waitForLoadState('networkidle');
       }
     }
     
     if (await saveBtn.isEnabled()) {
       await saveBtn.click();
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
       log.push(`  - ✅ Appearance saved`);
     } else {
       log.push(`  - ⚠️ Save still disabled`);
@@ -674,7 +674,7 @@ async function step3_Footer(page: Page, b: BrandConfig, n: number, auth: any): P
   try {
     // The copyright field is in a card titled "Copyright"
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Find all visible inputs and textareas
     const allInputs = page.getByRole('textbox');
@@ -699,7 +699,7 @@ async function step3_Footer(page: Page, b: BrandConfig, n: number, auth: any): P
   try {
     await saveBtn3.waitFor({ state: 'visible', timeout: 10000 });
     await saveBtn3.click();
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     log.push(`  - ✅ Footer saved`);
   } catch {
     log.push(`  - ⚠️ Footer save button not found`);
@@ -720,7 +720,7 @@ async function step4_Homepage(page: Page, b: BrandConfig, n: number, auth: any):
   log.push(`  - [DEBUG] URL after nav: ${page.url()}`);
   
   // Wait longer for this page to load
-  await page.waitForTimeout(3000);
+  await page.waitForLoadState('networkidle');
   
   await ss(page, `${n}-04-debug-homepage-load`);
   
@@ -768,7 +768,7 @@ async function step4_Homepage(page: Page, b: BrandConfig, n: number, auth: any):
     const ctaTab = page.getByRole('button', { name: 'Call to Action' });
     await ctaTab.waitFor({ state: 'visible', timeout: 10000 });
     await ctaTab.click();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
 
     const ctaInputs = page.getByRole('textbox');
     const ctaCount = await ctaInputs.count();
@@ -793,7 +793,7 @@ async function step4_Homepage(page: Page, b: BrandConfig, n: number, auth: any):
     const saveBtn = page.locator('button:has-text("Save")').last();
     await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
     await saveBtn.click();
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     log.push(`  - ✅ Homepage saved`);
   } catch {
     log.push(`  - ⚠️ Homepage save button error`);
@@ -813,7 +813,7 @@ async function step5_Terminology(page: Page, b: BrandConfig, n: number, auth: an
   
   log.push(`  - [DEBUG] URL after nav: ${page.url()}`);
   
-  await page.waitForTimeout(3000);
+  await page.waitForLoadState('networkidle');
   
   await ss(page, `${n}-05-debug-terminology-load`);
   
@@ -859,7 +859,7 @@ async function step5_Terminology(page: Page, b: BrandConfig, n: number, auth: an
   try {
     await saveBtn5.waitFor({ state: 'visible', timeout: 10000 });
     await saveBtn5.click();
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     log.push(`  - ✅ Terminology saved`);
   } catch {
     log.push(`  - ⚠️ Terminology save issue`);
@@ -880,7 +880,7 @@ async function verifyCustomer(page: Page, b: BrandConfig, n: number): Promise<st
   await page.context().clearCookies();
 
   await cleanGoto(page, '/', 'networkidle');
-  await page.waitForTimeout(1000);
+  await page.waitForLoadState('networkidle');
 
   const title = await page.title();
   log.push(`  - Title: "${title}" ${title.includes(b.name) ? '✅' : '❌'}`);
@@ -962,7 +962,7 @@ async function verifyAdmin(page: Page, b: BrandConfig, n: number): Promise<strin
     if (!searchOk) {
       await cleanGoto(page, p.url);
     }
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     const text = await page.textContent('body') || '';
     log.push(`  - ${p.name}: ${p.pattern.test(text) ? '✅' : '⚠️'}`);
     await ss(page, `${n}-admin-${p.name.toLowerCase()}`);

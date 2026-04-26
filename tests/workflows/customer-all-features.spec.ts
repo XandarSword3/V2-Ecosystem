@@ -16,7 +16,7 @@
  * - Language Switching
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -43,14 +43,14 @@ async function loginAsCustomer(page: Page): Promise<boolean> {
     await page.locator('input[type="password"]').fill(CUSTOMER_CREDENTIALS.password);
     
     // Wait for form to be ready
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Click login button
     const loginButton = page.getByRole('button', { name: /sign in|login/i });
     await loginButton.click();
     
     // Wait for redirect
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     return true;
   } catch (error) {
     console.error('Customer login failed:', error);
@@ -60,16 +60,14 @@ async function loginAsCustomer(page: Page): Promise<boolean> {
 
 async function navigateTo(page: Page, path: string): Promise<void> {
   await page.goto(`${FRONTEND_URL}${path}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.waitForTimeout(500);
+  await page.waitForLoadState('networkidle');
 }
 
 // ============================================
 // SECTION 1: HOMEPAGE & NAVIGATION
 // ============================================
 test.describe('1. Homepage & Navigation', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let page: Page;
+let page: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -149,9 +147,7 @@ test.describe('1. Homepage & Navigation', () => {
 // SECTION 2: RESTAURANT MENU & ORDERING
 // ============================================
 test.describe('2. Restaurant Menu & Ordering', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let page: Page;
+let page: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -168,7 +164,7 @@ test.describe('2. Restaurant Menu & Ordering', () => {
   });
 
   test('2.2 View menu categories', async () => {
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     const categories = page.locator('[data-testid="category"], [role="tab"], button:has-text("Main"), button:has-text("Appetizer")');
     // Verify restaurant page has loaded with content
     await expect(page.locator('main').first()).toBeVisible();
@@ -178,7 +174,7 @@ test.describe('2. Restaurant Menu & Ordering', () => {
     const category = page.locator('[data-testid="category"], [role="tab"]').first();
     if (await category.isVisible()) {
       await category.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -192,7 +188,7 @@ test.describe('2. Restaurant Menu & Ordering', () => {
     const menuItem = page.locator('[class*="menu-item"], [class*="MenuItem"]').first();
     if (await menuItem.isVisible()) {
       await menuItem.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -200,12 +196,12 @@ test.describe('2. Restaurant Menu & Ordering', () => {
     const filterButton = page.locator('button:has-text("Filter"), [data-testid="filter"]');
     if (await filterButton.isVisible()) {
       await filterButton.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
       
       const vegetarianFilter = page.locator('text=/vegetarian/i');
       if (await vegetarianFilter.isVisible()) {
         await vegetarianFilter.click();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle');
       }
     }
   });
@@ -214,7 +210,7 @@ test.describe('2. Restaurant Menu & Ordering', () => {
     const addButton = page.locator('button:has-text("Add"), [data-testid="add-to-cart"]').first();
     if (await addButton.isVisible()) {
       await addButton.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -222,7 +218,7 @@ test.describe('2. Restaurant Menu & Ordering', () => {
     const cartButton = page.locator('[data-testid="cart"], button:has-text("Cart"), [class*="cart"]').first();
     if (await cartButton.isVisible()) {
       await cartButton.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -230,13 +226,13 @@ test.describe('2. Restaurant Menu & Ordering', () => {
     const plusButton = page.locator('button:has-text("+")').first();
     if (await plusButton.isVisible()) {
       await plusButton.click();
-      await page.waitForTimeout(300);
+      await page.waitForLoadState('networkidle');
     }
     
     const minusButton = page.locator('button:has-text("-")').first();
     if (await minusButton.isVisible()) {
       await minusButton.click();
-      await page.waitForTimeout(300);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -265,9 +261,7 @@ test.describe('2. Restaurant Menu & Ordering', () => {
 // SECTION 3: CHALETS BROWSING & BOOKING
 // ============================================
 test.describe('3. Chalets Browsing & Booking', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let page: Page;
+let page: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -284,7 +278,7 @@ test.describe('3. Chalets Browsing & Booking', () => {
   });
 
   test('3.2 View chalet cards', async () => {
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     // Check for any chalet-related content
     const pageContent = page.locator('text=/Chalet|Book|Stay|Night|Reserve/i');
     const count = await pageContent.count();
@@ -310,7 +304,7 @@ test.describe('3. Chalets Browsing & Booking', () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 7);
       await checkIn.fill(tomorrow.toISOString().split('T')[0]);
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -318,7 +312,7 @@ test.describe('3. Chalets Browsing & Booking', () => {
     const checkButton = page.locator('button:has-text("Check"), button:has-text("Search"), button:has-text("Find")').first();
     if (await checkButton.isVisible()) {
       await checkButton.click();
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -343,7 +337,7 @@ test.describe('3. Chalets Browsing & Booking', () => {
       const nextButton = page.locator('button:has-text("Next"), [class*="next"]').first();
       if (await nextButton.isVisible()) {
         await nextButton.click();
-        await page.waitForTimeout(300);
+        await page.waitForLoadState('networkidle');
       }
     }
   });
@@ -358,7 +352,7 @@ test.describe('3. Chalets Browsing & Booking', () => {
     const availableDate = page.locator('[class*="available"]:not([class*="disabled"])').first();
     if (await availableDate.isVisible()) {
       await availableDate.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -374,9 +368,7 @@ test.describe('3. Chalets Browsing & Booking', () => {
 // SECTION 4: POOL TICKETS
 // ============================================
 test.describe('4. Pool Tickets', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let page: Page;
+let page: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -398,7 +390,7 @@ test.describe('4. Pool Tickets', () => {
   });
 
   test('4.3 View available sessions', async () => {
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     const sessions = page.locator('text=/session|morning|afternoon|evening|ticket|book|available/i');
     const count = await sessions.count();
     expect(count).toBeGreaterThan(0);
@@ -415,7 +407,7 @@ test.describe('4. Pool Tickets', () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       await datePicker.fill(tomorrow.toISOString().split('T')[0]);
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -423,7 +415,7 @@ test.describe('4. Pool Tickets', () => {
     const sessionButton = page.locator('button:has-text("Morning"), button:has-text("Afternoon"), [class*="session"]').first();
     if (await sessionButton.isVisible()) {
       await sessionButton.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -432,7 +424,7 @@ test.describe('4. Pool Tickets', () => {
     if (await plusButton.isVisible()) {
       await plusButton.click();
       await plusButton.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -454,9 +446,7 @@ test.describe('4. Pool Tickets', () => {
 // SECTION 5: AUTHENTICATION
 // ============================================
 test.describe('5. Authentication', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let page: Page;
+let page: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -493,7 +483,7 @@ test.describe('5. Authentication', () => {
     await page.fill('input[type="email"]', CUSTOMER_CREDENTIALS.email);
     await page.fill('input[type="password"]', CUSTOMER_CREDENTIALS.password);
     await page.click('button[type="submit"]');
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
   });
 });
 
@@ -501,9 +491,7 @@ test.describe('5. Authentication', () => {
 // SECTION 6: PROFILE MANAGEMENT
 // ============================================
 test.describe('6. Profile Management', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let page: Page;
+let page: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -529,7 +517,7 @@ test.describe('6. Profile Management', () => {
     const editButton = page.locator('button:has-text("Edit"), button:has-text("Update")').first();
     if (await editButton.isVisible()) {
       await editButton.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
       
       // Cancel without saving
       const cancelButton = page.locator('button:has-text("Cancel")').first();
@@ -556,9 +544,7 @@ test.describe('6. Profile Management', () => {
 // SECTION 7: BOOKING HISTORY
 // ============================================
 test.describe('7. Booking History', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let page: Page;
+let page: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -576,7 +562,7 @@ test.describe('7. Booking History', () => {
   });
 
   test('7.2 View booking list', async () => {
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     const pageContent = page.locator('text=/booking|reservation|order|no booking|no data/i');
     const count = await pageContent.count();
     expect(count).toBeGreaterThan(0);
@@ -586,7 +572,7 @@ test.describe('7. Booking History', () => {
     const statusFilter = page.locator('select, button:has-text("Status"), button:has-text("All")').first();
     if (await statusFilter.isVisible()) {
       await statusFilter.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -594,7 +580,7 @@ test.describe('7. Booking History', () => {
     const bookingCard = page.locator('[class*="booking-card"], tr').first();
     if (await bookingCard.isVisible()) {
       await bookingCard.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -604,7 +590,7 @@ test.describe('7. Booking History', () => {
   });
 
   test('7.6 View order list', async () => {
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     // Check for any order-related content
     const pageContent = await page.locator('text=/order|no order|empty/i').first().isVisible().catch(() => false);
     expect(pageContent).toBeTruthy();
@@ -616,7 +602,7 @@ test.describe('7. Booking History', () => {
   });
 
   test('7.8 View ticket list', async () => {
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     // Check for any ticket-related content
     const pageContent = await page.locator('text=/ticket|pass|pool|no ticket|empty/i').first().isVisible().catch(() => false);
     expect(pageContent).toBeTruthy();
@@ -627,9 +613,7 @@ test.describe('7. Booking History', () => {
 // SECTION 8: REVIEWS & RATINGS
 // ============================================
 test.describe('8. Reviews & Ratings', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let page: Page;
+let page: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -647,7 +631,7 @@ test.describe('8. Reviews & Ratings', () => {
   });
 
   test('8.2 View review list', async () => {
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     const pageContent = page.locator('text=/review|rating|no review|no data|empty/i');
     const count = await pageContent.count();
     expect(count).toBeGreaterThan(0);
@@ -657,7 +641,7 @@ test.describe('8. Reviews & Ratings', () => {
     const reviewButton = page.locator('button:has-text("Review"), button:has-text("Rate")').first();
     if (await reviewButton.isVisible()) {
       await reviewButton.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
       
       // Cancel
       const cancelButton = page.locator('button:has-text("Cancel")').first();
@@ -678,9 +662,7 @@ test.describe('8. Reviews & Ratings', () => {
 // SECTION 9: NOTIFICATIONS
 // ============================================
 test.describe('9. Customer Notifications', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let page: Page;
+let page: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -696,7 +678,7 @@ test.describe('9. Customer Notifications', () => {
     const bell = page.locator('[data-testid="notifications"], button[aria-label*="notification" i], [class*="notification-bell"]').first();
     if (await bell.isVisible()) {
       await bell.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -723,9 +705,7 @@ test.describe('9. Customer Notifications', () => {
 // SECTION 10: LANGUAGE & ACCESSIBILITY
 // ============================================
 test.describe('10. Language & Accessibility', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let page: Page;
+let page: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -745,7 +725,7 @@ test.describe('10. Language & Accessibility', () => {
 
   test('10.2 Switch to Arabic', async () => {
     await navigateTo(page, '/ar');
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     const htmlDir = await page.locator('html').getAttribute('dir');
     // Accept either rtl or no dir attribute (if site doesn't support Arabic)
     expect(htmlDir === 'rtl' || htmlDir === null || htmlDir === 'ltr').toBeTruthy();
@@ -776,7 +756,7 @@ test.describe('11. Responsive Design', () => {
     const hamburger = page.locator('[class*="hamburger"], button[aria-label*="menu" i], [class*="mobile-menu"]');
     if (await hamburger.first().isVisible()) {
       await hamburger.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
   });
 
@@ -805,7 +785,7 @@ test.describe('12. Logout', () => {
     const logoutButton = page.locator('button:has-text("Logout"), button:has-text("Sign Out"), a:has-text("Logout")').first();
     if (await logoutButton.isVisible()) {
       await logoutButton.click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
       expect(page.url()).toMatch(/\/login|\/$/);
     }
   });

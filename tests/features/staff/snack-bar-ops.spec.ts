@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 test.describe('Snack Bar Operations [STF-SNCK]', () => {
   test.beforeEach(async ({ page }) => {
@@ -30,7 +30,7 @@ test.describe('Snack Bar Operations [STF-SNCK]', () => {
     const search = page.locator('input[type="search"], input[placeholder*="earch"], [class*="search"] input, [class*="filter"] input');
     await expect(search.first()).toBeVisible();
     await search.first().fill('test');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     const results = page.locator('[class*="order"], [class*="list"], [class*="card"], tbody');
     await expect(results.first()).toBeVisible();
   });

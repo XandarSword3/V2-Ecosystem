@@ -10,7 +10,7 @@
  * This tests the complete lifecycle with role-based interactions.
  */
 
-import { test, expect, Page, BrowserContext } from '@playwright/test';
+import { test, expect, Page, BrowserContext } from '../fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
@@ -53,14 +53,14 @@ async function login(page: Page, email: string, password: string): Promise<boole
     await page.locator('input[type="password"]').fill(password);
     
     // Wait for form to be ready
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Click login button
     const loginButton = page.getByRole('button', { name: /sign in|login/i });
     await loginButton.click();
     
     // Wait for redirect
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     return true;
   } catch (error) {
     console.error('Login failed:', error);
@@ -82,9 +82,7 @@ async function getAuthToken(page: Page): Promise<string | null> {
 // PHASE 1: CUSTOMER PLACES ORDER
 // ============================================
 test.describe('Phase 1: Customer Places Order', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let customerPage: Page;
+let customerPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -111,7 +109,7 @@ test.describe('Phase 1: Customer Places Order', () => {
     await expect(customerPage.locator('main').first()).toBeVisible();
     
     // Wait for content to load
-    await customerPage.waitForTimeout(2000);
+    await customerPage.waitForLoadState('networkidle');
     
     // Check that the restaurant page has loaded - look for heading or menu items
     const pageContent = customerPage.locator('text=/Restaurant|Menu|Order|Categories|Popular|Item/i').first();
@@ -124,7 +122,7 @@ test.describe('Phase 1: Customer Places Order', () => {
     
     if (await categoryButton.isVisible()) {
       await categoryButton.click();
-      await customerPage.waitForTimeout(1000);
+      await customerPage.waitForLoadState('networkidle');
     }
   });
 
@@ -136,12 +134,12 @@ test.describe('Phase 1: Customer Places Order', () => {
     if (count > 0) {
       // Add first item
       await addButtons.first().click();
-      await customerPage.waitForTimeout(500);
+      await customerPage.waitForLoadState('networkidle');
       
       // Add second item if available
       if (count > 1) {
         await addButtons.nth(1).click();
-        await customerPage.waitForTimeout(500);
+        await customerPage.waitForLoadState('networkidle');
       }
       
       // Verify cart has items
@@ -159,7 +157,7 @@ test.describe('Phase 1: Customer Places Order', () => {
     
     if (await cartButton.isVisible()) {
       await cartButton.click();
-      await customerPage.waitForTimeout(1000);
+      await customerPage.waitForLoadState('networkidle');
       
       // Cart drawer or page should be visible
       await expect(customerPage.locator('main').first()).toBeVisible();
@@ -196,7 +194,7 @@ test.describe('Phase 1: Customer Places Order', () => {
         console.log('Created order ID:', createdOrderId);
       }
       
-      await customerPage.waitForTimeout(2000);
+      await customerPage.waitForLoadState('networkidle');
       
       // Should see confirmation or be redirected
       const confirmation = customerPage.locator('text=/order.*placed|order.*confirmed|thank you|success/i');
@@ -208,7 +206,7 @@ test.describe('Phase 1: Customer Places Order', () => {
     // Navigate to orders page
     await customerPage.goto(`${FRONTEND_URL}/orders`);
     await customerPage.waitForLoadState('load');
-    await customerPage.waitForTimeout(1000);
+    await customerPage.waitForLoadState('networkidle');
     
     // Check for any order content or main page
     await expect(customerPage.locator('main').first()).toBeVisible({ timeout: 10000 });
@@ -219,9 +217,7 @@ test.describe('Phase 1: Customer Places Order', () => {
 // PHASE 2: STAFF PROCESSES ORDER
 // ============================================
 test.describe('Phase 2: Staff Processes Order', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -252,7 +248,7 @@ test.describe('Phase 2: Staff Processes Order', () => {
   });
 
   test('Step 2.3: Staff sees pending orders', async () => {
-    await staffPage.waitForTimeout(1000);
+    await staffPage.waitForLoadState('networkidle');
     // Look for pending/new orders or any content
     const pageContent = staffPage.locator('text=/pending|new|processing|no orders|order|empty/i').first();
     await expect(pageContent).toBeVisible({ timeout: 10000 });
@@ -271,7 +267,7 @@ test.describe('Phase 2: Staff Processes Order', () => {
         await statusButton.click();
       }
       
-      await staffPage.waitForTimeout(1000);
+      await staffPage.waitForLoadState('networkidle');
       
       // Verify status changed
       const preparingIndicator = staffPage.locator('text=/preparing|in progress/i');
@@ -291,7 +287,7 @@ test.describe('Phase 2: Staff Processes Order', () => {
         await readyButton.click();
       }
       
-      await staffPage.waitForTimeout(1000);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -309,9 +305,7 @@ test.describe('Phase 2: Staff Processes Order', () => {
 // PHASE 3: ADMIN REVIEWS ANALYTICS
 // ============================================
 test.describe('Phase 3: Admin Reviews Order', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -359,7 +353,7 @@ test.describe('Phase 3: Admin Reviews Order', () => {
     
     if (await statusFilter.isVisible()) {
       await statusFilter.selectOption({ index: 1 });
-      await adminPage.waitForTimeout(1000);
+      await adminPage.waitForLoadState('networkidle');
     }
     
     // Try date filter
@@ -367,14 +361,14 @@ test.describe('Phase 3: Admin Reviews Order', () => {
     if (await dateFilter.isVisible()) {
       const today = new Date().toISOString().split('T')[0];
       await dateFilter.fill(today);
-      await adminPage.waitForTimeout(1000);
+      await adminPage.waitForLoadState('networkidle');
     }
   });
 
   test('Step 3.5: Admin views reports', async () => {
     await adminPage.goto(`${FRONTEND_URL}/admin/reports`);
     await adminPage.waitForLoadState('load');
-    await adminPage.waitForTimeout(1000);
+    await adminPage.waitForLoadState('networkidle');
     
     // Check for any report-related content
     const pageContent = adminPage.locator('text=/Report|Analytics|Revenue|Data|Overview/i').first();
@@ -393,13 +387,13 @@ test.describe('Phase 3: Admin Reviews Order', () => {
   test('Step 3.7: Admin sends notification about order', async () => {
     await adminPage.goto(`${FRONTEND_URL}/admin/settings/notifications`);
     await adminPage.waitForLoadState('load');
-    await adminPage.waitForTimeout(1000);
+    await adminPage.waitForLoadState('networkidle');
     
     // Open send notification modal if button exists
     const sendButton = adminPage.locator('button:has-text("Send Notification"), button:has-text("Send"), button:has-text("New")');
     if (await sendButton.first().isVisible().catch(() => false)) {
       await sendButton.first().click();
-      await adminPage.waitForTimeout(500);
+      await adminPage.waitForLoadState('networkidle');
       
       // Fill notification
       const titleInput = adminPage.locator('input[placeholder*="title" i]');

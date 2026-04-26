@@ -6,25 +6,36 @@ import { toast } from 'sonner';
 import { SessionAccessDashboard } from '@/components/staff/SessionAccessDashboard';
 import { KitchenView } from '@/components/staff/KitchenView';
 import { MultiDayBookingDashboard } from './components/MultiDayBookingDashboard';
+import { MembershipDashboard } from '@/components/staff/MembershipDashboard';
+import { GenericModuleDashboard } from '@/components/staff/GenericModuleDashboard';
+
+interface ModuleData {
+  id: string;
+  name: string;
+  slug: string;
+  template_type: string;
+  description?: string;
+  is_active: boolean;
+}
 
 export default function ModulePage({ params }: { params: { slug: string } }) {
   const slug = params.slug;
-  const [moduleId, setModuleId] = useState<string | null>(null);
-  const [moduleName, setModuleName] = useState<string>('');
-  const [templateType, setTemplateType] = useState<string>('');
+  const [module, setModule] = useState<ModuleData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchModule = async () => {
       try {
         const response = await api.get(`/admin/modules/${slug}`);
         if (response.data.success) {
-            setModuleId(response.data.data.id);
-            setModuleName(response.data.data.name);
-            setTemplateType(response.data.data.template_type);
+          setModule(response.data.data);
+        } else {
+          setError('Module not found');
         }
-      } catch (error) {
-        console.error('Failed to fetch module:', error);
+      } catch (err) {
+        console.error('Failed to fetch module:', err);
+        setError('Failed to load module details');
         toast.error('Failed to load module details');
       } finally {
         setIsLoading(false);
@@ -37,34 +48,59 @@ export default function ModulePage({ params }: { params: { slug: string } }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
       </div>
     );
   }
 
-  if (!moduleId) {
+  if (error || !module) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 text-lg mb-2">{error ?? 'Module not found'}</p>
+          <p className="text-gray-400 text-sm">Slug: {slug}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!module.is_active) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 text-lg">This module is currently disabled.</p>
+          <p className="text-gray-400 text-sm mt-1">{module.name}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Route to the correct staff dashboard based on template_type
+  switch (module.template_type) {
+    case 'menu_service':
+      return <KitchenView slug={slug} moduleName={module.name} moduleId={module.id} />;
+
+    case 'session_access':
+      return <SessionAccessDashboard slug={slug} moduleName={module.name} />;
+
+    case 'multi_day_booking':
+      return <MultiDayBookingDashboard slug={slug} moduleName={module.name} moduleId={module.id} />;
+
+    case 'ongoing_entitlement':
+      // Pool memberships, gym memberships, season passes, VIP clubs
+      return <MembershipDashboard slug={slug} moduleName={module.name} moduleId={module.id} />;
+
+    default:
+      // Generic fallback — shows module info and allows basic management
+      // Prevents the "blank page" problem for newly created modules
       return (
-          <div className="min-h-screen flex items-center justify-center">
-              <p className="text-gray-500">Module not found.</p>
-          </div>
+        <GenericModuleDashboard
+          slug={slug}
+          moduleName={module.name}
+          moduleId={module.id}
+          templateType={module.template_type}
+          description={module.description}
+        />
       );
   }
-
-  if (templateType === 'menu_service') {
-      return <KitchenView slug={slug} moduleName={moduleName} moduleId={moduleId} />;
-  }
-
-  if (templateType === 'session_access') {
-      return <SessionAccessDashboard slug={slug} moduleName={moduleName} />;
-  }
-  
-  if (templateType === 'multi_day_booking') {
-       return <MultiDayBookingDashboard slug={slug} moduleName={moduleName} moduleId={moduleId} />;
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Unsupported Module Type: {templateType}</p>
-    </div>
-  );
 }

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Iteration 1 - Restaurant Order Price Consistency', () => {
   
@@ -9,14 +9,14 @@ test.describe('Iteration 1 - Restaurant Order Price Consistency', () => {
     
     // Click Add to Cart on the first menu item (Test item with sale price $9 / regular $10)
     await page.getByRole('button', { name: 'Add to Cart' }).first().click();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     
     // Click Add to Cart in the customization modal
     const modalAddBtn = page.getByRole('button', { name: /Add to Cart \• \$/ });
     if (await modalAddBtn.isVisible({ timeout: 2000 })) {
       await modalAddBtn.click();
     }
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     
     // Go to checkout
     await page.getByRole('link', { name: 'Checkout' }).click();
@@ -31,13 +31,13 @@ test.describe('Iteration 1 - Restaurant Order Price Consistency', () => {
     
     // Fill order details - click Place Order first to trigger validation
     await page.getByRole('button', { name: 'Place Order' }).click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     await page.getByPlaceholder('Enter your full name').fill('Playwright Test User');
     await page.getByPlaceholder('Enter your phone number').fill('+1111111111');
     await page.getByPlaceholder('Enter your table number').fill('99');
     await page.getByRole('button', { name: 'Continue to Payment' }).click({ timeout: 10000 });
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     
     // Place order
     await page.getByRole('button', { name: 'Place Order' }).click();

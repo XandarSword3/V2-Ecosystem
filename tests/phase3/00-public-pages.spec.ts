@@ -9,7 +9,7 @@
  * NOTE: /forgot-password and /giftcards routes return 404 in current build.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 import { waitForPageLoad, isVisible, screenshot } from './helpers';
 
 test.describe('Public Pages — No Auth Required', () => {
@@ -43,7 +43,7 @@ test.describe('Public Pages — No Auth Required', () => {
       const hasFooter = await isVisible(page, 'footer', 10000);
       if (!hasFooter) {
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
       }
       await screenshot(page, 'homepage-footer');
     });
@@ -90,7 +90,7 @@ test.describe('Public Pages — No Auth Required', () => {
       await page.locator('input[type="password"]').first().fill('wrongpassword');
       await page.locator('button[type="submit"]').first().click();
 
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
       const body = (await page.textContent('body')) || '';
       const hasError = body.toLowerCase().includes('invalid') ||
                        body.toLowerCase().includes('failed') ||
@@ -109,7 +109,7 @@ test.describe('Public Pages — No Auth Required', () => {
       await page.locator('button[type="submit"]').first().click();
 
       // Wait for either redirect or error (CSRF/remote backend may cause failure)
-      await page.waitForTimeout(5000);
+      await page.waitForLoadState('networkidle');
       const currentUrl = page.url();
       const body = (await page.textContent('body')) || '';
       
@@ -170,7 +170,7 @@ test.describe('Public Pages — No Auth Required', () => {
       }
 
       await page.locator('button[type="submit"]').first().click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
 
       const body = (await page.textContent('body')) || '';
       const hasError = body.toLowerCase().includes('match') ||

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('V2 Ecosystem Critical Flows', () => {
   test('Homepage Footer Renders Correctly', async ({ page }) => {

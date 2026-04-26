@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 const BASE_URL = 'http://localhost:3000';
 const API_URL = 'http://localhost:3005';

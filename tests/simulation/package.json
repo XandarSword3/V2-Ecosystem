@@ -15,7 +15,9 @@
     "run:lunch": "ts-node scripts/run-scenario.ts lunch",
     "run:conference": "ts-node scripts/run-scenario.ts conference",
     "run:stress": "ts-node scripts/run-scenario.ts stress",
-    "run:weekend": "ts-node scripts/run-scenario.ts weekend"
+    "run:weekend": "ts-node scripts/run-scenario.ts weekend",
+    "test:race": "ts-node scripts/inventory-race.ts"
+
   },
   "dependencies": {
     "uuid": "^9.0.0"
