@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 
 const FRONTEND_URL =
   process.env.PRODUCTION_FRONTEND_URL ||
@@ -16,7 +16,7 @@ const CRITICAL_ENDPOINTS = [
   '/api/v1/terminology?business_type=resort',
 ];
 
-async function expectNoVisibleText(page: import('@playwright/test').Page, text: string): Promise<void> {
+async function expectNoVisibleText(page: import('../fixtures/auth.fixture').Page, text: string): Promise<void> {
   const visibleCount = await page.locator(`text=${text}`).evaluateAll((nodes) => {
     return nodes.filter((node) => {
       const element = node as HTMLElement;
@@ -35,7 +35,7 @@ test.describe('Smoke - Production Connectivity', () => {
       await page.goto(`${FRONTEND_URL}${path}`, { waitUntil: 'domcontentloaded' });
 
       // Give async API calls enough time to settle and surface fallback UI.
-      await page.waitForTimeout(4000);
+      await page.waitForLoadState('networkidle');
 
       await expectNoVisibleText(page, 'An error occurred');
       await expectNoVisibleText(page, 'Please try again later');

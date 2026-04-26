@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 // Iteration 12  Test Specification
 // BUG-12A: Password reset pages use authApi instead of raw fetch

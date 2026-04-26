@@ -17,7 +17,7 @@
  * Universal Styles: Width, Height, Padding, Border Radius
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from './fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
@@ -99,9 +99,7 @@ async function deleteTestModule(request: any, moduleId: string): Promise<void> {
 // COMPONENT ADDITION TESTS
 // ============================================
 test.describe('Module Builder - All 8 Components', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let moduleId: string;
+let moduleId: string;
   let moduleSlug: string;
 
   test.beforeAll(async ({ request }) => {
@@ -362,9 +360,7 @@ test.describe('Module Builder - All 8 Components', () => {
 // UNIVERSAL STYLING TESTS
 // ============================================
 test.describe('Module Builder - Universal Styling Options', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let moduleId: string;
+let moduleId: string;
   let moduleSlug: string;
 
   test.beforeAll(async ({ request }) => {
@@ -388,7 +384,7 @@ test.describe('Module Builder - Universal Styling Options', () => {
     
     // Add a text block
     await page.getByRole('button', { name: 'Text Block' }).click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Verify block was added - look for text content input or block element
     // The block appears in the canvas after being added
@@ -418,7 +414,7 @@ test.describe('Module Builder - Universal Styling Options', () => {
       const heightOptions = ['auto', '100px', '200px', '300px', '400px', '500px', '100vh'];
       for (const height of heightOptions) {
         await heightSelect.selectOption(height);
-        await page.waitForTimeout(200);
+        await page.waitForLoadState('networkidle');
       }
       
       await heightSelect.selectOption('200px');
@@ -441,7 +437,7 @@ test.describe('Module Builder - Universal Styling Options', () => {
       const paddingOptions = ['0', '8px', '16px', '24px', '32px', '48px'];
       for (const padding of paddingOptions) {
         await paddingSelect.selectOption(padding);
-        await page.waitForTimeout(200);
+        await page.waitForLoadState('networkidle');
       }
       
       await paddingSelect.selectOption('24px');
@@ -464,7 +460,7 @@ test.describe('Module Builder - Universal Styling Options', () => {
       const radiusOptions = ['0', '4px', '8px', '12px', '16px', '9999px'];
       for (const radius of radiusOptions) {
         await radiusSelect.selectOption(radius);
-        await page.waitForTimeout(200);
+        await page.waitForLoadState('networkidle');
       }
       
       await radiusSelect.selectOption('12px');
@@ -479,9 +475,7 @@ test.describe('Module Builder - Universal Styling Options', () => {
 // DRAG & DROP REORDER TESTS
 // ============================================
 test.describe('Module Builder - Drag & Drop Reordering', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let moduleId: string;
+let moduleId: string;
   let moduleSlug: string;
 
   test.beforeAll(async ({ request }) => {
@@ -505,15 +499,15 @@ test.describe('Module Builder - Drag & Drop Reordering', () => {
     
     // Add Hero
     await page.getByRole('button', { name: 'Hero Section' }).click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Add Text Block
     await page.getByRole('button', { name: 'Text Block' }).click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Add Image
     await page.getByRole('button', { name: 'Image' }).click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Look for blocks in the canvas area with more specific selector
     const canvasArea = page.locator('[data-testid="builder-canvas"]').or(page.locator('.builder-canvas')).or(page.locator('main'));
@@ -587,9 +581,7 @@ test.describe('Module Builder - Drag & Drop Reordering', () => {
 // UNDO/REDO TESTS
 // ============================================
 test.describe('Module Builder - Undo/Redo', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let moduleId: string;
+let moduleId: string;
   let moduleSlug: string;
 
   test.beforeAll(async ({ request }) => {
@@ -610,13 +602,13 @@ test.describe('Module Builder - Undo/Redo', () => {
     
     // Add a block
     await page.getByRole('button', { name: 'Hero Section' }).click();
-    await page.waitForTimeout(300);
+    await page.waitForLoadState('networkidle');
     
     const countAfterAdd = await page.locator('.group').count();
     
     // Try keyboard undo
     await page.keyboard.press('Control+z');
-    await page.waitForTimeout(300);
+    await page.waitForLoadState('networkidle');
     
     const countAfterUndo = await page.locator('.group').count();
     
@@ -636,19 +628,19 @@ test.describe('Module Builder - Undo/Redo', () => {
     
     // Add a block
     await page.getByRole('button', { name: 'Text Block' }).click();
-    await page.waitForTimeout(300);
+    await page.waitForLoadState('networkidle');
     
     const countAfterAdd = await page.locator('.group').count();
     
     // Undo
     await page.keyboard.press('Control+z');
-    await page.waitForTimeout(300);
+    await page.waitForLoadState('networkidle');
     
     const countAfterUndo = await page.locator('.group').count();
     
     // Redo
     await page.keyboard.press('Control+Shift+z');
-    await page.waitForTimeout(300);
+    await page.waitForLoadState('networkidle');
     
     const countAfterRedo = await page.locator('.group').count();
     
@@ -667,9 +659,7 @@ test.describe('Module Builder - Undo/Redo', () => {
 // SAVE/LOAD PERSISTENCE TESTS
 // ============================================
 test.describe('Module Builder - Save/Load Persistence', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let moduleId: string;
+let moduleId: string;
   let moduleSlug: string;
 
   test.beforeAll(async ({ request }) => {
@@ -695,7 +685,7 @@ test.describe('Module Builder - Save/Load Persistence', () => {
     const heroBtn = page.getByRole('button', { name: 'Hero Section' });
     await expect(heroBtn).toBeVisible({ timeout: 10000 });
     await heroBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Edit hero title
     await page.locator('.group').first().click();
@@ -753,9 +743,7 @@ test.describe('Module Builder - Save/Load Persistence', () => {
 // PREVIEW MODE TESTS
 // ============================================
 test.describe('Module Builder - Preview Mode', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let moduleId: string;
+let moduleId: string;
   let moduleSlug: string;
 
   test.beforeAll(async ({ request }) => {
@@ -781,7 +769,7 @@ test.describe('Module Builder - Preview Mode', () => {
     const heroBtn = page.getByRole('button', { name: 'Hero Section' });
     await expect(heroBtn).toBeVisible({ timeout: 10000 });
     await heroBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Find preview button - could be icon-only or have text
     const previewBtn = page.getByRole('button', { name: /preview/i }).or(page.locator('button[title*="preview" i]')).or(page.locator('button:has([class*="eye"])')).first();
@@ -790,14 +778,14 @@ test.describe('Module Builder - Preview Mode', () => {
     
     if (isPreviewVisible) {
       await previewBtn.click();
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState('networkidle');
       
       // In preview mode, editing controls might be hidden
       // Try to find exit preview or toggle back
       const exitPreview = page.getByRole('button', { name: /preview|exit|edit/i }).first();
       if (await exitPreview.isVisible({ timeout: 3000 }).catch(() => false)) {
         await exitPreview.click();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle');
       }
       
       // Verify we can still see builder UI - use .first() to avoid strict mode
@@ -813,9 +801,7 @@ test.describe('Module Builder - Preview Mode', () => {
 // ZOOM CONTROLS TESTS
 // ============================================
 test.describe('Module Builder - Zoom Controls', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let moduleId: string;
+let moduleId: string;
   let moduleSlug: string;
 
   test.beforeAll(async ({ request }) => {
@@ -845,14 +831,14 @@ test.describe('Module Builder - Zoom Controls', () => {
       
       // Zoom in
       await zoomInBtn.click();
-      await page.waitForTimeout(300);
+      await page.waitForLoadState('networkidle');
       
       // Verify zoom increased
       const zoomedIn = await zoomDisplay.textContent();
       
       // Zoom out
       await zoomOutBtn.click();
-      await page.waitForTimeout(300);
+      await page.waitForLoadState('networkidle');
       
       // Test passes if controls are interactive
       expect(true).toBe(true);

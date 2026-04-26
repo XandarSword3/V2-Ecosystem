@@ -10,7 +10,7 @@
  * - Multiple items from different modules tracked correctly
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 import { setupApiProxy, screenshot, URLS } from './helpers';
 
 /** Helper: inject a cart state directly into localStorage */
@@ -164,7 +164,7 @@ test.describe('Cart — Proves Real Functionality', () => {
 
     // Refresh the page
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
 
     // PROVE: Items survived the refresh
     const stored = await getCart(page);
@@ -228,7 +228,7 @@ test.describe('Cart — Proves Real Functionality', () => {
 
     // Navigate to cart page
     await page.goto('/restaurant/cart', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
 
     const body = (await page.textContent('body')) || '';
 

@@ -167,7 +167,7 @@ export async function waitForPageLoad(page: Page, opts?: {
   try {
     await page.waitForLoadState('domcontentloaded', { timeout });
     // Brief pause for React hydration
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('networkidle');
   } catch {
     // Tolerate timeout
   }
@@ -359,3 +359,4 @@ export async function getAuthHeaders(page: Page, role: ActorRole = 'admin'): Pro
     'x-csrf-token': csrfToken,
   };
 }
+

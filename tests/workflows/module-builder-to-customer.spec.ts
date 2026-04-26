@@ -1,16 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 
-const BASE = 'http://localhost:3000';
-const API = 'http://localhost:3005/api';
+const BASE = process.env.FRONTEND_URL || 'http://localhost:3000';
+const API = process.env.API_URL || 'http://localhost:3005/api';
 
-test.describe.serial('Module Builder → Customer Experience Workflow', () => {
-  test('Phase 1: Admin creates a new module', async ({ page }) => {
-    // Login as admin
-    await page.goto(`${BASE}/login`);
-    await page.getByLabel(/email/i).fill('admin@v2resort.com');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in|log in|login/i }).click();
-    await page.waitForURL(/\/admin/, { timeout: 10000 });
+test.describe('Module Builder → Customer Experience Workflow', () => {
+  test('Phase 1: Admin creates a new module', async ({ page, auth }) => {
+    await auth.loginAs('admin');
 
     // Navigate to modules
     await page.goto(`${BASE}/admin/modules`);
@@ -21,12 +16,8 @@ test.describe.serial('Module Builder → Customer Experience Workflow', () => {
     expect(body.length).toBeGreaterThan(50);
   });
 
-  test('Phase 2: Admin opens module builder', async ({ page }) => {
-    await page.goto(`${BASE}/login`);
-    await page.getByLabel(/email/i).fill('admin@v2resort.com');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in|log in|login/i }).click();
-    await page.waitForURL(/\/admin/, { timeout: 10000 });
+  test('Phase 2: Admin opens module builder', async ({ page, auth }) => {
+    await auth.loginAs('admin');
 
     // Navigate to modules
     await page.goto(`${BASE}/admin/modules`);

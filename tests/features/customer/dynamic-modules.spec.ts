@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 const FRONTEND = 'http://localhost:3000';
 const API = 'http://localhost:3005/api';

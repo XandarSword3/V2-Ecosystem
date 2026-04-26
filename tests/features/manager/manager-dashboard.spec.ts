@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 test.describe('Manager Dashboard [MGR]', () => {
   test.beforeEach(async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe('Manager Dashboard [MGR]', () => {
     const approvalsTab = page.locator('button, [role="tab"], a').filter({ hasText: /approval/i });
     if (await approvalsTab.count() > 0) {
       await approvalsTab.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
     const approvals = page.locator('[class*="approval"], [class*="pending"], [class*="request"]');
     const approvalArea = page.locator('text=/approval|pending|request|no pending/i');
@@ -43,7 +43,7 @@ test.describe('Manager Dashboard [MGR]', () => {
     const staffTab = page.locator('button, [role="tab"], a').filter({ hasText: /staff/i });
     if (await staffTab.count() > 0) {
       await staffTab.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
     const table = page.locator('table, [class*="staff-list"], [class*="table"], [class*="roster"]');
     const staffArea = page.locator('text=/staff|employee|team|member|no staff/i');
@@ -54,7 +54,7 @@ test.describe('Manager Dashboard [MGR]', () => {
     const reportsTab = page.locator('button, [role="tab"], a').filter({ hasText: /report/i });
     if (await reportsTab.count() > 0) {
       await reportsTab.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
     }
     const reportActions = page.locator('button').filter({
       hasText: /generate|export|download|create|view/i,

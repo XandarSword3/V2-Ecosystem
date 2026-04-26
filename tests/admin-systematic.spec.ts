@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from './fixtures/auth.fixture';
 
 /**
  * Admin Systematic Feature Tests
@@ -8,37 +8,11 @@ import { test, expect, Page } from '@playwright/test';
  */
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com';
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'admin123';
-
-/**
- * Helper to login with retry logic
- */
-async function loginAsAdmin(page: Page): Promise<boolean> {
-  try {
-    await page.goto(`${FRONTEND_URL}/login`, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
-    
-    // Wait for navigation
-    await page.waitForURL(/\/admin/, { timeout: 30000 });
-    return true;
-  } catch (error) {
-    console.error('Login failed:', error);
-    return false;
-  }
-}
 
 test.describe('Admin Systematic Feature Test', () => {
   // Run tests sequentially to avoid auth conflicts
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) {
-      test.skip(true, 'Login failed - backend may be down');
-    }
+test.beforeEach(async ({ page, auth }) => {
+    await auth.loginAs('admin');
     
     // Wait for dashboard to load (with flexible matcher)
     try {

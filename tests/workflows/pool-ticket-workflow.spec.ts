@@ -10,7 +10,7 @@
  * This tests the complete ticket lifecycle with role-based interactions.
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
@@ -52,14 +52,14 @@ async function login(page: Page, email: string, password: string): Promise<boole
     await page.locator('input[type="password"]').fill(password);
     
     // Wait for form to be ready
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Click login button
     const loginButton = page.getByRole('button', { name: /sign in|login/i });
     await loginButton.click();
     
     // Wait for redirect
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     return true;
   } catch (error) {
     console.error('Login failed:', error);
@@ -71,9 +71,7 @@ async function login(page: Page, email: string, password: string): Promise<boole
 // PHASE 1: CUSTOMER PURCHASES POOL TICKETS
 // ============================================
 test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let customerPage: Page;
+let customerPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -96,7 +94,7 @@ test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
   });
 
   test('Step 1.2: Customer views available sessions', async () => {
-    await customerPage.waitForTimeout(2000);
+    await customerPage.waitForLoadState('networkidle');
     
     // Should show pool content - sessions, pricing, or schedule
     const pageContent = customerPage.locator('text=/Session|Schedule|Ticket|Adult|Child|Morning|Afternoon|Available/i');
@@ -120,7 +118,7 @@ test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       await datePicker.fill(tomorrow.toISOString().split('T')[0]);
-      await customerPage.waitForTimeout(1000);
+      await customerPage.waitForLoadState('networkidle');
     }
   });
 
@@ -130,7 +128,7 @@ test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
     
     if (await bookButton.isVisible()) {
       await bookButton.click();
-      await customerPage.waitForTimeout(1000);
+      await customerPage.waitForLoadState('networkidle');
     }
   });
 
@@ -141,11 +139,11 @@ test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
     
     if (await adultInput.isVisible()) {
       await adultInput.fill('2');
-      await customerPage.waitForTimeout(500);
+      await customerPage.waitForLoadState('networkidle');
     } else if (await adultPlus.isVisible()) {
       await adultPlus.click();
       await adultPlus.click(); // 2 adults
-      await customerPage.waitForTimeout(500);
+      await customerPage.waitForLoadState('networkidle');
     }
   });
 
@@ -160,7 +158,7 @@ test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
     
     if (await buyButton.isVisible()) {
       await buyButton.click();
-      await customerPage.waitForTimeout(2000);
+      await customerPage.waitForLoadState('networkidle');
     }
   });
 
@@ -209,7 +207,7 @@ test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
         console.log('Ticket code:', ticketCode);
       }
       
-      await customerPage.waitForTimeout(2000);
+      await customerPage.waitForLoadState('networkidle');
     }
   });
 
@@ -232,9 +230,7 @@ test.describe('Phase 1: Customer Purchases Pool Tickets', () => {
 // PHASE 2: STAFF VALIDATES TICKETS
 // ============================================
 test.describe('Phase 2: Staff Validates Tickets', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -273,7 +269,7 @@ test.describe('Phase 2: Staff Validates Tickets', () => {
   test('Step 2.4: Staff views passes/tickets', async () => {
     await staffPage.goto(`${FRONTEND_URL}/admin/pool/passes`);
     await staffPage.waitForLoadState('load');
-    await staffPage.waitForTimeout(1000);
+    await staffPage.waitForLoadState('networkidle');
     
     // Check for any relevant content
     const pageContent = staffPage.locator('text=/pass|ticket|admission|pool|session|no data/i').first();
@@ -295,7 +291,7 @@ test.describe('Phase 2: Staff Validates Tickets', () => {
       
       // Click to open scanner/validator
       await scanButton.click();
-      await staffPage.waitForTimeout(1000);
+      await staffPage.waitForLoadState('networkidle');
       
       // If there's a code input, enter the ticket code
       const codeInput = staffPage.locator('input[name="code"], input[placeholder*="code" i]').first();
@@ -316,7 +312,7 @@ test.describe('Phase 2: Staff Validates Tickets', () => {
     
     if (await useButton.isVisible()) {
       await useButton.click();
-      await staffPage.waitForTimeout(1000);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 });
@@ -325,9 +321,7 @@ test.describe('Phase 2: Staff Validates Tickets', () => {
 // PHASE 3: ADMIN MONITORS POOL
 // ============================================
 test.describe('Phase 3: Admin Monitors Pool', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -366,7 +360,7 @@ test.describe('Phase 3: Admin Monitors Pool', () => {
   test('Step 3.4: Admin views ticket sales', async () => {
     await adminPage.goto(`${FRONTEND_URL}/admin/pool/passes`);
     await adminPage.waitForLoadState('load');
-    await adminPage.waitForTimeout(1000);
+    await adminPage.waitForLoadState('networkidle');
     
     // Should show ticket sales/passes or main content
     await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
@@ -375,7 +369,7 @@ test.describe('Phase 3: Admin Monitors Pool', () => {
   test('Step 3.5: Admin checks revenue', async () => {
     await adminPage.goto(`${FRONTEND_URL}/admin/reports`);
     await adminPage.waitForLoadState('load');
-    await adminPage.waitForTimeout(1000);
+    await adminPage.waitForLoadState('networkidle');
     
     // Check for page content
     await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });

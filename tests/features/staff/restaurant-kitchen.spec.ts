@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 test.describe('Restaurant Kitchen Display [STF-REST]', () => {
   test.beforeEach(async ({ page }) => {

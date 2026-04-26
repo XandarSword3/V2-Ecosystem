@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Iteration 24  i18n: Chalets Modal + Bookings Strings', () => {
   test('IMPROVE-24A/B: staff/chalets compiles with i18n statusConfig + modal', async ({ page }) => {

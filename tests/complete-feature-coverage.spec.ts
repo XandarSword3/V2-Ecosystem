@@ -5,29 +5,13 @@
  * These tests "let the bots loose" to systematically test every feature.
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from './fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com';
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'admin123';
 
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
-
-async function loginAsAdmin(page: Page): Promise<boolean> {
-  try {
-    await page.goto(`${FRONTEND_URL}/login`, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/admin/, { timeout: 30000 });
-    return true;
-  } catch (error) {
-    console.error('Login failed:', error);
-    return false;
-  }
-}
 
 async function navigateToPage(page: Page, path: string): Promise<void> {
   await page.goto(`${FRONTEND_URL}${path}`, { waitUntil: 'networkidle', timeout: 30000 });
@@ -98,11 +82,8 @@ test.describe('Public Pages Accessibility', () => {
 // ADMIN DASHBOARD TESTS
 // ============================================
 test.describe('Admin Dashboard', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) test.skip(true, 'Login failed');
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('Dashboard loads with stats', async ({ page }) => {
@@ -130,11 +111,8 @@ test.describe('Admin Dashboard', () => {
 // ADMIN USER MANAGEMENT TESTS
 // ============================================
 test.describe('Admin User Management', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) test.skip(true, 'Login failed');
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('Users page loads', async ({ page }) => {
@@ -176,11 +154,8 @@ test.describe('Admin User Management', () => {
 // ADMIN RESTAURANT MANAGEMENT TESTS
 // ============================================
 test.describe('Admin Restaurant Management', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) test.skip(true, 'Login failed');
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('Restaurant menu page loads', async ({ page }) => {
@@ -230,11 +205,8 @@ test.describe('Admin Restaurant Management', () => {
 // ADMIN POOL MANAGEMENT TESTS
 // ============================================
 test.describe('Admin Pool Management', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) test.skip(true, 'Login failed');
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('Pool sessions page loads', async ({ page }) => {
@@ -264,11 +236,8 @@ test.describe('Admin Pool Management', () => {
 // ADMIN CHALET MANAGEMENT TESTS
 // ============================================
 test.describe('Admin Chalet Management', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) test.skip(true, 'Login failed');
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('Chalets list page loads', async ({ page }) => {
@@ -294,11 +263,8 @@ test.describe('Admin Chalet Management', () => {
 // ADMIN REVIEWS MANAGEMENT TESTS
 // ============================================
 test.describe('Admin Reviews Management', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) test.skip(true, 'Login failed');
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('Reviews page loads', async ({ page }) => {
@@ -320,11 +286,8 @@ test.describe('Admin Reviews Management', () => {
 // ADMIN REPORTS TESTS
 // ============================================
 test.describe('Admin Reports', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) test.skip(true, 'Login failed');
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('Reports page loads', async ({ page }) => {
@@ -354,11 +317,8 @@ test.describe('Admin Reports', () => {
 // ADMIN SETTINGS TESTS
 // ============================================
 test.describe('Admin Settings', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) test.skip(true, 'Login failed');
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('General settings page loads', async ({ page }) => {
@@ -414,11 +374,8 @@ test.describe('Admin Settings', () => {
 // ADMIN MODULES MANAGEMENT TESTS
 // ============================================
 test.describe('Admin Modules Management', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) test.skip(true, 'Login failed');
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('Modules page loads', async ({ page }) => {
@@ -441,11 +398,8 @@ test.describe('Admin Modules Management', () => {
 // NAVIGATION TESTS
 // ============================================
 test.describe('Admin Navigation', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const success = await loginAsAdmin(page);
-    if (!success) test.skip(true, 'Login failed');
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('Sidebar navigation works', async ({ page }) => {

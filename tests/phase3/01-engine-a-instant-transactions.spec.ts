@@ -9,7 +9,7 @@
  * - Table-side QR ordering
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 import { waitForPageLoad, isVisible, getText, screenshot, URLS } from './helpers';
 
 test.describe('Engine A — Instant Transactions', () => {
@@ -39,7 +39,7 @@ test.describe('Engine A — Instant Transactions', () => {
       await waitForPageLoad(page, { timeout: 30000 });
 
       // Wait for possible loading state to finish
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       // Check if there are actual menu items or empty state
       const menuCards = page.locator('[class*="grid"] > div, [class*="menu"] > div');
@@ -57,7 +57,7 @@ test.describe('Engine A — Instant Transactions', () => {
     test('has category filtering', async ({ page }) => {
       await page.goto('/restaurant', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       // Look for category buttons/tabs
       const categoryElements = page.locator('button, [role="tab"]');
@@ -71,7 +71,7 @@ test.describe('Engine A — Instant Transactions', () => {
     test('can add item to cart', async ({ page }) => {
       await page.goto('/restaurant', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       // Try to find and click an add-to-cart button
       const addButton = page.locator('button').filter({ hasText: /add|cart|\+/i }).first();
@@ -79,7 +79,7 @@ test.describe('Engine A — Instant Transactions', () => {
 
       if (hasAddButton) {
         await addButton.click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
 
         // Cart indicator should update (floating cart bar or badge)
         const body = (await page.textContent('body')) || '';
@@ -129,12 +129,12 @@ test.describe('Engine A — Instant Transactions', () => {
       // First add an item
       await page.goto('/restaurant', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const addButton = page.locator('button').filter({ hasText: /add|cart|\+/i }).first();
       if (await addButton.isVisible().catch(() => false)) {
         await addButton.click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
       }
 
       await page.goto('/restaurant/cart', { waitUntil: 'domcontentloaded' });
@@ -190,7 +190,7 @@ test.describe('Engine A — Instant Transactions', () => {
     test('displays snack items or empty state', async ({ page }) => {
       await page.goto('/snack-bar', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const body = (await page.textContent('body')) || '';
       await screenshot(page, 'snack-bar-items');
@@ -202,7 +202,7 @@ test.describe('Engine A — Instant Transactions', () => {
     test('has category filters (sandwich, drink, snack, ice_cream)', async ({ page }) => {
       await page.goto('/snack-bar', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       // Look for category filter buttons
       const buttons = page.locator('button');
@@ -215,14 +215,14 @@ test.describe('Engine A — Instant Transactions', () => {
     test('can add snack item to cart', async ({ page }) => {
       await page.goto('/snack-bar', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const addButton = page.locator('button').filter({ hasText: /add|cart|\+/i }).first();
       const hasButton = await addButton.isVisible().catch(() => false);
 
       if (hasButton) {
         await addButton.click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
         await screenshot(page, 'snack-bar-item-added');
       } else {
         await screenshot(page, 'snack-bar-no-add-button');

@@ -9,7 +9,7 @@
  * - Protected endpoints reject unauthorized access
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 import { getAuthToken, getAuthHeaders, getCsrfToken, URLS, CREDS } from './helpers';
 
 const API = URLS.API;

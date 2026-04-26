@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 /**
  * Iteration 3 Tests — Missing i18n key fix + Order Page i18n
