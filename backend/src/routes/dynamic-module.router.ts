@@ -4,6 +4,7 @@ import { requireModule } from '../middleware/moduleGuard.middleware.js';
 import { getSupabase } from '../database/connection.js';
 import { getEngineService } from '../engines/engine-service.js';
 import { logger } from '../utils/logger.js';
+import { requirePropertyAccess } from '../middleware/propertyAccess.middleware.js';
 
 type TemplateType = 'menu_service' | 'multi_day_booking' | 'session_access' | 'subscription' | 'membership_access';
 
@@ -11,6 +12,7 @@ interface MountedModuleContext {
   id: string;
   slug: string;
   template_type: string;
+  property_id?: string | null;
 }
 
 interface DynamicRequest extends Request {
@@ -47,6 +49,28 @@ function enforceMountedModuleActive(req: Request, res: Response, next: NextFunct
       error: error instanceof Error ? error.message : String(error),
     });
     res.status(503).json({ success: false, error: 'Unable to validate module availability' });
+  });
+}
+
+function enforceMountedModulePropertyAccess(req: Request, res: Response, next: NextFunction): void {
+  const mounted = getMountedModule(req);
+  if (!mounted) {
+    res.status(500).json({ success: false, error: 'Mounted module context is missing' });
+    return;
+  }
+
+  if (!mounted.property_id) {
+    next();
+    return;
+  }
+
+  requirePropertyAccess(mounted.property_id)(req, res, next).catch((error: unknown) => {
+    logger.error('[Dynamic Router] Failed property access check', {
+      slug: mounted.slug,
+      propertyId: mounted.property_id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    res.status(403).json({ success: false, error: 'Access denied for this property' });
   });
 }
 
@@ -727,7 +751,7 @@ export function buildModuleRouter(templateType: string): Router {
   const normalizedType = templateType as TemplateType;
 
   // Every dynamic route is auth-protected and module-guarded.
-  router.use(authenticate, requireMountedModule, enforceMountedModuleActive);
+  router.use(authenticate, requireMountedModule, enforceMountedModuleActive, enforceMountedModulePropertyAccess);
 
   switch (normalizedType) {
     case 'menu_service':

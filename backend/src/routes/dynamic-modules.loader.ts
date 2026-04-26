@@ -11,6 +11,7 @@ interface ActiveModuleRow {
   id: string;
   slug: string;
   template_type: string;
+  property_id?: string | null;
 }
 
 export function getDynamicModulesRouter(): express.Router {
@@ -22,7 +23,7 @@ export async function loadDynamicModules(): Promise<void> {
 
   const { data: modules, error } = await supabase
     .from('modules')
-    .select('id, slug, template_type')
+    .select('id, slug, template_type, property_id')
     .eq('is_active', true)
     .not('slug', 'is', null)
     .not('template_type', 'is', null);
@@ -48,11 +49,12 @@ export async function loadDynamicModules(): Promise<void> {
       `/${module.slug}`,
       (req, _res, next) => {
         (req as express.Request & {
-          mountedModule?: { id: string; slug: string; template_type: string };
+          mountedModule?: { id: string; slug: string; template_type: string; property_id?: string | null };
         }).mountedModule = {
           id: module.id,
           slug: module.slug,
           template_type: module.template_type,
+          property_id: module.property_id,
         };
         next();
       },
