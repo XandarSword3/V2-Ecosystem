@@ -6,7 +6,8 @@ import {
   updateProfile, 
   listUsers, 
   getUserById, 
-  updateUserRoles 
+  updateUserRoles,
+  getMyStatement,
 } from './user.controller.js';
 
 const router = Router();
@@ -36,6 +37,7 @@ router.get('/profile', getProfile);
 
 // Update profile
 router.put('/profile', updateProfile);
+router.get('/me/statement', getMyStatement);
 
 // =====================================
 // Admin User Management
