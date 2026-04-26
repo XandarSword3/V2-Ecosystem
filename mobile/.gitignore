@@ -42,3 +42,7 @@ coverage/
 # Logs
 logs/
 *.log
+
+# Firebase credentials (must remain local-only)
+GoogleService-Info.plist
+google-services.json
