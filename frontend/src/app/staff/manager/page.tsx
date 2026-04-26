@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useSocket } from '@/lib/socket';
 
 interface OverviewStats {
   totalRevenue: number;
@@ -96,6 +97,8 @@ export default function ManagerDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [activeModules, setActiveModules] = useState<any[]>([]);
+  const [moduleSummary, setModuleSummary] = useState<Array<{ module: string; todays_order_count: number; todays_revenue: number; active_orders_count: number; staff_on_shift: number }>>([]);
+  const { socket } = useSocket();
 
   // Check for manager role
   const isManager = user?.roles?.some(r => 
@@ -125,7 +128,7 @@ export default function ManagerDashboard() {
     try {
       // FIX Iter-14: Pass AbortSignal to all API calls to cancel on unmount
       // Phase 2: Also fetch dynamic module orders for aggregation
-      const [ordersRes, snackOrdersRes, modulesRes, staffRes, activityRes, weeklyOrdersRes, approvalsRes, todayShiftsRes] = await Promise.all([
+      const [ordersRes, snackOrdersRes, modulesRes, staffRes, activityRes, weeklyOrdersRes, approvalsRes, todayShiftsRes, managerSummaryRes] = await Promise.all([
         api.get('/restaurant/staff/orders/live', { signal }).catch(() => ({ data: { data: [] } })),
         api.get('/snack/staff/orders/live', { signal }).catch(() => ({ data: { data: [] } })),
         api.get('/admin/modules', { signal }).catch(() => ({ data: { data: [] } })),
@@ -134,6 +137,7 @@ export default function ManagerDashboard() {
         api.get('/admin/dashboard', { signal }).catch(() => ({ data: { data: null } })), // FIX: Iteration 12 - Was '/admin/dashboard/stats' (404)
         api.get('/manager/approvals/pending', { signal }).catch(() => ({ data: { data: [] } })),
         api.get('/manager/shifts/today', { signal }).catch(() => ({ data: { data: [], summary: null } })),
+        api.get('/manager/summary', { signal }).catch(() => ({ data: { data: [] } })),
       ]);
       // FIX Iter-14: Bail out if aborted before processing results
       if (signal?.aborted) return;
@@ -184,6 +188,8 @@ export default function ManagerDashboard() {
       const pendingApprovals = approvalsRes.data.data || [];
       const todayShifts = todayShiftsRes.data?.data || [];
       const shiftSummary = todayShiftsRes.data?.summary;
+      const summaryModules = managerSummaryRes.data?.data || [];
+      setModuleSummary(summaryModules);
 
       // Calculate stats from REAL orders data
       const pending = orders.filter((o: any) => 
@@ -297,6 +303,28 @@ export default function ManagerDashboard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleApprovalNew = () => {
+      loadDashboardData();
+      toast.info('New approval request received');
+    };
+    const handleApprovalReviewed = () => {
+      loadDashboardData();
+    };
+
+    socket.on('approval:new', handleApprovalNew);
+    socket.on('approval:reviewed', handleApprovalReviewed);
+    const poll = setInterval(() => loadDashboardData(), 45000);
+
+    return () => {
+      socket.off('approval:new', handleApprovalNew);
+      socket.off('approval:reviewed', handleApprovalReviewed);
+      clearInterval(poll);
+    };
+  }, [socket]);
 
   const handleApproval = async (id: string, approved: boolean) => {
     try {
@@ -657,6 +685,29 @@ export default function ManagerDashboard() {
 
         {/* Reports Tab */}
         <TabsContent value="reports" className="space-y-4">
+          {moduleSummary.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Eye className="w-5 h-5" />
+                  Live Module Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {moduleSummary.map((row) => (
+                  <div key={row.module} className="rounded-lg border p-3">
+                    <div className="font-medium capitalize">{row.module.replaceAll('_', ' ')}</div>
+                    <div className="text-sm text-slate-500">
+                      Orders: {row.todays_order_count} | Active: {row.active_orders_count}
+                    </div>
+                    <div className="text-sm text-slate-500">
+                      Revenue: {formatCurrency(row.todays_revenue)} | Staff: {row.staff_on_shift}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
