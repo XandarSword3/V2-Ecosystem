@@ -5,7 +5,7 @@ import { Module } from '@/lib/settings-context';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { restaurantApi, poolApi, supportApi } from '@/lib/api';
+import { api, restaurantApi, poolApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import { useContentTranslation } from '@/lib/translate';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -254,7 +254,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
       return <TestimonialsComponent props={props} />;
 
     case 'pricing_table':
-      return <PricingTableComponent props={props} />;
+      return <PricingTableComponent module={module} props={props} />;
 
     default:
       // This case should be unreachable due to the check above, but as a safety net:
@@ -555,6 +555,24 @@ function BookingCalendarComponent({ module, props }: { module: Module; props: Bl
   const tCommon = useTranslations('common');
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
+  const startDate = new Date().toISOString().split('T')[0];
+  const endDate = new Date(Date.now() + 29 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const { data: availabilityResponse } = useQuery({
+    queryKey: ['module-availability', module.slug, startDate, endDate],
+    queryFn: () => api.get(`/${module.slug}/availability`, { params: { startDate, endDate } }),
+    retry: 1,
+  });
+
+  const blockedDates: string[] = availabilityResponse?.data?.data?.blockedDates || [];
+  const dateRows = Array.from({ length: 30 }).map((_, idx) => {
+    const d = new Date(Date.now() + idx * 24 * 60 * 60 * 1000);
+    const iso = d.toISOString().split('T')[0];
+    return {
+      date: iso,
+      available: !blockedDates.includes(iso),
+    };
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -596,6 +614,28 @@ function BookingCalendarComponent({ module, props }: { module: Module; props: Bl
         >
           Search Availability
         </button>
+
+        <div className="mt-6">
+          <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Next 30 days</div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            {dateRows.map((row) => (
+              <button
+                key={row.date}
+                type="button"
+                onClick={() => row.available && setCheckIn(row.date)}
+                className={`px-2 py-1 rounded text-xs border ${
+                  row.available
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-rose-50 border-rose-200 text-rose-600 cursor-not-allowed'
+                }`}
+                disabled={!row.available}
+                title={row.available ? 'Available' : 'Unavailable'}
+              >
+                {row.date}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -629,12 +669,15 @@ function FormContainerComponent({ module, block, props }: { module: Module; bloc
         message = formData.message;
       }
 
-      await supportApi.submitContact({
+      await api.post('/messaging/inquiries', {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         subject,
-        message
+        message,
+        moduleId: module.id,
+        moduleSlug: module.slug,
+        moduleName: module.name,
       });
 
       toast.success('Your request has been submitted successfully!');
@@ -765,12 +808,42 @@ function TestimonialsComponent({ props }: { props: BlockProps }) {
 // ============================================
 // Pricing Table Component
 // ============================================
-function PricingTableComponent({ props }: { props: BlockProps }) {
-  let plans = [];
-  try {
-    plans = typeof props.plans === 'string' ? JSON.parse(props.plans) : (props.plans || []);
-  } catch (e) {
-    console.error("Failed to parse pricing plans", e);
+function PricingTableComponent({ module, props }: { module: Module; props: BlockProps }) {
+  const { data: pricingRes } = useQuery({
+    queryKey: ['module-pricing', module.slug, module.template_type],
+    queryFn: async () => {
+      if (module.template_type === 'session_access') {
+        return api.get(`/${module.slug}/sessions`);
+      }
+      return api.get(`/${module.slug}/plans`);
+    },
+    retry: 1,
+  });
+
+  let plans: any[] = [];
+  if (module.template_type === 'session_access') {
+    plans = (pricingRes?.data?.data || []).map((s: any) => ({
+      name: s.name || s.session_name || 'Session',
+      price: String(s.price || s.adult_price || 0),
+      features: [
+        `${s.start_time || ''} - ${s.end_time || ''}`,
+        `Capacity: ${s.capacity || 0}`,
+      ],
+      popular: false,
+    }));
+  } else if (pricingRes?.data?.data) {
+    plans = (pricingRes.data.data || []).map((p: any) => ({
+      name: p.name || p.title || 'Plan',
+      price: String(p.price || 0),
+      features: Array.isArray(p.features) ? p.features : [],
+      popular: Boolean(p.popular),
+    }));
+  } else {
+    try {
+      plans = typeof props.plans === 'string' ? JSON.parse(props.plans) : (props.plans || []);
+    } catch (e) {
+      console.error("Failed to parse pricing plans", e);
+    }
   }
 
   return (

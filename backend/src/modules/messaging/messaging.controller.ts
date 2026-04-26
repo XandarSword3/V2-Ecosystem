@@ -6,6 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { messagingService } from './messaging.service';
+import { getSupabase } from '../../database/connection.js';
 
 // =============================================
 // CHANNEL CONFIGURATION
@@ -364,4 +365,63 @@ export const getMessagingAnalytics = asyncHandler(async (req: Request, res: Resp
       success: true,
       data: analytics
     });
+});
+
+// =============================================
+// PUBLIC INQUIRIES
+// =============================================
+export const submitInquiry = asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const {
+      name,
+      email,
+      phone,
+      subject,
+      message,
+      moduleId,
+      moduleSlug,
+      moduleName,
+    } = req.body as Record<string, any>;
+
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ success: false, error: 'name, email, subject and message are required' });
+    }
+
+    let { data, error } = await supabase
+      .from('support_inquiries')
+      .insert({
+        name,
+        email,
+        phone: phone || null,
+        subject,
+        message,
+        status: 'new',
+        metadata: {
+          moduleId: moduleId || null,
+          moduleSlug: moduleSlug || null,
+          moduleName: moduleName || null,
+        },
+      })
+      .select('id')
+      .single();
+
+    if (error && /metadata|column/i.test(String(error.message || error.details || ''))) {
+      const fallback = await supabase
+        .from('support_inquiries')
+        .insert({
+          name,
+          email,
+          phone: phone || null,
+          subject,
+          message,
+          status: 'new',
+        })
+        .select('id')
+        .single();
+      data = fallback.data;
+      error = fallback.error;
+    }
+
+    if (error) throw error;
+    res.status(201).json({ success: true, data, message: 'Inquiry submitted successfully' });
 });
