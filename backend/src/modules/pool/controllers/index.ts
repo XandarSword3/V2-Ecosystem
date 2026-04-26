@@ -26,6 +26,7 @@ export {
   getMyTickets,
   cancelTicket,
   validateTicket,
+  createStaffTicket,
   recordEntry,
   recordExit,
   getTodayTickets,
