@@ -11,6 +11,7 @@ import { authenticate as authMiddleware } from '../../middleware/auth.middleware
 import { roleGuard } from '../../middleware/roleGuard.middleware';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger';
+import { getEngineService } from '../../engines/engine-service.js';
 import {
   getAllMembershipPlans,
   getMembershipPricing,
@@ -23,6 +24,7 @@ import {
 } from '../../services/pool-membership.service.js';
 
 const router = Router();
+const engineService = getEngineService();
 
 // Validation schemas
 const createMembershipSchema = z.object({
@@ -43,6 +45,30 @@ const useGuestPassSchema = z.object({
   guestEmail: z.string().email().optional(),
 });
 
+const membershipPlanCreateSchema = z.object({
+  name: z.string().min(2),
+  type: z.string().optional(),
+  price: z.number().positive(),
+  interval: z.enum(['monthly', 'quarterly', 'yearly']),
+  features: z.array(z.string()).default([]),
+  is_active: z.boolean().default(true),
+});
+
+const membershipPlanUpdateSchema = membershipPlanCreateSchema.partial();
+
+function mapPlanIntervalToBillingCycle(interval: string): BillingCycle {
+  switch (interval) {
+    case 'monthly':
+      return BillingCycle.MONTHLY;
+    case 'quarterly':
+      return BillingCycle.QUARTERLY;
+    case 'yearly':
+      return BillingCycle.ANNUALLY;
+    default:
+      return BillingCycle.MONTHLY;
+  }
+}
+
 /**
  * GET /pool/memberships/plans
  * Get all available membership plans
@@ -50,18 +76,28 @@ const useGuestPassSchema = z.object({
 router.get(
   '/plans',
   asyncHandler(async (req: Request, res: Response) => {
-      const plans = getAllMembershipPlans();
-      
+      const supabase = getSupabase();
+      const { data: plans, error } = await supabase
+        .from('membership_plans')
+        .select('id, name, type, price, interval, features, is_active')
+        .eq('is_active', true)
+        .order('price', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
       res.json({
         success: true,
-        data: plans.map(plan => ({
+        data: (plans || []).map((plan: any) => ({
+          id: plan.id,
+          name: plan.name,
           type: plan.type,
-          billingCycle: plan.billingCycle,
-          price: plan.basePrice,
-          maxMembers: plan.maxMembers,
-          dailyAccessLimit: plan.dailyAccessLimit === 0 ? 'Unlimited' : plan.dailyAccessLimit,
-          guestPasses: plan.guestPasses === 0 ? 'Unlimited' : plan.guestPasses,
-          discountPercentage: plan.discountPercentage,
+          billingCycle: mapPlanIntervalToBillingCycle(plan.interval),
+          interval: plan.interval,
+          price: Number(plan.price),
+          features: plan.features || [],
+          isActive: plan.is_active,
         })),
       });
   })
@@ -126,6 +162,20 @@ router.post(
           error: 'Invalid input',
           details: validation.error.flatten(),
         });
+      }
+
+      const supabase = getSupabase();
+      const { data: plan, error: planError } = await supabase
+        .from('membership_plans')
+        .select('id, type, interval')
+        .eq('type', validation.data.type)
+        .eq('interval', validation.data.billingCycle === BillingCycle.ANNUALLY ? 'yearly' : validation.data.billingCycle.toLowerCase())
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      if (planError) throw planError;
+      if (!plan) {
+        return res.status(400).json({ success: false, error: 'No active membership plan found for selected type/billing cycle' });
       }
 
       const result = await createMembership({
@@ -498,6 +548,220 @@ router.get(
           },
         },
       });
+  })
+);
+
+/**
+ * Admin CRUD for membership plans
+ */
+router.get(
+  '/admin/plans',
+  authMiddleware,
+  roleGuard(['admin', 'super_admin']),
+  asyncHandler(async (_req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('membership_plans')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ success: true, data: data || [] });
+  })
+);
+
+router.post(
+  '/admin/plans',
+  authMiddleware,
+  roleGuard(['admin', 'super_admin']),
+  asyncHandler(async (req: Request, res: Response) => {
+    const validation = membershipPlanCreateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ success: false, error: 'Invalid plan payload', details: validation.error.flatten() });
+    }
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('membership_plans')
+      .insert(validation.data)
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json({ success: true, data });
+  })
+);
+
+router.patch(
+  '/admin/plans/:id',
+  authMiddleware,
+  roleGuard(['admin', 'super_admin']),
+  asyncHandler(async (req: Request, res: Response) => {
+    const validation = membershipPlanUpdateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ success: false, error: 'Invalid plan payload', details: validation.error.flatten() });
+    }
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('membership_plans')
+      .update(validation.data)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ success: true, data });
+  })
+);
+
+router.delete(
+  '/admin/plans/:id',
+  authMiddleware,
+  roleGuard(['admin', 'super_admin']),
+  asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from('membership_plans')
+      .update({ is_active: false })
+      .eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ success: true, message: 'Plan deactivated' });
+  })
+);
+
+/**
+ * Staff membership operations
+ */
+router.get(
+  '/staff/list',
+  authMiddleware,
+  roleGuard(['staff', 'admin', 'super_admin', 'pool_staff', 'pool_admin']),
+  asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const status = req.query.status as string | undefined;
+    const search = (req.query.search as string | undefined)?.trim();
+
+    let query = supabase
+      .from('pool_memberships')
+      .select('id, user_id, type, status, start_date, end_date, users(email, first_name, last_name)')
+      .order('created_at', { ascending: false });
+
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const filtered = (data || []).filter((row: any) => {
+      if (!search) return true;
+      const fullName = `${row.users?.first_name || ''} ${row.users?.last_name || ''}`.toLowerCase();
+      const email = `${row.users?.email || ''}`.toLowerCase();
+      return fullName.includes(search.toLowerCase()) || email.includes(search.toLowerCase());
+    });
+
+    res.json({ success: true, data: filtered });
+  })
+);
+
+router.get(
+  '/staff/expiring',
+  authMiddleware,
+  roleGuard(['staff', 'admin', 'super_admin', 'pool_staff', 'pool_admin']),
+  asyncHandler(async (_req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const start = new Date().toISOString();
+    const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('pool_memberships')
+      .select('id, user_id, type, status, end_date, users(email, first_name, last_name)')
+      .eq('status', 'ACTIVE')
+      .gte('end_date', start)
+      .lte('end_date', end)
+      .order('end_date', { ascending: true });
+    if (error) throw error;
+    res.json({ success: true, data: data || [] });
+  })
+);
+
+router.patch(
+  '/staff/:id/activate',
+  authMiddleware,
+  roleGuard(['staff', 'admin', 'super_admin', 'pool_staff', 'pool_admin']),
+  asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { data: membership, error: readError } = await supabase
+      .from('pool_memberships')
+      .select('id, status')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!membership) return res.status(404).json({ success: false, error: 'Membership not found' });
+
+    const transition = await engineService.transitionState('subscription', String(membership.status).toLowerCase(), 'activate', 'staff');
+    if (!transition.allowed) return res.status(400).json({ success: false, error: transition.error || 'Invalid transition' });
+
+    const { data, error } = await supabase
+      .from('pool_memberships')
+      .update({ status: transition.targetState.toUpperCase(), updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ success: true, data });
+  })
+);
+
+router.patch(
+  '/staff/:id/extend',
+  authMiddleware,
+  roleGuard(['staff', 'admin', 'super_admin', 'pool_staff', 'pool_admin']),
+  asyncHandler(async (req: Request, res: Response) => {
+    const extraDays = Number(req.body?.days || 0);
+    if (!Number.isFinite(extraDays) || extraDays <= 0) {
+      return res.status(400).json({ success: false, error: 'days must be a positive number' });
+    }
+    const supabase = getSupabase();
+    const { data: membership, error: readError } = await supabase
+      .from('pool_memberships')
+      .select('id, end_date')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!membership) return res.status(404).json({ success: false, error: 'Membership not found' });
+
+    const endDate = membership.end_date ? new Date(membership.end_date) : new Date();
+    endDate.setDate(endDate.getDate() + extraDays);
+
+    const { data, error } = await supabase
+      .from('pool_memberships')
+      .update({ end_date: endDate.toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ success: true, data });
+  })
+);
+
+router.patch(
+  '/staff/:id/suspend',
+  authMiddleware,
+  roleGuard(['staff', 'admin', 'super_admin', 'pool_staff', 'pool_admin']),
+  asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { data: membership, error: readError } = await supabase
+      .from('pool_memberships')
+      .select('id, status')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!membership) return res.status(404).json({ success: false, error: 'Membership not found' });
+
+    const transition = await engineService.transitionState('subscription', String(membership.status).toLowerCase(), 'pause', 'staff');
+    if (!transition.allowed) return res.status(400).json({ success: false, error: transition.error || 'Invalid transition' });
+
+    const { data, error } = await supabase
+      .from('pool_memberships')
+      .update({ status: transition.targetState.toUpperCase(), updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ success: true, data });
   })
 );
 

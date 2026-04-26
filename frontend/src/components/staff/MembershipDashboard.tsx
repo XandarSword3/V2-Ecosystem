@@ -2,6 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { BadgeCheck, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '@/lib/api';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 export interface MembershipDashboardProps {
   slug: string;
@@ -10,6 +14,53 @@ export interface MembershipDashboardProps {
 }
 
 export function MembershipDashboard({ slug, moduleName, moduleId }: MembershipDashboardProps) {
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [memberships, setMemberships] = useState<any[]>([]);
+  const [expiring, setExpiring] = useState<any[]>([]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [listResponse, expiringResponse] = await Promise.all([
+        api.get('/pool/memberships/staff/list'),
+        api.get('/pool/memberships/staff/expiring'),
+      ]);
+      setMemberships(listResponse.data?.data || []);
+      setExpiring(expiringResponse.data?.data || []);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const filteredMemberships = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return memberships;
+    return memberships.filter((membership) => {
+      const firstName = membership.users?.first_name || '';
+      const lastName = membership.users?.last_name || '';
+      const email = membership.users?.email || '';
+      return `${firstName} ${lastName}`.toLowerCase().includes(query) || email.toLowerCase().includes(query);
+    });
+  }, [memberships, search]);
+
+  async function runAction(id: string, action: 'activate' | 'extend' | 'suspend') {
+    if (action === 'extend') {
+      await api.patch(`/pool/memberships/staff/${id}/extend`, { days: 7 });
+    } else {
+      await api.patch(`/pool/memberships/staff/${id}/${action}`);
+    }
+    await loadData();
+  }
+
+  const activeCount = memberships.filter((m) => m.status === 'ACTIVE').length;
+  const expiredCount = memberships.filter((m) => m.status === 'EXPIRED').length;
+  const expiringCount = expiring.length;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -50,6 +101,76 @@ export function MembershipDashboard({ slug, moduleName, moduleId }: MembershipDa
             </CardContent>
           </Card>
         </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader><CardTitle>Total Active</CardTitle></CardHeader>
+            <CardContent className="text-2xl font-semibold">{activeCount}</CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Expiring This Week</CardTitle></CardHeader>
+            <CardContent className="text-2xl font-semibold">{expiringCount}</CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Expired</CardTitle></CardHeader>
+            <CardContent className="text-2xl font-semibold">{expiredCount}</CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Memberships</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by customer name/email"
+            />
+            {loading ? (
+              <p className="text-sm text-slate-500">Loading memberships...</p>
+            ) : (
+              <div className="space-y-3">
+                {filteredMemberships.map((membership) => (
+                  <div key={membership.id} className="border rounded-lg p-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium">
+                        {membership.users?.first_name} {membership.users?.last_name}
+                      </p>
+                      <p className="text-sm text-slate-600">{membership.users?.email}</p>
+                      <p className="text-xs text-slate-500">Status: {membership.status}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={() => runAction(membership.id, 'activate')}>Activate</Button>
+                      <Button size="sm" variant="outline" onClick={() => runAction(membership.id, 'extend')}>Extend +7d</Button>
+                      <Button size="sm" variant="ghost" onClick={() => runAction(membership.id, 'suspend')}>Suspend</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Expiring Soon</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {expiring.map((membership) => (
+                <div key={membership.id} className="border rounded-md p-3">
+                  <p className="font-medium">
+                    {membership.users?.first_name} {membership.users?.last_name}
+                  </p>
+                  <p className="text-sm text-slate-600">{membership.users?.email}</p>
+                  <p className="text-xs text-slate-500">Ends: {new Date(membership.end_date).toLocaleDateString()}</p>
+                </div>
+              ))}
+              {!expiring.length && <p className="text-sm text-slate-500">No memberships expiring in next 7 days.</p>}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
