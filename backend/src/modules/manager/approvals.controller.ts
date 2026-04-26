@@ -201,6 +201,12 @@ export class ApprovalsController {
             requested_by_name: requester?.full_name || 'Staff Member',
           },
         });
+        io.to('role:admin').to('role:super_admin').to('role:manager').emit('new_approval_request', {
+          approval: {
+            ...approval,
+            requested_by_name: requester?.full_name || 'Staff Member',
+          },
+        });
       }
 
       res.status(201).json({

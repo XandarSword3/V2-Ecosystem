@@ -26,12 +26,16 @@ import {
 interface ValidationResult {
   success: boolean;
   message: string;
-  ticket?: {
+  type?: 'pool_ticket' | 'chalet_booking' | 'restaurant_order' | 'membership';
+  entity?: {
     id: string;
-    ticket_number: string;
-    ticket_type: string;
-    status: string;
-    valid_date: string;
+    ticket_number?: string;
+    ticket_type?: string;
+    status?: string;
+    valid_date?: string;
+    booking_number?: string;
+    order_number?: string;
+    membership_number?: string;
     users?: {
       full_name: string;
       email: string;
@@ -67,11 +71,12 @@ export default function StaffScannerPage() {
     setLastResult(null);
 
     try {
-      const response = await api.post('/pool/staff/validate', { ticketNumber: code.trim() });
+      const response = await api.post('/staff/scan', { code: code.trim() });
       const result: ValidationResult = {
-        success: true,
-        message: response.data.message || t('ticketValidated'), // IMPROVE Iter-9: i18n
-        ticket: response.data.data,
+        success: !!response.data.valid,
+        message: response.data.message || t('ticketValidated'),
+        type: response.data.type,
+        entity: response.data.entity,
       };
       setLastResult(result);
       setScanHistory((prev) => [
@@ -99,10 +104,10 @@ export default function StaffScannerPage() {
   };
 
   const handleEntry = async () => {
-    if (!lastResult?.ticket?.id) return;
+    if (lastResult?.type !== 'pool_ticket' || !lastResult.entity?.id) return;
 
     try {
-      await api.post(`/pool/tickets/${lastResult.ticket.id}/entry`);
+      await api.post(`/pool/tickets/${lastResult.entity.id}/entry`);
       toast.success(t('entryRecorded')); // IMPROVE Iter-9: i18n
       setLastResult(null);
     } catch (error: unknown) {
@@ -112,10 +117,10 @@ export default function StaffScannerPage() {
   };
 
   const handleExit = async () => {
-    if (!lastResult?.ticket?.id) return;
+    if (lastResult?.type !== 'pool_ticket' || !lastResult.entity?.id) return;
 
     try {
-      await api.post(`/pool/tickets/${lastResult.ticket.id}/exit`);
+      await api.post(`/pool/tickets/${lastResult.entity.id}/exit`);
       toast.success(t('exitRecorded')); // IMPROVE Iter-9: i18n
       setLastResult(null);
     } catch (error: unknown) {
@@ -228,40 +233,52 @@ export default function StaffScannerPage() {
                       </div>
                     </div>
 
-                    {lastResult.ticket && (
+                    {lastResult.entity && (
                       <>
                         <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                           <div className="flex items-center gap-2">
                             <Ticket className="w-4 h-4 text-slate-500" />
-                            <span className="font-mono">{lastResult.ticket.ticket_number}</span>
+                            <span className="font-mono">
+                              {lastResult.entity.ticket_number
+                                || lastResult.entity.booking_number
+                                || lastResult.entity.order_number
+                                || lastResult.entity.membership_number
+                                || lastResult.entity.id}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                              {ticketTypeLabels[lastResult.ticket.ticket_type] || lastResult.ticket.ticket_type}
+                              {lastResult.type === 'pool_ticket'
+                                ? (ticketTypeLabels[lastResult.entity.ticket_type || ''] || lastResult.entity.ticket_type)
+                                : lastResult.type}
                             </span>
                           </div>
-                          {lastResult.ticket.users && (
+                          {lastResult.entity.users && (
                             <div className="flex items-center gap-2 col-span-2">
                               <User className="w-4 h-4 text-slate-500" />
-                              <span>{lastResult.ticket.users.full_name}</span>
+                              <span>{lastResult.entity.users.full_name}</span>
                             </div>
                           )}
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-slate-500" />
-                            <span>{new Date(lastResult.ticket.valid_date).toLocaleDateString()}</span>
-                          </div>
+                          {lastResult.entity.valid_date && (
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-slate-500" />
+                              <span>{new Date(lastResult.entity.valid_date).toLocaleDateString()}</span>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="flex gap-2">
-                          <Button onClick={handleEntry} className="flex-1">
-                            <LogIn className="w-4 h-4 mr-2" />
-                            {t('recordEntry')}{/* IMPROVE Iter-9: i18n */}
-                          </Button>
-                          <Button onClick={handleExit} variant="outline" className="flex-1">
-                            <LogOut className="w-4 h-4 mr-2" />
-                            {t('recordExit')}{/* IMPROVE Iter-9: i18n */}
-                          </Button>
-                        </div>
+                        {lastResult.type === 'pool_ticket' && (
+                          <div className="flex gap-2">
+                            <Button onClick={handleEntry} className="flex-1">
+                              <LogIn className="w-4 h-4 mr-2" />
+                              {t('recordEntry')}
+                            </Button>
+                            <Button onClick={handleExit} variant="outline" className="flex-1">
+                              <LogOut className="w-4 h-4 mr-2" />
+                              {t('recordExit')}
+                            </Button>
+                          </div>
+                        )}
                       </>
                     )}
                   </motion.div>

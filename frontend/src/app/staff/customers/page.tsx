@@ -69,15 +69,14 @@ export default function CustomerLookupPage() {
     setNotFound(false);
 
     try {
-      const res = await api.get('/admin/users', {
+      const res = await api.get('/staff/customers/search', {
         params: {
-          search: searchQuery.trim(),
-          type: 'customer',
+          q: searchQuery.trim(),
         },
       });
 
-      if (res.data.success && res.data.data) {
-        const userData = res.data.data;
+      const userData = res.data?.data?.[0];
+      if (res.data.success && userData) {
         
         // Fetch additional data
         const [loyaltyRes, ordersRes] = await Promise.all([
@@ -91,9 +90,9 @@ export default function CustomerLookupPage() {
           email: userData.email,
           phone: userData.phone,
           createdAt: userData.created_at,
-          loyaltyTier: loyaltyRes.data.data?.tier_name,
+          loyaltyTier: userData.loyalty_tier || loyaltyRes.data.data?.tier_name,
           loyaltyPoints: loyaltyRes.data.data?.total_points,
-          giftCardBalance: 0, // Would need separate API call
+          giftCardBalance: userData.total_lifetime_spend || 0,
           recentOrders: (ordersRes.data.data || []).map((o: any) => ({
             id: o.id,
             type: 'Restaurant',

@@ -37,7 +37,7 @@ import {
   X,
 } from 'lucide-react';
 
-type TabType = 'profile' | 'orders' | 'snacks' | 'bookings' | 'tickets';
+type TabType = 'profile' | 'orders' | 'snacks' | 'bookings' | 'tickets' | 'statement' | 'payments';
 
 interface OrderRecord {
   id: string;
@@ -68,6 +68,32 @@ interface TicketRecord {
   total_amount: number;
 }
 
+interface StatementRecord {
+  id: string;
+  type: string;
+  status?: string;
+  created_at: string;
+  total_amount?: number;
+  amount?: number;
+  points?: number;
+  order_number?: string;
+  booking_number?: string;
+  ticket_number?: string;
+  reference_id?: string;
+  reference_type?: string;
+}
+
+interface PaymentRecord {
+  id: string;
+  reference_type?: string;
+  reference_id?: string;
+  amount: number;
+  status: string;
+  method?: string;
+  created_at: string;
+  notes?: string;
+}
+
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
   confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -89,6 +115,8 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [saving, setSaving] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingRecord | null>(null);
+  const [statementFrom, setStatementFrom] = useState('');
+  const [statementTo, setStatementTo] = useState('');
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -124,10 +152,24 @@ export default function ProfilePage() {
     enabled: activeTab === 'snacks' && !!user,
   });
 
+  const { data: statementData, isLoading: statementLoading } = useQuery({
+    queryKey: ['my-statement', statementFrom, statementTo],
+    queryFn: () => api.get('/users/me/statement', { params: { from: statementFrom || undefined, to: statementTo || undefined } }),
+    enabled: activeTab === 'statement' && !!user,
+  });
+
+  const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
+    queryKey: ['my-payments'],
+    queryFn: () => api.get('/payments/me'),
+    enabled: activeTab === 'payments' && !!user,
+  });
+
   const orders = ordersData?.data?.data || [];
   const bookings = bookingsData?.data?.data || [];
   const tickets = ticketsData?.data?.data || [];
   const snackOrders = snackOrdersData?.data?.data || [];
+  const statement = statementData?.data?.data || [];
+  const payments = paymentsData?.data?.data || [];
 
   useEffect(() => {
     if (user) {
@@ -189,6 +231,8 @@ export default function ProfilePage() {
     { id: 'snacks' as TabType, label: t('tabs.snacks'), icon: Cookie },
     { id: 'bookings' as TabType, label: t('tabs.bookings'), icon: Home },
     { id: 'tickets' as TabType, label: t('tabs.tickets'), icon: Ticket },
+    { id: 'statement' as TabType, label: 'Statement', icon: Calendar },
+    { id: 'payments' as TabType, label: 'Payments', icon: Shield },
   ];
 
   return (
@@ -598,6 +642,104 @@ export default function ProfilePage() {
                               {formatCurrency(ticket.total_amount, currency)}
                             </span>
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {activeTab === 'statement' && (
+            <motion.div
+              key="statement"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5" />
+                    Unified Statement
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                    <Input type="date" value={statementFrom} onChange={(e) => setStatementFrom(e.target.value)} />
+                    <Input type="date" value={statementTo} onChange={(e) => setStatementTo(e.target.value)} />
+                  </div>
+                  {statementLoading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                    </div>
+                  ) : statement.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500">No statement activity found</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {statement.map((row: StatementRecord) => (
+                        <div key={`${row.type}-${row.id}`} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium">{row.type.replace(/_/g, ' ')}</span>
+                            <span className={`px-2 py-1 rounded-full text-xs ${statusColors[row.status || 'pending'] || statusColors.pending}`}>
+                              {(row.status || 'recorded').toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500 mb-1">{formatDate(row.created_at)}</div>
+                          <div className="text-sm text-slate-700 dark:text-slate-300">
+                            Ref: {row.order_number || row.booking_number || row.ticket_number || row.reference_id || row.id}
+                          </div>
+                          <div className="font-semibold mt-1">
+                            {row.total_amount !== undefined
+                              ? formatCurrency(Number(row.total_amount), currency)
+                              : row.amount !== undefined
+                                ? formatCurrency(Number(row.amount), currency)
+                                : `${row.points || 0} pts`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {activeTab === 'payments' && (
+            <motion.div
+              key="payments"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
+                    My Payments
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {paymentsLoading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                    </div>
+                  ) : payments.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500">No payments found</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {payments.map((payment: PaymentRecord) => (
+                        <div key={payment.id} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium">{payment.reference_type || 'payment'}</span>
+                            <span className={`px-2 py-1 rounded-full text-xs ${statusColors[payment.status] || statusColors.pending}`}>
+                              {payment.status.toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500">{formatDate(payment.created_at)}</div>
+                          <div className="text-sm text-slate-700 dark:text-slate-300">For: {payment.reference_id || '-'}</div>
+                          <div className="font-semibold mt-1">{formatCurrency(Number(payment.amount || 0), currency)}</div>
                         </div>
                       ))}
                     </div>
