@@ -36,6 +36,9 @@ export class SchedulerService {
 
     // Daily membership renewal and expiration check
     this.scheduleMembershipRenewal();
+
+    // Daily KPI threshold alerts for managers/admins
+    this.scheduleDailyKPIAlerts();
     
     logger.info('Scheduler service initialized.');
   }
@@ -192,5 +195,92 @@ export class SchedulerService {
     });
 
     logger.info('Scheduled membership renewal job (0 2 * * *)');
+  }
+
+  /**
+   * Runs daily KPI threshold checks and emits alerts to managers/admins.
+   */
+  private static scheduleDailyKPIAlerts() {
+    // 08:30 daily local server time
+    cron.schedule('30 8 * * *', async () => {
+      logger.info('Starting scheduled KPI alert job...');
+      try {
+        const supabase = getSupabase();
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const dateStr = yesterday.toISOString().slice(0, 10);
+
+        const { data: targets, error: targetsError } = await supabase
+          .from('kpi_targets')
+          .select('property_id, kpi_code, target_value, stretch_target')
+          .eq('period_type', 'daily')
+          .eq('period_start', dateStr);
+
+        if (targetsError) {
+          logger.warn('KPI alert job: failed loading targets', targetsError);
+          return;
+        }
+
+        const rows = targets || [];
+        if (rows.length === 0) {
+          logger.info('KPI alert job: no daily targets found');
+          return;
+        }
+
+        for (const target of rows) {
+          try {
+            const kpis = await reportingService.getKPIs(
+              target.property_id,
+              { start: new Date(dateStr), end: new Date(dateStr) },
+              [target.kpi_code]
+            );
+            const value = Number(kpis?.[0]?.value || 0);
+            const targetValue = Number(target.target_value || 0);
+            const stretchValue = Number(target.stretch_target || 0);
+
+            if (targetValue <= 0) continue;
+
+            const belowTarget = value < targetValue;
+            const reachedStretch = stretchValue > 0 && value >= stretchValue;
+
+            if (!belowTarget && !reachedStretch) continue;
+
+            const severity = belowTarget ? 'warning' : 'success';
+            const message = belowTarget
+              ? `KPI ${target.kpi_code} is below target (${value} vs ${targetValue}) for ${dateStr}`
+              : `KPI ${target.kpi_code} reached stretch target (${value} vs ${stretchValue}) for ${dateStr}`;
+
+            emitToRole('manager', 'kpi:alert', {
+              severity,
+              propertyId: target.property_id,
+              kpiCode: target.kpi_code,
+              value,
+              targetValue,
+              stretchValue,
+              date: dateStr,
+              message,
+            });
+            emitToRole('admin', 'kpi:alert', {
+              severity,
+              propertyId: target.property_id,
+              kpiCode: target.kpi_code,
+              value,
+              targetValue,
+              stretchValue,
+              date: dateStr,
+              message,
+            });
+          } catch (innerError) {
+            logger.warn('KPI alert job: failed to evaluate target row', innerError);
+          }
+        }
+
+        logger.info('KPI alert job completed.');
+      } catch (error) {
+        logger.error('KPI alert job failed:', error);
+      }
+    });
+
+    logger.info('Scheduled KPI alert job (30 8 * * *)');
   }
 }
