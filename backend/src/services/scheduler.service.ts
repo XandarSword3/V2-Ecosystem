@@ -7,6 +7,7 @@ import { bookingRemindersService } from './booking-reminders.service.js';
 import { reportingService } from '../modules/reporting/reporting.service.js';
 import { businessMetricsService } from './business-metrics.service.js';
 import { emitToRole } from '../socket/index.js';
+import { runMembershipRenewalJob } from '../jobs/membership-renewal.job.js';
 
 export class SchedulerService {
   /**
@@ -32,6 +33,9 @@ export class SchedulerService {
     
     // Real-time dashboard metric push to admins (every 30 seconds)
     this.scheduleDashboardMetricPush();
+
+    // Daily membership renewal and expiration check
+    this.scheduleMembershipRenewal();
     
     logger.info('Scheduler service initialized.');
   }
@@ -171,5 +175,22 @@ export class SchedulerService {
       }
     }, 30_000);
     logger.info('Dashboard real-time metric push started (every 30s)');
+  }
+
+  /**
+   * Runs daily membership renewal checks.
+   */
+  private static scheduleMembershipRenewal() {
+    cron.schedule('0 2 * * *', async () => {
+      logger.info('Starting scheduled membership renewal job...');
+      try {
+        await runMembershipRenewalJob();
+        logger.info('Membership renewal job completed.');
+      } catch (error) {
+        logger.error('Membership renewal job failed:', error);
+      }
+    });
+
+    logger.info('Scheduled membership renewal job (0 2 * * *)');
   }
 }
