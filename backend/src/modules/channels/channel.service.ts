@@ -1,5 +1,6 @@
 import { getSupabase } from '../../database/connection.js';
 import crypto from 'crypto';
+import { OtaProvider, SiteMinderProvider } from './ota.provider.js';
 
 // Get supabase client (lazy-loaded via proxy to avoid initialization issues)
 const supabase = new Proxy({} as ReturnType<typeof getSupabase>, {
@@ -108,6 +109,13 @@ async function siteMinderRequest(
   return response.json();
 }
 
+function getOtaProvider(connection: { siteminder_property_id?: string | null }): OtaProvider | null {
+  if (connection.siteminder_property_id) {
+    return new SiteMinderProvider(siteMinderRequest);
+  }
+  return null;
+}
+
 // ==================== CONNECTION MANAGEMENT ====================
 
 export interface ChannelConnection {
@@ -214,9 +222,10 @@ export async function activateConnection(connectionId: string): Promise<void> {
   const connection = await getConnection(connectionId);
   if (!connection) throw new Error('Connection not found');
 
-  if (connection.siteminder_property_id) {
+  const provider = getOtaProvider(connection);
+  if (provider && connection.siteminder_property_id) {
     try {
-      await siteMinderRequest(`/properties/${connection.siteminder_property_id}`);
+      await provider.verifyProperty(connection.siteminder_property_id);
       await updateConnectionStatus(connectionId, 'active');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Verification failed';
@@ -401,17 +410,13 @@ export async function pushAvailability(
     }
 
     // Push to SiteMinder if configured
-    if (connection.siteminder_property_id) {
+    const provider = getOtaProvider(connection);
+    if (provider && connection.siteminder_property_id) {
       try {
-        await siteMinderRequest(`/properties/${connection.siteminder_property_id}/availability`, 'POST', {
-          updates: [{
-            roomTypeCode: mapping.channel_room_code,
-            dateRange: {
-              startDate: update.date,
-              endDate: update.date
-            },
-            inventory: update.available
-          }]
+        await provider.pushAvailability(connection.siteminder_property_id, {
+          roomTypeCode: mapping.channel_room_code,
+          date: update.date,
+          available: update.available,
         });
 
         await client
@@ -560,26 +565,18 @@ export async function pushRates(
     }
 
     // Push to SiteMinder
-    if (connection.siteminder_property_id) {
+    const provider = getOtaProvider(connection);
+    if (provider && connection.siteminder_property_id) {
       try {
-        await siteMinderRequest(`/properties/${connection.siteminder_property_id}/rates`, 'POST', {
-          updates: [{
-            roomTypeCode: roomMapping.channel_room_code,
-            rateCode: rateMapping.channel_rate_code,
-            dateRange: {
-              startDate: update.date,
-              endDate: update.date
-            },
-            rate: {
-              amount: finalRate,
-              currency: update.currency
-            },
-            restrictions: {
-              minStay: update.minStay,
-              maxStay: update.maxStay,
-              closed: update.closed
-            }
-          }]
+        await provider.pushRate(connection.siteminder_property_id, {
+          roomTypeCode: roomMapping.channel_room_code,
+          rateCode: rateMapping.channel_rate_code,
+          date: update.date,
+          amount: finalRate,
+          currency: update.currency,
+          minStay: update.minStay,
+          maxStay: update.maxStay,
+          closed: update.closed,
         });
 
         await client
