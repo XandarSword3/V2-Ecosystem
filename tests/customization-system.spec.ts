@@ -1,4 +1,4 @@
-import { test, expect, APIRequestContext } from '@playwright/test';
+import { test, expect, APIRequestContext } from './fixtures/auth.fixture';
 
 const ADMIN_EMAIL = 'admin@v2resort.com';
 const ADMIN_PASSWORD = 'admin123';
@@ -164,7 +164,7 @@ test.describe('Unified Customization System - E2E Browser Tests', () => {
     });
     
     // Give time for any redirects
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
   });
 
   test('Admin can access restaurant management', async ({ page }) => {
@@ -172,7 +172,7 @@ test.describe('Unified Customization System - E2E Browser Tests', () => {
     await page.goto(`${FRONTEND_URL}/admin/restaurant`);
     
     // Wait for page to load
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     
     // Check if page loaded successfully
     const pageTitle = await page.title();
@@ -199,7 +199,7 @@ test.describe('Unified Customization System - E2E Browser Tests', () => {
     await page.goto(`${FRONTEND_URL}/restaurant`);
     
     // Wait for menu to load
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     
     // Take screenshot
     await page.screenshot({ path: 'test-results/customer-restaurant.png' });

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 test.describe('Pool Operations [STF-POOL]', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe('Pool Operations [STF-POOL]', () => {
     const scanBtn = page.locator('button').filter({ hasText: /scan|F2/i });
     await expect(scanBtn.first()).toBeVisible();
     await page.keyboard.press('F2');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     const scanUI = page.locator('[class*="scan"], input[placeholder*="scan"], [class*="scanner"]');
     const scanCount = await scanUI.count();
     expect(scanCount).toBeGreaterThanOrEqual(0);
@@ -63,7 +63,7 @@ test.describe('Pool Operations [STF-POOL]', () => {
     const tab = page.locator('button, [role="tab"]').filter({ hasText: /maintenance|schedule|clean/i });
     await expect(tab.first()).toBeVisible();
     await tab.first().click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     const form = page.locator('form, [class*="maintenance"], textarea, select');
     await expect(form.first()).toBeVisible();
   });

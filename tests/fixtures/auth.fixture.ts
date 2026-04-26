@@ -1,4 +1,13 @@
-import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import {
+  test as base,
+  expect,
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from '@playwright/test';
 
 export type AuthRole = 'guest' | 'customer' | 'admin' | 'staff';
 
@@ -6,7 +15,12 @@ type AuthFixtures = {
   auth: {
     loginAs: (role: Exclude<AuthRole, 'guest'>) => Promise<void>;
     getApiToken: (role: Exclude<AuthRole, 'guest'>) => Promise<string>;
+    createRolePage: (role: Exclude<AuthRole, 'guest'>) => Promise<{ context: BrowserContext; page: Page }>;
   };
+  storageStatePaths: Record<Exclude<AuthRole, 'guest'>, string>;
+  adminPage: Page;
+  staffPage: Page;
+  customerPage: Page;
 };
 
 type RoleCredentials = {
@@ -16,6 +30,7 @@ type RoleCredentials = {
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
+const AUTH_STATE_DIR = path.join(process.cwd(), 'tests', '.auth');
 
 const ROLE_CREDENTIALS: Record<Exclude<AuthRole, 'guest'>, RoleCredentials> = {
   customer: {
@@ -46,6 +61,19 @@ const ROLE_CREDENTIAL_FALLBACKS: Record<Exclude<AuthRole, 'guest'>, RoleCredenti
 };
 
 const tokenCache = new Map<string, string>();
+
+function roleStorageStatePath(role: Exclude<AuthRole, 'guest'>): string {
+  return path.join(AUTH_STATE_DIR, `${role}.json`);
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function getCredentialCandidates(role: Exclude<AuthRole, 'guest'>): RoleCredentials[] {
   const primary = ROLE_CREDENTIALS[role];
@@ -112,17 +140,116 @@ async function loginViaUi(page: Page, role: Exclude<AuthRole, 'guest'>): Promise
   throw new Error(`UI login failed for role ${role}: still on login page`);
 }
 
+async function ensureRoleStorageState(
+  browser: Browser,
+  role: Exclude<AuthRole, 'guest'>,
+): Promise<string> {
+  const storagePath = roleStorageStatePath(role);
+  const forceRefresh = String(process.env.PW_FORCE_REFRESH_AUTH_STATE || '').toLowerCase() === 'true';
+
+  await fs.mkdir(AUTH_STATE_DIR, { recursive: true });
+
+  if (!forceRefresh && (await fileExists(storagePath))) {
+    return storagePath;
+  }
+
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  try {
+    await loginViaUi(page, role);
+    await context.storageState({ path: storagePath });
+    return storagePath;
+  } finally {
+    await context.close();
+  }
+}
+
+async function applyRoleStorageToPage(page: Page, storagePath: string): Promise<void> {
+  const state = JSON.parse(await fs.readFile(storagePath, 'utf8')) as {
+    cookies?: Array<Record<string, unknown>>;
+    origins?: Array<{ origin: string; localStorage?: Array<{ name: string; value: string }> }>;
+  };
+
+  const context = page.context();
+  await context.clearCookies();
+  if (state.cookies && state.cookies.length > 0) {
+    await context.addCookies(state.cookies as Parameters<BrowserContext['addCookies']>[0]);
+  }
+
+  const origins = state.origins || [];
+  for (const originState of origins) {
+    await page.goto(originState.origin, { waitUntil: 'domcontentloaded' });
+    await page.evaluate((items) => {
+      localStorage.clear();
+      for (const item of items || []) {
+        localStorage.setItem(item.name, item.value);
+      }
+    }, originState.localStorage || []);
+  }
+
+  await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+}
+
 export const test = base.extend<AuthFixtures>({
-  auth: async ({ page, request }, use) => {
+  storageStatePaths: [
+    async ({}, use) => {
+      await fs.mkdir(AUTH_STATE_DIR, { recursive: true });
+      const admin = roleStorageStatePath('admin');
+      const staff = roleStorageStatePath('staff');
+      const customer = roleStorageStatePath('customer');
+      await use({ admin, staff, customer });
+    },
+    { scope: 'worker' },
+  ],
+  auth: async ({ page, request, browser, storageStatePaths }, use) => {
     await use({
       loginAs: async (role) => {
-        await loginViaUi(page, role);
+        const storagePath = await ensureRoleStorageState(browser, role);
+        await applyRoleStorageToPage(page, storagePath);
       },
       getApiToken: async (role) => {
         return loginViaApi(request, role);
       },
+      createRolePage: async (role) => {
+        const storagePath = await ensureRoleStorageState(browser, role);
+        const context = await browser.newContext({ storageState: storagePath });
+        const rolePage = await context.newPage();
+        return { context, page: rolePage };
+      },
     });
+  },
+  adminPage: async ({ browser }, use) => {
+    const storagePath = await ensureRoleStorageState(browser, 'admin');
+    const context = await browser.newContext({ storageState: storagePath });
+    const rolePage = await context.newPage();
+    try {
+      await use(rolePage);
+    } finally {
+      await context.close();
+    }
+  },
+  staffPage: async ({ browser }, use) => {
+    const storagePath = await ensureRoleStorageState(browser, 'staff');
+    const context = await browser.newContext({ storageState: storagePath });
+    const rolePage = await context.newPage();
+    try {
+      await use(rolePage);
+    } finally {
+      await context.close();
+    }
+  },
+  customerPage: async ({ browser }, use) => {
+    const storagePath = await ensureRoleStorageState(browser, 'customer');
+    const context = await browser.newContext({ storageState: storagePath });
+    const rolePage = await context.newPage();
+    try {
+      await use(rolePage);
+    } finally {
+      await context.close();
+    }
   },
 });
 
+export type { APIRequestContext, Browser, BrowserContext, Page };
 export { expect };

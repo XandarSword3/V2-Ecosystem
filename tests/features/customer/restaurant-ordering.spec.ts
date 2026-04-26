@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 const FRONTEND = 'http://localhost:3000';
 const API = 'http://localhost:3005/api';
@@ -19,7 +19,7 @@ test.describe('Customer Restaurant Ordering [CUS-REST]', () => {
     const search = page.getByRole('searchbox').or(page.getByPlaceholder(/search|filter/i));
     await expect(search).toBeVisible();
     await search.fill('pizza');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     const results = page.locator('[class*="menu-item"], [class*="card"], [class*="product"]');
     const count = await results.count();
     expect(count).toBeGreaterThanOrEqual(0);

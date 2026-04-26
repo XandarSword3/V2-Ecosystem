@@ -12,7 +12,7 @@
  * 5. Restore original value (cleanup)
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from './fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
@@ -56,9 +56,7 @@ async function getApiToken(): Promise<string> {
 // HOMEPAGE CMS SYNC TESTS
 // ============================================
 test.describe('Homepage CMS Sync', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('Hero slide title change reflects on public homepage', async ({ page, request }) => {
+test('Hero slide title change reflects on public homepage', async ({ page, request }) => {
     // Get API token
     const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
@@ -210,7 +208,7 @@ test.describe('Homepage CMS Sync', () => {
         const saveButton = page.getByRole('button', { name: /save/i });
         if (await saveButton.isVisible()) {
           await saveButton.click();
-          await page.waitForTimeout(1000);
+          await page.waitForLoadState('networkidle');
         }
         
         // Verify section visibility changed on public page
@@ -239,9 +237,7 @@ test.describe('Homepage CMS Sync', () => {
 // APPEARANCE/THEME CMS SYNC TESTS
 // ============================================
 test.describe('Appearance/Theme CMS Sync', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('Theme preset change reflects across all public pages', async ({ page, request }) => {
+test('Theme preset change reflects across all public pages', async ({ page, request }) => {
     const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
@@ -265,7 +261,7 @@ test.describe('Appearance/Theme CMS Sync', () => {
       const saveButton = page.getByRole('button', { name: /save/i });
       if (await saveButton.isVisible()) {
         await saveButton.click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
       }
     }
     
@@ -314,7 +310,7 @@ test.describe('Appearance/Theme CMS Sync', () => {
       const saveButton = page.getByRole('button', { name: /save/i });
       if (await saveButton.isVisible()) {
         await saveButton.click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
       }
       
       // Check public page for color
@@ -349,9 +345,7 @@ test.describe('Appearance/Theme CMS Sync', () => {
 // FOOTER CMS SYNC TESTS
 // ============================================
 test.describe('Footer CMS Sync', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('Footer description change reflects on all public pages', async ({ page, request }) => {
+test('Footer description change reflects on all public pages', async ({ page, request }) => {
     const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
@@ -376,7 +370,7 @@ test.describe('Footer CMS Sync', () => {
       const saveButton = page.getByRole('button', { name: /save/i });
       if (await saveButton.isVisible()) {
         await saveButton.click();
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState('networkidle');
         
         // Check for success message
         const successMsg = page.getByText(/saved|success/i);
@@ -442,7 +436,7 @@ test.describe('Footer CMS Sync', () => {
 
       if (await saveButton.isVisible()) {
         await saveButton.click();
-        await page.waitForTimeout(1500);
+        await page.waitForLoadState('networkidle');
       }
 
       await page.goto(FRONTEND_URL, { waitUntil: 'networkidle' });
@@ -475,9 +469,7 @@ test.describe('Footer CMS Sync', () => {
 // NAVBAR CMS SYNC TESTS
 // ============================================
 test.describe('Navbar CMS Sync', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('Navbar menu items reflect on public navigation', async ({ page }) => {
+test('Navbar menu items reflect on public navigation', async ({ page }) => {
     await loginAsAdmin(page);
     
     await page.goto(`${FRONTEND_URL}/admin/settings/navbar`, { waitUntil: 'networkidle' });
@@ -520,9 +512,7 @@ test.describe('Navbar CMS Sync', () => {
 // TRANSLATIONS CMS SYNC TESTS
 // ============================================
 test.describe('Translations CMS Sync', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('Language switch reflects correct translations on public pages', async ({ page }) => {
+test('Language switch reflects correct translations on public pages', async ({ page }) => {
     // Test English
     await page.goto(FRONTEND_URL, { waitUntil: 'networkidle' });
     
@@ -534,13 +524,13 @@ test.describe('Translations CMS Sync', () => {
     if (switcherCount > 0) {
       // Click the language switcher to open dropdown
       await langSwitcher.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
       
       // Look for French option in dropdown/menu
       const frenchOption = page.locator('[role="option"], [role="menuitem"], li, button').filter({ hasText: /Français|French|FR/i }).first();
       if (await frenchOption.isVisible({ timeout: 2000 }).catch(() => false)) {
         await frenchOption.click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
         
         // Verify some French content appears
         const pageContent = await page.textContent('body');
@@ -553,11 +543,11 @@ test.describe('Translations CMS Sync', () => {
       
       // Try Arabic
       await langSwitcher.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
       const arabicOption = page.locator('[role="option"], [role="menuitem"], li, button').filter({ hasText: /العربية|Arabic|AR/i }).first();
       if (await arabicOption.isVisible({ timeout: 2000 }).catch(() => false)) {
         await arabicOption.click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
         
         // Verify RTL direction
         const direction = await page.evaluate(() => {
@@ -576,9 +566,7 @@ test.describe('Translations CMS Sync', () => {
 // RESTAURANT MENU CMS SYNC TESTS
 // ============================================
 test.describe('Restaurant Menu CMS Sync', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('Menu item changes reflect on public restaurant page', async ({ page, request }) => {
+test('Menu item changes reflect on public restaurant page', async ({ page, request }) => {
     const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
@@ -664,9 +652,7 @@ test.describe('Restaurant Menu CMS Sync', () => {
 // CHALET CMS SYNC TESTS
 // ============================================
 test.describe('Chalet CMS Sync', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('Chalet details change reflects on public listing', async ({ page, request }) => {
+test('Chalet details change reflects on public listing', async ({ page, request }) => {
     const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
@@ -710,9 +696,7 @@ test.describe('Chalet CMS Sync', () => {
 // POOL CMS SYNC TESTS
 // ============================================
 test.describe('Pool CMS Sync', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('Pool pricing change reflects on public booking page', async ({ page }) => {
+test('Pool pricing change reflects on public booking page', async ({ page }) => {
     await loginAsAdmin(page);
     
     // Navigate to pool settings
@@ -733,7 +717,7 @@ test.describe('Pool CMS Sync', () => {
       const saveButton = page.getByRole('button', { name: /save/i });
       if (await saveButton.isVisible()) {
         await saveButton.click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
       }
       
       // Check public pool page
@@ -760,9 +744,7 @@ test.describe('Pool CMS Sync', () => {
 // MODULE ENABLE/DISABLE SYNC TESTS
 // ============================================
 test.describe('Module Enable/Disable Sync', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('Disabled module shows unavailable message on public page', async ({ page, request }) => {
+test('Disabled module shows unavailable message on public page', async ({ page, request }) => {
     const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });
@@ -860,9 +842,7 @@ test.describe('Module Enable/Disable Sync', () => {
 // GENERAL SETTINGS SYNC TESTS
 // ============================================
 test.describe('General Settings CMS Sync', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('Resort name change reflects in header/title', async ({ page, request }) => {
+test('Resort name change reflects in header/title', async ({ page, request }) => {
     const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
     });

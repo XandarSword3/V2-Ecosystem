@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 // Iteration 15  Test Specification
 // BUG-15D: Pool recordEntry/recordExit catch blocks  no more mock success

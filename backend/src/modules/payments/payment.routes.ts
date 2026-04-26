@@ -18,10 +18,11 @@ const staffRoles = ['restaurant_staff', 'snack_bar_staff', 'chalet_staff', 'pool
 router.post('/record-cash', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.recordCashPayment);
 router.post('/record-manual', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.recordManualPayment);
 
-// Admin routes
-const adminRoles = ['super_admin'];
+// Admin + manager routes — managers need refund access for daily operations
+const adminRoles = ['admin', 'manager', 'super_admin'];
 router.get('/transactions', authenticate, authorize(...adminRoles), paymentController.getTransactions);
 router.get('/transactions/:id', authenticate, authorize(...adminRoles), paymentController.getTransaction);
 router.post('/transactions/:id/refund', authenticate, authorize(...adminRoles), rateLimits.sensitive, paymentController.refundPayment);
+
 
 export default router;

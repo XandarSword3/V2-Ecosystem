@@ -8,7 +8,7 @@
  * - Restaurant waitlist
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 import { waitForPageLoad, isVisible, getText, screenshot, URLS } from './helpers';
 
 async function getChaletDetailHref(page: any): Promise<string | null> {
@@ -51,7 +51,7 @@ test.describe('Engine B — Time-Exclusive Reservations', () => {
     test('displays chalet cards or empty state', async ({ page }) => {
       await page.goto('/chalets', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       // Look for chalet cards
       const body = (await page.textContent('body')) || '';
@@ -68,7 +68,7 @@ test.describe('Engine B — Time-Exclusive Reservations', () => {
     test('chalet cards show amenity icons', async ({ page }) => {
       await page.goto('/chalets', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       // Look for SVG icons (lucide icons for amenities)
       const svgIcons = page.locator('svg');
@@ -82,7 +82,7 @@ test.describe('Engine B — Time-Exclusive Reservations', () => {
     test('can navigate to chalet detail page', async ({ page }) => {
       await page.goto('/chalets', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const detailHref = await getChaletDetailHref(page);
 
@@ -102,7 +102,7 @@ test.describe('Engine B — Time-Exclusive Reservations', () => {
       // First get a chalet ID from the listing
       await page.goto('/chalets', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const detailHref = await getChaletDetailHref(page);
 
@@ -120,14 +120,14 @@ test.describe('Engine B — Time-Exclusive Reservations', () => {
         await screenshot(page, 'chalet-detail-page');
         expect(hasDetails).toBeTruthy();
       } else {
-        test.skip();
+        test.skip(true, "Test precondition failed (previously skipped)");
       }
     });
 
     test('has date picker for booking', async ({ page }) => {
       await page.goto('/chalets', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const detailHref = await getChaletDetailHref(page);
       if (detailHref) {
@@ -142,7 +142,7 @@ test.describe('Engine B — Time-Exclusive Reservations', () => {
         await screenshot(page, 'chalet-date-picker');
         expect(totalInteractive).toBeGreaterThan(0);
       } else {
-        test.skip();
+        test.skip(true, "Test precondition failed (previously skipped)");
       }
     });
   });

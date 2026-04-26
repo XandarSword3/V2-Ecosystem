@@ -10,7 +10,7 @@
  * - GDPR privacy dashboard
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 import { waitForPageLoad, isVisible, getText, screenshot, loginAsAdmin, apiLogin, uiLogin, URLS, CREDS } from './helpers';
 
 test.describe('Engine D — Ongoing Entitlements', () => {
@@ -23,7 +23,7 @@ test.describe('Engine D — Ongoing Entitlements', () => {
       const success = await loginAsAdmin(page);
       expect(success).toBeTruthy();
       // apiLogin injects tokens at /, navigate to /admin to verify access
-      await page.goto('/admin', { waitUntil: 'domcontentloaded' });
+      await page.goto('/admin', { waitUntil: 'commit', timeout: 30000 });
       await waitForPageLoad(page, { timeout: 20000 });
       const body = (await page.textContent('body')) || '';
       const hasAdmin = body.toLowerCase().includes('dashboard') ||
@@ -49,7 +49,7 @@ test.describe('Engine D — Ongoing Entitlements', () => {
     });
 
     test('invalid credentials show error', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'domcontentloaded' });
+      await page.goto('/login', { waitUntil: 'commit', timeout: 30000 });
       await waitForPageLoad(page, { timeout: 15000 });
 
       const emailInput = page.locator('input[type="email"]');
@@ -60,7 +60,7 @@ test.describe('Engine D — Ongoing Entitlements', () => {
         await emailInput.fill('nonexistent@test.com');
         await passwordInput.fill('wrongpassword');
         await page.locator('button[type="submit"]').first().click();
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
       }
 
       // Should still be on login page (not redirected)
@@ -86,12 +86,12 @@ test.describe('Engine D — Ongoing Entitlements', () => {
       const profileMenu = page.locator('[class*="profile"], [class*="avatar"], [class*="user"]').first();
       if (await profileMenu.isVisible().catch(() => false)) {
         await profileMenu.click();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle');
 
         const logoutBtn = page.locator('button, a').filter({ hasText: /logout|sign out|log out/i }).first();
         if (await logoutBtn.isVisible().catch(() => false)) {
           await logoutBtn.click();
-          await page.waitForTimeout(3000);
+          await page.waitForLoadState('networkidle');
           await screenshot(page, 'auth-logged-out');
         }
       }
@@ -113,7 +113,7 @@ test.describe('Engine D — Ongoing Entitlements', () => {
       });
       
       await page.goto('/profile', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(5000);
+      await page.waitForLoadState('networkidle');
 
       const currentUrl = page.url();
       await screenshot(page, 'profile-unauthenticated');
@@ -167,7 +167,7 @@ test.describe('Engine D — Ongoing Entitlements', () => {
       });
       
       await page.goto('/account/loyalty', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(5000);
+      await page.waitForLoadState('networkidle');
 
       const currentUrl = page.url();
       await screenshot(page, 'loyalty-unauthenticated');

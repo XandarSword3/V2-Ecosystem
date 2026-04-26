@@ -32,24 +32,27 @@ const CSRF_COOKIE_SECURE = process.env.NODE_ENV === 'production' || CSRF_COOKIE_
 // Methods that don't require CSRF protection (safe methods)
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
-// Paths that are exempt from CSRF protection
+// Paths that are exempt from CSRF protection.
+// KEEP THIS LIST MINIMAL.
+// Rule: Bearer-token clients (mobile, API) are already handled by the Bearer bypass at line ~132.
+// Only add here if the path is truly unauthenticated AND cannot use CSRF cookies at all.
 const EXEMPT_PATHS = [
+  // Auth bootstrapping — these are the only truly cookie-free public mutations
   '/api/v1/auth/login',
   '/api/v1/auth/register',
   '/api/v1/auth/refresh',
   '/api/v1/auth/forgot-password',
   '/api/v1/auth/reset-password',
-  '/api/v1/payments/webhook', // Stripe webhooks have their own signature verification
-  '/api/v1/pool/tickets', // Anonymous ticket purchases (protected by rate limiting instead)
-  '/api/v1/restaurant/orders', // Anonymous restaurant orders (protected by rate limiting instead)
-  '/api/v1/restaurant/reservations', // Anonymous table reservations
-  '/api/v1/restaurant/waitlist', // Anonymous waitlist join
-  '/api/v1/booking', // Anonymous booking requests
-  '/api/v1/kiosk', // Kiosk self-service (protected by device authentication)
+  // Stripe webhooks have their own HMAC signature — CSRF does not apply
+  '/api/v1/payments/webhook',
+  // Kiosk: device-authenticated with hardware token, not browser cookies
+  '/api/v1/kiosk',
+  // Health probes — no state change
   '/health',
   '/healthz',
   '/api/health',
 ];
+
 
 /**
  * Generate a cryptographically secure random token

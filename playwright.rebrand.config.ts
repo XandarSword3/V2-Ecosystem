@@ -4,9 +4,9 @@ export default defineConfig({
   testDir: './tests/rebrand',
   timeout: 600000,
   expect: { timeout: 30000 },
-  fullyParallel: false,
+  fullyParallel: true,
   retries: 0,
-  workers: 1,
+  workers: process.env.CI ? 4 : undefined,
   reporter: [['list']],
   use: {
     baseURL: 'http://localhost:3000',

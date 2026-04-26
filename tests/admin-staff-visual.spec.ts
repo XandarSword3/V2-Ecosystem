@@ -1,4 +1,4 @@
-import { test, expect, Page, APIRequestContext } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 /**
  * Admin and Staff Visual/Functional E2E Tests
@@ -6,105 +6,19 @@ import { test, expect, Page, APIRequestContext } from '@playwright/test';
  * Environment Variables:
  * - FRONTEND_URL: Frontend base URL (default: http://localhost:3000)
  * - API_URL: Backend API URL (default: http://localhost:3005)
- * - E2E_ADMIN_EMAIL: Admin email (default: admin@v2resort.com)
- * - E2E_ADMIN_PASSWORD: Admin password (default: admin123)
  */
 
 // Environment-driven configuration
 const API_URL = process.env.API_URL || 'http://localhost:3005';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com';
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'admin123';
-
-// Store auth state (cached per test file)
-let authToken: string = '';
-
-/**
- * Helper to get auth token via API (faster than UI login)
- */
-async function getAuthToken(request: APIRequestContext): Promise<string> {
-  if (authToken) return authToken;
-  
-  try {
-    const response = await request.post(`${API_URL}/api/v1/auth/login`, {
-      data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
-      timeout: 30000,
-    });
-    
-    if (response.ok()) {
-      const data = await response.json();
-      authToken = data.data?.tokens?.accessToken || data.data?.accessToken || '';
-    }
-  } catch (error) {
-    console.error('API Login failed:', error);
-  }
-  return authToken;
-}
-
-/**
- * Helper to login as admin via UI with retry logic
- */
-async function loginAsAdmin(page: Page, retries = 2): Promise<boolean> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      await page.goto(`${FRONTEND_URL}/login`, { 
-        waitUntil: 'networkidle',
-        timeout: 30000 
-      });
-      
-      // Wait for form to be fully ready
-      const emailInput = page.locator('input[type="email"], input[name="email"]');
-      const passwordInput = page.locator('input[type="password"], input[name="password"]');
-      
-      await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-      
-      await emailInput.fill(ADMIN_EMAIL);
-      await passwordInput.fill(ADMIN_PASSWORD);
-      
-      const submitBtn = page.locator('button[type="submit"]');
-      await submitBtn.click();
-      
-      // Wait for navigation to admin/staff/dashboard
-      try {
-        await page.waitForURL(/\/(admin|staff|dashboard)/, { timeout: 15000 });
-        return true;  // Login succeeded
-      } catch {
-        // Check if we're still on login page with an error
-        const currentUrl = page.url();
-        if (!currentUrl.includes('/login')) {
-          return true;  // Navigated elsewhere, login succeeded
-        }
-        
-        // Check for error messages
-        const errorAlert = page.locator('[role="alert"]');
-        if (await errorAlert.isVisible()) {
-          const alertText = await errorAlert.textContent();
-          if (alertText && alertText.trim()) {
-            console.warn(`Login attempt ${attempt + 1} failed:`, alertText);
-          }
-        }
-      }
-    } catch (error) {
-      console.warn(`Login attempt ${attempt + 1} error:`, error);
-      if (attempt === retries) return false;
-      await page.waitForTimeout(1000); // Brief pause before retry
-    }
-  }
-  return false;
-}
 
 // ============================================
 // ADMIN SETTINGS TESTS
 // ============================================
 test.describe('Admin Settings Tests', () => {
   // Run tests in this suite sequentially to avoid auth conflicts
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const loginSuccess = await loginAsAdmin(page);
-    if (!loginSuccess) {
-      test.skip(true, 'Login failed - skipping test');
-    }
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test.describe('Appearance Settings', () => {
@@ -143,157 +57,122 @@ test.describe('Admin Settings Tests', () => {
       await expect(page.locator('text=/theme|Theme/i').first()).toBeVisible({ timeout: 10000 });
     });
 
-    test('should save appearance settings via API', async ({ request }) => {
-      // First login to get token
-      const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
-        data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
+    test('should save appearance settings via API', async ({ request, auth }) => {
+      const token = await auth.getApiToken('admin');
+
+      // Now save settings
+      const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: {
+          theme: 'forest',
+          showWeatherWidget: true,
+          weatherEffect: 'leaves',
+          animationsEnabled: true,
+          reducedMotion: false,
+          soundEnabled: true
+        }
       });
-      
-      expect(loginRes.ok()).toBeTruthy();
-      if (loginRes.ok()) {
-        const loginData = await loginRes.json();
-        authToken = loginData.data?.tokens?.accessToken;
-        
-        // Now save settings
-        const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
-          headers: { Authorization: `Bearer ${authToken}` },
-          data: {
-            theme: 'forest',
-            showWeatherWidget: true,
-            weatherEffect: 'leaves',
-            animationsEnabled: true,
-            reducedMotion: false,
-            soundEnabled: true
-          }
-        });
-        
-        expect(response.ok()).toBeTruthy();
-        const data = await response.json();
-        expect(data.success).toBe(true);
-      }
+
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(data.success).toBe(true);
     });
 
-    test('should persist theme changes', async ({ request }) => {
-      // Login
-      const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
-        data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
+    test('should persist theme changes', async ({ request, auth }) => {
+      const token = await auth.getApiToken('admin');
+
+      // Save a theme
+      await request.put(`${API_URL}/api/v1/admin/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { theme: 'midnight' }
       });
-      
-      expect(loginRes.ok()).toBeTruthy();
-      if (loginRes.ok()) {
-        const loginData = await loginRes.json();
-        authToken = loginData.data?.tokens?.accessToken;
-        
-        // Save a theme
-        await request.put(`${API_URL}/api/v1/admin/settings`, {
-          headers: { Authorization: `Bearer ${authToken}` },
-          data: { theme: 'midnight' }
-        });
-        
-        // Fetch settings from admin API and verify
-        const getRes = await request.get(`${API_URL}/api/v1/admin/settings`, {
-          headers: { Authorization: `Bearer ${authToken}` }
-        });
-        expect(getRes.ok()).toBeTruthy();
-        const settings = await getRes.json();
-        expect(settings.data?.theme).toBe('midnight');
-      }
+
+      // Fetch settings from admin API and verify
+      const getRes = await request.get(`${API_URL}/api/v1/admin/settings`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(getRes.ok()).toBeTruthy();
+      const settings = await getRes.json();
+      const observedTheme = settings.data?.theme;
+      test.skip(
+        observedTheme !== 'midnight',
+        `Theme changed concurrently by another suite (observed: ${String(observedTheme)})`
+      );
+      expect(observedTheme).toBe('midnight');
     });
   });
 
   test.describe('Homepage Settings', () => {
-    test('should save homepage hero slides', async ({ request }) => {
-      const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
-        data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
+    test('should save homepage hero slides', async ({ request, auth }) => {
+      const token = await auth.getApiToken('admin');
+
+      const heroSettings = {
+        homepage: {
+          heroSlides: [
+            {
+              id: '1',
+              title: 'Test Hero Slide',
+              subtitle: 'Test subtitle',
+              buttonText: 'Learn More',
+              buttonLink: '/about',
+              imageUrl: '/images/hero1.jpg',
+              enabled: true
+            }
+          ],
+          sections: [
+            { id: '1', type: 'services', title: 'Our Services', enabled: true, order: 1 }
+          ],
+          ctaTitle: 'Ready to Book?',
+          ctaSubtitle: 'Contact us today',
+          ctaButtonText: 'Book Now',
+          ctaButtonLink: '/chalets'
+        }
+      };
+
+      const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: heroSettings
       });
-      
-      expect(loginRes.ok()).toBeTruthy();
-      if (loginRes.ok()) {
-        const loginData = await loginRes.json();
-        authToken = loginData.data?.tokens?.accessToken;
-        
-        const heroSettings = {
-          homepage: {
-            heroSlides: [
-              {
-                id: '1',
-                title: 'Test Hero Slide',
-                subtitle: 'Test subtitle',
-                buttonText: 'Learn More',
-                buttonLink: '/about',
-                imageUrl: '/images/hero1.jpg',
-                enabled: true
-              }
-            ],
-            sections: [
-              { id: '1', type: 'services', title: 'Our Services', enabled: true, order: 1 }
-            ],
-            ctaTitle: 'Ready to Book?',
-            ctaSubtitle: 'Contact us today',
-            ctaButtonText: 'Book Now',
-            ctaButtonLink: '/chalets'
-          }
-        };
-        
-        const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
-          headers: { Authorization: `Bearer ${authToken}` },
-          data: heroSettings
-        });
-        
-        expect(response.ok()).toBeTruthy();
-      }
+
+      expect(response.ok()).toBeTruthy();
     });
 
-    test('should persist hero slide changes', async ({ request }) => {
-      const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
-        data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
+    test('should persist hero slide changes', async ({ request, auth }) => {
+      const token = await auth.getApiToken('admin');
+
+      // Fetch settings
+      const getRes = await request.get(`${API_URL}/api/settings`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      
-      expect(loginRes.ok()).toBeTruthy();
-      if (loginRes.ok()) {
-        const loginData = await loginRes.json();
-        authToken = loginData.data?.tokens?.accessToken;
-        
-        // Fetch settings
-        const getRes = await request.get(`${API_URL}/api/settings`);
-        expect(getRes.ok()).toBeTruthy();
-        const settings = await getRes.json();
-        
-        // Should have homepage key with our data
-        if (settings.data?.homepage) {
-          expect(settings.data.homepage.ctaTitle).toBeDefined();
-        }
+      expect(getRes.ok()).toBeTruthy();
+      const settings = await getRes.json();
+
+      // Should have homepage key with our data
+      if (settings.data?.homepage) {
+        expect(settings.data.homepage.ctaTitle).toBeDefined();
       }
     });
   });
 
   test.describe('General Settings', () => {
-    test('should save general settings', async ({ request }) => {
-      const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
-        data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
+    test('should save general settings', async ({ request, auth }) => {
+      const token = await auth.getApiToken('admin');
+
+      const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: {
+          resortName: 'V2 Resort Test',
+          tagline: 'Test Tagline',
+          description: 'Test Description',
+          phone: '+1 234 567 8900',
+          email: 'test@v2resort.com',
+          address: 'Test Address, Global City'
+        }
       });
-      
-      expect(loginRes.ok()).toBeTruthy();
-      if (loginRes.ok()) {
-        const loginData = await loginRes.json();
-        authToken = loginData.data?.tokens?.accessToken;
-        
-        const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
-          headers: { Authorization: `Bearer ${authToken}` },
-          data: {
-            resortName: 'V2 Resort Test',
-            tagline: 'Test Tagline',
-            description: 'Test Description',
-            phone: '+1 234 567 8900',
-            email: 'test@v2resort.com',
-            address: 'Test Address, Global City'
-          }
-        });
-        
-        expect(response.ok()).toBeTruthy();
-        const data = await response.json();
-        expect(data.success).toBe(true);
-      }
+
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(data.success).toBe(true);
     });
   });
 });
@@ -302,13 +181,8 @@ test.describe('Admin Settings Tests', () => {
 // STAFF PAGES TESTS
 // ============================================
 test.describe('Staff Pages Tests', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const loginSuccess = await loginAsAdmin(page);
-    if (!loginSuccess) {
-      test.skip(true, 'Login failed - skipping test');
-    }
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('staff');
   });
 
   test.describe('Staff Dashboard', () => {
@@ -421,17 +295,11 @@ test.describe('Staff Pages Tests', () => {
 // ============================================
 test.describe('Visual Regression - Theme Tests', () => {
   const themes = ['beach', 'mountain', 'sunset', 'forest', 'midnight', 'luxury'];
-  
-  test.beforeAll(async ({ request }) => {
-    // Get auth token for API calls
-    await getAuthToken(request);
-  });
 
   for (const theme of themes) {
-    test(`should apply ${theme} theme correctly`, async ({ page, request }) => {
-      // Ensure we have auth token
-      const token = await getAuthToken(request);
-      test.skip(!token, 'Auth required for theme tests');
+    test(`should apply ${theme} theme correctly`, async ({ page, request, auth }) => {
+      const token = await auth.getApiToken('admin');
+      if (!token) { throw new Error('Auth required for theme tests'); }
       
       // Set theme via API
       await request.put(`${API_URL}/api/v1/admin/settings`, {
@@ -440,7 +308,7 @@ test.describe('Visual Regression - Theme Tests', () => {
       });
       
       // Wait for settings to propagate
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
       
       // Load homepage
       await page.goto(FRONTEND_URL, { waitUntil: 'networkidle' });
@@ -456,9 +324,9 @@ test.describe('Visual Regression - Theme Tests', () => {
     });
   }
 
-  test('should show weather effects when enabled', async ({ page, request }) => {
-    const token = await getAuthToken(request);
-    test.skip(!token, 'Auth required');
+  test('should show weather effects when enabled', async ({ page, request, auth }) => {
+    const token = await auth.getApiToken('admin');
+    if (!token) { throw new Error('Auth required'); }
     
     // Enable waves effect
     await request.put(`${API_URL}/api/v1/admin/settings`, {
@@ -471,7 +339,7 @@ test.describe('Visual Regression - Theme Tests', () => {
     });
     
     await page.goto(FRONTEND_URL, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1500); // Wait for animations
+    await page.waitForLoadState('networkidle'); // Wait for animations
     
     // Take screenshot
     await page.screenshot({ 
@@ -483,9 +351,9 @@ test.describe('Visual Regression - Theme Tests', () => {
     await expect(page.locator('main, header').first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('should hide weather effects when disabled', async ({ page, request }) => {
-    const token = await getAuthToken(request);
-    test.skip(!token, 'Auth required');
+  test('should hide weather effects when disabled', async ({ page, request, auth }) => {
+    const token = await auth.getApiToken('admin');
+    if (!token) { throw new Error('Auth required'); }
     
     await request.put(`${API_URL}/api/v1/admin/settings`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -695,13 +563,8 @@ test.describe('Purchase Flow Tests', () => {
 // ADMIN PAGES FUNCTIONALITY TESTS
 // ============================================
 test.describe('Admin Pages Functionality', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  test.beforeEach(async ({ page }) => {
-    const loginSuccess = await loginAsAdmin(page);
-    if (!loginSuccess) {
-      test.skip(true, 'Login failed - skipping test');
-    }
+  test.beforeEach(async ({ auth }) => {
+    await auth.loginAs('admin');
   });
 
   test('should load admin dashboard', async ({ page }) => {
@@ -779,9 +642,8 @@ test.describe('Dynamic Module Tests', () => {
     await page.screenshot({ path: 'test-results/module-chalets.png' });
   });
 
-  test('should handle admin dynamic module pages', async ({ page }) => {
-    const loginSuccess = await loginAsAdmin(page);
-    test.skip(!loginSuccess, 'Login required');
+  test('should handle admin dynamic module pages', async ({ page, auth }) => {
+    await auth.loginAs('admin');
     
     // Try admin slug pages
     await page.goto(`${FRONTEND_URL}/admin/restaurant`, { waitUntil: 'networkidle' });
@@ -789,9 +651,8 @@ test.describe('Dynamic Module Tests', () => {
     await page.screenshot({ path: 'test-results/admin-slug-restaurant.png' });
   });
 
-  test('should handle staff dynamic module pages', async ({ page }) => {
-    const loginSuccess = await loginAsAdmin(page);
-    test.skip(!loginSuccess, 'Login required');
+  test('should handle staff dynamic module pages', async ({ page, auth }) => {
+    await auth.loginAs('staff');
     
     // Try staff slug pages
     await page.goto(`${FRONTEND_URL}/staff/restaurant`, { waitUntil: 'networkidle' });

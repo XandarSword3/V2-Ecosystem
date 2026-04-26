@@ -1,4 +1,4 @@
-import { test, expect, Page, APIRequestContext } from '@playwright/test';
+import { test, expect, Page, APIRequestContext } from './fixtures/auth.fixture';
 
 /**
  * Stress Testing Utilities for V2 Resort Ecosystem

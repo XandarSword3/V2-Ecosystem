@@ -13,7 +13,7 @@
  * to redirect compiled remote-backend URLs to localhost.
  */
 
-import { test, expect, Page, Browser } from '@playwright/test';
+import { test, expect, Page, Browser } from '../fixtures/auth.fixture';
 import {
   URLS, CREDS, fullSetup, setupApiProxy, getAuthToken,
   getCsrfToken, getAuthHeaders, screenshot, waitForPageLoad,
@@ -95,7 +95,7 @@ test.describe('ENGINE A — Restaurant Order Full Lifecycle', () => {
 
       // ── PHASE 1: Customer browses restaurant menu (FRONTEND) ──
       await customerPage.goto('/restaurant', { waitUntil: 'domcontentloaded' });
-      await customerPage.waitForTimeout(3000);
+      await customerPage.waitForLoadState('networkidle');
 
       // Verify menu page renders with items
       const pageText = await customerPage.textContent('body');
@@ -146,7 +146,7 @@ test.describe('ENGINE A — Restaurant Order Full Lifecycle', () => {
 
       // ── PHASE 4: Staff sees the order on kitchen display (FRONTEND) ──
       await staffPage.goto('/staff/restaurant', { waitUntil: 'domcontentloaded' });
-      await staffPage.waitForTimeout(3000);
+      await staffPage.waitForLoadState('networkidle');
       await screenshot(staffPage, 'J-A1-02-staff-kitchen-display');
 
       // Also verify via staff API that the order is visible
@@ -197,7 +197,7 @@ test.describe('ENGINE A — Restaurant Order Full Lifecycle', () => {
 
       // ── PHASE 6: Admin sees order in admin panel (FRONTEND + API) ──
       await adminPage.goto('/admin/orders', { waitUntil: 'domcontentloaded' });
-      await adminPage.waitForTimeout(3000);
+      await adminPage.waitForLoadState('networkidle');
       await screenshot(adminPage, 'J-A1-03-admin-orders-page');
 
       // Admin API verification
@@ -280,7 +280,7 @@ test.describe('ENGINE A — Restaurant Order Full Lifecycle', () => {
 
       // ── PHASE 2: Admin sees coupon in admin panel (FRONTEND) ──
       await adminPage.goto('/admin/coupons', { waitUntil: 'domcontentloaded' });
-      await adminPage.waitForTimeout(3000);
+      await adminPage.waitForLoadState('networkidle');
       await screenshot(adminPage, 'J-A2-01-admin-coupons-page');
 
       // Verify via API that coupon exists
@@ -396,7 +396,7 @@ test.describe('ENGINE A — Restaurant Order Full Lifecycle', () => {
       // Navigate to the frontend to verify the confirmation page or order history
       // The restaurant frontend shows /restaurant/confirmation after order
       await page.goto('/restaurant', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
       await screenshot(page, 'J-A3-01-restaurant-after-order');
 
     } finally {
@@ -440,7 +440,7 @@ test.describe('ENGINE A — Restaurant Order Full Lifecycle', () => {
 
       // Staff navigates to kitchen display
       await staffPage.goto('/staff/restaurant', { waitUntil: 'domcontentloaded' });
-      await staffPage.waitForTimeout(4000); // wait for orders to load
+      await staffPage.waitForLoadState('networkidle'); // wait for orders to load
 
       // Verify the page renders (staff restaurant page should show orders)
       const staffBody = await staffPage.textContent('body');

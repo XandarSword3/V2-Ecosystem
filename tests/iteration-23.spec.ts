@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Iteration 23  AbortController: Bookings, FloorPlan, Chalets', () => {
   test('FIX-23A: staff/bookings has AbortController', async ({ page }) => {

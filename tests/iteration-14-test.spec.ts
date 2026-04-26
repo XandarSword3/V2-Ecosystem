@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 // Iteration 14  Test Specification
 // BUG-14A: staff/manager AbortController for 6 parallel API calls

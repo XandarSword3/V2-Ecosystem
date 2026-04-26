@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Iteration 4 — SVG Path Animation + Footer Links', () => {
   test('BUG-4A: No SVG path console errors on page load', async ({ page }) => {

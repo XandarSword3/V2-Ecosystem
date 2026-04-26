@@ -1695,3 +1695,4354 @@ Timestamp: 2026-03-27T13:20:44.344Z
 ======================================================================
 # REBRAND #5 COMPLETE: Midnight Luxe Hotel
 ======================================================================
+
+======================================================================
+# REBRAND #4: Emerald Forest Retreat
+======================================================================
+Theme: Cedar Forest (forest)
+Tagline: "Nature's Luxury Hideaway"
+Timestamp: 2026-04-06T12:40:34.408Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Emerald Forest Retreat"
+  - Tagline: "Nature's Luxury Hideaway"
+  - Description: "Emerald Forest Retreat is an eco-luxury hideaway nestled dee..."
+  - Phone: "+62 361 975 888"
+  - Email: "nature@emeraldforestretreat.com"
+  - Address: "88 Rainforest Trail, Ubud, Bali 80571, Indonesia"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 29
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13826
+  - Buttons found: 35 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Cedar Forest" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Emerald Forest Retreat"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13197
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13367
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Emerald Forest Retreat"
+  - Hero Subtitle: "Nature's Luxury Hideaway"
+  - CTA inputs found: 5
+  - CTA: "Ready to Reconnect with Nature?" / "Explore Nature"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13226
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Treehouse, Treehouses, Lagoon, Lagoons, Garden Kitchen, Garden Kitchens
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12971 chars)
+  - Sidebar: 14 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #4 COMPLETE: Emerald Forest Retreat
+======================================================================
+
+======================================================================
+# REBRAND #3: Golden Sunset Spa
+======================================================================
+Theme: Golden Sunset (sunset)
+Tagline: "Radiance Awaits"
+Timestamp: 2026-04-06T12:40:34.047Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Golden Sunset Spa"
+  - Tagline: "Radiance Awaits"
+  - Description: "Golden Sunset Spa is a luxury wellness destination offering ..."
+  - Phone: "+30 2286 070000"
+  - Email: "wellness@goldensunset.spa"
+  - Address: "7 Caldera View, Oia, Santorini 84702, Greece"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 29
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13826
+  - Buttons found: 35 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Golden Sunset" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Golden Sunset Spa"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13197
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13367
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Golden Sunset Spa"
+  - Hero Subtitle: "Radiance Awaits"
+  - CTA inputs found: 5
+  - CTA: "Begin Your Wellness Journey?" / "Book Treatment"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13226
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Suite, Suites, Spa, Spas, Bistro, Bistros
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12971 chars)
+  - Sidebar: 14 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #3 COMPLETE: Golden Sunset Spa
+======================================================================
+
+======================================================================
+# REBRAND #2: Alpine Peak Lodge
+======================================================================
+Theme: Mountain Retreat (mountain)
+Tagline: "Summit of Luxury"
+Timestamp: 2026-04-06T12:40:27.296Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Alpine Peak Lodge"
+  - Tagline: "Summit of Luxury"
+  - Description: "Alpine Peak Lodge is an exclusive mountain retreat offering ..."
+  - Phone: "+41 27 966 0000"
+  - Email: "concierge@alpinepeaklodge.com"
+  - Address: "42 Summit Ridge, Zermatt, Valais, Switzerland"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 29
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13489
+  - Buttons found: 35 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Mountain Retreat" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Alpine Peak Lodge"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12860
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13004
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Alpine Peak Lodge"
+  - Hero Subtitle: "Summit of Luxury"
+  - CTA inputs found: 5
+  - CTA: "Ready for a Mountain Adventure?" / "Reserve Your Stay"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12838
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Chalet, Chalets, Spa, Spas, Lodge Dining, Lodge Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12971 chars)
+  - Sidebar: 14 items
+  - Settings Name: "Alpine Peak Lodge" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #2 COMPLETE: Alpine Peak Lodge
+======================================================================
+
+======================================================================
+# REBRAND #1: Azure Bay Resort
+======================================================================
+Theme: Beach Paradise (beach)
+Tagline: "Where the Ocean Meets Paradise"
+Timestamp: 2026-04-06T12:40:27.053Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Azure Bay Resort"
+  - Tagline: "Where the Ocean Meets Paradise"
+  - Description: "Azure Bay Resort is a premier oceanfront destination offerin..."
+  - Phone: "+1 (555) 289-2929"
+  - Email: "reservations@azurebayresort.com"
+  - Address: "1 Azure Bay Drive, Crystal Cove, FL 33101"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [12:40:32.272] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [12:40:32.272] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 29
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13489
+  - Buttons found: 35 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Beach Paradise" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Azure Bay Resort"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12860
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13004
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Azure Bay Resort"
+  - Hero Subtitle: "Where the Ocean Meets Paradise"
+  - CTA inputs found: 5
+  - CTA: "Ready to Experience Paradise?" / "Book Now"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12838
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Cabana, Cabanas, Pool, Pools, Restaurant, Restaurants
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12971 chars)
+  - Sidebar: 14 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #1 COMPLETE: Azure Bay Resort
+======================================================================
+
+======================================================================
+# REBRAND #5: Midnight Luxe Hotel
+======================================================================
+Theme: Midnight Sky (midnight)
+Tagline: "Where Elegance Meets the Night"
+Timestamp: 2026-04-06T12:42:24.358Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Midnight Luxe Hotel"
+  - Tagline: "Where Elegance Meets the Night"
+  - Description: "Midnight Luxe Hotel is an ultra-premium boutique hotel offer..."
+  - Phone: "+971 4 888 0000"
+  - Email: "vip@midnightluxehotel.com"
+  - Address: "1 Royal Boulevard, Downtown Dubai, UAE"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 29
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13983
+  - Buttons found: 35 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Midnight Sky" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Midnight Luxe Hotel"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13210
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13354
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Midnight Luxe Hotel"
+  - Hero Subtitle: "Where Elegance Meets the Night"
+  - CTA inputs found: 5
+  - CTA: "Ready for Ultimate Luxury?" / "Reserve Suite"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12430
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Extra Features Test | Extra Features Test | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings
+  - [DEBUG] Has "Terminology": false
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": false
+  - Term inputs found: 7
+  - Terms: Penthouse, Penthouses, Rooftop Pool, Rooftop Pools, Fine Dining, Fine Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Midnight Luxe Hotel | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13117 chars)
+  - Sidebar: 14 items
+  - Settings Name: "Midnight Luxe Hotel" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #5 COMPLETE: Midnight Luxe Hotel
+======================================================================
+
+======================================================================
+# REBRAND #1: Azure Bay Resort
+======================================================================
+Theme: Beach Paradise (beach)
+Tagline: "Where the Ocean Meets Paradise"
+Timestamp: 2026-04-06T14:34:16.039Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Azure Bay Resort"
+  - Tagline: "Where the Ocean Meets Paradise"
+  - Description: "Azure Bay Resort is a premier oceanfront destination offerin..."
+  - Phone: "+1 (555) 289-2929"
+  - Email: "reservations@azurebayresort.com"
+  - Address: "1 Azure Bay Drive, Crystal Cove, FL 33101"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: [14:34:25.003] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [14:34:25.003] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13451
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Beach Paradise" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Azure Bay Resort"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Azure Bay Resort"
+  - Hero Subtitle: "Where the Ocean Meets Paradise"
+  - CTA inputs found: 5
+  - CTA: "Ready to Experience Paradise?" / "Book Now"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12828
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Cabana, Cabanas, Pool, Pools, Restaurant, Restaurants
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ⚠️
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12933 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #1 COMPLETE: Azure Bay Resort
+======================================================================
+
+======================================================================
+# REBRAND #2: Alpine Peak Lodge
+======================================================================
+Theme: Mountain Retreat (mountain)
+Tagline: "Summit of Luxury"
+Timestamp: 2026-04-06T14:34:21.573Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Alpine Peak Lodge"
+  - Tagline: "Summit of Luxury"
+  - Description: "Alpine Peak Lodge is an exclusive mountain retreat offering ..."
+  - Phone: "+41 27 966 0000"
+  - Email: "concierge@alpinepeaklodge.com"
+  - Address: "42 Summit Ridge, Zermatt, Valais, Switzerland"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13451
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Mountain Retreat" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Alpine Peak Lodge"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Alpine Peak Lodge"
+  - Hero Subtitle: "Summit of Luxury"
+  - CTA inputs found: 5
+  - CTA: "Ready for a Mountain Adventure?" / "Reserve Your Stay"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12825
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Chalet, Chalets, Spa, Spas, Lodge Dining, Lodge Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ⚠️
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12933 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #2 COMPLETE: Alpine Peak Lodge
+======================================================================
+
+======================================================================
+# REBRAND #4: Emerald Forest Retreat
+======================================================================
+Theme: Cedar Forest (forest)
+Tagline: "Nature's Luxury Hideaway"
+Timestamp: 2026-04-06T14:34:28.700Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Emerald Forest Retreat"
+  - Tagline: "Nature's Luxury Hideaway"
+  - Description: "Emerald Forest Retreat is an eco-luxury hideaway nestled dee..."
+  - Phone: "+62 361 975 888"
+  - Email: "nature@emeraldforestretreat.com"
+  - Address: "88 Rainforest Trail, Ubud, Bali 80571, Indonesia"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13788
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Cedar Forest" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Emerald Forest Retreat"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Emerald Forest Retreat"
+  - Hero Subtitle: "Nature's Luxury Hideaway"
+  - CTA inputs found: 5
+  - CTA: "Ready to Reconnect with Nature?" / "Explore Nature"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13162
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Treehouse, Treehouses, Lagoon, Lagoons, Garden Kitchen, Garden Kitchens
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12933 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #4 COMPLETE: Emerald Forest Retreat
+======================================================================
+
+======================================================================
+# REBRAND #3: Golden Sunset Spa
+======================================================================
+Theme: Golden Sunset (sunset)
+Tagline: "Radiance Awaits"
+Timestamp: 2026-04-06T14:34:28.516Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Golden Sunset Spa"
+  - Tagline: "Radiance Awaits"
+  - Description: "Golden Sunset Spa is a luxury wellness destination offering ..."
+  - Phone: "+30 2286 070000"
+  - Email: "wellness@goldensunset.spa"
+  - Address: "7 Caldera View, Oia, Santorini 84702, Greece"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13801
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Golden Sunset" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Golden Sunset Spa"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13172
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13316
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Golden Sunset Spa"
+  - Hero Subtitle: "Radiance Awaits"
+  - CTA inputs found: 5
+  - CTA: "Begin Your Wellness Journey?" / "Book Treatment"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13165
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Suite, Suites, Spa, Spas, Bistro, Bistros
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ⚠️
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12933 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ✅
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #3 COMPLETE: Golden Sunset Spa
+======================================================================
+
+======================================================================
+# REBRAND #5: Midnight Luxe Hotel
+======================================================================
+Theme: Midnight Sky (midnight)
+Tagline: "Where Elegance Meets the Night"
+Timestamp: 2026-04-06T14:36:05.687Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Midnight Luxe Hotel"
+  - Tagline: "Where Elegance Meets the Night"
+  - Description: "Midnight Luxe Hotel is an ultra-premium boutique hotel offer..."
+  - Phone: "+971 4 888 0000"
+  - Email: "vip@midnightluxehotel.com"
+  - Address: "1 Royal Boulevard, Downtown Dubai, UAE"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13801
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Midnight Sky" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Midnight Luxe Hotel"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13172
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13316
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Midnight Luxe Hotel"
+  - Hero Subtitle: "Where Elegance Meets the Night"
+  - ⚠️ CTA: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  -
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13316
+  - [DEBUG] Input count: 21
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": false
+  - Term inputs found: 1
+  - Terms: Penthouse, Penthouses, Rooftop Pool, Rooftop Pools, Fine Dining, Fine Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Midnight Luxe Hotel | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13079 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Midnight Luxe Hotel" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #5 COMPLETE: Midnight Luxe Hotel
+======================================================================
+
+======================================================================
+# REBRAND #2: Alpine Peak Lodge
+======================================================================
+Theme: Mountain Retreat (mountain)
+Tagline: "Summit of Luxury"
+Timestamp: 2026-04-06T14:52:55.344Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Alpine Peak Lodge"
+  - Tagline: "Summit of Luxury"
+  - Description: "Alpine Peak Lodge is an exclusive mountain retreat offering ..."
+  - Phone: "+41 27 966 0000"
+  - Email: "concierge@alpinepeaklodge.com"
+  - Address: "42 Summit Ridge, Zermatt, Valais, Switzerland"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [14:53:01.734] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa | [14:53:01.734] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13451
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Mountain Retreat" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Alpine Peak Lodge"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Alpine Peak Lodge"
+  - Hero Subtitle: "Summit of Luxury"
+  - CTA inputs found: 5
+  - CTA: "Ready for a Mountain Adventure?" / "Reserve Your Stay"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12828
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Chalet, Chalets, Spa, Spas, Lodge Dining, Lodge Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12933 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #2 COMPLETE: Alpine Peak Lodge
+======================================================================
+
+======================================================================
+# REBRAND #1: Azure Bay Resort
+======================================================================
+Theme: Beach Paradise (beach)
+Tagline: "Where the Ocean Meets Paradise"
+Timestamp: 2026-04-06T14:52:45.912Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Azure Bay Resort"
+  - Tagline: "Where the Ocean Meets Paradise"
+  - Description: "Azure Bay Resort is a premier oceanfront destination offerin..."
+  - Phone: "+1 (555) 289-2929"
+  - Email: "reservations@azurebayresort.com"
+  - Address: "1 Azure Bay Drive, Crystal Cove, FL 33101"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13595
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Beach Paradise" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Azure Bay Resort"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Azure Bay Resort"
+  - Hero Subtitle: "Where the Ocean Meets Paradise"
+  - CTA inputs found: 5
+  - CTA: "Ready to Experience Paradise?" / "Book Now"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12828
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Cabana, Cabanas, Pool, Pools, Restaurant, Restaurants
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ⚠️
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12933 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #1 COMPLETE: Azure Bay Resort
+======================================================================
+
+======================================================================
+# REBRAND #3: Golden Sunset Spa
+======================================================================
+Theme: Golden Sunset (sunset)
+Tagline: "Radiance Awaits"
+Timestamp: 2026-04-06T14:53:01.083Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Golden Sunset Spa"
+  - Tagline: "Radiance Awaits"
+  - Description: "Golden Sunset Spa is a luxury wellness destination offering ..."
+  - Phone: "+30 2286 070000"
+  - Email: "wellness@goldensunset.spa"
+  - Address: "7 Caldera View, Oia, Santorini 84702, Greece"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [14:53:06.904] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [14:53:06.904] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13932
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Golden Sunset" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Golden Sunset Spa"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Golden Sunset Spa"
+  - Hero Subtitle: "Radiance Awaits"
+  - CTA inputs found: 5
+  - CTA: "Begin Your Wellness Journey?" / "Book Treatment"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13149
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Suite, Suites, Spa, Spas, Bistro, Bistros
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ⚠️
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12933 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #3 COMPLETE: Golden Sunset Spa
+======================================================================
+
+======================================================================
+# REBRAND #4: Emerald Forest Retreat
+======================================================================
+Theme: Cedar Forest (forest)
+Tagline: "Nature's Luxury Hideaway"
+Timestamp: 2026-04-06T14:53:01.663Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Emerald Forest Retreat"
+  - Tagline: "Nature's Luxury Hideaway"
+  - Description: "Emerald Forest Retreat is an eco-luxury hideaway nestled dee..."
+  - Phone: "+62 361 975 888"
+  - Email: "nature@emeraldforestretreat.com"
+  - Address: "88 Rainforest Trail, Ubud, Bali 80571, Indonesia"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13932
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Cedar Forest" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Emerald Forest Retreat"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Emerald Forest Retreat"
+  - Hero Subtitle: "Nature's Luxury Hideaway"
+  - CTA inputs found: 5
+  - CTA: "Ready to Reconnect with Nature?" / "Explore Nature"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13152
+  - [DEBUG] Input count: 0
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Treehouse, Treehouses, Lagoon, Lagoons, Garden Kitchen, Garden Kitchens
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12933 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #4 COMPLETE: Emerald Forest Retreat
+======================================================================
+
+======================================================================
+# REBRAND #5: Midnight Luxe Hotel
+======================================================================
+Theme: Midnight Sky (midnight)
+Tagline: "Where Elegance Meets the Night"
+Timestamp: 2026-04-06T14:54:27.848Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Midnight Luxe Hotel"
+  - Tagline: "Where Elegance Meets the Night"
+  - Description: "Midnight Luxe Hotel is an ultra-premium boutique hotel offer..."
+  - Phone: "+971 4 888 0000"
+  - Email: "vip@midnightluxehotel.com"
+  - Address: "1 Royal Boulevard, Downtown Dubai, UAE"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [14:54:32.219] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [14:54:32.219] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13801
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Midnight Sky" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Midnight Luxe Hotel"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13172
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13316
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Midnight Luxe Hotel"
+  - Hero Subtitle: "Where Elegance Meets the Night"
+  - CTA inputs found: 5
+  - CTA: "Ready for Ultimate Luxury?" / "Reserve Suite"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13175
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Penthouse, Penthouses, Rooftop Pool, Rooftop Pools, Fine Dining, Fine Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Midnight Luxe Hotel | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13018 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Midnight Luxe Hotel" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ✅
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #5 COMPLETE: Midnight Luxe Hotel
+======================================================================
+
+======================================================================
+# REBRAND #2: Alpine Peak Lodge
+======================================================================
+Theme: Mountain Retreat (mountain)
+Tagline: "Summit of Luxury"
+Timestamp: 2026-04-06T15:10:02.234Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Alpine Peak Lodge"
+  - Tagline: "Summit of Luxury"
+  - Description: "Alpine Peak Lodge is an exclusive mountain retreat offering ..."
+  - Phone: "+41 27 966 0000"
+  - Email: "concierge@alpinepeaklodge.com"
+  - Address: "42 Summit Ridge, Zermatt, Valais, Switzerland"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [15:10:06.979] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [15:10:06.979] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13595
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Mountain Retreat" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Alpine Peak Lodge"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Alpine Peak Lodge"
+  - Hero Subtitle: "Summit of Luxury"
+  - CTA inputs found: 5
+  - CTA: "Ready for a Mountain Adventure?" / "Reserve Your Stay"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12812
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Chalet, Chalets, Spa, Spas, Lodge Dining, Lodge Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Golden Sunset Spa | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12983 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Golden Sunset Spa" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #2 COMPLETE: Alpine Peak Lodge
+======================================================================
+
+======================================================================
+# REBRAND #1: Azure Bay Resort
+======================================================================
+Theme: Beach Paradise (beach)
+Tagline: "Where the Ocean Meets Paradise"
+Timestamp: 2026-04-06T15:09:54.738Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Azure Bay Resort"
+  - Tagline: "Where the Ocean Meets Paradise"
+  - Description: "Azure Bay Resort is a premier oceanfront destination offerin..."
+  - Phone: "+1 (555) 289-2929"
+  - Email: "reservations@azurebayresort.com"
+  - Address: "1 Azure Bay Drive, Crystal Cove, FL 33101"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13595
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Beach Paradise" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Azure Bay Resort"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Azure Bay Resort"
+  - Hero Subtitle: "Where the Ocean Meets Paradise"
+  - CTA inputs found: 5
+  - CTA: "Ready to Experience Paradise?" / "Book Now"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12825
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Cabana, Cabanas, Pool, Pools, Restaurant, Restaurants
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Golden Sunset Spa | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12983 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Golden Sunset Spa" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #1 COMPLETE: Azure Bay Resort
+======================================================================
+
+======================================================================
+# REBRAND #3: Golden Sunset Spa
+======================================================================
+Theme: Golden Sunset (sunset)
+Tagline: "Radiance Awaits"
+Timestamp: 2026-04-06T15:10:03.789Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Golden Sunset Spa"
+  - Tagline: "Radiance Awaits"
+  - Description: "Golden Sunset Spa is a luxury wellness destination offering ..."
+  - Phone: "+30 2286 070000"
+  - Email: "wellness@goldensunset.spa"
+  - Address: "7 Caldera View, Oia, Santorini 84702, Greece"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13932
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Golden Sunset" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Golden Sunset Spa"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Golden Sunset Spa"
+  - Hero Subtitle: "Radiance Awaits"
+  - CTA inputs found: 5
+  - CTA: "Begin Your Wellness Journey?" / "Book Treatment"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13162
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Suite, Suites, Spa, Spas, Bistro, Bistros
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Golden Sunset Spa | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12983 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Golden Sunset Spa" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #3 COMPLETE: Golden Sunset Spa
+======================================================================
+
+======================================================================
+# REBRAND #4: Emerald Forest Retreat
+======================================================================
+Theme: Cedar Forest (forest)
+Tagline: "Nature's Luxury Hideaway"
+Timestamp: 2026-04-06T15:10:07.756Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Emerald Forest Retreat"
+  - Tagline: "Nature's Luxury Hideaway"
+  - Description: "Emerald Forest Retreat is an eco-luxury hideaway nestled dee..."
+  - Phone: "+62 361 975 888"
+  - Email: "nature@emeraldforestretreat.com"
+  - Address: "88 Rainforest Trail, Ubud, Bali 80571, Indonesia"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [15:10:12.556] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [15:10:12.556] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13788
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Cedar Forest" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Emerald Forest Retreat"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Emerald Forest Retreat"
+  - Hero Subtitle: "Nature's Luxury Hideaway"
+  - CTA inputs found: 5
+  - CTA: "Ready to Reconnect with Nature?" / "Explore Nature"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13188
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Treehouse, Treehouses, Lagoon, Lagoons, Garden Kitchen, Garden Kitchens
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Golden Sunset Spa | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12983 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Golden Sunset Spa" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #4 COMPLETE: Emerald Forest Retreat
+======================================================================
+
+======================================================================
+# REBRAND #5: Midnight Luxe Hotel
+======================================================================
+Theme: Midnight Sky (midnight)
+Tagline: "Where Elegance Meets the Night"
+Timestamp: 2026-04-06T15:11:43.342Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Midnight Luxe Hotel"
+  - Tagline: "Where Elegance Meets the Night"
+  - Description: "Midnight Luxe Hotel is an ultra-premium boutique hotel offer..."
+  - Phone: "+971 4 888 0000"
+  - Email: "vip@midnightluxehotel.com"
+  - Address: "1 Royal Boulevard, Downtown Dubai, UAE"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [15:11:49.879] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa | [15:11:49.879] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13841
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Midnight Sky" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Midnight Luxe Hotel"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13212
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13356
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Midnight Luxe Hotel"
+  - Hero Subtitle: "Where Elegance Meets the Night"
+  - CTA inputs found: 5
+  - CTA: "Ready for Ultimate Luxury?" / "Reserve Suite"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13179
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Penthouse, Penthouses, Rooftop Pool, Rooftop Pools, Fine Dining, Fine Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Midnight Luxe Hotel | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13018 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Midnight Luxe Hotel" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #5 COMPLETE: Midnight Luxe Hotel
+======================================================================
+
+======================================================================
+# REBRAND #3: Golden Sunset Spa
+======================================================================
+Theme: Golden Sunset (sunset)
+Tagline: "Radiance Awaits"
+Timestamp: 2026-04-06T15:31:20.294Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Golden Sunset Spa"
+  - Tagline: "Radiance Awaits"
+  - Description: "Golden Sunset Spa is a luxury wellness destination offering ..."
+  - Phone: "+30 2286 070000"
+  - Email: "wellness@goldensunset.spa"
+  - Address: "7 Caldera View, Oia, Santorini 84702, Greece"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [15:31:25.015] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa | [15:31:25.015] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13595
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Golden Sunset" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Golden Sunset Spa"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Golden Sunset Spa"
+  - Hero Subtitle: "Radiance Awaits"
+  - CTA inputs found: 5
+  - CTA: "Begin Your Wellness Journey?" / "Book Treatment"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12825
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Suite, Suites, Spa, Spas, Bistro, Bistros
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Azure Bay Resort | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12976 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Azure Bay Resort" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #3 COMPLETE: Golden Sunset Spa
+======================================================================
+
+======================================================================
+# REBRAND #1: Azure Bay Resort
+======================================================================
+Theme: Beach Paradise (beach)
+Tagline: "Where the Ocean Meets Paradise"
+Timestamp: 2026-04-06T15:31:04.015Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Azure Bay Resort"
+  - Tagline: "Where the Ocean Meets Paradise"
+  - Description: "Azure Bay Resort is a premier oceanfront destination offerin..."
+  - Phone: "+1 (555) 289-2929"
+  - Email: "reservations@azurebayresort.com"
+  - Address: "1 Azure Bay Drive, Crystal Cove, FL 33101"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [15:31:17.450] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [15:31:17.451] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13595
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Beach Paradise" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Azure Bay Resort"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Azure Bay Resort"
+  - Hero Subtitle: "Where the Ocean Meets Paradise"
+  - CTA inputs found: 5
+  - CTA: "Ready to Experience Paradise?" / "Book Now"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12815
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Cabana, Cabanas, Pool, Pools, Restaurant, Restaurants
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Azure Bay Resort | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12976 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Azure Bay Resort" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #1 COMPLETE: Azure Bay Resort
+======================================================================
+
+======================================================================
+# REBRAND #2: Alpine Peak Lodge
+======================================================================
+Theme: Mountain Retreat (mountain)
+Tagline: "Summit of Luxury"
+Timestamp: 2026-04-06T15:31:07.368Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Alpine Peak Lodge"
+  - Tagline: "Summit of Luxury"
+  - Description: "Alpine Peak Lodge is an exclusive mountain retreat offering ..."
+  - Phone: "+41 27 966 0000"
+  - Email: "concierge@alpinepeaklodge.com"
+  - Address: "42 Summit Ridge, Zermatt, Valais, Switzerland"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [15:31:17.281] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa | [15:31:17.281] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13451
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Mountain Retreat" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Alpine Peak Lodge"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Alpine Peak Lodge"
+  - Hero Subtitle: "Summit of Luxury"
+  - CTA inputs found: 5
+  - CTA: "Ready for a Mountain Adventure?" / "Reserve Your Stay"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12812
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Chalet, Chalets, Spa, Spas, Lodge Dining, Lodge Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Azure Bay Resort | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12918 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Azure Bay Resort" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #2 COMPLETE: Alpine Peak Lodge
+======================================================================
+
+======================================================================
+# REBRAND #4: Emerald Forest Retreat
+======================================================================
+Theme: Cedar Forest (forest)
+Tagline: "Nature's Luxury Hideaway"
+Timestamp: 2026-04-06T15:31:24.205Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Emerald Forest Retreat"
+  - Tagline: "Nature's Luxury Hideaway"
+  - Description: "Emerald Forest Retreat is an eco-luxury hideaway nestled dee..."
+  - Phone: "+62 361 975 888"
+  - Email: "nature@emeraldforestretreat.com"
+  - Address: "88 Rainforest Trail, Ubud, Bali 80571, Indonesia"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [15:31:28.418] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [15:31:28.419] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13932
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Cedar Forest" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Emerald Forest Retreat"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Emerald Forest Retreat"
+  - Hero Subtitle: "Nature's Luxury Hideaway"
+  - CTA inputs found: 5
+  - CTA: "Ready to Reconnect with Nature?" / "Explore Nature"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13162
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Treehouse, Treehouses, Lagoon, Lagoons, Garden Kitchen, Garden Kitchens
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Azure Bay Resort | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12976 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Azure Bay Resort" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #4 COMPLETE: Emerald Forest Retreat
+======================================================================
+
+======================================================================
+# REBRAND #5: Midnight Luxe Hotel
+======================================================================
+Theme: Midnight Sky (midnight)
+Tagline: "Where Elegance Meets the Night"
+Timestamp: 2026-04-06T15:32:48.438Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Midnight Luxe Hotel"
+  - Tagline: "Where Elegance Meets the Night"
+  - Description: "Midnight Luxe Hotel is an ultra-premium boutique hotel offer..."
+  - Phone: "+971 4 888 0000"
+  - Email: "vip@midnightluxehotel.com"
+  - Address: "1 Royal Boulevard, Downtown Dubai, UAE"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: [15:32:53.447] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [15:32:53.447] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13788
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Midnight Sky" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Midnight Luxe Hotel"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Midnight Luxe Hotel"
+  - Hero Subtitle: "Where Elegance Meets the Night"
+  - CTA inputs found: 5
+  - CTA: "Ready for Ultimate Luxury?" / "Reserve Suite"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13162
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Penthouse, Penthouses, Rooftop Pool, Rooftop Pools, Fine Dining, Fine Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Midnight Luxe Hotel | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13018 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Midnight Luxe Hotel" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #5 COMPLETE: Midnight Luxe Hotel
+======================================================================
+
+======================================================================
+# REBRAND #1: Azure Bay Resort
+======================================================================
+Theme: Beach Paradise (beach)
+Tagline: "Where the Ocean Meets Paradise"
+Timestamp: 2026-04-06T15:49:14.096Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Azure Bay Resort"
+  - Tagline: "Where the Ocean Meets Paradise"
+  - Description: "Azure Bay Resort is a premier oceanfront destination offerin..."
+  - Phone: "+1 (555) 289-2929"
+  - Email: "reservations@azurebayresort.com"
+  - Address: "1 Azure Bay Drive, Crystal Cove, FL 33101"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [15:49:22.979] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [15:49:22.979] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13451
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Beach Paradise" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Azure Bay Resort"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Azure Bay Resort"
+  - Hero Subtitle: "Where the Ocean Meets Paradise"
+  - CTA inputs found: 5
+  - CTA: "Ready to Experience Paradise?" / "Book Now"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12825
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Cabana, Cabanas, Pool, Pools, Restaurant, Restaurants
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Azure Bay Resort | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12976 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Azure Bay Resort" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #1 COMPLETE: Azure Bay Resort
+======================================================================
+
+======================================================================
+# REBRAND #2: Alpine Peak Lodge
+======================================================================
+Theme: Mountain Retreat (mountain)
+Tagline: "Summit of Luxury"
+Timestamp: 2026-04-06T15:49:25.779Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Alpine Peak Lodge"
+  - Tagline: "Summit of Luxury"
+  - Description: "Alpine Peak Lodge is an exclusive mountain retreat offering ..."
+  - Phone: "+41 27 966 0000"
+  - Email: "concierge@alpinepeaklodge.com"
+  - Address: "42 Summit Ridge, Zermatt, Valais, Switzerland"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [15:49:30.328] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa | [15:49:30.328] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13451
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Mountain Retreat" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Alpine Peak Lodge"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Alpine Peak Lodge"
+  - Hero Subtitle: "Summit of Luxury"
+  - CTA inputs found: 5
+  - CTA: "Ready for a Mountain Adventure?" / "Reserve Your Stay"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12825
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Chalet, Chalets, Spa, Spas, Lodge Dining, Lodge Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Azure Bay Resort | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12918 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Azure Bay Resort" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #2 COMPLETE: Alpine Peak Lodge
+======================================================================
+
+======================================================================
+# REBRAND #4: Emerald Forest Retreat
+======================================================================
+Theme: Cedar Forest (forest)
+Tagline: "Nature's Luxury Hideaway"
+Timestamp: 2026-04-06T15:49:27.152Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Emerald Forest Retreat"
+  - Tagline: "Nature's Luxury Hideaway"
+  - Description: "Emerald Forest Retreat is an eco-luxury hideaway nestled dee..."
+  - Phone: "+62 361 975 888"
+  - Email: "nature@emeraldforestretreat.com"
+  - Address: "88 Rainforest Trail, Ubud, Bali 80571, Indonesia"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13788
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Cedar Forest" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Emerald Forest Retreat"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Emerald Forest Retreat"
+  - Hero Subtitle: "Nature's Luxury Hideaway"
+  - CTA inputs found: 5
+  - CTA: "Ready to Reconnect with Nature?" / "Explore Nature"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13152
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Treehouse, Treehouses, Lagoon, Lagoons, Garden Kitchen, Garden Kitchens
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Azure Bay Resort | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12918 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Azure Bay Resort" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #4 COMPLETE: Emerald Forest Retreat
+======================================================================
+
+======================================================================
+# REBRAND #3: Golden Sunset Spa
+======================================================================
+Theme: Golden Sunset (sunset)
+Tagline: "Radiance Awaits"
+Timestamp: 2026-04-06T15:49:26.824Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Golden Sunset Spa"
+  - Tagline: "Radiance Awaits"
+  - Description: "Golden Sunset Spa is a luxury wellness destination offering ..."
+  - Phone: "+30 2286 070000"
+  - Email: "wellness@goldensunset.spa"
+  - Address: "7 Caldera View, Oia, Santorini 84702, Greece"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13788
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Golden Sunset" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Golden Sunset Spa"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Golden Sunset Spa"
+  - Hero Subtitle: "Radiance Awaits"
+  - CTA inputs found: 5
+  - CTA: "Begin Your Wellness Journey?" / "Book Treatment"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13152
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Suite, Suites, Spa, Spas, Bistro, Bistros
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Azure Bay Resort | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12918 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Azure Bay Resort" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #3 COMPLETE: Golden Sunset Spa
+======================================================================
+
+======================================================================
+# REBRAND #5: Midnight Luxe Hotel
+======================================================================
+Theme: Midnight Sky (midnight)
+Tagline: "Where Elegance Meets the Night"
+Timestamp: 2026-04-06T15:50:54.440Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Midnight Luxe Hotel"
+  - Tagline: "Where Elegance Meets the Night"
+  - Description: "Midnight Luxe Hotel is an ultra-premium boutique hotel offer..."
+  - Phone: "+971 4 888 0000"
+  - Email: "vip@midnightluxehotel.com"
+  - Address: "1 Royal Boulevard, Downtown Dubai, UAE"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [15:51:00.547] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa | [15:51:00.548] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13788
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Midnight Sky" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Midnight Luxe Hotel"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Midnight Luxe Hotel"
+  - Hero Subtitle: "Where Elegance Meets the Night"
+  - CTA inputs found: 5
+  - CTA: "Ready for Ultimate Luxury?" / "Reserve Suite"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13162
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Penthouse, Penthouses, Rooftop Pool, Rooftop Pools, Fine Dining, Fine Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Midnight Luxe Hotel | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13018 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Midnight Luxe Hotel" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #5 COMPLETE: Midnight Luxe Hotel
+======================================================================
+
+======================================================================
+# REBRAND #3: Golden Sunset Spa
+======================================================================
+Theme: Golden Sunset (sunset)
+Tagline: "Radiance Awaits"
+Timestamp: 2026-04-06T16:07:44.466Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Golden Sunset Spa"
+  - Tagline: "Radiance Awaits"
+  - Description: "Golden Sunset Spa is a luxury wellness destination offering ..."
+  - Phone: "+30 2286 070000"
+  - Email: "wellness@goldensunset.spa"
+  - Address: "7 Caldera View, Oia, Santorini 84702, Greece"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [16:07:49.157] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [16:07:49.157] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13451
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Golden Sunset" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Golden Sunset Spa"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Golden Sunset Spa"
+  - Hero Subtitle: "Radiance Awaits"
+  - CTA inputs found: 5
+  - CTA: "Begin Your Wellness Journey?" / "Book Treatment"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12812
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Suite, Suites, Spa, Spas, Bistro, Bistros
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Emerald Forest Retreat | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13186 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Emerald Forest Retreat" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #3 COMPLETE: Golden Sunset Spa
+======================================================================
+
+======================================================================
+# REBRAND #2: Alpine Peak Lodge
+======================================================================
+Theme: Mountain Retreat (mountain)
+Tagline: "Summit of Luxury"
+Timestamp: 2026-04-06T16:07:41.091Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Alpine Peak Lodge"
+  - Tagline: "Summit of Luxury"
+  - Description: "Alpine Peak Lodge is an exclusive mountain retreat offering ..."
+  - Phone: "+41 27 966 0000"
+  - Email: "concierge@alpinepeaklodge.com"
+  - Address: "42 Summit Ridge, Zermatt, Valais, Switzerland"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13595
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Mountain Retreat" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Alpine Peak Lodge"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Alpine Peak Lodge"
+  - Hero Subtitle: "Summit of Luxury"
+  - CTA inputs found: 5
+  - CTA: "Ready for a Mountain Adventure?" / "Reserve Your Stay"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12815
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Chalet, Chalets, Spa, Spas, Lodge Dining, Lodge Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Emerald Forest Retreat | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13128 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Emerald Forest Retreat" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #2 COMPLETE: Alpine Peak Lodge
+======================================================================
+
+======================================================================
+# REBRAND #1: Azure Bay Resort
+======================================================================
+Theme: Beach Paradise (beach)
+Tagline: "Where the Ocean Meets Paradise"
+Timestamp: 2026-04-06T16:07:40.924Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Azure Bay Resort"
+  - Tagline: "Where the Ocean Meets Paradise"
+  - Description: "Azure Bay Resort is a premier oceanfront destination offerin..."
+  - Phone: "+1 (555) 289-2929"
+  - Email: "reservations@azurebayresort.com"
+  - Address: "1 Azure Bay Drive, Crystal Cove, FL 33101"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [16:07:45.574] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [16:07:45.575] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13595
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Beach Paradise" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Azure Bay Resort"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Azure Bay Resort"
+  - Hero Subtitle: "Where the Ocean Meets Paradise"
+  - CTA inputs found: 5
+  - CTA: "Ready to Experience Paradise?" / "Book Now"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12815
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Cabana, Cabanas, Pool, Pools, Restaurant, Restaurants
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Emerald Forest Retreat | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13186 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Emerald Forest Retreat" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #1 COMPLETE: Azure Bay Resort
+======================================================================
+
+======================================================================
+# REBRAND #4: Emerald Forest Retreat
+======================================================================
+Theme: Cedar Forest (forest)
+Tagline: "Nature's Luxury Hideaway"
+Timestamp: 2026-04-06T16:07:47.245Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Emerald Forest Retreat"
+  - Tagline: "Nature's Luxury Hideaway"
+  - Description: "Emerald Forest Retreat is an eco-luxury hideaway nestled dee..."
+  - Phone: "+62 361 975 888"
+  - Email: "nature@emeraldforestretreat.com"
+  - Address: "88 Rainforest Trail, Ubud, Bali 80571, Indonesia"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [16:07:52.858] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [16:07:52.858] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13451
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Cedar Forest" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Emerald Forest Retreat"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12822
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12966
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Emerald Forest Retreat"
+  - Hero Subtitle: "Nature's Luxury Hideaway"
+  - CTA inputs found: 5
+  - CTA: "Ready to Reconnect with Nature?" / "Explore Nature"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12851
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Treehouse, Treehouses, Lagoon, Lagoons, Garden Kitchen, Garden Kitchens
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Emerald Forest Retreat | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13128 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Emerald Forest Retreat" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #4 COMPLETE: Emerald Forest Retreat
+======================================================================
+
+======================================================================
+# REBRAND #5: Midnight Luxe Hotel
+======================================================================
+Theme: Midnight Sky (midnight)
+Tagline: "Where Elegance Meets the Night"
+Timestamp: 2026-04-06T16:09:10.354Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Midnight Luxe Hotel"
+  - Tagline: "Where Elegance Meets the Night"
+  - Description: "Midnight Luxe Hotel is an ultra-premium boutique hotel offer..."
+  - Phone: "+971 4 888 0000"
+  - Email: "vip@midnightluxehotel.com"
+  - Address: "1 Royal Boulevard, Downtown Dubai, UAE"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [16:09:15.784] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [16:09:15.785] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 14106
+  - Buttons found: 33 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 1, Selects: 0
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Midnight Sky" selected
+  - ⚠️ Weather location input not found
+  - ⚠️ Weather effect select not found
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Midnight Luxe Hotel"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13333
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13477
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Midnight Luxe Hotel"
+  - Hero Subtitle: "Where Elegance Meets the Night"
+  - CTA inputs found: 5
+  - CTA: "Ready for Ultimate Luxury?" / "Reserve Suite"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13336
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Penthouse, Penthouses, Rooftop Pool, Rooftop Pools, Fine Dining, Fine Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Midnight Luxe Hotel | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13018 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Midnight Luxe Hotel" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #5 COMPLETE: Midnight Luxe Hotel
+======================================================================
+
+======================================================================
+# REBRAND #4: Emerald Forest Retreat
+======================================================================
+Theme: Cedar Forest (forest)
+Tagline: "Nature's Luxury Hideaway"
+Timestamp: 2026-04-06T16:26:18.913Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Emerald Forest Retreat"
+  - Tagline: "Nature's Luxury Hideaway"
+  - Description: "Emerald Forest Retreat is an eco-luxury hideaway nestled dee..."
+  - Phone: "+62 361 975 888"
+  - Email: "nature@emeraldforestretreat.com"
+  - Address: "88 Rainforest Trail, Ubud, Bali 80571, Indonesia"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [16:26:23.276] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [16:26:23.277] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 14227
+  - Buttons found: 37 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 2, Selects: 1
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Cedar Forest" selected
+  - Weather Location: "Bali, Indonesia"
+  - Weather Effect: "leaves"
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Emerald Forest Retreat"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13172
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13316
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Emerald Forest Retreat"
+  - Hero Subtitle: "Nature's Luxury Hideaway"
+  - CTA inputs found: 5
+  - CTA: "Ready to Reconnect with Nature?" / "Explore Nature"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13215
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Treehouse, Treehouses, Lagoon, Lagoons, Garden Kitchen, Garden Kitchens
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12983 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #4 COMPLETE: Emerald Forest Retreat
+======================================================================
+
+======================================================================
+# REBRAND #1: Azure Bay Resort
+======================================================================
+Theme: Beach Paradise (beach)
+Tagline: "Where the Ocean Meets Paradise"
+Timestamp: 2026-04-06T16:25:58.455Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Azure Bay Resort"
+  - Tagline: "Where the Ocean Meets Paradise"
+  - Description: "Azure Bay Resort is a premier oceanfront destination offerin..."
+  - Phone: "+1 (555) 289-2929"
+  - Email: "reservations@azurebayresort.com"
+  - Address: "1 Azure Bay Drive, Crystal Cove, FL 33101"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 14021
+  - Buttons found: 37 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 2, Selects: 1
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Beach Paradise" selected
+  - Weather Location: "Miami Beach, USA"
+  - Weather Effect: "waves"
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Azure Bay Resort"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12850
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12994
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Azure Bay Resort"
+  - Hero Subtitle: "Where the Ocean Meets Paradise"
+  - CTA inputs found: 5
+  - CTA: "Ready to Experience Paradise?" / "Book Now"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12851
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Cabana, Cabanas, Pool, Pools, Restaurant, Restaurants
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12983 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #1 COMPLETE: Azure Bay Resort
+======================================================================
+
+======================================================================
+# REBRAND #3: Golden Sunset Spa
+======================================================================
+Theme: Golden Sunset (sunset)
+Tagline: "Radiance Awaits"
+Timestamp: 2026-04-06T16:26:14.314Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Golden Sunset Spa"
+  - Tagline: "Radiance Awaits"
+  - Description: "Golden Sunset Spa is a luxury wellness destination offering ..."
+  - Phone: "+30 2286 070000"
+  - Email: "wellness@goldensunset.spa"
+  - Address: "7 Caldera View, Oia, Santorini 84702, Greece"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 14221
+  - Buttons found: 37 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 2, Selects: 1
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Golden Sunset" selected
+  - Weather Location: "Santorini, Greece"
+  - Weather Effect: "sunny"
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Golden Sunset Spa"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13159
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13303
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Golden Sunset Spa"
+  - Hero Subtitle: "Radiance Awaits"
+  - CTA inputs found: 5
+  - CTA: "Begin Your Wellness Journey?" / "Book Treatment"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13204
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Suite, Suites, Spa, Spas, Bistro, Bistros
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ❌
+  - Name visible: ⚠️
+  - Tagline visible: ⚠️
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12983 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ❌
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ✅
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #3 COMPLETE: Golden Sunset Spa
+======================================================================
+
+======================================================================
+# REBRAND #2: Alpine Peak Lodge
+======================================================================
+Theme: Mountain Retreat (mountain)
+Tagline: "Summit of Luxury"
+Timestamp: 2026-04-06T16:26:07.378Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Alpine Peak Lodge"
+  - Tagline: "Summit of Luxury"
+  - Description: "Alpine Peak Lodge is an exclusive mountain retreat offering ..."
+  - Phone: "+41 27 966 0000"
+  - Email: "concierge@alpinepeaklodge.com"
+  - Address: "42 Summit Ridge, Zermatt, Valais, Switzerland"
+  - Save result: ⚠️ (no toast text detected)
+  [Console Errors after Step 1]: Weather fetch error: TypeError: Failed to fetch
+    at fetchWeather (webpack-internal:///(app-pages-browser)/./src/components/WeatherWidget.tsx:106:40)
+    at eval (webpack-internal:///(app-pages-brow | [16:26:15.524] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:85:17)
+    at eval (webpa | [16:26:15.524] [Settings] Failed to load site settings TypeError: Failed to fetch
+    at fetchSettings (webpack-internal:///(app-pages-browser)/./src/lib/settings-context.tsx:86:17)
+    at eval (webpa
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 13877
+  - Buttons found: 37 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 2, Selects: 1
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Mountain Retreat" selected
+  - Weather Location: "Zermatt, Switzerland"
+  - Weather Effect: "snow"
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Alpine Peak Lodge"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 12850
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 12994
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Alpine Peak Lodge"
+  - Hero Subtitle: "Summit of Luxury"
+  - CTA inputs found: 5
+  - CTA: "Ready for a Mountain Adventure?" / "Reserve Your Stay"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 12815
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Chalet, Chalets, Spa, Spas, Lodge Dining, Lodge Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Alpine Peak Lodge | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (12983 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Alpine Peak Lodge" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #2 COMPLETE: Alpine Peak Lodge
+======================================================================
+
+======================================================================
+# REBRAND #5: Midnight Luxe Hotel
+======================================================================
+Theme: Midnight Sky (midnight)
+Tagline: "Where Elegance Meets the Night"
+Timestamp: 2026-04-06T16:27:47.123Z
+
+### Step 1: General Settings & Contact
+  - Resort Name: "Midnight Luxe Hotel"
+  - Tagline: "Where Elegance Meets the Night"
+  - Description: "Midnight Luxe Hotel is an ultra-premium boutique hotel offer..."
+  - Phone: "+971 4 888 0000"
+  - Email: "vip@midnightluxehotel.com"
+  - Address: "1 Royal Boulevard, Downtown Dubai, UAE"
+  - Save result: ⚠️ (no toast text detected)
+  [DEBUG after Step 1]:
+    URL: http://localhost:3000/admin/settings
+    <aside> elements: 1
+    <nav> elements: 1
+    <button> elements: 27
+    <a> elements: 1
+    Button texts: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout | 🇬🇧 English | Saving... | General | Modules | Contact | Business Hours | Chalets | Pool | Legal Pages
+    Aside buttons: Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Logout
+    Aside links: Dashboard
+### Step 2: Appearance (Theme, Weather)
+  - Page loaded, has "theme": true
+  - Page loaded, has "beach": true
+  - Body length: 14279
+  - Buttons found: 37 — $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations
+  - Inputs: 2, Selects: 1
+  - Body first 300: "((e, i, s, u, m, a, l, h)=>{     let d = document.documentElement, w = [         "light",         "dark"     ];     function p(n) {         (Array.isArray(e) ? e : [             e         ]).forEach((y)=>{             let k = y === "class", S = k && a ? m.map((f)=>a[f] || f) : m;             k ? (d."
+  - Theme: "Midnight Sky" selected
+  - Weather Location: "Dubai, UAE"
+  - Weather Effect: "stars"
+  - ✅ Appearance saved
+### Step 3: Footer CMS
+  - Logo Text: "Midnight Luxe Hotel"
+  - ✅ Footer saved
+  [DEBUG after Step 3]:
+    URL: http://localhost:3000/admin/settings/footer
+    <aside> count: 1
+    Has "Try Again": false
+    Body length: 13222
+    Auth tokens: access=true, refresh=true, user=true
+### Step 4: Homepage Settings (Hero, CTA)
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] URL after nav: http://localhost:3000/admin/settings/footer
+  - [DEBUG] Body length: 13366
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Input count: 21
+  - [DEBUG] Has "Hero": false
+  - [DEBUG] Has "Slide": false
+  - [DEBUG] Has "Try Again": false
+  - Homepage textbox inputs found: 22
+  - Hero Title: "Welcome to Midnight Luxe Hotel"
+  - Hero Subtitle: "Where Elegance Meets the Night"
+  - CTA inputs found: 5
+  - CTA: "Ready for Ultimate Luxury?" / "Reserve Suite"
+  - ✅ Homepage saved
+### Step 5: Terminology
+  - [DEBUG] URL before nav: http://localhost:3000/admin/settings/homepage
+  - [DEBUG] URL after nav: http://localhost:3000/admin/terminology
+  - [DEBUG] Body length: 13162
+  - [DEBUG] Input count: 7
+  - [DEBUG] Buttons: $ | 🇬🇧 English | Modules | Auto Test Module | Auto Test Module | Chalets | Pool | Snack Bar | Marketing | Operations | People | System | Settings | Logout | 🇬🇧 English
+  - [DEBUG] Has "Terminology": true
+  - [DEBUG] Has "Try Again": false
+  - [DEBUG] Has "Unit": true
+  - Term inputs found: 7
+  - Terms: Penthouse, Penthouses, Rooftop Pool, Rooftop Pools, Fine Dining, Fine Dining
+  - ✅ Terminology saved
+
+--- Rebrand Applied ---
+
+
+### Verification: Customer
+  - Title: "Midnight Luxe Hotel | Luxury Experience" ✅
+  - Name visible: ✅
+  - Tagline visible: ✅
+  - Footer brand: ⚠️
+  - Restaurant: ✅
+  - Chalets: ✅
+  - Pool: ✅
+  - Gift Cards: ✅
+  - Login: ✅
+
+### Verification: Admin
+  - Admin panel loaded: ✅ (13079 chars)
+  - Sidebar: 12 items
+  - Settings Name: "Midnight Luxe Hotel" ✅
+  - Orders: ✅
+  - Users: ✅
+  - Modules: ✅
+  - Reports: ⚠️
+  - Audit: ✅
+
+### Verification: Staff
+  - Dashboard: ✅
+  - Kitchen: ✅
+  - Scanner: ✅
+
+======================================================================
+# REBRAND #5 COMPLETE: Midnight Luxe Hotel
+======================================================================

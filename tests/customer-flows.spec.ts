@@ -9,7 +9,7 @@
  * These tests validate the complete customer experience from browsing to payment.
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from './fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
@@ -50,7 +50,7 @@ test.describe('Restaurant Ordering Flow', () => {
 
   test('should display menu items with prices', async ({ page }) => {
     // Wait for menu items to load
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     
     // Look for menu items
     const menuItems = page.locator('[data-testid="menu-item"], .menu-item, [class*="MenuItem"]');
@@ -66,7 +66,7 @@ test.describe('Restaurant Ordering Flow', () => {
 
   test('should be able to add item to cart', async ({ page }) => {
     // Wait for menu to load
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     
     // Find and click an add to cart button
     const addButton = page.locator('button:has-text("Add"), button:has-text("add"), [data-testid="add-to-cart"]').first();
@@ -113,7 +113,7 @@ test.describe('Chalet Booking Flow', () => {
   });
 
   test('should display chalet cards with key information', async ({ page }) => {
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     
     // Should show chalet names
     const chaletCards = page.locator('[data-testid="chalet-card"], .chalet-card, [class*="chalet"]');
@@ -133,7 +133,7 @@ test.describe('Chalet Booking Flow', () => {
     const chaletCard = page.locator('[data-testid="chalet-card"], .chalet-card').first();
     if (await chaletCard.isVisible()) {
       await chaletCard.click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
       
       // Date picker should be visible on booking page
       await expect(datePicker.first()).toBeVisible({ timeout: 10000 });
@@ -187,7 +187,7 @@ test.describe('Pool Ticket Purchase Flow', () => {
   });
 
   test('should show available pool sessions', async ({ page }) => {
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     
     // Look for session cards or time slots
     const sessions = page.locator('[data-testid="pool-session"], .session-card, [class*="Session"]');
@@ -205,7 +205,7 @@ test.describe('Pool Ticket Purchase Flow', () => {
   });
 
   test('should be able to select ticket quantities', async ({ page }) => {
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     
     // Look for quantity selectors
     const quantityInput = page.locator('input[type="number"], [data-testid="quantity"], .quantity-selector, button:has-text("+")');
@@ -221,7 +221,7 @@ test.describe('Pool Ticket Purchase Flow', () => {
     const addButton = page.locator('button:has-text("+")').first();
     if (await addButton.isVisible()) {
       await addButton.click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
       
       // Total should be visible
       const total = page.locator('text=/total|Total|\\$\\d+\\.\\d{2}/');
@@ -238,20 +238,20 @@ test.describe('Checkout Flow', () => {
     // Go to restaurant and add item
     await page.goto(`${FRONTEND_URL}/restaurant`);
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     
     // Try to get to checkout
     const cartButton = page.locator('[data-testid="cart"], .cart-button, button:has-text("Cart")');
     if (await cartButton.isVisible()) {
       await cartButton.click();
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState('networkidle');
       
       // Look for checkout button
       const checkoutButton = page.locator('button:has-text("Checkout"), button:has-text("Pay"), [data-testid="checkout"]');
       
       if (await checkoutButton.isVisible()) {
         await checkoutButton.click();
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState('networkidle');
         
         // Should see payment form or Stripe elements
         const paymentForm = page.locator('[class*="stripe"], [data-testid="payment-form"], form');

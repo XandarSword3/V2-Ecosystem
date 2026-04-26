@@ -9,7 +9,7 @@
  *   J-C3: Ticket cancellation
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures/auth.fixture';
 import {
   URLS, CREDS, fullSetup, getCsrfToken, screenshot,
 } from './helpers';
@@ -86,7 +86,7 @@ test.describe('ENGINE C — Pool Ticket Full Lifecycle', () => {
 
       // ── PHASE 1: Customer browses pool page (FRONTEND) ──
       await customerPage.goto('/pool', { waitUntil: 'domcontentloaded' });
-      await customerPage.waitForTimeout(3000);
+      await customerPage.waitForLoadState('networkidle');
       const poolText = await customerPage.textContent('body');
       expect(poolText!.length).toBeGreaterThan(50);
       await screenshot(customerPage, 'J-C1-01-customer-pool-page');
@@ -121,7 +121,7 @@ test.describe('ENGINE C — Pool Ticket Full Lifecycle', () => {
 
       // ── PHASE 3: Staff validates ticket (CROSS-ACTOR) ──
       await staffPage.goto('/staff/pool', { waitUntil: 'domcontentloaded' });
-      await staffPage.waitForTimeout(2000);
+      await staffPage.waitForLoadState('networkidle');
       await screenshot(staffPage, 'J-C1-02-staff-pool-page');
 
       const validateResp = await apiCall(staffPage, 'POST', '/pool/staff/validate', {
@@ -288,7 +288,7 @@ test.describe('ENGINE C — Pool Ticket Full Lifecycle', () => {
 
       // Staff navigates to pool management (FRONTEND)
       await staffPage.goto('/staff/pool', { waitUntil: 'domcontentloaded' });
-      await staffPage.waitForTimeout(3000);
+      await staffPage.waitForLoadState('networkidle');
       const poolStaffText = await staffPage.textContent('body');
       expect(poolStaffText!.length).toBeGreaterThan(50);
       await screenshot(staffPage, 'J-C3-01-staff-pool-capacity');

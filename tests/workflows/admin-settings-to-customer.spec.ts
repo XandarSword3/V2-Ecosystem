@@ -1,15 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 
-const BASE = 'http://localhost:3000';
-const API = 'http://localhost:3005/api/v1';
+const BASE = process.env.FRONTEND_URL || 'http://localhost:3000';
+const API = `${process.env.API_URL || 'http://localhost:3005'}/api/v1`;
 
-test.describe.serial('Admin Settings → Customer Experience Workflow', () => {
-  test('Phase 1: Admin configures homepage settings', async ({ page }) => {
-    await page.goto(`${BASE}/login`);
-    await page.getByLabel(/email/i).fill('admin@v2resort.com');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in|log in|login/i }).click();
-    await page.waitForURL(/\/admin/, { timeout: 10000 });
+test.describe('Admin Settings → Customer Experience Workflow', () => {
+  test('Phase 1: Admin configures homepage settings', async ({ page, auth }) => {
+    await auth.loginAs('admin');
 
     // Navigate to homepage settings
     await page.goto(`${BASE}/admin/settings/homepage`);
@@ -18,12 +14,8 @@ test.describe.serial('Admin Settings → Customer Experience Workflow', () => {
     expect(body.length).toBeGreaterThan(50);
   });
 
-  test('Phase 2: Admin configures appearance', async ({ page }) => {
-    await page.goto(`${BASE}/login`);
-    await page.getByLabel(/email/i).fill('admin@v2resort.com');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in|log in|login/i }).click();
-    await page.waitForURL(/\/admin/, { timeout: 10000 });
+  test('Phase 2: Admin configures appearance', async ({ page, auth }) => {
+    await auth.loginAs('admin');
 
     await page.goto(`${BASE}/admin/settings/appearance`);
     await expect(page.locator('main').first()).toBeVisible();
@@ -50,13 +42,8 @@ test.describe.serial('Admin Settings → Customer Experience Workflow', () => {
     expect(body.length).toBeGreaterThan(100);
   });
 
-  test('Phase 5: Verify settings API returns config', async ({ request }) => {
-    const authRes = await request.post(`${API}/auth/login`, {
-      data: { email: 'admin@v2resort.com', password: 'admin123' },
-    });
-    expect(authRes.status()).toBe(200);
-    const authData = await authRes.json();
-    const token = authData.data?.tokens?.accessToken || authData.token;
+  test('Phase 5: Verify settings API returns config', async ({ request, auth }) => {
+    const token = await auth.getApiToken('admin');
 
     const settingsRes = await request.get(`${API}/admin/settings`, {
       headers: { Authorization: `Bearer ${token}` },

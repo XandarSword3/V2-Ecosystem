@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Iteration 22  Modal A11y: Chalets, Cart Payment, Mobile Nav', () => {
   test('FIX-22A: staff/chalets booking detail modal has dialog a11y', async ({ page }) => {
