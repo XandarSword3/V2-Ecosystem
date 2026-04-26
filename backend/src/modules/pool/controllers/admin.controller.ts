@@ -221,3 +221,45 @@ export const createMaintenanceLog = asyncHandler(async (req: Request, res: Respo
     if (error) throw error;
     res.status(201).json({ success: true, data: log });
 });
+
+/**
+ * Override session capacity (manager/admin only)
+ */
+export const overrideSessionCapacity = asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { id } = req.params;
+    const { additional, reason, approved_by } = req.body as { additional: number; reason: string; approved_by: string };
+
+    if (!additional || additional <= 0 || !reason || !approved_by) {
+      return res.status(400).json({ success: false, error: 'additional, reason, and approved_by are required' });
+    }
+
+    const { data: session, error: sessionError } = await supabase
+      .from('pool_sessions')
+      .select('id, max_capacity')
+      .eq('id', id)
+      .single();
+    if (sessionError || !session) {
+      return res.status(404).json({ success: false, error: 'Session not found' });
+    }
+
+    const nextCapacity = Number(session.max_capacity || 0) + Number(additional);
+    const { data: updated, error: updateError } = await supabase
+      .from('pool_sessions')
+      .update({ max_capacity: nextCapacity, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (updateError) throw updateError;
+
+    await supabase.from('audit_logs').insert({
+      user_id: req.user?.userId || 'system',
+      action: 'pool_capacity_override',
+      resource: 'pool_session',
+      resource_id: id,
+      new_value: { previous: session.max_capacity, additional, next: nextCapacity, reason, approved_by },
+      created_at: new Date().toISOString(),
+    });
+
+    res.json({ success: true, data: updated });
+});

@@ -48,6 +48,7 @@ router.post('/admin/sessions', authenticate, poolPropertyScope, authorize(...adm
 router.put('/admin/sessions/:id', authenticate, poolPropertyScope, authorize(...adminRoles), poolController.updateSession);
 router.delete('/admin/sessions/:id', authenticate, poolPropertyScope, authorize(...adminRoles), poolController.deleteSession);
 router.get('/admin/reports/daily', authenticate, poolPropertyScope, authorize(...adminRoles), poolController.getDailyReport);
+router.post('/sessions/:id/capacity/override', authenticate, poolPropertyScope, authorize('manager', 'pool_admin', 'admin', 'super_admin'), poolController.overrideSessionCapacity);
 
 // Membership routes (mount entire membership sub-router)
 router.use('/memberships', membershipRoutes);

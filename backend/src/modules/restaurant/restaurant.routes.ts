@@ -66,6 +66,7 @@ router.get('/staff/orders/live', authenticate, restaurantPropertyScope, authoriz
 router.post('/staff/orders', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.createStaffOrder);
 router.patch('/staff/orders/:id/status', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.updateOrderStatus);
 router.put('/staff/orders/:id/status', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.updateOrderStatus);
+router.post('/orders/:id/split', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.splitOrder);
 
 // Tables - Public (for reservations)
 router.get('/tables', tableController.getTables);
