@@ -361,6 +361,104 @@ export const validateTicket = asyncHandler(async (req: Request, res: Response) =
 });
 
 /**
+ * Staff sell ticket for walk-in guests
+ */
+export const createStaffTicket = asyncHandler(async (req: Request, res: Response) => {
+    const {
+      session_id,
+      ticket_type,
+      customer_id,
+      customer_name,
+      customer_phone,
+      payment_method,
+      quantity,
+    } = req.body as {
+      session_id: string;
+      ticket_type?: 'adult' | 'child' | 'family' | 'VIP';
+      customer_id?: string;
+      customer_name?: string;
+      customer_phone?: string;
+      payment_method?: 'cash' | 'card' | 'comp';
+      quantity: number;
+    };
+
+    if (!session_id || !quantity || quantity < 1) {
+      return res.status(400).json({ success: false, error: 'session_id and valid quantity are required' });
+    }
+
+    const supabase = getSupabase();
+    const { data: session, error: sessionError } = await supabase
+      .from('pool_sessions')
+      .select('*')
+      .eq('id', session_id)
+      .single();
+    if (sessionError || !session) {
+      return res.status(404).json({ success: false, error: 'Session not found' });
+    }
+
+    const today = dayjs().startOf('day').toISOString();
+    const endOfDay = dayjs().endOf('day').toISOString();
+    const { data: existingTickets, error: ticketsError } = await supabase
+      .from('pool_tickets')
+      .select('number_of_guests')
+      .eq('session_id', session_id)
+      .gte('ticket_date', today)
+      .lte('ticket_date', endOfDay)
+      .in('status', ['valid', 'used', 'active']);
+    if (ticketsError) throw ticketsError;
+
+    const soldGuests = (existingTickets || []).reduce((sum, row) => sum + Number(row.number_of_guests || 0), 0);
+    if (soldGuests + quantity > Number(session.max_capacity || 0)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Not enough capacity available',
+        available: Math.max(0, Number(session.max_capacity || 0) - soldGuests),
+      });
+    }
+
+    const unitPrice = ticket_type === 'child'
+      ? parseFloat(session.child_price ?? session.price)
+      : parseFloat(session.adult_price ?? session.price);
+    const totalAmount = unitPrice * quantity;
+    const ticketNumber = generateTicketNumber();
+    const qrCode = await QRCode.toDataURL(JSON.stringify({
+      type: 'pool_ticket',
+      id: ticketNumber,
+      sessionId: session_id,
+      quantity,
+    }));
+
+    const { data: ticket, error: insertError } = await supabase
+      .from('pool_tickets')
+      .insert({
+        ticket_number: ticketNumber,
+        session_id,
+        module_id: session.module_id,
+        customer_id: customer_id || req.user?.userId || null,
+        customer_name: customer_name || 'Walk-in Guest',
+        customer_phone: customer_phone || null,
+        ticket_date: today,
+        number_of_guests: quantity,
+        total_amount: totalAmount.toFixed(2),
+        status: 'valid',
+        payment_status: payment_method === 'comp' ? 'paid' : 'pending',
+        payment_method: payment_method || 'cash',
+        qr_code: qrCode,
+      })
+      .select()
+      .single();
+    if (insertError) throw insertError;
+
+    emitToUnit('pool', 'pool:ticket:new', {
+      ...ticket,
+      sessionId: ticket.session_id,
+      ticketDate: ticket.ticket_date,
+    });
+
+    res.status(201).json({ success: true, data: ticket });
+});
+
+/**
  * Record pool entry
  */
 export const recordEntry = asyncHandler(async (req: Request, res: Response) => {

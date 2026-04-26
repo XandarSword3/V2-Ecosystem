@@ -187,6 +187,97 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
     res.status(201).json({ success: true, data: order });
 });
 
+export const createStaffOrder = asyncHandler(async (req: Request, res: Response) => {
+    const userRoles = req.user?.roles || [];
+    const allowedRoles = ['staff', 'snack_bar_staff', 'snack_bar_admin', 'admin', 'super_admin'];
+    if (!userRoles.some((role) => allowedRoles.includes(role))) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+    }
+
+    const body = req.body as {
+      customer_id?: string;
+      customer_name?: string;
+      customer_phone?: string;
+      items: Array<{ item_id?: string; itemId?: string; quantity: number; notes?: string }>;
+      notes?: string;
+    };
+
+    if (!Array.isArray(body.items) || body.items.length === 0) {
+      return res.status(400).json({ success: false, error: 'items are required' });
+    }
+
+    const supabase = getSupabase();
+    const itemIds = body.items.map((item) => item.itemId || item.item_id).filter(Boolean) as string[];
+    const { data: snackItems, error: itemsError } = await supabase
+      .from('snack_items')
+      .select('id, name, price, is_available')
+      .in('id', itemIds);
+    if (itemsError) throw itemsError;
+
+    const itemMap = new Map((snackItems || []).map((item: any) => [item.id, item]));
+    const engineService = getEngineService();
+    const pricingLineItems: PricingLineItem[] = body.items.map((item) => {
+      const resolvedId = item.itemId || item.item_id || '';
+      const dbItem = itemMap.get(resolvedId);
+      if (!dbItem || !dbItem.is_available) {
+        throw new Error(`Snack item ${resolvedId} is unavailable`);
+      }
+      return {
+        itemId: resolvedId,
+        name: dbItem.name,
+        unitPrice: parseFloat(dbItem.price),
+        quantity: item.quantity,
+      };
+    });
+    const pricing = await engineService.calculatePricing('menu_service', pricingLineItems, {});
+
+    const { data: order, error: orderError } = await supabase
+      .from('snack_orders')
+      .insert({
+        order_number: generateOrderNumber(),
+        customer_id: body.customer_id || req.user?.userId,
+        customer_name: body.customer_name || 'Walk-in Guest',
+        customer_phone: body.customer_phone || null,
+        status: 'confirmed',
+        subtotal: pricing.subtotal.toFixed(2),
+        tax_amount: pricing.taxAmount.toFixed(2),
+        total_amount: pricing.totalAmount.toFixed(2),
+        payment_status: 'pending',
+        payment_method: 'cash',
+        special_instructions: body.notes || null,
+        estimated_ready_time: dayjs().add(10, 'minute').toISOString(),
+      })
+      .select()
+      .single();
+    if (orderError) throw orderError;
+
+    const insertItemsPayload = body.items.map((item) => {
+      const resolvedId = item.itemId || item.item_id || '';
+      const dbItem = itemMap.get(resolvedId);
+      const unitPrice = parseFloat(dbItem.price);
+      return {
+        order_id: order.id,
+        snack_item_id: resolvedId,
+        quantity: item.quantity,
+        unit_price: unitPrice.toFixed(2),
+        subtotal: (unitPrice * item.quantity).toFixed(2),
+        notes: item.notes || null,
+      };
+    });
+    const { error: insertItemsError } = await supabase
+      .from('snack_order_items')
+      .insert(insertItemsPayload);
+    if (insertItemsError) throw insertItemsError;
+
+    emitToUnit('snack_bar', 'order:new', {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      status: order.status,
+    });
+
+    res.status(201).json({ success: true, data: order });
+});
+
 export const getOrder = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: order, error: orderError } = await supabase

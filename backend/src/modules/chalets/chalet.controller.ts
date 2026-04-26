@@ -1036,6 +1036,80 @@ export const getStaffBookings = asyncHandler(async (req: Request, res: Response)
   res.json({ success: true, data: enrichedBookings });
 });
 
+export const createStaffBooking = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const {
+    customer_id,
+    customer_name,
+    customer_phone,
+    customer_email,
+    chalet_id,
+    check_in_date,
+    check_out_date,
+    add_ons,
+    payment_method,
+    number_of_guests,
+  } = req.body as {
+    customer_id?: string;
+    customer_name?: string;
+    customer_phone?: string;
+    customer_email?: string;
+    chalet_id: string;
+    check_in_date: string;
+    check_out_date: string;
+    add_ons?: Array<{ addOnId: string; quantity: number }>;
+    payment_method?: 'cash' | 'card' | 'pending';
+    number_of_guests?: number;
+  };
+
+  if (!chalet_id || !check_in_date || !check_out_date) {
+    return res.status(400).json({ success: false, error: 'chalet_id, check_in_date, and check_out_date are required' });
+  }
+
+  let resolvedCustomerId = customer_id;
+  if (!resolvedCustomerId) {
+    const guestName = customer_name || 'Guest';
+    const syntheticEmail = customer_email || `guest_${Date.now()}@local.v2-resort`;
+    const syntheticPassword = `guest_${Date.now()}`;
+    const { data: guestProfile, error: guestError } = await supabase
+      .from('users')
+      .insert({
+        full_name: guestName,
+        email: syntheticEmail,
+        phone: customer_phone || null,
+        password: syntheticPassword,
+        role: 'customer',
+      })
+      .select('id')
+      .single();
+    if (guestError) throw guestError;
+    resolvedCustomerId = guestProfile.id;
+  }
+
+  const payload = {
+    chaletId: chalet_id,
+    customerName: customer_name || 'Walk-in Guest',
+    customerEmail: customer_email || `${resolvedCustomerId}@local.v2-resort`,
+    customerPhone: customer_phone || '',
+    checkInDate: check_in_date,
+    checkOutDate: check_out_date,
+    numberOfGuests: number_of_guests || 1,
+    addOns: add_ons || [],
+    paymentMethod: payment_method === 'pending' ? 'cash' : (payment_method || 'cash'),
+    specialRequests: 'Staff booking',
+  };
+
+  const effectiveCustomerId = resolvedCustomerId || customer_id || `guest-${Date.now()}`;
+  const currentUser = req.user as any;
+  (req as any).user = {
+    ...(currentUser || {}),
+    userId: effectiveCustomerId,
+  };
+
+  req.body = payload;
+  return createBooking(req, res, () => undefined);
+});
+
 export const getTodayBookings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
   const today = dayjs().format('YYYY-MM-DD');
@@ -1103,6 +1177,32 @@ export const getTodayBookings = asyncHandler(async (req: Request, res: Response)
 
 export const checkIn = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
+  const { data: booking, error: bookingError } = await supabase
+    .from('chalet_bookings')
+    .select('id, total_amount')
+    .eq('id', req.params.id)
+    .single();
+  if (bookingError || !booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+
+  const { data: paymentRows, error: paymentError } = await supabase
+    .from('payments')
+    .select('id, amount, status')
+    .eq('booking_id', req.params.id)
+    .in('status', ['completed', 'succeeded', 'paid']);
+  if (paymentError) throw paymentError;
+
+  const paidAmount = (paymentRows || []).reduce((sum, row: any) => sum + parseFloat(String(row.amount || 0)), 0);
+  const bookingTotal = parseFloat(String((booking as any).total_amount || 0));
+  if (paidAmount < bookingTotal) {
+    return res.status(402).json({
+      success: false,
+      error: 'Booking has an outstanding balance',
+      outstanding: Math.max(0, bookingTotal - paidAmount),
+    });
+  }
+
   let { data, error } = await supabase
     .from('chalet_bookings')
     .update({

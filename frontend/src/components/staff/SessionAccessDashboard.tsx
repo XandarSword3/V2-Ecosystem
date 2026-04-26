@@ -122,6 +122,29 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
     }
   };
 
+  const createStaffTicket = async () => {
+    try {
+      const sessionId = window.prompt('Session ID');
+      if (!sessionId) return;
+      const quantityRaw = window.prompt('Quantity', '1');
+      const quantity = Number(quantityRaw || '1');
+      if (!Number.isFinite(quantity) || quantity < 1) {
+        toast.error('Invalid quantity');
+        return;
+      }
+      await api.post('/pool/staff/tickets', {
+        session_id: sessionId,
+        quantity,
+        ticket_type: 'adult',
+        payment_method: 'cash',
+      });
+      toast.success('Ticket sold successfully');
+      loadData();
+    } catch (error) {
+      toast.error('Failed to sell ticket');
+    }
+  };
+
   const handleValidate = async () => {
     if (!scanInput.trim()) return;
     setIsValidating(true);
@@ -208,9 +231,12 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
             Manage sessions, validate tickets, and track capacity.
           </p>
         </div>
-        <Button variant="outline" size="icon" onClick={loadData}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={createStaffTicket}>Sell Ticket</Button>
+          <Button variant="outline" size="icon" onClick={loadData}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </header>
 
       {/* Tab Bar */}

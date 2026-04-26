@@ -111,6 +111,28 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
     }
   };
 
+  const createStaffOrder = async () => {
+    try {
+      const itemId = window.prompt('Menu item ID');
+      if (!itemId) return;
+      const quantityRaw = window.prompt('Quantity', '1');
+      const quantity = Number(quantityRaw || '1');
+      if (!Number.isFinite(quantity) || quantity < 1) {
+        toast.error('Invalid quantity');
+        return;
+      }
+      const tableNumber = window.prompt('Table number (optional)') || undefined;
+      await api.post(`/${slug}/staff/orders`, {
+        table_number: tableNumber,
+        items: [{ item_id: itemId, quantity }],
+      });
+      toast.success('Staff order created');
+      loadOrders();
+    } catch (error) {
+      toast.error('Failed to create staff order');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -134,6 +156,7 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          <Button onClick={createStaffOrder}>New Order</Button>
           <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" />
             <span className="font-mono font-medium">
