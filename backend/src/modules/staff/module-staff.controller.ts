@@ -748,4 +748,168 @@ export async function createModuleMaintenanceLog(req: Request, res: Response) {
   }
 }
 
+/**
+ * POST /api/v1/staff/scan
+ * Unified QR scanner endpoint mounted on module-staff routes.
+ */
+export async function scanCode(req: Request, res: Response) {
+  try {
+    const code = String(req.body?.code || '').trim();
+    if (!code) {
+      return res.status(400).json({ valid: false, message: 'code is required' });
+    }
+
+    const supabase = getSupabase();
+    let parsed: { type?: string; id?: string } | null = null;
+    try {
+      parsed = JSON.parse(code);
+    } catch {
+      try {
+        const decoded = Buffer.from(code, 'base64url').toString('utf-8');
+        parsed = JSON.parse(decoded) as { type?: string; id?: string };
+      } catch {
+        parsed = null;
+      }
+    }
+
+    if (!parsed?.type || !parsed?.id) {
+      return res.status(400).json({
+        valid: false,
+        message: 'Invalid QR format. Expected JSON with { type, id }',
+      });
+    }
+
+    const { type, id } = parsed;
+
+    if (type === 'pool_ticket') {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+      let query = supabase.from('pool_tickets').select('*');
+      query = isUuid ? query.eq('id', id) : query.eq('ticket_number', id);
+      const { data, error } = await query.single();
+      if (error || !data) {
+        return res.status(404).json({ valid: false, type, entity: null, message: 'Pool ticket not found' });
+      }
+      return res.json({ valid: true, type, entity: data, message: 'Pool ticket is valid' });
+    }
+
+    if (type === 'chalet_booking') {
+      const { data, error } = await supabase.from('chalet_bookings').select('*').eq('id', id).single();
+      if (error || !data) {
+        return res.status(404).json({ valid: false, type, entity: null, message: 'Chalet booking not found' });
+      }
+      return res.json({ valid: true, type, entity: data, message: 'Chalet booking found' });
+    }
+
+    if (type === 'restaurant_order') {
+      const { data, error } = await supabase.from('restaurant_orders').select('*').eq('id', id).single();
+      if (error || !data) {
+        return res.status(404).json({ valid: false, type, entity: null, message: 'Restaurant order not found' });
+      }
+      return res.json({ valid: true, type, entity: data, message: 'Restaurant order found' });
+    }
+
+    if (type === 'membership') {
+      const { data, error } = await supabase.from('pool_memberships').select('*').eq('id', id).single();
+      if (error || !data) {
+        return res.status(404).json({ valid: false, type, entity: null, message: 'Membership not found' });
+      }
+      return res.json({ valid: true, type, entity: data, message: 'Membership found' });
+    }
+
+    return res.status(400).json({
+      valid: false,
+      type,
+      entity: null,
+      message: `Unsupported QR type: ${type}`,
+    });
+  } catch (error: any) {
+    logger.error('Error scanning QR code:', error);
+    res.status(500).json({ valid: false, message: 'Failed to scan code' });
+  }
+}
+
+/**
+ * GET /api/v1/staff/customers/search?q=...
+ * Staff-safe customer search mounted on module-staff routes.
+ */
+export async function searchCustomers(req: Request, res: Response) {
+  try {
+    const q = String(req.query?.q || '').trim();
+    if (!q) {
+      return res.status(400).json({ success: false, error: 'q query parameter is required' });
+    }
+
+    const supabase = getSupabase();
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('id, full_name, email, phone, created_at')
+      .or(`full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`)
+      .eq('role', 'customer')
+      .limit(20);
+
+    if (error) throw error;
+    const rows = users || [];
+    if (rows.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const customerIds = rows.map((u) => u.id);
+    const [restaurantOrders, poolTickets, chaletBookings, snackOrders, memberships, loyaltyAccounts] = await Promise.all([
+      supabase.from('restaurant_orders').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
+      supabase.from('pool_tickets').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
+      supabase.from('chalet_bookings').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
+      supabase.from('snack_orders').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
+      supabase.from('pool_memberships').select('customer_id,status').in('customer_id', customerIds),
+      supabase.from('loyalty_accounts').select('user_id,tier_name').in('user_id', customerIds),
+    ]);
+
+    const spendByCustomer: Record<string, number> = {};
+    const recentOrderByCustomer: Record<string, string> = {};
+    const membershipByCustomer: Record<string, string> = {};
+    const tierByCustomer: Record<string, string> = {};
+
+    const rollupFinancialRows = (items: Array<{ customer_id: string; total_amount?: string | number; created_at?: string }> = []) => {
+      items.forEach((row) => {
+        const amount = Number(row.total_amount || 0);
+        spendByCustomer[row.customer_id] = (spendByCustomer[row.customer_id] || 0) + amount;
+        if (row.created_at) {
+          const existing = recentOrderByCustomer[row.customer_id];
+          if (!existing || new Date(row.created_at) > new Date(existing)) {
+            recentOrderByCustomer[row.customer_id] = row.created_at;
+          }
+        }
+      });
+    };
+
+    rollupFinancialRows((restaurantOrders.data as any[]) || []);
+    rollupFinancialRows((poolTickets.data as any[]) || []);
+    rollupFinancialRows((chaletBookings.data as any[]) || []);
+    rollupFinancialRows((snackOrders.data as any[]) || []);
+
+    ((memberships.data as any[]) || []).forEach((m) => {
+      if (!membershipByCustomer[m.customer_id]) membershipByCustomer[m.customer_id] = m.status || 'inactive';
+    });
+    ((loyaltyAccounts.data as any[]) || []).forEach((l) => {
+      if (!tierByCustomer[l.user_id]) tierByCustomer[l.user_id] = l.tier_name || 'Standard';
+    });
+
+    const safeResults = rows.map((user) => ({
+      id: user.id,
+      name: user.full_name || 'Customer',
+      email: user.email,
+      phone: user.phone,
+      created_at: user.created_at,
+      lifetime_spend: Number((spendByCustomer[user.id] || 0).toFixed(2)),
+      loyalty_tier: tierByCustomer[user.id] || 'Standard',
+      membership_status: membershipByCustomer[user.id] || 'inactive',
+      last_order_at: recentOrderByCustomer[user.id] || null,
+    }));
+
+    res.json({ success: true, data: safeResults });
+  } catch (error: any) {
+    logger.error('Error searching customers:', error);
+    res.status(500).json({ success: false, error: 'Failed to search customers', message: error.message });
+  }
+}
+
 

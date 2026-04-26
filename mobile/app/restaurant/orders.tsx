@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { io, Socket } from 'socket.io-client';
 import { 
   ArrowLeft, 
   Clock, 
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react-native';
 import { restaurantApi } from '../../src/api/client';
 import { Card, CardContent } from '../../src/components/ui/Card';
+import { SOCKET_URL } from '../../src/config/env';
 
 interface Order {
   id: string;
@@ -42,6 +44,7 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  const [liveConnected, setLiveConnected] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -58,6 +61,34 @@ export default function OrdersScreen() {
 
   useEffect(() => {
     fetchOrders();
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    const socket: Socket = io(SOCKET_URL, {
+      transports: ['websocket'],
+      reconnection: true,
+    });
+
+    socket.on('connect', () => setLiveConnected(true));
+    socket.on('disconnect', () => setLiveConnected(false));
+
+    socket.on('order_status_updated', (payload: { orderId: string; status: Order['status'] }) => {
+      if (!payload?.orderId || !payload?.status) return;
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === payload.orderId ? { ...order, status: payload.status } : order
+        )
+      );
+    });
+
+    // Keep list in sync after reconnects.
+    socket.on('reconnect', () => {
+      fetchOrders();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [fetchOrders]);
 
   const onRefresh = async () => {
@@ -197,6 +228,9 @@ export default function OrdersScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+        <Text className={`mx-4 mt-3 text-xs ${liveConnected ? 'text-green-600' : 'text-amber-600'}`}>
+          {liveConnected ? 'Live status updates connected' : 'Live updates reconnecting...'}
+        </Text>
 
         <FlatList
           data={displayOrders}

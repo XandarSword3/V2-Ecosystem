@@ -10,6 +10,10 @@ router.use(authenticate);
 // Staff roles that can access module operations
 const staffRoles = ['admin', 'super_admin', 'manager', 'hotel_staff', 'restaurant_staff', 'pool_staff', 'housekeeping'];
 
+// Unified scanner + staff customer lookup
+router.post('/scan', authorize(...staffRoles), moduleStaffController.scanCode);
+router.get('/customers/search', authorize(...staffRoles), moduleStaffController.searchCustomers);
+
 // ============================================
 // Menu Service Orders (restaurant, snack-bar, etc.)
 // ============================================
