@@ -133,6 +133,22 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
     }
   };
 
+  const splitBill = async (orderId: string) => {
+    try {
+      const partsRaw = window.prompt('Split into how many parts?', '2');
+      const parts = Number(partsRaw || '2');
+      if (!Number.isFinite(parts) || parts < 2) {
+        toast.error('Invalid split parts');
+        return;
+      }
+      await api.post(`/restaurant/orders/${orderId}/split`, { method: 'equal', parts });
+      toast.success('Bill split created');
+      loadOrders();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to split bill');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -262,8 +278,8 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                       </div>
 
                       {/* Quick Action */}
-                      {nextStatus && (
-                        <div className="px-2 pb-2">
+                      {(nextStatus || ['confirmed', 'preparing', 'ready', 'served'].includes(order.status)) && (
+                        <div className="px-2 pb-2 flex gap-2">
                           <Button
                             className={`w-full text-white text-xs ${col.actionBg}`}
                             size="sm"
@@ -274,6 +290,18 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                           >
                             {col.action}
                           </Button>
+                          {['confirmed', 'preparing', 'ready', 'served'].includes(order.status) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                splitBill(order.id);
+                              }}
+                            >
+                              Split Bill
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
