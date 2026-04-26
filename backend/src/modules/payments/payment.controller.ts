@@ -6,6 +6,7 @@ import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
 import { createPaymentIntentSchema, recordCashPaymentSchema, recordManualPaymentSchema, validateBody } from "../../validation/schemas.js";
 import { awardLoyaltyPointsForPayment } from './loyalty-integration.js';
+import { getEngineService } from '../../engines/engine-service.js';
 
 const getStripeInstance = async () => {
   const supabase = getSupabase();
@@ -36,6 +37,26 @@ const getStripeWebhookSecret = async () => {
 
   return settings?.value?.stripeWebhookSecret || config.stripe.webhookSecret;
 };
+
+function calculateRenewedEndDate(currentEndDate: string | null, billingCycle: string): string {
+  const baseDate = currentEndDate ? new Date(currentEndDate) : new Date();
+  const nextDate = new Date(baseDate);
+  switch (billingCycle) {
+    case 'MONTHLY':
+      nextDate.setMonth(nextDate.getMonth() + 1);
+      break;
+    case 'QUARTERLY':
+      nextDate.setMonth(nextDate.getMonth() + 3);
+      break;
+    case 'ANNUALLY':
+      nextDate.setFullYear(nextDate.getFullYear() + 1);
+      break;
+    default:
+      nextDate.setMonth(nextDate.getMonth() + 1);
+      break;
+  }
+  return nextDate.toISOString();
+}
 
 export const createPaymentIntent = asyncHandler(async (req: Request, res: Response) => {
   // Validate input
@@ -241,6 +262,74 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
         logger.info(`Charge refunded for PI:${paymentIntentId}`);
       }
+      break;
+    }
+
+    case 'invoice.payment_succeeded': {
+      const invoice = event.data.object as Stripe.Invoice;
+      const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null;
+      if (!subscriptionId) {
+        break;
+      }
+
+      const engineService = getEngineService();
+      const { data: membership, error: membershipError } = await supabase
+        .from('pool_memberships')
+        .select('id, status, end_date, billing_cycle, user_id')
+        .eq('stripe_subscription_id', subscriptionId)
+        .maybeSingle();
+
+      if (membershipError) {
+        logger.error('Failed to fetch membership for invoice.payment_succeeded', membershipError);
+        break;
+      }
+
+      if (!membership) {
+        logger.warn(`No membership found for Stripe subscription ${subscriptionId}`);
+        break;
+      }
+
+      const transition = await engineService.transitionState(
+        'subscription',
+        String(membership.status || 'active').toLowerCase(),
+        'renew',
+        'system',
+      );
+
+      const renewedEndDate = calculateRenewedEndDate(membership.end_date, membership.billing_cycle || 'MONTHLY');
+      const nextStatus = transition.allowed ? transition.targetState.toUpperCase() : 'ACTIVE';
+
+      const { error: updateMembershipError } = await supabase
+        .from('pool_memberships')
+        .update({
+          status: nextStatus,
+          end_date: renewedEndDate,
+          renewed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', membership.id);
+
+      if (updateMembershipError) {
+        logger.error('Failed to update membership renewal state', updateMembershipError);
+        break;
+      }
+
+      await supabase.from('audit_logs').insert({
+        user_id: membership.user_id ?? null,
+        action: 'MEMBERSHIP_RENEWED',
+        resource: 'pool_memberships',
+        resource_id: membership.id,
+        new_value: JSON.stringify({
+          stripe_subscription_id: subscriptionId,
+          invoice_id: invoice.id,
+          renewed_end_date: renewedEndDate,
+          transition_allowed: transition.allowed,
+          transition_target: transition.targetState,
+        }),
+        created_at: new Date().toISOString(),
+      });
+
+      logger.info(`Processed subscription renewal for membership ${membership.id}`);
       break;
     }
   }

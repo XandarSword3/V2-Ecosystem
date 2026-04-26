@@ -13,9 +13,7 @@
  *   - Grace periods for expired subscriptions
  *   - Pause/resume capability
  * 
- * NOTE: This engine is currently PLANNED. The existing pool-membership.service.ts
- * has hardcoded pricing and no state machine. This definition formalizes what
- * the subscription engine should become.
+ * This definition is live and used by EngineService.
  */
 
 import type {
@@ -38,95 +36,65 @@ export const ongoingEntitlementStateMachine: StateMachineDefinition<OngoingEntit
   terminalStates: ['cancelled'],
 
   transitions: [
-    // Activation
+    // pending -> active
     {
       from: 'pending',
       to: 'active',
       action: 'activate',
-      allowedActors: ['system', 'staff'],
-      guardDescription: 'Initial payment received and verified',
+      allowedActors: ['system', 'admin', 'staff'],
+      guardDescription: 'Initial payment verified or manually activated by staff/admin',
     },
 
-    // Renewal (active remains active)
+    // active -> paused
+    {
+      from: 'active',
+      to: 'paused',
+      action: 'pause',
+      allowedActors: ['admin', 'staff'],
+      guardDescription: 'Membership paused by staff/admin action',
+    },
+
+    // paused -> active
+    {
+      from: 'paused',
+      to: 'active',
+      action: 'resume',
+      allowedActors: ['admin', 'staff'],
+      guardDescription: 'Membership resumed by staff/admin action',
+    },
+
+    // active/paused -> cancelled
+    {
+      from: 'active',
+      to: 'cancelled',
+      action: 'cancel',
+      allowedActors: ['customer', 'staff', 'admin'],
+      guardDescription: 'Cancellation while active',
+    },
+    {
+      from: 'paused',
+      to: 'cancelled',
+      action: 'cancel',
+      allowedActors: ['customer', 'staff', 'admin'],
+      guardDescription: 'Cancellation while paused',
+    },
+
+    // active -> expired
+    {
+      from: 'active',
+      to: 'expired',
+      action: 'expire',
+      allowedActors: ['system'],
+      guardDescription: 'Expiration via renewal failure/cron',
+    },
+
+    // active -> active
     {
       from: 'active',
       to: 'active',
       action: 'renew',
       allowedActors: ['system'],
-      guardDescription: 'Recurring payment succeeded; extends end_date',
-    },
-
-    // Pause
-    {
-      from: 'active',
-      to: 'paused',
-      action: 'pause',
-      allowedActors: ['customer', 'staff', 'admin'],
-      guardDescription: 'Pause count within policy limit; remaining days frozen',
-    },
-
-    // Resume
-    {
-      from: 'paused',
-      to: 'active',
-      action: 'resume',
-      allowedActors: ['customer', 'staff', 'admin'],
-      guardDescription: 'Pause period ended or customer requests early resume',
-    },
-
-    // Expiration
-    {
-      from: 'active',
-      to: 'expired',
-      action: 'expire',
-      allowedActors: ['system'],
-      guardDescription: 'End date passed and auto-renewal failed or is disabled',
-    },
-    {
-      from: 'paused',
-      to: 'expired',
-      action: 'expire',
-      allowedActors: ['system'],
-      guardDescription: 'Max pause duration exceeded without resume',
-    },
-
-    // Re-activation from expired (within grace period)
-    {
-      from: 'expired',
-      to: 'active',
-      action: 'reactivate',
-      allowedActors: ['staff', 'system'],
-      guardDescription: 'Within grace period; payment received',
-    },
-
-    // Cancellation
-    {
-      from: 'active',
-      to: 'cancelled',
-      action: 'cancel',
-      allowedActors: ['customer', 'staff', 'admin'],
-      guardDescription: 'Customer requests cancellation; effective at end of current period or immediate',
-    },
-    {
-      from: 'paused',
-      to: 'cancelled',
-      action: 'cancel',
-      allowedActors: ['customer', 'staff', 'admin'],
-      guardDescription: 'Customer cancels while paused',
-    },
-    {
-      from: 'pending',
-      to: 'cancelled',
-      action: 'cancel',
-      allowedActors: ['customer', 'staff', 'admin'],
-      guardDescription: 'Subscription cancelled before activation',
-    },
-    {
-      from: 'expired',
-      to: 'cancelled',
-      action: 'cancel',
-      allowedActors: ['staff', 'admin', 'system'],
-      guardDescription: 'Grace period passed without reactivation',
+      guardDescription: 'Successful renewal extends end_date',
     },
   ],
 };
@@ -139,10 +107,10 @@ export const ongoingEntitlementPricing: PricingConfig = {
   applyTax: true,
   applyServiceCharge: false,
   applyDeliveryFee: false,
-  supportsCoupons: true,    // Promo codes for subscription discounts
-  supportsGiftCards: false,  // Gift cards typically not used for recurring
-  supportsLoyaltyRedemption: false, // Loyalty points not redeemable against subscriptions
-  earnsLoyaltyPoints: true,  // Subscriptions earn loyalty points per billing cycle
+  supportsCoupons: false,
+  supportsGiftCards: false,
+  supportsLoyaltyRedemption: false,
+  earnsLoyaltyPoints: true,
   deductsInventory: false,
   rounding: 'round',
   decimalPlaces: 2,
