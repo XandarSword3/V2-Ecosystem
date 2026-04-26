@@ -3,6 +3,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { UIBlock } from '@/types/module-builder';
 import { GripVertical, Trash2, Copy, Layout, Type, Image as ImageIcon, Grid, List, Calendar, Clock, Box, MousePointer2, FormInput } from 'lucide-react';
 import { useModuleBuilderStore } from '@/stores/module-builder-store';
+import { useEffect, useState } from 'react';
+import { api, modulesApi } from '@/lib/api';
 
 interface SortableBlockProps {
   block: UIBlock;
@@ -31,9 +33,60 @@ export function SortableBlock({ block }: SortableBlockProps) {
     isDragging
   } = useSortable({ id: block.id });
 
-  const { selectBlock, selectedBlockId, removeBlock, duplicateBlock } = useModuleBuilderStore();
+  const { selectBlock, selectedBlockId, removeBlock, duplicateBlock, activeModuleId } = useModuleBuilderStore();
+  const [liveData, setLiveData] = useState<{ count?: number; subtitle?: string } | null>(null);
   const isSelected = selectedBlockId === block.id;
   const TypeIcon = typeIcons[block.type] || Box;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchLiveData = async () => {
+      if (!activeModuleId) return;
+      if (!['menu_list', 'session_list', 'booking_calendar'].includes(block.type)) return;
+      try {
+        const moduleRes = await modulesApi.getById(activeModuleId);
+        const moduleSlug = moduleRes?.data?.slug;
+        if (!moduleSlug) return;
+
+        if (block.type === 'menu_list') {
+          const ordersRes = await api.get(`/staff/modules/${moduleSlug}/orders`);
+          const rows = ordersRes.data?.data || [];
+          if (!cancelled) {
+            setLiveData({
+              count: rows.length,
+              subtitle: rows[0]?.order_number ? `Latest: #${rows[0].order_number}` : 'Live order feed connected',
+            });
+          }
+        } else if (block.type === 'session_list') {
+          const sessionsRes = await api.get(`/staff/modules/${moduleSlug}/sessions`);
+          const rows = sessionsRes.data?.data || [];
+          if (!cancelled) {
+            setLiveData({
+              count: rows.length,
+              subtitle: rows[0]?.session_name || rows[0]?.name || 'Sessions feed connected',
+            });
+          }
+        } else if (block.type === 'booking_calendar') {
+          const bookingsRes = await api.get(`/staff/modules/${moduleSlug}/bookings`);
+          const rows = bookingsRes.data?.data || [];
+          if (!cancelled) {
+            setLiveData({
+              count: rows.length,
+              subtitle: rows[0]?.booking_number ? `Latest: #${rows[0].booking_number}` : 'Bookings feed connected',
+            });
+          }
+        }
+      } catch {
+        if (!cancelled) setLiveData(null);
+      }
+    };
+
+    fetchLiveData();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeModuleId, block.type]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -139,7 +192,7 @@ export function SortableBlock({ block }: SortableBlockProps) {
                         <span className="text-sm font-medium">Menu Items List</span>
                     </div>
                     <div className="mt-2 text-xs text-amber-600 dark:text-amber-500">
-                        Displays menu items from this module
+                        {liveData ? `${liveData.count || 0} live records. ${liveData.subtitle || ''}` : 'Displays live data from this module'}
                     </div>
                 </div>
             )}
@@ -150,7 +203,7 @@ export function SortableBlock({ block }: SortableBlockProps) {
                         <span className="text-sm font-medium">Session Booking</span>
                     </div>
                     <div className="mt-2 text-xs text-blue-600 dark:text-blue-500">
-                        Displays bookable sessions with date picker
+                        {liveData ? `${liveData.count || 0} sessions connected. ${liveData.subtitle || ''}` : 'Displays bookable sessions with date picker'}
                     </div>
                 </div>
             )}
@@ -161,7 +214,7 @@ export function SortableBlock({ block }: SortableBlockProps) {
                         <span className="text-sm font-medium">Booking Calendar</span>
                     </div>
                     <div className="mt-2 text-xs text-green-600 dark:text-green-500">
-                        Check-in / Check-out date selection
+                        {liveData ? `${liveData.count || 0} bookings connected. ${liveData.subtitle || ''}` : 'Check-in / Check-out date selection'}
                     </div>
                 </div>
             )}
