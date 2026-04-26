@@ -388,7 +388,11 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
 
     const { from, to } = req.query as { from?: string; to?: string };
     const supabase = getSupabase();
-    const applyDateFilters = <T extends { gte: Function; lte: Function }>(query: T) => {
+    type DateFilterQuery<T> = {
+      gte: (column: string, value: string) => T;
+      lte: (column: string, value: string) => T;
+    };
+    const applyDateFilters = <T extends DateFilterQuery<T>>(query: T) => {
       let q = query;
       if (from) q = q.gte('created_at', from);
       if (to) q = q.lte('created_at', to);

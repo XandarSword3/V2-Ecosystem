@@ -73,11 +73,14 @@ export default function StaffPoolPage() {
   const [tickets, setTickets] = useState<PoolTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanMode, setScanMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tickets' | 'maintenance'>('tickets');
+  const [activeTab, setActiveTab] = useState<'tickets' | 'maintenance' | 'bracelets'>('tickets');
   const [manualCode, setManualCode] = useState('');
   const [currentlyInPool, setCurrentlyInPool] = useState(0);
   const [selectedTicket, setSelectedTicket] = useState<PoolTicket | null>(null);
-  const poolCapacity = 100; // This should come from settings
+  const [poolCapacity, setPoolCapacity] = useState(0);
+  const [bracelets, setBracelets] = useState<any[]>([]);
+  const [braceletNumber, setBraceletNumber] = useState('');
+  const [braceletTicketId, setBraceletTicketId] = useState('');
   const { socket } = useSocket();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -110,12 +113,40 @@ export default function StaffPoolPage() {
     }
   }, []);
 
+  const fetchCapacity = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await api.get('/pool/capacity/current', { signal });
+      if (signal?.aborted) return;
+      const totalCapacity = (response.data?.data?.sessions || []).reduce(
+        (sum: number, session: { maxCapacity?: number }) => sum + Number(session.maxCapacity || 0),
+        0
+      );
+      setPoolCapacity(totalCapacity || 0);
+    } catch (error: any) {
+      if (error?.name === 'CanceledError' || signal?.aborted) return;
+      setPoolCapacity(0);
+    }
+  }, []);
+
+  const fetchBracelets = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await api.get('/pool/staff/bracelets/active', { signal });
+      if (signal?.aborted) return;
+      setBracelets(response.data?.data || []);
+    } catch (error: any) {
+      if (error?.name === 'CanceledError' || signal?.aborted) return;
+      setBracelets([]);
+    }
+  }, []);
+
   // FIX Iter-17: AbortController to prevent state updates on unmounted component
   useEffect(() => {
     const controller = new AbortController();
     fetchTickets(controller.signal);
+    fetchCapacity(controller.signal);
+    fetchBracelets(controller.signal);
     return () => controller.abort();
-  }, [fetchTickets]);
+  }, [fetchTickets, fetchCapacity, fetchBracelets]);
 
   // Real-time updates
   useEffect(() => {
@@ -223,7 +254,7 @@ export default function StaffPoolPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const capacityPercentage = (currentlyInPool / poolCapacity) * 100;
+  const capacityPercentage = poolCapacity > 0 ? (currentlyInPool / poolCapacity) * 100 : 0;
   const isNearCapacity = capacityPercentage > 80;
 
   const stats = {
@@ -295,6 +326,13 @@ export default function StaffPoolPage() {
             }`}
         >
           {tp('maintenanceLogs')}
+        </button>
+        <button
+          onClick={() => setActiveTab('bracelets')}
+          className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'bracelets' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+        >
+          Bracelets
         </button>
       </div>
 
@@ -561,8 +599,74 @@ export default function StaffPoolPage() {
             </div>
           )}
         </>
-      ) : (
+      ) : activeTab === 'maintenance' ? (
         <MaintenanceTab />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Bracelet Management</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <input
+                value={braceletTicketId}
+                onChange={(e) => setBraceletTicketId(e.target.value)}
+                placeholder="Ticket ID"
+                className="px-3 py-2 rounded border dark:bg-slate-800"
+              />
+              <input
+                value={braceletNumber}
+                onChange={(e) => setBraceletNumber(e.target.value)}
+                placeholder="Bracelet Number"
+                className="px-3 py-2 rounded border dark:bg-slate-800"
+              />
+              <Button
+                onClick={async () => {
+                  if (!braceletTicketId || !braceletNumber) return;
+                  try {
+                    await api.post(`/pool/tickets/${braceletTicketId}/bracelet`, { braceletNumber });
+                    toast.success('Bracelet assigned');
+                    setBraceletNumber('');
+                    setBraceletTicketId('');
+                    fetchBracelets();
+                  } catch {
+                    toast.error('Failed to assign bracelet');
+                  }
+                }}
+              >
+                Assign Bracelet
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {bracelets.map((b) => (
+                <div key={b.id} className="flex items-center justify-between p-3 rounded border">
+                  <div>
+                    <div className="font-medium">{b.bracelet_number} - {b.customer_name || 'Guest'}</div>
+                    <div className="text-sm text-slate-500">Ticket: {b.ticket_number}</div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await api.delete(`/pool/tickets/${b.id}/bracelet`);
+                        toast.success('Bracelet returned');
+                        fetchBracelets();
+                      } catch {
+                        toast.error('Failed to return bracelet');
+                      }
+                    }}
+                  >
+                    Return Bracelet
+                  </Button>
+                </div>
+              ))}
+              {bracelets.length === 0 && (
+                <div className="text-sm text-slate-500">No active bracelets</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Pool Ticket Details Modal */}

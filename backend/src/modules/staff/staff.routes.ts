@@ -80,6 +80,10 @@ router.delete('/shifts/swap/:id', authorize(...staffRoles), staffController.canc
 // Time Tracking & Reports
 // ============================================
 
+// Unified staff scanner endpoint
+router.post('/scan', authorize(...staffRoles), staffController.scanCode);
+router.get('/customers/search', authorize(...staffRoles), staffController.searchCustomers);
+
 // Get time tracking report
 router.get('/time-tracking', authorize(...managerRoles), staffController.getTimeTrackingReport);
 

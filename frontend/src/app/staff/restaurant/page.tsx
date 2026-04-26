@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useRestaurantOrders } from '@/lib/socket';
 import { formatCurrency, formatTime, getOrderStatusColor } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { RestaurantFloorPlan } from '@/components/RestaurantFloorPlan';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import {
@@ -68,6 +69,7 @@ export default function RestaurantKitchenPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [activeTab, setActiveTab] = useState<'orders' | 'floor_plan'>('orders');
 
   // Load initial orders
   useEffect(() => {
@@ -148,6 +150,25 @@ export default function RestaurantKitchenPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex gap-2">
+        <Button
+          variant={activeTab === 'orders' ? 'primary' : 'outline'}
+          onClick={() => setActiveTab('orders')}
+        >
+          Orders
+        </Button>
+        <Button
+          variant={activeTab === 'floor_plan' ? 'primary' : 'outline'}
+          onClick={() => setActiveTab('floor_plan')}
+        >
+          Floor Plan
+        </Button>
+      </div>
+
+      {activeTab === 'floor_plan' ? (
+        <RestaurantFloorPlan />
+      ) : (
+        <>
       {/* Status Summary */}
       <div className="grid grid-cols-5 gap-4 mb-6">
         {[
@@ -428,6 +449,8 @@ export default function RestaurantKitchenPage() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

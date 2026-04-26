@@ -250,7 +250,8 @@ export const purchaseTicket = asyncHandler(async (req: Request, res: Response) =
 
     // Generate QR code
     const qrData = JSON.stringify({
-      ticketNumber,
+      type: 'pool_ticket',
+      id: ticketNumber,
       sessionId,
       date: ticketDate,
       guests: numberOfGuests,
@@ -498,10 +499,11 @@ export const validateTicket = asyncHandler(async (req: Request, res: Response) =
     } else if (qrData) {
       try {
         const parsed = JSON.parse(qrData);
+        const lookupId = parsed.id || parsed.ticketNumber;
         const { data: ticket, error } = await supabase
           .from('pool_tickets')
           .select('id')
-          .eq('ticket_number', parsed.ticketNumber)
+          .eq('ticket_number', lookupId)
           .single();
 
         if (!error) ticketId = ticket?.id;
