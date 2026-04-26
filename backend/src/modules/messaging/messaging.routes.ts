@@ -9,6 +9,9 @@ import * as controller from './messaging.controller';
 
 const router = Router();
 
+// Public inquiry endpoint for module-builder form blocks.
+router.post('/inquiries', controller.submitInquiry);
+
 // =============================================
 // CHANNEL CONFIGURATION (Admin Only)
 // =============================================
