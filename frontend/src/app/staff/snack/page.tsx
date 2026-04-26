@@ -120,6 +120,26 @@ export default function StaffSnackPage() {
     }
   };
 
+  const createStaffOrder = async () => {
+    try {
+      const itemId = window.prompt('Snack item ID');
+      if (!itemId) return;
+      const quantityRaw = window.prompt('Quantity', '1');
+      const quantity = Number(quantityRaw || '1');
+      if (!Number.isFinite(quantity) || quantity < 1) {
+        toast.error('Invalid quantity');
+        return;
+      }
+      await api.post('/snack/staff/orders', {
+        items: [{ item_id: itemId, quantity }],
+      });
+      toast.success('Staff order created');
+      fetchOrders();
+    } catch (error) {
+      toast.error('Failed to create staff order');
+    }
+  };
+
   const filteredOrders = orders
     .filter((o) => {
       if (filter === 'active') {
@@ -175,6 +195,9 @@ export default function StaffSnackPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button onClick={createStaffOrder}>
+            New Order
+          </Button>
           <Button variant="outline" onClick={() => fetchOrders()}>
             <RefreshCw className="w-4 h-4 mr-2" />
             {ts('refresh')}

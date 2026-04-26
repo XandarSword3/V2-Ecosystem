@@ -66,6 +66,80 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export const createStaffOrder = asyncHandler(async (req: Request, res: Response) => {
+    const userRoles = req.user?.roles || [];
+    const allowedRoles = ['staff', 'restaurant_staff', 'restaurant_admin', 'admin', 'super_admin'];
+    if (!userRoles.some((role) => allowedRoles.includes(role))) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+    }
+
+    const body = req.body as {
+      customer_id?: string;
+      customer_name?: string;
+      customer_phone?: string;
+      customer_email?: string;
+      table_number?: string;
+      items: Array<{
+        item_id?: string;
+        menuItemId?: string;
+        quantity: number;
+        notes?: string;
+        selectedModifiers?: Array<{
+          optionId: string;
+          optionName?: string;
+          groupId: string;
+          groupName?: string;
+          modifierType?: 'add' | 'remove' | 'swap';
+          priceAdjustment?: number;
+          quantity?: number;
+          inventoryItemId?: string;
+          inventoryQuantity?: number;
+        }>;
+      }>;
+      notes?: string;
+    };
+
+    if (!Array.isArray(body.items) || body.items.length === 0) {
+      return res.status(400).json({ success: false, error: 'items are required' });
+    }
+
+    const order = await orderService.createOrder({
+      customerId: body.customer_id,
+      customerName: body.customer_name || 'Walk-in Guest',
+      customerPhone: body.customer_phone,
+      customerEmail: body.customer_email,
+      tableNumber: body.table_number,
+      orderType: 'dine_in',
+      items: body.items.map((item) => ({
+        menuItemId: item.menuItemId || item.item_id || '',
+        quantity: item.quantity,
+        specialInstructions: item.notes,
+        selectedModifiers: item.selectedModifiers?.map((modifier) => ({
+          optionId: modifier.optionId,
+          optionName: modifier.optionName || '',
+          groupId: modifier.groupId,
+          groupName: modifier.groupName || '',
+          modifierType: modifier.modifierType || 'add',
+          priceAdjustment: modifier.priceAdjustment || 0,
+          quantity: modifier.quantity || 1,
+          inventoryItemId: modifier.inventoryItemId,
+          inventoryQuantity: modifier.inventoryQuantity,
+        })),
+      })),
+      specialInstructions: body.notes,
+      paymentMethod: 'cash',
+    });
+
+    // Staff-side order starts directly as confirmed.
+    await orderService.updateOrderStatus(
+      order.id,
+      'confirmed',
+      req.user?.userId || 'system',
+    );
+
+    res.status(201).json({ success: true, data: { ...order, status: 'confirmed' } });
+});
+
 export const getOrder = asyncHandler(async (req: Request, res: Response) => {
     const order = await orderService.getOrderById(req.params.id);
     if (!order) {

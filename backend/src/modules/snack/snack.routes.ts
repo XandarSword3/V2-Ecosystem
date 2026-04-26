@@ -24,6 +24,7 @@ router.get('/staff/orders', authenticate, snackPropertyScope, authorize(...staff
 router.get('/staff/orders/live', authenticate, snackPropertyScope, authorize(...staffRoles), snackController.getLiveOrders);
 router.patch('/staff/orders/:id/status', authenticate, snackPropertyScope, authorize(...staffRoles), snackController.updateOrderStatus);
 router.put('/staff/orders/:id/status', authenticate, snackPropertyScope, authorize(...staffRoles), snackController.updateOrderStatus);
+router.post('/staff/orders', authenticate, snackPropertyScope, authorize(...staffRoles), snackController.createStaffOrder);
 
 // Admin routes
 const adminRoles = ['snack_bar_admin', 'super_admin'];

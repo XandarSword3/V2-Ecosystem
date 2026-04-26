@@ -25,6 +25,7 @@ router.get('/my-bookings', authenticate, chaletsPropertyScope, chaletController.
 const staffRoles = ['staff', 'chalet_staff', 'chalet_admin', 'super_admin'];
 router.get('/staff/bookings', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.getStaffBookings);
 router.get('/staff/bookings/today', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.getTodayBookings);
+router.post('/staff/bookings', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.createStaffBooking);
 router.patch('/staff/bookings/:id/check-in', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.checkIn);
 router.patch('/staff/bookings/:id/check-out', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.checkOut);
 router.patch('/staff/bookings/:id/status', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.updateBookingStatus);

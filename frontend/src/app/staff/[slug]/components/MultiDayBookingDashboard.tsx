@@ -81,6 +81,33 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
     }
   };
 
+  const createStaffBooking = async () => {
+    try {
+      const chaletId = window.prompt('Chalet ID');
+      if (!chaletId) return;
+      const customerName = window.prompt('Guest name') || 'Walk-in Guest';
+      const customerPhone = window.prompt('Guest phone') || '';
+      const checkIn = window.prompt('Check-in date (YYYY-MM-DD)');
+      const checkOut = window.prompt('Check-out date (YYYY-MM-DD)');
+      if (!checkIn || !checkOut) {
+        toast.error('Check-in and check-out are required');
+        return;
+      }
+      await api.post('/chalets/staff/bookings', {
+        chalet_id: chaletId,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        payment_method: 'cash',
+      });
+      toast.success('Staff booking created');
+      fetchBookings();
+    } catch (error) {
+      toast.error('Failed to create booking');
+    }
+  };
+
   const statusConfig: Record<string, { color: string; label: string }> = {
     pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
     confirmed: { color: 'bg-blue-100 text-blue-800', label: 'Confirmed' },
@@ -150,6 +177,7 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button onClick={createStaffBooking}>New Booking</Button>
           <div className="flex bg-white dark:bg-gray-800 rounded-lg shadow-sm">
             <button
               onClick={() => setView('list')}

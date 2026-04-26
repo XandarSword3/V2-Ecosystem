@@ -63,6 +63,7 @@ const staffRoles = [
 
 router.get('/staff/orders', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.getStaffOrders);
 router.get('/staff/orders/live', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.getLiveOrders);
+router.post('/staff/orders', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.createStaffOrder);
 router.patch('/staff/orders/:id/status', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.updateOrderStatus);
 router.put('/staff/orders/:id/status', authenticate, restaurantPropertyScope, authorize(...staffRoles), orderController.updateOrderStatus);
 
