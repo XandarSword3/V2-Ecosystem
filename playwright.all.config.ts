@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Broad exploratory profile that excludes data-dependent suites unless explicitly enabled.
+// Use this to run the full test suite across all features.
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
