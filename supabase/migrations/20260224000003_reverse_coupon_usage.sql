@@ -1,3 +1,7 @@
+-- Canonical migration for reverse_coupon_usage.
+-- NOTE: A later duplicate migration existed at timestamp 20260224000030.
+-- That duplicate has been renamed with DUPLICATE_DO_NOT_RUN_ prefix to prevent
+-- re-execution on fresh installs.
 CREATE OR REPLACE FUNCTION reverse_coupon_usage(
   p_coupon_id UUID,
   p_user_id UUID DEFAULT NULL,

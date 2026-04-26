@@ -1,5 +1,8 @@
--- Split from 20260224000000_atomic_safety_functions.sql
--- M4 Fix: reverse coupon usage on compensation path
+-- DUPLICATE_DO_NOT_RUN
+-- This migration duplicates functionality already provided by:
+-- 20260224000003_reverse_coupon_usage.sql
+-- Kept in repository for historical traceability only.
+-- Do not execute on fresh installs.
 
 CREATE OR REPLACE FUNCTION reverse_coupon_usage(
   p_coupon_id UUID,
