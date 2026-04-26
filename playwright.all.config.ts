@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Broad exploratory profile that excludes data-dependent suites unless explicitly enabled.
+
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
 

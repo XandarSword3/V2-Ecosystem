@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Dedicated profile for long-running rebrand scenarios.
+
 export default defineConfig({
   testDir: './tests/rebrand',
   timeout: 600000,

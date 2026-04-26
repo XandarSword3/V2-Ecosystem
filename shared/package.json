@@ -2,6 +2,9 @@
   "name": "@v2-resort/shared",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "build": "npx tsc -p tsconfig.json"
+  },
   "main": "types/index.ts",
   "types": "types/index.ts",
   "exports": {

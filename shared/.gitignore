@@ -1,0 +1,4 @@
+types/**/*.js
+types/**/*.js.map
+types/**/*.d.ts
+types/**/*.d.ts.map

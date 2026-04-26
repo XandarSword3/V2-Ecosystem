@@ -1,7 +1,5 @@
+# Compose profile for running backend/frontend against a managed Supabase database.
 version: '3.8'
-
-# V2 Resort - Production Docker Compose (uses Supabase as database)
-# Usage: docker-compose -f docker-compose.supabase.yml up --build
 
 services:
   backend:
