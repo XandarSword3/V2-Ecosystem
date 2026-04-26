@@ -76,8 +76,27 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
       toast.success(`Booking ${status.replace('_', ' ')}`);
       setSelectedBooking(null);
-    } catch (error) {
-      toast.error('Failed to update booking');
+    } catch (error: any) {
+      if (status === 'checked_in' && error?.response?.status === 402) {
+        const outstanding = Number(error?.response?.data?.outstanding || 0);
+        const shouldRecord = window.confirm(
+          `Outstanding balance: ${outstanding.toFixed(2)}. Record cash payment now?`,
+        );
+        if (shouldRecord) {
+          await api.post('/payments/record-cash', {
+            referenceType: 'chalet_booking',
+            referenceId: bookingId,
+            amount: outstanding,
+            notes: 'Recorded during check-in',
+          });
+          await api.patch(`/staff/modules/${slug}/bookings/${bookingId}/status`, { status: 'checked_in' });
+          setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'checked_in' } : b)));
+          toast.success('Payment recorded and guest checked in');
+          setSelectedBooking(null);
+          return;
+        }
+      }
+      toast.error(error?.response?.data?.error || 'Failed to update booking');
     }
   };
 
@@ -437,6 +456,10 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
               <div className="flex justify-between">
                 <span className="text-gray-500">Total</span>
                 <span className="font-bold">{formatCurrency(selectedBooking.total_amount || 0)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Deposit Status</span>
+                <span className="font-medium">{selectedBooking.payment_status || 'pending'}</span>
               </div>
               {selectedBooking.special_requests && (
                 <div className="bg-yellow-50 p-3 rounded">

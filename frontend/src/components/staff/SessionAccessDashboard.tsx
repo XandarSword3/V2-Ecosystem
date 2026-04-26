@@ -87,7 +87,7 @@ interface MaintenanceLog {
 }
 
 export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAccessDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'tickets' | 'maintenance'>('tickets');
+  const [activeTab, setActiveTab] = useState<'tickets' | 'maintenance' | 'bracelets'>('tickets');
   const [capacity, setCapacity] = useState<CapacityData | null>(null);
   const [tickets, setTickets] = useState<TicketData[]>([]);
   const [scanInput, setScanInput] = useState('');
@@ -101,6 +101,7 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
   const [maintenanceType, setMaintenanceType] = useState('inspection');
   const [maintenanceNotes, setMaintenanceNotes] = useState('');
   const [maintenanceReadings, setMaintenanceReadings] = useState({ ph: '', chlorine: '', temperature: '' });
+  const [bracelets, setBracelets] = useState<any[]>([]);
 
   useEffect(() => {
     loadData();
@@ -192,6 +193,62 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
     }
   };
 
+  const loadBracelets = async () => {
+    try {
+      const { data } = await api.get('/pool/staff/bracelets/active');
+      setBracelets(data.data || []);
+    } catch (error) {
+      toast.error('Failed to load bracelets');
+    }
+  };
+
+  const assignBracelet = async () => {
+    try {
+      const ticketId = window.prompt('Ticket ID');
+      if (!ticketId) return;
+      const braceletNumber = window.prompt('Bracelet number');
+      if (!braceletNumber) return;
+      await api.post(`/pool/tickets/${ticketId}/bracelet`, { braceletNumber });
+      toast.success('Bracelet assigned');
+      loadBracelets();
+    } catch (error) {
+      toast.error('Failed to assign bracelet');
+    }
+  };
+
+  const returnBracelet = async (ticketId: string) => {
+    try {
+      await api.delete(`/pool/tickets/${ticketId}/bracelet`);
+      toast.success('Bracelet returned');
+      loadBracelets();
+    } catch (error) {
+      toast.error('Failed to return bracelet');
+    }
+  };
+
+  const overrideCapacity = async () => {
+    try {
+      const sessionId = window.prompt('Session ID to override');
+      const additionalRaw = window.prompt('Additional capacity');
+      const reason = window.prompt('Reason');
+      if (!sessionId || !additionalRaw || !reason) return;
+      const additional = Number(additionalRaw);
+      if (!Number.isFinite(additional) || additional <= 0) {
+        toast.error('Invalid additional capacity');
+        return;
+      }
+      await api.post(`/pool/sessions/${sessionId}/capacity/override`, {
+        additional,
+        reason,
+        approved_by: 'manager',
+      });
+      toast.success('Capacity overridden');
+      loadData();
+    } catch (error) {
+      toast.error('Failed to override capacity');
+    }
+  };
+
   const handleMaintenanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -261,6 +318,16 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
         >
           <Wrench className="w-4 h-4 inline mr-1" /> Maintenance Logs
         </button>
+        <button
+          onClick={() => { setActiveTab('bracelets'); loadBracelets(); }}
+          className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+            activeTab === 'bracelets'
+              ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400'
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Ticket className="w-4 h-4 inline mr-1" /> Bracelets
+        </button>
       </div>
 
       {activeTab === 'tickets' && (<>
@@ -303,6 +370,14 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
             </CardContent>
           </Card>
         </div>
+      )}
+      {capacity?.utilizationPercent && capacity.utilizationPercent >= 100 && (
+        <Card>
+          <CardContent className="pt-4 flex items-center justify-between">
+            <p className="text-sm text-red-600 dark:text-red-400">Pool full for active sessions.</p>
+            <Button onClick={overrideCapacity}>Override Capacity</Button>
+          </CardContent>
+        </Card>
       )}
 
       {/* Sessions Capacity Bars */}
@@ -617,6 +692,30 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
               <p className="text-center text-slate-500 py-8">No maintenance logs found.</p>
             )}
           </div>
+        </div>
+      )}
+      {activeTab === 'bracelets' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Active Bracelets</h2>
+            <Button onClick={assignBracelet}>Assign Bracelet</Button>
+          </div>
+          <Card>
+            <CardContent className="pt-4 space-y-2">
+              {bracelets.length === 0 && <p className="text-sm text-slate-500">No active bracelets.</p>}
+              {bracelets.map((item) => (
+                <div key={item.id} className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 py-2">
+                  <div className="text-sm">
+                    <p className="font-medium">{item.bracelet_number} - {item.customer_name || 'Guest'}</p>
+                    <p className="text-slate-500">{item.ticket_number}</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => returnBracelet(item.id)}>
+                    Return Bracelet
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

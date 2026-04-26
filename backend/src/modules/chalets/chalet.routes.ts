@@ -23,12 +23,15 @@ router.get('/my-bookings', authenticate, chaletsPropertyScope, chaletController.
 
 // Staff routes
 const staffRoles = ['staff', 'chalet_staff', 'chalet_admin', 'super_admin'];
+const managerOrAdminRoles = ['manager', 'admin', 'super_admin', 'chalet_admin'];
 router.get('/staff/bookings', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.getStaffBookings);
 router.get('/staff/bookings/today', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.getTodayBookings);
 router.post('/staff/bookings', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.createStaffBooking);
 router.patch('/staff/bookings/:id/check-in', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.checkIn);
 router.patch('/staff/bookings/:id/check-out', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.checkOut);
 router.patch('/staff/bookings/:id/status', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.updateBookingStatus);
+router.post('/bookings/:id/deposit/charge', authenticate, chaletsPropertyScope, authorize(...managerOrAdminRoles), chaletController.chargeDeposit);
+router.post('/bookings/:id/deposit/release', authenticate, chaletsPropertyScope, authorize(...managerOrAdminRoles), chaletController.releaseDeposit);
 
 // Admin routes
 const adminRoles = ['chalet_admin', 'super_admin'];
