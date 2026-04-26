@@ -12,6 +12,7 @@ router.post('/webhook/stripe', paymentController.handleStripeWebhook);
 // Use optionalAuth to support guest checkout while still capturing user if logged in
 router.post('/create-intent', optionalAuth, rateLimits.write, paymentController.createPaymentIntent);
 router.get('/methods', authenticate, paymentController.getPaymentMethods);
+router.get('/me', authenticate, paymentController.getMyPayments);
 
 // Staff routes (record cash payments) - rate limited to prevent abuse
 const staffRoles = ['restaurant_staff', 'snack_bar_staff', 'chalet_staff', 'pool_staff', 'restaurant_admin', 'snack_bar_admin', 'chalet_admin', 'pool_admin', 'super_admin'];
