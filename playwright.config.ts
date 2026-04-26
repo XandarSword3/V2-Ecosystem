@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Primary Playwright profile for phase3 E2E coverage.
+
 /**
  * E2E Test Configuration
  * 

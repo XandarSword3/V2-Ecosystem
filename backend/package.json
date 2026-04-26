@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "npm --prefix ../shared run build && tsc",
     "start": "node dist/index.js",
     "keep-alive": "tsx src/scripts/keep-alive.ts",
     "migrate": "ts-node src/database/migrate.ts",
