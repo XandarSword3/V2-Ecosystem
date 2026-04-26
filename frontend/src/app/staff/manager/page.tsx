@@ -98,6 +98,17 @@ export default function ManagerDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [activeModules, setActiveModules] = useState<any[]>([]);
   const [moduleSummary, setModuleSummary] = useState<Array<{ module: string; todays_order_count: number; todays_revenue: number; active_orders_count: number; staff_on_shift: number }>>([]);
+  const [todayShifts, setTodayShifts] = useState<any[]>([]);
+  const [showShiftForm, setShowShiftForm] = useState(false);
+  const [editingShift, setEditingShift] = useState<any | null>(null);
+  const [shiftForm, setShiftForm] = useState({
+    staffId: '',
+    shiftDate: '',
+    startTime: '09:00',
+    endTime: '17:00',
+    department: '',
+    breakMinutes: 0,
+  });
   const { socket } = useSocket();
 
   // Check for manager role
@@ -123,7 +134,7 @@ export default function ManagerDashboard() {
     }
   }, [isAuthenticated, isLoading, isManager]);
 
-  const loadDashboardData = async (signal?: AbortSignal) => {
+  const loadDashboardData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
       // FIX Iter-14: Pass AbortSignal to all API calls to cancel on unmount
@@ -190,6 +201,7 @@ export default function ManagerDashboard() {
       const shiftSummary = todayShiftsRes.data?.summary;
       const summaryModules = managerSummaryRes.data?.data || [];
       setModuleSummary(summaryModules);
+      setTodayShifts(todayShifts);
 
       // Calculate stats from REAL orders data
       const pending = orders.filter((o: any) => 
@@ -302,29 +314,62 @@ export default function ManagerDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
 
-    const handleApprovalNew = () => {
-      loadDashboardData();
+    const requestBrowserPermission = async () => {
+      if (typeof window === 'undefined' || !('Notification' in window)) return;
+      if (Notification.permission === 'default') {
+        try {
+          await Notification.requestPermission();
+        } catch {
+          // Ignore permission errors and keep in-app notifications only.
+        }
+      }
+    };
+
+    requestBrowserPermission();
+
+    const handleApprovalNew = (payload?: { approval?: any }) => {
+      const approval = payload?.approval;
+      if (approval) {
+        setApprovals((prev) => {
+          const normalized: PendingApproval = {
+            id: approval.id,
+            type: approval.type,
+            amount: approval.amount,
+            description: approval.description,
+            requestedBy: approval.requested_by_name || 'Staff Member',
+            requestedAt: approval.created_at,
+            orderId: approval.reference_id,
+          };
+          const withoutDuplicate = prev.filter((p) => p.id !== normalized.id);
+          return [normalized, ...withoutDuplicate];
+        });
+      }
       toast.info('New approval request received');
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        const title = 'New approval request';
+        const body = approval?.description || 'A staff approval request requires review.';
+        new Notification(title, { body });
+      }
     };
     const handleApprovalReviewed = () => {
       loadDashboardData();
     };
 
     socket.on('approval:new', handleApprovalNew);
+    socket.on('new_approval_request', handleApprovalNew);
     socket.on('approval:reviewed', handleApprovalReviewed);
-    const poll = setInterval(() => loadDashboardData(), 45000);
 
     return () => {
       socket.off('approval:new', handleApprovalNew);
+      socket.off('new_approval_request', handleApprovalNew);
       socket.off('approval:reviewed', handleApprovalReviewed);
-      clearInterval(poll);
     };
-  }, [socket]);
+  }, [socket, loadDashboardData]);
 
   const handleApproval = async (id: string, approved: boolean) => {
     try {
@@ -458,7 +503,7 @@ export default function ManagerDashboard() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 w-full max-w-lg">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="approvals">
             Approvals
@@ -469,6 +514,7 @@ export default function ManagerDashboard() {
             )}
           </TabsTrigger>
           <TabsTrigger value="staff">Staff</TabsTrigger>
+          <TabsTrigger value="shifts">Shifts</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
@@ -683,6 +729,83 @@ export default function ManagerDashboard() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="shifts" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  Today's Shift Schedule
+                </span>
+                <Button
+                  onClick={() => {
+                    setEditingShift(null);
+                    setShiftForm({
+                      staffId: '',
+                      shiftDate: new Date().toISOString().split('T')[0],
+                      startTime: '09:00',
+                      endTime: '17:00',
+                      department: '',
+                      breakMinutes: 0,
+                    });
+                    setShowShiftForm(true);
+                  }}
+                >
+                  Create Shift
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {todayShifts.map((shift) => (
+                <div key={shift.id} className="border rounded p-3 flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">{shift.staff_name || 'Unknown staff'}</div>
+                    <div className="text-sm text-slate-500">
+                      {shift.start_time} - {shift.end_time} | {shift.department || 'general'} | {shift.status}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingShift(shift);
+                        setShiftForm({
+                          staffId: shift.staff_id || '',
+                          shiftDate: shift.shift_date || new Date().toISOString().split('T')[0],
+                          startTime: shift.start_time || '09:00',
+                          endTime: shift.end_time || '17:00',
+                          department: shift.department || '',
+                          breakMinutes: shift.break_minutes || 0,
+                        });
+                        setShowShiftForm(true);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await api.delete(`/manager/shifts/${shift.id}`);
+                          toast.success('Shift deleted');
+                          loadDashboardData();
+                        } catch {
+                          toast.error('Failed to delete shift');
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {todayShifts.length === 0 && <div className="text-slate-500 text-sm">No shifts scheduled for today</div>}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Reports Tab */}
         <TabsContent value="reports" className="space-y-4">
           {moduleSummary.length > 0 && (
@@ -758,6 +881,55 @@ export default function ManagerDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {showShiftForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-lg">
+            <CardHeader>
+              <CardTitle>{editingShift ? 'Edit Shift' : 'Create Shift'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input placeholder="Staff ID" value={shiftForm.staffId} onChange={(e) => setShiftForm((s) => ({ ...s, staffId: e.target.value }))} />
+              <Input type="date" value={shiftForm.shiftDate} onChange={(e) => setShiftForm((s) => ({ ...s, shiftDate: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-2">
+                <Input type="time" value={shiftForm.startTime} onChange={(e) => setShiftForm((s) => ({ ...s, startTime: e.target.value }))} />
+                <Input type="time" value={shiftForm.endTime} onChange={(e) => setShiftForm((s) => ({ ...s, endTime: e.target.value }))} />
+              </div>
+              <Input placeholder="Department" value={shiftForm.department} onChange={(e) => setShiftForm((s) => ({ ...s, department: e.target.value }))} />
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setShowShiftForm(false)}>Cancel</Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      const payload = {
+                        staffId: shiftForm.staffId,
+                        shiftDate: shiftForm.shiftDate,
+                        startTime: shiftForm.startTime,
+                        endTime: shiftForm.endTime,
+                        department: shiftForm.department || undefined,
+                        breakMinutes: shiftForm.breakMinutes || 0,
+                      };
+                      if (editingShift) {
+                        await api.put(`/manager/shifts/${editingShift.id}`, payload);
+                        toast.success('Shift updated');
+                      } else {
+                        await api.post('/manager/shifts', payload);
+                        toast.success('Shift created');
+                      }
+                      setShowShiftForm(false);
+                      loadDashboardData();
+                    } catch {
+                      toast.error('Failed to save shift');
+                    }
+                  }}
+                >
+                  Save
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </motion.div>
   );
 }

@@ -47,7 +47,8 @@ export const purchaseTicket = asyncHandler(async (req: Request, res: Response) =
 
     // Generate QR code before the atomic call (pure compute, no race risk)
     const qrData = JSON.stringify({
-      ticketNumber,
+      type: 'pool_ticket',
+      id: ticketNumber,
       sessionId,
       date: ticketDate,
       guests: numberOfGuests,
