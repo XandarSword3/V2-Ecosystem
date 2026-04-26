@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import * as channelService from './channel.service.js';
+import { getOTAAdapter, listOTAAdapters } from './adapters/ota-registry.js';
 
 // ==================== CONNECTIONS ====================
 
@@ -18,7 +19,8 @@ export async function getConnections(req: Request, res: Response): Promise<void>
     res.json({
       success: true,
       connections,
-      available_channels: Object.values(channelService.CHANNELS)
+      available_channels: Object.values(channelService.CHANNELS),
+      available_adapters: listOTAAdapters(),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to get connections';
@@ -413,6 +415,14 @@ export async function handleOTAWebhook(req: Request, res: Response): Promise<voi
   try {
     const { property_id, channel } = req.params;
     const payload = req.body;
+
+    try {
+      getOTAAdapter(String(channel).toLowerCase());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Adapter not registered';
+      res.status(400).json({ error: message });
+      return;
+    }
 
     await channelService.handleSiteMinderWebhook(property_id, channel, payload);
 
