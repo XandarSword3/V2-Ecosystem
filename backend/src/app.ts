@@ -43,6 +43,7 @@ import terminologyRoutes from './routes/terminology.routes.js';
 import genericRoutes from './routes/generic.routes.js';
 import translationRoutes from './routes/translation.routes.js';
 import docsRoutes from './routes/docs.routes.js';
+import { getDynamicModulesRouter, loadDynamicModules as reloadDynamicModules } from './routes/dynamic-modules.loader.js';
 
 const app = express();
 
@@ -224,6 +225,7 @@ apiRouter.use('/mobile-checkin', mobileCheckinRoutes);
 apiRouter.use('/kiosk', kioskRoutes);
 apiRouter.use('/messaging', messagingRoutes);
 apiRouter.use('/i18n', i18nRoutes);
+apiRouter.use(getDynamicModulesRouter());
 
 // Channel Webhooks - FIXED
 app.use('/webhooks/channels', channelWebhookRoutes);
@@ -285,7 +287,12 @@ app.use((err: Error & { statusCode?: number; code?: string; isOperational?: bool
 });
 
 export async function createApp() {
+  await reloadDynamicModules();
   return app;
+}
+
+export async function loadDynamicModules(): Promise<void> {
+  await reloadDynamicModules();
 }
 
 export default app;
