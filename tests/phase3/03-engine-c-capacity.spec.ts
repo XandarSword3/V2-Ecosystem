@@ -8,7 +8,7 @@
  * - Real-time availability
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 import { waitForPageLoad, isVisible, getText, screenshot, URLS } from './helpers';
 
 test.describe('Engine C — Shared Capacity Access', () => {
@@ -35,7 +35,7 @@ test.describe('Engine C — Shared Capacity Access', () => {
     test('has date picker', async ({ page }) => {
       await page.goto('/pool', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       // Look for date input
       const dateInput = page.locator('input[type="date"]');
@@ -50,7 +50,7 @@ test.describe('Engine C — Shared Capacity Access', () => {
     test('displays session cards', async ({ page }) => {
       await page.goto('/pool', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const body = (await page.textContent('body')) || '';
       // Sessions should show time, price, or availability
@@ -69,7 +69,7 @@ test.describe('Engine C — Shared Capacity Access', () => {
     test('has guest count selectors (adults/children)', async ({ page }) => {
       await page.goto('/pool', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const body = (await page.textContent('body')) || '';
       const hasGuestSelect = body.toLowerCase().includes('adult') ||
@@ -84,7 +84,7 @@ test.describe('Engine C — Shared Capacity Access', () => {
     test('has customer info form', async ({ page }) => {
       await page.goto('/pool', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       // Customer info fields may render AFTER a session is selected (progressive disclosure)
       // Check for any input types or descriptive text about customer details
@@ -108,7 +108,7 @@ test.describe('Engine C — Shared Capacity Access', () => {
     test('has purchase/book button', async ({ page }) => {
       await page.goto('/pool', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const buyButton = page.locator('button').filter({ 
         hasText: /buy|purchase|book|get ticket|submit/i 
@@ -122,7 +122,7 @@ test.describe('Engine C — Shared Capacity Access', () => {
     test('shows availability/capacity info', async ({ page }) => {
       await page.goto('/pool', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const body = (await page.textContent('body')) || '';
       const hasAvailability = body.toLowerCase().includes('available') ||
@@ -164,14 +164,14 @@ test.describe('Engine C — Shared Capacity Access', () => {
     test('complete flow: select session → fill details → purchase', async ({ page }) => {
       await page.goto('/pool', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       // Step 1: Check if sessions are loaded
       const body = (await page.textContent('body')) || '';
       
       if (body.toLowerCase().includes('no sessions') || body.toLowerCase().includes('coming soon')) {
         await screenshot(page, 'pool-flow-no-sessions');
-        test.skip();
+        test.skip(true, "Test precondition failed (previously skipped)");
         return;
       }
 
@@ -183,7 +183,7 @@ test.describe('Engine C — Shared Capacity Access', () => {
 
       if (sessionCount > 0) {
         await sessionCards.first().click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
       }
 
       // Step 3: Fill customer details

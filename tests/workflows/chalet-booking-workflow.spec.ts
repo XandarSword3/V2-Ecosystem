@@ -12,7 +12,7 @@
  * This tests the complete booking lifecycle with role-based interactions.
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
@@ -54,14 +54,14 @@ async function login(page: Page, email: string, password: string): Promise<boole
     await page.locator('input[type="password"]').fill(password);
     
     // Wait for form to be ready
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Click login button
     const loginButton = page.getByRole('button', { name: /sign in|login/i });
     await loginButton.click();
     
     // Wait for redirect
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     return true;
   } catch (error) {
     console.error('Login failed:', error);
@@ -79,9 +79,7 @@ function getFutureDate(daysFromNow: number): string {
 // PHASE 1: CUSTOMER SEARCHES & BOOKS CHALET
 // ============================================
 test.describe('Phase 1: Customer Books Chalet', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let customerPage: Page;
+let customerPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -121,13 +119,13 @@ test.describe('Phase 1: Customer Books Chalet', () => {
     const searchButton = customerPage.locator('button:has-text("Search"), button:has-text("Check Availability"), button:has-text("Find")').first();
     if (await searchButton.isVisible()) {
       await searchButton.click();
-      await customerPage.waitForTimeout(2000);
+      await customerPage.waitForLoadState('networkidle');
     }
   });
 
   test('Step 1.3: Customer views available chalets', async () => {
     // Check for any content related to chalets
-    await customerPage.waitForTimeout(1000);
+    await customerPage.waitForLoadState('networkidle');
     const chaletContent = customerPage.locator('text=/chalet|cabin|stay|book|reserve/i');
     const count = await chaletContent.count();
     
@@ -153,7 +151,7 @@ test.describe('Phase 1: Customer Books Chalet', () => {
   });
 
   test('Step 1.5: Customer views chalet details', async () => {
-    await customerPage.waitForTimeout(1000);
+    await customerPage.waitForLoadState('networkidle');
     // Check for any chalet-related content
     await expect(customerPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
@@ -173,7 +171,7 @@ test.describe('Phase 1: Customer Books Chalet', () => {
       const availableDates = customerPage.locator('[class*="available"], [class*="selectable"]:not([class*="disabled"])');
       if (await availableDates.first().isVisible()) {
         await availableDates.first().click();
-        await customerPage.waitForTimeout(500);
+        await customerPage.waitForLoadState('networkidle');
         
         if (await availableDates.nth(2).isVisible()) {
           await availableDates.nth(2).click();
@@ -191,21 +189,21 @@ test.describe('Phase 1: Customer Books Chalet', () => {
     const nameVisible = await nameInput.isVisible({ timeout: 3000 }).catch(() => false);
     if (nameVisible) {
       await nameInput.fill('John Test');
-      await customerPage.waitForTimeout(300);
+      await customerPage.waitForLoadState('networkidle');
     }
     
     const emailInput = customerPage.locator('input[name="email"], input[type="email"]').first();
     const emailVisible = await emailInput.isVisible({ timeout: 2000 }).catch(() => false);
     if (emailVisible) {
       await emailInput.fill(CUSTOMER_CREDENTIALS.email);
-      await customerPage.waitForTimeout(300);
+      await customerPage.waitForLoadState('networkidle');
     }
     
     const phoneInput = customerPage.locator('input[name="phone"], input[type="tel"]').first();
     const phoneVisible = await phoneInput.isVisible({ timeout: 2000 }).catch(() => false);
     if (phoneVisible) {
       await phoneInput.fill('+961 71 123 456');
-      await customerPage.waitForTimeout(300);
+      await customerPage.waitForLoadState('networkidle');
     }
     
     const guestsInput = customerPage.locator('input[name="guests"], select[name="guests"], input[name*="number" i]').first();
@@ -217,7 +215,7 @@ test.describe('Phase 1: Customer Books Chalet', () => {
       } else {
         await guestsInput.fill('2');
       }
-      await customerPage.waitForTimeout(300);
+      await customerPage.waitForLoadState('networkidle');
     }
     
     // Fill any other required fields - special requests, notes, etc.
@@ -228,7 +226,7 @@ test.describe('Phase 1: Customer Books Chalet', () => {
     }
     
     // Wait for form validation to complete
-    await customerPage.waitForTimeout(500);
+    await customerPage.waitForLoadState('networkidle');
     
     // Now try to click the submit/book button (should be enabled after filling form)
     const submitButton = customerPage.locator('button:has-text("Submit"), button:has-text("Book"), button:has-text("Reserve"), button[type="submit"]').first();
@@ -261,7 +259,7 @@ test.describe('Phase 1: Customer Books Chalet', () => {
         console.log('Created booking ID:', createdBookingId);
       }
       
-      await customerPage.waitForTimeout(2000);
+      await customerPage.waitForLoadState('networkidle');
     }
   });
 
@@ -276,9 +274,7 @@ test.describe('Phase 1: Customer Books Chalet', () => {
 // PHASE 2: STAFF PROCESSES BOOKING
 // ============================================
 test.describe('Phase 2: Staff Processes Booking', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -313,7 +309,7 @@ test.describe('Phase 2: Staff Processes Booking', () => {
     
     if (await bookingsTab.isVisible()) {
       await bookingsTab.click();
-      await staffPage.waitForTimeout(1000);
+      await staffPage.waitForLoadState('networkidle');
     }
     
     // Check for any page content
@@ -326,7 +322,7 @@ test.describe('Phase 2: Staff Processes Booking', () => {
     
     if (await confirmButton.isVisible()) {
       await confirmButton.click();
-      await staffPage.waitForTimeout(1000);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -336,7 +332,7 @@ test.describe('Phase 2: Staff Processes Booking', () => {
     
     if (await statusSelect.isVisible()) {
       await statusSelect.selectOption('preparing');
-      await staffPage.waitForTimeout(1000);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -345,7 +341,7 @@ test.describe('Phase 2: Staff Processes Booking', () => {
     
     if (await statusSelect.isVisible()) {
       await statusSelect.selectOption('ready');
-      await staffPage.waitForTimeout(1000);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 });
@@ -354,9 +350,7 @@ test.describe('Phase 2: Staff Processes Booking', () => {
 // PHASE 3: CUSTOMER CHECK-IN/OUT & REVIEW
 // ============================================
 test.describe('Phase 3: Customer Stay & Review', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let customerPage: Page;
+let customerPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -382,7 +376,7 @@ test.describe('Phase 3: Customer Stay & Review', () => {
     
     if (await reviewButton.isVisible()) {
       await reviewButton.click();
-      await customerPage.waitForTimeout(1000);
+      await customerPage.waitForLoadState('networkidle');
       
       // Fill review form
       const ratingStars = customerPage.locator('[data-testid="rating"], [class*="star"]');
@@ -398,7 +392,7 @@ test.describe('Phase 3: Customer Stay & Review', () => {
       const submitButton = customerPage.locator('button:has-text("Submit"), button:has-text("Post")').first();
       if (await submitButton.isVisible()) {
         await submitButton.click();
-        await customerPage.waitForTimeout(1000);
+        await customerPage.waitForLoadState('networkidle');
       }
     }
   });
@@ -408,9 +402,7 @@ test.describe('Phase 3: Customer Stay & Review', () => {
 // PHASE 4: ADMIN REVIEWS EVERYTHING
 // ============================================
 test.describe('Phase 4: Admin Reviews Booking & Analytics', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let adminPage: Page;
+let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -441,7 +433,7 @@ test.describe('Phase 4: Admin Reviews Booking & Analytics', () => {
     const bookingsTab = adminPage.locator('button:has-text("Bookings"), [data-testid="bookings-tab"]').first();
     if (await bookingsTab.isVisible().catch(() => false)) {
       await bookingsTab.click();
-      await adminPage.waitForTimeout(1000);
+      await adminPage.waitForLoadState('networkidle');
     }
     
     // Page should have some content
@@ -451,7 +443,7 @@ test.describe('Phase 4: Admin Reviews Booking & Analytics', () => {
   test('Step 4.4: Admin views occupancy reports', async () => {
     await adminPage.goto(`${FRONTEND_URL}/admin/reports`);
     await adminPage.waitForLoadState('load');
-    await adminPage.waitForTimeout(1000);
+    await adminPage.waitForLoadState('networkidle');
     
     // Check for page content
     await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
@@ -460,7 +452,7 @@ test.describe('Phase 4: Admin Reviews Booking & Analytics', () => {
   test('Step 4.5: Admin reviews customer feedback', async () => {
     await adminPage.goto(`${FRONTEND_URL}/admin/reviews`);
     await adminPage.waitForLoadState('load');
-    await adminPage.waitForTimeout(1000);
+    await adminPage.waitForLoadState('networkidle');
     
     // Check for any review-related content or main area
     const pageContent = adminPage.locator('text=/review|feedback|rating|no review/i').first();

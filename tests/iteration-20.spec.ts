@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Iteration 20 - POS Modal A11y + i18n Status Keys', () => {
 

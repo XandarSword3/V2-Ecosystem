@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 const FRONTEND = 'http://localhost:3000';
 
@@ -8,7 +8,7 @@ test.describe('Customer Profile & Account [CUS-ACCT]', () => {
     await page.getByLabel(/email/i).fill('customer@test.com');
     await page.getByLabel(/password/i).fill('password123');
     await page.getByRole('button', { name: /log.?in|sign.?in/i }).click();
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
   });
 
   test('CUS-ACCT-001: view profile page', async ({ page }) => {

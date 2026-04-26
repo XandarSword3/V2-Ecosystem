@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 // Iteration 13  Test Specification
 // BUG-13B: KitchenView socket room leak on prop change

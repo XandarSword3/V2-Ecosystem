@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../../fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005/api';
@@ -14,9 +14,7 @@ async function loginAsAdmin(page: Page) {
 }
 
 test.describe('Admin Inventory Management [ADM-INV-001 → 011]', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
   });
 

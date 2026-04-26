@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 test.describe('Bookings Calendar [STF-BOOK]', () => {
   test.beforeEach(async ({ page }) => {
@@ -19,9 +19,9 @@ test.describe('Bookings Calendar [STF-BOOK]', () => {
     await expect(nextBtn.first()).toBeVisible();
     await expect(todayBtn.first()).toBeVisible();
     await nextBtn.first().click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     await prevBtn.first().click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
   });
 
   test('STF-BOOK-002: Check-in/out/staying stats', async ({ page }) => {

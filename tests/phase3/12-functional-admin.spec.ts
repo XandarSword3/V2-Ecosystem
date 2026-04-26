@@ -9,7 +9,7 @@
  * - Created data is verifiable and removable
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 import { getAuthToken, getAuthHeaders, getCsrfToken, fullSetup, screenshot, URLS } from './helpers';
 
 const API = URLS.API;
@@ -20,9 +20,7 @@ test.describe('Admin CRUD — Proves Real Functionality', () => {
   // COUPON LIFECYCLE: Create → Read → Update → Delete
   // ──────────────────────────────────────────────
   test.describe('Coupon CRUD Lifecycle', () => {
-    test.describe.configure({ mode: 'serial' });
-
-    let token: string;
+let token: string;
     let couponId: string;
     const testCode = `E2ETEST${Date.now()}`;
 
@@ -69,7 +67,7 @@ test.describe('Admin CRUD — Proves Real Functionality', () => {
     });
 
     test('list coupons includes the created coupon', async ({ page }) => {
-      if (!couponId || !token) test.skip();
+      if (!couponId || !token) test.skip(true, "Test precondition failed (previously skipped)");
 
       const resp = await page.request.get(`${API}/api/v1/coupons`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -89,7 +87,7 @@ test.describe('Admin CRUD — Proves Real Functionality', () => {
     });
 
     test('update coupon name and verify change', async ({ page }) => {
-      if (!couponId || !token) test.skip();
+      if (!couponId || !token) test.skip(true, "Test precondition failed (previously skipped)");
 
       const csrfToken = await getCsrfToken(page);
 
@@ -120,7 +118,7 @@ test.describe('Admin CRUD — Proves Real Functionality', () => {
     });
 
     test('validate coupon works for an order', async ({ page }) => {
-      if (!token) test.skip();
+      if (!token) test.skip(true, "Test precondition failed (previously skipped)");
 
       const resp = await page.request.post(`${API}/api/v1/coupons/validate`, {
         headers: { 'Content-Type': 'application/json' },
@@ -145,7 +143,7 @@ test.describe('Admin CRUD — Proves Real Functionality', () => {
     });
 
     test('delete coupon and verify removal', async ({ page }) => {
-      if (!couponId || !token) test.skip();
+      if (!couponId || !token) test.skip(true, "Test precondition failed (previously skipped)");
 
       const csrfToken = await getCsrfToken(page);
 
@@ -265,7 +263,7 @@ test.describe('Admin CRUD — Proves Real Functionality', () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const modules = (await listResp.json()).data || [];
-      if (modules.length === 0) { test.skip(); return; }
+      if (modules.length === 0) { test.skip(true, "Test precondition failed (previously skipped)"); return; }
 
       const moduleId = modules[0].id;
       const resp = await page.request.get(`${API}/api/v1/admin/modules/${moduleId}`, {
@@ -336,7 +334,7 @@ test.describe('Admin CRUD — Proves Real Functionality', () => {
       expect(setup).toBeTruthy();
 
       await page.goto('/admin', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const body = (await page.textContent('body')) || '';
 
@@ -356,7 +354,7 @@ test.describe('Admin CRUD — Proves Real Functionality', () => {
       expect(setup).toBeTruthy();
 
       await page.goto('/admin/orders', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
 
       const body = (await page.textContent('body')) || '';
 

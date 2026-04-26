@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 // Constants
 const ADMIN_EMAIL = 'admin@v2resort.com';

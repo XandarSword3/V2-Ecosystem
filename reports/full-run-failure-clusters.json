@@ -1,0 +1,244 @@
+{
+  "timing-or-ui-state": {
+    "count": 197,
+    "examples": [
+      {
+        "file": "admin-notifications.spec.ts",
+        "message": "Error: locator.check: Clicking the checkbox did not change its state"
+      },
+      {
+        "file": "admin-systematic.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed"
+      },
+      {
+        "file": "admin-systematic.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed"
+      },
+      {
+        "file": "admin-systematic.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed"
+      },
+      {
+        "file": "auth-apple.spec.ts",
+        "message": "TimeoutError: page.waitForURL: Timeout 60000ms exceeded."
+      },
+      {
+        "file": "cms-settings-comprehensive.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed"
+      },
+      {
+        "file": "cms-settings-comprehensive.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed"
+      },
+      {
+        "file": "cms-settings-comprehensive.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed"
+      },
+      {
+        "file": "cms-sync-hardened.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed"
+      },
+      {
+        "file": "cms-sync-hardened.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed"
+      },
+      {
+        "file": "cms-sync-hardened.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed"
+      },
+      {
+        "file": "cms-sync-hardened.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed"
+      }
+    ]
+  },
+  "assertion-mismatch": {
+    "count": 30,
+    "examples": [
+      {
+        "file": "cms-sync-hardened.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "cms-sync-hardened.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "cms-sync-hardened.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "complete-feature-coverage.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "complete-feature-coverage.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "customer-flows.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "customer-flows.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "customer-flows.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "customer-flows.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m"
+      },
+      {
+        "file": "customer-flows.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m"
+      },
+      {
+        "file": "customer-flows.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m"
+      },
+      {
+        "file": "customer-flows.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m"
+      }
+    ]
+  },
+  "auth-session": {
+    "count": 29,
+    "examples": [
+      {
+        "file": "complete-feature-coverage.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatch\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "customer-flows.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "features/customer/auth-flow.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m"
+      },
+      {
+        "file": "features/customer/auth-flow.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatch\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
+      },
+      {
+        "file": "features/customer/loyalty-program.spec.ts",
+        "message": "Error: UI login failed for role admin: still on login page"
+      },
+      {
+        "file": "features/customer/loyalty-program.spec.ts",
+        "message": "Error: UI login failed for role admin: still on login page"
+      },
+      {
+        "file": "features/customer/loyalty-program.spec.ts",
+        "message": "Error: UI login failed for role admin: still on login page"
+      },
+      {
+        "file": "features/customer/loyalty-program.spec.ts",
+        "message": "Error: UI login failed for role admin: still on login page"
+      },
+      {
+        "file": "features/customer/loyalty-program.spec.ts",
+        "message": "Error: UI login failed for role admin: still on login page"
+      },
+      {
+        "file": "smoke/smoke-admin-protected-route.spec.ts",
+        "message": "Error: UI login failed for role admin: still on login page"
+      },
+      {
+        "file": "smoke/smoke-auth-session.spec.ts",
+        "message": "Error: UI login failed for role admin: still on login page"
+      },
+      {
+        "file": "smoke/smoke-booking-e2e.spec.ts",
+        "message": "Error: UI login failed for role admin: still on login page"
+      }
+    ]
+  },
+  "missing-setup-data-or-route": {
+    "count": 1,
+    "examples": [
+      {
+        "file": "customer-flows.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m"
+      }
+    ]
+  },
+  "backend-api-contract": {
+    "count": 4,
+    "examples": [
+      {
+        "file": "e2e/ui-coverage.spec.ts",
+        "message": "Error: apiRequestContext.get: connect ECONNREFUSED ::1:3001"
+      },
+      {
+        "file": "e2e/ui-coverage.spec.ts",
+        "message": "Error: apiRequestContext.get: connect ECONNREFUSED ::1:3001"
+      },
+      {
+        "file": "e2e/ui-coverage.spec.ts",
+        "message": "Error: apiRequestContext.get: connect ECONNREFUSED ::1:3001"
+      },
+      {
+        "file": "e2e/ui-coverage.spec.ts",
+        "message": "Error: apiRequestContext.get: connect ECONNREFUSED ::1:3001"
+      }
+    ]
+  },
+  "other": {
+    "count": 14,
+    "examples": [
+      {
+        "file": "iteration-11-test.spec.ts",
+        "message": "Error: page.goto: net::ERR_ABORTED at http://localhost:3000/staff/modules/restaurant"
+      },
+      {
+        "file": "iteration-13-test.spec.ts",
+        "message": "Error: page.goto: net::ERR_ABORTED at http://localhost:3000/staff/restaurant"
+      },
+      {
+        "file": "module-builder-comprehensive.spec.ts",
+        "message": "Error: locator.isVisible: Error: strict mode violation: getByRole('button', { name: /zoom in|\\+/i }) resolved to 3 elements:"
+      },
+      {
+        "file": "phase3/02-engine-b-reservations.spec.ts",
+        "message": "Error: Test precondition failed (previously skipped)"
+      },
+      {
+        "file": "phase3/10-functional-restaurant.spec.ts",
+        "message": "Error: Test precondition failed (previously skipped)"
+      },
+      {
+        "file": "phase3/10-functional-restaurant.spec.ts",
+        "message": "Error: Test precondition failed (previously skipped)"
+      },
+      {
+        "file": "phase3/10-functional-restaurant.spec.ts",
+        "message": "Error: Test precondition failed (previously skipped)"
+      },
+      {
+        "file": "phase3/12-functional-admin.spec.ts",
+        "message": "Error: Test precondition failed (previously skipped)"
+      },
+      {
+        "file": "phase3/12-functional-admin.spec.ts",
+        "message": "Error: Test precondition failed (previously skipped)"
+      },
+      {
+        "file": "workflows/chalet-booking-workflow.spec.ts",
+        "message": "Error: No booking was created"
+      },
+      {
+        "file": "workflows/customer-all-features.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m"
+      },
+      {
+        "file": "workflows/customer-all-features.spec.ts",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m"
+      }
+    ]
+  }
+}

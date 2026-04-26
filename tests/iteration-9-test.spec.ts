@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Iteration 9 — Staff Scanner i18n', () => {
   test('IMPROVE-9A: scanner page renders all i18n strings', async ({ page }) => {

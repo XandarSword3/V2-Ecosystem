@@ -416,82 +416,107 @@ export const getTransaction = asyncHandler(async (req: Request, res: Response) =
   res.json({ success: true, data: payment });
 });
 
-export const refundPayment = asyncHandler(async (req: Request, res: Response) => {
+/**
+ * Shared refund service — called by both the HTTP handler and the approval controller.
+ * Looks up the payment by ID, calls Stripe if needed, updates the DB.
+ * Throws on error so callers can handle HTTP responses appropriately.
+ */
+export async function processRefundById(
+  paymentId: string,
+  amount: number | undefined,
+  reason: string | undefined,
+  processedByUserId: string,
+): Promise<{ isPartial: boolean }> {
   const supabase = getSupabase();
-  const { id } = req.params;
-  const { reason, amount } = req.body; // amount is optional, if not provided, full refund
 
-  // Get original payment
   const { data: payment, error: fetchError } = await supabase
     .from('payments')
     .select('*')
-    .eq('id', id)
+    .eq('id', paymentId)
     .single();
 
-  if (fetchError || !payment) {
-    return res.status(404).json({ success: false, error: 'Payment record not found' });
-  }
+  if (fetchError || !payment) throw new Error('Payment record not found');
+  if (payment.status === 'refunded') throw new Error('Payment is already refunded');
 
-  if (payment.status === 'refunded') {
-    return res.status(400).json({ success: false, error: 'Payment is already refunded' });
-  }
-
-  interface RefundDetails {
-    status: string;
-    notes: string | null;
-    processed_at: string;
-    processed_by: string;
-  }
-
-  // Determine if this is a partial or full refund
   const paymentAmount = parseFloat(payment.amount);
-  const isPartialRefund = amount && amount < paymentAmount;
+  const isPartialRefund = amount !== undefined && amount < paymentAmount;
 
-  const refundDetails: RefundDetails = {
+  const refundDetails: Record<string, unknown> = {
     status: isPartialRefund ? 'partial' : 'refunded',
-    notes: reason ? `${payment.notes || ''} [Refund Reason: ${reason}]${isPartialRefund ? ` [Partial Refund: ${amount}]` : ''}` : payment.notes,
+    notes: reason
+      ? `${payment.notes || ''} [Refund Reason: ${reason}]${isPartialRefund ? ` [Partial: ${amount}]` : ''}`
+      : payment.notes,
     processed_at: new Date().toISOString(),
-    processed_by: req.user!.userId,
+    processed_by: processedByUserId,
   };
 
-  // If it's a Stripe payment, trigger Stripe refund
+  // Execute Stripe refund for card payments
   if (payment.method === 'card' && payment.stripe_payment_intent_id) {
-    // Skip Stripe refund for test/fake payment intents
-    const isTestPaymentIntent = payment.stripe_payment_intent_id.startsWith('pi_test_') ||
+    const isTestPI = payment.stripe_payment_intent_id.startsWith('pi_test_') ||
       !payment.stripe_payment_intent_id.startsWith('pi_');
 
-    if (!isTestPaymentIntent) {
-      try {
-        const stripe = await getStripeInstance();
-        const stripeRefund = await stripe.refunds.create({
-          payment_intent: payment.stripe_payment_intent_id,
-          amount: amount ? Math.round(amount * 100) : undefined,
-          reason: 'requested_by_customer', // Default reason
-        });
-        refundDetails.notes = `${refundDetails.notes || ''} [Stripe Refund ID: ${stripeRefund.id}]`;
-      } catch (stripeError: unknown) {
-        const err = stripeError as Error;
-        logger.error('Stripe refund failed:', stripeError);
-        return res.status(400).json({ success: false, error: `Stripe refund failed: ${err.message}` });
-      }
+    if (!isTestPI) {
+      const stripe = await getStripeInstance();
+      const stripeRefund = await stripe.refunds.create({
+        payment_intent: payment.stripe_payment_intent_id,
+        amount: amount ? Math.round(amount * 100) : undefined,
+        reason: 'requested_by_customer',
+      });
+      refundDetails.notes = `${refundDetails.notes || ''} [Stripe Refund ID: ${stripeRefund.id}]`;
     } else {
-      // For test payments, just mark as refunded without calling Stripe
       refundDetails.notes = `${refundDetails.notes || ''} [Test Payment - No Stripe Refund Required]`;
-      logger.info(`Skipping Stripe refund for test payment intent: ${payment.stripe_payment_intent_id}`);
+      logger.info(`Skipping Stripe refund for test PI: ${payment.stripe_payment_intent_id}`);
     }
   }
 
-  // Update payment record
   const { error: updateError } = await supabase
     .from('payments')
     .update(refundDetails)
-    .eq('id', id);
+    .eq('id', paymentId);
 
   if (updateError) throw updateError;
 
-  // Update source reference (Order/Booking)
   const refStatus = isPartialRefund ? 'partial' as const : 'refunded' as const;
   await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, refStatus);
 
-  res.json({ success: true, message: isPartialRefund ? 'Partial refund processed' : 'Payment refunded successfully' });
+  logger.info(`Refund processed for payment ${paymentId} by user ${processedByUserId}`);
+  return { isPartial: isPartialRefund };
+}
+
+/**
+ * Find payment record by reference (for approval-triggered refunds where we
+ * have a reference_type + reference_id but not a payment ID).
+ */
+export async function findPaymentByReference(
+  referenceType: string,
+  referenceId: string,
+): Promise<{ id: string } | null> {
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .from('payments')
+    .select('id')
+    .eq('reference_type', referenceType)
+    .eq('reference_id', referenceId)
+    .eq('status', 'completed')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data ?? null;
+}
+
+export const refundPayment = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { reason, amount } = req.body;
+
+  try {
+    const { isPartial } = await processRefundById(id, amount, reason, req.user!.userId);
+    res.json({
+      success: true,
+      message: isPartial ? 'Partial refund processed' : 'Payment refunded successfully',
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Refund failed';
+    const status = message.includes('not found') ? 404 : message.includes('already refunded') ? 400 : 500;
+    res.status(status).json({ success: false, error: message });
+  }
 });

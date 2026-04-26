@@ -26,23 +26,26 @@ const activeConnections = new Map<string, ActiveConnection>();
 function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return true;
 
+  // Dev-mode localhost origins (never in production)
+  const devOrigins = process.env.NODE_ENV !== 'production'
+    ? ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003']
+    : [];
+
+  // Runtime-configurable extra origins from environment variable.
+  // Set SOCKET_EXTRA_ORIGINS in your .env / deployment config (comma-separated).
+  // Example: SOCKET_EXTRA_ORIGINS=https://your-app.vercel.app,https://your-custom-domain.com
+  const extraOrigins = (process.env.SOCKET_EXTRA_ORIGINS ?? '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+
   const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:3002',
-    'http://localhost:3003',
+    ...devOrigins,
     config.frontendUrl,
-    'https://v2-ecosystem.vercel.app',
-  ].filter(Boolean);
+    ...extraOrigins,
+  ].filter(Boolean) as string[];
 
-  // Check exact match
-  if (allowedOrigins.includes(origin)) return true;
-
-  // Allow only YOUR Vercel project's preview URLs
-  // Pattern: https://v2-ecosystem-{hash}-{username}.vercel.app
-  if (origin.match(/^https:\/\/v2-ecosystem(-[a-z0-9]+)*\.vercel\.app$/)) return true;
-
-  return false;
+  return allowedOrigins.includes(origin);
 }
 
 export function getOnlineUsers(): string[] {

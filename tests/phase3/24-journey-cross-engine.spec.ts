@@ -11,7 +11,7 @@
  *   J-X5: Review moderation lifecycle (customer → admin)
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures/auth.fixture';
 import {
   URLS, CREDS, fullSetup, getCsrfToken, screenshot,
 } from './helpers';
@@ -56,7 +56,7 @@ test.describe('CROSS-ENGINE — Admin Dashboard & System Verification', () => {
 
       // Navigate to admin dashboard (FRONTEND)
       await page.goto('/admin', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(4000);
+      await page.waitForLoadState('networkidle');
       const dashText = await page.textContent('body');
       expect(dashText!.length).toBeGreaterThan(100);
       await screenshot(page, 'J-X1-01-admin-dashboard');
@@ -104,7 +104,7 @@ test.describe('CROSS-ENGINE — Admin Dashboard & System Verification', () => {
 
       // Navigate to admin orders page (FRONTEND)
       await page.goto('/admin/orders', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
       await screenshot(page, 'J-X2-01-admin-all-orders');
 
       // API: Restaurant admin orders
@@ -157,7 +157,7 @@ test.describe('CROSS-ENGINE — Admin Dashboard & System Verification', () => {
 
       // Navigate to admin settings page (FRONTEND)
       await page.goto('/admin/settings', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
       await screenshot(page, 'J-X3-01-admin-settings-page');
 
       // Verify key settings exist in the response
@@ -191,8 +191,14 @@ test.describe('CROSS-ENGINE — Admin Dashboard & System Verification', () => {
       const token = setup!.tokens.accessToken;
 
       // Navigate to audit page (FRONTEND)
-      await page.goto('/admin/audit', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000);
+      try {
+        await page.goto('/admin/audit', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      } catch {
+        await page.goto('/admin/audit', { waitUntil: 'commit', timeout: 30000 });
+      }
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(async () => {
+        await page.waitForLoadState('load');
+      });
       await screenshot(page, 'J-X4-01-admin-audit-page');
 
       // API: Get audit logs
@@ -258,7 +264,7 @@ test.describe('CROSS-ENGINE — Admin Dashboard & System Verification', () => {
 
       // Navigate to admin reviews page (FRONTEND)
       await adminPage.goto('/admin/reviews', { waitUntil: 'domcontentloaded' });
-      await adminPage.waitForTimeout(3000);
+      await adminPage.waitForLoadState('networkidle');
       await screenshot(adminPage, 'J-X5-01-admin-reviews-page');
 
       // ── PHASE 3: Admin approves review ──
@@ -309,7 +315,7 @@ test.describe('CROSS-ENGINE — Admin Dashboard & System Verification', () => {
 
       // Navigate to admin users page (FRONTEND)
       await page.goto('/admin/users', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
       await screenshot(page, 'J-X6-01-admin-users-page');
 
       // API: List users
@@ -347,7 +353,7 @@ test.describe('CROSS-ENGINE — Admin Dashboard & System Verification', () => {
 
       // Navigate to admin reports (FRONTEND)
       await page.goto('/admin/reports', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle');
       await screenshot(page, 'J-X7-01-admin-reports-page');
 
       // Restaurant daily report

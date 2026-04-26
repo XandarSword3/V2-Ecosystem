@@ -66,7 +66,7 @@ const LogoRing = ({ delay, scale, reverse }: { delay: number; scale: number; rev
 
 export function LoadingScreen({ minDuration = 2500 }: LoadingScreenProps) {
   const t = useTranslations('common');
-  const { settings } = useSiteSettings();
+  const { settings, loading: settingsLoading } = useSiteSettings();
   const [mounted, setMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
@@ -74,10 +74,13 @@ export function LoadingScreen({ minDuration = 2500 }: LoadingScreenProps) {
   const [, setPhase] = useState<'entering' | 'loading' | 'exiting'>('entering');
   const enableLoadingAnimation = useSettingsStore((s) => s.enableLoadingAnimation);
   
-  // Dynamic branding from CMS
-  const resortName = settings.resortName || 'Iron Paradise Gym';
-  const tagline = settings.tagline || 'Experience Luxury';
-  const logoText = resortName.substring(0, 2).toUpperCase();
+  // Keep startup branding neutral until CMS settings are loaded
+  const cmsResortName = settings.resortName?.trim() || '';
+  const cmsTagline = settings.tagline?.trim() || '';
+  const hasCmsBranding = !settingsLoading && cmsResortName.length > 0;
+  const resortName = hasCmsBranding ? cmsResortName : 'Resort Experience';
+  const tagline = hasCmsBranding ? (cmsTagline || t('loading')) : t('loading');
+  const logoText = hasCmsBranding ? cmsResortName.substring(0, 2).toUpperCase() : 'V2';
   
   // Generate particles only on client to avoid hydration mismatch
   const [particles, setParticles] = useState<Array<{
@@ -539,7 +542,7 @@ export function LoadingScreenWrapper({ children, minDuration = 2500 }: LoadingSc
  */
 function LoadingScreenContent() {
   const t = useTranslations('common');
-  const { settings } = useSiteSettings();
+  const { settings, loading: settingsLoading } = useSiteSettings();
   const [progress, setProgress] = useState(0);
   const [particles, setParticles] = useState<Array<{
     id: number;
@@ -550,9 +553,12 @@ function LoadingScreenContent() {
     y: string;
   }>>([]);
   
-  const resortName = settings.resortName || 'Iron Paradise Gym';
-  const tagline = settings.tagline || 'Experience Luxury';
-  const logoText = resortName.substring(0, 2).toUpperCase();
+  const cmsResortName = settings.resortName?.trim() || '';
+  const cmsTagline = settings.tagline?.trim() || '';
+  const hasCmsBranding = !settingsLoading && cmsResortName.length > 0;
+  const resortName = hasCmsBranding ? cmsResortName : 'Resort Experience';
+  const tagline = hasCmsBranding ? (cmsTagline || t('loading')) : t('loading');
+  const logoText = hasCmsBranding ? cmsResortName.substring(0, 2).toUpperCase() : 'V2';
   const nameLetters = resortName.split('');
 
   useEffect(() => {

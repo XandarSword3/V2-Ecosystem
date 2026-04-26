@@ -9,7 +9,7 @@
  * - UI cart reflects actual item data from localStorage
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 import { setupApiProxy, fullSetup, getAuthToken, getAuthHeaders, getCsrfToken, waitForPageLoad, screenshot, URLS, CREDS } from './helpers';
 
 const API = URLS.API;
@@ -132,7 +132,7 @@ test.describe('Restaurant — Proves Real Functionality', () => {
     });
 
     test('can fetch the created order by ID', async ({ page }) => {
-      if (!orderId) test.skip();
+      if (!orderId) test.skip(true, "Test precondition failed (previously skipped)");
 
       const resp = await page.request.get(`${API}/api/v1/restaurant/orders/${orderId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -153,7 +153,7 @@ test.describe('Restaurant — Proves Real Functionality', () => {
     });
 
     test('staff can list orders and see the test order', async ({ page }) => {
-      if (!orderId) test.skip();
+      if (!orderId) test.skip(true, "Test precondition failed (previously skipped)");
 
       const resp = await page.request.get(`${API}/api/v1/restaurant/staff/orders`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -174,7 +174,7 @@ test.describe('Restaurant — Proves Real Functionality', () => {
     });
 
     test('staff can advance order status', async ({ page }) => {
-      if (!orderId) test.skip();
+      if (!orderId) test.skip(true, "Test precondition failed (previously skipped)");
 
       const csrfToken = await getCsrfToken(page);
       const headers = {
@@ -221,7 +221,7 @@ test.describe('Restaurant — Proves Real Functionality', () => {
     test('menu renders real items with visible prices in the browser', async ({ page }) => {
       await setupApiProxy(page);
       await page.goto('/restaurant', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(5000);
+      await page.waitForLoadState('networkidle');
 
       const body = (await page.textContent('body')) || '';
 
@@ -250,7 +250,7 @@ test.describe('Restaurant — Proves Real Functionality', () => {
       await page.goto('/restaurant', { waitUntil: 'domcontentloaded' });
       await page.evaluate(() => localStorage.removeItem('v2-resort-cart'));
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(5000);
+      await page.waitForLoadState('networkidle');
 
       // Find any clickable add/order button or card action
       const addButtons = page.locator('button').filter({ hasText: /add|order/i });
@@ -265,14 +265,14 @@ test.describe('Restaurant — Proves Real Functionality', () => {
           const cards = page.locator('[class*="card"], [class*="Card"], [class*="item"], [class*="Item"]');
           if (await cards.count() > 0) {
             await cards.first().click();
-            await page.waitForTimeout(2000);
+            await page.waitForLoadState('networkidle');
             // Look for add button in opened modal/detail
             const modalAdd = page.locator('button').filter({ hasText: /add|cart|order/i });
             if (await modalAdd.count() > 0) {
               await modalAdd.first().click();
             }
           } else {
-            test.skip();
+            test.skip(true, "Test precondition failed (previously skipped)");
             return;
           }
         } else {
@@ -281,13 +281,21 @@ test.describe('Restaurant — Proves Real Functionality', () => {
       } else {
         await addButtons.first().click();
       }
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
 
       // Handle possible modifier/customization modal
-      const modalConfirm = page.locator('button').filter({ hasText: /confirm|add to cart|done|ok|add$/i });
-      if (await modalConfirm.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await modalConfirm.first().click();
-        await page.waitForTimeout(1500);
+      const activeDialog = page.locator('[role="dialog"][aria-modal="true"]').last();
+      const dialogVisible = await activeDialog.isVisible({ timeout: 3000 }).catch(() => false);
+      if (dialogVisible) {
+        const modalConfirm = activeDialog
+          .locator('button')
+          .filter({ hasText: /confirm|add to cart|done|ok|add$/i })
+          .first();
+
+        if (await modalConfirm.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await modalConfirm.click({ force: true });
+          await page.waitForLoadState('networkidle');
+        }
       }
 
       // PROVE: Cart in localStorage has an item with name, price, quantity
@@ -355,7 +363,9 @@ test.describe('Restaurant — Proves Real Functionality', () => {
 
       // Navigate to cart page
       await page.goto('/restaurant/cart', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(async () => {
+        await page.waitForLoadState('load');
+      });
 
       const body = (await page.textContent('body')) || '';
 

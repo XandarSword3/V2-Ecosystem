@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 // Iteration 25 — Pool i18n verification
 // IMPROVE Iter-25: Verify all pool page strings are i18n'd

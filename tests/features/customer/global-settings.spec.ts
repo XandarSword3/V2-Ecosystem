@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/auth.fixture';
 
 const FRONTEND = 'http://localhost:3000';
 
@@ -36,7 +36,7 @@ test.describe('Customer Global Settings [CUS-SET]', () => {
 
     const htmlBefore = await page.locator('html').getAttribute('class') ?? '';
     await themeToggle.first().click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     const htmlAfter = await page.locator('html').getAttribute('class') ?? '';
 
     // Theme class should have changed (e.g., adding or removing 'dark')

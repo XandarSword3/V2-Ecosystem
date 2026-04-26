@@ -14,7 +14,7 @@
  * - Manager dashboard
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth.fixture';
 import { waitForPageLoad, isVisible, getText, screenshot, uiLogin, loginAsAdmin, CREDS } from './helpers';
 
 test.describe('Staff Panel', () => {
@@ -196,7 +196,7 @@ test.describe('Staff Panel', () => {
 
       await page.goto('/staff/pool', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page, { timeout: 20000 });
-      await page.waitForTimeout(1500);
+      await page.waitForLoadState('networkidle');
 
       const body = (await page.textContent('body')) || '';
       const hasValidationKeywords = body.toLowerCase().includes('valid') ||

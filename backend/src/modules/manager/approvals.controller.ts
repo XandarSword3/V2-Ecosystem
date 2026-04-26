@@ -3,6 +3,7 @@ import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { z } from 'zod';
 import { getIO } from '../../socket/index.js';
+import { processRefundById, findPaymentByReference } from '../payments/payment.controller.js';
 
 // Validation schemas
 const createApprovalSchema = z.object({
@@ -301,68 +302,98 @@ export class ApprovalsController {
   }
 
   /**
-   * Apply the approved action (refund, discount, etc.)
+   * Apply the approved action (refund, discount, void, comp)
+   * FIXED: refund now actually executes via payment service (Stripe + DB),
+   * not just writing metadata fields to the order row.
    */
   private async applyApprovalAction(approval: any) {
     const supabase = getSupabase();
 
     try {
       switch (approval.type) {
-        case 'refund':
-          // Update order payment status
-          if (approval.reference_type === 'restaurant_order') {
-            await supabase
-              .from('restaurant_orders')
-              .update({ 
-                payment_status: 'refunded',
-                refund_amount: approval.amount,
-                refund_approved_at: new Date().toISOString(),
-              })
-              .eq('id', approval.reference_id);
+        case 'refund': {
+          // Find the payment record for this reference
+          const payment = await findPaymentByReference(
+            approval.reference_type,
+            approval.reference_id,
+          );
+
+          if (!payment) {
+            logger.error(
+              `Approval ${approval.id}: no completed payment found for ` +
+              `${approval.reference_type}:${approval.reference_id} — cannot execute refund`,
+            );
+            // Record failure in audit log so managers can see it
+            await supabase.from('audit_logs').insert({
+              user_id: approval.reviewed_by,
+              action: 'refund_approval_failed',
+              resource: approval.reference_type,
+              resource_id: approval.reference_id,
+              details: {
+                approval_id: approval.id,
+                reason: 'No completed payment record found for reference',
+              },
+            });
+            break;
           }
+
+          await processRefundById(
+            payment.id,
+            approval.amount,
+            `Manager approval #${approval.id}: ${approval.description}`,
+            approval.reviewed_by,
+          );
+          logger.info(`Approval ${approval.id}: refund executed for payment ${payment.id}`);
           break;
+        }
 
         case 'void':
-          // Cancel the order
+          // Cancel the order across all reference types
           if (approval.reference_type === 'restaurant_order') {
             await supabase
               .from('restaurant_orders')
-              .update({ 
+              .update({
                 status: 'cancelled',
                 cancellation_reason: approval.description,
                 cancelled_at: new Date().toISOString(),
               })
+              .eq('id', approval.reference_id);
+          } else if (approval.reference_type === 'chalet_booking') {
+            await supabase
+              .from('chalet_bookings')
+              .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+              .eq('id', approval.reference_id);
+          } else if (approval.reference_type === 'pool_ticket') {
+            await supabase
+              .from('pool_tickets')
+              .update({ status: 'cancelled' })
               .eq('id', approval.reference_id);
           }
           break;
 
         case 'discount':
         case 'price_adjustment':
-          // Log the discount applied
           if (approval.reference_id) {
-            await supabase
-              .from('audit_logs')
-              .insert({
-                user_id: approval.reviewed_by,
-                action: `${approval.type}_applied`,
-                resource: approval.reference_type,
-                resource_id: approval.reference_id,
-                details: {
-                  amount: approval.amount,
-                  percentage: approval.percentage,
-                  original_amount: approval.original_amount,
-                  approval_id: approval.id,
-                },
-              });
+            await supabase.from('audit_logs').insert({
+              user_id: approval.reviewed_by,
+              action: `${approval.type}_applied`,
+              resource: approval.reference_type,
+              resource_id: approval.reference_id,
+              details: {
+                amount: approval.amount,
+                percentage: approval.percentage,
+                original_amount: approval.original_amount,
+                approval_id: approval.id,
+              },
+            });
           }
           break;
 
         case 'comp':
-          // Mark order as comped
           if (approval.reference_type === 'restaurant_order') {
             await supabase
               .from('restaurant_orders')
-              .update({ 
+              .update({
                 payment_status: 'comped',
                 comp_reason: approval.description,
                 comped_at: new Date().toISOString(),
@@ -375,7 +406,8 @@ export class ApprovalsController {
       logger.info(`Approval action applied: ${approval.type} for ${approval.reference_type}:${approval.reference_id}`);
     } catch (error: any) {
       logger.error('Error applying approval action:', error.message);
-      // Don't throw - approval is still recorded even if action fails
+      // Re-throw so reviewApproval can surface the failure to the caller
+      throw error;
     }
   }
 

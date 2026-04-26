@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Iteration 5 — Reviews API, Login Autocomplete, Homepage CTA', () => {
   test('BUG-5A: Homepage has no console errors (reviews API graceful)', async ({ page }) => {

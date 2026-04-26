@@ -13,7 +13,7 @@
  * - Customer Lookup
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -40,14 +40,14 @@ async function loginAsStaff(page: Page): Promise<boolean> {
     await page.locator('input[type="password"]').fill(STAFF_CREDENTIALS.password);
     
     // Wait for form to be ready
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
     
     // Click login button
     const loginButton = page.getByRole('button', { name: /sign in|login/i });
     await loginButton.click();
     
     // Wait for redirect
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
     return true;
   } catch (error) {
     console.error('Staff login failed:', error);
@@ -58,7 +58,7 @@ async function loginAsStaff(page: Page): Promise<boolean> {
 async function navigateTo(page: Page, path: string): Promise<void> {
   await page.goto(`${FRONTEND_URL}${path}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   // Wait for page to stabilize after navigation
-  await page.waitForTimeout(2000);
+  await page.waitForLoadState('networkidle');
   await page.waitForLoadState('load');
 }
 
@@ -66,9 +66,7 @@ async function navigateTo(page: Page, path: string): Promise<void> {
 // SECTION 1: STAFF DASHBOARD
 // ============================================
 test.describe('1. Staff Dashboard', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -103,9 +101,7 @@ test.describe('1. Staff Dashboard', () => {
 // SECTION 2: RESTAURANT ORDER PROCESSING
 // ============================================
 test.describe('2. Restaurant Order Processing', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -139,7 +135,7 @@ test.describe('2. Restaurant Order Processing', () => {
       const tagName = await statusFilter.evaluate(el => el.tagName.toLowerCase());
       if (tagName === 'select') {
         await statusFilter.selectOption('pending');
-        await staffPage.waitForTimeout(500);
+        await staffPage.waitForLoadState('networkidle');
       }
     }
   });
@@ -148,7 +144,7 @@ test.describe('2. Restaurant Order Processing', () => {
     const orderRow = staffPage.locator('tr, [class*="order"]').first();
     if (await orderRow.isVisible()) {
       await orderRow.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -165,7 +161,7 @@ test.describe('2. Restaurant Order Processing', () => {
       const options = await statusSelect.locator('option').allTextContents();
       if (options.some(o => o.toLowerCase().includes('prepar'))) {
         await statusSelect.selectOption({ label: options.find(o => o.toLowerCase().includes('prepar')) || '' });
-        await staffPage.waitForTimeout(500);
+        await staffPage.waitForLoadState('networkidle');
       }
     }
   });
@@ -188,7 +184,7 @@ test.describe('2. Restaurant Order Processing', () => {
     const historyTab = staffPage.locator('button:has-text("History"), button:has-text("Completed")').first();
     if (await historyTab.isVisible()) {
       await historyTab.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -196,7 +192,7 @@ test.describe('2. Restaurant Order Processing', () => {
     const search = staffPage.locator('input[placeholder*="Search" i]').first();
     if (await search.isVisible()) {
       await search.fill('test');
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
       await search.clear();
     }
   });
@@ -206,9 +202,7 @@ test.describe('2. Restaurant Order Processing', () => {
 // SECTION 3: POOL SESSION MANAGEMENT
 // ============================================
 test.describe('3. Pool Session Management', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -233,7 +227,7 @@ test.describe('3. Pool Session Management', () => {
     const todayFilter = staffPage.locator('button:has-text("Today"), input[type="date"]').first();
     if (await todayFilter.isVisible()) {
       await todayFilter.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -252,7 +246,7 @@ test.describe('3. Pool Session Management', () => {
     const validateButton = staffPage.locator('button:has-text("Validate"), button:has-text("Scan"), button:has-text("Check")').first();
     if (await validateButton.isVisible()) {
       await validateButton.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
       
       // Close modal if opened
       const cancelButton = staffPage.locator('button:has-text("Cancel"), button:has-text("Close")').first();
@@ -279,9 +273,7 @@ test.describe('3. Pool Session Management', () => {
 // SECTION 4: CHALET BOOKING MANAGEMENT
 // ============================================
 test.describe('4. Chalet Booking Management', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -316,7 +308,7 @@ test.describe('4. Chalet Booking Management', () => {
     const bookingRow = staffPage.locator('tr, [class*="booking"]').first();
     if (await bookingRow.isVisible()) {
       await bookingRow.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -351,7 +343,7 @@ test.describe('4. Chalet Booking Management', () => {
     const noteButton = staffPage.locator('button:has-text("Note"), button:has-text("Comment")').first();
     if (await noteButton.isVisible()) {
       await noteButton.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
       
       const noteInput = staffPage.locator('textarea').first();
       if (await noteInput.isVisible()) {
@@ -370,9 +362,7 @@ test.describe('4. Chalet Booking Management', () => {
 // SECTION 5: MENU VIEWING
 // ============================================
 test.describe('5. Menu Viewing (Read-Only)', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -397,7 +387,7 @@ test.describe('5. Menu Viewing (Read-Only)', () => {
     const search = staffPage.locator('input[placeholder*="Search" i]').first();
     if (await search.isVisible()) {
       await search.fill('pizza');
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
       await search.clear();
     }
   });
@@ -406,7 +396,7 @@ test.describe('5. Menu Viewing (Read-Only)', () => {
     const categoryFilter = staffPage.locator('select, button:has-text("Category")').first();
     if (await categoryFilter.isVisible()) {
       await categoryFilter.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -414,7 +404,7 @@ test.describe('5. Menu Viewing (Read-Only)', () => {
     const menuItem = staffPage.locator('[class*="menu-item"], tr').first();
     if (await menuItem.isVisible()) {
       await menuItem.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -429,9 +419,7 @@ test.describe('5. Menu Viewing (Read-Only)', () => {
 // SECTION 6: REVIEWS
 // ============================================
 test.describe('6. Reviews', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -456,7 +444,7 @@ test.describe('6. Reviews', () => {
     const ratingFilter = staffPage.locator('select, button:has-text("Rating")').first();
     if (await ratingFilter.isVisible()) {
       await ratingFilter.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -464,7 +452,7 @@ test.describe('6. Reviews', () => {
     const reviewCard = staffPage.locator('[class*="review"], tr').first();
     if (await reviewCard.isVisible()) {
       await reviewCard.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -472,7 +460,7 @@ test.describe('6. Reviews', () => {
     const respondButton = staffPage.locator('button:has-text("Respond"), button:has-text("Reply")').first();
     if (await respondButton.isVisible()) {
       await respondButton.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
       
       const responseInput = staffPage.locator('textarea').first();
       if (await responseInput.isVisible()) {
@@ -491,9 +479,7 @@ test.describe('6. Reviews', () => {
 // SECTION 7: CUSTOMER LOOKUP
 // ============================================
 test.describe('7. Customer Lookup', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -515,7 +501,7 @@ test.describe('7. Customer Lookup', () => {
     const search = staffPage.locator('input[placeholder*="Search" i]').first();
     if (await search.isVisible()) {
       await search.fill('john');
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
       await search.clear();
     }
   });
@@ -524,7 +510,7 @@ test.describe('7. Customer Lookup', () => {
     const customerRow = staffPage.locator('tr, [class*="customer"]').first();
     if (await customerRow.isVisible()) {
       await customerRow.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -538,9 +524,7 @@ test.describe('7. Customer Lookup', () => {
 // SECTION 8: NOTIFICATIONS
 // ============================================
 test.describe('8. Staff Notifications', () => {
-  test.describe.configure({ mode: 'serial' });
-  
-  let staffPage: Page;
+let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -557,7 +541,7 @@ test.describe('8. Staff Notifications', () => {
     const bell = staffPage.locator('[data-testid="notifications"], button[aria-label*="notification" i], [class*="notification-bell"]').first();
     if (await bell.isVisible()) {
       await bell.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 
@@ -570,7 +554,7 @@ test.describe('8. Staff Notifications', () => {
     const notification = staffPage.locator('[class*="notification-item"]').first();
     if (await notification.isVisible()) {
       await notification.click();
-      await staffPage.waitForTimeout(500);
+      await staffPage.waitForLoadState('networkidle');
     }
   });
 });
@@ -585,7 +569,7 @@ test.describe('9. Staff Logout', () => {
     const logoutButton = page.locator('button:has-text("Logout"), button:has-text("Sign Out"), a:has-text("Logout")').first();
     if (await logoutButton.isVisible()) {
       await logoutButton.click();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle');
       expect(page.url()).toMatch(/\/login|\/$/);
     }
   });

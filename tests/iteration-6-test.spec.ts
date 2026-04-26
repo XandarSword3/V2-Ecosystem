@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Iteration 6 — Register Autocomplete, Cart Discount & Modifier Fixes', () => {
   test('BUG-6A: Register page has no autocomplete warnings', async ({ page }) => {
