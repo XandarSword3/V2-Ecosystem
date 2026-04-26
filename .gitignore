@@ -49,3 +49,14 @@ frontend/coverage-critical/
 # Misc
 *.tgz
 .cache/
+
+# Phase 0 security hardening
+*.plist
+google-services.json
+auth-token.json
+.ci_*.json
+.ci_*.txt
+.tmp_*
+coverage-output.txt
+**/dist-android/
+**/archive/**/*.txt
