@@ -13,6 +13,7 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'ax
 import * as SecureStore from 'expo-secure-store';
 import * as Application from 'expo-application';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/env';
 
 // Storage keys
@@ -78,6 +79,61 @@ let failedQueue: Array<{
   reject: (error: any) => void;
 }> = [];
 
+const OFFLINE_QUEUE_KEY = 'v2_offline_request_queue';
+
+type OfflineQueuedRequest = {
+  id: string;
+  method: 'post' | 'put' | 'patch' | 'delete';
+  url: string;
+  data?: any;
+  params?: any;
+  headers?: Record<string, string>;
+  createdAt: string;
+};
+
+async function readOfflineQueue(): Promise<OfflineQueuedRequest[]> {
+  try {
+    const raw = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeOfflineQueue(queue: OfflineQueuedRequest[]): Promise<void> {
+  await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue.slice(-200)));
+}
+
+async function enqueueOfflineRequest(entry: OfflineQueuedRequest): Promise<void> {
+  const queue = await readOfflineQueue();
+  queue.push(entry);
+  await writeOfflineQueue(queue);
+}
+
+async function flushOfflineQueue(client: AxiosInstance): Promise<void> {
+  const queue = await readOfflineQueue();
+  if (queue.length === 0) return;
+
+  const remaining: OfflineQueuedRequest[] = [];
+  for (const item of queue) {
+    try {
+      await client.request({
+        method: item.method,
+        url: item.url,
+        data: item.data,
+        params: item.params,
+        headers: item.headers,
+      });
+    } catch {
+      // Keep failed items for next flush attempt.
+      remaining.push(item);
+    }
+  }
+  await writeOfflineQueue(remaining);
+}
+
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach((promise) => {
     if (error) {
@@ -120,6 +176,10 @@ function createApiClient(): AxiosInstance {
       if (deviceId) {
         config.headers['X-Device-ID'] = deviceId;
       }
+
+      // Best-effort background queue flush on each outbound request.
+      // This keeps offline writes eventually consistent once connectivity returns.
+      flushOfflineQueue(client).catch(() => undefined);
 
       return config;
     },
@@ -196,6 +256,21 @@ function createApiClient(): AxiosInstance {
         } finally {
           isRefreshing = false;
         }
+      }
+
+      const method = (originalRequest?.method || '').toLowerCase();
+      const shouldQueueOffline = ['post', 'put', 'patch', 'delete'].includes(method);
+      const likelyNetworkIssue = !error.response || error.code === 'ECONNABORTED' || /network|timeout/i.test(String(error.message || ''));
+      if (!originalRequest?._retry && shouldQueueOffline && likelyNetworkIssue && originalRequest?.url) {
+        await enqueueOfflineRequest({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          method: method as OfflineQueuedRequest['method'],
+          url: originalRequest.url,
+          data: originalRequest.data,
+          params: originalRequest.params,
+          headers: (originalRequest.headers || {}) as Record<string, string>,
+          createdAt: new Date().toISOString(),
+        });
       }
 
       return Promise.reject(error);

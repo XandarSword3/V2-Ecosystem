@@ -1,21 +1,15 @@
 /**
- * Push Notification Service (MOCKED for Expo Go SDK 54 Compatibility)
- * 
- * NOTE: The original expo-notifications implementation is disabled
- * because Android Push Notifications are removed from Expo Go in SDK 53+.
- * To restore functionality, use a Development Build or run on a physical device with a dev client.
+ * Push Notification Service
+ *
+ * Works on development builds and production builds. In Expo Go, token
+ * retrieval may be unavailable on some platforms; errors are handled gracefully.
  */
 
-// import * as Notifications from 'expo-notifications'; // DISABLED to prevent crash
+import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { deviceApi } from '../api/client';
 import { router } from 'expo-router';
-
-// Mock Types
-namespace Notifications {
-  export type NotificationResponse = any;
-}
 
 // Notification categories for iOS
 export const NOTIFICATION_CATEGORIES = {
@@ -31,45 +25,104 @@ export const NOTIFICATION_CATEGORIES = {
  * Request notification permissions
  */
 export async function requestPermissions(): Promise<boolean> {
-  console.log('Push notifications disabled in Expo Go (Mocked)');
-  return false;
+  try {
+    const existingStatus = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus.status;
+
+    if (existingStatus.status !== 'granted') {
+      const requested = await Notifications.requestPermissionsAsync();
+      finalStatus = requested.status;
+    }
+
+    return finalStatus === 'granted';
+  } catch (error) {
+    console.warn('Failed to request notification permissions:', error);
+    return false;
+  }
 }
 
 /**
  * Get the push notification token
  */
 export async function getPushToken(): Promise<string | null> {
-  console.log('getPushToken called (Mocked)');
-  return null;
+  try {
+    if (!Device.isDevice) {
+      return null;
+    }
+
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) {
+      return null;
+    }
+
+    const tokenResponse = await Notifications.getExpoPushTokenAsync();
+
+    return tokenResponse.data || null;
+  } catch (error) {
+    console.warn('Failed to get Expo push token:', error);
+    return null;
+  }
 }
 
 /**
  * Get FCM token (for production builds with Firebase)
  */
 export async function getFCMToken(): Promise<string | null> {
-  return null;
+  if (Platform.OS !== 'android') return null;
+  try {
+    // expo-notifications does not expose raw FCM token directly in managed workflow.
+    // We return Expo push token for backend mapping.
+    return await getPushToken();
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Register device with backend
  */
 export async function registerDevice(): Promise<boolean> {
-  console.log('registerDevice called (Mocked)');
-  return false;
+  try {
+    const token = await getPushToken();
+    if (!token) return false;
+
+    const result = await deviceApi.register({
+      token,
+      platform: Platform.OS === 'ios' ? 'ios' : 'android',
+      deviceName: Device.deviceName || undefined,
+    });
+
+    return !!result.success;
+  } catch (error) {
+    console.warn('Failed to register device for push:', error);
+    return false;
+  }
 }
 
 /**
  * Update push token (call when token refreshes)
  */
 export async function updatePushToken(token: string): Promise<boolean> {
-  return false;
+  try {
+    const result = await deviceApi.updateToken(token);
+    return !!result.success;
+  } catch (error) {
+    console.warn('Failed to update push token:', error);
+    return false;
+  }
 }
 
 /**
  * Unregister device (call on logout)
  */
 export async function unregisterDevice(): Promise<boolean> {
-  return false; // Mocked
+  try {
+    const result = await deviceApi.unregister();
+    return !!result.success;
+  } catch (error) {
+    console.warn('Failed to unregister device:', error);
+    return false;
+  }
 }
 
 /**
@@ -84,13 +137,13 @@ export function handleNotificationData(data: Record<string, any>): void {
 
   // Map notification screen to app routes
   const routeMap: Record<string, string> = {
-    'OrderDetails': `/orders/${data.orderId}`,
-    'BookingDetails': `/bookings/${data.bookingId}`,
-    'PaymentSuccess': '/payment/success',
-    'PaymentRetry': '/payment/retry',
+    'OrderDetails': `/restaurant/orders`,
+    'BookingDetails': `/chalets`,
+    'PaymentSuccess': '/profile',
+    'PaymentRetry': '/profile',
     'LoyaltyAccount': '/loyalty',
-    'Promotions': '/promotions',
-    'Menu': '/restaurant/menu',
+    'Promotions': '/restaurant',
+    'Menu': '/restaurant',
     'Pool': '/pool',
     'Chalets': '/chalets',
   };
@@ -111,9 +164,18 @@ export function handleNotificationData(data: Record<string, any>): void {
  * Notification listeners setup
  */
 export function setupNotificationListeners(): () => void {
-  // Mock listeners
+  const receiveSubscription = Notifications.addNotificationReceivedListener(() => {
+    // Optional foreground handling hook can be expanded by feature screens.
+  });
+
+  const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    const data = response.notification.request.content.data as Record<string, any>;
+    handleNotificationData(data || {});
+  });
+
   return () => {
-    // No-op cleanup
+    receiveSubscription.remove();
+    responseSubscription.remove();
   };
 }
 
@@ -121,21 +183,38 @@ export function setupNotificationListeners(): () => void {
  * Check for initial notification (app opened from notification)
  */
 export async function getInitialNotification(): Promise<Notifications.NotificationResponse | null> {
-  return null;
+  try {
+    return await Notifications.getLastNotificationResponseAsync();
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Set badge count
  */
 export async function setBadgeCount(count: number): Promise<void> {
-  // No-op
+  try {
+    if (Platform.OS === 'ios') {
+      await Notifications.setBadgeCountAsync(Math.max(0, count));
+    }
+  } catch (error) {
+    console.warn('Failed to set badge count:', error);
+  }
 }
 
 /**
  * Clear all notifications
  */
 export async function clearNotifications(): Promise<void> {
-  // No-op
+  try {
+    await Notifications.dismissAllNotificationsAsync();
+    if (Platform.OS === 'ios') {
+      await Notifications.setBadgeCountAsync(0);
+    }
+  } catch (error) {
+    console.warn('Failed to clear notifications:', error);
+  }
 }
 
 export default {
