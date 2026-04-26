@@ -7,6 +7,7 @@ import { clearModuleCache } from "../../middleware/moduleGuard.middleware";
 import { createModuleSchema, updateModuleSchema, validateBody } from "../../validation/schemas";
 import { logActivity } from "../../utils/activityLogger";
 import { logger } from "../../utils/logger.js";
+import { loadDynamicModules } from "../../routes/dynamic-modules.loader.js";
 
 export async function getModules(req: Request, res: Response, next: NextFunction) {
   try {
@@ -231,6 +232,9 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
     }
 
     emitToAll('modules.updated', data);
+
+    // Make the new module routes available immediately (no server restart).
+    await loadDynamicModules();
 
     await logActivity({
       user_id: (req.user as any)?.userId || 'system',
