@@ -6,8 +6,17 @@
 import { Router } from 'express';
 import { authenticate, authorize, optionalAuth } from '../../middleware/auth.middleware.js';
 import * as controller from './mobile-checkin.controller';
+import { getMyStatement } from '../users/user.controller.js';
+import { getMyPayments } from '../payments/payment.controller.js';
 
 const router = Router();
+
+// =============================================
+// MOBILE PARITY ROUTES
+// =============================================
+// Mirror core account-finance endpoints for mobile clients.
+router.get('/me/statement', authenticate, getMyStatement);
+router.get('/me/payments', authenticate, getMyPayments);
 
 // =============================================
 // PRE-ARRIVAL REGISTRATION ROUTES
