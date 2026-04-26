@@ -46,3 +46,8 @@ logs/
 # Firebase credentials (must remain local-only)
 GoogleService-Info.plist
 google-services.json
+
+# Generated mobile artifacts
+dist-android/
+*.threadDump
+coverage-output.txt

@@ -63,3 +63,5 @@ coverage-output.txt
 tools/*.json
 reports/*.json
 screenshots/*.png
+screenshots/**/*.png
+screenshots/**/*.jpg

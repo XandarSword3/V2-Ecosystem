@@ -1,4 +1,4 @@
-# Compose profile for running backend/frontend against a managed Supabase database.
+# Compose profile for running Supabase-related development flows when Docker Desktop is unavailable.
 version: '3.8'
 
 services:

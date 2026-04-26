@@ -307,8 +307,8 @@ After setup is complete:
 
 ---
 
-## Docker Compose Files
+## Which docker-compose file do I use?
 
 - `docker-compose.yml`: local full-stack environment (Postgres, Redis, backend, frontend).
-- `docker-compose.supabase.yml`: backend/frontend against remote or managed Supabase.
+- `docker-compose.supabase.yml`: run Supabase-related development workflows when Docker Desktop is unavailable.
 - `backend/docker-compose.test.yml`: isolated Postgres/Redis stack for backend integration tests.
