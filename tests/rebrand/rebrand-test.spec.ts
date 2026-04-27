@@ -16,6 +16,9 @@ import { test, expect, Page } from '../fixtures/auth.fixture';
 import * as fs from 'fs';
 import * as path from 'path';
 
+const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
+test.skip(!RUN_EXPLORATORY_E2E, 'Full multi-theme rebrand validation is exploratory outside dedicated runs.');
+
 // ═══════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════

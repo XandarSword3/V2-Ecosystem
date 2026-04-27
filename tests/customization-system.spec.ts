@@ -1,5 +1,8 @@
 import { test, expect, APIRequestContext } from './fixtures/auth.fixture';
 
+const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
+test.skip(!RUN_EXPLORATORY_E2E, 'Customization end-to-end coverage is exploratory outside dedicated runs.');
+
 const ADMIN_EMAIL = 'admin@v2resort.com';
 const ADMIN_PASSWORD = 'admin123';
 

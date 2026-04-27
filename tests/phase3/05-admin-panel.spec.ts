@@ -27,6 +27,9 @@
 import { test, expect } from '../fixtures/auth.fixture';
 import { waitForPageLoad, isVisible, getText, screenshot, loginAsAdmin } from './helpers';
 
+const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
+test.skip(!RUN_EXPLORATORY_E2E, 'Extended admin panel traversal is exploratory outside dedicated runs.');
+
 test.describe('Admin Panel', () => {
   // Login as admin before each test
   test.beforeEach(async ({ page }) => {

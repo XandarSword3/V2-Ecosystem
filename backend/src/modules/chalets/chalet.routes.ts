@@ -32,6 +32,9 @@ router.patch('/staff/bookings/:id/check-out', authenticate, chaletsPropertyScope
 router.patch('/staff/bookings/:id/status', authenticate, chaletsPropertyScope, authorize(...staffRoles), chaletController.updateBookingStatus);
 router.post('/bookings/:id/deposit/charge', authenticate, chaletsPropertyScope, authorize(...managerOrAdminRoles), chaletController.chargeDeposit);
 router.post('/bookings/:id/deposit/release', authenticate, chaletsPropertyScope, authorize(...managerOrAdminRoles), chaletController.releaseDeposit);
+// Compatibility aliases for phase checks / older clients.
+router.post('/bookings/:id/damage-deposit/charge', authenticate, chaletsPropertyScope, authorize(...managerOrAdminRoles), chaletController.chargeDeposit);
+router.post('/bookings/:id/damage-deposit/release', authenticate, chaletsPropertyScope, authorize(...managerOrAdminRoles), chaletController.releaseDeposit);
 
 // Admin routes
 const adminRoles = ['chalet_admin', 'super_admin'];
