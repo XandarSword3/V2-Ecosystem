@@ -80,7 +80,19 @@ describe('Admin scheduled reports route coverage', () => {
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
 
-    apiGetMock.mockResolvedValue({ data: { data: scheduledReportsSeed } });
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/reporting/scheduled') {
+        return Promise.resolve({ data: { reports: scheduledReportsSeed } });
+      }
+      if (url === '/reporting/templates') {
+        return Promise.resolve({
+          data: {
+            templates: [{ id: 'tpl-1', name: 'Revenue Template', category: 'finance' }],
+          },
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
     apiPostMock.mockResolvedValue({ data: { success: true } });
     apiPutMock.mockResolvedValue({ data: { success: true } });
     apiDeleteMock.mockResolvedValue({ data: { success: true } });
@@ -98,7 +110,7 @@ describe('Admin scheduled reports route coverage', () => {
     await user.click(screen.getByRole('button', { name: /Send Now/i }));
 
     await waitFor(() => {
-      expect(apiPostMock).toHaveBeenCalledWith('/admin/reports/scheduled/report-1/send');
+      expect(apiPostMock).toHaveBeenCalledWith('/reporting/scheduled/report-1/run');
     });
 
     expect(toastSuccessMock).toHaveBeenCalledWith('Report sent successfully');
@@ -107,7 +119,19 @@ describe('Admin scheduled reports route coverage', () => {
   it('shows validation error when creating report without a name', async () => {
     const user = userEvent.setup();
 
-    apiGetMock.mockResolvedValueOnce({ data: { data: [] } });
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/reporting/scheduled') {
+        return Promise.resolve({ data: { reports: [] } });
+      }
+      if (url === '/reporting/templates') {
+        return Promise.resolve({
+          data: {
+            templates: [{ id: 'tpl-1', name: 'Revenue Template', category: 'finance' }],
+          },
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
 
     render(<ScheduledReportsPage />);
 

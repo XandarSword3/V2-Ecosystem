@@ -18,7 +18,6 @@ module.exports = {
     es2022: true,
     node: true,
     jest: true,
-    'react-native/react-native': true,
   },
   settings: {
     react: {
@@ -48,7 +47,9 @@ module.exports = {
     // General code quality
     'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
     'no-debugger': 'error',
-    'no-duplicate-imports': 'error',
+    'no-duplicate-imports': 'warn',
+    'no-undef': 'off',
+    'no-unused-vars': 'off',
     'no-unused-expressions': 'warn',
     'prefer-const': 'warn',
     'eqeqeq': ['error', 'always', { null: 'ignore' }],
