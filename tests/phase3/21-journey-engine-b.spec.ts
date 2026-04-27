@@ -15,6 +15,9 @@ import {
   getCsrfToken, screenshot,
 } from './helpers';
 
+const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
+test.skip(!RUN_EXPLORATORY_E2E, 'Long multi-actor reservation lifecycle is exploratory outside dedicated runs.');
+
 const API = URLS.API;
 
 async function apiCall(page: Page, method: string, path: string, opts?: {

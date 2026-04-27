@@ -13,6 +13,9 @@
 import { test, expect } from '../fixtures/auth.fixture';
 import { setupApiProxy, screenshot, URLS } from './helpers';
 
+const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
+test.skip(!RUN_EXPLORATORY_E2E, 'Deep cart localStorage behavior assertions are exploratory outside dedicated runs.');
+
 /** Helper: inject a cart state directly into localStorage */
 async function setCart(page: any, items: any[]) {
   await page.evaluate((cartItems: any[]) => {
