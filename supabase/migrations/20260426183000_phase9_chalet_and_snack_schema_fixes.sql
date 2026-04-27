@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS chalet_images (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_chalet_images_unique
   ON chalet_images (chalet_id, image_url);
 
-CREATE TABLE IF NOT EXISTS snack_category (
+-- NOTE: avoid naming collision with the existing enum type `snack_category`.
+CREATE TABLE IF NOT EXISTS snack_categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -45,8 +46,8 @@ FROM chalets c
 CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(c.images::jsonb, '[]'::jsonb)) WITH ORDINALITY AS img(value, ordinality)
 ON CONFLICT (chalet_id, image_url) DO NOTHING;
 
--- Seed snack_category from existing snack item category values.
-INSERT INTO snack_category (name)
+-- Seed snack_categories from existing snack item category values.
+INSERT INTO snack_categories (name)
 SELECT DISTINCT TRIM(category)
 FROM snack_items
 WHERE category IS NOT NULL AND TRIM(category) <> ''

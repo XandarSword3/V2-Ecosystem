@@ -157,27 +157,40 @@ export async function login(email: string, password: string, meta: SessionMeta) 
   }
 
   // Get user roles
-  const { data: userRolesList, error: rolesError } = await supabase
-    .from('user_roles')
-    .select(`
-      role_id,
-      roles (id, name, display_name)
-    `)
-    .eq('user_id', user.id);
+  // Prefer the denormalized users.roles array. It is kept in sync by DB triggers
+  // (see 20260424000002_unify_user_roles_junction.sql) and avoids flaky join shapes.
+  let roleNames: string[] = [];
+  if (Array.isArray(user.roles) && user.roles.length > 0) {
+    roleNames = user.roles;
+  } else if (typeof user.role === 'string' && user.role.length > 0) {
+    roleNames = [user.role];
+  } else {
+    const { data: userRolesList, error: rolesError } = await supabase
+      .from('user_roles')
+      .select(`
+        role_id,
+        roles (id, name, display_name)
+      `)
+      .eq('user_id', user.id);
 
-  if (rolesError) {
-    logger.error('Error getting user roles:', rolesError.message);
-    throw rolesError;
+    if (rolesError) {
+      logger.error('Error getting user roles:', rolesError.message);
+      throw rolesError;
+    }
+
+    // Handle Supabase join which may return roles as array or object
+    interface RoleJoinResult { role_id?: string; roles?: { name?: string }[] | { name?: string } | null }
+    roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
+      const roles = r.roles;
+      if (!roles) return undefined;
+      if (Array.isArray(roles)) return roles[0]?.name;
+      return (roles as { name?: string }).name;
+    }).filter(Boolean) as string[];
   }
 
-  // Handle Supabase join which may return roles as array or object
-  interface RoleJoinResult { role_id?: string; roles?: { name?: string }[] | { name?: string } | null }
-  const roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
-    const roles = r.roles;
-    if (!roles) return undefined;
-    if (Array.isArray(roles)) return roles[0]?.name;
-    return (roles as { name?: string }).name;
-  }).filter(Boolean) as string[];
+  if (roleNames.length === 0) {
+    roleNames = ['customer'];
+  }
 
   // Generate tokens
   const tokens = generateTokens({
