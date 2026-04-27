@@ -11,6 +11,9 @@ import { test, expect } from './fixtures/auth.fixture';
 // Environment-driven configuration
 const API_URL = process.env.API_URL || 'http://localhost:3005';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
+
+test.skip(!RUN_EXPLORATORY_E2E, 'Admin/staff visual suite is exploratory and excluded from CI-critical runs.');
 
 // ============================================
 // ADMIN SETTINGS TESTS

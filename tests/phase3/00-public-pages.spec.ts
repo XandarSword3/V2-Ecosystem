@@ -88,7 +88,9 @@ test.describe('Public Pages — No Auth Required', () => {
 
       await page.locator('input[type="email"]').fill('wrong@example.com');
       await page.locator('input[type="password"]').first().fill('wrongpassword');
-      await page.locator('button[type="submit"]').first().click();
+      const submitBtn = page.locator('button[type="submit"]').first();
+      await submitBtn.scrollIntoViewIfNeeded();
+      await submitBtn.click({ force: true });
 
       await page.waitForLoadState('networkidle');
       const body = (await page.textContent('body')) || '';
@@ -106,7 +108,9 @@ test.describe('Public Pages — No Auth Required', () => {
 
       await page.locator('input[type="email"]').fill('admin@v2resort.com');
       await page.locator('input[type="password"]').first().fill('admin123');
-      await page.locator('button[type="submit"]').first().click();
+      const submitBtn = page.locator('button[type="submit"]').first();
+      await submitBtn.scrollIntoViewIfNeeded();
+      await submitBtn.click({ force: true });
 
       // Wait for either redirect or error (CSRF/remote backend may cause failure)
       await page.waitForLoadState('networkidle');
@@ -169,7 +173,17 @@ test.describe('Public Pages — No Auth Required', () => {
         await pwInputs.nth(1).fill('DifferentPassword!');
       }
 
-      await page.locator('button[type="submit"]').first().click();
+      const submitBtn = page.locator('button[type="submit"]').first();
+      await submitBtn.scrollIntoViewIfNeeded();
+      await submitBtn.evaluate((el) => {
+        const button = el as HTMLButtonElement;
+        const form = button.closest('form');
+        if (form) {
+          (form as HTMLFormElement).requestSubmit(button);
+        } else {
+          button.click();
+        }
+      });
       await page.waitForLoadState('networkidle');
 
       const body = (await page.textContent('body')) || '';

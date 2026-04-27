@@ -504,6 +504,48 @@ export const getMyPayments = asyncHandler(async (req: Request, res: Response) =>
   res.json({ success: true, data: transactions || [] });
 });
 
+export const getPaymentReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+  const userRoles = req.user?.roles || [];
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Authentication required' });
+  }
+
+  const supabase = getSupabase();
+  const { data: payment, error } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('id', req.params.id)
+    .single();
+
+  if (error || !payment) {
+    return res.status(404).json({ success: false, error: 'Payment not found' });
+  }
+
+  const adminLikeRoles = ['admin', 'manager', 'super_admin'];
+  const canViewAnyReceipt = userRoles.some((role) => adminLikeRoles.includes(role));
+  const isOwner = payment.customer_id && payment.customer_id === userId;
+  if (!canViewAnyReceipt && !isOwner) {
+    return res.status(403).json({ success: false, error: 'Forbidden' });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      id: payment.id,
+      amount: payment.amount,
+      currency: payment.currency,
+      method: payment.method,
+      status: payment.status,
+      reference_type: payment.reference_type,
+      reference_id: payment.reference_id,
+      processed_at: payment.processed_at || payment.created_at,
+      receipt_url: payment.receipt_url || null,
+      notes: payment.notes || null,
+    },
+  });
+});
+
 export const getTransaction = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
   const { data: payment, error } = await supabase

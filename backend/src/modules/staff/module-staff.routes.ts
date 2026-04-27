@@ -23,6 +23,8 @@ router.get('/modules/:slug/orders', authorize(...staffRoles), moduleStaffControl
 
 // Get live orders (alias for real-time order view)
 router.get('/modules/:slug/orders/live', authorize(...staffRoles), moduleStaffController.getModuleOrders);
+router.post('/modules/:slug/tables/:tableId/split', authorize(...staffRoles), moduleStaffController.splitModuleTable);
+router.post('/modules/:slug/tables/:tableId/merge', authorize(...staffRoles), moduleStaffController.mergeModuleTables);
 
 // Update order status
 router.put('/modules/:slug/orders/:orderId/status', authorize(...staffRoles), moduleStaffController.updateModuleOrderStatus);

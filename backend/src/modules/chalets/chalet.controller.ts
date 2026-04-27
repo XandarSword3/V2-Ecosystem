@@ -1189,22 +1189,41 @@ export const checkIn = asyncHandler(async (req: Request, res: Response) => {
     return res.status(404).json({ success: false, error: 'Booking not found' });
   }
 
-  const { data: paymentRows, error: paymentError } = await supabase
-    .from('payments')
-    .select('id, amount, status')
-    .eq('booking_id', req.params.id)
-    .in('status', ['completed', 'succeeded', 'paid']);
-
-  let paidAmount = (paymentRows || []).reduce((sum, row: any) => sum + parseFloat(String(row.amount || 0)), 0);
+  let paymentRows: any[] | null = null;
+  let paymentError: any = null;
+  let paidAmount = 0;
   const bookingTotal = parseFloat(String((booking as any).total_amount || 0));
 
-  // Compatibility: some schemas do not expose payments.booking_id yet.
+  const referenceLookup = await supabase
+    .from('payments')
+    .select('id, amount, status')
+    .eq('reference_type', 'chalet_booking')
+    .eq('reference_id', req.params.id)
+    .in('status', ['completed', 'succeeded', 'paid']);
+
+  paymentRows = referenceLookup.data;
+  paymentError = referenceLookup.error;
+
+  if (paymentError && /reference_type|reference_id|column|schema cache/i.test(String(paymentError.message || paymentError.details || ''))) {
+    const legacyLookup = await supabase
+      .from('payments')
+      .select('id, amount, status')
+      .eq('booking_id', req.params.id)
+      .in('status', ['completed', 'succeeded', 'paid']);
+
+    paymentRows = legacyLookup.data;
+    paymentError = legacyLookup.error;
+  }
+
+  // Compatibility: some schemas do not expose payments linkage columns yet.
   // In that case skip strict outstanding-balance enforcement instead of 500.
-  if (paymentError && !/booking_id|column|schema cache/i.test(String(paymentError.message || paymentError.details || ''))) {
+  if (paymentError && !/booking_id|reference_type|reference_id|column|schema cache/i.test(String(paymentError.message || paymentError.details || ''))) {
     throw paymentError;
   }
-  if (paymentError && /booking_id|column|schema cache/i.test(String(paymentError.message || paymentError.details || ''))) {
+  if (paymentError && /booking_id|reference_type|reference_id|column|schema cache/i.test(String(paymentError.message || paymentError.details || ''))) {
     paidAmount = bookingTotal;
+  } else {
+    paidAmount = (paymentRows || []).reduce((sum, row: any) => sum + parseFloat(String(row.amount || 0)), 0);
   }
 
   if (paidAmount < bookingTotal) {

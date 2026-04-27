@@ -16,9 +16,11 @@ async function seed() {
   const isDev = process.env.NODE_ENV !== 'production';
   const adminPasswordPlain = process.env.SEED_ADMIN_PASSWORD || (isDev ? 'admin123' : undefined);
   const staffPasswordPlain = process.env.SEED_STAFF_PASSWORD || (isDev ? 'staff123' : undefined);
+  const customerPasswordPlain = process.env.SEED_CUSTOMER_PASSWORD || (isDev ? 'TestPass123!' : undefined);
+  const legacyCustomerPasswordPlain = process.env.SEED_LEGACY_CUSTOMER_PASSWORD || (isDev ? 'password123' : undefined);
   
-  if (!adminPasswordPlain || !staffPasswordPlain) {
-    throw new Error('SEED_ADMIN_PASSWORD and SEED_STAFF_PASSWORD are required in production');
+  if (!adminPasswordPlain || !staffPasswordPlain || !customerPasswordPlain || !legacyCustomerPasswordPlain) {
+    throw new Error('SEED_ADMIN_PASSWORD, SEED_STAFF_PASSWORD, SEED_CUSTOMER_PASSWORD, and SEED_LEGACY_CUSTOMER_PASSWORD are required in production');
   }
 
   try {
@@ -143,7 +145,52 @@ async function seed() {
     }
     console.log('  ✓ Staff users created\n');
 
-    // 5. Create menu categories
+    // 5. Create customer users used by Playwright suites
+    console.log('Creating customer users...');
+    const customerPassword = await bcrypt.hash(customerPasswordPlain, 12);
+    const legacyCustomerPassword = await bcrypt.hash(legacyCustomerPasswordPlain, 12);
+    const customerUsers = [
+      { email: 'e2e.customer@test.com', full_name: 'E2E Customer', password_hash: customerPassword },
+      { email: 'customer@test.com', full_name: 'Test Customer', password_hash: legacyCustomerPassword },
+    ];
+
+    const { data: customerRole } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', 'customer')
+      .single();
+
+    for (const customer of customerUsers) {
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .upsert({
+          email: customer.email,
+          password_hash: customer.password_hash,
+          full_name: customer.full_name,
+          email_verified: true,
+          is_active: true,
+        }, { onConflict: 'email' })
+        .select('id')
+        .single();
+
+      if (userError || !user || !customerRole) continue;
+
+      const { data: existingRole } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('role_id', customerRole.id);
+
+      if (!existingRole || existingRole.length === 0) {
+        await supabase.from('user_roles').insert({
+          user_id: user.id,
+          role_id: customerRole.id,
+        });
+      }
+    }
+    console.log('  ✓ Customer users created\n');
+
+    // 6. Create menu categories
     console.log('Creating menu categories...');
     const categories = [
       { name: 'Appetizers', name_ar: 'مقبلات', name_fr: 'Entrées', description: 'Start your meal with our delicious appetizers', display_order: 1 },

@@ -100,6 +100,145 @@ export async function getModuleOrders(req: Request, res: Response) {
   }
 }
 
+export async function splitModuleTable(req: Request, res: Response) {
+  try {
+    const { slug, tableId } = req.params;
+    const { newTableId } = req.body as { newTableId?: string };
+    const supabase = getSupabase();
+
+    if (!newTableId) {
+      return res.status(400).json({ success: false, error: 'newTableId is required' });
+    }
+
+    const { data: module } = await supabase
+      .from('modules')
+      .select('id, template_type')
+      .eq('slug', slug)
+      .single();
+
+    if (!module || module.template_type !== 'menu_service') {
+      return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
+    }
+
+    const { data: sourceTab } = await supabase
+      .from('restaurant_tabs')
+      .select('id, table_id, status, customer_id, waiter_id, guest_count, notes')
+      .eq('table_id', tableId)
+      .eq('status', 'open')
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!sourceTab) {
+      return res.status(404).json({ success: false, error: 'Source table has no open tab' });
+    }
+
+    const { data: existingTarget } = await supabase
+      .from('restaurant_tabs')
+      .select('id')
+      .eq('table_id', newTableId)
+      .eq('status', 'open')
+      .maybeSingle();
+
+    if (existingTarget) {
+      return res.status(409).json({ success: false, error: 'Target table already has an open tab' });
+    }
+
+    const { data: newTab, error: createError } = await supabase
+      .from('restaurant_tabs')
+      .insert({
+        table_id: newTableId,
+        customer_id: sourceTab.customer_id,
+        waiter_id: sourceTab.waiter_id,
+        guest_count: sourceTab.guest_count,
+        notes: sourceTab.notes,
+        status: 'open',
+      })
+      .select('id, table_id, status')
+      .single();
+
+    if (createError) throw createError;
+
+    res.status(201).json({
+      success: true,
+      data: {
+        sourceTabId: sourceTab.id,
+        targetTabId: newTab.id,
+        sourceTableId: tableId,
+        targetTableId: newTableId,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error splitting table:', error);
+    res.status(500).json({ success: false, error: 'Failed to split table', message: error.message });
+  }
+}
+
+export async function mergeModuleTables(req: Request, res: Response) {
+  try {
+    const { slug, tableId } = req.params;
+    const { targetTableId } = req.body as { targetTableId?: string };
+    const supabase = getSupabase();
+
+    if (!targetTableId) {
+      return res.status(400).json({ success: false, error: 'targetTableId is required' });
+    }
+
+    const { data: module } = await supabase
+      .from('modules')
+      .select('id, template_type')
+      .eq('slug', slug)
+      .single();
+
+    if (!module || module.template_type !== 'menu_service') {
+      return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
+    }
+
+    const { data: sourceTab } = await supabase
+      .from('restaurant_tabs')
+      .select('id, table_id')
+      .eq('table_id', tableId)
+      .eq('status', 'open')
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: targetTab } = await supabase
+      .from('restaurant_tabs')
+      .select('id, table_id')
+      .eq('table_id', targetTableId)
+      .eq('status', 'open')
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!sourceTab || !targetTab) {
+      return res.status(404).json({ success: false, error: 'Both source and target tables must have open tabs' });
+    }
+
+    await supabase
+      .from('restaurant_orders')
+      .update({ tab_id: targetTab.id })
+      .eq('tab_id', sourceTab.id);
+
+    await supabase
+      .from('restaurant_tabs')
+      .update({ status: 'merged', closed_at: new Date().toISOString() })
+      .eq('id', sourceTab.id);
+
+    res.json({
+      success: true,
+      data: {
+        sourceTabId: sourceTab.id,
+        targetTabId: targetTab.id,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error merging tables:', error);
+    res.status(500).json({ success: false, error: 'Failed to merge tables', message: error.message });
+  }
+}
+
 /**
  * Update order status for a module
  */

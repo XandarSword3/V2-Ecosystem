@@ -35,7 +35,8 @@ test.describe('Smoke - Production Connectivity', () => {
       await page.goto(`${FRONTEND_URL}${path}`, { waitUntil: 'domcontentloaded' });
 
       // Give async API calls enough time to settle and surface fallback UI.
-      await page.waitForLoadState('networkidle');
+      // Avoid strict network-idle waiting on pages that keep long-polling connections.
+      await page.waitForTimeout(3000);
 
       await expectNoVisibleText(page, 'An error occurred');
       await expectNoVisibleText(page, 'Please try again later');
@@ -51,11 +52,15 @@ test.describe('Smoke - Production Connectivity', () => {
 
         for (const endpoint of endpoints) {
           try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
             const response = await fetch(`${apiUrl}${endpoint}`, {
               method: 'GET',
               mode: 'cors',
               credentials: 'include',
+              signal: controller.signal,
             });
+            clearTimeout(timeout);
 
             checks.push({
               endpoint,
