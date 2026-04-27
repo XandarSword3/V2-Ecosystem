@@ -50,7 +50,7 @@ export function SortableBlock({ block }: SortableBlockProps) {
         if (!moduleSlug) return;
 
         if (block.type === 'menu_list') {
-          const ordersRes = await api.get(`/staff/modules/${moduleSlug}/orders`);
+          const ordersRes = await api.get(`/${moduleSlug}/orders`);
           const rows = ordersRes.data?.data || [];
           if (!cancelled) {
             setLiveData({
@@ -59,7 +59,7 @@ export function SortableBlock({ block }: SortableBlockProps) {
             });
           }
         } else if (block.type === 'session_list') {
-          const sessionsRes = await api.get(`/staff/modules/${moduleSlug}/sessions`);
+          const sessionsRes = await api.get(`/${moduleSlug}/sessions`);
           const rows = sessionsRes.data?.data || [];
           if (!cancelled) {
             setLiveData({
@@ -68,7 +68,7 @@ export function SortableBlock({ block }: SortableBlockProps) {
             });
           }
         } else if (block.type === 'booking_calendar') {
-          const bookingsRes = await api.get(`/staff/modules/${moduleSlug}/bookings`);
+          const bookingsRes = await api.get(`/${moduleSlug}/bookings`);
           const rows = bookingsRes.data?.data || [];
           if (!cancelled) {
             setLiveData({
