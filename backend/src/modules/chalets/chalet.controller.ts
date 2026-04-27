@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 import { getRedis } from '../../config/session-store.js';
 import { config } from '../../config/index.js';
 import Stripe from 'stripe';
+import bcrypt from 'bcryptjs';
 
 // Distributed booking lock using Redis (falls back to in-memory for non-Redis environments)
 // Ensures only one booking request per chalet is processed at a time, even across server instances
@@ -1072,7 +1073,7 @@ export const createStaffBooking = asyncHandler(async (req: Request, res: Respons
   if (!resolvedCustomerId) {
     const guestName = customer_name || 'Guest';
     const syntheticEmail = customer_email || `guest_${Date.now()}@local.v2-resort`;
-    const syntheticPassword = `guest_${Date.now()}`;
+    const syntheticPassword = await bcrypt.hash(`guest_${Date.now()}`, 12);
     const { data: guestProfile, error: guestError } = await supabase
       .from('users')
       .insert({
