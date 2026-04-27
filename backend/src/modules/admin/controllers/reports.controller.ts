@@ -3,8 +3,18 @@
  * Provides simplified report endpoints for the admin dashboard
  */
 import { Request, Response } from 'express';
-import { getSupabase } from '../../../database/connection.js';
+import { getPool, getSupabase } from '../../../database/connection.js';
 import { asyncHandler } from '../../../middleware/async-handler.js';
+import dayjs from 'dayjs';
+
+type PeriodAggregateRow = {
+  count: string | number;
+  revenue: string | number;
+};
+
+function toNumber(value: string | number | null | undefined): number {
+  return Number(value || 0);
+}
 
 function getDateRange(range: string): { start: Date; end: Date } {
   const end = new Date();
@@ -46,6 +56,145 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
   const endISO = end.toISOString();
   const prevStartISO = prev.start.toISOString();
   const prevEndISO = prev.end.toISOString();
+
+  try {
+    const pool = getPool();
+
+    const [currentRestaurant, currentChalets, currentPool, currentSnack, previousRestaurant, previousChalets, previousPool, previousSnack, monthlyRevenueRows, topItemsResult, usersResult] = await Promise.all([
+      pool.query<PeriodAggregateRow>(
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM restaurant_orders WHERE created_at BETWEEN $1 AND $2',
+        [startISO, endISO]
+      ),
+      pool.query<PeriodAggregateRow>(
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM chalet_bookings WHERE created_at BETWEEN $1 AND $2',
+        [startISO, endISO]
+      ),
+      pool.query<PeriodAggregateRow>(
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM pool_tickets WHERE created_at BETWEEN $1 AND $2',
+        [startISO, endISO]
+      ),
+      pool.query<PeriodAggregateRow>(
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM snack_orders WHERE created_at BETWEEN $1 AND $2',
+        [startISO, endISO]
+      ),
+      pool.query<PeriodAggregateRow>(
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM restaurant_orders WHERE created_at BETWEEN $1 AND $2',
+        [prevStartISO, prevEndISO]
+      ),
+      pool.query<PeriodAggregateRow>(
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM chalet_bookings WHERE created_at BETWEEN $1 AND $2',
+        [prevStartISO, prevEndISO]
+      ),
+      pool.query<PeriodAggregateRow>(
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM pool_tickets WHERE created_at BETWEEN $1 AND $2',
+        [prevStartISO, prevEndISO]
+      ),
+      pool.query<PeriodAggregateRow>(
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM snack_orders WHERE created_at BETWEEN $1 AND $2',
+        [prevStartISO, prevEndISO]
+      ),
+      pool.query<{ month_key: string; revenue: string }>(`
+        WITH all_items AS (
+          SELECT date_trunc('month', created_at) AS month_start, total_amount
+          FROM restaurant_orders
+          WHERE created_at BETWEEN $1 AND $2
+          UNION ALL
+          SELECT date_trunc('month', created_at) AS month_start, total_amount
+          FROM chalet_bookings
+          WHERE created_at BETWEEN $1 AND $2
+          UNION ALL
+          SELECT date_trunc('month', created_at) AS month_start, total_amount
+          FROM pool_tickets
+          WHERE created_at BETWEEN $1 AND $2
+          UNION ALL
+          SELECT date_trunc('month', created_at) AS month_start, total_amount
+          FROM snack_orders
+          WHERE created_at BETWEEN $1 AND $2
+        )
+        SELECT to_char(month_start, 'YYYY-MM') AS month_key, COALESCE(SUM(total_amount), 0) AS revenue
+        FROM all_items
+        GROUP BY month_start
+        ORDER BY month_start
+      `, [dayjs().subtract(5, 'month').startOf('month').toISOString(), endISO]),
+      pool.query<{
+        id: string;
+        menu_item_id: string;
+        quantity: number;
+        unit_price: string;
+        name: string | null;
+      }>(`
+        SELECT
+          roi.id,
+          roi.menu_item_id,
+          roi.quantity,
+          roi.unit_price,
+          mi.name
+        FROM restaurant_order_items roi
+        LEFT JOIN menu_items mi ON mi.id = roi.menu_item_id
+        ORDER BY roi.quantity DESC
+        LIMIT 5
+      `),
+      pool.query<{ count: string | number }>('SELECT COUNT(*)::int AS count FROM users'),
+    ]);
+
+    const revenueByMonthMap = new Map(
+      (monthlyRevenueRows.rows || []).map((row) => [row.month_key, toNumber(row.revenue)])
+    );
+
+    const revenueByMonth = Array.from({ length: 6 }, (_, index) => {
+      const month = dayjs().subtract(5 - index, 'month').startOf('month');
+      const key = month.format('YYYY-MM');
+      return {
+        month: month.toDate().toLocaleDateString('en', { month: 'short', year: 'numeric' }),
+        revenue: revenueByMonthMap.get(key) || 0,
+      };
+    });
+
+    const restaurantRevenue = toNumber(currentRestaurant.rows[0]?.revenue);
+    const chaletRevenue = toNumber(currentChalets.rows[0]?.revenue);
+    const poolRevenue = toNumber(currentPool.rows[0]?.revenue);
+    const snackRevenue = toNumber(currentSnack.rows[0]?.revenue);
+    const totalRevenue = restaurantRevenue + chaletRevenue + poolRevenue + snackRevenue;
+    const totalOrders = toNumber(currentRestaurant.rows[0]?.count) + toNumber(currentSnack.rows[0]?.count);
+    const totalBookings = toNumber(currentChalets.rows[0]?.count) + toNumber(currentPool.rows[0]?.count);
+
+    const prevRevenue = toNumber(previousRestaurant.rows[0]?.revenue) + toNumber(previousChalets.rows[0]?.revenue) + toNumber(previousPool.rows[0]?.revenue) + toNumber(previousSnack.rows[0]?.revenue);
+    const prevOrders = toNumber(previousRestaurant.rows[0]?.count) + toNumber(previousSnack.rows[0]?.count);
+
+    const revenueChange = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
+    const ordersChange = prevOrders > 0 ? ((totalOrders - prevOrders) / prevOrders) * 100 : 0;
+
+    const topItems = (topItemsResult.rows || []).map((item) => ({
+      name: item.name || 'Unknown',
+      quantity: item.quantity,
+      revenue: toNumber(item.quantity) * toNumber(item.unit_price),
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalRevenue,
+          totalOrders,
+          totalBookings,
+          totalUsers: toNumber(usersResult.rows[0]?.count),
+          revenueChange: Math.round(revenueChange * 10) / 10,
+          ordersChange: Math.round(ordersChange * 10) / 10,
+        },
+        revenueByService: {
+          restaurant: restaurantRevenue,
+          snackBar: snackRevenue,
+          chalets: chaletRevenue,
+          pool: poolRevenue,
+        },
+        revenueByMonth,
+        topItems,
+      },
+    });
+    return;
+  } catch {
+    // Fall back to the existing Supabase client path when a direct pool is unavailable.
+  }
 
   // Current period queries
   const [ordersRes, chaletBookingsRes, poolTicketsRes, snackOrdersRes, usersRes] = await Promise.all([
