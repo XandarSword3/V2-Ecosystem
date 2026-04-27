@@ -56,6 +56,10 @@ router.get('/my-orders', authenticate, restaurantPropertyScope, orderController.
 const staffRoles = [
   'staff',
   'restaurant_staff', 'restaurant_admin',
+  'kitchen_staff',
+  'bar_staff',
+  'chef',
+  'server',
   'snack_bar_staff', 'snack_bar_admin',
   'admin',
   'super_admin'

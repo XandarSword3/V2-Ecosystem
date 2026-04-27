@@ -26,6 +26,8 @@ router.get('/my-tickets', authenticate, poolPropertyScope, poolController.getMyT
 const staffRoles = ['staff', 'pool_staff', 'pool_admin', 'super_admin'];
 router.post('/staff/validate', authenticate, poolPropertyScope, authorize(...staffRoles), poolController.validateTicket);
 router.post('/staff/tickets', authenticate, poolPropertyScope, authorize(...staffRoles), poolController.createStaffTicket);
+// Compatibility: Phase 2 client posts /pool/tickets/:id/validate
+router.post('/tickets/:id/validate', authenticate, poolPropertyScope, authorize(...staffRoles), poolController.validateTicket);
 router.post('/tickets/:id/entry', authenticate, poolPropertyScope, authorize(...staffRoles), poolController.recordEntry);
 router.post('/tickets/:id/exit', authenticate, poolPropertyScope, authorize(...staffRoles), poolController.recordExit);
 router.get('/staff/capacity', authenticate, poolPropertyScope, authorize(...staffRoles), poolController.getCurrentCapacity);

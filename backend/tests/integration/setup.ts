@@ -13,9 +13,9 @@ import * as path from 'path';
 
 // Load .env.test first for overrides
 dotenv.config({ path: path.resolve(__dirname, '../../.env.test') });
-// Load backend .env and allow it to override placeholder test values when present.
-// This keeps integration setup aligned with the actively running local stack.
-dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
+// Load backend .env but DO NOT override process env (CI passes live URLs/keys).
+// This keeps local runs convenient while respecting explicitly-provided variables.
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Set test environment variables before any imports
 process.env.NODE_ENV = 'test';

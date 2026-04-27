@@ -1194,10 +1194,19 @@ export const checkIn = asyncHandler(async (req: Request, res: Response) => {
     .select('id, amount, status')
     .eq('booking_id', req.params.id)
     .in('status', ['completed', 'succeeded', 'paid']);
-  if (paymentError) throw paymentError;
 
-  const paidAmount = (paymentRows || []).reduce((sum, row: any) => sum + parseFloat(String(row.amount || 0)), 0);
+  let paidAmount = (paymentRows || []).reduce((sum, row: any) => sum + parseFloat(String(row.amount || 0)), 0);
   const bookingTotal = parseFloat(String((booking as any).total_amount || 0));
+
+  // Compatibility: some schemas do not expose payments.booking_id yet.
+  // In that case skip strict outstanding-balance enforcement instead of 500.
+  if (paymentError && !/booking_id|column|schema cache/i.test(String(paymentError.message || paymentError.details || ''))) {
+    throw paymentError;
+  }
+  if (paymentError && /booking_id|column|schema cache/i.test(String(paymentError.message || paymentError.details || ''))) {
+    paidAmount = bookingTotal;
+  }
+
   if (paidAmount < bookingTotal) {
     return res.status(402).json({
       success: false,
