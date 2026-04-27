@@ -19,13 +19,18 @@ class PermissionCacheService {
       this.loadFallbackFromStaticPermissions();
     }
 
+    // Super admin: wildcard grants everything.
+    if (roleName === 'super_admin') {
+      const superAdmin = this.permissionByRole.get('super_admin');
+      return Boolean(superAdmin?.has('*') || superAdmin?.has(permissionSlug));
+    }
+
     const direct = this.permissionByRole.get(roleName);
     if (direct?.has(permissionSlug)) {
       return true;
     }
 
-    const superAdmin = this.permissionByRole.get('super_admin');
-    return Boolean(superAdmin?.has('*'));
+    return false;
   }
 
   getPermissionsForRole(roleName: string): string[] {

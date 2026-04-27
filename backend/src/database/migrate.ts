@@ -586,6 +586,38 @@ export async function migrate() {
       WHERE reference_type IS NULL;
     `);
 
+    // Compatibility shim for legacy loyalty_transactions schema.
+    // Some historical Supabase migrations created loyalty_transactions without reference_type/reference_id
+    // (or with a `type` column rather than `transaction_type`). Integration tests and reporting indexes
+    // assume these fields exist.
+    await pool.query(`
+      ALTER TABLE IF EXISTS loyalty_transactions
+        ADD COLUMN IF NOT EXISTS reference_type VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS reference_id UUID;
+
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'loyalty_transactions'
+            AND column_name = 'type'
+        ) AND NOT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'loyalty_transactions'
+            AND column_name = 'transaction_type'
+        ) THEN
+          ALTER TABLE loyalty_transactions ADD COLUMN transaction_type VARCHAR(50);
+          UPDATE loyalty_transactions
+          SET transaction_type = COALESCE(transaction_type, type)
+          WHERE transaction_type IS NULL;
+        END IF;
+      END $$;
+    `);
+
     // Compatibility shim: older bootstrap schemas created notifications without
     // scheduling and delivery columns used by notification jobs.
     await pool.query(`
