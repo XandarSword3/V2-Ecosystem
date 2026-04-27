@@ -8,13 +8,7 @@ router.get('/orders', authenticate, authorize('staff', 'manager', 'admin', 'supe
   try {
     const supabase = getSupabase();
     const { customer_id, q, date_from, date_to, module, status } = req.query as Record<string, string | undefined>;
-    type SearchFilterQuery<T> = {
-      gte: (column: string, value: string) => T;
-      lte: (column: string, value: string) => T;
-      eq: (column: string, value: string) => T;
-      ilike: (column: string, value: string) => T;
-    };
-    const applyFilters = <T extends SearchFilterQuery<T>>(query: T) => {
+    const applyFilters = (query: any) => {
       let nextQuery = query;
       if (date_from) nextQuery = nextQuery.gte('created_at', date_from);
       if (date_to) nextQuery = nextQuery.lte('created_at', date_to);
