@@ -34,6 +34,7 @@ export default defineConfig({
       reportsDirectory: './coverage-critical',
       reportOnFailure: true,
       thresholds: {
+        statements: 44,
         lines: 46,
         branches: 31,
       },

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const useQueryMock = vi.hoisted(() => vi.fn());
 const addItemMock = vi.hoisted(() => vi.fn());
 const removeItemMock = vi.hoisted(() => vi.fn());
-const supportSubmitMock = vi.hoisted(() => vi.fn());
+const apiPostMock = vi.hoisted(() => vi.fn());
 const toastSuccessMock = vi.hoisted(() => vi.fn());
 const toastErrorMock = vi.hoisted(() => vi.fn());
 
@@ -18,14 +18,15 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('@/lib/api', () => ({
+  api: {
+    post: apiPostMock,
+    get: vi.fn(),
+  },
   restaurantApi: {
     getMenu: vi.fn(),
   },
   poolApi: {
     getSessions: vi.fn(),
-  },
-  supportApi: {
-    submitContact: supportSubmitMock,
   },
 }));
 
@@ -138,7 +139,7 @@ describe('DynamicModuleRenderer behavior', () => {
     useQueryMock.mockReset();
     addItemMock.mockReset();
     removeItemMock.mockReset();
-    supportSubmitMock.mockReset();
+    apiPostMock.mockReset();
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
     cartState.items = [];
@@ -290,7 +291,7 @@ describe('DynamicModuleRenderer behavior', () => {
   it('submits form container successfully and surfaces submit errors', async () => {
     const user = userEvent.setup();
 
-    supportSubmitMock.mockResolvedValueOnce({ data: { success: true } });
+    apiPostMock.mockResolvedValueOnce({ data: { success: true } });
 
     const layout = [
       {
@@ -313,11 +314,11 @@ describe('DynamicModuleRenderer behavior', () => {
     await user.click(screen.getByRole('button', { name: /send form/i }));
 
     await waitFor(() => {
-      expect(supportSubmitMock).toHaveBeenCalled();
+      expect(apiPostMock).toHaveBeenCalled();
       expect(toastSuccessMock).toHaveBeenCalledWith('Your request has been submitted successfully!');
     });
 
-    supportSubmitMock.mockRejectedValueOnce({ response: { data: { error: 'Submit failed' } } });
+    apiPostMock.mockRejectedValueOnce({ response: { data: { error: 'Submit failed' } } });
 
     rerender(<DynamicModuleRenderer layout={layout as never} module={moduleData as never} />);
 

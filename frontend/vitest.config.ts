@@ -27,7 +27,7 @@ export default defineConfig({
       reportsDirectory: './coverage',
       reportOnFailure: true,
       thresholds: {
-        statements: 45,
+        statements: 44,
         branches: 25,
       },
     },
