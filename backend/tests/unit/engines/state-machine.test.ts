@@ -305,30 +305,26 @@ describe('StateMachine - Ongoing Entitlement (Engine D)', () => {
 
   describe('pause/resume', () => {
     it('should allow pausing and resuming', async () => {
-      let result = await sm.transition('active', 'pause', 'customer');
+      let result = await sm.transition('active', 'pause', 'staff');
       expect(result.newState).toBe('paused');
 
-      result = await sm.transition('paused', 'resume', 'customer');
+      result = await sm.transition('paused', 'resume', 'staff');
       expect(result.newState).toBe('active');
     });
   });
 
-  describe('expiration and reactivation', () => {
-    it('should allow expiration and reactivation within grace period', async () => {
+  describe('expiration', () => {
+    it('should allow expiration from active and block reactivation', async () => {
       let result = await sm.transition('active', 'expire', 'system');
       expect(result.newState).toBe('expired');
 
-      result = await sm.transition('expired', 'reactivate', 'staff');
-      expect(result.newState).toBe('active');
+      await expect(
+        sm.transition('expired', 'reactivate', 'staff'),
+      ).rejects.toThrow(StateMachineError);
     });
   });
 
-  describe('cancellation from any non-cancelled state', () => {
-    it('should allow cancellation from pending', async () => {
-      const result = await sm.transition('pending', 'cancel', 'customer');
-      expect(result.success).toBe(true);
-    });
-
+  describe('cancellation from active/paused states', () => {
     it('should allow cancellation from active', async () => {
       const result = await sm.transition('active', 'cancel', 'customer');
       expect(result.success).toBe(true);
@@ -339,9 +335,16 @@ describe('StateMachine - Ongoing Entitlement (Engine D)', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should allow cancellation from expired', async () => {
-      const result = await sm.transition('expired', 'cancel', 'admin');
-      expect(result.success).toBe(true);
+    it('should block cancellation from pending', async () => {
+      await expect(
+        sm.transition('pending', 'cancel', 'customer'),
+      ).rejects.toThrow(StateMachineError);
+    });
+
+    it('should block cancellation from expired', async () => {
+      await expect(
+        sm.transition('expired', 'cancel', 'admin'),
+      ).rejects.toThrow(StateMachineError);
     });
 
     it('should make cancelled the only terminal state', () => {

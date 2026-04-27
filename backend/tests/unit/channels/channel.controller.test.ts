@@ -53,7 +53,8 @@ describe('Channel Controller', () => {
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         connections: mockConnections,
-        available_channels: Object.values(channelService.CHANNELS)
+        available_channels: Object.values(channelService.CHANNELS),
+        available_adapters: ['siteminder']
       });
     });
 

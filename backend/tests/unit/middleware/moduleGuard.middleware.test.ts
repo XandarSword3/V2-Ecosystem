@@ -60,7 +60,7 @@ describe('ModuleGuard Middleware', () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('should default to active when module not found in database', async () => {
+    it('should fail closed when module is not found in database', async () => {
       vi.mocked(getSupabase).mockReturnValue({
         from: vi.fn().mockReturnValue(createChainableMock(null, { code: 'PGRST116' }))
       } as any);
@@ -70,7 +70,13 @@ describe('ModuleGuard Middleware', () => {
 
       await middleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'This feature is currently unavailable',
+        code: 'MODULE_DISABLED'
+      });
+      expect(next).not.toHaveBeenCalled();
     });
 
     it('should use cached value on subsequent requests', async () => {
@@ -91,7 +97,7 @@ describe('ModuleGuard Middleware', () => {
       expect(next2).toHaveBeenCalled();
     });
 
-    it('should allow request on database error (fail-open)', async () => {
+    it('should block request on database error (fail-closed)', async () => {
       vi.mocked(getSupabase).mockReturnValue({
         from: vi.fn().mockReturnValue(createChainableMock(null, { code: 'NETWORK_ERROR' }))
       } as any);
@@ -101,7 +107,13 @@ describe('ModuleGuard Middleware', () => {
 
       await middleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Unable to verify module status',
+        code: 'MODULE_CHECK_FAILED'
+      });
+      expect(next).not.toHaveBeenCalled();
     });
   });
 
