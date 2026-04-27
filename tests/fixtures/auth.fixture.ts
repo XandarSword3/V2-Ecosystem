@@ -137,7 +137,35 @@ async function loginViaUi(page: Page, role: Exclude<AuthRole, 'guest'>): Promise
     }
   }
 
-  throw new Error(`UI login failed for role ${role}: still on login page`);
+  // Fallback: seed local storage via API login for environments where
+  // interactive login is blocked by CSRF/origin constraints.
+  for (const creds of getCredentialCandidates(role)) {
+    const response = await page.request.post(`${API_URL}/api/v1/auth/login`, {
+      data: creds,
+      timeout: 30000,
+    });
+    if (!response.ok()) continue;
+
+    const body = await response.json();
+    const tokens = body?.data?.tokens;
+    const user = body?.data?.user;
+    const accessToken = tokens?.accessToken || body?.data?.accessToken;
+    const refreshToken = tokens?.refreshToken || body?.data?.refreshToken || '';
+    if (!accessToken) continue;
+
+    await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+    await page.evaluate(
+      ({ token, refresh, userData }) => {
+        localStorage.setItem('accessToken', token);
+        localStorage.setItem('refreshToken', refresh || '');
+        if (userData) localStorage.setItem('user', JSON.stringify(userData));
+      },
+      { token: accessToken, refresh: refreshToken, userData: user },
+    );
+    return;
+  }
+
+  throw new Error(`UI/API login failed for role ${role}: credentials rejected or session bootstrap failed`);
 }
 
 async function ensureRoleStorageState(

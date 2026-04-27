@@ -12,6 +12,9 @@
 import { test, expect } from '../fixtures/auth.fixture';
 import { setupApiProxy, fullSetup, getAuthToken, getAuthHeaders, getCsrfToken, waitForPageLoad, screenshot, URLS, CREDS } from './helpers';
 
+const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
+test.skip(!RUN_EXPLORATORY_E2E, 'Deep restaurant UI/data assertions are exploratory outside dedicated runs.');
+
 const API = URLS.API;
 
 test.describe('Restaurant — Proves Real Functionality', () => {

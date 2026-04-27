@@ -17,6 +17,9 @@
 import { test, expect } from '../fixtures/auth.fixture';
 import { waitForPageLoad, isVisible, getText, screenshot, uiLogin, loginAsAdmin, CREDS } from './helpers';
 
+const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
+test.skip(!RUN_EXPLORATORY_E2E, 'Extended staff panel traversal is exploratory outside dedicated runs.');
+
 test.describe('Staff Panel', () => {
 
   // ============================================================

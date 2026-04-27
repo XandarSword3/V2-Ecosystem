@@ -82,15 +82,31 @@ test.describe('Engine D — Ongoing Entitlements', () => {
       await loginAsAdmin(page);
       await waitForPageLoad(page, { timeout: 20000 });
 
-      // Look for logout in profile menu
-      const profileMenu = page.locator('[class*="profile"], [class*="avatar"], [class*="user"]').first();
-      if (await profileMenu.isVisible().catch(() => false)) {
-        await profileMenu.click();
+      // Prefer direct logout button/link when already visible.
+      const directLogoutBtn = page.locator('button, a').filter({ hasText: /logout|sign out|log out/i }).first();
+      if (await directLogoutBtn.isVisible().catch(() => false)) {
+        await directLogoutBtn.scrollIntoViewIfNeeded();
+        await directLogoutBtn.click({ force: true });
         await page.waitForLoadState('networkidle');
+        await screenshot(page, 'auth-logged-out');
+        return;
+      }
+
+      // Fallback: open a likely account/profile trigger, then click logout.
+      const profileMenu = page
+        .locator('button, a, [role="button"]')
+        .filter({ hasText: /profile|account|avatar|user|admin/i })
+        .first();
+
+      if (await profileMenu.isVisible().catch(() => false)) {
+        await profileMenu.scrollIntoViewIfNeeded();
+        await profileMenu.click({ force: true });
+        await page.waitForTimeout(500);
 
         const logoutBtn = page.locator('button, a').filter({ hasText: /logout|sign out|log out/i }).first();
         if (await logoutBtn.isVisible().catch(() => false)) {
-          await logoutBtn.click();
+          await logoutBtn.scrollIntoViewIfNeeded();
+          await logoutBtn.click({ force: true });
           await page.waitForLoadState('networkidle');
           await screenshot(page, 'auth-logged-out');
         }

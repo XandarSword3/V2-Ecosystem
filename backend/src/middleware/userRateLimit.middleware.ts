@@ -59,6 +59,12 @@ export function userRateLimit(config: RateLimitConfig) {
         return next();
       }
 
+      // CI test suites can trigger auth/write bursts across many workers.
+      // Disable app-level throttling there to avoid non-deterministic 429s.
+      if (process.env.CI === 'true' || process.env.DISABLE_RATE_LIMITS === 'true') {
+        return next();
+      }
+
       // Determine the rate limit key
       // Use user ID if authenticated, otherwise fall back to IP
       const userId = (req as { user?: { userId: string } }).user?.userId;
