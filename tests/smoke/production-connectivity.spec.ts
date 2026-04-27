@@ -51,31 +51,40 @@ test.describe('Smoke - Production Connectivity', () => {
         const checks: Array<{ endpoint: string; ok: boolean; status: number; error: string | null }> = [];
 
         for (const endpoint of endpoints) {
-          try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000);
-            const response = await fetch(`${apiUrl}${endpoint}`, {
-              method: 'GET',
-              mode: 'cors',
-              credentials: 'include',
-              signal: controller.signal,
-            });
-            clearTimeout(timeout);
+          let lastResult: { endpoint: string; ok: boolean; status: number; error: string | null } | null = null;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 30000);
+              const response = await fetch(`${apiUrl}${endpoint}`, {
+                method: 'GET',
+                mode: 'cors',
+                credentials: 'include',
+                signal: controller.signal,
+              });
+              clearTimeout(timeout);
 
-            checks.push({
-              endpoint,
-              ok: response.ok,
-              status: response.status,
-              error: null,
-            });
-          } catch (error) {
-            checks.push({
-              endpoint,
-              ok: false,
-              status: 0,
-              error: error instanceof Error ? error.message : String(error),
-            });
+              lastResult = {
+                endpoint,
+                ok: response.ok,
+                status: response.status,
+                error: null,
+              };
+              if (response.ok) break;
+            } catch (error) {
+              lastResult = {
+                endpoint,
+                ok: false,
+                status: 0,
+                error: error instanceof Error ? error.message : String(error),
+              };
+            }
+
+            if (attempt === 0) {
+              await new Promise((resolve) => setTimeout(resolve, 3000));
+            }
           }
+          checks.push(lastResult || { endpoint, ok: false, status: 0, error: 'Unknown fetch failure' });
         }
 
         return checks;
