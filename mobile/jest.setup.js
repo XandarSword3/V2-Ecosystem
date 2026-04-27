@@ -86,6 +86,20 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   return mockImpl;
 });
 
+// Mock @react-native-community/netinfo
+jest.mock('@react-native-community/netinfo', () => ({
+  __esModule: true,
+  default: {
+    addEventListener: jest.fn(() => jest.fn()),
+    fetch: jest.fn(async () => ({
+      type: 'wifi',
+      isConnected: true,
+      isInternetReachable: true,
+      details: null,
+    })),
+  },
+}));
+
 // Mock expo-constants
 jest.mock('expo-constants', () => ({
   expoConfig: {

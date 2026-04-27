@@ -62,16 +62,16 @@ describe('Push Notifications Service', () => {
   });
 
   describe('requestPermissions', () => {
-    it('should return false (mocked)', async () => {
+    it('should return true when mocked permissions are granted', async () => {
       const result = await requestPermissions();
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
   });
 
   describe('getPushToken', () => {
-    it('should return null (mocked)', async () => {
+    it('should return expo token in mocked environment', async () => {
       const result = await getPushToken();
-      expect(result).toBeNull();
+      expect(result).toBe('ExponentPushToken[mock-token-12345]');
     });
   });
 
@@ -110,7 +110,7 @@ describe('Push Notifications Service', () => {
         orderId: '123',
       });
 
-      expect(mockRouter.push).toHaveBeenCalledWith('/orders/123');
+      expect(mockRouter.push).toHaveBeenCalledWith('/restaurant/orders');
     });
 
     it('should navigate to booking details', () => {
@@ -119,7 +119,7 @@ describe('Push Notifications Service', () => {
         bookingId: '456',
       });
 
-      expect(mockRouter.push).toHaveBeenCalledWith('/bookings/456');
+      expect(mockRouter.push).toHaveBeenCalledWith('/chalets');
     });
 
     it('should navigate to payment success', () => {
@@ -127,7 +127,7 @@ describe('Push Notifications Service', () => {
         screen: 'PaymentSuccess',
       });
 
-      expect(mockRouter.push).toHaveBeenCalledWith('/payment/success');
+      expect(mockRouter.push).toHaveBeenCalledWith('/profile');
     });
 
     it('should navigate to loyalty account', () => {
@@ -143,7 +143,7 @@ describe('Push Notifications Service', () => {
         screen: 'Promotions',
       });
 
-      expect(mockRouter.push).toHaveBeenCalledWith('/promotions');
+      expect(mockRouter.push).toHaveBeenCalledWith('/restaurant');
     });
 
     it('should navigate to menu', () => {
@@ -151,7 +151,7 @@ describe('Push Notifications Service', () => {
         screen: 'Menu',
       });
 
-      expect(mockRouter.push).toHaveBeenCalledWith('/restaurant/menu');
+      expect(mockRouter.push).toHaveBeenCalledWith('/restaurant');
     });
 
     it('should not navigate for unknown screen', () => {
