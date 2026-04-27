@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockReqRes } from '../utils';
 
 // Mock cache
@@ -22,8 +22,22 @@ import { cache } from '../../../src/utils/cache.js';
 import { userRateLimit, rateLimits } from '../../../src/middleware/userRateLimit.middleware';
 
 describe('UserRateLimit Middleware', () => {
+  let originalCi: string | undefined;
+  let originalDisableRateLimits: string | undefined;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    originalCi = process.env.CI;
+    originalDisableRateLimits = process.env.DISABLE_RATE_LIMITS;
+    delete process.env.CI;
+    delete process.env.DISABLE_RATE_LIMITS;
+  });
+
+  afterEach(() => {
+    if (originalCi === undefined) delete process.env.CI;
+    else process.env.CI = originalCi;
+    if (originalDisableRateLimits === undefined) delete process.env.DISABLE_RATE_LIMITS;
+    else process.env.DISABLE_RATE_LIMITS = originalDisableRateLimits;
   });
 
   describe('userRateLimit', () => {
