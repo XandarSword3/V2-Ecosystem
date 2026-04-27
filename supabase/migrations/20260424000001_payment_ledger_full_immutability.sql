@@ -19,13 +19,12 @@ RETURNS TRIGGER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION
-      'payment_ledger is append-only. Deleting rows is forbidden. '
-      'Create a reversal entry with a negative amount instead.';
+      'Deleting from payment_ledger is strictly forbidden. Create a reversal entry instead.';
   END IF;
 
   IF TG_OP = 'UPDATE' THEN
     RAISE EXCEPTION
-      'payment_ledger is append-only. Updating any field is forbidden. '
+      'Modifying financial fields in payment_ledger is forbidden. '
       'Record a new corrective row instead. '
       'Attempted UPDATE on ledger row id=%.', OLD.id;
   END IF;

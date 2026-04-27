@@ -69,6 +69,16 @@ export async function validatePropertyAccess(req: Request, res: Response, next: 
 async function userHasAccessToProperty(userId: string, propertyId: string): Promise<boolean> {
   const supabase = getSupabase();
 
+  // Backward compatibility: single-property deployments may not have
+  // user_property_access rows yet. In that case, allow access.
+  const { count: accessRowCount, error: countError } = await supabase
+    .from('user_property_access')
+    .select('id', { count: 'exact', head: true });
+
+  if (!countError && (accessRowCount ?? 0) === 0) {
+    return true;
+  }
+
   const { data: directAccess, error: directError } = await supabase
     .from('user_property_access')
     .select('id')

@@ -777,22 +777,49 @@ describe('J-11: Dynamic Module — Gym', () => {
 describe('J-12: Full Guest Stay — Cross-Engine Grand Journey', () => {
   // Use a random offset to avoid date collisions with previous test runs
   const j12Offset = 900 + Math.floor(Math.random() * 800);
-  const checkIn = futureDate(j12Offset);
-  const checkOut = futureDate(j12Offset + 2);
+  let checkIn = futureDate(j12Offset);
+  let checkOut = futureDate(j12Offset + 2);
 
   it('should book Mountain View A for Alice (Mon-Wed, 2 nights)', async () => {
     const alice = client(requireState('aliceToken'));
-    const res = await alice.createBooking({
+    const payloadBase = {
       chaletId: requireState('chaletAId'),
-      checkInDate: checkIn,
-      checkOutDate: checkOut,
       customerName: 'Alice Johnson',
       customerEmail: 'alice@test.com',
       customerPhone: '+1-555-1001',
       numberOfGuests: 2,
       paymentMethod: 'cash',
       addOns: state.bbqAddonId ? [{ addOnId: state.bbqAddonId, quantity: 1 }] : undefined,
+    };
+    const candidateOffsets = [j12Offset, j12Offset + 30, j12Offset + 60, j12Offset + 90, j12Offset + 120];
+
+    let res = await alice.createBooking({
+      ...payloadBase,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
     });
+
+    if (!res.success && isDateConflictError(res.error)) {
+      for (const offset of candidateOffsets) {
+        const candidateIn = futureDate(offset);
+        const candidateOut = futureDate(offset + 2);
+        const retry = await alice.createBooking({
+          ...payloadBase,
+          checkInDate: candidateIn,
+          checkOutDate: candidateOut,
+        });
+        if (retry.success) {
+          checkIn = candidateIn;
+          checkOut = candidateOut;
+          res = retry;
+          break;
+        }
+        if (!isDateConflictError(retry.error)) {
+          res = retry;
+          break;
+        }
+      }
+    }
 
     expect(res.success, `Booking failed: ${res.error}`).toBe(true);
     state.j12BookingId = res.data?.id || res.data?.booking?.id;
