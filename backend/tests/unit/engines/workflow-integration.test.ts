@@ -478,43 +478,40 @@ describe('Engine D: Ongoing Entitlement Full Lifecycle', () => {
 
   describe('Pause and resume', () => {
     it('should transition: active → paused', async () => {
-      const r = await service.transitionState('subscription', 'active', 'pause', 'customer');
+      const r = await service.transitionState('subscription', 'active', 'pause', 'staff');
       expect(r.allowed).toBe(true);
       expect(r.targetState).toBe('paused');
     });
 
     it('should transition: paused → active (resume)', async () => {
-      const r = await service.transitionState('subscription', 'paused', 'resume', 'customer');
+      const r = await service.transitionState('subscription', 'paused', 'resume', 'staff');
       expect(r.allowed).toBe(true);
       expect(r.targetState).toBe('active');
     });
   });
 
-  describe('Expiration and reactivation', () => {
+  describe('Expiration', () => {
     it('active → expired on payment failure', async () => {
       const r = await service.transitionState('subscription', 'active', 'expire', 'system');
       expect(r.allowed).toBe(true);
       expect(r.targetState).toBe('expired');
     });
 
-    it('paused → expired on max pause exceeded', async () => {
+    it('should not allow paused → expired directly', async () => {
       const r = await service.transitionState('subscription', 'paused', 'expire', 'system');
-      expect(r.allowed).toBe(true);
-      expect(r.targetState).toBe('expired');
+      expect(r.allowed).toBe(false);
     });
 
-    it('expired → active (reactivate within grace period)', async () => {
+    it('should not allow expired → active reactivation action', async () => {
       const r = await service.transitionState('subscription', 'expired', 'reactivate', 'staff');
-      expect(r.allowed).toBe(true);
-      expect(r.targetState).toBe('active');
+      expect(r.allowed).toBe(false);
     });
   });
 
   describe('Cancellation from multiple states', () => {
-    it('can cancel from pending', async () => {
+    it('cannot cancel from pending', async () => {
       const r = await service.transitionState('subscription', 'pending', 'cancel', 'customer');
-      expect(r.allowed).toBe(true);
-      expect(r.targetState).toBe('cancelled');
+      expect(r.allowed).toBe(false);
     });
 
     it('can cancel from active', async () => {
@@ -529,10 +526,9 @@ describe('Engine D: Ongoing Entitlement Full Lifecycle', () => {
       expect(r.targetState).toBe('cancelled');
     });
 
-    it('can cancel from expired', async () => {
+    it('cannot cancel from expired', async () => {
       const r = await service.transitionState('subscription', 'expired', 'cancel', 'admin');
-      expect(r.allowed).toBe(true);
-      expect(r.targetState).toBe('cancelled');
+      expect(r.allowed).toBe(false);
     });
 
     it('cancelled should be the only terminal state', () => {
