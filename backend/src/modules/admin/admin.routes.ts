@@ -57,7 +57,7 @@ router.get('/users', authorizeManager, usersController.getUsers); // Supports ?t
 router.post('/users', authorizeManager, usersController.createUser);
 router.get('/users/:id', authorizeManager, usersController.getUserDetails); // Enhanced details
 router.put('/users/:id', authorizeManager, usersController.updateUser);
-router.put('/users/:id/roles', authorize('super_admin'), usersController.updateUserRoles); // Role assignment is sensitive
+router.put('/users/:id/roles', authorize('admin', 'super_admin'), usersController.updateUserRoles); // Role assignment is sensitive
 router.delete('/users/:id', authorize('super_admin'), usersController.deleteUser);
 router.put('/users/:id/permissions', authorize('super_admin'), permissionsController.updateUserPermissions); // User Override
 
@@ -94,11 +94,11 @@ router.get('/audit-logs/:resource', authorize('admin', 'super_admin'), auditCont
 router.get('/audit-logs/:resource/:resourceId', authorize('admin', 'super_admin'), auditController.getAuditLogsByResource);
 
 // Backups (rate limited - expensive operations) - SUPER ADMIN ONLY
-router.get('/backups', authorize('super_admin'), backupsController.getBackups);
-router.post('/backups', authorize('super_admin'), rateLimits.expensive, backupsController.createBackup);
-router.get('/backups/:id/download', authorize('super_admin'), backupsController.getDownloadUrl);
+router.get('/backups', authorize('admin', 'super_admin'), backupsController.getBackups);
+router.post('/backups', authorize('admin', 'super_admin'), rateLimits.expensive, backupsController.createBackup);
+router.get('/backups/:id/download', authorize('admin', 'super_admin'), backupsController.getDownloadUrl);
 router.post('/backups/restore', authorize('super_admin'), rateLimits.expensive, backupsController.restoreBackup);
-router.delete('/backups/:id', authorize('super_admin'), backupsController.deleteBackup);
+router.delete('/backups/:id', authorize('admin', 'super_admin'), backupsController.deleteBackup);
 
 // Legacy Reports and Scheduled Reports endpoints removed in favor of Unified Reporting Module
 

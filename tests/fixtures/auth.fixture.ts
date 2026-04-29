@@ -97,10 +97,23 @@ async function loginViaApi(
   let lastStatus: number | null = null;
 
   for (const creds of getCredentialCandidates(role)) {
-    const response = await request.post(`${API_URL}/api/v1/auth/login`, {
+    // Backend can briefly reject logins while warming up (especially right after webServer boots).
+    // Try each credential twice before moving to the next.
+    let response = await request.post(`${API_URL}/api/v1/auth/login`, {
       data: creds,
       timeout: 30000,
     });
+    if (!response.ok()) {
+      lastStatus = response.status();
+      // One short retry on common transient statuses
+      if ([401, 429, 500, 502, 503].includes(lastStatus)) {
+        await new Promise((r) => setTimeout(r, 500));
+        response = await request.post(`${API_URL}/api/v1/auth/login`, {
+          data: creds,
+          timeout: 30000,
+        });
+      }
+    }
 
     if (!response.ok()) {
       lastStatus = response.status();

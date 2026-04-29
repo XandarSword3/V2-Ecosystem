@@ -23,7 +23,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
 
 export default defineConfig({
-  testDir: './tests/phase3',
+  testDir: './tests',
   testIgnore: ['**/simulation/**', '**/node_modules/**'],
   timeout: 120000,
   expect: {
