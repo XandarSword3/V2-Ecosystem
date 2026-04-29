@@ -9,6 +9,25 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Semantic UI tokens (shadcn-style), mapped to CMS variables
+        // These power classes like `bg-background`, `text-foreground`, `border-border`, etc.
+        background: 'var(--color-background)',
+        foreground: 'var(--color-text)',
+        card: 'var(--color-surface)',
+        'card-foreground': 'var(--color-text)',
+        popover: 'var(--color-surface-elevated)',
+        'popover-foreground': 'var(--color-text)',
+        muted: 'var(--color-surface-secondary)',
+        'muted-foreground': 'var(--color-text-muted)',
+        border: 'var(--color-border)',
+        'border-muted': 'var(--color-border-muted)',
+        input: 'var(--color-border-muted)',
+        ring: 'var(--color-focus-ring)',
+        destructive: {
+          DEFAULT: 'var(--color-error)',
+          foreground: 'var(--color-text-on-primary)',
+        },
+
         // CMS Theme-aware colors using CSS variables
         theme: {
           primary: 'var(--color-primary)',
@@ -31,6 +50,8 @@ module.exports = {
           800: 'rgb(var(--color-primary-rgb) / 0.7)',
           900: 'rgb(var(--color-primary-rgb) / 0.6)',
           950: 'rgb(var(--color-primary-rgb) / 0.5)',
+          DEFAULT: 'rgb(var(--color-primary-rgb) / <alpha-value>)',
+          foreground: 'var(--color-text-on-primary)',
         },
         secondary: {
           50: 'rgb(var(--color-secondary-rgb) / 0.05)',
@@ -44,6 +65,8 @@ module.exports = {
           800: 'rgb(var(--color-secondary-rgb) / 0.7)',
           900: 'rgb(var(--color-secondary-rgb) / 0.6)',
           950: 'rgb(var(--color-secondary-rgb) / 0.5)',
+          DEFAULT: 'rgb(var(--color-secondary-rgb) / <alpha-value>)',
+          foreground: 'var(--color-text-on-secondary)',
         },
         accent: {
           50: 'rgb(var(--color-accent-rgb) / 0.05)',
@@ -58,6 +81,7 @@ module.exports = {
           900: 'rgb(var(--color-accent-rgb) / 0.6)',
           950: 'rgb(var(--color-accent-rgb) / 0.5)',
           DEFAULT: 'rgb(var(--color-accent-rgb) / <alpha-value>)',
+          foreground: 'var(--color-text-on-accent)',
         },
         resort: {
           sand: '#f5f0e6',
@@ -159,6 +183,12 @@ module.exports = {
       transitionTimingFunction: {
         'bounce-in': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
         'smooth-out': 'cubic-bezier(0.22, 1, 0.36, 1)',
+      },
+
+      // Layout tokens (used by customer-facing shell primitives)
+      spacing: {
+        'page-x': 'var(--layout-page-x)',
+        'section-y': 'var(--layout-section-y)',
       },
     },
   },

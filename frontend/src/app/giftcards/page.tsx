@@ -29,6 +29,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
+import { Container } from '@/components/layout/Container';
 
 interface GiftCardTemplate {
   id: string;
@@ -190,8 +191,9 @@ export default function PublicGiftCardsPage() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative max-w-6xl mx-auto px-4 py-16 text-center"
+          className="relative py-16 text-center"
         >
+          <Container as="div" size="lg">
           <motion.div 
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -223,11 +225,12 @@ export default function PublicGiftCardsPage() {
               Never Expires
             </Badge>
           </div>
+          </Container>
         </motion.div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 pb-16 -mt-8">
+      <Container as="div" size="md" className="pb-16 -mt-8">
         <Tabs defaultValue="buy" className="w-full">
           <TabsList className="grid grid-cols-2 w-full max-w-md mx-auto mb-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
             <TabsTrigger value="buy">Buy Gift Card</TabsTrigger>
@@ -576,7 +579,7 @@ export default function PublicGiftCardsPage() {
             ))}
           </div>
         </motion.div>
-      </div>
+      </Container>
     </div>
   );
 }

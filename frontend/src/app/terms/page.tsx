@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { FileText, CheckCircle, Briefcase, Calendar, Users, AlertTriangle, RefreshCw, Mail, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useSiteSettings } from '@/lib/settings-context';
+import { Container } from '@/components/layout/Container';
 
 export default function TermsPage() {
   const t = useTranslations('legal.terms');
@@ -20,10 +21,10 @@ export default function TermsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 py-16">
-        <div className="container mx-auto px-4">
+        <Container as="div">
           <Link 
             href="/"
             className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
@@ -51,11 +52,11 @@ export default function TermsPage() {
               {t('lastUpdated')}: January 2025
             </p>
           </motion.div>
-        </div>
+        </Container>
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-12">
+      <Container as="div" className="py-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {settings.termsOfService ? (
             <motion.div
@@ -111,15 +112,15 @@ export default function TermsPage() {
               {t('contactUs')}
             </p>
             <a 
-              href="mailto:legal@ironparadisegym.com"
+              href={`mailto:${settings.email || 'legal@example.com'}`}
               className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-medium"
             >
               <Mail className="w-5 h-5" />
-              legal@ironparadisegym.com
+              {settings.email || 'legal@example.com'}
             </a>
           </motion.div>
         </div>
-      </div>
+      </Container>
     </div>
   );
 }

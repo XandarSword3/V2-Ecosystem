@@ -8,6 +8,11 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
 import Link from 'next/link';
+import { Container } from '@/components/layout/Container';
+import { Section } from '@/components/layout/Section';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
 
 interface TimeSlot {
   time: string;
@@ -101,7 +106,7 @@ export default function ModuleReservePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -124,15 +129,16 @@ export default function ModuleReservePage() {
 
   if (step === 'success') {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-2xl p-8 text-center border border-slate-200 dark:border-slate-700">
+      <div className="min-h-screen bg-background flex items-center justify-center py-10">
+        <Container size="sm" className="w-full">
+          <div className="w-full rounded-2xl p-8 text-center border border-border bg-card text-card-foreground shadow-elevated">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
             <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Reservation Confirmed!</h1>
           <p className="text-slate-600 dark:text-slate-400 mb-6">We&apos;ve sent a confirmation email to {form.email}</p>
           <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 mb-6 text-left">
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div><p className="text-slate-500">Date</p><p className="font-medium text-slate-900 dark:text-white">{formatDate(form.date)}</p></div>
               <div><p className="text-slate-500">Time</p><p className="font-medium text-slate-900 dark:text-white">{form.time}</p></div>
               <div><p className="text-slate-500">Party</p><p className="font-medium text-slate-900 dark:text-white">{form.partySize} guests</p></div>
@@ -142,25 +148,27 @@ export default function ModuleReservePage() {
           <Link href={`/${slug}`} className="block w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition-colors text-center">
             Back to {moduleName}
           </Link>
-        </div>
+          </div>
+        </Container>
       </div>
     );
   }
 
   if (step === 'confirm') {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-          <div className="max-w-4xl mx-auto px-4 py-8">
-            <button onClick={() => setStep('details')} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white mb-4">
+      <div className="min-h-screen bg-background">
+        <Section tone="surface" className="py-8 border-b border-border">
+          <Container size="md">
+            <Button variant="ghost" className="-ml-2 mb-4" onClick={() => setStep('details')}>
               <ChevronLeft className="w-4 h-4" /> Back
-            </button>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Confirm Reservation</h1>
-          </div>
-        </div>
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
-            <div className="grid grid-cols-2 gap-6">
+            </Button>
+            <h1 className="text-3xl font-bold">Confirm Reservation</h1>
+          </Container>
+        </Section>
+
+        <Container size="md" className="py-8">
+          <div className="rounded-xl p-6 border border-border bg-card text-card-foreground">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div><p className="text-sm text-slate-500">Date</p><p className="text-lg font-medium text-slate-900 dark:text-white">{formatDate(form.date)}</p></div>
               <div><p className="text-sm text-slate-500">Time</p><p className="text-lg font-medium text-slate-900 dark:text-white">{form.time}</p></div>
               <div><p className="text-sm text-slate-500">Party Size</p><p className="text-lg font-medium text-slate-900 dark:text-white">{form.partySize} guests</p></div>
@@ -181,82 +189,139 @@ export default function ModuleReservePage() {
               </div>
             </div>
           </div>
-          <div className="mt-6 flex gap-4">
-            <button onClick={() => setStep('details')} className="flex-1 py-4 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-semibold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">Back</button>
-            <button onClick={() => submitMutation.mutate(form)} disabled={submitMutation.isPending} className="flex-1 py-4 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-500 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
-              {submitMutation.isPending ? <><Loader2 className="w-5 h-5 animate-spin" /> Booking...</> : 'Confirm Reservation'}
-            </button>
+          <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <Button variant="outline" className="flex-1 py-6" onClick={() => setStep('details')}>
+              Back
+            </Button>
+            <Button
+              variant="success"
+              className="flex-1 py-6"
+              onClick={() => submitMutation.mutate(form)}
+              disabled={submitMutation.isPending}
+              isLoading={submitMutation.isPending}
+            >
+              Confirm Reservation
+            </Button>
           </div>
-        </div>
+        </Container>
       </div>
     );
   }
 
   if (step === 'details') {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-          <div className="max-w-4xl mx-auto px-4 py-8">
-            <button onClick={() => setStep('select')} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white mb-4">
+      <div className="min-h-screen bg-background">
+        <Section tone="surface" className="py-8 border-b border-border">
+          <Container size="md">
+            <Button variant="ghost" className="-ml-2 mb-4" onClick={() => setStep('select')}>
               <ChevronLeft className="w-4 h-4" /> Back
-            </button>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Your Details</h1>
-            <p className="text-slate-600 dark:text-slate-400 mt-2">{formatDate(form.date)} at {form.time} for {form.partySize} {form.partySize === 1 ? 'guest' : 'guests'}</p>
+            </Button>
+            <h1 className="text-3xl font-bold">Your Details</h1>
+            <p className="text-muted-foreground mt-2">
+              {formatDate(form.date)} at {form.time} for {form.partySize}{' '}
+              {form.partySize === 1 ? 'guest' : 'guests'}
+            </p>
+          </Container>
+        </Section>
+
+        <Container size="md" className="py-8">
+          <div className="rounded-xl p-6 border border-border bg-card text-card-foreground space-y-6">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium mb-2">
+                <User className="w-4 h-4" /> Full Name *
+              </label>
+              <Input
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="John Smith"
+              />
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium mb-2">
+                <Mail className="w-4 h-4" /> Email Address *
+              </label>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="john@example.com"
+              />
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium mb-2">
+                <Phone className="w-4 h-4" /> Phone Number *
+              </label>
+              <Input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="+1 (555) 000-0000"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Special Requests</label>
+              <Textarea
+                value={form.specialRequests}
+                onChange={(e) => setForm({ ...form, specialRequests: e.target.value })}
+                placeholder="Allergies, dietary requirements..."
+                rows={3}
+              />
+            </div>
           </div>
-        </div>
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 space-y-6">
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"><User className="w-4 h-4" /> Full Name *</label>
-              <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Smith" className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
-            </div>
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"><Mail className="w-4 h-4" /> Email Address *</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@example.com" className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
-            </div>
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"><Phone className="w-4 h-4" /> Phone Number *</label>
-              <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 (555) 000-0000" className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Special Requests</label>
-              <textarea value={form.specialRequests} onChange={(e) => setForm({ ...form, specialRequests: e.target.value })} placeholder="Allergies, dietary requirements..." rows={3} className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white resize-none" />
-            </div>
+
+          <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <Button variant="outline" className="flex-1 py-6" onClick={() => setStep('select')}>
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-1 py-6"
+              onClick={() => setStep('confirm')}
+              disabled={!canSubmit}
+            >
+              Review Reservation
+            </Button>
           </div>
-          <div className="mt-6 flex gap-4">
-            <button onClick={() => setStep('select')} className="flex-1 py-4 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-semibold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">Back</button>
-            <button onClick={() => setStep('confirm')} disabled={!canSubmit} className="flex-1 py-4 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Review Reservation</button>
-          </div>
-        </div>
+        </Container>
       </div>
     );
   }
 
   // Select Date/Time Step (default)
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Reserve a Table</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">Book your dining experience at {moduleName}</p>
-        </div>
-      </div>
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-background">
+      <Section tone="surface" className="py-8 border-b border-border">
+        <Container size="md">
+          <h1 className="text-3xl font-bold">Reserve a Table</h1>
+          <p className="text-muted-foreground mt-2">Book your dining experience at {moduleName}</p>
+        </Container>
+      </Section>
+
+      <Container size="md" className="py-8">
         {/* Party Size */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 mb-6 border border-slate-200 dark:border-slate-700">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-4"><Users className="w-4 h-4" /> Party Size</label>
+        <div className="rounded-xl p-6 mb-6 border border-border bg-card text-card-foreground">
+          <label className="flex items-center gap-2 text-sm font-medium mb-4">
+            <Users className="w-4 h-4" /> Party Size
+          </label>
           <div className="flex gap-2 flex-wrap">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((size) => (
-              <button key={size} onClick={() => setForm({ ...form, partySize: size })} className={`px-5 py-3 rounded-lg font-medium transition-colors ${form.partySize === size ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>
+              <Button
+                key={size}
+                variant={form.partySize === size ? 'primary' : 'secondary'}
+                onClick={() => setForm({ ...form, partySize: size })}
+              >
                 {size} {size === 1 ? 'Guest' : 'Guests'}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
 
         {/* Date Selection */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 mb-6 border border-slate-200 dark:border-slate-700">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-4"><Calendar className="w-4 h-4" /> Select Date</label>
+        <div className="rounded-xl p-6 mb-6 border border-border bg-card text-card-foreground">
+          <label className="flex items-center gap-2 text-sm font-medium mb-4">
+            <Calendar className="w-4 h-4" /> Select Date
+          </label>
           <div className="flex items-center justify-between">
             <button onClick={() => handleDateChange(-1)} disabled={form.date <= new Date().toISOString().split('T')[0]} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">
               <ChevronLeft className="w-5 h-5" />
@@ -286,7 +351,7 @@ export default function ModuleReservePage() {
         <button onClick={() => setStep('details')} disabled={!canProceedToDetails} className="w-full py-4 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
           Continue
         </button>
-      </div>
+      </Container>
     </div>
   );
 }

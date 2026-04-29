@@ -11,6 +11,8 @@ import { Loader2, AlertCircle, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
+import { Container } from '@/components/layout/Container';
+import { Button } from '@/components/ui/Button';
 
 export default function ModulePage() {
   const t = useTranslations('errors');
@@ -48,7 +50,7 @@ export default function ModulePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-12 h-12 animate-spin text-primary-600" />
       </div>
     );
@@ -63,29 +65,28 @@ export default function ModulePage() {
   if (disabledModule) {
     // Module exists but is disabled - show friendly message
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Container size="sm" className="w-full py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center max-w-md"
+          className="text-center"
         >
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-amber-500/20 flex items-center justify-center">
             <AlertCircle className="w-10 h-10 text-amber-500" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-3">
+          <h1 className="text-2xl font-bold text-foreground mb-3">
             {t('featureUnavailable')}
           </h1>
-          <p className="text-slate-400 mb-6">
+          <p className="text-muted-foreground mb-6">
             {t('featureUnavailableDesc', { name: disabledModule.name })}
           </p>
-          <button 
-            onClick={() => router.push('/')}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-          >
+          <Button onClick={() => router.push('/')} className="gap-2">
             <Home className="w-5 h-5" />
             {tCommon('returnHome')}
-          </button>
+          </Button>
         </motion.div>
+        </Container>
       </div>
     );
   }
@@ -93,25 +94,24 @@ export default function ModulePage() {
   if (!currentModule) {
     // Module not found at all - 404
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Container size="sm" className="w-full py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center max-w-md"
+          className="text-center"
         >
-          <h1 className="text-6xl font-bold text-white mb-4">404</h1>
-          <h2 className="text-2xl font-semibold text-slate-300 mb-3">{t('pageNotFound')}</h2>
-          <p className="text-slate-400 mb-6">
+          <h1 className="text-6xl font-bold text-foreground mb-4">404</h1>
+          <h2 className="text-2xl font-semibold text-muted-foreground mb-3">{t('pageNotFound')}</h2>
+          <p className="text-muted-foreground mb-6">
             {t('pageNotFoundDesc')}
           </p>
-          <button 
-            onClick={() => router.push('/')}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-          >
+          <Button onClick={() => router.push('/')} className="gap-2">
             <Home className="w-5 h-5" />
             {tCommon('returnHome')}
-          </button>
+          </Button>
         </motion.div>
+        </Container>
       </div>
     );
   }

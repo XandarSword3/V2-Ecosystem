@@ -632,7 +632,7 @@ export default function RestaurantCartPage() {
                     exit={{ height: 0, opacity: 0 }}
                     className="p-6 space-y-6"
                   >
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <motion.button
                         whileHover={{ scale: 1.02, y: -2 }}
                         whileTap={{ scale: 0.98 }}

@@ -7,9 +7,9 @@
  * Can be toggled on/off via settings.
  */
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { usePathname } from 'next/navigation';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
 
 interface PageTransitionProps {
@@ -116,12 +116,18 @@ export function PageTransition({ children }: PageTransitionProps) {
   const pathname = usePathname();
   const enableTransitions = useSettingsStore((s) => s.enableTransitions);
   const transitionStyle = useSettingsStore((s) => s.transitionStyle);
+  const animationsEnabled = useSettingsStore((s) => s.animationsEnabled);
+  const reducedMotionSetting = useSettingsStore((s) => s.reducedMotion);
+  const prefersReducedMotion = useReducedMotion();
+
+  const motionEnabled =
+    enableTransitions && animationsEnabled && !reducedMotionSetting && !prefersReducedMotion;
 
   // Get the appropriate variant
   const variant = pageVariants[transitionStyle as keyof typeof pageVariants] || pageVariants.fade;
 
   // If transitions are disabled, just render children
-  if (!enableTransitions) {
+  if (!motionEnabled) {
     return <>{children}</>;
   }
 
@@ -152,8 +158,14 @@ interface AnimatedSectionProps {
 
 export function AnimatedSection({ children, delay = 0, className = '' }: AnimatedSectionProps) {
   const enableTransitions = useSettingsStore((s) => s.enableTransitions);
+  const animationsEnabled = useSettingsStore((s) => s.animationsEnabled);
+  const reducedMotionSetting = useSettingsStore((s) => s.reducedMotion);
+  const prefersReducedMotion = useReducedMotion();
 
-  if (!enableTransitions) {
+  const motionEnabled =
+    enableTransitions && animationsEnabled && !reducedMotionSetting && !prefersReducedMotion;
+
+  if (!motionEnabled) {
     return <div className={className}>{children}</div>;
   }
 
@@ -185,8 +197,14 @@ interface StaggeredContainerProps {
 
 export function StaggeredContainer({ children, className = '', staggerDelay = 0.1 }: StaggeredContainerProps) {
   const enableTransitions = useSettingsStore((s) => s.enableTransitions);
+  const animationsEnabled = useSettingsStore((s) => s.animationsEnabled);
+  const reducedMotionSetting = useSettingsStore((s) => s.reducedMotion);
+  const prefersReducedMotion = useReducedMotion();
 
-  if (!enableTransitions) {
+  const motionEnabled =
+    enableTransitions && animationsEnabled && !reducedMotionSetting && !prefersReducedMotion;
+
+  if (!motionEnabled) {
     return <div className={className}>{children}</div>;
   }
 
@@ -211,6 +229,14 @@ export function StaggeredContainer({ children, className = '', staggerDelay = 0.
 }
 
 export function StaggeredItem({ children, className = '' }: { children: ReactNode; className?: string }) {
+  const animationsEnabled = useSettingsStore((s) => s.animationsEnabled);
+  const reducedMotionSetting = useSettingsStore((s) => s.reducedMotion);
+  const prefersReducedMotion = useReducedMotion();
+
+  if (!animationsEnabled || reducedMotionSetting || prefersReducedMotion) {
+    return <div className={className}>{children}</div>;
+  }
+
   return (
     <motion.div
       className={className}
@@ -231,8 +257,14 @@ export function StaggeredItem({ children, className = '' }: { children: ReactNod
  */
 export function LuxuryReveal({ children, className = '', delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
   const enableTransitions = useSettingsStore((s) => s.enableTransitions);
+  const animationsEnabled = useSettingsStore((s) => s.animationsEnabled);
+  const reducedMotionSetting = useSettingsStore((s) => s.reducedMotion);
+  const prefersReducedMotion = useReducedMotion();
 
-  if (!enableTransitions) {
+  const motionEnabled =
+    enableTransitions && animationsEnabled && !reducedMotionSetting && !prefersReducedMotion;
+
+  if (!motionEnabled) {
     return <div className={className}>{children}</div>;
   }
 
@@ -279,8 +311,14 @@ export function SlideReveal({
   delay?: number;
 }) {
   const enableTransitions = useSettingsStore((s) => s.enableTransitions);
+  const animationsEnabled = useSettingsStore((s) => s.animationsEnabled);
+  const reducedMotionSetting = useSettingsStore((s) => s.reducedMotion);
+  const prefersReducedMotion = useReducedMotion();
 
-  if (!enableTransitions) {
+  const motionEnabled =
+    enableTransitions && animationsEnabled && !reducedMotionSetting && !prefersReducedMotion;
+
+  if (!motionEnabled) {
     return <div className={className}>{children}</div>;
   }
 
