@@ -1,0 +1,1857 @@
+{
+  "generatedAt": "2026-04-29T10:12:57.152Z",
+  "inventoryCount": 54,
+  "pages": [
+    {
+      "route": "/admin",
+      "sector": "Core Shell",
+      "templateType": null,
+      "file": "frontend/src/app/admin/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/dashboard",
+          "frontendTemplatePath": "/admin/dashboard",
+          "openApiPath": "/admin/dashboard",
+          "line": 250
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]",
+      "sector": "Dynamic Module Admin",
+      "templateType": "multi_day_booking",
+      "file": "frontend/src/app/admin/[slug]/page.tsx",
+      "endpoints": []
+    },
+    {
+      "route": "/admin/[slug]/addons",
+      "sector": "Dynamic Module Admin",
+      "templateType": "multi_day_booking",
+      "file": "frontend/src/app/admin/[slug]/addons/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/chalets/add-ons",
+          "frontendTemplatePath": "/chalets/add-ons",
+          "openApiPath": "/chalets/add-ons",
+          "line": 65
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/chalets/admin/add-ons",
+          "frontendTemplatePath": "/chalets/admin/add-ons",
+          "openApiPath": "/chalets/admin/add-ons",
+          "line": 92
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/chalets/admin/add-ons/${editing.id}",
+          "frontendTemplatePath": "/chalets/admin/add-ons/:id",
+          "openApiPath": "/chalets/admin/add-ons/{id}",
+          "line": 89
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/chalets/admin/add-ons/${id}",
+          "frontendTemplatePath": "/chalets/admin/add-ons/:id",
+          "openApiPath": "/chalets/admin/add-ons/{id}",
+          "line": 121
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/bookings",
+      "sector": "Dynamic Module Admin",
+      "templateType": "multi_day_booking",
+      "file": "frontend/src/app/admin/[slug]/bookings/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/chalets/staff/bookings",
+          "frontendTemplatePath": "/chalets/staff/bookings",
+          "openApiPath": "/chalets/staff/bookings",
+          "line": 89
+        },
+        {
+          "method": "PATCH",
+          "rawEndpoint": "/chalets/staff/bookings/${bookingId}/status",
+          "frontendTemplatePath": "/chalets/staff/bookings/:bookingId/status",
+          "openApiPath": "/chalets/staff/bookings/{bookingId}/status",
+          "line": 106
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/calendar",
+      "sector": "Dynamic Module Admin",
+      "templateType": "unmapped",
+      "file": "frontend/src/app/admin/[slug]/calendar/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/chalets",
+          "frontendTemplatePath": "/chalets",
+          "openApiPath": "/chalets",
+          "line": 76
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/chalets/admin/chalets/${selectedChaletId}/block-dates",
+          "frontendTemplatePath": "/chalets/admin/chalets/:selectedChaletId/block-dates",
+          "openApiPath": "/chalets/admin/chalets/{selectedChaletId}/block-dates",
+          "line": 195
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/chalets/admin/chalets/${selectedChaletId}/calendar",
+          "frontendTemplatePath": "/chalets/admin/chalets/:selectedChaletId/calendar",
+          "openApiPath": "/chalets/admin/chalets/{selectedChaletId}/calendar",
+          "line": 103
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/chalets/admin/chalets/${selectedChaletId}/unblock-dates",
+          "frontendTemplatePath": "/chalets/admin/chalets/:selectedChaletId/unblock-dates",
+          "openApiPath": "/chalets/admin/chalets/{selectedChaletId}/unblock-dates",
+          "line": 211
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/capacity",
+      "sector": "Dynamic Module Admin",
+      "templateType": "session_access",
+      "file": "frontend/src/app/admin/[slug]/capacity/page.tsx",
+      "endpoints": [
+        {
+          "method": "POST",
+          "rawEndpoint": "/pool/admin/reset-occupancy",
+          "frontendTemplatePath": "/pool/admin/reset-occupancy",
+          "openApiPath": "/pool/admin/reset-occupancy",
+          "line": 87
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/pool/admin/settings",
+          "frontendTemplatePath": "/pool/admin/settings",
+          "openApiPath": "/pool/admin/settings",
+          "line": 75
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/pool/staff/capacity",
+          "frontendTemplatePath": "/pool/staff/capacity",
+          "openApiPath": "/pool/staff/capacity",
+          "line": 48
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/categories",
+      "sector": "Dynamic Module Admin",
+      "templateType": "menu_service",
+      "file": "frontend/src/app/admin/[slug]/categories/page.tsx",
+      "endpoints": [
+        {
+          "method": "POST",
+          "rawEndpoint": "/restaurant/admin/categories",
+          "frontendTemplatePath": "/restaurant/admin/categories",
+          "openApiPath": "/restaurant/admin/categories",
+          "line": 85
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/restaurant/admin/categories/${editingCategory.id}",
+          "frontendTemplatePath": "/restaurant/admin/categories/:id",
+          "openApiPath": "/restaurant/admin/categories/{id}",
+          "line": 82
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/restaurant/admin/categories/${id}",
+          "frontendTemplatePath": "/restaurant/admin/categories/:id",
+          "openApiPath": "/restaurant/admin/categories/{id}",
+          "line": 101
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/categories",
+          "frontendTemplatePath": "/restaurant/categories",
+          "openApiPath": "/restaurant/categories",
+          "line": 53
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/menu",
+      "sector": "Dynamic Module Admin",
+      "templateType": "menu_service",
+      "file": "frontend/src/app/admin/[slug]/menu/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/inventory/items",
+          "frontendTemplatePath": "/inventory/items",
+          "openApiPath": "/inventory/items",
+          "line": 137
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/restaurant/admin/items",
+          "frontendTemplatePath": "/restaurant/admin/items",
+          "openApiPath": "/restaurant/admin/items",
+          "line": 236
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/restaurant/admin/items/${editingItem.id}",
+          "frontendTemplatePath": "/restaurant/admin/items/:id",
+          "openApiPath": "/restaurant/admin/items/{id}",
+          "line": 233
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/restaurant/admin/items/${id}",
+          "frontendTemplatePath": "/restaurant/admin/items/:id",
+          "openApiPath": "/restaurant/admin/items/{id}",
+          "line": 253
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/categories",
+          "frontendTemplatePath": "/restaurant/categories",
+          "openApiPath": "/restaurant/categories",
+          "line": 136
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/items",
+          "frontendTemplatePath": "/restaurant/items",
+          "openApiPath": "/restaurant/items",
+          "line": 135
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/modifiers",
+          "frontendTemplatePath": "/restaurant/modifiers",
+          "openApiPath": "/restaurant/modifiers",
+          "line": 138
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/modifiers",
+      "sector": "Dynamic Module Admin",
+      "templateType": "menu_service",
+      "file": "frontend/src/app/admin/[slug]/modifiers/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/modifiers",
+          "frontendTemplatePath": "/restaurant/modifiers",
+          "openApiPath": "/restaurant/modifiers",
+          "line": 106
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/restaurant/modifiers",
+          "frontendTemplatePath": "/restaurant/modifiers",
+          "openApiPath": "/restaurant/modifiers",
+          "line": 180
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/restaurant/modifiers/${groupId}",
+          "frontendTemplatePath": "/restaurant/modifiers/:groupId",
+          "openApiPath": "/restaurant/modifiers/{groupId}",
+          "line": 195
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/restaurant/modifiers/${editingGroup.id}",
+          "frontendTemplatePath": "/restaurant/modifiers/:id",
+          "openApiPath": "/restaurant/modifiers/{id}",
+          "line": 177
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/restaurant/modifiers/${selectedGroupId}/options",
+          "frontendTemplatePath": "/restaurant/modifiers/:selectedGroupId/options",
+          "openApiPath": "/restaurant/modifiers/{selectedGroupId}/options",
+          "line": 253
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/restaurant/modifiers/options/${editingOption.id}",
+          "frontendTemplatePath": "/restaurant/modifiers/options/:id",
+          "openApiPath": "/restaurant/modifiers/options/{id}",
+          "line": 250
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/restaurant/modifiers/options/${optionId}",
+          "frontendTemplatePath": "/restaurant/modifiers/options/:optionId",
+          "openApiPath": "/restaurant/modifiers/options/{optionId}",
+          "line": 268
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/orders",
+      "sector": "Dynamic Module Admin",
+      "templateType": "menu_service",
+      "file": "frontend/src/app/admin/[slug]/orders/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/staff/orders",
+          "frontendTemplatePath": "/restaurant/staff/orders",
+          "openApiPath": "/restaurant/staff/orders",
+          "line": 101
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/restaurant/staff/orders/${orderId}/status",
+          "frontendTemplatePath": "/restaurant/staff/orders/:orderId/status",
+          "openApiPath": "/restaurant/staff/orders/{orderId}/status",
+          "line": 144
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/pricing",
+      "sector": "Dynamic Module Admin",
+      "templateType": "multi_day_booking",
+      "file": "frontend/src/app/admin/[slug]/pricing/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/chalets/admin/price-rules",
+          "frontendTemplatePath": "/chalets/admin/price-rules",
+          "openApiPath": "/chalets/admin/price-rules",
+          "line": 74
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/chalets/admin/price-rules",
+          "frontendTemplatePath": "/chalets/admin/price-rules",
+          "openApiPath": "/chalets/admin/price-rules",
+          "line": 101
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/chalets/admin/price-rules/${editing.id}",
+          "frontendTemplatePath": "/chalets/admin/price-rules/:id",
+          "openApiPath": "/chalets/admin/price-rules/{id}",
+          "line": 98
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/chalets/admin/price-rules/${id}",
+          "frontendTemplatePath": "/chalets/admin/price-rules/:id",
+          "openApiPath": "/chalets/admin/price-rules/{id}",
+          "line": 141
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/reservations",
+      "sector": "Dynamic Module Admin",
+      "templateType": "menu_service",
+      "file": "frontend/src/app/admin/[slug]/reservations/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/reservations",
+          "frontendTemplatePath": "/restaurant/reservations",
+          "openApiPath": "/restaurant/reservations",
+          "line": 85
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/restaurant/reservations",
+          "frontendTemplatePath": "/restaurant/reservations",
+          "openApiPath": "/restaurant/reservations",
+          "line": 140
+        },
+        {
+          "method": "PATCH",
+          "rawEndpoint": "/restaurant/reservations/${id}",
+          "frontendTemplatePath": "/restaurant/reservations/:id",
+          "openApiPath": "/restaurant/reservations/{id}",
+          "line": 107
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/restaurant/reservations/${reservationId}/assign-table",
+          "frontendTemplatePath": "/restaurant/reservations/:reservationId/assign-table",
+          "openApiPath": "/restaurant/reservations/{reservationId}/assign-table",
+          "line": 122
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/tables",
+          "frontendTemplatePath": "/restaurant/tables",
+          "openApiPath": "/restaurant/tables",
+          "line": 98
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/sessions",
+      "sector": "Dynamic Module Admin",
+      "templateType": "session_access",
+      "file": "frontend/src/app/admin/[slug]/sessions/page.tsx",
+      "endpoints": [
+        {
+          "method": "POST",
+          "rawEndpoint": "/pool/admin/sessions",
+          "frontendTemplatePath": "/pool/admin/sessions",
+          "openApiPath": "/pool/admin/sessions",
+          "line": 134
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/pool/admin/sessions/${editingSession.id}",
+          "frontendTemplatePath": "/pool/admin/sessions/:id",
+          "openApiPath": "/pool/admin/sessions/{id}",
+          "line": 131
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/pool/admin/sessions/${id}",
+          "frontendTemplatePath": "/pool/admin/sessions/:id",
+          "openApiPath": "/pool/admin/sessions/{id}",
+          "line": 150
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/pool/sessions",
+          "frontendTemplatePath": "/pool/sessions",
+          "openApiPath": "/pool/sessions",
+          "line": 89
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/tables",
+      "sector": "Dynamic Module Admin",
+      "templateType": "menu_service",
+      "file": "frontend/src/app/admin/[slug]/tables/page.tsx",
+      "endpoints": [
+        {
+          "method": "POST",
+          "rawEndpoint": "/restaurant/admin/tables",
+          "frontendTemplatePath": "/restaurant/admin/tables",
+          "openApiPath": "/restaurant/admin/tables",
+          "line": 92
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/restaurant/admin/tables/${id}",
+          "frontendTemplatePath": "/restaurant/admin/tables/:id",
+          "openApiPath": "/restaurant/admin/tables/{id}",
+          "line": 107
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/staff/tables",
+          "frontendTemplatePath": "/restaurant/staff/tables",
+          "openApiPath": "/restaurant/staff/tables",
+          "line": 59
+        },
+        {
+          "method": "PATCH",
+          "rawEndpoint": "/restaurant/staff/tables/${editingTable.id}",
+          "frontendTemplatePath": "/restaurant/staff/tables/:id",
+          "openApiPath": "/restaurant/staff/tables/{id}",
+          "line": 89
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/tickets",
+      "sector": "Dynamic Module Admin",
+      "templateType": "session_access",
+      "file": "frontend/src/app/admin/[slug]/tickets/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/pool/staff/tickets/today",
+          "frontendTemplatePath": "/pool/staff/tickets/today",
+          "openApiPath": "/pool/staff/tickets/today",
+          "line": 82
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/pool/tickets/${id}",
+          "frontendTemplatePath": "/pool/tickets/:id",
+          "openApiPath": "/pool/tickets/{id}",
+          "line": 100
+        }
+      ]
+    },
+    {
+      "route": "/admin/[slug]/waitlist",
+      "sector": "Dynamic Module Admin",
+      "templateType": "menu_service",
+      "file": "frontend/src/app/admin/[slug]/waitlist/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/waitlist",
+          "frontendTemplatePath": "/restaurant/waitlist",
+          "openApiPath": "/restaurant/waitlist",
+          "line": 62
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/restaurant/waitlist",
+          "frontendTemplatePath": "/restaurant/waitlist",
+          "openApiPath": "/restaurant/waitlist",
+          "line": 78
+        },
+        {
+          "method": "PATCH",
+          "rawEndpoint": "/restaurant/waitlist/${id}",
+          "frontendTemplatePath": "/restaurant/waitlist/:id",
+          "openApiPath": "/restaurant/waitlist/{id}",
+          "line": 101
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/restaurant/waitlist/${id}",
+          "frontendTemplatePath": "/restaurant/waitlist/:id",
+          "openApiPath": "/restaurant/waitlist/{id}",
+          "line": 131
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/restaurant/waitlist/${id}/notify",
+          "frontendTemplatePath": "/restaurant/waitlist/:id/notify",
+          "openApiPath": "/restaurant/waitlist/{id}/notify",
+          "line": 116
+        }
+      ]
+    },
+    {
+      "route": "/admin/audit",
+      "sector": "Audit Logs",
+      "templateType": null,
+      "file": "frontend/src/app/admin/audit/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/audit-logs",
+          "frontendTemplatePath": "/admin/audit-logs",
+          "openApiPath": "/admin/audit-logs",
+          "line": 83
+        }
+      ]
+    },
+    {
+      "route": "/admin/channels",
+      "sector": "Misc",
+      "templateType": null,
+      "file": "frontend/src/app/admin/channels/page.tsx",
+      "endpoints": [
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/channels/connections/${channelId}",
+          "frontendTemplatePath": "/channels/connections/:channelId",
+          "openApiPath": "/channels/connections/{channelId}",
+          "line": 237
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/channels/connections/${channelId}/sync/availability",
+          "frontendTemplatePath": "/channels/connections/:channelId/sync/availability",
+          "openApiPath": "/channels/connections/{channelId}/sync/availability",
+          "line": 199
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/channels/properties/${propertyId}/connections",
+          "frontendTemplatePath": "/channels/properties/:propertyId/connections",
+          "openApiPath": "/channels/properties/{propertyId}/connections",
+          "line": 150
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/channels/properties/${propertyId}/connections",
+          "frontendTemplatePath": "/channels/properties/:propertyId/connections",
+          "openApiPath": "/channels/properties/{propertyId}/connections",
+          "line": 215
+        }
+      ]
+    },
+    {
+      "route": "/admin/coupons",
+      "sector": "Marketing & Loyalty & Codes",
+      "templateType": null,
+      "file": "frontend/src/app/admin/coupons/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/coupons",
+          "frontendTemplatePath": "/coupons",
+          "openApiPath": "/coupons",
+          "line": 95
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/coupons",
+          "frontendTemplatePath": "/coupons",
+          "openApiPath": "/coupons",
+          "line": 150
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/coupons/${couponId}",
+          "frontendTemplatePath": "/coupons/:couponId",
+          "openApiPath": "/coupons/{couponId}",
+          "line": 207
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/coupons/${editingCoupon.id}",
+          "frontendTemplatePath": "/coupons/:id",
+          "openApiPath": "/coupons/{id}",
+          "line": 148
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/coupons/generate-code",
+          "frontendTemplatePath": "/coupons/generate-code",
+          "openApiPath": "/coupons/generate-code",
+          "line": 114
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/coupons/stats",
+          "frontendTemplatePath": "/coupons/stats",
+          "openApiPath": "/coupons/stats",
+          "line": 96
+        }
+      ]
+    },
+    {
+      "route": "/admin/customizations",
+      "sector": "Misc",
+      "templateType": null,
+      "file": "frontend/src/app/admin/customizations/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/customizations/dual-write/stats",
+          "frontendTemplatePath": "/customizations/dual-write/stats",
+          "openApiPath": "/customizations/dual-write/stats",
+          "line": 232
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/customizations/groups",
+          "frontendTemplatePath": "/customizations/groups",
+          "openApiPath": "/customizations/groups",
+          "line": 200
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/customizations/groups",
+          "frontendTemplatePath": "/customizations/groups",
+          "openApiPath": "/customizations/groups",
+          "line": 241
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/customizations/groups/${id}",
+          "frontendTemplatePath": "/customizations/groups/:id",
+          "openApiPath": "/customizations/groups/{id}",
+          "line": 254
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/customizations/groups/${id}",
+          "frontendTemplatePath": "/customizations/groups/:id",
+          "openApiPath": "/customizations/groups/{id}",
+          "line": 266
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/customizations/metrics",
+          "frontendTemplatePath": "/customizations/metrics",
+          "openApiPath": "/customizations/metrics",
+          "line": 222
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/customizations/migrate",
+          "frontendTemplatePath": "/customizations/migrate",
+          "openApiPath": "/customizations/migrate",
+          "line": 314
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/customizations/options",
+          "frontendTemplatePath": "/customizations/options",
+          "openApiPath": "/customizations/options",
+          "line": 278
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/customizations/options/${id}",
+          "frontendTemplatePath": "/customizations/options/:id",
+          "openApiPath": "/customizations/options/{id}",
+          "line": 291
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/customizations/options/${id}",
+          "frontendTemplatePath": "/customizations/options/:id",
+          "openApiPath": "/customizations/options/{id}",
+          "line": 303
+        }
+      ]
+    },
+    {
+      "route": "/admin/giftcards",
+      "sector": "Marketing & Loyalty & Codes",
+      "templateType": null,
+      "file": "frontend/src/app/admin/giftcards/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/giftcards/admin",
+          "frontendTemplatePath": "/giftcards/admin",
+          "openApiPath": "/giftcards/admin",
+          "line": 93
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/giftcards/admin",
+          "frontendTemplatePath": "/giftcards/admin",
+          "openApiPath": "/giftcards/admin",
+          "line": 141
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/giftcards/admin/${cardId}/disable",
+          "frontendTemplatePath": "/giftcards/admin/:cardId/disable",
+          "openApiPath": "/giftcards/admin/{cardId}/disable",
+          "line": 161
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/giftcards/admin/stats",
+          "frontendTemplatePath": "/giftcards/admin/stats",
+          "openApiPath": "/giftcards/admin/stats",
+          "line": 95
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/giftcards/templates",
+          "frontendTemplatePath": "/giftcards/templates",
+          "openApiPath": "/giftcards/templates",
+          "line": 94
+        }
+      ]
+    },
+    {
+      "route": "/admin/housekeeping",
+      "sector": "Operations",
+      "templateType": null,
+      "file": "frontend/src/app/admin/housekeeping/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/housekeeping/staff",
+          "frontendTemplatePath": "/housekeeping/staff",
+          "openApiPath": "/housekeeping/staff",
+          "line": 126
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/housekeeping/stats",
+          "frontendTemplatePath": "/housekeeping/stats",
+          "openApiPath": "/housekeeping/stats",
+          "line": 127
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/housekeeping/task-types",
+          "frontendTemplatePath": "/housekeeping/task-types",
+          "openApiPath": "/housekeeping/task-types",
+          "line": 125
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/housekeeping/tasks",
+          "frontendTemplatePath": "/housekeeping/tasks",
+          "openApiPath": "/housekeeping/tasks",
+          "line": 118
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/housekeeping/tasks",
+          "frontendTemplatePath": "/housekeeping/tasks",
+          "openApiPath": "/housekeeping/tasks",
+          "line": 151
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/housekeeping/tasks/${taskId}/assign",
+          "frontendTemplatePath": "/housekeeping/tasks/:taskId/assign",
+          "openApiPath": "/housekeeping/tasks/{taskId}/assign",
+          "line": 180
+        }
+      ]
+    },
+    {
+      "route": "/admin/integrations",
+      "sector": "Integrations",
+      "templateType": null,
+      "file": "frontend/src/app/admin/integrations/page.tsx",
+      "endpoints": []
+    },
+    {
+      "route": "/admin/integrations/quickbooks",
+      "sector": "Integrations",
+      "templateType": null,
+      "file": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/integrations/quickbooks/${status.connectionId}/accounts",
+          "frontendTemplatePath": "/integrations/quickbooks/:connectionId/accounts",
+          "openApiPath": "/integrations/quickbooks/{connectionId}/accounts",
+          "line": 138
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/integrations/quickbooks/${status.connectionId}/disconnect",
+          "frontendTemplatePath": "/integrations/quickbooks/:connectionId/disconnect",
+          "openApiPath": "/integrations/quickbooks/{connectionId}/disconnect",
+          "line": 167
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/integrations/quickbooks/${status.connectionId}/mappings",
+          "frontendTemplatePath": "/integrations/quickbooks/:connectionId/mappings",
+          "openApiPath": "/integrations/quickbooks/{connectionId}/mappings",
+          "line": 128
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/integrations/quickbooks/${status.connectionId}/mappings",
+          "frontendTemplatePath": "/integrations/quickbooks/:connectionId/mappings",
+          "openApiPath": "/integrations/quickbooks/{connectionId}/mappings",
+          "line": 212
+        },
+        {
+          "method": "PATCH",
+          "rawEndpoint": "/integrations/quickbooks/${status.connectionId}/settings",
+          "frontendTemplatePath": "/integrations/quickbooks/:connectionId/settings",
+          "openApiPath": "/integrations/quickbooks/{connectionId}/settings",
+          "line": 235
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/integrations/quickbooks/${status.connectionId}/sync",
+          "frontendTemplatePath": "/integrations/quickbooks/:connectionId/sync",
+          "openApiPath": "/integrations/quickbooks/{connectionId}/sync",
+          "line": 186
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/integrations/quickbooks/${status.connectionId}/sync/history",
+          "frontendTemplatePath": "/integrations/quickbooks/:connectionId/sync/history",
+          "openApiPath": "/integrations/quickbooks/{connectionId}/sync/history",
+          "line": 118
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/integrations/quickbooks/connect",
+          "frontendTemplatePath": "/integrations/quickbooks/connect",
+          "openApiPath": "/integrations/quickbooks/connect",
+          "line": 147
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/integrations/quickbooks/status",
+          "frontendTemplatePath": "/integrations/quickbooks/status",
+          "openApiPath": "/integrations/quickbooks/status",
+          "line": 106
+        }
+      ]
+    },
+    {
+      "route": "/admin/inventory",
+      "sector": "Operations",
+      "templateType": null,
+      "file": "frontend/src/app/admin/inventory/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/inventory/alerts",
+          "frontendTemplatePath": "/inventory/alerts",
+          "openApiPath": "/inventory/alerts",
+          "line": 176
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/inventory/alerts/${alertId}/resolve",
+          "frontendTemplatePath": "/inventory/alerts/:alertId/resolve",
+          "openApiPath": "/inventory/alerts/{alertId}/resolve",
+          "line": 321
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/inventory/categories",
+          "frontendTemplatePath": "/inventory/categories",
+          "openApiPath": "/inventory/categories",
+          "line": 174
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/inventory/categories",
+          "frontendTemplatePath": "/inventory/categories",
+          "openApiPath": "/inventory/categories",
+          "line": 1084
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/inventory/categories/${deletingCategory.id}",
+          "frontendTemplatePath": "/inventory/categories/:id",
+          "openApiPath": "/inventory/categories/{id}",
+          "line": 352
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/inventory/categories/${editingCategory.id}",
+          "frontendTemplatePath": "/inventory/categories/:id",
+          "openApiPath": "/inventory/categories/{id}",
+          "line": 1079
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/inventory/items",
+          "frontendTemplatePath": "/inventory/items",
+          "openApiPath": "/inventory/items",
+          "line": 166
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/inventory/items",
+          "frontendTemplatePath": "/inventory/items",
+          "openApiPath": "/inventory/items",
+          "line": 239
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/inventory/items/${editingItem.id}",
+          "frontendTemplatePath": "/inventory/items/:id",
+          "openApiPath": "/inventory/items/{id}",
+          "line": 237
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/inventory/items/${deletingItem.id}",
+          "frontendTemplatePath": "/inventory/items/:id",
+          "openApiPath": "/inventory/items/{id}",
+          "line": 336
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/inventory/stats",
+          "frontendTemplatePath": "/inventory/stats",
+          "openApiPath": "/inventory/stats",
+          "line": 175
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/inventory/transactions",
+          "frontendTemplatePath": "/inventory/transactions",
+          "openApiPath": "/inventory/transactions",
+          "line": 192
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/inventory/transactions",
+          "frontendTemplatePath": "/inventory/transactions",
+          "openApiPath": "/inventory/transactions",
+          "line": 299
+        }
+      ]
+    },
+    {
+      "route": "/admin/kiosk",
+      "sector": "Misc",
+      "templateType": null,
+      "file": "frontend/src/app/admin/kiosk/page.tsx",
+      "endpoints": [
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/kiosk/devices/${deviceId}",
+          "frontendTemplatePath": "/kiosk/devices/:deviceId",
+          "openApiPath": "/kiosk/devices/{deviceId}",
+          "line": 126
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/kiosk/devices/${deviceId}/maintenance",
+          "frontendTemplatePath": "/kiosk/devices/:deviceId/maintenance",
+          "openApiPath": "/kiosk/devices/{deviceId}/maintenance",
+          "line": 102
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/kiosk/devices/${propertyId}",
+          "frontendTemplatePath": "/kiosk/devices/:propertyId",
+          "openApiPath": "/kiosk/devices/{propertyId}",
+          "line": 74
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/kiosk/devices/property/${propertyId}?includeInactive=true",
+          "frontendTemplatePath": "/kiosk/devices/property/:propertyId",
+          "openApiPath": "/kiosk/devices/property/{propertyId}",
+          "line": 48
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/kiosk/key-stock/${kioskId}/refill",
+          "frontendTemplatePath": "/kiosk/key-stock/:kioskId/refill",
+          "openApiPath": "/kiosk/key-stock/{kioskId}/refill",
+          "line": 114
+        }
+      ]
+    },
+    {
+      "route": "/admin/loyalty",
+      "sector": "Marketing & Loyalty & Codes",
+      "templateType": null,
+      "file": "frontend/src/app/admin/loyalty/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/loyalty/accounts",
+          "frontendTemplatePath": "/loyalty/accounts",
+          "openApiPath": "/loyalty/accounts",
+          "line": 155
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/loyalty/accounts/${selectedAccount.id}/adjust",
+          "frontendTemplatePath": "/loyalty/accounts/:id/adjust",
+          "openApiPath": "/loyalty/accounts/{id}/adjust",
+          "line": 183
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/loyalty/settings",
+          "frontendTemplatePath": "/loyalty/settings",
+          "openApiPath": "/loyalty/settings",
+          "line": 140
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/loyalty/settings",
+          "frontendTemplatePath": "/loyalty/settings",
+          "openApiPath": "/loyalty/settings",
+          "line": 171
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/loyalty/stats",
+          "frontendTemplatePath": "/loyalty/stats",
+          "openApiPath": "/loyalty/stats",
+          "line": 139
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/loyalty/tiers",
+          "frontendTemplatePath": "/loyalty/tiers",
+          "openApiPath": "/loyalty/tiers",
+          "line": 138
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/loyalty/tiers",
+          "frontendTemplatePath": "/loyalty/tiers",
+          "openApiPath": "/loyalty/tiers",
+          "line": 672
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/loyalty/tiers/${tier.id}",
+          "frontendTemplatePath": "/loyalty/tiers/:id",
+          "openApiPath": "/loyalty/tiers/{id}",
+          "line": 510
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/loyalty/tiers/${editingTier.id}",
+          "frontendTemplatePath": "/loyalty/tiers/:id",
+          "openApiPath": "/loyalty/tiers/{id}",
+          "line": 667
+        }
+      ]
+    },
+    {
+      "route": "/admin/modules",
+      "sector": "Core Shell",
+      "templateType": null,
+      "file": "frontend/src/app/admin/modules/page.tsx",
+      "endpoints": []
+    },
+    {
+      "route": "/admin/modules/builder/[id]",
+      "sector": "Core Shell",
+      "templateType": null,
+      "file": "frontend/src/app/admin/modules/builder/[id]/page.tsx",
+      "endpoints": []
+    },
+    {
+      "route": "/admin/orders",
+      "sector": "Core Shell",
+      "templateType": null,
+      "file": "frontend/src/app/admin/orders/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/restaurant/admin/orders",
+          "frontendTemplatePath": "/restaurant/admin/orders",
+          "openApiPath": "/restaurant/admin/orders",
+          "line": 78
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/snack/staff/orders",
+          "frontendTemplatePath": "/snack/staff/orders",
+          "openApiPath": "/snack/staff/orders",
+          "line": 79
+        }
+      ]
+    },
+    {
+      "route": "/admin/properties",
+      "sector": "Misc",
+      "templateType": null,
+      "file": "frontend/src/app/admin/properties/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/multi-property/my-properties",
+          "frontendTemplatePath": "/multi-property/my-properties",
+          "openApiPath": "/multi-property/my-properties",
+          "line": 166
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/multi-property/properties",
+          "frontendTemplatePath": "/multi-property/properties",
+          "openApiPath": "/multi-property/properties",
+          "line": 208
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/multi-property/switch-property",
+          "frontendTemplatePath": "/multi-property/switch-property",
+          "openApiPath": "/multi-property/switch-property",
+          "line": 193
+        }
+      ]
+    },
+    {
+      "route": "/admin/reports",
+      "sector": "Reports & Finance",
+      "templateType": null,
+      "file": "frontend/src/app/admin/reports/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/reports/customers",
+          "frontendTemplatePath": "/admin/reports/customers",
+          "openApiPath": "/admin/reports/customers",
+          "line": 116
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/reports/export",
+          "frontendTemplatePath": "/admin/reports/export",
+          "openApiPath": "/admin/reports/export",
+          "line": 139
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/reports/occupancy",
+          "frontendTemplatePath": "/admin/reports/occupancy",
+          "openApiPath": "/admin/reports/occupancy",
+          "line": 115
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/reports/overview",
+          "frontendTemplatePath": "/admin/reports/overview",
+          "openApiPath": "/admin/reports/overview",
+          "line": 114
+        }
+      ]
+    },
+    {
+      "route": "/admin/reports/analytics",
+      "sector": "Reports & Finance",
+      "templateType": null,
+      "file": "frontend/src/app/admin/reports/analytics/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/reports/export",
+          "frontendTemplatePath": "/admin/reports/export",
+          "openApiPath": "/admin/reports/export",
+          "line": 209
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/reports/overview",
+          "frontendTemplatePath": "/admin/reports/overview",
+          "openApiPath": "/admin/reports/overview",
+          "line": 177
+        }
+      ]
+    },
+    {
+      "route": "/admin/reports/scheduled",
+      "sector": "Reports & Finance",
+      "templateType": null,
+      "file": "frontend/src/app/admin/reports/scheduled/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/reporting/scheduled",
+          "frontendTemplatePath": "/reporting/scheduled",
+          "openApiPath": "/reporting/scheduled",
+          "line": 75
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/reporting/scheduled",
+          "frontendTemplatePath": "/reporting/scheduled",
+          "openApiPath": "/reporting/scheduled",
+          "line": 152
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/reporting/scheduled/${editingReport.id}",
+          "frontendTemplatePath": "/reporting/scheduled/:id",
+          "openApiPath": "/reporting/scheduled/{id}",
+          "line": 140
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/reporting/scheduled/${id}",
+          "frontendTemplatePath": "/reporting/scheduled/:id",
+          "openApiPath": "/reporting/scheduled/{id}",
+          "line": 179
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/reporting/scheduled/${id}/run",
+          "frontendTemplatePath": "/reporting/scheduled/:id/run",
+          "openApiPath": "/reporting/scheduled/{id}/run",
+          "line": 202
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/reporting/templates",
+          "frontendTemplatePath": "/reporting/templates",
+          "openApiPath": "/reporting/templates",
+          "line": 76
+        }
+      ]
+    },
+    {
+      "route": "/admin/reviews",
+      "sector": "Reviews",
+      "templateType": null,
+      "file": "frontend/src/app/admin/reviews/page.tsx",
+      "endpoints": [
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/reviews/${id}",
+          "frontendTemplatePath": "/reviews/:id",
+          "openApiPath": "/reviews/{id}",
+          "line": 114
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/reviews/${id}/approve",
+          "frontendTemplatePath": "/reviews/:id/approve",
+          "openApiPath": "/reviews/{id}/approve",
+          "line": 82
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/reviews/${id}/reject",
+          "frontendTemplatePath": "/reviews/:id/reject",
+          "openApiPath": "/reviews/{id}/reject",
+          "line": 97
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/reviews/admin",
+          "frontendTemplatePath": "/reviews/admin",
+          "openApiPath": "/reviews/admin",
+          "line": 66
+        }
+      ]
+    },
+    {
+      "route": "/admin/settings",
+      "sector": "Settings",
+      "templateType": null,
+      "file": "frontend/src/app/admin/settings/page.tsx",
+      "endpoints": [
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/settings",
+          "frontendTemplatePath": "/admin/settings",
+          "openApiPath": "/admin/settings",
+          "line": 50
+        }
+      ]
+    },
+    {
+      "route": "/admin/settings/appearance",
+      "sector": "Settings",
+      "templateType": null,
+      "file": "frontend/src/app/admin/settings/appearance/page.tsx",
+      "endpoints": [
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/settings",
+          "frontendTemplatePath": "/admin/settings",
+          "openApiPath": "/admin/settings",
+          "line": 208
+        }
+      ]
+    },
+    {
+      "route": "/admin/settings/backups",
+      "sector": "Settings",
+      "templateType": null,
+      "file": "frontend/src/app/admin/settings/backups/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/backups",
+          "frontendTemplatePath": "/admin/backups",
+          "openApiPath": "/admin/backups",
+          "line": 63
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/backups",
+          "frontendTemplatePath": "/admin/backups",
+          "openApiPath": "/admin/backups",
+          "line": 84
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/admin/backups/${id}",
+          "frontendTemplatePath": "/admin/backups/:id",
+          "openApiPath": "/admin/backups/{id}",
+          "line": 102
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/backups/${id}/download",
+          "frontendTemplatePath": "/admin/backups/:id/download",
+          "openApiPath": "/admin/backups/{id}/download",
+          "line": 113
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/backups/restore",
+          "frontendTemplatePath": "/admin/backups/restore",
+          "openApiPath": "/admin/backups/restore",
+          "line": 194
+        }
+      ]
+    },
+    {
+      "route": "/admin/settings/footer",
+      "sector": "Settings",
+      "templateType": null,
+      "file": "frontend/src/app/admin/settings/footer/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/settings",
+          "frontendTemplatePath": "/admin/settings",
+          "openApiPath": "/admin/settings",
+          "line": 105
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/settings",
+          "frontendTemplatePath": "/admin/settings",
+          "openApiPath": "/admin/settings",
+          "line": 135
+        }
+      ]
+    },
+    {
+      "route": "/admin/settings/homepage",
+      "sector": "Settings",
+      "templateType": null,
+      "file": "frontend/src/app/admin/settings/homepage/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/settings",
+          "frontendTemplatePath": "/admin/settings",
+          "openApiPath": "/admin/settings",
+          "line": 158
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/settings/homepage",
+          "frontendTemplatePath": "/admin/settings/homepage",
+          "openApiPath": "/admin/settings/homepage",
+          "line": 152
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/settings/homepage",
+          "frontendTemplatePath": "/admin/settings/homepage",
+          "openApiPath": "/admin/settings/homepage",
+          "line": 169
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/uploads",
+          "frontendTemplatePath": "/admin/uploads",
+          "openApiPath": "/admin/uploads",
+          "line": 247
+        }
+      ]
+    },
+    {
+      "route": "/admin/settings/navbar",
+      "sector": "Settings",
+      "templateType": null,
+      "file": "frontend/src/app/admin/settings/navbar/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/settings",
+          "frontendTemplatePath": "/admin/settings",
+          "openApiPath": "/admin/settings",
+          "line": 93
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/settings",
+          "frontendTemplatePath": "/admin/settings",
+          "openApiPath": "/admin/settings",
+          "line": 109
+        }
+      ]
+    },
+    {
+      "route": "/admin/settings/notifications",
+      "sector": "Settings",
+      "templateType": null,
+      "file": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/notifications",
+          "frontendTemplatePath": "/admin/notifications",
+          "openApiPath": "/admin/notifications",
+          "line": 167
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/admin/notifications/${id}",
+          "frontendTemplatePath": "/admin/notifications/:id",
+          "openApiPath": "/admin/notifications/{id}",
+          "line": 225
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/notifications/broadcast",
+          "frontendTemplatePath": "/admin/notifications/broadcast",
+          "openApiPath": "/admin/notifications/broadcast",
+          "line": 208
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/notifications/broadcasts",
+          "frontendTemplatePath": "/admin/notifications/broadcasts",
+          "openApiPath": "/admin/notifications/broadcasts",
+          "line": 168
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/notifications/delete-multiple",
+          "frontendTemplatePath": "/admin/notifications/delete-multiple",
+          "openApiPath": "/admin/notifications/delete-multiple",
+          "line": 238
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/notifications/templates",
+          "frontendTemplatePath": "/admin/notifications/templates",
+          "openApiPath": "/admin/notifications/templates",
+          "line": 169
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/notifications/templates",
+          "frontendTemplatePath": "/admin/notifications/templates",
+          "openApiPath": "/admin/notifications/templates",
+          "line": 261
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/notifications/templates/${editingTemplate.id}",
+          "frontendTemplatePath": "/admin/notifications/templates/:id",
+          "openApiPath": "/admin/notifications/templates/{id}",
+          "line": 258
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/admin/notifications/templates/${id}",
+          "frontendTemplatePath": "/admin/notifications/templates/:id",
+          "openApiPath": "/admin/notifications/templates/{id}",
+          "line": 276
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/notifications/templates/${template.id}/send",
+          "frontendTemplatePath": "/admin/notifications/templates/:id/send",
+          "openApiPath": "/admin/notifications/templates/{id}/send",
+          "line": 286
+        }
+      ]
+    },
+    {
+      "route": "/admin/settings/payments",
+      "sector": "Settings",
+      "templateType": null,
+      "file": "frontend/src/app/admin/settings/payments/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/settings",
+          "frontendTemplatePath": "/admin/settings",
+          "openApiPath": "/admin/settings",
+          "line": 140
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/settings",
+          "frontendTemplatePath": "/admin/settings",
+          "openApiPath": "/admin/settings",
+          "line": 157
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/payments/transactions",
+          "frontendTemplatePath": "/payments/transactions",
+          "openApiPath": "/payments/transactions",
+          "line": 116
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/payments/transactions/${paymentId}/refund",
+          "frontendTemplatePath": "/payments/transactions/:paymentId/refund",
+          "openApiPath": "/payments/transactions/{paymentId}/refund",
+          "line": 174
+        }
+      ]
+    },
+    {
+      "route": "/admin/settings/tax",
+      "sector": "Settings",
+      "templateType": null,
+      "file": "frontend/src/app/admin/settings/tax/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/settings/tax",
+          "frontendTemplatePath": "/admin/settings/tax",
+          "openApiPath": "/admin/settings/tax",
+          "line": 125
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/settings/tax",
+          "frontendTemplatePath": "/admin/settings/tax",
+          "openApiPath": "/admin/settings/tax",
+          "line": 146
+        }
+      ]
+    },
+    {
+      "route": "/admin/settings/translations",
+      "sector": "Settings",
+      "templateType": null,
+      "file": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoints": [
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/translations/${editingItem.table}/${editingItem.id}",
+          "frontendTemplatePath": "/admin/translations/:table/:id",
+          "openApiPath": "/admin/translations/{table}/{id}",
+          "line": 218
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/translations/auto-translate",
+          "frontendTemplatePath": "/admin/translations/auto-translate",
+          "openApiPath": "/admin/translations/auto-translate",
+          "line": 236
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/translations/batch-translate",
+          "frontendTemplatePath": "/admin/translations/batch-translate",
+          "openApiPath": "/admin/translations/batch-translate",
+          "line": 251
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/translations/frontend/compare",
+          "frontendTemplatePath": "/admin/translations/frontend/compare",
+          "openApiPath": "/admin/translations/frontend/compare",
+          "line": 182
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/translations/frontend/update",
+          "frontendTemplatePath": "/admin/translations/frontend/update",
+          "openApiPath": "/admin/translations/frontend/update",
+          "line": 328
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/translations/languages",
+          "frontendTemplatePath": "/admin/translations/languages",
+          "openApiPath": "/admin/translations/languages",
+          "line": 170
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/translations/languages",
+          "frontendTemplatePath": "/admin/translations/languages",
+          "openApiPath": "/admin/translations/languages",
+          "line": 271
+        },
+        {
+          "method": "DELETE",
+          "rawEndpoint": "/admin/translations/languages/${code}",
+          "frontendTemplatePath": "/admin/translations/languages/:code",
+          "openApiPath": "/admin/translations/languages/{code}",
+          "line": 290
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/translations/languages/${code}",
+          "frontendTemplatePath": "/admin/translations/languages/:code",
+          "openApiPath": "/admin/translations/languages/{code}",
+          "line": 302
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/translations/missing",
+          "frontendTemplatePath": "/admin/translations/missing",
+          "openApiPath": "/admin/translations/missing",
+          "line": 142
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/translations/stats",
+          "frontendTemplatePath": "/admin/translations/stats",
+          "openApiPath": "/admin/translations/stats",
+          "line": 141
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/translations/status",
+          "frontendTemplatePath": "/admin/translations/status",
+          "openApiPath": "/admin/translations/status",
+          "line": 143
+        }
+      ]
+    },
+    {
+      "route": "/admin/terminology",
+      "sector": "Misc",
+      "templateType": null,
+      "file": "frontend/src/app/admin/terminology/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/terminology?business_type=${businessType}",
+          "frontendTemplatePath": "/terminology",
+          "openApiPath": "/terminology",
+          "line": 37
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/terminology/bulk",
+          "frontendTemplatePath": "/terminology/bulk",
+          "openApiPath": "/terminology/bulk",
+          "line": 54
+        }
+      ]
+    },
+    {
+      "route": "/admin/users",
+      "sector": "Users",
+      "templateType": null,
+      "file": "frontend/src/app/admin/users/page.tsx",
+      "endpoints": []
+    },
+    {
+      "route": "/admin/users/[id]",
+      "sector": "Users",
+      "templateType": null,
+      "file": "frontend/src/app/admin/users/[id]/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/permissions",
+          "frontendTemplatePath": "/admin/permissions",
+          "openApiPath": "/admin/permissions",
+          "line": 57
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/roles",
+          "frontendTemplatePath": "/admin/roles",
+          "openApiPath": "/admin/roles",
+          "line": 58
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/users/${id}",
+          "frontendTemplatePath": "/admin/users/:id",
+          "openApiPath": "/admin/users/{id}",
+          "line": 56
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/users/${id}",
+          "frontendTemplatePath": "/admin/users/:id",
+          "openApiPath": "/admin/users/{id}",
+          "line": 95
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/users/${id}/permissions",
+          "frontendTemplatePath": "/admin/users/:id/permissions",
+          "openApiPath": "/admin/users/{id}/permissions",
+          "line": 129
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/users/${id}/roles",
+          "frontendTemplatePath": "/admin/users/:id/roles",
+          "openApiPath": "/admin/users/{id}/roles",
+          "line": 109
+        }
+      ]
+    },
+    {
+      "route": "/admin/users/admins",
+      "sector": "Users",
+      "templateType": null,
+      "file": "frontend/src/app/admin/users/admins/page.tsx",
+      "endpoints": []
+    },
+    {
+      "route": "/admin/users/create",
+      "sector": "Users",
+      "templateType": null,
+      "file": "frontend/src/app/admin/users/create/page.tsx",
+      "endpoints": [
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/users",
+          "frontendTemplatePath": "/admin/users",
+          "openApiPath": "/admin/users",
+          "line": 104
+        }
+      ]
+    },
+    {
+      "route": "/admin/users/customers",
+      "sector": "Users",
+      "templateType": null,
+      "file": "frontend/src/app/admin/users/customers/page.tsx",
+      "endpoints": []
+    },
+    {
+      "route": "/admin/users/live",
+      "sector": "Users",
+      "templateType": null,
+      "file": "frontend/src/app/admin/users/live/page.tsx",
+      "endpoints": []
+    },
+    {
+      "route": "/admin/users/roles",
+      "sector": "Users",
+      "templateType": null,
+      "file": "frontend/src/app/admin/users/roles/page.tsx",
+      "endpoints": [
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/permissions",
+          "frontendTemplatePath": "/admin/permissions",
+          "openApiPath": "/admin/permissions",
+          "line": 50
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/roles",
+          "frontendTemplatePath": "/admin/roles",
+          "openApiPath": "/admin/roles",
+          "line": 49
+        },
+        {
+          "method": "POST",
+          "rawEndpoint": "/admin/roles",
+          "frontendTemplatePath": "/admin/roles",
+          "openApiPath": "/admin/roles",
+          "line": 83
+        },
+        {
+          "method": "GET",
+          "rawEndpoint": "/admin/roles/${role.id}/permissions",
+          "frontendTemplatePath": "/admin/roles/:id/permissions",
+          "openApiPath": "/admin/roles/{id}/permissions",
+          "line": 110
+        },
+        {
+          "method": "PUT",
+          "rawEndpoint": "/admin/roles/${selectedRole.id}/permissions",
+          "frontendTemplatePath": "/admin/roles/:id/permissions",
+          "openApiPath": "/admin/roles/{id}/permissions",
+          "line": 131
+        }
+      ]
+    },
+    {
+      "route": "/admin/users/staff",
+      "sector": "Users",
+      "templateType": null,
+      "file": "frontend/src/app/admin/users/staff/page.tsx",
+      "endpoints": []
+    }
+  ]
+}

@@ -61,6 +61,7 @@ auth-token.json
 coverage-output.txt
 **/dist-android/
 **/archive/**/*.txt
+**/_archive/**/*.txt
 tools/*.json
 reports/*.json
 screenshots/*.png

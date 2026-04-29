@@ -18,7 +18,8 @@ import * as quickbooksService from './quickbooks.service.js';
  */
 export const getConnectionStatus = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-    const propertyId = req.query.propertyId as string || req.body.propertyId;
+    const propertyId =
+      (req.query.propertyId as string) || (req.body?.propertyId as string) || 'default';
     
     const { data: connection, error } = await supabase
       .from('quickbooks_connections')
@@ -26,7 +27,23 @@ export const getConnectionStatus = asyncHandler(async (req: Request, res: Respon
       .eq('property_id', propertyId)
       .single();
       
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+    if (error && error.code !== 'PGRST116') {
+      // In some environments the QuickBooks integration tables may not exist yet.
+      // Degrade gracefully so the admin UI can still render and show "not connected".
+      const msg = (error as any)?.message as string | undefined;
+      const maybeMissingTable =
+        error.code === '42P01' ||
+        (msg?.toLowerCase().includes('quickbooks_connections') ?? false) ||
+        (msg?.toLowerCase().includes('schema cache') ?? false) ||
+        (msg?.toLowerCase().includes('relation') ?? false);
+
+      if (maybeMissingTable) {
+        return res.json({
+          connected: false,
+          message: 'QuickBooks integration is not available in this environment',
+        });
+      }
+
       throw error;
     }
     

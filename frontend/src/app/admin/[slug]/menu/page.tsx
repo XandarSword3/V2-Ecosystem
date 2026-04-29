@@ -82,8 +82,14 @@ interface CustomizationGroup {
 interface CustomizationOption {
   id: string;
   name: string;
-  price_modifier: number;
+  // Depending on which backend route the UI is wired to, the price delta may come
+  // either as `price_modifier` or as `price_adjustment`.
+  price_modifier?: number;
+  price_adjustment?: number;
 }
+
+const getCustomizationOptionPrice = (opt: CustomizationOption): number =>
+  opt.price_modifier ?? opt.price_adjustment ?? 0;
 
 interface Category {
   id: string;
@@ -129,7 +135,7 @@ export default function DynamicMenuPage() {
         api.get('/restaurant/items', { params: { moduleId: currentModule.id } }),
         api.get('/restaurant/categories', { params: { moduleId: currentModule.id } }),
         api.get('/inventory/items', { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
-        api.get('/restaurant/customization-groups', { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
+        api.get('/restaurant/modifiers', { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
       ]);
       setItems(menuRes.data.data || []);
       setCategories(catRes.data.data || []);
@@ -843,9 +849,9 @@ export default function DynamicMenuPage() {
                                     className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-700 rounded"
                                   >
                                     {opt.name}
-                                    {opt.price_modifier !== 0 && (
+                                    {getCustomizationOptionPrice(opt) !== 0 && (
                                       <span className="ml-1 text-orange-600">
-                                        {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
+                                        {getCustomizationOptionPrice(opt) > 0 ? '+' : ''}{formatCurrency(getCustomizationOptionPrice(opt))}
                                       </span>
                                     )}
                                   </span>

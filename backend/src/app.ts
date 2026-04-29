@@ -158,8 +158,8 @@ import waitlistRoutes from './modules/restaurant/waitlist.routes.js';
 import customizationRoutes from './modules/customization/routes/customization.routes.js';
 import paymentPlatformRoutes from './modules/payments/payment.v1.routes.js';
 
-// Integrations - DISABLED: Uses PrismaClient, needs Supabase refactor
-// import { quickbooksRoutes } from './modules/integrations/index.js';
+// Integrations
+import { quickbooksRoutes } from './modules/integrations/index.js';
 
 // Hardware POS
 import posHardwareRoutes from './modules/pos/pos-hardware.routes.js';
@@ -195,8 +195,8 @@ apiRouter.use('/restaurant/waitlist', waitlistRoutes);
 // Unified Customization System - for ALL modules (restaurant, chalets, pool, snack bar, future modules)
 apiRouter.use('/customizations', customizationRoutes);
 
-// Integration Routes - DISABLED: Uses PrismaClient
-// apiRouter.use('/integrations/quickbooks', quickbooksRoutes);
+// Integration Routes
+apiRouter.use('/integrations/quickbooks', quickbooksRoutes);
 
 // POS Hardware Routes
 apiRouter.use('/pos', posHardwareRoutes);

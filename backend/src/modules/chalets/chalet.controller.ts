@@ -1698,6 +1698,16 @@ export const createPriceRule = asyncHandler(async (req: Request, res: Response) 
     .select()
     .single();
 
+  // Backward compatibility: some deployed schemas do not have module_id on chalet_price_rules.
+  if (error && req.body?.module_id && (error as { code?: string }).code === 'PGRST204') {
+    // Retry without module_id (and any other unknown field the schema cache rejected).
+    const { module_id: _omit, ...rest } = insertData;
+    const retry = await supabase.from('chalet_price_rules').insert(rest).select().single();
+    if (retry.error) throw retry.error;
+    res.status(201).json({ success: true, data: retry.data });
+    return;
+  }
+
   if (error) throw error;
   res.status(201).json({ success: true, data });
 });
@@ -1731,6 +1741,20 @@ export const updatePriceRule = asyncHandler(async (req: Request, res: Response) 
     .eq('id', req.params.id)
     .select()
     .single();
+
+  // Backward compatibility: some deployed schemas do not have module_id on chalet_price_rules.
+  if (error && req.body?.module_id && (error as { code?: string }).code === 'PGRST204') {
+    const { module_id: _omit, ...rest } = updateData;
+    const retry = await supabase
+      .from('chalet_price_rules')
+      .update(rest)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (retry.error) throw retry.error;
+    res.json({ success: true, data: retry.data });
+    return;
+  }
 
   if (error) throw error;
   res.json({ success: true, data });

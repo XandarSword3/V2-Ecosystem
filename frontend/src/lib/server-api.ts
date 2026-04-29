@@ -14,6 +14,12 @@ interface FetchOptions {
 }
 
 async function serverFetch<T>(endpoint: string, options: FetchOptions = {}): Promise<T | null> {
+  // If we are running a Next.js build and the API is hitting a local missing server, skip it.
+  if (process.env.npm_lifecycle_event === 'build' && API_BASE_URL.includes('localhost')) {
+    console.warn(`[Build Bypass] Skipping server fetch to ${endpoint} during static generation`);
+    return null;
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       headers: {

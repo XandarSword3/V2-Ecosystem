@@ -1,0 +1,383 @@
+{
+  "generatedAt": "2026-04-29T09:39:39.199Z",
+  "inventory": [
+    {
+      "route": "/admin",
+      "file": "frontend/src/app/admin/page.tsx",
+      "sector": "Core Shell",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/[slug]",
+      "file": "frontend/src/app/admin/[slug]/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "multi_day_booking"
+    },
+    {
+      "route": "/admin/[slug]/addons",
+      "file": "frontend/src/app/admin/[slug]/addons/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "multi_day_booking"
+    },
+    {
+      "route": "/admin/[slug]/bookings",
+      "file": "frontend/src/app/admin/[slug]/bookings/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "multi_day_booking"
+    },
+    {
+      "route": "/admin/[slug]/calendar",
+      "file": "frontend/src/app/admin/[slug]/calendar/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "unmapped"
+    },
+    {
+      "route": "/admin/[slug]/capacity",
+      "file": "frontend/src/app/admin/[slug]/capacity/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "session_access"
+    },
+    {
+      "route": "/admin/[slug]/categories",
+      "file": "frontend/src/app/admin/[slug]/categories/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "menu_service"
+    },
+    {
+      "route": "/admin/[slug]/menu",
+      "file": "frontend/src/app/admin/[slug]/menu/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "menu_service"
+    },
+    {
+      "route": "/admin/[slug]/modifiers",
+      "file": "frontend/src/app/admin/[slug]/modifiers/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "menu_service"
+    },
+    {
+      "route": "/admin/[slug]/orders",
+      "file": "frontend/src/app/admin/[slug]/orders/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "menu_service"
+    },
+    {
+      "route": "/admin/[slug]/pricing",
+      "file": "frontend/src/app/admin/[slug]/pricing/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "multi_day_booking"
+    },
+    {
+      "route": "/admin/[slug]/reservations",
+      "file": "frontend/src/app/admin/[slug]/reservations/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "menu_service"
+    },
+    {
+      "route": "/admin/[slug]/sessions",
+      "file": "frontend/src/app/admin/[slug]/sessions/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "session_access"
+    },
+    {
+      "route": "/admin/[slug]/tables",
+      "file": "frontend/src/app/admin/[slug]/tables/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "menu_service"
+    },
+    {
+      "route": "/admin/[slug]/tickets",
+      "file": "frontend/src/app/admin/[slug]/tickets/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "session_access"
+    },
+    {
+      "route": "/admin/[slug]/waitlist",
+      "file": "frontend/src/app/admin/[slug]/waitlist/page.tsx",
+      "sector": "Dynamic Module Admin",
+      "isDynamic": true,
+      "templateType": "menu_service"
+    },
+    {
+      "route": "/admin/audit",
+      "file": "frontend/src/app/admin/audit/page.tsx",
+      "sector": "Audit Logs",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/channels",
+      "file": "frontend/src/app/admin/channels/page.tsx",
+      "sector": "Misc",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/coupons",
+      "file": "frontend/src/app/admin/coupons/page.tsx",
+      "sector": "Marketing & Loyalty & Codes",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/customizations",
+      "file": "frontend/src/app/admin/customizations/page.tsx",
+      "sector": "Misc",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/giftcards",
+      "file": "frontend/src/app/admin/giftcards/page.tsx",
+      "sector": "Marketing & Loyalty & Codes",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/housekeeping",
+      "file": "frontend/src/app/admin/housekeeping/page.tsx",
+      "sector": "Operations",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/integrations",
+      "file": "frontend/src/app/admin/integrations/page.tsx",
+      "sector": "Integrations",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/integrations/quickbooks",
+      "file": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "sector": "Integrations",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/inventory",
+      "file": "frontend/src/app/admin/inventory/page.tsx",
+      "sector": "Operations",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/kiosk",
+      "file": "frontend/src/app/admin/kiosk/page.tsx",
+      "sector": "Misc",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/loyalty",
+      "file": "frontend/src/app/admin/loyalty/page.tsx",
+      "sector": "Marketing & Loyalty & Codes",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/modules",
+      "file": "frontend/src/app/admin/modules/page.tsx",
+      "sector": "Core Shell",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/modules/builder/[id]",
+      "file": "frontend/src/app/admin/modules/builder/[id]/page.tsx",
+      "sector": "Core Shell",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/orders",
+      "file": "frontend/src/app/admin/orders/page.tsx",
+      "sector": "Core Shell",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/properties",
+      "file": "frontend/src/app/admin/properties/page.tsx",
+      "sector": "Misc",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/reports",
+      "file": "frontend/src/app/admin/reports/page.tsx",
+      "sector": "Reports & Finance",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/reports/analytics",
+      "file": "frontend/src/app/admin/reports/analytics/page.tsx",
+      "sector": "Reports & Finance",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/reports/scheduled",
+      "file": "frontend/src/app/admin/reports/scheduled/page.tsx",
+      "sector": "Reports & Finance",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/reviews",
+      "file": "frontend/src/app/admin/reviews/page.tsx",
+      "sector": "Reviews",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/settings",
+      "file": "frontend/src/app/admin/settings/page.tsx",
+      "sector": "Settings",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/settings/appearance",
+      "file": "frontend/src/app/admin/settings/appearance/page.tsx",
+      "sector": "Settings",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/settings/backups",
+      "file": "frontend/src/app/admin/settings/backups/page.tsx",
+      "sector": "Settings",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/settings/footer",
+      "file": "frontend/src/app/admin/settings/footer/page.tsx",
+      "sector": "Settings",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/settings/homepage",
+      "file": "frontend/src/app/admin/settings/homepage/page.tsx",
+      "sector": "Settings",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/settings/navbar",
+      "file": "frontend/src/app/admin/settings/navbar/page.tsx",
+      "sector": "Settings",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/settings/notifications",
+      "file": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "sector": "Settings",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/settings/payments",
+      "file": "frontend/src/app/admin/settings/payments/page.tsx",
+      "sector": "Settings",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/settings/tax",
+      "file": "frontend/src/app/admin/settings/tax/page.tsx",
+      "sector": "Settings",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/settings/translations",
+      "file": "frontend/src/app/admin/settings/translations/page.tsx",
+      "sector": "Settings",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/terminology",
+      "file": "frontend/src/app/admin/terminology/page.tsx",
+      "sector": "Misc",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/users",
+      "file": "frontend/src/app/admin/users/page.tsx",
+      "sector": "Users",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/users/[id]",
+      "file": "frontend/src/app/admin/users/[id]/page.tsx",
+      "sector": "Users",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/users/admins",
+      "file": "frontend/src/app/admin/users/admins/page.tsx",
+      "sector": "Users",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/users/create",
+      "file": "frontend/src/app/admin/users/create/page.tsx",
+      "sector": "Users",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/users/customers",
+      "file": "frontend/src/app/admin/users/customers/page.tsx",
+      "sector": "Users",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/users/live",
+      "file": "frontend/src/app/admin/users/live/page.tsx",
+      "sector": "Users",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/users/roles",
+      "file": "frontend/src/app/admin/users/roles/page.tsx",
+      "sector": "Users",
+      "isDynamic": false,
+      "templateType": null
+    },
+    {
+      "route": "/admin/users/staff",
+      "file": "frontend/src/app/admin/users/staff/page.tsx",
+      "sector": "Users",
+      "isDynamic": false,
+      "templateType": null
+    }
+  ]
+}

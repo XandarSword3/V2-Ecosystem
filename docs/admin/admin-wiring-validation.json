@@ -1,0 +1,1437 @@
+{
+  "generatedAt": "2026-04-29T09:44:09.271Z",
+  "wiringMap": {
+    "path": "C:\\Alessandro\\Work\\Attempts to Code\\V2 Ecosystem\\v2-resort\\docs\\admin\\admin-wiring-map.json",
+    "inventoryCount": 54,
+    "pagesCount": 54
+  },
+  "validation": {
+    "openApiSpec": "C:\\Alessandro\\Work\\Attempts to Code\\V2 Ecosystem\\v2-resort\\backend\\src\\docs\\openapi-spec.ts",
+    "openApiPathsCount": 306,
+    "matching": {
+      "usesShapeNormalizationForPathParams": true,
+      "securityCheckMutationOnly": true
+    }
+  },
+  "sectorStats": {
+    "Core Shell": {
+      "totalEndpoints": 3,
+      "missingPaths": 1,
+      "missingMethods": 0,
+      "securityMismatches": 0
+    },
+    "Dynamic Module Admin": {
+      "totalEndpoints": 57,
+      "missingPaths": 28,
+      "missingMethods": 4,
+      "securityMismatches": 1
+    },
+    "Audit Logs": {
+      "totalEndpoints": 1,
+      "missingPaths": 1,
+      "missingMethods": 0,
+      "securityMismatches": 0
+    },
+    "Misc": {
+      "totalEndpoints": 24,
+      "missingPaths": 10,
+      "missingMethods": 0,
+      "securityMismatches": 0
+    },
+    "Marketing & Loyalty & Codes": {
+      "totalEndpoints": 21,
+      "missingPaths": 6,
+      "missingMethods": 2,
+      "securityMismatches": 0
+    },
+    "Operations": {
+      "totalEndpoints": 19,
+      "missingPaths": 0,
+      "missingMethods": 0,
+      "securityMismatches": 0
+    },
+    "Integrations": {
+      "totalEndpoints": 9,
+      "missingPaths": 9,
+      "missingMethods": 0,
+      "securityMismatches": 0
+    },
+    "Reports & Finance": {
+      "totalEndpoints": 12,
+      "missingPaths": 8,
+      "missingMethods": 0,
+      "securityMismatches": 0
+    },
+    "Reviews": {
+      "totalEndpoints": 4,
+      "missingPaths": 0,
+      "missingMethods": 0,
+      "securityMismatches": 0
+    },
+    "Settings": {
+      "totalEndpoints": 43,
+      "missingPaths": 41,
+      "missingMethods": 0,
+      "securityMismatches": 0
+    },
+    "Users": {
+      "totalEndpoints": 12,
+      "missingPaths": 0,
+      "missingMethods": 0,
+      "securityMismatches": 0
+    }
+  },
+  "issues": [
+    {
+      "type": "MISSING_PATH",
+      "sector": "Audit Logs",
+      "pageRoute": "/admin/audit",
+      "pageFile": "frontend/src/app/admin/audit/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/audit-logs",
+        "openApiPath": "/admin/audit-logs"
+      },
+      "details": "No OpenAPI path matches shape: /admin/audit-logs"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Core Shell",
+      "pageRoute": "/admin/orders",
+      "pageFile": "frontend/src/app/admin/orders/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/restaurant/admin/orders",
+        "openApiPath": "/restaurant/admin/orders"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/admin/orders"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/calendar",
+      "pageFile": "frontend/src/app/admin/[slug]/calendar/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/chalets/admin/chalets/:selectedChaletId/block-dates",
+        "openApiPath": "/chalets/admin/chalets/{selectedChaletId}/block-dates"
+      },
+      "details": "No OpenAPI path matches shape: /chalets/admin/chalets/{}/block-dates"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/calendar",
+      "pageFile": "frontend/src/app/admin/[slug]/calendar/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/chalets/admin/chalets/:selectedChaletId/calendar",
+        "openApiPath": "/chalets/admin/chalets/{selectedChaletId}/calendar"
+      },
+      "details": "No OpenAPI path matches shape: /chalets/admin/chalets/{}/calendar"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/calendar",
+      "pageFile": "frontend/src/app/admin/[slug]/calendar/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/chalets/admin/chalets/:selectedChaletId/unblock-dates",
+        "openApiPath": "/chalets/admin/chalets/{selectedChaletId}/unblock-dates"
+      },
+      "details": "No OpenAPI path matches shape: /chalets/admin/chalets/{}/unblock-dates"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/capacity",
+      "pageFile": "frontend/src/app/admin/[slug]/capacity/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/pool/admin/capacity",
+        "openApiPath": "/pool/admin/capacity"
+      },
+      "details": "No OpenAPI path matches shape: /pool/admin/capacity"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/capacity",
+      "pageFile": "frontend/src/app/admin/[slug]/capacity/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/pool/admin/capacity/reset",
+        "openApiPath": "/pool/admin/capacity/reset"
+      },
+      "details": "No OpenAPI path matches shape: /pool/admin/capacity/reset"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/capacity",
+      "pageFile": "frontend/src/app/admin/[slug]/capacity/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/pool/capacity",
+        "openApiPath": "/pool/capacity"
+      },
+      "details": "No OpenAPI path matches shape: /pool/capacity"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/categories",
+      "pageFile": "frontend/src/app/admin/[slug]/categories/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/restaurant/admin/categories",
+        "openApiPath": "/restaurant/admin/categories"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/admin/categories"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/categories",
+      "pageFile": "frontend/src/app/admin/[slug]/categories/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/restaurant/admin/categories/:id",
+        "openApiPath": "/restaurant/admin/categories/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/admin/categories/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/categories",
+      "pageFile": "frontend/src/app/admin/[slug]/categories/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/restaurant/admin/categories/:id",
+        "openApiPath": "/restaurant/admin/categories/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/admin/categories/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/categories",
+      "pageFile": "frontend/src/app/admin/[slug]/categories/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/restaurant/categories",
+        "openApiPath": "/restaurant/categories"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/categories"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/menu",
+      "pageFile": "frontend/src/app/admin/[slug]/menu/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/restaurant/admin/items",
+        "openApiPath": "/restaurant/admin/items"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/admin/items"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/menu",
+      "pageFile": "frontend/src/app/admin/[slug]/menu/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/restaurant/admin/items/:id",
+        "openApiPath": "/restaurant/admin/items/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/admin/items/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/menu",
+      "pageFile": "frontend/src/app/admin/[slug]/menu/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/restaurant/admin/items/:id",
+        "openApiPath": "/restaurant/admin/items/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/admin/items/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/menu",
+      "pageFile": "frontend/src/app/admin/[slug]/menu/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/restaurant/categories",
+        "openApiPath": "/restaurant/categories"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/categories"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/menu",
+      "pageFile": "frontend/src/app/admin/[slug]/menu/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/restaurant/customization-groups",
+        "openApiPath": "/restaurant/customization-groups"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/customization-groups"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/menu",
+      "pageFile": "frontend/src/app/admin/[slug]/menu/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/restaurant/items",
+        "openApiPath": "/restaurant/items"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/items"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/modifiers",
+      "pageFile": "frontend/src/app/admin/[slug]/modifiers/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/restaurant/modifiers/:selectedGroupId/options",
+        "openApiPath": "/restaurant/modifiers/{selectedGroupId}/options"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/modifiers/{}/options"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/modifiers",
+      "pageFile": "frontend/src/app/admin/[slug]/modifiers/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/restaurant/modifiers/options/:id",
+        "openApiPath": "/restaurant/modifiers/options/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/modifiers/options/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/modifiers",
+      "pageFile": "frontend/src/app/admin/[slug]/modifiers/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/restaurant/modifiers/options/:optionId",
+        "openApiPath": "/restaurant/modifiers/options/{optionId}"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/modifiers/options/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/pricing",
+      "pageFile": "frontend/src/app/admin/[slug]/pricing/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/chalets/admin/price-rules/:id",
+        "openApiPath": "/chalets/admin/price-rules/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /chalets/admin/price-rules/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/pricing",
+      "pageFile": "frontend/src/app/admin/[slug]/pricing/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/chalets/admin/price-rules/:id",
+        "openApiPath": "/chalets/admin/price-rules/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /chalets/admin/price-rules/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/reservations",
+      "pageFile": "frontend/src/app/admin/[slug]/reservations/page.tsx",
+      "endpoint": {
+        "method": "PATCH",
+        "frontendTemplatePath": "/restaurant/reservations/:id",
+        "openApiPath": "/restaurant/reservations/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/reservations/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/reservations",
+      "pageFile": "frontend/src/app/admin/[slug]/reservations/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/restaurant/reservations/:reservationId/assign-table",
+        "openApiPath": "/restaurant/reservations/{reservationId}/assign-table"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/reservations/{}/assign-table"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/sessions",
+      "pageFile": "frontend/src/app/admin/[slug]/sessions/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/pool/admin/sessions",
+        "openApiPath": "/pool/admin/sessions"
+      },
+      "details": "No OpenAPI path matches shape: /pool/admin/sessions"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/sessions",
+      "pageFile": "frontend/src/app/admin/[slug]/sessions/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/pool/admin/sessions/:id",
+        "openApiPath": "/pool/admin/sessions/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /pool/admin/sessions/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/sessions",
+      "pageFile": "frontend/src/app/admin/[slug]/sessions/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/pool/admin/sessions/:id",
+        "openApiPath": "/pool/admin/sessions/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /pool/admin/sessions/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/tables",
+      "pageFile": "frontend/src/app/admin/[slug]/tables/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/restaurant/admin/tables",
+        "openApiPath": "/restaurant/admin/tables"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/admin/tables"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/tables",
+      "pageFile": "frontend/src/app/admin/[slug]/tables/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/restaurant/admin/tables/:id",
+        "openApiPath": "/restaurant/admin/tables/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /restaurant/admin/tables/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Integrations",
+      "pageRoute": "/admin/integrations/quickbooks",
+      "pageFile": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/integrations/quickbooks/:connectionId/accounts",
+        "openApiPath": "/integrations/quickbooks/{connectionId}/accounts"
+      },
+      "details": "No OpenAPI path matches shape: /integrations/quickbooks/{}/accounts"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Integrations",
+      "pageRoute": "/admin/integrations/quickbooks",
+      "pageFile": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/integrations/quickbooks/:connectionId/disconnect",
+        "openApiPath": "/integrations/quickbooks/{connectionId}/disconnect"
+      },
+      "details": "No OpenAPI path matches shape: /integrations/quickbooks/{}/disconnect"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Integrations",
+      "pageRoute": "/admin/integrations/quickbooks",
+      "pageFile": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/integrations/quickbooks/:connectionId/mappings",
+        "openApiPath": "/integrations/quickbooks/{connectionId}/mappings"
+      },
+      "details": "No OpenAPI path matches shape: /integrations/quickbooks/{}/mappings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Integrations",
+      "pageRoute": "/admin/integrations/quickbooks",
+      "pageFile": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/integrations/quickbooks/:connectionId/mappings",
+        "openApiPath": "/integrations/quickbooks/{connectionId}/mappings"
+      },
+      "details": "No OpenAPI path matches shape: /integrations/quickbooks/{}/mappings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Integrations",
+      "pageRoute": "/admin/integrations/quickbooks",
+      "pageFile": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "endpoint": {
+        "method": "PATCH",
+        "frontendTemplatePath": "/integrations/quickbooks/:connectionId/settings",
+        "openApiPath": "/integrations/quickbooks/{connectionId}/settings"
+      },
+      "details": "No OpenAPI path matches shape: /integrations/quickbooks/{}/settings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Integrations",
+      "pageRoute": "/admin/integrations/quickbooks",
+      "pageFile": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/integrations/quickbooks/:connectionId/sync",
+        "openApiPath": "/integrations/quickbooks/{connectionId}/sync"
+      },
+      "details": "No OpenAPI path matches shape: /integrations/quickbooks/{}/sync"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Integrations",
+      "pageRoute": "/admin/integrations/quickbooks",
+      "pageFile": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/integrations/quickbooks/:connectionId/sync/history",
+        "openApiPath": "/integrations/quickbooks/{connectionId}/sync/history"
+      },
+      "details": "No OpenAPI path matches shape: /integrations/quickbooks/{}/sync/history"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Integrations",
+      "pageRoute": "/admin/integrations/quickbooks",
+      "pageFile": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/integrations/quickbooks/connect",
+        "openApiPath": "/integrations/quickbooks/connect"
+      },
+      "details": "No OpenAPI path matches shape: /integrations/quickbooks/connect"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Integrations",
+      "pageRoute": "/admin/integrations/quickbooks",
+      "pageFile": "frontend/src/app/admin/integrations/quickbooks/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/integrations/quickbooks/status",
+        "openApiPath": "/integrations/quickbooks/status"
+      },
+      "details": "No OpenAPI path matches shape: /integrations/quickbooks/status"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Marketing & Loyalty & Codes",
+      "pageRoute": "/admin/giftcards",
+      "pageFile": "frontend/src/app/admin/giftcards/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/giftcards/admin",
+        "openApiPath": "/giftcards/admin"
+      },
+      "details": "No OpenAPI path matches shape: /giftcards/admin"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Marketing & Loyalty & Codes",
+      "pageRoute": "/admin/giftcards",
+      "pageFile": "frontend/src/app/admin/giftcards/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/giftcards/admin",
+        "openApiPath": "/giftcards/admin"
+      },
+      "details": "No OpenAPI path matches shape: /giftcards/admin"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Marketing & Loyalty & Codes",
+      "pageRoute": "/admin/giftcards",
+      "pageFile": "frontend/src/app/admin/giftcards/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/giftcards/admin/:cardId/disable",
+        "openApiPath": "/giftcards/admin/{cardId}/disable"
+      },
+      "details": "No OpenAPI path matches shape: /giftcards/admin/{}/disable"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Marketing & Loyalty & Codes",
+      "pageRoute": "/admin/giftcards",
+      "pageFile": "frontend/src/app/admin/giftcards/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/giftcards/admin/stats",
+        "openApiPath": "/giftcards/admin/stats"
+      },
+      "details": "No OpenAPI path matches shape: /giftcards/admin/stats"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Marketing & Loyalty & Codes",
+      "pageRoute": "/admin/loyalty",
+      "pageFile": "frontend/src/app/admin/loyalty/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/csrf-token",
+        "openApiPath": "/csrf-token"
+      },
+      "details": "No OpenAPI path matches shape: /csrf-token"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Marketing & Loyalty & Codes",
+      "pageRoute": "/admin/loyalty",
+      "pageFile": "frontend/src/app/admin/loyalty/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/loyalty/accounts/:id/adjust",
+        "openApiPath": "/loyalty/accounts/{id}/adjust"
+      },
+      "details": "No OpenAPI path matches shape: /loyalty/accounts/{}/adjust"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Misc",
+      "pageRoute": "/admin/channels",
+      "pageFile": "frontend/src/app/admin/channels/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/channels/connections/:channelId/sync/availability",
+        "openApiPath": "/channels/connections/{channelId}/sync/availability"
+      },
+      "details": "No OpenAPI path matches shape: /channels/connections/{}/sync/availability"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Misc",
+      "pageRoute": "/admin/customizations",
+      "pageFile": "frontend/src/app/admin/customizations/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/customizations/dual-write/stats",
+        "openApiPath": "/customizations/dual-write/stats"
+      },
+      "details": "No OpenAPI path matches shape: /customizations/dual-write/stats"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Misc",
+      "pageRoute": "/admin/customizations",
+      "pageFile": "frontend/src/app/admin/customizations/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/customizations/metrics",
+        "openApiPath": "/customizations/metrics"
+      },
+      "details": "No OpenAPI path matches shape: /customizations/metrics"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Misc",
+      "pageRoute": "/admin/customizations",
+      "pageFile": "frontend/src/app/admin/customizations/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/customizations/migrate",
+        "openApiPath": "/customizations/migrate"
+      },
+      "details": "No OpenAPI path matches shape: /customizations/migrate"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Misc",
+      "pageRoute": "/admin/kiosk",
+      "pageFile": "frontend/src/app/admin/kiosk/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/kiosk/devices/:deviceId",
+        "openApiPath": "/kiosk/devices/{deviceId}"
+      },
+      "details": "No OpenAPI path matches shape: /kiosk/devices/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Misc",
+      "pageRoute": "/admin/kiosk",
+      "pageFile": "frontend/src/app/admin/kiosk/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/kiosk/devices/:deviceId/maintenance",
+        "openApiPath": "/kiosk/devices/{deviceId}/maintenance"
+      },
+      "details": "No OpenAPI path matches shape: /kiosk/devices/{}/maintenance"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Misc",
+      "pageRoute": "/admin/kiosk",
+      "pageFile": "frontend/src/app/admin/kiosk/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/kiosk/devices/:propertyId",
+        "openApiPath": "/kiosk/devices/{propertyId}"
+      },
+      "details": "No OpenAPI path matches shape: /kiosk/devices/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Misc",
+      "pageRoute": "/admin/kiosk",
+      "pageFile": "frontend/src/app/admin/kiosk/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/kiosk/devices/property/:propertyId",
+        "openApiPath": "/kiosk/devices/property/{propertyId}"
+      },
+      "details": "No OpenAPI path matches shape: /kiosk/devices/property/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Misc",
+      "pageRoute": "/admin/kiosk",
+      "pageFile": "frontend/src/app/admin/kiosk/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/kiosk/key-stock/:kioskId/refill",
+        "openApiPath": "/kiosk/key-stock/{kioskId}/refill"
+      },
+      "details": "No OpenAPI path matches shape: /kiosk/key-stock/{}/refill"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Misc",
+      "pageRoute": "/admin/properties",
+      "pageFile": "frontend/src/app/admin/properties/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/multi-property/properties",
+        "openApiPath": "/multi-property/properties"
+      },
+      "details": "No OpenAPI path matches shape: /multi-property/properties"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Reports & Finance",
+      "pageRoute": "/admin/reports",
+      "pageFile": "frontend/src/app/admin/reports/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/reports/customers",
+        "openApiPath": "/admin/reports/customers"
+      },
+      "details": "No OpenAPI path matches shape: /admin/reports/customers"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Reports & Finance",
+      "pageRoute": "/admin/reports",
+      "pageFile": "frontend/src/app/admin/reports/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/reports/export",
+        "openApiPath": "/admin/reports/export"
+      },
+      "details": "No OpenAPI path matches shape: /admin/reports/export"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Reports & Finance",
+      "pageRoute": "/admin/reports",
+      "pageFile": "frontend/src/app/admin/reports/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/reports/occupancy",
+        "openApiPath": "/admin/reports/occupancy"
+      },
+      "details": "No OpenAPI path matches shape: /admin/reports/occupancy"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Reports & Finance",
+      "pageRoute": "/admin/reports",
+      "pageFile": "frontend/src/app/admin/reports/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/reports/overview",
+        "openApiPath": "/admin/reports/overview"
+      },
+      "details": "No OpenAPI path matches shape: /admin/reports/overview"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Reports & Finance",
+      "pageRoute": "/admin/reports/analytics",
+      "pageFile": "frontend/src/app/admin/reports/analytics/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/reports/export-comprehensive",
+        "openApiPath": "/reports/export-comprehensive"
+      },
+      "details": "No OpenAPI path matches shape: /reports/export-comprehensive"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Reports & Finance",
+      "pageRoute": "/admin/reports/scheduled",
+      "pageFile": "frontend/src/app/admin/reports/scheduled/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/reporting/scheduled/:id",
+        "openApiPath": "/reporting/scheduled/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /reporting/scheduled/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Reports & Finance",
+      "pageRoute": "/admin/reports/scheduled",
+      "pageFile": "frontend/src/app/admin/reports/scheduled/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/reporting/scheduled/:id",
+        "openApiPath": "/reporting/scheduled/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /reporting/scheduled/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Reports & Finance",
+      "pageRoute": "/admin/reports/scheduled",
+      "pageFile": "frontend/src/app/admin/reports/scheduled/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/reporting/scheduled/:id/run",
+        "openApiPath": "/reporting/scheduled/{id}/run"
+      },
+      "details": "No OpenAPI path matches shape: /reporting/scheduled/{}/run"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings",
+      "pageFile": "frontend/src/app/admin/settings/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/admin/settings",
+        "openApiPath": "/admin/settings"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/appearance",
+      "pageFile": "frontend/src/app/admin/settings/appearance/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/admin/settings",
+        "openApiPath": "/admin/settings"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/backups",
+      "pageFile": "frontend/src/app/admin/settings/backups/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/backups",
+        "openApiPath": "/admin/backups"
+      },
+      "details": "No OpenAPI path matches shape: /admin/backups"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/backups",
+      "pageFile": "frontend/src/app/admin/settings/backups/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/backups",
+        "openApiPath": "/admin/backups"
+      },
+      "details": "No OpenAPI path matches shape: /admin/backups"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/backups",
+      "pageFile": "frontend/src/app/admin/settings/backups/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/admin/backups/:id",
+        "openApiPath": "/admin/backups/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /admin/backups/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/backups",
+      "pageFile": "frontend/src/app/admin/settings/backups/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/backups/:id/download",
+        "openApiPath": "/admin/backups/{id}/download"
+      },
+      "details": "No OpenAPI path matches shape: /admin/backups/{}/download"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/backups",
+      "pageFile": "frontend/src/app/admin/settings/backups/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/backups/restore",
+        "openApiPath": "/admin/backups/restore"
+      },
+      "details": "No OpenAPI path matches shape: /admin/backups/restore"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/footer",
+      "pageFile": "frontend/src/app/admin/settings/footer/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/settings",
+        "openApiPath": "/admin/settings"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/footer",
+      "pageFile": "frontend/src/app/admin/settings/footer/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/admin/settings",
+        "openApiPath": "/admin/settings"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/homepage",
+      "pageFile": "frontend/src/app/admin/settings/homepage/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/settings",
+        "openApiPath": "/admin/settings"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/homepage",
+      "pageFile": "frontend/src/app/admin/settings/homepage/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/settings/homepage",
+        "openApiPath": "/admin/settings/homepage"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings/homepage"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/homepage",
+      "pageFile": "frontend/src/app/admin/settings/homepage/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/admin/settings/homepage",
+        "openApiPath": "/admin/settings/homepage"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings/homepage"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/homepage",
+      "pageFile": "frontend/src/app/admin/settings/homepage/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/uploads",
+        "openApiPath": "/admin/uploads"
+      },
+      "details": "No OpenAPI path matches shape: /admin/uploads"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/navbar",
+      "pageFile": "frontend/src/app/admin/settings/navbar/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/settings",
+        "openApiPath": "/admin/settings"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/navbar",
+      "pageFile": "frontend/src/app/admin/settings/navbar/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/admin/settings",
+        "openApiPath": "/admin/settings"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/notifications",
+      "pageFile": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/notifications",
+        "openApiPath": "/admin/notifications"
+      },
+      "details": "No OpenAPI path matches shape: /admin/notifications"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/notifications",
+      "pageFile": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/admin/notifications/:id",
+        "openApiPath": "/admin/notifications/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /admin/notifications/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/notifications",
+      "pageFile": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/notifications/broadcast",
+        "openApiPath": "/admin/notifications/broadcast"
+      },
+      "details": "No OpenAPI path matches shape: /admin/notifications/broadcast"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/notifications",
+      "pageFile": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/notifications/broadcasts",
+        "openApiPath": "/admin/notifications/broadcasts"
+      },
+      "details": "No OpenAPI path matches shape: /admin/notifications/broadcasts"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/notifications",
+      "pageFile": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/notifications/delete-multiple",
+        "openApiPath": "/admin/notifications/delete-multiple"
+      },
+      "details": "No OpenAPI path matches shape: /admin/notifications/delete-multiple"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/notifications",
+      "pageFile": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/notifications/templates",
+        "openApiPath": "/admin/notifications/templates"
+      },
+      "details": "No OpenAPI path matches shape: /admin/notifications/templates"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/notifications",
+      "pageFile": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/notifications/templates",
+        "openApiPath": "/admin/notifications/templates"
+      },
+      "details": "No OpenAPI path matches shape: /admin/notifications/templates"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/notifications",
+      "pageFile": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/admin/notifications/templates/:id",
+        "openApiPath": "/admin/notifications/templates/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /admin/notifications/templates/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/notifications",
+      "pageFile": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/admin/notifications/templates/:id",
+        "openApiPath": "/admin/notifications/templates/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /admin/notifications/templates/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/notifications",
+      "pageFile": "frontend/src/app/admin/settings/notifications/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/notifications/templates/:id/send",
+        "openApiPath": "/admin/notifications/templates/{id}/send"
+      },
+      "details": "No OpenAPI path matches shape: /admin/notifications/templates/{}/send"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/payments",
+      "pageFile": "frontend/src/app/admin/settings/payments/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/settings",
+        "openApiPath": "/admin/settings"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/payments",
+      "pageFile": "frontend/src/app/admin/settings/payments/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/admin/settings",
+        "openApiPath": "/admin/settings"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/tax",
+      "pageFile": "frontend/src/app/admin/settings/tax/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/settings/tax",
+        "openApiPath": "/admin/settings/tax"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings/tax"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/tax",
+      "pageFile": "frontend/src/app/admin/settings/tax/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/admin/settings/tax",
+        "openApiPath": "/admin/settings/tax"
+      },
+      "details": "No OpenAPI path matches shape: /admin/settings/tax"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/admin/translations/:table/:id",
+        "openApiPath": "/admin/translations/{table}/{id}"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/{}/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/translations/auto-translate",
+        "openApiPath": "/admin/translations/auto-translate"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/auto-translate"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/translations/batch-translate",
+        "openApiPath": "/admin/translations/batch-translate"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/batch-translate"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/translations/frontend/compare",
+        "openApiPath": "/admin/translations/frontend/compare"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/frontend/compare"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/translations/frontend/update",
+        "openApiPath": "/admin/translations/frontend/update"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/frontend/update"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/translations/languages",
+        "openApiPath": "/admin/translations/languages"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/languages"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/admin/translations/languages",
+        "openApiPath": "/admin/translations/languages"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/languages"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/admin/translations/languages/:code",
+        "openApiPath": "/admin/translations/languages/{code}"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/languages/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/admin/translations/languages/:code",
+        "openApiPath": "/admin/translations/languages/{code}"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/languages/{}"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/translations/missing",
+        "openApiPath": "/admin/translations/missing"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/missing"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/translations/stats",
+        "openApiPath": "/admin/translations/stats"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/stats"
+    },
+    {
+      "type": "MISSING_PATH",
+      "sector": "Settings",
+      "pageRoute": "/admin/settings/translations",
+      "pageFile": "frontend/src/app/admin/settings/translations/page.tsx",
+      "endpoint": {
+        "method": "GET",
+        "frontendTemplatePath": "/admin/translations/status",
+        "openApiPath": "/admin/translations/status"
+      },
+      "details": "No OpenAPI path matches shape: /admin/translations/status"
+    },
+    {
+      "type": "MISSING_METHOD",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/orders",
+      "pageFile": "frontend/src/app/admin/[slug]/orders/page.tsx",
+      "endpoint": {
+        "method": "PUT",
+        "frontendTemplatePath": "/restaurant/staff/orders/:orderId/status",
+        "openApiPath": "/restaurant/staff/orders/{orderId}/status"
+      },
+      "details": "OpenAPI has path(s) for shape /restaurant/staff/orders/{}/status but no PUT operation.",
+      "openApiCandidatePaths": [
+        "/restaurant/staff/orders/{id}/status"
+      ]
+    },
+    {
+      "type": "MISSING_METHOD",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/pricing",
+      "pageFile": "frontend/src/app/admin/[slug]/pricing/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/chalets/admin/price-rules",
+        "openApiPath": "/chalets/admin/price-rules"
+      },
+      "details": "OpenAPI has path(s) for shape /chalets/admin/price-rules but no POST operation.",
+      "openApiCandidatePaths": [
+        "/chalets/admin/price-rules"
+      ]
+    },
+    {
+      "type": "MISSING_METHOD",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/reservations",
+      "pageFile": "frontend/src/app/admin/[slug]/reservations/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/restaurant/reservations",
+        "openApiPath": "/restaurant/reservations"
+      },
+      "details": "OpenAPI has path(s) for shape /restaurant/reservations but no POST operation.",
+      "openApiCandidatePaths": [
+        "/restaurant/reservations"
+      ]
+    },
+    {
+      "type": "MISSING_METHOD",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/waitlist",
+      "pageFile": "frontend/src/app/admin/[slug]/waitlist/page.tsx",
+      "endpoint": {
+        "method": "PATCH",
+        "frontendTemplatePath": "/restaurant/waitlist/:id",
+        "openApiPath": "/restaurant/waitlist/{id}"
+      },
+      "details": "OpenAPI has path(s) for shape /restaurant/waitlist/{} but no PATCH operation.",
+      "openApiCandidatePaths": [
+        "/restaurant/waitlist/{id}"
+      ]
+    },
+    {
+      "type": "MISSING_METHOD",
+      "sector": "Marketing & Loyalty & Codes",
+      "pageRoute": "/admin/loyalty",
+      "pageFile": "frontend/src/app/admin/loyalty/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/loyalty/tiers",
+        "openApiPath": "/loyalty/tiers"
+      },
+      "details": "OpenAPI has path(s) for shape /loyalty/tiers but no POST operation.",
+      "openApiCandidatePaths": [
+        "/loyalty/tiers"
+      ]
+    },
+    {
+      "type": "MISSING_METHOD",
+      "sector": "Marketing & Loyalty & Codes",
+      "pageRoute": "/admin/loyalty",
+      "pageFile": "frontend/src/app/admin/loyalty/page.tsx",
+      "endpoint": {
+        "method": "DELETE",
+        "frontendTemplatePath": "/loyalty/tiers/:id",
+        "openApiPath": "/loyalty/tiers/{id}"
+      },
+      "details": "OpenAPI has path(s) for shape /loyalty/tiers/{} but no DELETE operation.",
+      "openApiCandidatePaths": [
+        "/loyalty/tiers/{tierId}"
+      ]
+    },
+    {
+      "type": "SECURITY_MISMATCH",
+      "sector": "Dynamic Module Admin",
+      "pageRoute": "/admin/[slug]/waitlist",
+      "pageFile": "frontend/src/app/admin/[slug]/waitlist/page.tsx",
+      "endpoint": {
+        "method": "POST",
+        "frontendTemplatePath": "/restaurant/waitlist",
+        "openApiPath": "/restaurant/waitlist"
+      },
+      "details": "OpenAPI operation exists at /restaurant/waitlist but has no security requirement.",
+      "matchedOpenApiPath": "/restaurant/waitlist"
+    }
+  ]
+}

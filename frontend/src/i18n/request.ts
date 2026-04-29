@@ -49,6 +49,12 @@ export default getRequestConfig(async ({locale}) => {
   // 2. In Production, layer dynamic translations from DB/API
   // This satisfies the requirement to serve dynamic translations at runtime
   if (process.env.ENABLE_DYNAMIC_TRANSLATIONS === 'true') {
+     // Skip dynamic translations during static generation build if using missing localhost backend
+     if (process.env.npm_lifecycle_event === 'build' && (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005').includes('localhost')) {
+        console.warn(`[Build Bypass] Skipping dynamic translation fetch for ${locale} during static generation`);
+        return { locale, messages };
+     }
+
      try {
        // We fetch all "published" translations for this locale
        // Using Next.js fetch cache tag 'translations' to allow revalidation on publish

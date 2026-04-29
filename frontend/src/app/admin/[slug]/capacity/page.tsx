@@ -45,9 +45,14 @@ export default function DynamicCapacityPage() {
   const fetchCapacity = useCallback(async () => {
     if (!currentModule) return;
     try {
-      const response = await api.get('/pool/capacity', { params: { moduleId: currentModule.id } });
-      if (response.data.data) {
-        setCapacity(response.data.data);
+      const response = await api.get('/pool/staff/capacity', { params: { moduleId: currentModule.id } });
+      const payload = response.data?.data;
+      if (payload) {
+        setCapacity(prev => ({
+          ...prev,
+          current_capacity: payload.currentOccupancy ?? prev.current_capacity,
+          max_capacity: payload.maxCapacity ?? prev.max_capacity,
+        }));
       }
     } catch (error) {
       // Capacity settings may not exist yet
@@ -66,7 +71,8 @@ export default function DynamicCapacityPage() {
     if (!currentModule) return;
     try {
       setSaving(true);
-      await api.post('/pool/admin/capacity', { ...capacity, module_id: currentModule.id });
+      // Persist max capacity in site_settings (pool category)
+      await api.put('/pool/admin/settings', { maxCapacity: capacity.max_capacity });
       toast.success(tc('success.saved'));
     } catch (error) {
       toast.error(tc('errors.failedToSave'));
@@ -78,8 +84,8 @@ export default function DynamicCapacityPage() {
   const resetCurrent = async () => {
     if (!currentModule) return;
     try {
-      await api.post('/pool/admin/capacity/reset', { module_id: currentModule.id });
-      setCapacity({ ...capacity, current_capacity: 0 });
+      await api.post('/pool/admin/reset-occupancy');
+      setCapacity(prev => ({ ...prev, current_capacity: 0 }));
       toast.success(tc('capacity.resetSuccess'));
     } catch (error) {
       toast.error(tc('errors.failedToSave'));
