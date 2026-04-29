@@ -201,6 +201,118 @@ test.describe('Admin functional - Dynamic module admin', () => {
     await page.goto('/admin/pool/capacity', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('button', { name: /refresh/i }).first()).toBeVisible();
+
+    // Reset occupancy triggers reset endpoint and sets site_settings.pool.currentOccupancy = 0
+    const waitReset = page.waitForResponse(
+      (r) =>
+        r.url().includes('/api/v1/pool/admin/reset-occupancy') && r.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: /reset/i }).first().click();
+    const resetResp = await waitReset;
+    expect(resetResp.ok()).toBeTruthy();
+
+    const poolSettings = await apiJson(page.request, { method: 'GET', path: '/pool/settings', token });
+    expect(poolSettings.status).toBe(200);
+    expect(Number(poolSettings.body?.data?.currentOccupancy ?? 0)).toBe(0);
+  });
+
+  test('DYN-15 menu_service: categories CRUD (API + UI render)', async ({ page, auth }) => {
+    const token = await auth.getApiToken('admin');
+    const restaurantModule = await ensureModuleBySlug(page, token, {
+      slug: 'restaurant',
+      name: 'Restaurant',
+      template_type: 'menu_service',
+    });
+
+    const name = `E2E Category ${Date.now()}`;
+    const created = await apiJson(page.request, {
+      method: 'POST',
+      path: '/restaurant/admin/categories',
+      token,
+      data: { name, description: 'e2e', moduleId: restaurantModule!.id },
+    });
+    expect([200, 201]).toContain(created.status);
+    const catId = created.body?.data?.id;
+    expect(typeof catId).toBe('string');
+
+    const updatedName = `${name} Updated`;
+    const updated = await apiJson(page.request, {
+      method: 'PUT',
+      path: `/restaurant/admin/categories/${catId}`,
+      token,
+      data: { name: updatedName, description: 'e2e2', moduleId: restaurantModule!.id },
+    });
+    expect([200, 204]).toContain(updated.status);
+
+    const list = await apiJson(page.request, {
+      method: 'GET',
+      path: '/restaurant/categories',
+      token,
+      params: { moduleId: restaurantModule!.id },
+    });
+    expect(list.status).toBe(200);
+    expect((list.body?.data || []).some((c: any) => c.id === catId && c.name === updatedName)).toBeTruthy();
+
+    await loginAdminUi(page, auth);
+    await page.goto('/admin/restaurant/categories', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(updatedName).first()).toBeVisible({ timeout: 15000 });
+
+    const del = await apiJson(page.request, {
+      method: 'DELETE',
+      path: `/restaurant/admin/categories/${catId}`,
+      token,
+    });
+    expect([200, 204]).toContain(del.status);
+  });
+
+  test('DYN-16 menu_service: modifiers create group+option then UI shows group (API + UI)', async ({ page, auth }) => {
+    const token = await auth.getApiToken('admin');
+    const restaurantModule = await ensureModuleBySlug(page, token, {
+      slug: 'restaurant',
+      name: 'Restaurant',
+      template_type: 'menu_service',
+    });
+
+    const groupName = `E2E Mod Group ${Date.now()}`;
+    const created = await apiJson(page.request, {
+      method: 'POST',
+      path: '/restaurant/modifiers',
+      token,
+      data: {
+        name: groupName,
+        minSelections: 0,
+        maxSelections: 1,
+        isRequired: false,
+        allowMultipleSame: false,
+        moduleId: restaurantModule!.id,
+        options: [{ name: 'Extra Sauce', price: 1.5, isAvailable: true, modifierType: 'add' }],
+      },
+    });
+    expect([200, 201]).toContain(created.status);
+    const groupId = created.body?.data?.id;
+    expect(typeof groupId).toBe('string');
+
+    const list = await apiJson(page.request, {
+      method: 'GET',
+      path: '/restaurant/modifiers',
+      token,
+      params: { moduleId: restaurantModule!.id },
+    });
+    expect(list.status).toBe(200);
+    expect((list.body?.data || []).some((g: any) => g.id === groupId)).toBeTruthy();
+
+    await loginAdminUi(page, auth);
+    await page.goto('/admin/restaurant/modifiers', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(groupName).first()).toBeVisible({ timeout: 15000 });
+
+    const del = await apiJson(page.request, {
+      method: 'DELETE',
+      path: `/restaurant/modifiers/${groupId}`,
+      token,
+    });
+    expect([200, 204]).toContain(del.status);
   });
 
   test('DYN-30 multi_day_booking: create price rule then UI shows count increase', async ({ page, auth }) => {

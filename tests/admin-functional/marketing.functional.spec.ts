@@ -35,6 +35,57 @@ test.describe('Admin functional - Marketing', () => {
     await expect(page.getByText(tierName).first()).toBeVisible({ timeout: 20000 });
   });
 
+  test('MKT-15 loyalty: adjust points updates account (API + GET)', async ({ page, auth }) => {
+    const token = await auth.getApiToken('admin');
+
+    // Create a user to enroll.
+    const email = `e2e.loyalty.${Date.now()}@test.com`;
+    const password = 'TestPass123!';
+    const user = await apiJson(page.request, {
+      method: 'POST',
+      path: '/admin/users',
+      token,
+      data: { email, password, full_name: 'Test Customer', role: 'customer' },
+    });
+    expect([200, 201]).toContain(user.status);
+    const userId = user.body?.data?.id;
+    expect(typeof userId).toBe('string');
+
+    // Enroll the *created customer* (the enroll endpoint operates on current user).
+    const loginResp = await page.request.post(
+      `${process.env.API_URL || 'http://localhost:3005'}/api/v1/auth/login`,
+      { data: { email, password } },
+    );
+    expect(loginResp.ok()).toBeTruthy();
+    const loginJson = await loginResp.json();
+    const customerToken = loginJson?.data?.tokens?.accessToken || loginJson?.data?.accessToken;
+    expect(typeof customerToken).toBe('string');
+
+    const enroll = await apiJson(page.request, {
+      method: 'POST',
+      path: '/loyalty/enroll',
+      token: customerToken,
+      data: {},
+    });
+    expect([200, 201]).toContain(enroll.status);
+
+    const adjust = await apiJson(page.request, {
+      method: 'POST',
+      path: '/loyalty/adjust',
+      token,
+      data: { userId, points: 25, reason: 'E2E adjustment' },
+    });
+    expect(adjust.status).toBe(200);
+
+    const acct = await apiJson(page.request, {
+      method: 'GET',
+      path: `/loyalty/accounts/${userId}`,
+      token,
+    });
+    expect(acct.status).toBe(200);
+    expect(typeof acct.body?.data?.total_points).not.toBe('undefined');
+  });
+
   test('MKT-20 coupons: create coupon then UI shows code', async ({ page, auth }) => {
     const token = await auth.getApiToken('admin');
 
