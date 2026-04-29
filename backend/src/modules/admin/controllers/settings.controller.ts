@@ -303,7 +303,6 @@ export const getHomepageSettings = asyncHandler(async (req: Request, res: Respon
 
 export const updateHomepageSettings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
-  const userId = (req as any).user?.id;
   const homepageData = req.body;
 
   const { error } = await supabase
@@ -312,7 +311,6 @@ export const updateHomepageSettings = asyncHandler(async (req: Request, res: Res
       key: 'homepage',
       value: homepageData,
       updated_at: new Date().toISOString(),
-      updated_by: userId,
     }, { onConflict: 'key' });
 
   if (error) {
@@ -323,7 +321,7 @@ export const updateHomepageSettings = asyncHandler(async (req: Request, res: Res
   emitToAll('settings.updated', { homepage: homepageData });
 
   await logActivity({
-    user_id: userId!,
+    user_id: (req.user as any)?.userId || 'system',
     action: 'UPDATE_SETTINGS',
     resource: 'settings:homepage',
     new_value: homepageData,
@@ -338,7 +336,7 @@ export const getTaxSettings = asyncHandler(async (req: Request, res: Response) =
   const { data, error } = await supabase
     .from('site_settings')
     .select('value')
-    .eq('key', 'tax')
+    .eq('key', 'tax_configuration')
     .single();
 
   if (error && error.code !== 'PGRST116') {
@@ -351,16 +349,14 @@ export const getTaxSettings = asyncHandler(async (req: Request, res: Response) =
 
 export const updateTaxSettings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
-  const userId = (req as any).user?.id;
   const taxData = req.body;
 
   const { error } = await supabase
     .from('site_settings')
     .upsert({
-      key: 'tax',
+      key: 'tax_configuration',
       value: taxData,
       updated_at: new Date().toISOString(),
-      updated_by: userId,
     }, { onConflict: 'key' });
 
   if (error) {
@@ -371,7 +367,7 @@ export const updateTaxSettings = asyncHandler(async (req: Request, res: Response
   emitToAll('settings.updated', { tax: taxData });
 
   await logActivity({
-    user_id: userId!,
+    user_id: (req.user as any)?.userId || 'system',
     action: 'UPDATE_SETTINGS',
     resource: 'settings:tax',
     new_value: taxData,

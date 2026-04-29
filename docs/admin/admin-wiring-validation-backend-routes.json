@@ -1,0 +1,71 @@
+{
+  "generatedAt": "2026-04-29T10:20:05.783Z",
+  "wiringMap": {
+    "path": "C:\\Alessandro\\Work\\Attempts to Code\\V2 Ecosystem\\v2-resort\\docs\\admin\\admin-wiring-map.json",
+    "inventoryCount": 54
+  },
+  "validation": {
+    "backendRouteScan": {
+      "appTs": "C:\\Alessandro\\Work\\Attempts to Code\\V2 Ecosystem\\v2-resort\\backend\\src\\app.ts",
+      "matching": "shapeNormalization: {id} and :id -> {}"
+    }
+  },
+  "sectorStats": {
+    "Core Shell": {
+      "totalEndpoints": 3,
+      "missingPaths": 0,
+      "missingMethods": 0
+    },
+    "Dynamic Module Admin": {
+      "totalEndpoints": 57,
+      "missingPaths": 0,
+      "missingMethods": 0
+    },
+    "Audit Logs": {
+      "totalEndpoints": 1,
+      "missingPaths": 0,
+      "missingMethods": 0
+    },
+    "Misc": {
+      "totalEndpoints": 24,
+      "missingPaths": 0,
+      "missingMethods": 0
+    },
+    "Marketing & Loyalty & Codes": {
+      "totalEndpoints": 20,
+      "missingPaths": 0,
+      "missingMethods": 0
+    },
+    "Operations": {
+      "totalEndpoints": 19,
+      "missingPaths": 0,
+      "missingMethods": 0
+    },
+    "Integrations": {
+      "totalEndpoints": 9,
+      "missingPaths": 0,
+      "missingMethods": 0
+    },
+    "Reports & Finance": {
+      "totalEndpoints": 12,
+      "missingPaths": 0,
+      "missingMethods": 0
+    },
+    "Reviews": {
+      "totalEndpoints": 4,
+      "missingPaths": 0,
+      "missingMethods": 0
+    },
+    "Settings": {
+      "totalEndpoints": 43,
+      "missingPaths": 0,
+      "missingMethods": 0
+    },
+    "Users": {
+      "totalEndpoints": 12,
+      "missingPaths": 0,
+      "missingMethods": 0
+    }
+  },
+  "issues": []
+}

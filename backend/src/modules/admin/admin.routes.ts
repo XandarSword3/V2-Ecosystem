@@ -88,10 +88,10 @@ router.post('/uploads', authorizeManager, rateLimits.expensive, uploadController
 router.delete('/uploads/:path(*)', authorizeManager, uploadController.deleteFile);
 router.get('/branding', authorizeManager, uploadController.getBranding);
 
-// Audit logs (using refactored controller) - SUPER ADMIN ONLY
-router.get('/audit-logs', authorize('super_admin'), auditController.getAuditLogs);
-router.get('/audit-logs/:resource', authorize('super_admin'), auditController.getAuditLogsByResource);
-router.get('/audit-logs/:resource/:resourceId', authorize('super_admin'), auditController.getAuditLogsByResource);
+// Audit logs (using refactored controller) - ADMIN + SUPER ADMIN
+router.get('/audit-logs', authorize('admin', 'super_admin'), auditController.getAuditLogs);
+router.get('/audit-logs/:resource', authorize('admin', 'super_admin'), auditController.getAuditLogsByResource);
+router.get('/audit-logs/:resource/:resourceId', authorize('admin', 'super_admin'), auditController.getAuditLogsByResource);
 
 // Backups (rate limited - expensive operations) - SUPER ADMIN ONLY
 router.get('/backups', authorize('super_admin'), backupsController.getBackups);
