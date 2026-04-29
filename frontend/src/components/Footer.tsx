@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings-context';
 import { usePathname } from 'next/navigation';
+import { Container } from '@/components/layout/Container';
 
 export default function Footer() {
     const pathname = usePathname();
@@ -168,7 +169,7 @@ export default function Footer() {
                 <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-secondary-500/10 rounded-full blur-3xl" />
             </div>
 
-            <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Container as="div" className="relative">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
                     {/* Brand Column */}
                     <motion.div
@@ -309,7 +310,7 @@ export default function Footer() {
                         </div>
                     </div>
                 </div>
-            </div>
+            </Container>
         </footer>
     );
 }

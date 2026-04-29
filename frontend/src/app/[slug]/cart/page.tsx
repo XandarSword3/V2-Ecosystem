@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { PaymentDiscounts } from '@/components/customer/PaymentDiscounts';
 import StripePayment from '@/components/payments/StripePayment';
+import { Container } from '@/components/layout/Container';
 
 export default function ModuleCartPage() {
   const t = useTranslations('common');
@@ -299,7 +300,7 @@ export default function ModuleCartPage() {
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-br from-rose-200/40 to-pink-200/40 dark:from-rose-900/10 dark:to-pink-900/10 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 py-8">
+      <Container as="div" className="relative py-8">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <Link href={`/${slug}`} className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors mb-4">
@@ -863,7 +864,7 @@ export default function ModuleCartPage() {
             </motion.div>
           </div>
         </div>
-      </div>
+      </Container>
 
       {/* Stripe Payment Modal */}
       <AnimatePresence>

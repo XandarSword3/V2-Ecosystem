@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Shield, Database, Lock, Cookie, UserCheck, Users, Mail, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useSiteSettings } from '@/lib/settings-context';
+import { Container } from '@/components/layout/Container';
 
 export default function PrivacyPage() {
   const t = useTranslations('legal.privacy');
@@ -20,10 +21,10 @@ export default function PrivacyPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-gradient-to-r from-amber-600 to-amber-700 py-16">
-        <div className="container mx-auto px-4">
+        <Container as="div">
           <Link 
             href="/"
             className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
@@ -51,11 +52,11 @@ export default function PrivacyPage() {
               {t('lastUpdated')}: January 2025
             </p>
           </motion.div>
-        </div>
+        </Container>
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-12">
+      <Container as="div" className="py-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {settings.privacyPolicy ? (
             <motion.div
@@ -111,15 +112,15 @@ export default function PrivacyPage() {
               {t('contactUs')}
             </p>
             <a 
-              href="mailto:privacy@ironparadisegym.com"
+              href={`mailto:${settings.email || 'privacy@example.com'}`}
               className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition-colors font-medium"
             >
               <Mail className="w-5 h-5" />
-              privacy@ironparadisegym.com
+              {settings.email || 'privacy@example.com'}
             </a>
           </motion.div>
         </div>
-      </div>
+      </Container>
     </div>
   );
 }

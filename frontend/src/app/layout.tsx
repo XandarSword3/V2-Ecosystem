@@ -154,13 +154,13 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
-      <body className={`${isRtl ? 'font-arabic' : 'font-sans'} bg-cms-background transition-colors duration-300`}>
+      <body
+        className={`${isRtl ? 'font-arabic' : 'font-sans'} bg-cms-background transition-colors duration-300 overflow-x-hidden min-h-dvh`}
+      >
         <Providers>
           <Header />
-          <main>
-            <PageTransition>
-              {children}
-            </PageTransition>
+          <main className="min-h-[60vh] overflow-x-clip">
+            <PageTransition>{children}</PageTransition>
           </main>
           <Footer />
           <Toaster position={isRtl ? 'top-left' : 'top-right'} richColors />
