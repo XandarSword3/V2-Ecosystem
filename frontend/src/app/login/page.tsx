@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Mail, Lock, Loader2, Eye, EyeOff, AlertCircle, Shield, KeyRound } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { Container } from '@/components/layout/Container';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
 
@@ -109,24 +110,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
-      >
+    <div className="min-h-screen bg-background flex items-center justify-center py-12">
+      <Container size="sm" className="w-full">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-primary-600 font-bold text-xl">V2</span>
+            <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg">
+              <span className="text-primary-foreground font-bold text-xl">V2</span>
             </div>
-            <span className="text-2xl font-bold text-white">Resort</span>
+            <span className="text-2xl font-bold text-foreground">Resort</span>
           </Link>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-8">
+        <div className="bg-card text-card-foreground rounded-2xl shadow-2xl p-8 border border-border">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
               {tAuth('welcomeBack')}
@@ -407,7 +405,8 @@ export default function LoginPage() {
             ← {tCommon('backToHome')}
           </Link>
         </div>
-      </motion.div>
+        </motion.div>
+      </Container>
     </div>
   );
 }

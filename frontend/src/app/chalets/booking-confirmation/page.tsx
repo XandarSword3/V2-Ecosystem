@@ -152,7 +152,7 @@ function BookingConfirmationContent() {
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                 <Calendar className="w-6 h-6 text-blue-600" />
               </div>
-              <div className="flex-1 grid grid-cols-2 gap-4">
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-slate-500">{t('checkIn')}</p>
                   <p className="font-semibold">{formatDate(booking.check_in_date)}</p>

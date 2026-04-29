@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
+import { Container } from '@/components/layout/Container';
 
 interface ContactForm {
   name: string;
@@ -91,7 +92,7 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <Container as="div" className="py-16">
         <motion.div
           initial="hidden"
           animate="visible"
@@ -279,7 +280,7 @@ export default function ContactPage() {
             </motion.div>
           </div>
         </motion.div>
-      </div>
+      </Container>
     </div>
   );
 }

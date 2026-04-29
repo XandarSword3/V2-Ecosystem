@@ -26,6 +26,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { cn } from '@/lib/cn';
 import { useTerminology } from '@/hooks/useTerminology';
 import { useSiteSettings } from '@/lib/settings-context';
+import { Container } from './Container';
 
 // ... inside Header component
 export default function Header() {
@@ -226,7 +227,7 @@ export default function Header() {
       )}
       role="banner"
     >
-      <div className="container mx-auto px-4">
+      <Container as="div">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 group" aria-label={`${settings.resortName || t('home')} Home`}>
@@ -277,7 +278,7 @@ export default function Header() {
           </nav>
 
           {/* Right Side Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Cart Button - only show after mount to prevent hydration mismatch */}
             {mounted && navConfig.showCart && cartCount > 0 && (
               <Link href="/cart">
@@ -300,9 +301,11 @@ export default function Header() {
               </Link>
             )}
 
-            {navConfig.showCurrencySwitcher && <CurrencySwitcher />}
-            {navConfig.showLanguageSwitcher && <LanguageSwitcher />}
-            {navConfig.showThemeToggle && <ThemeToggle />}
+            <div className="hidden sm:flex items-center gap-2">
+              {navConfig.showCurrencySwitcher && <CurrencySwitcher />}
+              {navConfig.showLanguageSwitcher && <LanguageSwitcher />}
+              {navConfig.showThemeToggle && <ThemeToggle />}
+            </div>
 
             {/* Settings Button */}
             {navConfig.showUserPreferences && (
@@ -495,7 +498,7 @@ export default function Header() {
             </motion.nav>
           )}
         </AnimatePresence>
-      </div>
+      </Container>
 
       {/* User Preferences Modal */}
       <UserPreferencesModal
