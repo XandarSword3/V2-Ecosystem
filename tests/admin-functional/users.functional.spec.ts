@@ -75,5 +75,46 @@ test.describe('Admin functional - Users', () => {
     await expect(page.getByRole('heading', { name: /roles/i })).toBeVisible();
     await expect(page.getByText(roleName).first()).toBeVisible({ timeout: 20000 });
   });
+
+  test('USR-30 role assignment persists for a user (API + UI)', async ({ page, auth }) => {
+    const token = await auth.getApiToken('admin');
+
+    // Create a user we can assign roles to.
+    const email = `e2e.assign.${Date.now()}@test.com`;
+    const createUser = await apiJson(page.request, {
+      method: 'POST',
+      path: '/admin/users',
+      token,
+      data: { email, password: 'TestPass123!', full_name: 'Test Customer', role: 'customer' },
+    });
+    expect([200, 201]).toContain(createUser.status);
+    const userId = createUser.body?.data?.id;
+    expect(typeof userId).toBe('string');
+
+    // Ensure there is at least one role to assign.
+    const roles = await apiJson(page.request, { method: 'GET', path: '/admin/roles', token });
+    expect(roles.status).toBe(200);
+    const roleId = roles.body?.data?.[0]?.id;
+    expect(typeof roleId).toBe('string');
+
+    const assign = await apiJson(page.request, {
+      method: 'PUT',
+      path: `/admin/users/${userId}/roles`,
+      token,
+      data: { roleIds: [roleId] },
+    });
+    expect([200, 204]).toContain(assign.status);
+
+    const getUser = await apiJson(page.request, { method: 'GET', path: `/admin/users/${userId}`, token });
+    expect(getUser.status).toBe(200);
+    const rolesList = getUser.body?.data?.roles || [];
+    expect(Array.isArray(rolesList)).toBeTruthy();
+    expect(rolesList.length).toBeGreaterThan(0);
+
+    await loginAdminUi(page, auth);
+    await page.goto(`/admin/users/${userId}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(email).first()).toBeVisible();
+  });
 });
 
