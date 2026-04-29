@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { Inter, Noto_Sans_Arabic } from 'next/font/google';
 import '../styles/globals.css';
 import { Providers } from './providers';
 import { Toaster } from 'sonner';
@@ -10,33 +9,38 @@ import Footer from '@/components/Footer';
 import { PageTransition } from '@/components/effects/PageTransition';
 import { JsonLd, generateResortSchema } from '@/lib/structured-data';
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-});
-
-const notoArabic = Noto_Sans_Arabic({
-  subsets: ['arabic'],
-  variable: '--font-arabic',
-});
-
 const getBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   return 'http://localhost:3005';
 };
 
+const fallbackSettings = {
+  resortName: 'Iron Paradise Gym',
+  description: 'Premier resort platform.'
+};
+
+const isLocalApiUrl = (url: string) => /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?/i.test(url);
+
 async function getSiteSettings() {
+  const baseUrl = getBaseUrl();
+  const isLocalApi = isLocalApiUrl(baseUrl);
+  const shouldLogError = process.env.NODE_ENV === 'development' || !isLocalApi;
+
   try {
-    const res = await fetch(`${getBaseUrl()}/api/settings`, { next: { revalidate: 60 } });
+    // Skip fetch when the API points to localhost.
+    if (isLocalApi) {
+      return fallbackSettings;
+    }
+
+    const res = await fetch(`${baseUrl}/api/settings`, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error('Failed to fetch settings');
     const data = await res.json();
     return data.data || data;
   } catch (error) {
-    console.error('Metadata fetch error:', error);
-    return {
-      resortName: 'Iron Paradise Gym',
-      description: 'Premier resort platform.'
-    };
+    if (shouldLogError) {
+      console.error('Metadata fetch error:', error);
+    }
+    return fallbackSettings;
   }
 }
 
@@ -150,7 +154,7 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
-      <body className={`${inter.variable} ${notoArabic.variable} ${isRtl ? 'font-arabic' : 'font-sans'} bg-cms-background transition-colors duration-300`}>
+      <body className={`${isRtl ? 'font-arabic' : 'font-sans'} bg-cms-background transition-colors duration-300`}>
         <Providers>
           <Header />
           <main>

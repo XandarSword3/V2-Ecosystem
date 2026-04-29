@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api } from '@/lib/api';
+import axios from 'axios';
+import { api, API_BASE_URL } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -500,8 +501,11 @@ export default function LoyaltyAdminPage() {
                             let csrfToken = csrfCookie ? csrfCookie[2] : undefined;
                             if (!csrfToken) {
                               // Fetch new CSRF token
-                              const res = await api.get('/csrf-token');
-                              csrfToken = res.data.csrfToken;
+                              const res = await axios.get(
+                                `${API_BASE_URL.replace('/api/v1', '')}/api/csrf-token`,
+                                { withCredentials: true }
+                              );
+                              csrfToken = res.data?.csrfToken;
                             }
                             await api.delete(`/loyalty/tiers/${tier.id}`, {
                               headers: { 'X-CSRF-Token': csrfToken },
