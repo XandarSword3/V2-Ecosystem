@@ -8,6 +8,32 @@
 }
 
 /* ========================================
+   LAYOUT TOKENS (mobile-first defaults)
+   Keep these as CSS variables so they remain white-label friendly
+   and can be tuned centrally without touching page code.
+   ======================================== */
+:root {
+  /* Horizontal gutter used by `Container` */
+  --layout-page-x: 1rem; /* 16px */
+  /* Vertical section spacing used by `Section` */
+  --layout-section-y: 3rem; /* 48px */
+}
+
+@media (min-width: 640px) {
+  :root {
+    --layout-page-x: 1.5rem; /* 24px */
+    --layout-section-y: 4rem; /* 64px */
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --layout-page-x: 2rem; /* 32px */
+    --layout-section-y: 5rem; /* 80px */
+  }
+}
+
+/* ========================================
    CMS THEME UTILITY CLASSES
    These classes use CSS variables set by ThemeInjector
    so they respond to CMS theme changes
@@ -321,6 +347,21 @@ body {
     rgb(var(--background-end-rgb))
   );
   min-height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer base {

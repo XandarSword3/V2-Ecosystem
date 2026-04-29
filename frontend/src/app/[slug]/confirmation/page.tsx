@@ -11,6 +11,8 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Container } from '@/components/layout/Container';
+import { Section } from '@/components/layout/Section';
 import {
   CheckCircle2,
   Calendar,
@@ -161,8 +163,9 @@ function ConfirmationContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 via-white to-white dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-12">
-      <div className="max-w-2xl mx-auto px-4">
+    <div className="min-h-screen bg-background">
+      <Section className="py-12">
+        <Container size="sm">
         {/* Success Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -473,7 +476,8 @@ function ConfirmationContent() {
             </Button>
           </Link>
         </div>
-      </div>
+        </Container>
+      </Section>
     </div>
   );
 }
@@ -481,7 +485,7 @@ function ConfirmationContent() {
 export default function UnifiedConfirmationPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary-50 to-white dark:from-slate-900 dark:to-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
       </div>
     }>

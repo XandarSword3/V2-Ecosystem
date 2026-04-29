@@ -439,7 +439,7 @@ export default function ChaletDetailPage() {
                 )}
 
                 {/* Pricing */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <p className="text-sm text-slate-500">{t('weekdayRate')}</p>
                     <p className="text-2xl font-bold text-green-600">
