@@ -56,21 +56,38 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
 
 const channelLogos: Record<string, string> = {
   booking_com: '🅱️',
+  booking: '🅱️',
   expedia: '🔵',
   airbnb: '🏠',
   agoda: '🟣',
   trip_com: '✈️',
-  custom: '🔗'
+  custom: '🔗',
 };
 
 const channelNames: Record<string, string> = {
   booking_com: 'Booking.com',
+  booking: 'Booking.com',
   expedia: 'Expedia',
   airbnb: 'Airbnb',
   agoda: 'Agoda',
   trip_com: 'Trip.com',
-  custom: 'Custom Channel'
+  custom: 'Custom Channel',
 };
+
+const CHANNEL_CODE_MAP: Record<string, string> = {
+  booking_com: 'BOOKING',
+  expedia: 'EXPEDIA',
+  airbnb: 'AIRBNB',
+  agoda: 'AGODA',
+  trip_com: 'TRIPADVISOR', // backend supports TRIPADVISOR; keep UI label as Trip.com
+};
+
+function normalizeChannelType(code: unknown): string {
+  const normalized = String(code || '').toLowerCase();
+  if (normalized === 'booking') return 'booking_com';
+  if (normalized === 'tripadvisor') return 'trip_com';
+  return normalized || 'custom';
+}
 
 const statusColors: Record<string, string> = {
   connected: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
@@ -153,8 +170,8 @@ export default function ChannelManagerPage() {
         // Transform backend data to frontend format
         return (data.connections || []).map((conn: any) => ({
           id: conn.id,
-          name: channelNames[conn.channel_code?.toLowerCase()] || conn.channel_name,
-          type: conn.channel_code?.toLowerCase() || 'custom',
+          name: channelNames[normalizeChannelType(conn.channel_code)] || conn.channel_name,
+          type: normalizeChannelType(conn.channel_code),
           status: conn.status === 'active' ? 'connected' : conn.status,
           last_sync: conn.last_sync_at,
           sync_errors: conn.error_count,
@@ -213,7 +230,7 @@ export default function ChannelManagerPage() {
     mutationFn: async (data: { type: string; hotelId: string; apiKey: string }) => {
       const propertyId = getPropertyId();
       const res = await api.post(`/channels/properties/${propertyId}/connections`, {
-        channel_code: data.type.toUpperCase(),
+        channel_code: (CHANNEL_CODE_MAP[data.type] || data.type).toUpperCase(),
         channel_name: channelNames[data.type] || data.type,
         hotel_code: data.hotelId,
         api_key: data.apiKey,

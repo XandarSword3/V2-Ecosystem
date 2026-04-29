@@ -1,0 +1,37 @@
+{
+  "cookies": [
+    {
+      "name": "csrf-token",
+      "value": "d6bb836bb88447dd0a5cbd1245d0071225a9bd694b9f1a3385c8d5a2e607d571",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1777545600,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "accessToken",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJhNDdjMzQwOC00MmI4LTQ1MWItOTA5OS03Yzk1YTRjY2RjYmMiLCJlbWFpbCI6ImFkbWluQHYycmVzb3J0LmNvbSIsInJvbGVzIjpbInN1cGVyX2FkbWluIl0sInRva2VuVmVyc2lvbiI6MCwiaWF0IjoxNzc3NDU5MTk5LCJleHAiOjE3NzgwNjM5OTl9.wqinOJm4jYMAw_wTSpR1_V3Z1okVNHLVjceZRfr0QWg"
+        },
+        {
+          "name": "refreshToken",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJhNDdjMzQwOC00MmI4LTQ1MWItOTA5OS03Yzk1YTRjY2RjYmMiLCJ0eXBlIjoicmVmcmVzaCIsInRva2VuVmVyc2lvbiI6MCwiaWF0IjoxNzc3NDU5MTk5LCJleHAiOjE3ODAwNTExOTl9.oPK6K5VaXGgsT0eI1joFuttqeApje644BksQ9XScNEQ"
+        },
+        {
+          "name": "user",
+          "value": "{\"id\":\"a47c3408-42b8-451b-9099-7c95a4ccdcbc\",\"email\":\"admin@v2resort.com\",\"fullName\":\"System Administrator\",\"profileImageUrl\":null,\"preferredLanguage\":\"en\",\"roles\":[\"super_admin\"]}"
+        },
+        {
+          "name": "v2-resort-theme",
+          "value": "luxury"
+        }
+      ]
+    }
+  ]
+}

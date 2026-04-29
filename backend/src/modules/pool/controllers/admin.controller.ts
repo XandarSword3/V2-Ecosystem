@@ -41,15 +41,20 @@ export const getCurrentCapacity = asyncHandler(async (req: Request, res: Respons
       0
     );
 
-    // Get max capacity from settings
-    const { data: settings } = await supabase
+    // Get max capacity from site settings.
+    // Canonical schema: site_settings(key TEXT, value JSONB).
+    // Pool settings are stored under key='pool' (JSON object).
+    const { data: poolSettings } = await supabase
       .from('site_settings')
       .select('value')
-      .eq('key', 'maxCapacity')
-      .eq('category', 'pool')
-      .single();
+      .eq('key', 'pool')
+      .maybeSingle();
 
-    const maxCapacity = parseInt(settings?.value || '100', 10);
+    const maxCapacityRaw =
+      (poolSettings?.value && typeof poolSettings.value === 'object'
+        ? (poolSettings.value as any).maxCapacity
+        : undefined) ?? '100';
+    const maxCapacity = parseInt(String(maxCapacityRaw), 10);
 
     res.json({
       success: true,
@@ -107,17 +112,13 @@ export const getDailyReport = asyncHandler(async (req: Request, res: Response) =
 export const getPoolSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
-    const { data: settings, error } = await supabase
+    const { data: row, error } = await supabase
       .from('site_settings')
-      .select('*')
-      .eq('category', 'pool');
+      .select('value')
+      .eq('key', 'pool')
+      .maybeSingle();
 
     if (error) throw error;
-
-    const settingsObj: Record<string, string> = {};
-    (settings || []).forEach((s: { key: string; value: string }) => {
-      settingsObj[s.key] = s.value;
-    });
 
     const defaultSettings = {
       maxCapacity: '100',
@@ -125,7 +126,7 @@ export const getPoolSettings = asyncHandler(async (req: Request, res: Response) 
       childPrice: '10.00',
       operatingHours: 'Open 8:00 AM - 8:00 PM',
       isOpen: 'true',
-      ...settingsObj,
+      ...(row?.value && typeof row.value === 'object' ? (row.value as Record<string, unknown>) : {}),
     };
 
     res.json({ success: true, data: defaultSettings });
@@ -136,21 +137,27 @@ export const getPoolSettings = asyncHandler(async (req: Request, res: Response) 
  */
 export const updatePoolSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-    const settings = req.body;
+    const settingsPatch = req.body || {};
 
-    for (const [key, value] of Object.entries(settings)) {
-      await supabase
-        .from('site_settings')
-        .upsert(
-          {
-            key,
-            value: String(value),
-            category: 'pool',
-            updated_at: new Date().toISOString()
-          },
-          { onConflict: 'key,category' }
-        );
-    }
+    const { data: existing, error: existingError } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'pool')
+      .maybeSingle();
+    if (existingError) throw existingError;
+
+    const prev = existing?.value && typeof existing.value === 'object' ? (existing.value as Record<string, unknown>) : {};
+    const next = { ...prev, ...settingsPatch };
+
+    const { error } = await supabase.from('site_settings').upsert(
+      {
+        key: 'pool',
+        value: next,
+        updated_at: new Date().toISOString(),
+      } as any,
+      { onConflict: 'key' }
+    );
+    if (error) throw error;
 
     res.json({ success: true, message: 'Pool settings updated' });
 });
@@ -161,17 +168,25 @@ export const updatePoolSettings = asyncHandler(async (req: Request, res: Respons
 export const resetOccupancy = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
-    await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('site_settings')
-      .upsert(
-        {
-          key: 'current_occupancy',
-          value: '0',
-          category: 'pool',
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: 'key,category' }
-      );
+      .select('value')
+      .eq('key', 'pool')
+      .maybeSingle();
+    if (existingError) throw existingError;
+
+    const prev = existing?.value && typeof existing.value === 'object' ? (existing.value as Record<string, unknown>) : {};
+    const next = { ...prev, currentOccupancy: 0 };
+
+    const { error } = await supabase.from('site_settings').upsert(
+      {
+        key: 'pool',
+        value: next,
+        updated_at: new Date().toISOString(),
+      } as any,
+      { onConflict: 'key' }
+    );
+    if (error) throw error;
 
     emitToUnit('pool', 'pool:occupancy:reset', { currentOccupancy: 0 });
 
