@@ -6,7 +6,8 @@ import { defaultLocale, type Locale } from '@/i18n';
 
 import Header from '@/components/layout/Header';
 import Footer from '@/components/Footer';
-import { PageTransition } from '@/components/effects/PageTransition';
+import { ModuleTransition } from '@/components/effects/ModuleTransition';
+import { LoadingScreenWrapper } from '@/components/effects/LoadingScreen';
 import { JsonLd, generateResortSchema } from '@/lib/structured-data';
 
 const getBaseUrl = () => {
@@ -158,12 +159,14 @@ export default async function RootLayout({
         className={`${isRtl ? 'font-arabic' : 'font-sans'} bg-cms-background transition-colors duration-300 overflow-x-hidden min-h-dvh`}
       >
         <Providers>
-          <Header />
-          <main className="min-h-[60vh] overflow-x-clip">
-            <PageTransition>{children}</PageTransition>
-          </main>
-          <Footer />
-          <Toaster position={isRtl ? 'top-left' : 'top-right'} richColors />
+          <LoadingScreenWrapper minDuration={2000}>
+            <Header />
+            <main className="min-h-[60vh] overflow-x-clip">
+              <ModuleTransition>{children}</ModuleTransition>
+            </main>
+            <Footer />
+            <Toaster position={isRtl ? 'top-left' : 'top-right'} richColors />
+          </LoadingScreenWrapper>
         </Providers>
       </body>
     </html>
