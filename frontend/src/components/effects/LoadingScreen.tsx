@@ -600,8 +600,13 @@ function LoadingScreenContent() {
       }}
       transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
     >
-      {/* Animated gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900" />
+      {/* Animated gradient background - using CSS variables for white-label */}
+      <div 
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 85%, black) 50%, color-mix(in srgb, var(--color-primary) 70%, black) 100%)',
+        }}
+      />
 
       {/* Mesh gradient overlay */}
       <div 
@@ -615,8 +620,8 @@ function LoadingScreenContent() {
         }}
       />
 
-      {/* Floating particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {/* Floating particles - hidden for reduced motion */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none motion-reduce:hidden">
         {particles.map((p) => (
           <Particle key={p.id} {...p} />
         ))}
@@ -661,16 +666,16 @@ function LoadingScreenContent() {
             damping: 15,
           }}
         >
-          {/* Rotating rings */}
-          <div className="absolute inset-0 flex items-center justify-center">
+          {/* Rotating rings - static for reduced motion */}
+          <div className="absolute inset-0 flex items-center justify-center motion-reduce:hidden">
             <LogoRing delay={0} scale={1.3} />
             <LogoRing delay={0.5} scale={1.5} reverse />
             <LogoRing delay={1} scale={1.7} />
           </div>
 
-          {/* Glow effect */}
+          {/* Glow effect - static for reduced motion */}
           <motion.div
-            className="absolute inset-0 rounded-full"
+            className="absolute inset-0 rounded-full motion-safe:animate-pulse"
             style={{
               background: 'radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%)',
               transform: 'scale(2)',
@@ -801,8 +806,8 @@ function LoadingScreenContent() {
         </motion.div>
       </div>
 
-      {/* Bottom wave decoration */}
-      <div className="absolute bottom-0 left-0 right-0">
+      {/* Bottom wave decoration - hidden for reduced motion */}
+      <div className="absolute bottom-0 left-0 right-0 motion-reduce:hidden">
         <svg
           className="w-full h-32 md:h-40"
           viewBox="0 0 1440 160"

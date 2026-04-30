@@ -207,17 +207,15 @@ export default function HomePage() {
         >
           {/* Floating decorative orbs - only show if no background image */}
           {!currentSlide.imageUrl && [
-            { size: 300, x: '10%', y: '20%', delay: 0 },
-            { size: 200, x: '80%', y: '30%', delay: 1 },
-            { size: 150, x: '20%', y: '70%', delay: 2 },
-            { size: 250, x: '70%', y: '75%', delay: 0.5 },
+            { size: 'w-48 sm:w-64 lg:w-80', x: '10%', y: '20%', delay: 0 },
+            { size: 'w-32 sm:w-48 lg:w-64', x: '80%', y: '30%', delay: 1 },
+            { size: 'w-24 sm:w-32 lg:w-48', x: '20%', y: '70%', delay: 2 },
+            { size: 'w-40 sm:w-56 lg:w-72', x: '70%', y: '75%', delay: 0.5 },
           ].map((orb, i) => (
             <motion.div
               key={i}
-              className="absolute rounded-full"
+              className={`absolute rounded-full ${orb.size}`}
               style={{
-                width: orb.size,
-                height: orb.size,
                 left: orb.x,
                 top: orb.y,
                 background: `radial-gradient(circle, var(--color-primary)20 0%, transparent 70%)`,
@@ -237,14 +235,14 @@ export default function HomePage() {
         </motion.div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          {/* Weather Widget - Top Right Corner */}
-          <div className="absolute top-4 right-4 z-20">
+          {/* Weather Widget - Below hero text on mobile, top right on desktop */}
+          <div className="hidden sm:block absolute top-4 right-4 z-20">
             <WeatherWidget variant="compact" />
           </div>
 
           {/* Slide indicators */}
           {heroSlides.length > 1 && (
-            <div className="absolute bottom-28 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+            <div className="absolute bottom-20 sm:bottom-28 left-1/2 -translate-x-1/2 flex gap-2 z-20">
               {heroSlides.map((_, idx) => (
                 <button
                   key={idx}
@@ -287,17 +285,17 @@ export default function HomePage() {
               exit={{ opacity: 0, y: -30 }}
               transition={{ duration: 0.5 }}
             >
-              <h1 className={`text-5xl md:text-7xl lg:text-8xl font-bold mb-6 tracking-tight ${currentSlide.imageUrl ? 'text-white drop-shadow-lg' : 'text-slate-900 dark:text-white'
+              <h1 className={`text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-6 tracking-tight ${currentSlide.imageUrl ? 'text-white drop-shadow-lg' : 'text-slate-900 dark:text-white'
                 }`}>
                 {/* Single CMS-driven title from Homepage Hero Config */}
                 {currentSlide.imageUrl ? (
-                  <span className="text-6xl md:text-8xl lg:text-9xl font-black text-white drop-shadow-xl">
+                  <span className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white drop-shadow-xl">
                     <StaggerText delay={0.4} staggerDelay={0.08}>
                       {settings.homepage?.hero?.title || currentSlide.title || settings.resortName || 'Welcome'}
                     </StaggerText>
                   </span>
                 ) : (
-                  <GradientText className="text-6xl md:text-8xl lg:text-9xl font-black">
+                  <GradientText className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black">
                     {settings.homepage?.hero?.title || currentSlide.title || settings.resortName || 'Welcome'}
                   </GradientText>
                 )}
@@ -315,7 +313,7 @@ export default function HomePage() {
               transition={{ duration: 0.5, delay: 0.1 }}
             >
               <BlurReveal delay={0.6}>
-                <p className={`text-xl md:text-2xl mb-12 max-w-3xl mx-auto leading-relaxed ${currentSlide.imageUrl
+                <p className={`text-lg sm:text-xl md:text-2xl mb-12 max-w-3xl mx-auto leading-relaxed px-4 sm:px-0 ${currentSlide.imageUrl
                   ? 'text-white/90 drop-shadow-md'
                   : 'text-slate-600 dark:text-slate-300'
                   }`}>
