@@ -67,3 +67,14 @@ reports/*.json
 screenshots/*.png
 screenshots/**/*.png
 screenshots/**/*.jpg
+
+# Archived data
+archive/
+
+# Root logs
+/*.txt
+
+# Operational probe and ci logs
+.ci_*.log
+.ci_*.utf8.log
+.ci_service_probe.log
