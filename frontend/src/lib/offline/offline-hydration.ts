@@ -15,6 +15,7 @@ import {
   modifiersStore,
   customersStore,
   cacheManager,
+  syncQueue,
 } from './offline-storage';
 import api from '@/lib/api';
 
@@ -138,11 +139,14 @@ async function hydrateTodayBookings(force: boolean): Promise<void> {
     
     if (response.data?.bookings) {
       // If we got 'incremental' results, we merge. If we got a full list, we clear.
-      // Most resort endpoints return full list for 'today' for safety.
       if (since && response.data.isIncremental) {
         await bookingsStore.putMany(response.data.bookings);
       } else {
-        await bookingsStore.clear();
+        // SAFETY: Only clear if there are no pending offline updates for bookings
+        const hasPending = await syncQueue.hasPending('booking');
+        if (!hasPending) {
+          await bookingsStore.clear();
+        }
         await bookingsStore.putMany(response.data.bookings);
       }
       await cacheManager.updateMetadata('bookings', await bookingsStore.count());
@@ -182,7 +186,10 @@ async function hydrateTodayTickets(force: boolean): Promise<void> {
   try {
     const response = await api.get(STORE_CONFIG.tickets.endpoint);
     if (response.data?.tickets) {
-      await ticketsStore.clear();
+      const hasPending = await syncQueue.hasPending('pool_ticket');
+      if (!hasPending) {
+        await ticketsStore.clear();
+      }
       await ticketsStore.putMany(response.data.tickets);
       await cacheManager.updateMetadata('tickets', response.data.tickets.length);
     }
@@ -200,7 +207,10 @@ async function hydrateMyHousekeepingTasks(force: boolean): Promise<void> {
   try {
     const response = await api.get(STORE_CONFIG.housekeeping_tasks.endpoint);
     if (response.data?.tasks) {
-      await housekeepingTasksStore.clear();
+      const hasPending = await syncQueue.hasPending('housekeeping_task');
+      if (!hasPending) {
+        await housekeepingTasksStore.clear();
+      }
       await housekeepingTasksStore.putMany(response.data.tasks);
       await cacheManager.updateMetadata('housekeeping_tasks', response.data.tasks.length);
     }
@@ -267,8 +277,19 @@ async function hydrateCustomers(force: boolean): Promise<void> {
       for (const customer of response.data.users) {
         await customersStore.put(customer);
       }
+      
+      // SIZE CAP: Limit to 500 records to prevent unbounded growth
       const count = await customersStore.count();
-      await cacheManager.updateMetadata('customers', count);
+      if (count > 500) {
+        const all = await customersStore.getAll();
+        // Remove oldest records (this is a simple cap, in production we'd use last_visit)
+        const toRemove = all.slice(0, all.length - 500);
+        for (const item of toRemove) {
+          await customersStore.delete(item.id);
+        }
+      }
+      
+      await cacheManager.updateMetadata('customers', await customersStore.count());
     }
   } catch (error) {
     console.error('[Offline] Failed to hydrate customers:', error);

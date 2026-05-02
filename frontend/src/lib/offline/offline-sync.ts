@@ -17,6 +17,8 @@ import {
   customersStore,
   ordersStore,
   paymentsStore,
+  chaletsStore,
+  bookingsStore,
   ticketsStore,
   housekeepingTasksStore,
   conflictsStore,
@@ -27,7 +29,7 @@ import {
 import { hydrateOfflineStores } from './offline-hydration';
 import api from '@/lib/api';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+
 
 // Sync configuration
 const SYNC_CONFIG = {
@@ -157,6 +159,10 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
     for (const item of pending) {
       try {
         await resolveSyncAction(item);
+        
+        // After successful sync, update the local record with synced: true
+        await updateLocalRecordSyncStatus(item.entityType, item.entityId, true);
+        
         await syncQueue.remove(item.id);
         synced++;
       } catch (error: any) {
@@ -197,6 +203,43 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
   }
 
   return { synced, failed };
+}
+
+/**
+ * Helper to update a local record's sync status or data
+ */
+async function updateLocalRecordSyncStatus(entityType: string, entityId: string, synced: boolean, extraData: any = {}): Promise<void> {
+  let store: any = null;
+  
+  switch (entityType) {
+    case 'order':
+      store = ordersStore;
+      break;
+    case 'booking':
+    case 'booking_check_in':
+    case 'booking_check_out':
+      store = bookingsStore;
+      break;
+    case 'pool_ticket':
+      store = ticketsStore;
+      break;
+    case 'housekeeping_task':
+      store = housekeepingTasksStore;
+      break;
+    case 'chalet_status':
+      store = chaletsStore;
+      break;
+    case 'payment':
+      store = paymentsStore;
+      break;
+  }
+
+  if (store) {
+    const record = await store.getById(entityId);
+    if (record) {
+      await store.put({ ...record, ...extraData, synced });
+    }
+  }
 }
 
 /**
@@ -306,7 +349,9 @@ export async function createOfflineBookingStatusUpdate(bookingId: string, status
     data: { status },
   });
   
-  // No store update needed here as the UI uses optimistic updates or re-fetches
+  // Optimistic update to local store
+  await updateLocalRecordSyncStatus('booking', bookingId, false, { status });
+  
   await publishSyncStatus();
   return syncId;
 }
@@ -321,6 +366,9 @@ export async function createOfflineOrderStatusUpdate(orderId: string, status: st
     operation: 'update',
     data: { status },
   });
+  
+  // Optimistic update to local store
+  await updateLocalRecordSyncStatus('order', orderId, false, { status });
   
   await publishSyncStatus();
   return syncId;
@@ -352,6 +400,9 @@ export async function createOfflineChaletStatusUpdate(chaletId: string, status: 
     data: { status },
   });
   
+  // Optimistic update to local store
+  await updateLocalRecordSyncStatus('chalet_status', chaletId, false, { status });
+  
   await publishSyncStatus();
   return syncId;
 }
@@ -366,6 +417,9 @@ export async function createOfflineTaskStatusUpdate(taskId: string, status: stri
     operation: 'update',
     data: { status },
   });
+  
+  // Optimistic update to local store
+  await updateLocalRecordSyncStatus('housekeeping_task', taskId, false, { status });
   
   await publishSyncStatus();
   return syncId;
@@ -522,7 +576,8 @@ async function resolveSyncAction(item: any): Promise<any> {
     
     case 'booking':
       if (operation === 'update') {
-        return api.patch(`/chalets/bookings/${entityId}/status`, data);
+        // Correct path: /chalets/staff/bookings/:id/status
+        return api.patch(`/chalets/staff/bookings/${entityId}/status`, data);
       }
       break;
 
@@ -534,7 +589,8 @@ async function resolveSyncAction(item: any): Promise<any> {
 
     case 'restaurant_table_status':
       if (operation === 'update') {
-        return api.put(`/restaurant/tables/${entityId}/status`, data);
+        // Correct path: /restaurant/staff/tables/:id (no /status suffix)
+        return api.patch(`/restaurant/staff/tables/${entityId}`, data);
       }
       break;
 
