@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { conflictsStore } from '@/lib/offline/offline-storage';
+import { conflictsStore, syncQueue } from '@/lib/offline/offline-storage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -49,24 +49,45 @@ export default function ConflictDashboard() {
     loadConflicts();
   }, []);
 
-  const resolveConflict = async (id: string) => {
+  const resolveConflict = async (id: string, resolution: 'local' | 'server') => {
     try {
-      await conflictsStore.delete(id);
-      setConflicts(prev => prev.filter(c => c.id !== id));
-      toast.success('Conflict resolved (Server data kept)');
+      if (resolution === 'server') {
+        await conflictsStore.delete(id);
+        setConflicts(prev => prev.filter(c => c.id !== id));
+        toast.success('Conflict resolved (Server data kept)');
+      } else {
+        const conflict = conflicts.find(c => c.id === id);
+        if (conflict) {
+          // Re-queue the local data with an override flag
+          await syncQueue.add({
+            entityType: conflict.entityType,
+            entityId: conflict.entityId,
+            operation: 'update', // or 'create' depending on context, but usually update for conflicts
+            data: { ...conflict.localData, _conflictOverride: true },
+          });
+          await conflictsStore.delete(id);
+          setConflicts(prev => prev.filter(c => c.id !== id));
+          toast.success('Conflict re-queued (Overriding server)');
+        }
+      }
     } catch (error) {
       toast.error('Failed to resolve conflict');
     }
   };
 
-  const clearAllResolved = async () => {
+  const clearAllConflicts = async () => {
     try {
-      // For now we just delete them manually as we don't have a 'resolved' flag update logic yet
-      // but the UI only shows what's in the store.
-      toast.info('Clearing conflicts...');
-      loadConflicts();
-    } catch (error) {}
+      const all = await conflictsStore.getAll();
+      for (const c of all) {
+        await conflictsStore.delete(c.id);
+      }
+      setConflicts([]);
+      toast.success('All conflicts cleared');
+    } catch (error) {
+      toast.error('Failed to clear conflicts');
+    }
   };
+
 
   const filteredConflicts = conflicts.filter(c => 
     c.entityType.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -98,7 +119,7 @@ export default function ConflictDashboard() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="ghost" onClick={clearAllResolved} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+          <Button variant="ghost" onClick={clearAllConflicts} className="text-red-500 hover:text-red-600 hover:bg-red-50">
             <Trash2 className="h-4 w-4 mr-2" />
             Clear All
           </Button>
@@ -170,9 +191,18 @@ export default function ConflictDashboard() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => resolveConflict(conflict.id)}
+                    onClick={() => resolveConflict(conflict.id, 'server')}
+                    className="text-slate-600"
                   >
-                    Acknowledge & Close
+                    Keep Server (Discard Local)
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm"
+                    onClick={() => resolveConflict(conflict.id, 'local')}
+                    className="bg-primary hover:bg-primary/90"
+                  >
+                    Keep Local (Override Server)
                   </Button>
                 </div>
               </CardContent>

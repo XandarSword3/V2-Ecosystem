@@ -16,8 +16,9 @@ import {
 } from 'lucide-react';
 import { Order, statusFlow } from './types';
 
-import { isOnline } from '@/lib/offline/offline-storage';
-import { createOfflineOrderStatusUpdate } from '@/lib/offline/offline-sync';
+import { isOnline, ordersStore, cacheManager } from '@/lib/offline/offline-storage';
+import { createOfflineOrderStatusUpdate, createOfflineOrder } from '@/lib/offline/offline-sync';
+import { DataFreshnessFooter } from '@/components/offline/DataFreshnessFooter';
 
 export interface KitchenViewProps {
   slug: string;
@@ -82,17 +83,39 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
   }, [socket, moduleId, slug]);
 
   const loadOrders = async () => {
-    try {
-      const response = await api.get(`/staff/modules/${slug}/orders`, {
-        params: {
-          status: 'pending,confirmed,preparing,ready,served',
-          moduleId: moduleId,
-        },
-      });
-      setOrders(response.data.data || []);
-    } catch (error) {
-      toast.error('Failed to load orders');
-    } finally {
+    // 1. Load from offline store immediately
+    const offlineOrders = await ordersStore.getAll();
+    if (offlineOrders.length > 0) {
+      setOrders(offlineOrders as unknown as Order[]);
+      setIsLoading(false);
+    }
+
+    // 2. Refresh from API in background if online
+    if (isOnline()) {
+      try {
+        const response = await api.get(`/staff/modules/${slug}/orders`, {
+          params: {
+            status: 'pending,confirmed,preparing,ready,served',
+            moduleId: moduleId,
+          },
+        });
+        const freshOrders = response.data.data || [];
+        setOrders(freshOrders);
+        
+        // 3. Update offline store
+        await ordersStore.clear();
+        await ordersStore.putMany(freshOrders);
+        await cacheManager.updateMetadata('orders', freshOrders.length);
+      } catch (error) {
+        console.error('Background orders refresh failed:', error);
+        if (offlineOrders.length === 0) {
+          toast.error('Failed to load orders');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    } else if (offlineOrders.length === 0) {
+      toast.error('Offline and no cached orders found');
       setIsLoading(false);
     }
   };
@@ -136,12 +159,27 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         return;
       }
       const tableNumber = window.prompt('Table number (optional)') || undefined;
-      await api.post(`/${slug}/staff/orders`, {
-        table_number: tableNumber,
-        items: [{ item_id: itemId, quantity }],
-      });
-      toast.success('Staff order created');
-      loadOrders();
+      
+      const orderData = {
+        tableId: tableNumber, // API expects tableId or table_number depending on endpoint
+        items: [{ menuItemId: itemId, quantity }],
+      };
+
+      try {
+        await api.post(`/${slug}/staff/orders`, {
+          table_number: tableNumber,
+          items: [{ item_id: itemId, quantity }],
+        });
+        toast.success('Staff order created');
+        loadOrders();
+      } catch (error) {
+        if (!isOnline()) {
+          await createOfflineOrder(orderData as any);
+          toast.info('Staff order queued offline', { icon: '⏳' });
+          return;
+        }
+        toast.error('Failed to create staff order');
+      }
     } catch (error) {
       toast.error('Failed to create staff order');
     }
@@ -422,6 +460,12 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
           </div>
         </div>
       )}
+      {/* Order Details Modal ... */}
+      
+      {/* Footer */}
+      <footer className="mt-auto">
+        <DataFreshnessFooter storeName="orders" />
+      </footer>
     </div>
   );
 }

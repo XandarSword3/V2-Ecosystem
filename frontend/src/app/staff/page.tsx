@@ -20,6 +20,7 @@ import {
   AlertCircle,
   TrendingUp,
   RefreshCw,
+  ClipboardList,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -239,6 +240,14 @@ export default function StaffDashboard() {
       icon: Cookie,
       color: 'from-amber-400 to-orange-500',
       bgColor: 'bg-amber-50 dark:bg-amber-950/30',
+    },
+    {
+      title: td('housekeeping'),
+      description: td('housekeepingDesc'),
+      href: '/staff/housekeeping',
+      icon: ClipboardList,
+      color: 'from-blue-400 to-indigo-500',
+      bgColor: 'bg-blue-50 dark:bg-blue-950/30',
     },
     {
       title: td('chalets'),

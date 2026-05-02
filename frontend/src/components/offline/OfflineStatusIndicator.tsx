@@ -8,8 +8,14 @@ import { useOfflineSync } from '@/lib/offline';
 
 export function OfflineStatusIndicator() {
   const t = useTranslations('adminCommon.offline');
-  const { isOnline, isSyncing, pendingCount, error } = useOfflineSync();
+  const { isOnline, isSyncing, pendingCount, lastSyncAt, error } = useOfflineSync();
   const [showSyncSuccess, setShowSyncSuccess] = useState(false);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 30000); // Refresh every 30s
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (isOnline && pendingCount === 0 && !isSyncing && !error) {
@@ -18,6 +24,22 @@ export function OfflineStatusIndicator() {
       return () => clearTimeout(timer);
     }
   }, [isOnline, pendingCount, isSyncing, error]);
+
+  const getStalenessColor = (date: Date) => {
+    const minutes = (now.getTime() - new Date(date).getTime()) / 60000;
+    if (minutes < 15) return 'bg-green-600 text-white';
+    if (minutes < 60) return 'bg-yellow-500 text-white';
+    return 'bg-red-600 text-white';
+  };
+
+  const getTimeAgo = (date: Date) => {
+    const minutes = Math.floor((now.getTime() - new Date(date).getTime()) / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  };
+
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end pointer-events-none">
@@ -48,6 +70,22 @@ export function OfflineStatusIndicator() {
           </motion.div>
         )}
 
+        {/* Staleness / Last Updated Indicator */}
+        {lastSyncAt && isOnline && !isSyncing && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm font-medium transition-colors ${
+              getStalenessColor(lastSyncAt)
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>
+              {t('lastUpdated')} {getTimeAgo(lastSyncAt)}
+            </span>
+          </motion.div>
+        )}
+
         {/* Pending Actions Count */}
         {pendingCount > 0 && !isSyncing && (
           <motion.div
@@ -55,8 +93,8 @@ export function OfflineStatusIndicator() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-slate-800 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm font-medium"
           >
-            <Clock className="w-4 h-4" />
-            {pendingCount} actions pending
+            <AlertCircle className="w-4 h-4 text-yellow-400" />
+            {pendingCount} {t('actionsPending')}
           </motion.div>
         )}
 

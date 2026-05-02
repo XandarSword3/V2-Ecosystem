@@ -222,8 +222,24 @@ let dbInstance: IDBDatabase | null = null;
 export async function getDatabase(): Promise<IDBDatabase> {
   if (!dbInstance) {
     dbInstance = await initDatabase();
+    
+    // Layer 5: Platform Hardening - Request persistent storage
+    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+      const persisted = await navigator.storage.persist();
+      console.log(`[Offline] Storage persisted: ${persisted}`);
+    }
   }
   return dbInstance;
+}
+
+/**
+ * Get estimated storage usage and quota
+ */
+export async function getStorageEstimate() {
+  if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
+    return await navigator.storage.estimate();
+  }
+  return null;
 }
 
 /**
@@ -293,6 +309,18 @@ export class OfflineStore<T extends { id: string }> {
       const request = store.delete(id);
 
       request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async count(): Promise<number> {
+    const db = await getDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(this.storeName, 'readonly');
+      const store = transaction.objectStore(this.storeName);
+      const request = store.count();
+
+      request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
   }

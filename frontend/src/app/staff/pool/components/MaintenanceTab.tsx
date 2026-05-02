@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
+import { isOnline } from '@/lib/offline/offline-storage';
+import { createOfflineMaintenanceLog } from '@/lib/offline/offline-sync';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -44,18 +46,29 @@ export function MaintenanceTab() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        const logData = {
+            type: newLogType,
+            notes: newLogNotes,
+            readings: newLogType === 'chemical_check' ? newLogReadings : {},
+        };
+
         try {
-            await api.post('/pool/staff/maintenance', {
-                type: newLogType,
-                notes: newLogNotes,
-                readings: newLogType === 'chemical_check' ? newLogReadings : {},
-            });
+            await api.post('/pool/staff/maintenance', logData);
             toast.success(tc('success.saved'));
             setShowAddForm(false);
             setNewLogNotes('');
             setNewLogReadings({ ph: '', chlorine: '', temperature: '' });
             fetchLogs();
         } catch (error) {
+            if (!isOnline()) {
+                await createOfflineMaintenanceLog(logData);
+                toast.info('Log saved offline', { icon: '⏳' });
+                setShowAddForm(false);
+                setNewLogNotes('');
+                setNewLogReadings({ ph: '', chlorine: '', temperature: '' });
+                return;
+            }
             toast.error(tc('errors.failedToSave'));
         }
     };
