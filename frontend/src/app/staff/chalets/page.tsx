@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
-import { bookingsStore } from '@/lib/offline/offline-storage';
+import { bookingsStore, cacheManager, isOnline } from '@/lib/offline/offline-storage';
 import { createOfflineBookingStatusUpdate } from '@/lib/offline/offline-sync';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import { useSocket } from '@/lib/socket';
+import { DataFreshnessFooter } from '@/components/offline/DataFreshnessFooter';
 import {
   Home,
   Clock,
@@ -95,29 +96,49 @@ export default function StaffChaletsPage() {
   const [selectedBooking, setSelectedBooking] = useState<ChaletBooking | null>(null);
   const { socket } = useSocket();
 
-  const fetchBookings = useCallback(async (signal?: AbortSignal) => { // FIX Iter-23: AbortController support
-    try {
-      const response = await api.get('/chalets/staff/bookings', {
-        params: filter === 'today' ? { date: new Date().toISOString().split('T')[0] } : {},
-        signal, // FIX Iter-23: pass signal
-      });
-      if (!signal?.aborted) setBookings(response.data.data || []); // FIX Iter-23: guard setState
-    } catch (error: any) {
-      if (error?.name === 'CanceledError') return;
-      
-      // Fallback to offline store
-      const offlineBookings = await bookingsStore.getAll();
-      if (offlineBookings.length > 0) {
-        setBookings(offlineBookings as unknown as ChaletBooking[]);
-        toast.info(tCommon('offline.showingCached'));
-      } else {
-        toast.error(tCommon('errors.failedToLoad'));
-        setBookings([]);
+  const fetchBookings = useCallback(async (signal?: AbortSignal) => {
+    // 1. Load from offline store immediately
+    const offlineBookings = await bookingsStore.getAll();
+    if (offlineBookings.length > 0) {
+      setBookings(offlineBookings as unknown as ChaletBooking[]);
+      setLoading(false); // UI is now interactive with cached data
+    }
+
+    // 2. Refresh from API in background if online
+    if (isOnline()) {
+      try {
+        const response = await api.get('/chalets/staff/bookings', {
+          params: filter === 'today' ? { date: new Date().toISOString().split('T')[0] } : {},
+          signal,
+        });
+        
+        if (!signal?.aborted) {
+          const freshData = response.data.data || [];
+          setBookings(freshData);
+          setLoading(false);
+          
+          // 3. Update offline store with fresh data
+          await bookingsStore.clear();
+          await bookingsStore.putMany(freshData);
+          await cacheManager.updateMetadata('bookings', freshData.length);
+        }
+      } catch (error: any) {
+        if (error?.name === 'CanceledError') return;
+        console.error('Background refresh failed:', error);
+        // We stay with cached data, no need to show error if we have cache
+        if (offlineBookings.length === 0) {
+          toast.error(tCommon('errors.failedToLoad'));
+          setBookings([]);
+        }
+      } finally {
+        if (!signal?.aborted) setLoading(false);
       }
-    } finally {
+    } else if (offlineBookings.length === 0) {
+      // Offline and no cache
+      toast.error(tCommon('errors.failedToLoad'));
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, isOnline]);
 
   useEffect(() => {
     const controller = new AbortController(); // FIX Iter-23: cleanup on unmount
@@ -591,6 +612,10 @@ export default function StaffChaletsPage() {
           </div>
         )}
       </AnimatePresence>
+      {/* Footer */}
+      <footer className="mt-8">
+        <DataFreshnessFooter storeName="bookings" />
+      </footer>
     </motion.div>
   );
 }
