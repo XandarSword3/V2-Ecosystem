@@ -53,3 +53,17 @@ Discrepancies found between local migrations and the actual `seed.ts` expectatio
 - Run a full diff between `supabase/migrations` and a clean DB state.
 - Ensure `soft-delete` triggers are implemented on all critical tables (orders, bookings).
 - Fix the `DB_ERROR` seen in loyalty service tests during CI.
+
+---
+
+## 5. [OFFLINE] Implement Phase 2 - Granular Data Merging and Resolution Policies
+**Priority:** Medium
+**Label:** `enhancement`, `offline`
+
+**Description:**
+Phase 1 (Resilience) is complete, but synchronization follows a "Server Wins" policy for conflicts. 
+**Requirements:**
+- **Granular Merging:** Update the sync manager to merge partial updates (e.g., if one staff updates order status and another updates order notes) instead of rejecting the entire local state.
+- **Resolution Policies:** Implement customizable policies (Latest Wins, Manual Review, Auto-Merge) per entity type.
+- **Telemetry:** Track sync success rates and common conflict types to optimize local storage strategies.
+

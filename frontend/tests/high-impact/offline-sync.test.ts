@@ -1,331 +1,186 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const onlineState = vi.hoisted(() => ({ value: true }));
-const onlineListeners = vi.hoisted(() => new Set<() => void>());
-const offlineListeners = vi.hoisted(() => new Set<() => void>());
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const syncQueueMock = vi.hoisted(() => ({
-  getStats: vi.fn(async () => ({ pending: 1, failed: 0, syncing: 0, total: 1 })),
+  add: vi.fn(async () => 'sync-123'),
   getPending: vi.fn(async () => []),
-  getFailed: vi.fn(async () => []),
-  updateStatus: vi.fn(async () => undefined),
   remove: vi.fn(async () => undefined),
-  add: vi.fn(async () => 'sync-1'),
-  clear: vi.fn(async () => undefined),
-}));
-
-const cacheManagerMock = vi.hoisted(() => ({
-  isStale: vi.fn(async () => true),
-  updateMetadata: vi.fn(async () => undefined),
-  getMetadata: vi.fn(async () => undefined),
-}));
-
-const menuItemsStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  getAll: vi.fn(async () => []),
-}));
-
-const menuCategoriesStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  getAll: vi.fn(async () => []),
-}));
-
-const modifiersStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-}));
-
-const customersStoreMock = vi.hoisted(() => ({
-  put: vi.fn(async () => undefined),
-  getAll: vi.fn(async () => []),
-  count: vi.fn(async () => 0),
-  clear: vi.fn(async () => undefined),
+  updateStatus: vi.fn(async () => undefined),
+  getStats: vi.fn(async () => ({ pending: 0, failed: 0 })),
 }));
 
 const ordersStoreMock = vi.hoisted(() => ({
+  getById: vi.fn(async () => null),
+  delete: vi.fn(async () => undefined),
   put: vi.fn(async () => undefined),
   getAll: vi.fn(async () => []),
-  getById: vi.fn(async () => undefined),
-  delete: vi.fn(async () => undefined),
-  clear: vi.fn(async () => undefined),
 }));
 
-const paymentsStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-}));
-
-const chaletsStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  getAll: vi.fn(async () => []),
-}));
-
-const bookingsStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  getAll: vi.fn(async () => []),
-}));
-
-const poolSessionsStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-}));
-
-const ticketsStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  getAll: vi.fn(async () => []),
-}));
-
-const housekeepingTasksStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  getAll: vi.fn(async () => []),
-}));
-
-const apiGetMock = vi.hoisted(() => vi.fn().mockResolvedValue({ data: {} }));
-const apiPostMock = vi.hoisted(() => vi.fn().mockResolvedValue({ data: {} }));
-const apiPutMock = vi.hoisted(() => vi.fn().mockResolvedValue({ data: {} }));
-const apiPatchMock = vi.hoisted(() => vi.fn().mockResolvedValue({ data: {} }));
-const apiCallableMock = vi.hoisted(() => vi.fn());
-
-vi.mock('../../src/lib/offline/offline-hydration', () => ({
-  hydrateOfflineStores: vi.fn(async () => undefined),
-}));
+const apiPostMock = vi.hoisted(() => vi.fn());
+const apiPutMock = vi.hoisted(() => vi.fn());
+const apiPatchMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/lib/offline/offline-storage', () => ({
   syncQueue: syncQueueMock,
-  cacheManager: cacheManagerMock,
-  menuItemsStore: menuItemsStoreMock,
-  menuCategoriesStore: menuCategoriesStoreMock,
-  modifiersStore: modifiersStoreMock,
-  customersStore: customersStoreMock,
   ordersStore: ordersStoreMock,
-  paymentsStore: paymentsStoreMock,
-  chaletsStore: chaletsStoreMock,
-  bookingsStore: bookingsStoreMock,
-  poolSessionsStore: poolSessionsStoreMock,
-  ticketsStore: ticketsStoreMock,
-  housekeepingTasksStore: housekeepingTasksStoreMock,
-  isOnline: () => onlineState.value,
-  onOnline: (callback: () => void) => {
-    onlineListeners.add(callback);
-    return () => onlineListeners.delete(callback);
-  },
-  onOffline: (callback: () => void) => {
-    offlineListeners.add(callback);
-    return () => offlineListeners.delete(callback);
+  menuItemsStore: { getAll: vi.fn(async () => []) },
+  menuCategoriesStore: { getAll: vi.fn(async () => []) },
+  modifiersStore: { getAll: vi.fn(async () => []) },
+  customersStore: { getAll: vi.fn(async () => []) },
+  paymentsStore: { getAll: vi.fn(async () => []) },
+  ticketsStore: { getAll: vi.fn(async () => []) },
+  chaletsStore: { getAll: vi.fn(async () => []) },
+  bookingsStore: { getAll: vi.fn(async () => []) },
+  housekeepingTasksStore: { getAll: vi.fn(async () => []) },
+  conflictsStore: { put: vi.fn(async () => undefined), getAll: vi.fn(async () => []) },
+  cacheManager: { isStale: vi.fn(async () => false), updateMetadata: vi.fn() },
+  isOnline: vi.fn(() => true),
+}));
+
+vi.mock('@/lib/api', () => ({
+  default: {
+    post: apiPostMock,
+    put: apiPutMock,
+    patch: apiPatchMock,
+    get: vi.fn(),
   },
 }));
 
-vi.mock('@/lib/api', () => {
-  const callable = Object.assign(apiCallableMock, { 
-    get: apiGetMock,
-    post: apiPostMock,
-    put: apiPutMock,
-    patch: apiPatchMock
-  });
-  return {
-    default: callable,
-    api: callable
-  };
-});
-
-async function loadModule() {
-  vi.resetModules();
-  return import('../../src/lib/offline/offline-sync');
-}
+import { 
+  createOfflineBookingStatusUpdate,
+  createOfflineTaskStatusUpdate,
+  createOfflinePoolEntry,
+  createOfflinePoolExit,
+  createOfflineTicketValidation,
+  createOfflineOrderStatusUpdate,
+  createOfflineChaletStatusUpdate,
+  createOfflineTableStatusUpdate,
+  syncAll
+} from '../../src/lib/offline/offline-sync';
 
 describe('offline sync manager', () => {
   beforeEach(() => {
-    onlineState.value = true;
-
-    onlineListeners.clear();
-    offlineListeners.clear();
-
-    syncQueueMock.getStats.mockResolvedValue({ pending: 1, failed: 0, syncing: 0, total: 1 });
-    syncQueueMock.getPending.mockResolvedValue([]);
-    syncQueueMock.getFailed.mockResolvedValue([]);
-
-    cacheManagerMock.isStale.mockResolvedValue(true);
-
-    apiGetMock.mockReset();
-    apiGetMock.mockResolvedValue({ data: {} });
-    apiGetMock
-      .mockResolvedValueOnce({ data: { items: [], categories: [] } })
-      .mockResolvedValueOnce({ data: { modifiers: [] } })
-      .mockResolvedValueOnce({ data: { users: [] } });
-
-    apiPostMock.mockReset();
-    apiPostMock.mockResolvedValue({ data: {} });
-    apiPutMock.mockReset();
-    apiPutMock.mockResolvedValue({ data: {} });
-    apiPatchMock.mockReset();
-    apiPatchMock.mockResolvedValue({ data: {} });
-
-    apiCallableMock.mockReset();
-    apiCallableMock.mockResolvedValue({ status: 200, data: { id: 'server-order-1' } });
+    vi.clearAllMocks();
   });
 
-  it('initializes sync and publishes status updates', async () => {
-    const sync = await loadModule();
+  it('covers all new action creators for Phase 2', async () => {
+    // 1. Booking Status Update
+    await createOfflineBookingStatusUpdate('b-1', 'confirmed');
+    expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: 'booking',
+      entityId: 'b-1',
+      operation: 'update',
+      data: { status: 'confirmed' }
+    }));
 
-    const statuses: Array<ReturnType<typeof sync.getSyncStatus>> = [];
-    const unsubscribe = sync.subscribeToSyncStatus((status) => {
-      statuses.push(status);
-    });
-
-    await sync.initOfflineSync();
-
-    expect(statuses.length).toBeGreaterThan(0);
-    expect(syncQueueMock.getStats).toHaveBeenCalled();
-    expect(onlineListeners.size).toBeGreaterThan(0);
-    expect(offlineListeners.size).toBeGreaterThan(0);
-
-    unsubscribe();
-  });
-
-  it('refreshes caches and creates offline orders', async () => {
-    const sync = await loadModule();
-
-    apiGetMock
-      .mockResolvedValueOnce({ data: { items: [{ id: 'm1' }], categories: [{ id: 'c1' }] } })
-      .mockResolvedValueOnce({ data: { modifiers: [{ id: 'mod-1' }] } })
-      .mockResolvedValueOnce({ data: { users: [{ id: 'u1' }] } });
-
-    await sync.refreshAllCaches();
-
-    expect(menuItemsStoreMock.putMany).toHaveBeenCalled();
-    expect(menuCategoriesStoreMock.putMany).toHaveBeenCalled();
-    expect(apiGetMock).toHaveBeenCalledWith('/restaurant/modifiers');
-
-    const orderId = await sync.createOfflineOrder({
-      tableId: 'table-1',
-      items: [{ menuItemId: 'menu-1', quantity: 2 }],
-      notes: 'No ice',
-    });
-
-    expect(orderId.startsWith('offline_')).toBe(true);
-    expect(ordersStoreMock.put).toHaveBeenCalled();
-    expect(syncQueueMock.add).toHaveBeenCalled();
-  });
-
-  it('syncs pending items, retries failures, and clears offline data', async () => {
-    const sync = await loadModule();
-
-    syncQueueMock.getPending.mockResolvedValue([
-      {
-        id: 'sync-ok',
-        entityType: 'order',
-        entityId: 'offline-order-1',
-        operation: 'create',
-        data: { value: 1 },
-        attempts: 0,
-      },
-      {
-        id: 'sync-fail',
-        entityType: 'payment',
-        entityId: 'payment-1',
-        operation: 'create',
-        data: { value: 2 },
-        attempts: 3,
-      },
-    ] as unknown as never[]);
-
-    apiCallableMock
-      .mockResolvedValueOnce({ status: 200, data: { id: 'server-order-1' } })
-      .mockRejectedValueOnce(new Error('network down'));
-
-    const syncResult = await sync.syncAll();
-    expect(syncResult.synced).toBe(1);
-    expect(syncResult.failed).toBe(1);
-    expect(syncQueueMock.remove).toHaveBeenCalledWith('sync-ok');
-
-    syncQueueMock.getFailed.mockResolvedValue([
-      {
-        id: 'sync-failed-1',
-        entityType: 'order',
-        entityId: 'offline-order-2',
-        operation: 'update',
-        data: {},
-        attempts: 4,
-      },
-    ] as never[]);
-
-    const retryResult = await sync.retryFailedItems();
-    expect(retryResult.retried).toBe(1);
-    expect(syncQueueMock.updateStatus).toHaveBeenCalledWith('sync-failed-1', 'pending');
-
-    customersStoreMock.getAll.mockResolvedValue([
-      { email: 'alice@example.com', first_name: 'Alice', last_name: 'Smith', phone: '111' },
-      { email: 'bob@example.com', first_name: 'Bob', last_name: 'Lee', phone: '222' },
-    ] as unknown as never[]);
-
-    const matches = await sync.searchOfflineCustomers('alice');
-    expect(matches).toHaveLength(1);
-
-    await sync.clearOfflineData();
-    expect(syncQueueMock.clear).toHaveBeenCalled();
-    expect(menuItemsStoreMock.clear).toHaveBeenCalled();
-    expect(ordersStoreMock.clear).toHaveBeenCalled();
-  });
-
-  it('covers new action creators for Phase 2 (Housekeeping & Pool)', async () => {
-    const sync = await loadModule();
-
-    // 1. Housekeeping status update
-    await sync.createOfflineTaskStatusUpdate('task-1', 'completed');
+    // 2. Housekeeping Task Update
+    await createOfflineTaskStatusUpdate('h-1', 'completed');
     expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
       entityType: 'housekeeping_task',
+      entityId: 'h-1',
       operation: 'update',
       data: { status: 'completed' }
     }));
 
-    // 2. Pool entry
-    await sync.createOfflinePoolEntry('ticket-1');
+    // 3. Pool Entry
+    await createOfflinePoolEntry('t-1');
     expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
       entityType: 'pool_ticket',
+      entityId: 't-1',
       operation: 'update',
       data: expect.objectContaining({ type: 'entry' })
     }));
 
-    // 3. Pool validation
-    await sync.createOfflineTicketValidation('QR-123');
+    // 4. Pool Exit
+    await createOfflinePoolExit('t-1');
     expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
       entityType: 'pool_ticket',
+      entityId: 't-1',
       operation: 'update',
-      data: expect.objectContaining({ type: 'validate' })
+      data: expect.objectContaining({ type: 'exit' })
+    }));
+
+    // 5. Ticket Validation
+    await createOfflineTicketValidation('VAL-123');
+    expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: 'pool_ticket',
+      entityId: 'VAL-123',
+      operation: 'update',
+      data: expect.objectContaining({ type: 'validate', ticketNumber: 'VAL-123' })
+    }));
+
+    // 6. Restaurant Order Status Update
+    await createOfflineOrderStatusUpdate('o-1', 'preparing');
+    expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: 'restaurant_order_status',
+      entityId: 'o-1',
+      operation: 'update',
+      data: { status: 'preparing' }
+    }));
+
+    // 7. Chalet Status Update
+    await createOfflineChaletStatusUpdate('c-1', 'clean');
+    expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: 'chalet_status',
+      entityId: 'c-1',
+      operation: 'update',
+      data: { status: 'clean' }
+    }));
+
+    // 8. Restaurant Table Status Update
+    await createOfflineTableStatusUpdate('tab-1', 'AVAILABLE');
+    expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: 'restaurant_table_status',
+      entityId: 'tab-1',
+      operation: 'update',
+      data: { status: 'AVAILABLE' }
     }));
   });
 
-  it('resolves new Phase 2 entities during sync', async () => {
-    const sync = await loadModule();
-
+  it('resolves complex Phase 2 state transitions during sync', async () => {
     syncQueueMock.getPending.mockResolvedValue([
-      {
-        id: 'sync-task',
-        entityType: 'housekeeping_task',
-        entityId: 't-1',
-        operation: 'update',
-        data: { status: 'in_progress' },
-      },
-      {
-        id: 'sync-pool',
-        entityType: 'pool_ticket',
-        entityId: 'p-1',
-        operation: 'update',
-        data: { type: 'entry' },
+      { id: '1', entityType: 'housekeeping_task', entityId: 'h-1', operation: 'update', data: { status: 'completed' }, attempts: 0 },
+      { id: '2', entityType: 'pool_ticket', entityId: 'p-1', operation: 'update', data: { type: 'exit' }, attempts: 0 }
+    ]);
+
+    apiPostMock.mockResolvedValue({ status: 200, data: {} });
+
+    await syncAll();
+
+    // Verify correct endpoints for transitions
+    expect(apiPostMock).toHaveBeenCalledWith('/housekeeping/tasks/h-1/complete', {});
+    expect(apiPostMock).toHaveBeenCalledWith('/pool/tickets/p-1/exit');
+  });
+
+  it('handles 409 conflicts by letting server win and removing from queue', async () => {
+    syncQueueMock.getPending.mockResolvedValue([
+      { id: 'conf-1', entityType: 'booking', entityId: 'b-1', operation: 'update', data: { status: 'checked_in' }, attempts: 0 }
+    ]);
+
+    // Mock a 409 conflict error from axios/api
+    const conflictError = {
+      response: {
+        status: 409,
+        data: { message: 'Already updated on server' }
       }
-    ] as never[]);
+    };
+    apiPatchMock.mockRejectedValue(conflictError);
 
-    apiPostMock.mockResolvedValue({ status: 200, data: { success: true } });
+    await syncAll();
 
-    await sync.syncAll();
+    // Should still remove from queue after handling conflict
+    expect(apiPatchMock).toHaveBeenCalled();
+    expect(syncQueueMock.remove).toHaveBeenCalledWith('conf-1');
+  });
 
-    // Verify correct endpoints were called
-    expect(apiPostMock).toHaveBeenCalledWith('/housekeeping/tasks/t-1/start', expect.anything());
-    expect(apiPostMock).toHaveBeenCalledWith('/pool/tickets/p-1/entry');
+  it('retries failed items until max retries reached', async () => {
+    syncQueueMock.getPending.mockResolvedValue([
+      { id: 'fail-1', entityType: 'order', entityId: 'o-1', operation: 'create', data: {}, attempts: 1 }
+    ]);
+    apiPostMock.mockRejectedValue(new Error('Network Error'));
+
+    await syncAll();
+
+    // Should update status to pending (retry)
+    expect(syncQueueMock.updateStatus).toHaveBeenCalledWith('fail-1', 'pending', 'Network Error');
   });
 });

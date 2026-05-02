@@ -10,6 +10,10 @@ import {
   poolSessionsStore,
   ticketsStore,
   housekeepingTasksStore,
+  menuItemsStore,
+  menuCategoriesStore,
+  modifiersStore,
+  customersStore,
   cacheManager,
 } from './offline-storage';
 import api from '@/lib/api';
@@ -28,6 +32,8 @@ export async function hydrateOfflineStores(): Promise<void> {
     hydratePoolSessions(),
     hydrateTodayTickets(),
     hydrateMyHousekeepingTasks(),
+    hydrateMenu(),
+    hydrateCustomers(),
   ]);
   
   console.log('[Offline] Hydration complete.');
@@ -112,5 +118,56 @@ async function hydrateMyHousekeepingTasks(): Promise<void> {
     }
   } catch (error) {
     console.error('[Offline] Failed to hydrate housekeeping tasks:', error);
+  }
+}
+
+/**
+ * Fetch and store menu items, categories, and modifiers
+ */
+async function hydrateMenu(): Promise<void> {
+  try {
+    const [menuResponse, modifiersResponse] = await Promise.all([
+      api.get('/restaurant/menu'),
+      api.get('/restaurant/modifiers')
+    ]);
+
+    if (menuResponse.data?.items) {
+      await menuItemsStore.clear();
+      await menuItemsStore.putMany(menuResponse.data.items);
+      await cacheManager.updateMetadata('menu_items', menuResponse.data.items.length);
+    }
+
+    if (menuResponse.data?.categories) {
+      await menuCategoriesStore.clear();
+      await menuCategoriesStore.putMany(menuResponse.data.categories);
+      await cacheManager.updateMetadata('menu_categories', menuResponse.data.categories.length);
+    }
+
+    if (modifiersResponse.data?.modifiers) {
+      await modifiersStore.clear();
+      await modifiersStore.putMany(modifiersResponse.data.modifiers);
+      await cacheManager.updateMetadata('modifiers', modifiersResponse.data.modifiers.length);
+    }
+  } catch (error) {
+    console.error('[Offline] Failed to hydrate menu:', error);
+  }
+}
+
+/**
+ * Fetch and store recent customers
+ */
+async function hydrateCustomers(): Promise<void> {
+  try {
+    const response = await api.get('/users?role=customer&limit=500&sort=last_visit:desc');
+    if (response.data?.users) {
+      // For customers we merge instead of clear to build a larger offline directory over time
+      for (const customer of response.data.users) {
+        await customersStore.put(customer);
+      }
+      const count = await customersStore.count();
+      await cacheManager.updateMetadata('customers', count);
+    }
+  } catch (error) {
+    console.error('[Offline] Failed to hydrate customers:', error);
   }
 }

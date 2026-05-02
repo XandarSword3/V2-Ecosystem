@@ -22,6 +22,7 @@ import {
   poolSessionsStore,
   ticketsStore,
   housekeepingTasksStore,
+  conflictsStore,
   isOnline,
   onOnline,
   onOffline,
@@ -80,20 +81,29 @@ export function getSyncStatus(): SyncStatus {
  * Initialize offline sync manager
  */
 export async function initOfflineSync(): Promise<void> {
-  // Update online status
+  // Update online status and handle iOS foreground sync fallback
   onOnline(() => {
     updateStatus({ isOnline: true });
-    syncAll();
+    
+    // Check if Workbox Background Sync is supported, if not, force a manual sync
+    // This is critical for iOS/Safari which doesn't support BackgroundSync API
+    const isBackgroundSyncSupported = 'serviceWorker' in navigator && 'SyncManager' in window;
+    if (!isBackgroundSyncSupported) {
+      console.log('[Offline Sync] Manual sync fallback for iOS/Safari');
+      syncAll();
+    } else {
+      // Even if supported, a proactive syncAll is safer on network resume
+      syncAll();
+    }
   });
 
   onOffline(() => {
     updateStatus({ isOnline: false });
   });
 
-  // Initial cache refresh if online
+  // Initial hydration if online (only call once)
   if (isOnline()) {
     await hydrateOfflineStores();
-    await refreshAllCaches();
   }
 
   // Update pending count
@@ -103,10 +113,11 @@ export async function initOfflineSync(): Promise<void> {
     failedCount: stats.failed,
   });
 
-  // Start periodic sync
+  // Start periodic sync/refresh
   setInterval(() => {
     if (isOnline() && !currentStatus.isSyncing) {
       syncAll();
+      refreshAllCaches();
     }
   }, SYNC_CONFIG.cacheRefreshIntervalMs);
 }
@@ -118,11 +129,8 @@ export async function refreshAllCaches(): Promise<void> {
   if (!isOnline()) return;
 
   try {
-    await Promise.all([
-      refreshMenuCache(),
-      refreshCustomerCache(),
-      hydrateOfflineStores(),
-    ]);
+    // Note: hydrateOfflineStores now includes menu and customer data
+    await hydrateOfflineStores();
     
     updateStatus({ lastSyncAt: new Date(), error: null });
   } catch (error) {
@@ -131,69 +139,7 @@ export async function refreshAllCaches(): Promise<void> {
   }
 }
 
-/**
- * Refresh menu data cache
- */
-export async function refreshMenuCache(): Promise<void> {
-  const isStale = await cacheManager.isStale('menu_items', SYNC_CONFIG.maxCacheAgeMinutes);
-  if (!isStale && !isOnline()) return;
 
-  try {
-    // Fetch menu items
-    const menuResponse = await api.get('/restaurant/menu');
-    const menuData = menuResponse.data;
-    
-    // Store menu items
-    if (menuData.items) {
-      await menuItemsStore.clear();
-      await menuItemsStore.putMany(menuData.items);
-      await cacheManager.updateMetadata('menu_items', menuData.items.length);
-    }
-    
-    // Store categories
-    if (menuData.categories) {
-      await menuCategoriesStore.clear();
-      await menuCategoriesStore.putMany(menuData.categories);
-      await cacheManager.updateMetadata('menu_categories', menuData.categories.length);
-    }
-
-    // Fetch modifiers
-    const modifiersResponse = await api.get('/restaurant/modifiers');
-    const modifiersData = modifiersResponse.data;
-    if (modifiersData.modifiers) {
-      await modifiersStore.clear();
-      await modifiersStore.putMany(modifiersData.modifiers);
-      await cacheManager.updateMetadata('modifiers', modifiersData.modifiers.length);
-    }
-  } catch (error) {
-    console.error('Menu cache refresh failed:', error);
-    throw error;
-  }
-}
-
-/**
- * Refresh customer data cache (recent customers only)
- */
-export async function refreshCustomerCache(): Promise<void> {
-  const isStale = await cacheManager.isStale('customers', SYNC_CONFIG.maxCacheAgeMinutes);
-  if (!isStale && !isOnline()) return;
-
-  try {
-    const response = await api.get('/users?role=customer&limit=500&sort=last_visit:desc');
-    const data = response.data;
-    
-    if (data.users) {
-      // Don't clear - merge with existing data
-      for (const customer of data.users) {
-        await customersStore.put(customer);
-      }
-      await cacheManager.updateMetadata('customers', await customersStore.count());
-    }
-  } catch (error) {
-    console.error('Customer cache refresh failed:', error);
-    throw error;
-  }
-}
 
 /**
  * Sync all pending items to server
@@ -260,9 +206,22 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
  * Handle sync conflicts based on Phase 1 rules
  */
 async function handleSyncConflict(item: any, serverData: any): Promise<void> {
-  const { entityType, entityId } = item;
+  const { entityType, entityId, data } = item;
   console.warn(`[Offline Sync] Conflict for ${entityType} ${entityId}. Server wins.`);
-  // Log or notify user if needed
+  
+  // Persist conflict for manager review
+  await conflictsStore.put({
+    id: `${entityType}_${entityId}`,
+    entityType,
+    entityId,
+    localData: data,
+    serverData,
+    resolved: false,
+    createdAt: new Date(),
+  });
+
+  // Notify UI
+  updateStatus({ error: `Conflict detected for ${entityType} ${entityId}. Flagged for review.` });
 }
 
 /**
@@ -345,6 +304,51 @@ export async function createOfflineBookingStatusUpdate(bookingId: string, status
 }
 
 /**
+ * Update a restaurant order status offline
+ */
+export async function createOfflineOrderStatusUpdate(orderId: string, status: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'restaurant_order_status',
+    entityId: orderId,
+    operation: 'update',
+    data: { status },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Update a restaurant table status offline
+ */
+export async function createOfflineTableStatusUpdate(tableId: string, status: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'restaurant_table_status',
+    entityId: tableId,
+    operation: 'update',
+    data: { status },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Update a chalet status (clean/dirty/occupied) offline
+ */
+export async function createOfflineChaletStatusUpdate(chaletId: string, status: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'chalet_status',
+    entityId: chaletId,
+    operation: 'update',
+    data: { status },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
  * Update a housekeeping task status offline
  */
 export async function createOfflineTaskStatusUpdate(taskId: string, status: string): Promise<string> {
@@ -416,6 +420,24 @@ async function resolveSyncAction(item: any): Promise<any> {
     case 'booking':
       if (operation === 'update') {
         return api.patch(`/chalets/bookings/${entityId}/status`, data);
+      }
+      break;
+
+    case 'restaurant_order_status':
+      if (operation === 'update') {
+        return api.patch(`/restaurant/staff/orders/${entityId}/status`, data);
+      }
+      break;
+
+    case 'restaurant_table_status':
+      if (operation === 'update') {
+        return api.put(`/restaurant/tables/${entityId}/status`, data);
+      }
+      break;
+
+    case 'chalet_status':
+      if (operation === 'update') {
+        return api.patch(`/chalets/staff/status`, { chaletId: entityId, status: data.status });
       }
       break;
 

@@ -7,6 +7,8 @@ import { useAuth } from '@/lib/auth-context';
 import { useRestaurantOrders } from '@/lib/socket';
 import { formatCurrency, formatTime, getOrderStatusColor } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { isOnline } from '@/lib/offline/offline-storage';
+import { createOfflineOrderStatusUpdate } from '@/lib/offline/offline-sync';
 import { RestaurantFloorPlan } from '@/components/RestaurantFloorPlan';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
@@ -124,6 +126,16 @@ export default function RestaurantKitchenPage() {
       );
       toast.success(t('orders.orderUpdated', { status: newStatus }));
     } catch (error) {
+      if (!isOnline()) {
+        await createOfflineOrderStatusUpdate(orderId, newStatus);
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.id === orderId ? { ...order, status: newStatus } : order
+          )
+        );
+        toast.info(t('orders.orderUpdatedOffline'), { icon: '⏳' });
+        return;
+      }
       toast.error(tc('errors.failedToUpdate'));
     }
   };
