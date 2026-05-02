@@ -203,24 +203,31 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
     return { synced: 0, failed: 0 };
   }
 
-  updateStatus({ isSyncing: true });
+  updateStatus({ isSyncing: true, error: null });
   
   let synced = 0;
   let failed = 0;
 
   try {
-    // Get all pending items
     const pending = await syncQueue.getPending();
     
     for (const item of pending) {
       try {
-        await syncItem(item);
+        await resolveSyncAction(item);
         await syncQueue.remove(item.id);
         synced++;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      } catch (error: any) {
+        console.error(`[Offline Sync] Item ${item.id} failed:`, error);
         
-        // Update item status
+        // Conflict handling (409)
+        if (error.response?.status === 409) {
+          await handleSyncConflict(item, error.response.data);
+          await syncQueue.remove(item.id);
+          synced++;
+          continue;
+        }
+
+        const errorMessage = error.message || 'Unknown error';
         if (item.attempts >= SYNC_CONFIG.maxRetries) {
           await syncQueue.updateStatus(item.id, 'failed', errorMessage);
           failed++;
@@ -230,20 +237,16 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
       }
     }
 
-    // Update status
     const stats = await syncQueue.getStats();
     updateStatus({
       isSyncing: false,
       pendingCount: stats.pending,
       failedCount: stats.failed,
       lastSyncAt: new Date(),
-      error: null,
     });
 
-    // Refresh caches after sync
-    await refreshAllCaches();
-
   } catch (error) {
+    console.error('[Offline Sync] Global sync error:', error);
     updateStatus({
       isSyncing: false,
       error: error instanceof Error ? error.message : 'Sync failed',
@@ -254,98 +257,12 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
 }
 
 /**
- * Sync a single queue item
- */
-async function syncItem(item: { entityType: string; entityId: string; operation: string; data: unknown }): Promise<void> {
-  const { entityType, entityId, operation, data } = item;
-  
-  let endpoint: string;
-  let method: string;
-  
-  switch (entityType) {
-    case 'order':
-      endpoint = operation === 'create' 
-        ? `${API_BASE}/api/v1/restaurant/orders`
-        : `${API_BASE}/api/v1/restaurant/orders/${entityId}`;
-      break;
-    case 'payment':
-      endpoint = `${API_BASE}/api/v1/payments`;
-      break;
-    case 'booking':
-      endpoint = `${API_BASE}/api/v1/chalets/staff/bookings/${entityId}/status`;
-      break;
-    case 'check-in':
-      endpoint = `${API_BASE}/api/v1/chalets/staff/bookings/${entityId}/check-in`;
-      break;
-    case 'pool-check-in':
-      endpoint = `${API_BASE}/api/v1/pool/staff/validate`;
-      break;
-    default:
-      throw new Error(`Unknown entity type: ${entityType}`);
-  }
-
-  switch (operation) {
-    case 'create':
-      method = 'POST';
-      break;
-    case 'update':
-      method = 'PUT';
-      break;
-    case 'delete':
-      method = 'DELETE';
-      break;
-    default:
-      throw new Error(`Unknown operation: ${operation}`);
-  }
-
-  const response = await api({
-    url: endpoint.replace(`${API_BASE}/api/v1`, ''),
-    method,
-    data: operation !== 'delete' ? data : undefined,
-  });
-
-  if (response.status >= 400) {
-    // Handle conflict detection
-    if (response.status === 409) {
-      await handleSyncConflict(item, response.data);
-      return;
-    }
-    throw new Error(`HTTP ${response.status}`);
-  }
-
-  // If this was an offline order, update local record with server ID
-  if (entityType === 'order' && operation === 'create') {
-    const result = response.data;
-    if (result.id && result.id !== entityId) {
-      // Update local order with server ID
-      const localOrder = await ordersStore.getById(entityId);
-      if (localOrder) {
-        await ordersStore.delete(entityId);
-        await ordersStore.put({ ...localOrder, id: result.id, synced: true });
-      }
-    }
-  }
-}
-
-/**
  * Handle sync conflicts based on Phase 1 rules
  */
 async function handleSyncConflict(item: any, serverData: any): Promise<void> {
-  const { entityType, entityId, data } = item;
-
-  switch (entityType) {
-    case 'booking':
-      // Chalet status: server wins on sync, flag mismatch for manager review
-      console.warn(`[Offline] Conflict detected for booking ${entityId}. Server data wins.`);
-      // We could add a 'flagged_for_review' field if the schema allowed
-      break;
-    case 'check-in':
-      // Check-ins: union merge - if already checked in, we just accept it
-      console.log(`[Offline] Check-in merge for ${entityId}.`);
-      break;
-    default:
-      console.warn(`[Offline] Unhandled conflict for ${entityType}`);
-  }
+  const { entityType, entityId } = item;
+  console.warn(`[Offline Sync] Conflict for ${entityType} ${entityId}. Server wins.`);
+  // Log or notify user if needed
 }
 
 /**
