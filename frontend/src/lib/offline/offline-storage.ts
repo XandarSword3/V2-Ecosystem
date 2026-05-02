@@ -426,6 +426,11 @@ export class SyncQueue {
       total: all.length,
     };
   }
+
+  async hasPending(entityType: string): Promise<boolean> {
+    const all = await this.store.getAll();
+    return all.some((i) => i.entityType === entityType && i.status === 'pending');
+  }
 }
 
 export const syncQueue = new SyncQueue();

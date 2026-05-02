@@ -6,6 +6,7 @@ const syncQueueMock = vi.hoisted(() => ({
   remove: vi.fn(async () => undefined),
   updateStatus: vi.fn(async () => undefined),
   getStats: vi.fn(async () => ({ pending: 0, failed: 0 })),
+  hasPending: vi.fn(() => false),
 }));
 
 const ordersStoreMock = vi.hoisted(() => ({
@@ -27,10 +28,10 @@ vi.mock('../../src/lib/offline/offline-storage', () => ({
   modifiersStore: { getAll: vi.fn(async () => []) },
   customersStore: { getAll: vi.fn(async () => []) },
   paymentsStore: { getAll: vi.fn(async () => []) },
-  ticketsStore: { getAll: vi.fn(async () => []) },
-  chaletsStore: { getAll: vi.fn(async () => []) },
-  bookingsStore: { getAll: vi.fn(async () => []) },
-  housekeepingTasksStore: { getAll: vi.fn(async () => []) },
+  ticketsStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
+  chaletsStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
+  bookingsStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
+  housekeepingTasksStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
   conflictsStore: { put: vi.fn(async () => undefined), getAll: vi.fn(async () => []) },
   cacheManager: { isStale: vi.fn(async () => true), updateMetadata: vi.fn(), getAllMetadata: vi.fn(async () => []) },
   isOnline: vi.fn(() => true),

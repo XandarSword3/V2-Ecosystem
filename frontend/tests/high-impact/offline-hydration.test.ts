@@ -64,6 +64,9 @@ vi.mock('../../src/lib/offline/offline-storage', () => ({
   modifiersStore: modifiersStoreMock,
   customersStore: customersStoreMock,
   cacheManager: cacheManagerMock,
+  syncQueue: {
+    hasPending: vi.fn(() => false),
+  },
   isOnline: vi.fn(() => true),
 }));
 
