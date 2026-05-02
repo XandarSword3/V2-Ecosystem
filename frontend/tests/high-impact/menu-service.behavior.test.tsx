@@ -269,14 +269,14 @@ describe('MenuService behavior', () => {
     expect(screen.getAllByText('Fries').length).toBeGreaterThan(0);
     expect(screen.getByText('Cola')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Drinks' }));
+    await user.click(screen.getByRole('button', { name: /Drinks/i }));
     expect(screen.queryByText('Fries')).not.toBeInTheDocument();
     expect(screen.getByText('Cola')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'All' }));
+    await user.click(screen.getByRole('button', { name: /All/i }));
     expect(screen.getAllByText('Fries').length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole('button', { name: /view cart/i }));
+    await user.click(screen.getByRole('button', { name: /\$\d+\.\d+/ }));
     expect(pushMock).toHaveBeenCalledWith('/restaurant/cart');
   });
 });

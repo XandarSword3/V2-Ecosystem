@@ -200,11 +200,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   if (isLoading || !authChecked || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full"
+          className="w-10 h-10 border-3 rounded-full border-primary-600 border-t-transparent"
         />
       </div>
     );

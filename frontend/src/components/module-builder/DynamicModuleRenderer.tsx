@@ -1,6 +1,6 @@
 'use client';
 
-import { UIBlock } from '@/types/module-builder';
+import { UIBlock, SectionBackground, SectionHeight } from '@/types/module-builder';
 import { Module } from '@/lib/settings-context';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
@@ -11,7 +11,7 @@ import { useContentTranslation } from '@/lib/translate';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCartStore } from '@/stores/cartStore';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Clock, Users, ShoppingCart, Plus, Minus, Calendar, Star, Check } from 'lucide-react';
+import { Loader2, Clock, Users, ShoppingCart, Plus, Minus, Calendar, Star, Check, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState } from 'react';
 
@@ -118,6 +118,47 @@ export function DynamicModuleRenderer({ layout, module }: RendererProps) {
     return <div className="p-10 text-center">No layout defined for this module.</div>;
   }
 
+  // Detect if any block uses freeform positioning
+  const hasFreeformBlocks = safeLayout.some(b => b.position && (b.position.x !== undefined || b.position.y !== undefined));
+
+  if (hasFreeformBlocks) {
+    // Freeform canvas mode - blocks positioned absolutely like PowerPoint
+    return (
+      <div className="relative w-full min-h-screen bg-slate-50 dark:bg-slate-900" style={{ overflow: 'hidden' }}>
+        {safeLayout.map((block) => {
+          const pos = block.position;
+          if (pos && (pos.x !== undefined || pos.y !== undefined)) {
+            // Absolutely positioned block
+            return (
+              <div
+                key={block.id}
+                style={{
+                  position: 'absolute',
+                  left: pos.x !== undefined ? `${pos.x}px` : undefined,
+                  top: pos.y !== undefined ? `${pos.y}px` : undefined,
+                  zIndex: pos.z || 1,
+                  width: pos.width || undefined,
+                  height: pos.height || undefined,
+                  transform: pos.rotation ? `rotate(${pos.rotation}deg)` : pos.scale && pos.scale !== 1 ? `scale(${pos.scale})` : undefined,
+                  transformOrigin: 'center center',
+                }}
+              >
+                <BlockRenderer block={block} module={module} />
+              </div>
+            );
+          }
+          // Stack-positioned block in freeform canvas
+          return (
+            <div key={block.id} style={{ position: 'relative', zIndex: pos?.z || 0 }}>
+              <BlockRenderer block={block} module={module} />
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Default stack mode - blocks flow vertically
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
       {safeLayout.map((block) => (
@@ -127,11 +168,239 @@ export function DynamicModuleRenderer({ layout, module }: RendererProps) {
   );
 }
 
+// ============================================
+// LAYER 1: Section Background & Height Wrapper
+// ============================================
+interface SectionWrapperProps {
+  block: UIBlock;
+  children: React.ReactNode;
+}
+
+function SectionWrapper({ block, children }: SectionWrapperProps) {
+  const { background, sectionHeight, sectionLayout, layers } = block;
+
+  // Helper: Build layout class based on sectionLayout
+  const getLayoutClass = (): string => {
+    if (!sectionLayout) return '';
+
+    switch (sectionLayout) {
+      case 'full-width':
+        return 'w-full';
+      case 'contained':
+        return 'container mx-auto';
+      case 'split-50-50':
+        return 'grid grid-cols-1 md:grid-cols-2 gap-0';
+      case 'split-60-40':
+        return 'grid grid-cols-1 md:grid-cols-[60%_40%] gap-0';
+      case 'split-40-60':
+        return 'grid grid-cols-1 md:grid-cols-[40%_60%] gap-0';
+      case 'centered-narrow':
+        return 'max-w-4xl mx-auto';
+      default:
+        return '';
+    }
+  };
+
+  // Helper: Build background styles
+  const getBackgroundStyles = (): React.CSSProperties => {
+    if (!background) return {};
+
+    switch (background.type) {
+      case 'color':
+        return { backgroundColor: background.color || 'transparent' };
+
+      case 'gradient':
+        if (background.gradient) {
+          const { direction, stops } = background.gradient;
+          return {
+            background: `linear-gradient(${direction}, ${stops.join(', ')})`,
+          };
+        }
+        return {};
+
+      case 'image':
+        if (background.image) {
+          const { url, position = 'center', size = 'cover', repeat = 'no-repeat', attachment = 'scroll' } = background.image;
+          return {
+            backgroundImage: `url(${url})`,
+            backgroundPosition: position,
+            backgroundSize: size,
+            backgroundRepeat: repeat,
+            backgroundAttachment: attachment,
+          };
+        }
+        return {};
+
+      case 'video':
+        // Video is rendered as a separate element, not in CSS
+        return { backgroundColor: '#000' };
+
+      default:
+        return {};
+    }
+  };
+
+  // Helper: Build height styles
+  const getHeightStyles = (): React.CSSProperties => {
+    if (!sectionHeight) return {};
+
+    switch (sectionHeight.mode) {
+      case 'fixed':
+        return { height: sectionHeight.value || '400px' };
+      case 'min-height':
+        return { minHeight: sectionHeight.value || '400px' };
+      case 'full-screen':
+      case 'viewport':
+        return { minHeight: '100vh' };
+      case 'auto':
+      default:
+        return {};
+    }
+  };
+
+  const backgroundStyles = getBackgroundStyles();
+  const heightStyles = getHeightStyles();
+  const layoutClass = getLayoutClass();
+  const hasBackground = !!background;
+  const hasOverlay = background?.overlay && background.overlay.opacity > 0;
+
+  // If no background or height control, just render children
+  if (!hasBackground && !sectionHeight) {
+    return <>{children}</>;
+  }
+
+  return (
+    <section
+      className="relative w-full overflow-hidden"
+      style={{
+        ...backgroundStyles,
+        ...heightStyles,
+        position: 'relative',
+      }}
+    >
+      {/* Video Background */}
+      {background?.type === 'video' && background.video && (
+        <video
+          className="absolute inset-0 w-full h-full object-cover"
+          src={background.video.url}
+          poster={background.video.poster}
+          autoPlay={background.video.autoplay}
+          loop={background.video.loop}
+          muted={background.video.muted !== false}
+          playsInline
+        >
+          <track kind="captions" />
+        </video>
+      )}
+
+      {/* Overlay for text readability */}
+      {hasOverlay && (
+        <div
+          className="absolute inset-0 z-10 pointer-events-none"
+          style={{
+            backgroundColor: background.overlay!.color,
+            opacity: background.overlay!.opacity,
+          }}
+        />
+      )}
+
+      {/* Positioned Layers (Layer 3) */}
+      {layers && layers.length > 0 && (
+        <div className="absolute inset-0 z-20">
+          {layers.map((layer) => (
+            <div
+              key={layer.id}
+              className="absolute"
+              style={{
+                top: layer.position.top,
+                right: layer.position.right,
+                bottom: layer.position.bottom,
+                left: layer.position.left,
+                zIndex: layer.position.zIndex || 1,
+                width: layer.size?.width,
+                height: layer.size?.height,
+              }}
+            >
+              {/* Layer content based on type */}
+              {layer.type === 'text' && (
+                <div style={layer.style as React.CSSProperties}>
+                  {layer.content?.text}
+                </div>
+              )}
+              {layer.type === 'image' && layer.content?.src && (
+                <img
+                  src={layer.content.src}
+                  alt={layer.content.alt || ''}
+                  className="w-full h-full object-cover"
+                  style={{
+                    objectFit: layer.content.objectFit || 'cover',
+                    // Apply specific style properties separately to avoid transform type issues
+                    opacity: layer.style?.opacity,
+                    filter: layer.style?.filter,
+                  }}
+                />
+              )}
+              {layer.type === 'button' && (
+                <button
+                  style={layer.style as React.CSSProperties}
+                  onClick={() => layer.content?.url && (window.location.href = layer.content.url)}
+                >
+                  {layer.content?.text || 'Button'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className={`relative z-30 w-full h-full ${hasBackground ? 'flex flex-col justify-center' : ''} ${layoutClass}`}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+// Error boundary wrapper for individual blocks
+function BlockErrorBoundary({ children, blockType }: { children: React.ReactNode; blockType: string }) {
+  const [hasError, setHasError] = useState(false);
+  
+  if (hasError) {
+    return (
+      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-center">
+        <p className="text-red-600 dark:text-red-400 text-sm font-medium">Failed to render: {blockType}</p>
+        <button 
+          onClick={() => setHasError(false)}
+          className="mt-2 text-xs text-red-500 underline hover:text-red-700"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  try {
+    return <>{children}</>;
+  } catch (err) {
+    console.error(`[BlockRenderer] Error rendering ${blockType}:`, err);
+    setHasError(true);
+    return null;
+  }
+}
+
 function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
   const { type, style } = block;
 
-  // Validate Block Type
-  const KNOWN_TYPES = ['hero', 'container', 'grid', 'text_block', 'image', 'menu_list', 'session_list', 'booking_calendar', 'button', 'form_container', 'testimonials', 'pricing_table'];
+  // Validate Block Type - Added new glassmorphic components
+  const KNOWN_TYPES = [
+    'hero', 'container', 'grid', 'text_block', 'image', 
+    'menu_list', 'session_list', 'booking_calendar', 'button', 'form_container', 
+    'testimonials', 'pricing_table',
+    // New glassmorphic components
+    'hero_v2', 'card_grid', 'stats', 'features', 'cta', 'video', 'divider', 'spacer',
+    // Gym/Session specific components
+    'class_schedule', 'calendar', 'testimonials_carousel'
+  ];
   if (!KNOWN_TYPES.includes(type)) {
     return null;
   }
@@ -147,9 +416,12 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
     backgroundPosition: 'center',
   } as React.CSSProperties;
 
+  // Render content based on block type
+  let content: React.ReactNode;
+
   switch (type) {
     case 'hero':
-      return (
+      content = (
         <section
           style={inlineStyle}
           className="w-full flex items-center justify-center relative overflow-hidden text-white min-h-[300px]"
@@ -163,19 +435,21 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
           </div>
         </section>
       );
+      break;
 
     case 'container':
-      return (
+      content = (
         <div style={inlineStyle} className="container mx-auto px-4 py-8">
           {block.children?.map(child => (
             <BlockRenderer key={child.id} block={child} module={module} />
           ))}
         </div>
       );
+      break;
 
     case 'grid':
       const gridCols = props.columns || 3;
-      return (
+      content = (
         <div className={`grid grid-cols-1 md:grid-cols-${gridCols} gap-6 container mx-auto px-4 py-8`} style={inlineStyle}>
           {block.children && block.children.length > 0
             ? block.children.map(child => <BlockRenderer key={child.id} block={child} module={module} />)
@@ -183,16 +457,18 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
           }
         </div>
       );
+      break;
 
     case 'text_block':
-      return (
+      content = (
         <div style={inlineStyle} className="prose dark:prose-invert max-w-none container mx-auto px-4 py-8">
           {props.content || 'Empty Text Block'}
         </div>
       );
+      break;
 
     case 'image':
-      return (
+      content = (
         <div style={inlineStyle} className="w-full container mx-auto px-4 py-4">
           <img
             src={props.src || '/placeholder-image.jpg'}
@@ -201,15 +477,19 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
           />
         </div>
       );
+      break;
 
     case 'menu_list':
-      return <MenuListComponent module={module} props={props} />;
+      content = <MenuListComponent module={module} props={props} />;
+      break;
 
     case 'session_list':
-      return <SessionListComponent module={module} props={props} />;
+      content = <SessionListComponent module={module} props={props} />;
+      break;
 
     case 'booking_calendar':
-      return <BookingCalendarComponent module={module} props={props} />;
+      content = <BookingCalendarComponent module={module} props={props} />;
+      break;
 
     case 'button':
       const buttonSizeClasses = {
@@ -237,7 +517,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
         </button>
       );
 
-      return (
+      content = (
         <div style={inlineStyle} className="flex justify-center py-4">
           {props.href ? (
             <a href={props.href} className="no-underline">
@@ -246,20 +526,305 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
           ) : ButtonContent}
         </div>
       );
+      break;
 
     case 'form_container':
-      return <FormContainerComponent module={module} block={block} props={props} />;
+      content = <FormContainerComponent module={module} block={block} props={props} />;
+      break;
 
     case 'testimonials':
-      return <TestimonialsComponent props={props} />;
+      content = <TestimonialsComponent props={props} />;
+      break;
 
     case 'pricing_table':
-      return <PricingTableComponent module={module} props={props} />;
+      content = <PricingTableComponent module={module} props={props} />;
+      break;
+
+    // ============================================
+    // NEW GLASSMORPHIC COMPONENTS
+    // ============================================
+
+    case 'hero_v2':
+      // Background is handled by SectionWrapper via block.background
+      // Fallback gradient only if no background is set on the block
+      const heroV2HasBackground = !!block.background;
+      const heroV2FallbackStyle: React.CSSProperties = heroV2HasBackground
+        ? inlineStyle
+        : {
+            ...inlineStyle,
+            background: `linear-gradient(135deg, ${props.headerColor || '#0ea5e9'} 0%, ${props.accentColor || '#6366f1'} 50%, ${props.headerColor || '#0ea5e9'} 100%)`,
+            backgroundSize: '400% 400%',
+          };
+
+      content = (
+        <section
+          style={heroV2FallbackStyle}
+          className="w-full relative overflow-hidden min-h-[45vh] flex items-center justify-center"
+        >
+          {/* Aurora overlay - only when no image background */}
+          {!block.background?.image && (
+            <div
+              className="absolute inset-0 opacity-60"
+              style={{
+                background: `
+                  radial-gradient(ellipse 80% 50% at 30% 40%, rgba(255,255,255,0.3) 0%, transparent 50%),
+                  radial-gradient(ellipse 60% 40% at 70% 60%, rgba(255,255,255,0.2) 0%, transparent 50%)
+                `,
+                filter: 'blur(40px)',
+              }}
+            />
+          )}
+
+          {/* Eyebrow / Badge */}
+          {(props.eyebrow || props.badgeText) && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="absolute top-8 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-2 px-4 py-2 rounded-full text-white text-sm font-medium"
+              style={{
+                background: 'rgba(255,255,255,0.15)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.3)',
+              }}
+            >
+              <Sparkles className="w-4 h-4" />
+              {props.eyebrow || props.badgeText}
+            </motion.div>
+          )}
+
+          {/* Content */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className={`relative z-10 px-4 ${props.align === 'left' ? 'text-left' : props.align === 'right' ? 'text-right' : 'text-center'}`}
+          >
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
+              {props.title || module.name}
+              {props.highlight && (
+                <span className="text-amber-400"> {props.highlight}</span>
+              )}
+            </h1>
+            {props.subtitle && (
+              <p className="text-xl text-white/90 mb-2">
+                {props.subtitle}
+              </p>
+            )}
+            {props.description && (
+              <p className="text-lg text-white/80 max-w-2xl mx-auto mb-8">
+                {props.description}
+              </p>
+            )}
+
+            {/* Buttons */}
+            {(props.primaryButton || props.secondaryButton) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="flex gap-4 flex-wrap justify-center mt-6"
+              >
+                {props.primaryButton && (
+                  <a
+                    href={props.primaryUrl || '#'}
+                    className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold rounded-lg transition-colors shadow-lg"
+                  >
+                    {props.primaryButton}
+                  </a>
+                )}
+                {props.secondaryButton && (
+                  <a
+                    href={props.secondaryUrl || '#'}
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-lg border border-white/30 transition-colors backdrop-blur-sm"
+                  >
+                    {props.secondaryButton}
+                  </a>
+                )}
+              </motion.div>
+            )}
+          </motion.div>
+
+          {/* Bottom wave */}
+          <div className="absolute bottom-0 left-0 right-0">
+            <svg viewBox="0 0 1440 60" fill="none" className="w-full">
+              <path d="M0 60L60 52.5C120 45 240 30 360 22.5C480 15 600 15 720 18.75C840 22.5 960 30 1080 33.75C1200 37.5 1320 37.5 1380 37.5L1440 37.5V60H1380C1320 60 1200 60 1080 60C960 60 840 60 720 60C600 60 480 60 360 60C240 60 120 60 60 60H0Z" className="fill-slate-50 dark:fill-slate-900"/>
+            </svg>
+          </div>
+        </section>
+      );
+      break;
+
+    case 'card_grid':
+      const cardCols = props.columns || 3;
+      content = (
+        <div className={`grid grid-cols-1 md:grid-cols-${cardCols} gap-6 container mx-auto px-4 py-8`} style={inlineStyle}>
+          {props.cards?.map((card: any, index: number) => (
+            <motion.div
+              key={index}
+              whileHover={{ y: -8, scale: 1.02 }}
+              className="rounded-2xl overflow-hidden cursor-pointer"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.5) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255,255,255,0.5)',
+                boxShadow: '0 10px 30px -10px rgba(0,0,0,0.15)',
+              }}
+            >
+              {card.image && (
+                <div className="h-48 overflow-hidden">
+                  <img src={card.image} alt={card.title} className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="p-6">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{card.title}</h3>
+                <p className="text-slate-600 dark:text-slate-400">{card.description}</p>
+              </div>
+            </motion.div>
+          )) || <div className="col-span-full text-center p-8">Add cards in the builder</div>}
+        </div>
+      );
+      break;
+
+    case 'stats':
+      content = (
+        <div className="container mx-auto px-4 py-12" style={inlineStyle}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {props.stats?.map((stat: any, index: number) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ y: -4 }}
+                className="text-center p-6 rounded-2xl"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.3) 100%)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255,255,255,0.5)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                }}
+              >
+                <div className="text-3xl md:text-4xl font-bold mb-1" style={{ color: props.accentColor || '#6366f1' }}>
+                  {stat.value}
+                </div>
+                <div className="text-slate-600 dark:text-slate-400 text-sm">{stat.label}</div>
+              </motion.div>
+            )) || <div className="col-span-full text-center p-8">Add stats in the builder</div>}
+          </div>
+        </div>
+      );
+      break;
+
+    case 'features':
+      content = (
+        <div className="container mx-auto px-4 py-12" style={inlineStyle}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {props.features?.map((feature: any, index: number) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="flex items-start gap-4 p-6 rounded-2xl"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.3) 100%)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255,255,255,0.5)',
+                }}
+              >
+                <div 
+                  className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: props.accentColor || '#6366f1' }}
+                >
+                  <Check className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white mb-1">{feature.title}</h3>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm">{feature.description}</p>
+                </div>
+              </motion.div>
+            )) || <div className="col-span-full text-center p-8">Add features in the builder</div>}
+          </div>
+        </div>
+      );
+      break;
+
+    case 'cta':
+      content = (
+        <div className="container mx-auto px-4 py-12" style={inlineStyle}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="rounded-3xl p-8 md:p-12 text-center"
+            style={{
+              background: `linear-gradient(135deg, ${props.headerColor || '#0ea5e9'} 0%, ${props.accentColor || '#6366f1'} 100%)`,
+            }}
+          >
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              {props.title || 'Ready to get started?'}
+            </h2>
+            <p className="text-white/80 text-lg mb-8 max-w-2xl mx-auto">
+              {props.description || 'Join us today and experience the difference.'}
+            </p>
+            <button
+              onClick={() => props.buttonUrl && (window.location.href = props.buttonUrl)}
+              className="px-8 py-4 bg-white text-slate-900 rounded-xl font-semibold hover:bg-white/90 transition-colors shadow-xl"
+            >
+              {props.buttonText || 'Get Started'}
+            </button>
+          </motion.div>
+        </div>
+      );
+      break;
+
+    case 'divider':
+      content = (
+        <div className="container mx-auto px-4 py-8" style={inlineStyle}>
+          <div 
+            className="h-px w-full"
+            style={{ 
+              background: `linear-gradient(90deg, transparent, ${props.accentColor || '#6366f1'}40, transparent)` 
+            }}
+          />
+        </div>
+      );
+      break;
+
+    case 'spacer':
+      content = (
+        <div style={{ height: props.height || 40 }} />
+      );
+      break;
+
+    // ============================================
+    // GYM/SESSION SPECIFIC COMPONENTS
+    // ============================================
+
+    case 'class_schedule':
+      content = <ClassScheduleComponent module={module} props={props} />;
+      break;
+
+    case 'calendar':
+      content = <CalendarComponent module={module} props={props} />;
+      break;
+
+    case 'testimonials_carousel':
+      content = <TestimonialsCarouselComponent module={module} props={props} />;
+      break;
 
     default:
       // This case should be unreachable due to the check above, but as a safety net:
-      return null;
+      content = null;
   }
+
+  // Wrap content with SectionWrapper for background/height/layer support
+  return (
+    <BlockErrorBoundary blockType={type}>
+      <SectionWrapper block={block}>
+        {content}
+      </SectionWrapper>
+    </BlockErrorBoundary>
+  );
 }
 
 // ============================================
@@ -881,6 +1446,206 @@ function PricingTableComponent({ module, props }: { module: Module; props: Block
             </button>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Class Schedule Component for Gym/Session modules
+// ============================================
+function ClassScheduleComponent({ module, props }: { module: Module; props: BlockProps }) {
+  const t = useTranslations('common');
+  const classes = props.classes || [
+    { id: '1', name: 'Strength Training', time: '07:00 AM - 08:00 AM', trainer: 'Coach Mike', category: 'Full Body', icon: 'Dumbbell' },
+    { id: '2', name: 'Yoga Flow', time: '09:30 AM - 10:30 AM', trainer: 'Coach Sarah', category: 'Mind & Flexibility', icon: 'Sparkles' },
+    { id: '3', name: 'HIIT Blast', time: '05:00 PM - 06:00 PM', trainer: 'Coach Alex', category: 'High Intensity', icon: 'Zap' },
+    { id: '4', name: 'Pilates Core', time: '06:30 PM - 07:30 PM', trainer: 'Coach Emma', category: 'Core Strength', icon: 'Heart' },
+  ];
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="text-sm font-semibold text-amber-500 uppercase tracking-wider">{props.subtitle || 'Upcoming Sessions'}</h3>
+          <h2 className="text-2xl font-bold text-white">{props.title || 'Next Classes'}</h2>
+        </div>
+        <button className="text-amber-500 hover:text-amber-400 text-sm font-medium flex items-center gap-1">
+          {t('viewFullSchedule') || 'View Full Schedule'} →
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {classes.map((cls: any, index: number) => (
+          <motion.div
+            key={cls.id}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.1 }}
+            className="flex items-center gap-4 p-4 bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 hover:border-amber-500/50 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-amber-500 text-lg">
+              {cls.icon === 'Dumbbell' && '💪'}
+              {cls.icon === 'Sparkles' && '✨'}
+              {cls.icon === 'Zap' && '⚡'}
+              {cls.icon === 'Heart' && '❤️'}
+            </div>
+
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <h4 className="font-semibold text-white">{cls.name}</h4>
+                <span className="text-xs text-slate-400 bg-slate-700 px-2 py-0.5 rounded">{cls.category}</span>
+              </div>
+              <p className="text-sm text-slate-400">{cls.time} • {cls.trainer}</p>
+            </div>
+
+            <button className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-medium text-sm rounded-lg transition-colors">
+              Book
+            </button>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Calendar Component
+// ============================================
+function CalendarComponent({ module, props }: { module: Module; props: BlockProps }) {
+  const [currentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<number | null>(null);
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+  const generateDays = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    const days = [];
+    const startOffset = firstDay === 0 ? 6 : firstDay - 1;
+    
+    for (let i = 0; i < startOffset; i++) {
+      days.push(null);
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(i);
+    }
+    return days;
+  };
+
+  const days = generateDays();
+  const hasEvent = (day: number | null) => day && [4, 12, 15, 19, 26].includes(day);
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold text-white">{props.title || 'Weekly Schedule'}</h3>
+        <div className="flex items-center gap-2 text-slate-300">
+          <button className="p-1 hover:bg-slate-700 rounded">←</button>
+          <span className="text-sm font-medium">{monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}</span>
+          <button className="p-1 hover:bg-slate-700 rounded">→</button>
+        </div>
+      </div>
+
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-4">
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {weekDays.map(day => (
+            <div key={day} className="text-center text-xs font-medium text-slate-500 py-2">{day}</div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {days.map((day, index) => (
+            <button
+              key={index}
+              onClick={() => day && setSelectedDate(day)}
+              disabled={!day}
+              className={`
+                aspect-square flex items-center justify-center rounded-lg text-sm font-medium
+                ${!day ? 'invisible' : ''}
+                ${selectedDate === day ? 'bg-amber-500 text-slate-900' : ''}
+                ${selectedDate !== day && hasEvent(day) ? 'bg-slate-700 text-amber-400 border border-amber-500/50' : ''}
+                ${selectedDate !== day && day && !hasEvent(day) ? 'text-slate-300 hover:bg-slate-700' : ''}
+              `}
+            >
+              {day}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button className="w-full mt-4 py-2 text-center text-sm text-slate-400 hover:text-white border border-slate-700 rounded-lg hover:bg-slate-800 transition-colors">
+        View Full Calendar →
+      </button>
+    </div>
+  );
+}
+
+// ============================================
+// Testimonials Carousel Component
+// ============================================
+function TestimonialsCarouselComponent({ module, props }: { module: Module; props: BlockProps }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const testimonials = props.testimonials || [
+    { id: '1', text: 'The gym facilities are top-notch and the trainers are incredibly supportive. It is the perfect balance with my resort stay.', name: 'Jessica M.', role: 'Member', rating: 5, avatar: 'JM' },
+    { id: '2', text: 'I love starting my day with a workout here. The environment is motivating and the classes are amazing!', name: 'David L.', role: 'Member', rating: 5, avatar: 'DL' },
+    { id: '3', text: 'From yoga to strength training, everything I need is here. Highly recommend the gym module!', name: 'Sophia K.', role: 'Member', rating: 5, avatar: 'SK' },
+  ];
+
+  const nextSlide = () => setActiveIndex((prev: number) => (prev + 1) % testimonials.length);
+  const prevSlide = () => setActiveIndex((prev: number) => (prev - 1 + testimonials.length) % testimonials.length);
+
+  return (
+    <div className="w-full">
+      <div className="text-center mb-8">
+        <h3 className="text-sm font-semibold text-amber-500 uppercase tracking-wider mb-2">{props.subtitle || 'What Our Members Say'}</h3>
+        <h2 className="text-3xl font-bold text-white">{props.title || 'Stronger Together'}</h2>
+      </div>
+
+      <div className="relative">
+        <button onClick={prevSlide} className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 w-10 h-10 bg-slate-800 hover:bg-slate-700 rounded-full flex items-center justify-center text-white border border-slate-700 transition-colors">←</button>
+        <button onClick={nextSlide} className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 w-10 h-10 bg-slate-800 hover:bg-slate-700 rounded-full flex items-center justify-center text-white border border-slate-700 transition-colors">→</button>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-4">
+          {testimonials.map((testimonial: any, index: number) => (
+            <motion.div
+              key={testimonial.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50"
+            >
+              <div className="flex items-center gap-1 mb-4">
+                {Array.from({ length: testimonial.rating }).map((_, i) => (
+                  <Star key={i} className="w-4 h-4 text-amber-500 fill-current" />
+                ))}
+              </div>
+              <p className="text-slate-300 italic mb-6 leading-relaxed">&ldquo;{testimonial.text}&rdquo;</p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-amber-500 font-semibold text-sm">{testimonial.avatar}</div>
+                <div>
+                  <div className="font-semibold text-white">{testimonial.name}</div>
+                  <div className="text-xs text-slate-500">{testimonial.role}</div>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="flex justify-center gap-2 mt-6">
+          {testimonials.map((_: any, index: number) => (
+            <button
+              key={index}
+              onClick={() => setActiveIndex(index)}
+              className={`w-2 h-2 rounded-full transition-colors ${index === activeIndex ? 'bg-amber-500' : 'bg-slate-600 hover:bg-slate-500'}`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -135,18 +135,21 @@ describe('Admin channels route coverage', () => {
     const apiKeyInput = screen.getByPlaceholderText('••••••••••••');
     await user.type(apiKeyInput, 'my-secret-key');
 
-    await user.click(screen.getAllByRole('button', { name: /^Connect$/i })[1]);
+    const modal = screen.getByText('Connect Channel', { selector: 'h2' }).parentElement!;
+    const submitButton = within(modal).getByRole('button', { name: /^Connect$/ });
+    await waitFor(() => expect(submitButton).not.toBeDisabled());
+    await user.click(submitButton);
 
     await waitFor(() => {
       expect(apiPostMock).toHaveBeenCalledWith(
         `/channels/properties/${propertyId}/connections`,
         expect.objectContaining({
-          channel_code: 'BOOKING_COM',
+          channel_code: 'BOOKING', // page.tsx maps booking_com to BOOKING
           hotel_code: 'HTL-99',
           api_key: 'my-secret-key',
         })
       );
-    });
+    }, { timeout: 3000 });
 
     expect(toastSuccessMock).toHaveBeenCalledWith('Channel connected');
   });

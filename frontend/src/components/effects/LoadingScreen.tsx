@@ -1,15 +1,18 @@
 'use client';
 
 /**
- * Cinematic Loading Screen
+ * Cinematic Loading Screen - Enhanced 5 Stage Sequence
  * 
- * A luxurious, premium loading animation that plays on initial app load.
- * Features dynamic resort branding with elegant staggered animations,
- * particle effects, and a sophisticated reveal sequence.
+ * Stage 1 (0-500ms): Void - Complete darkness, anticipation builds
+ * Stage 2 (500-2000ms): Orbital Rings - Golden ratio rings with constellation lines
+ * Stage 3 (2000-3500ms): Aurora Field - Multi-layered mesh gradient with light rays
+ * Stage 4 (3500-5500ms): Typography Reveal - Resort name with letter cascade
+ * Stage 5 (5500-8000ms): Particle Bloom - Orbiting sparkles, glow intensifies
+ * Exit (8000ms+): Dramatic curtain rise with blur and brightness flash
  */
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
@@ -18,148 +21,406 @@ interface LoadingScreenProps {
   minDuration?: number;
 }
 
-// Particle component for floating elements
-const Particle = ({ delay, duration, size, x, y }: { delay: number; duration: number; size: number; x: string; y: string }) => (
-  <motion.div
-    className="absolute rounded-full"
-    style={{
-      width: size,
-      height: size,
-      left: x,
-      top: y,
-      background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), rgba(255,255,255,0.1))',
-      boxShadow: '0 0 20px rgba(255,255,255,0.2)',
-    }}
-    initial={{ opacity: 0, scale: 0 }}
-    animate={{
-      opacity: [0, 0.8, 0.4, 0.8, 0],
-      scale: [0, 1, 1.2, 1, 0],
-      y: [0, -30, -60, -90, -120],
-    }}
-    transition={{
-      duration,
-      delay,
-      repeat: Infinity,
-      ease: 'easeInOut',
-    }}
-  />
+// Stage timing - MUCH SLOWER for visibility (milliseconds)
+const STAGE_TIMING = {
+  void: 0,
+  rings: 500,
+  aurora: 2000,
+  typography: 3500,
+  particles: 5500,
+  complete: 8000,
+} as const;
+
+// Golden ratio
+const PHI = 1.618;
+
+// Aurora mesh gradient with film grain
+const AuroraField = ({ visible }: { visible: boolean }) => {
+  if (!visible) return null;
+  
+  return (
+    <motion.div
+      className="absolute inset-0"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 1.1 }}
+      transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {/* Primary gradient orbs */}
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          background: `
+            radial-gradient(ellipse 80% 50% at 20% 40%, var(--color-primary) 0%, transparent 50%),
+            radial-gradient(ellipse 60% 40% at 80% 20%, color-mix(in srgb, var(--color-primary) 70%, #a855f7) 0%, transparent 50%),
+            radial-gradient(ellipse 70% 60% at 60% 80%, color-mix(in srgb, var(--color-primary) 60%, #3b82f6) 0%, transparent 50%)
+          `,
+          filter: 'blur(80px)',
+        }}
+        animate={{
+          scale: [1, 1.2, 1],
+          x: ['0%', '5%', '-5%', '0%'],
+          y: ['0%', '-5%', '5%', '0%'],
+        }}
+        transition={{
+          duration: 12,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+      />
+      
+      {/* Secondary glow layer */}
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          background: 'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 60%)',
+        }}
+        animate={{
+          opacity: [0.3, 0.6, 0.3],
+          scale: [1, 1.1, 1],
+        }}
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+      />
+      
+      {/* Film grain noise overlay */}
+      <div 
+        className="absolute inset-0 opacity-[0.04] mix-blend-overlay pointer-events-none"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+        }}
+      />
+      
+      {/* Light rays from center */}
+      <div className="absolute inset-0 pointer-events-none">
+        {[...Array(12)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute left-1/2 top-1/2 h-full origin-top"
+            style={{
+              width: '2px',
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0.3) 0%, transparent 60%)',
+              transform: `translateX(-50%) rotate(${i * 30}deg)`,
+              marginTop: '-10%',
+            }}
+            animate={{
+              opacity: [0.1, 0.3, 0.1],
+              scaleY: [0.8, 1, 0.8],
+            }}
+            transition={{
+              duration: 4,
+              delay: i * 0.2,
+              repeat: Infinity,
+              ease: 'easeInOut',
+            }}
+          />
+        ))}
+      </div>
+    </motion.div>
+  );
+};
+
+// Centered orbital ring
+const OrbitalRing = ({ 
+  index, 
+  total, 
+  color 
+}: { 
+  index: number; 
+  total: number; 
+  color: string;
+}) => {
+  const baseSize = 200;
+  const size = baseSize * Math.pow(PHI, index / 2.5);
+  const delay = index * 0.3;
+  const duration = 20 + index * 5;
+  const reverse = index % 2 === 1;
+  
+  return (
+    <motion.div
+      className="absolute rounded-full"
+      style={{
+        width: size,
+        height: size,
+        left: '50%',
+        top: '50%',
+        marginLeft: -size / 2,
+        marginTop: -size / 2,
+        borderColor: color,
+        borderWidth: index === 0 ? '2px' : '1px',
+        borderStyle: 'solid',
+      }}
+      initial={{ 
+        opacity: 0, 
+        scale: 0.5,
+        rotate: 0,
+      }}
+      animate={{ 
+        opacity: [0.2, 0.5, 0.2],
+        scale: 1,
+        rotate: reverse ? -360 : 360,
+      }}
+      transition={{
+        opacity: { duration: 3, repeat: Infinity, ease: 'easeInOut', delay },
+        scale: { duration: 1, ease: [0.22, 1, 0.36, 1] },
+        rotate: { duration, repeat: Infinity, ease: 'linear', delay },
+      }}
+    />
+  );
+};
+
+// Orbiting particle system with trails
+const OrbitingParticles = ({ count = 50 }: { count?: number }) => {
+  const particles = useMemo(() => {
+    return Array.from({ length: count }, (_, i) => ({
+      id: i,
+      angle: (i / count) * 360,
+      radius: 150 + Math.random() * 200,
+      size: Math.random() * 4 + 2,
+      speed: 0.5 + Math.random() * 1,
+      delay: Math.random() * 2,
+      orbitTilt: Math.random() * 30 - 15,
+    }));
+  }, [count]);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {particles.map((p) => (
+        <motion.div
+          key={p.id}
+          className="absolute left-1/2 top-1/2 rounded-full"
+          style={{
+            width: p.size,
+            height: p.size,
+            marginLeft: -p.size / 2,
+            marginTop: -p.size / 2,
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 70%)',
+            boxShadow: '0 0 20px rgba(255,255,255,0.8), 0 0 40px rgba(255,255,255,0.4)',
+          }}
+          initial={{ opacity: 0 }}
+          animate={{
+            opacity: [0, 0.8, 0.4, 0.8, 0],
+            x: [
+              Math.cos((p.angle * Math.PI) / 180) * p.radius,
+              Math.cos(((p.angle + 90) * Math.PI) / 180) * p.radius,
+              Math.cos(((p.angle + 180) * Math.PI) / 180) * p.radius,
+              Math.cos(((p.angle + 270) * Math.PI) / 180) * p.radius,
+              Math.cos(((p.angle + 360) * Math.PI) / 180) * p.radius,
+            ],
+            y: [
+              Math.sin((p.angle * Math.PI) / 180) * p.radius * 0.3,
+              Math.sin(((p.angle + 90) * Math.PI) / 180) * p.radius * 0.3,
+              Math.sin(((p.angle + 180) * Math.PI) / 180) * p.radius * 0.3,
+              Math.sin(((p.angle + 270) * Math.PI) / 180) * p.radius * 0.3,
+              Math.sin(((p.angle + 360) * Math.PI) / 180) * p.radius * 0.3,
+            ],
+            scale: [0.5, 1.2, 1, 1.2, 0.5],
+          }}
+          transition={{
+            duration: 8 / p.speed,
+            delay: p.delay,
+            repeat: Infinity,
+            ease: 'linear',
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+// Rising sparkles from bottom
+const RisingSparkles = ({ count = 40 }: { count?: number }) => {
+  const sparkles = useMemo(() => {
+    return Array.from({ length: count }, (_, i) => ({
+      id: i,
+      x: 10 + Math.random() * 80,
+      delay: Math.random() * 3,
+      duration: 3 + Math.random() * 2,
+      size: Math.random() * 3 + 1,
+    }));
+  }, [count]);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {sparkles.map((s) => (
+        <motion.div
+          key={s.id}
+          className="absolute rounded-full"
+          style={{
+            left: `${s.x}%`,
+            bottom: -20,
+            width: s.size,
+            height: s.size,
+            background: 'white',
+            boxShadow: '0 0 10px white, 0 0 20px rgba(255,255,255,0.5)',
+          }}
+          initial={{ opacity: 0, y: 0, scale: 0 }}
+          animate={{
+            opacity: [0, 1, 1, 0],
+            y: [-window.innerHeight * 0.3, -window.innerHeight * 0.6, -window.innerHeight],
+            scale: [0, 1, 0.5],
+            x: [0, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 50],
+          }}
+          transition={{
+            duration: s.duration,
+            delay: s.delay,
+            repeat: Infinity,
+            ease: 'easeOut',
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+// Typography reveal with 3D letter cascade
+const TypographyReveal = ({ 
+  text, 
+  delay = 0,
+  className = '',
+}: { 
+  text: string; 
+  delay?: number;
+  className?: string;
+}) => {
+  const letters = text.split('');
+  
+  return (
+    <div className={`flex justify-center flex-wrap ${className}`} style={{ perspective: '1000px' }}>
+      {letters.map((letter, i) => (
+        <motion.span
+          key={i}
+          className="inline-block font-bold text-4xl md:text-6xl lg:text-7xl"
+          style={{
+            color: 'var(--color-loading-text, white)',
+            textShadow: '0 4px 30px rgba(0,0,0,0.4), 0 0 60px rgba(255,255,255,0.1)',
+            transformStyle: 'preserve-3d',
+          }}
+          initial={{ 
+            y: 80, 
+            opacity: 0,
+            rotateX: -90,
+            scale: 0.8,
+          }}
+          animate={{ 
+            y: 0, 
+            opacity: 1,
+            rotateX: 0,
+            scale: 1,
+          }}
+          transition={{
+            duration: 0.8,
+            delay: delay + i * 0.08,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+        >
+          {letter === ' ' ? '\u00A0' : letter}
+        </motion.span>
+      ))}
+    </div>
+  );
+};
+
+// Reduced motion fallback
+const ReducedMotionLoader = ({ resortName }: { resortName: string }) => (
+  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900">
+    <div className="text-center">
+      <div className="text-3xl font-bold text-white mb-4">{resortName}</div>
+      <div className="w-48 h-1 bg-white/20 rounded-full overflow-hidden mx-auto">
+        <motion.div
+          className="h-full bg-white rounded-full"
+          animate={{ x: ['-100%', '100%'] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      </div>
+    </div>
+  </div>
 );
 
-// Elegant ring animation around logo
-const LogoRing = ({ delay, scale, reverse }: { delay: number; scale: number; reverse?: boolean }) => (
-  <motion.div
-    className="absolute inset-0 rounded-full border border-white/20"
-    style={{ transform: `scale(${scale})` }}
-    initial={{ opacity: 0, rotate: 0 }}
-    animate={{
-      opacity: [0, 0.5, 0],
-      rotate: reverse ? -360 : 360,
-    }}
-    transition={{
-      duration: 8,
-      delay,
-      repeat: Infinity,
-      ease: 'linear',
-    }}
-  />
-);
-
-export function LoadingScreen({ minDuration = 2500 }: LoadingScreenProps) {
+export function LoadingScreen({ minDuration = 4000 }: LoadingScreenProps) {
   const t = useTranslations('common');
-  const { settings, loading: settingsLoading } = useSiteSettings();
+  const { settings } = useSiteSettings();
   const [mounted, setMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
-  // Phase used for potential future animation choreography
-  const [, setPhase] = useState<'entering' | 'loading' | 'exiting'>('entering');
+  const [stage, setStage] = useState<'void' | 'rings' | 'aurora' | 'typography' | 'particles' | 'complete'>('void');
   const enableLoadingAnimation = useSettingsStore((s) => s.enableLoadingAnimation);
+  const shouldReduceMotion = useReducedMotion();
+  const startTimeRef = useRef<number>(0);
   
-  // Keep startup branding neutral until CMS settings are loaded
-  const cmsResortName = settings.resortName?.trim() || '';
-  const cmsTagline = settings.tagline?.trim() || '';
-  const hasCmsBranding = !settingsLoading && cmsResortName.length > 0;
-  const resortName = hasCmsBranding ? cmsResortName : 'Resort Experience';
-  const tagline = hasCmsBranding ? (cmsTagline || t('loading')) : t('loading');
-  const logoText = hasCmsBranding ? cmsResortName.substring(0, 2).toUpperCase() : 'V2';
+  // CMS branding
+  const resortName = settings.resortName?.trim() || 'Resort Experience';
+  const tagline = settings.tagline?.trim() || t('loading');
+  const logoText = resortName.substring(0, 2).toUpperCase();
+  const primaryColor = 'var(--color-primary, #6366f1)';
   
-  // Generate particles only on client to avoid hydration mismatch
-  const [particles, setParticles] = useState<Array<{
-    id: number;
-    delay: number;
-    duration: number;
-    size: number;
-    x: string;
-    y: string;
-  }>>([]);
-
-  // Split resort name for staggered animation
-  const nameLetters = resortName.split('');
-
-  // Generate particles on mount (client-side only)
+  // Mount effect
   useEffect(() => {
     setMounted(true);
-    setParticles(
-      Array.from({ length: 20 }, (_, i) => ({
-        id: i,
-        delay: Math.random() * 3,
-        duration: 4 + Math.random() * 2,
-        size: 4 + Math.random() * 8,
-        x: `${Math.random() * 100}%`,
-        y: `${60 + Math.random() * 40}%`,
-      }))
-    );
+    startTimeRef.current = Date.now();
   }, []);
-
+  
+  // Stage progression - independent of loading state
   useEffect(() => {
     if (!mounted) return;
-    if (!enableLoadingAnimation) {
-      setIsLoading(false);
-      return;
-    }
-
-    const hasVisited = sessionStorage.getItem('v2resort_visited');
-    if (hasVisited) {
-      setIsLoading(false);
-      return;
-    }
-
-    // Smooth progress animation
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        // Ease out progress
-        const remaining = 100 - prev;
-        return prev + Math.min(remaining * 0.15, 8);
-      });
-    }, 100);
-
-    // Phase transitions
-    setTimeout(() => setPhase('loading'), 500);
     
-    const timer = setTimeout(() => {
-      setPhase('exiting');
-      setTimeout(() => {
-        setIsLoading(false);
-        sessionStorage.setItem('v2resort_visited', 'true');
-      }, 800);
-    }, minDuration);
-
-    return () => {
-      clearTimeout(timer);
-      clearInterval(progressInterval);
+    const timers = [
+      setTimeout(() => setStage('rings'), STAGE_TIMING.rings),
+      setTimeout(() => setStage('aurora'), STAGE_TIMING.aurora),
+      setTimeout(() => setStage('typography'), STAGE_TIMING.typography),
+      setTimeout(() => setStage('particles'), STAGE_TIMING.particles),
+      setTimeout(() => setStage('complete'), STAGE_TIMING.complete),
+    ];
+    
+    return () => timers.forEach(clearTimeout);
+  }, [mounted]);
+  
+  // Progress calculation - ALWAYS runs regardless of settings state
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const updateProgress = () => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const newProgress = Math.min((elapsed / minDuration) * 100, 99);
+      setProgress(newProgress);
+      
+      if (elapsed < minDuration) {
+        requestAnimationFrame(updateProgress);
+      } else {
+        setProgress(100);
+        setTimeout(() => setIsLoading(false), 500);
+      }
     };
-  }, [minDuration, enableLoadingAnimation, mounted]);
-
-  // Don't render anything on server or before mount
+    
+    const rafId = requestAnimationFrame(updateProgress);
+    return () => cancelAnimationFrame(rafId);
+  }, [minDuration, mounted]);
+  
+  // Skip animation if disabled
+  useEffect(() => {
+    if (enableLoadingAnimation === false) {
+      setIsLoading(false);
+    }
+  }, [enableLoadingAnimation]);
+  
+  // Don't render on server
   if (!mounted) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900" />
+      <div 
+        className="fixed inset-0 z-[9999] bg-slate-950"
+        style={{ background: 'var(--color-loading-bg, #020617)' }}
+      />
     );
   }
-
+  
+  // Reduced motion fallback
+  if (shouldReduceMotion) {
+    return isLoading ? <ReducedMotionLoader resortName={resortName} /> : null;
+  }
+  
   return (
     <AnimatePresence mode="wait">
       {isLoading && (
@@ -168,719 +429,245 @@ export function LoadingScreen({ minDuration = 2500 }: LoadingScreenProps) {
           initial={{ opacity: 1 }}
           exit={{ 
             opacity: 0,
-            scale: 1.1,
-            filter: 'blur(10px)',
+            scale: 1.05,
+            filter: 'blur(30px) brightness(2)',
           }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ 
+            duration: 1.2, 
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          style={{ background: 'var(--color-loading-bg, #020617)' }}
         >
-          {/* Animated gradient background */}
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900"
-            animate={{
-              backgroundPosition: ['0% 0%', '100% 100%', '0% 0%'],
-            }}
-            transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-          />
-
-          {/* Mesh gradient overlay */}
+          {/* Vignette overlay */}
           <div 
-            className="absolute inset-0 opacity-30"
+            className="absolute inset-0 pointer-events-none"
             style={{
-              backgroundImage: `radial-gradient(at 40% 20%, rgba(255,255,255,0.15) 0px, transparent 50%),
-                               radial-gradient(at 80% 0%, rgba(255,255,255,0.1) 0px, transparent 50%),
-                               radial-gradient(at 0% 50%, rgba(255,255,255,0.1) 0px, transparent 50%),
-                               radial-gradient(at 80% 50%, rgba(255,255,255,0.08) 0px, transparent 50%),
-                               radial-gradient(at 0% 100%, rgba(255,255,255,0.12) 0px, transparent 50%)`,
+              background: 'radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.5) 100%)',
             }}
           />
-
-          {/* Floating particles */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {particles.map((p) => (
-              <Particle key={p.id} {...p} />
-            ))}
-          </div>
-
-          {/* Ambient light rays */}
-          <motion.div
-            className="absolute inset-0 overflow-hidden opacity-20"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.2 }}
-            transition={{ delay: 0.5, duration: 1 }}
-          >
-            {[...Array(5)].map((_, i) => (
+          
+          {/* STAGE 2: Orbital Rings - PROPERLY CENTERED */}
+          <AnimatePresence>
+            {stage !== 'void' && stage !== 'complete' && (
               <motion.div
-                key={i}
-                className="absolute h-[200%] w-1 bg-gradient-to-b from-transparent via-white to-transparent"
-                style={{
-                  left: `${20 + i * 15}%`,
-                  top: '-50%',
-                  transform: 'rotate(15deg)',
-                }}
-                animate={{
-                  opacity: [0, 0.5, 0],
-                  x: [0, 100, 200],
-                }}
-                transition={{
-                  duration: 3,
-                  delay: i * 0.5,
-                  repeat: Infinity,
-                  repeatDelay: 2,
-                }}
-              />
-            ))}
-          </motion.div>
-
-          {/* Main content */}
-          <div className="relative z-10 text-center px-4">
-            {/* Logo container */}
-            <motion.div
-              className="mb-10 relative inline-block"
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ 
-                scale: 1, 
-                opacity: 1,
-              }}
-              transition={{ 
-                duration: 1.2,
-                type: 'spring',
-                stiffness: 80,
-                damping: 15,
-              }}
-            >
-              {/* Rotating rings */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <LogoRing delay={0} scale={1.3} />
-                <LogoRing delay={0.5} scale={1.5} reverse />
-                <LogoRing delay={1} scale={1.7} />
-              </div>
-
-              {/* Glow effect */}
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: 'radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%)',
-                  transform: 'scale(2)',
-                }}
-                animate={{
-                  opacity: [0.3, 0.6, 0.3],
-                  scale: [1.8, 2.2, 1.8],
-                }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              />
-              
-              {/* Logo circle */}
-              <motion.div
-                className="relative w-36 h-36 md:w-44 md:h-44 rounded-full flex items-center justify-center"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 100%)',
-                  backdropFilter: 'blur(12px)',
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)',
-                }}
-                animate={{ 
-                  boxShadow: [
-                    '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3), 0 0 40px rgba(255,255,255,0.2)',
-                    '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3), 0 0 80px rgba(255,255,255,0.4)',
-                    '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3), 0 0 40px rgba(255,255,255,0.2)',
-                  ],
-                }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, scale: 1.5 }}
+                transition={{ duration: 1 }}
               >
-                {/* Logo text with staggered letters */}
-                <div className="flex">
-                  {logoText.split('').map((letter, i) => (
-                    <motion.span
-                      key={i}
-                      className="text-5xl md:text-6xl font-bold text-white"
-                      style={{ textShadow: '0 2px 10px rgba(0,0,0,0.2)' }}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 + i * 0.1, duration: 0.5 }}
-                    >
-                      {letter}
-                    </motion.span>
-                  ))}
-                </div>
-              </motion.div>
-            </motion.div>
-
-            {/* Resort name with staggered letters */}
-            <div className="overflow-hidden mb-3">
-              <motion.div className="flex justify-center flex-wrap">
-                {nameLetters.map((letter, i) => (
-                  <motion.span
-                    key={i}
-                    className="text-4xl md:text-5xl lg:text-6xl font-bold text-white inline-block"
-                    style={{ textShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
-                    initial={{ y: 60, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{
-                      delay: 0.6 + i * 0.04,
-                      duration: 0.5,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                {/* Constellation lines connecting rings */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                  <motion.g
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 0.3 }}
+                    transition={{ delay: 1, duration: 1 }}
                   >
-                    {letter === ' ' ? '\u00A0' : letter}
-                  </motion.span>
-                ))}
-              </motion.div>
-            </div>
-
-            {/* Tagline */}
-            <motion.p
-              className="text-lg md:text-xl text-white/70 mb-10 tracking-wide"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1, duration: 0.6 }}
-            >
-              {tagline}
-            </motion.p>
-
-            {/* Elegant progress indicator */}
-            <motion.div
-              className="w-72 md:w-96 mx-auto"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.2, duration: 0.5 }}
-            >
-              {/* Progress track */}
-              <div className="relative h-[2px] bg-white/10 rounded-full overflow-hidden">
-                {/* Animated shimmer */}
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                  animate={{ x: ['-100%', '100%'] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                />
-                {/* Progress fill */}
-                <motion.div
-                  className="absolute left-0 top-0 h-full rounded-full"
-                  style={{
-                    background: 'linear-gradient(90deg, rgba(255,255,255,0.8), rgba(255,255,255,1), rgba(255,255,255,0.8))',
-                    boxShadow: '0 0 20px rgba(255,255,255,0.5)',
-                  }}
-                  initial={{ width: '0%' }}
-                  animate={{ width: `${Math.min(progress, 100)}%` }}
-                  transition={{ duration: 0.1 }}
-                />
-              </div>
-              
-              {/* Loading text */}
-              <motion.div
-                className="flex items-center justify-center gap-2 mt-4"
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <span className="text-white/50 text-sm tracking-widest uppercase">
-                  {t('loading')}
-                </span>
-                <motion.span
-                  className="flex gap-1"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  {[0, 1, 2].map((i) => (
-                    <motion.span
-                      key={i}
-                      className="w-1 h-1 bg-white/50 rounded-full"
-                      animate={{ opacity: [0.3, 1, 0.3] }}
-                      transition={{
-                        duration: 1,
-                        repeat: Infinity,
-                        delay: i * 0.2,
-                      }}
+                    {[0, 1, 2, 3].map((i) => {
+                      const angle = (i * 90 + 45) * (Math.PI / 180);
+                      return (
+                        <motion.line
+                          key={i}
+                          x1="50%"
+                          y1="50%"
+                          x2={`${50 + Math.cos(angle) * 20}%`}
+                          y2={`${50 + Math.sin(angle) * 20}%`}
+                          stroke="rgba(255,255,255,0.2)"
+                          strokeWidth="1"
+                          initial={{ pathLength: 0 }}
+                          animate={{ pathLength: 1 }}
+                          transition={{ delay: 0.5 + i * 0.2, duration: 1.5 }}
+                        />
+                      );
+                    })}
+                  </motion.g>
+                </svg>
+                
+                {/* Rings */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  {[0, 1, 2, 3].map((i) => (
+                    <OrbitalRing 
+                      key={i} 
+                      index={i} 
+                      total={4} 
+                      color={primaryColor}
                     />
                   ))}
-                </motion.span>
+                </div>
+                
+                {/* Center glow pulse */}
+                <motion.div
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                  style={{
+                    width: 20,
+                    height: 20,
+                    background: primaryColor,
+                    boxShadow: `0 0 60px ${primaryColor}, 0 0 100px ${primaryColor}80`,
+                  }}
+                  animate={{
+                    scale: [1, 1.5, 1],
+                    opacity: [0.5, 0.8, 0.5],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          {/* STAGE 3: Aurora Field */}
+          <AuroraField visible={stage === 'aurora' || stage === 'typography' || stage === 'particles'} />
+          
+          {/* Main content container */}
+          <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
+            
+            {/* Logo reveal - glassmorphic */}
+            <AnimatePresence>
+              {(stage === 'typography' || stage === 'particles' || stage === 'complete') && (
+                <motion.div
+                  className="mb-10"
+                  initial={{ opacity: 0, scale: 0.5, y: 30 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -50, scale: 0.8 }}
+                  transition={{ 
+                    duration: 1, 
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                >
+                  <motion.div 
+                    className="w-28 h-28 md:w-36 md:h-36 mx-auto rounded-full flex items-center justify-center text-3xl md:text-4xl font-bold relative"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.05) 100%)',
+                      backdropFilter: 'blur(20px)',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      color: 'white',
+                      boxShadow: `
+                        0 25px 50px -12px rgba(0,0,0,0.5),
+                        inset 0 1px 1px rgba(255,255,255,0.2),
+                        0 0 80px ${primaryColor}40
+                      `,
+                    }}
+                    animate={{
+                      boxShadow: [
+                        `0 25px 50px -12px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.2), 0 0 60px ${primaryColor}30`,
+                        `0 25px 50px -12px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.2), 0 0 100px ${primaryColor}60`,
+                        `0 25px 50px -12px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.2), 0 0 60px ${primaryColor}30`,
+                      ],
+                    }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                  >
+                    {logoText}
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {/* STAGE 4: Typography Reveal */}
+            <AnimatePresence>
+              {(stage === 'typography' || stage === 'particles' || stage === 'complete') && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <TypographyReveal 
+                    text={resortName} 
+                    delay={0}
+                    className="mb-5"
+                  />
+                  
+                  <motion.p
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 1.2, duration: 0.6 }}
+                    className="text-lg md:text-xl text-white/60 tracking-wide"
+                  >
+                    {tagline}
+                  </motion.p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {/* STAGE 5: Particle Bloom */}
+            {stage === 'particles' && (
+              <>
+                <OrbitingParticles count={60} />
+                <RisingSparkles count={50} />
+              </>
+            )}
+            
+            {/* Progress bar - ALWAYS visible after stage 1 */}
+            <motion.div
+              className="mt-16 w-72 md:w-96 mx-auto"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: stage !== 'void' ? 1 : 0, y: stage !== 'void' ? 0 : 20 }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full relative overflow-hidden"
+                  style={{ 
+                    background: `linear-gradient(90deg, ${primaryColor}, color-mix(in srgb, ${primaryColor} 80%, white))`,
+                    boxShadow: `0 0 20px ${primaryColor}`,
+                  }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.1 }}
+                >
+                  {/* Shimmer effect on progress bar */}
+                  <motion.div
+                    className="absolute inset-0"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+                    }}
+                    animate={{ x: ['-100%', '200%'] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                  />
+                </motion.div>
+              </div>
+              
+              <motion.div
+                className="mt-3 text-sm text-center text-white/40 font-medium"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: stage !== 'void' ? 1 : 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                {Math.round(progress)}%
               </motion.div>
             </motion.div>
           </div>
-
-          {/* Bottom wave decoration - more elegant */}
+          
+          {/* Bottom gradient fade */}
           <motion.div
-            className="absolute bottom-0 left-0 right-0"
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.5, duration: 1, ease: 'easeOut' }}
-          >
-            <svg
-              className="w-full h-32 md:h-40"
-              viewBox="0 0 1440 160"
-              preserveAspectRatio="none"
-            >
-              <motion.path
-                fill="rgba(255,255,255,0.05)"
-                initial={{ d: "M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z" }}
-                animate={{
-                  d: [
-                    "M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z",
-                    "M0,100 C240,40 480,120 720,60 C960,20 1200,100 1440,80 L1440,160 L0,160 Z",
-                    "M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z",
-                  ],
-                }}
-                transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-              />
-              <motion.path
-                fill="rgba(255,255,255,0.08)"
-                initial={{ d: "M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z" }}
-                animate={{
-                  d: [
-                    "M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z",
-                    "M0,120 C360,80 720,140 1080,100 C1260,60 1380,120 1440,100 L1440,160 L0,160 Z",
-                    "M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z",
-                  ],
-                }}
-                transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
-              />
-            </svg>
-          </motion.div>
+            className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none"
+            style={{
+              background: `linear-gradient(to top, ${primaryColor}15, transparent)`,
+            }}
+            animate={{ opacity: [0.3, 0.6, 0.3] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          />
         </motion.div>
       )}
     </AnimatePresence>
   );
 }
 
-/**
- * Loading Screen Wrapper
- * 
- * Wraps children and blocks them from rendering until loading is complete.
- * This prevents the hydration issue and ensures proper loading sequence.
- * 
- * NOW: Waits for settings/modules to actually load from backend before revealing content.
- */
+// Wrapper component for layout integration
 interface LoadingScreenWrapperProps {
   children: React.ReactNode;
   minDuration?: number;
 }
 
-export function LoadingScreenWrapper({ children, minDuration = 2500 }: LoadingScreenWrapperProps) {
-  const [mounted, setMounted] = useState(false);
-  const [showContent, setShowContent] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(true);
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
-  const enableLoadingAnimation = useSettingsStore((s) => s.enableLoadingAnimation);
-  const { loading: settingsLoading } = useSiteSettings();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Track minimum duration elapsed
-  useEffect(() => {
-    if (!mounted) return;
-    
-    const timer = setTimeout(() => {
-      setMinTimeElapsed(true);
-    }, minDuration);
-
-    return () => clearTimeout(timer);
-  }, [mounted, minDuration]);
-
-  // Main logic: wait for BOTH minDuration AND settings to load
-  useEffect(() => {
-    if (!mounted) return;
-
-    // Check if animation is disabled or already visited
-    if (!enableLoadingAnimation) {
-      setShowContent(true);
-      setIsAnimating(false);
-      return;
-    }
-
-    const hasVisited = sessionStorage.getItem('v2resort_visited');
-    if (hasVisited) {
-      // For returning visitors, show content immediately but wait for settings
-      // to ensure theme is applied correctly
-      if (!settingsLoading) {
-        setShowContent(true);
-        setIsAnimating(false);
-      }
-      return;
-    }
-
-    // For first-time visitors: wait for BOTH conditions
-    // 1. Minimum time elapsed (for smooth animation)
-    // 2. Settings loaded (so theme/branding is ready)
-    if (minTimeElapsed && !settingsLoading) {
-      setIsAnimating(false);
-      sessionStorage.setItem('v2resort_visited', 'true');
-      // Small delay to let exit animation start before showing content
-      setTimeout(() => {
-        setShowContent(true);
-      }, 100);
-    }
-  }, [mounted, minTimeElapsed, settingsLoading, enableLoadingAnimation]);
-
-  // IMPORTANT: For SEO/Bots, we MUST render children on the server.
-  // We use CSS to hide/reveal the content visually for users, 
-  // but ensure the HTML structure is present for crawlers.
-
+export function LoadingScreenWrapper({ children, minDuration = 4000 }: LoadingScreenWrapperProps) {
   return (
     <>
-      {/* Loader Overlay - only active on client to prevent blocking server HTML */}
-      {isAnimating && mounted && (
-        <div className="fixed inset-0 z-[9999]">
-          <LoadingScreenContent />
-        </div>
-      )}
-      
-      {/* Main Content - Always rendered for SEO */}
-      {/* Hidden visually initially, then revealed */}
-      <div 
-        className={`min-h-screen transition-opacity duration-700 ease-in-out ${
-          showContent ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
-        {children}
-      </div>
+      <LoadingScreen minDuration={minDuration} />
+      {children}
     </>
   );
 }
 
-/**
- * Internal loading screen content (the actual animation)
- */
-function LoadingScreenContent() {
-  const t = useTranslations('common');
-  const { settings, loading: settingsLoading } = useSiteSettings();
-  const [progress, setProgress] = useState(0);
-  const [particles, setParticles] = useState<Array<{
-    id: number;
-    delay: number;
-    duration: number;
-    size: number;
-    x: string;
-    y: string;
-  }>>([]);
-  
-  const cmsResortName = settings.resortName?.trim() || '';
-  const cmsTagline = settings.tagline?.trim() || '';
-  const hasCmsBranding = !settingsLoading && cmsResortName.length > 0;
-  const resortName = hasCmsBranding ? cmsResortName : 'Resort Experience';
-  const tagline = hasCmsBranding ? (cmsTagline || t('loading')) : t('loading');
-  const logoText = hasCmsBranding ? cmsResortName.substring(0, 2).toUpperCase() : 'V2';
-  const nameLetters = resortName.split('');
-
-  useEffect(() => {
-    // Generate particles on client only
-    setParticles(
-      Array.from({ length: 20 }, (_, i) => ({
-        id: i,
-        delay: Math.random() * 3,
-        duration: 4 + Math.random() * 2,
-        size: 4 + Math.random() * 8,
-        x: `${Math.random() * 100}%`,
-        y: `${60 + Math.random() * 40}%`,
-      }))
-    );
-
-    // Progress animation
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        const remaining = 100 - prev;
-        return prev + Math.min(remaining * 0.15, 8);
-      });
-    }, 100);
-
-    return () => clearInterval(progressInterval);
-  }, []);
-
-  return (
-    <motion.div
-      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
-      initial={{ opacity: 1 }}
-      exit={{ 
-        opacity: 0,
-        scale: 1.1,
-        filter: 'blur(10px)',
-      }}
-      transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {/* Animated gradient background - using CSS variables for white-label */}
-      <div 
-        className="absolute inset-0"
-        style={{
-          background: 'linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 85%, black) 50%, color-mix(in srgb, var(--color-primary) 70%, black) 100%)',
-        }}
-      />
-
-      {/* Mesh gradient overlay */}
-      <div 
-        className="absolute inset-0 opacity-30"
-        style={{
-          backgroundImage: `radial-gradient(at 40% 20%, rgba(255,255,255,0.15) 0px, transparent 50%),
-                           radial-gradient(at 80% 0%, rgba(255,255,255,0.1) 0px, transparent 50%),
-                           radial-gradient(at 0% 50%, rgba(255,255,255,0.1) 0px, transparent 50%),
-                           radial-gradient(at 80% 50%, rgba(255,255,255,0.08) 0px, transparent 50%),
-                           radial-gradient(at 0% 100%, rgba(255,255,255,0.12) 0px, transparent 50%)`,
-        }}
-      />
-
-      {/* Floating particles - hidden for reduced motion */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none motion-reduce:hidden">
-        {particles.map((p) => (
-          <Particle key={p.id} {...p} />
-        ))}
-      </div>
-
-      {/* Ambient light rays */}
-      <div className="absolute inset-0 overflow-hidden opacity-20">
-        {[...Array(5)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute h-[200%] w-1 bg-gradient-to-b from-transparent via-white to-transparent"
-            style={{
-              left: `${20 + i * 15}%`,
-              top: '-50%',
-              transform: 'rotate(15deg)',
-            }}
-            animate={{
-              opacity: [0, 0.5, 0],
-              x: [0, 100, 200],
-            }}
-            transition={{
-              duration: 3,
-              delay: i * 0.5,
-              repeat: Infinity,
-              repeatDelay: 2,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Main content */}
-      <div className="relative z-10 text-center px-4">
-        {/* Logo container */}
-        <motion.div
-          className="mb-10 relative inline-block"
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ 
-            duration: 1.2,
-            type: 'spring',
-            stiffness: 80,
-            damping: 15,
-          }}
-        >
-          {/* Rotating rings - static for reduced motion */}
-          <div className="absolute inset-0 flex items-center justify-center motion-reduce:hidden">
-            <LogoRing delay={0} scale={1.3} />
-            <LogoRing delay={0.5} scale={1.5} reverse />
-            <LogoRing delay={1} scale={1.7} />
-          </div>
-
-          {/* Glow effect - static for reduced motion */}
-          <motion.div
-            className="absolute inset-0 rounded-full motion-safe:animate-pulse"
-            style={{
-              background: 'radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%)',
-              transform: 'scale(2)',
-            }}
-            animate={{
-              opacity: [0.3, 0.6, 0.3],
-              scale: [1.8, 2.2, 1.8],
-            }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          
-          {/* Logo circle */}
-          <motion.div
-            className="relative w-36 h-36 md:w-44 md:h-44 rounded-full flex items-center justify-center"
-            style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 100%)',
-              backdropFilter: 'blur(12px)',
-              border: '2px solid rgba(255,255,255,0.3)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)',
-            }}
-            animate={{ 
-              boxShadow: [
-                '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3), 0 0 40px rgba(255,255,255,0.2)',
-                '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3), 0 0 80px rgba(255,255,255,0.4)',
-                '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3), 0 0 40px rgba(255,255,255,0.2)',
-              ],
-            }}
-            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            {/* Logo text */}
-            <div className="flex">
-              {logoText.split('').map((letter, i) => (
-                <motion.span
-                  key={i}
-                  className="text-5xl md:text-6xl font-bold text-white"
-                  style={{ textShadow: '0 2px 10px rgba(0,0,0,0.2)' }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 + i * 0.1, duration: 0.5 }}
-                >
-                  {letter}
-                </motion.span>
-              ))}
-            </div>
-          </motion.div>
-        </motion.div>
-
-        {/* Resort name with staggered letters */}
-        <div className="overflow-hidden mb-3">
-          <motion.div className="flex justify-center flex-wrap">
-            {nameLetters.map((letter, i) => (
-              <motion.span
-                key={i}
-                className="text-4xl md:text-5xl lg:text-6xl font-bold text-white inline-block"
-                style={{ textShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
-                initial={{ y: 60, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{
-                  delay: 0.6 + i * 0.04,
-                  duration: 0.5,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-              >
-                {letter === ' ' ? '\u00A0' : letter}
-              </motion.span>
-            ))}
-          </motion.div>
-        </div>
-
-        {/* Tagline */}
-        <motion.p
-          className="text-lg md:text-xl text-white/70 mb-10 tracking-wide"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 0.6 }}
-        >
-          {tagline}
-        </motion.p>
-
-        {/* Progress indicator */}
-        <motion.div
-          className="w-72 md:w-96 mx-auto"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.2, duration: 0.5 }}
-        >
-          <div className="relative h-[2px] bg-white/10 rounded-full overflow-hidden">
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-              animate={{ x: ['-100%', '100%'] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-            />
-            <motion.div
-              className="absolute left-0 top-0 h-full rounded-full"
-              style={{
-                background: 'linear-gradient(90deg, rgba(255,255,255,0.8), rgba(255,255,255,1), rgba(255,255,255,0.8))',
-                boxShadow: '0 0 20px rgba(255,255,255,0.5)',
-              }}
-              initial={{ width: '0%' }}
-              animate={{ width: `${Math.min(progress, 100)}%` }}
-              transition={{ duration: 0.1 }}
-            />
-          </div>
-          
-          <motion.div
-            className="flex items-center justify-center gap-2 mt-4"
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <span className="text-white/50 text-sm tracking-widest uppercase">
-              {t('loading')}
-            </span>
-            <span className="flex gap-1">
-              {[0, 1, 2].map((i) => (
-                <motion.span
-                  key={i}
-                  className="w-1 h-1 bg-white/50 rounded-full"
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{
-                    duration: 1,
-                    repeat: Infinity,
-                    delay: i * 0.2,
-                  }}
-                />
-              ))}
-            </span>
-          </motion.div>
-        </motion.div>
-      </div>
-
-      {/* Bottom wave decoration - hidden for reduced motion */}
-      <div className="absolute bottom-0 left-0 right-0 motion-reduce:hidden">
-        <svg
-          className="w-full h-32 md:h-40"
-          viewBox="0 0 1440 160"
-          preserveAspectRatio="none"
-        >
-          <motion.path
-            fill="rgba(255,255,255,0.05)"
-            initial={{ d: "M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z" }}
-            animate={{
-              d: [
-                "M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z",
-                "M0,100 C240,40 480,120 720,60 C960,20 1200,100 1440,80 L1440,160 L0,160 Z",
-                "M0,80 C240,140 480,20 720,80 C960,140 1200,20 1440,80 L1440,160 L0,160 Z",
-              ],
-            }}
-            transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.path
-            fill="rgba(255,255,255,0.08)"
-            initial={{ d: "M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z" }}
-            animate={{
-              d: [
-                "M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z",
-                "M0,120 C360,80 720,140 1080,100 C1260,60 1380,120 1440,100 L1440,160 L0,160 Z",
-                "M0,100 C360,140 720,60 1080,100 C1260,120 1380,80 1440,100 L1440,160 L0,160 Z",
-              ],
-            }}
-            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
-          />
-        </svg>
-      </div>
-    </motion.div>
-  );
-}
-
-/**
- * Smaller loading indicator for page-level loading
- */
-export function PageLoader() {
-  const { settings } = useSiteSettings();
-  const logoText = (settings.resortName || 'V2').substring(0, 2).toUpperCase();
-  
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-      <motion.div
-        className="flex flex-col items-center"
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-      >
-        {/* Spinning logo */}
-        <div className="relative">
-          <motion.div
-            className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg"
-          >
-            <span className="text-white font-bold text-xl">{logoText}</span>
-          </motion.div>
-          <motion.div
-            className="absolute inset-0 rounded-full border-2 border-primary-300 border-t-primary-600"
-            animate={{ rotate: -360 }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-          />
-        </div>
-        <motion.p
-          className="mt-4 text-slate-600 dark:text-slate-400 text-sm tracking-wide"
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-        >
-          Loading...
-        </motion.p>
-      </motion.div>
-    </div>
-  );
-}
-
-// Keep old export for backwards compatibility - LoadingScreen is already exported above
 export default LoadingScreen;

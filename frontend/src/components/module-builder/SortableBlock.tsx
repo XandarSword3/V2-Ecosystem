@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { UIBlock } from '@/types/module-builder';
-import { GripVertical, Trash2, Copy, Layout, Type, Image as ImageIcon, Grid, List, Calendar, Clock, Box, MousePointer2, FormInput } from 'lucide-react';
+import { GripVertical, Trash2, Copy, Layout, Type, Image as ImageIcon, Grid, List, Calendar, Clock, Box, MousePointer2, FormInput, Sparkles, Star, BarChart3, Dumbbell, ArrowRight, Divide, Minus, CreditCard, Users } from 'lucide-react';
 import { useModuleBuilderStore } from '@/stores/module-builder-store';
 import { useEffect, useState } from 'react';
 import { api, modulesApi } from '@/lib/api';
@@ -12,15 +12,27 @@ interface SortableBlockProps {
 
 const typeIcons: Record<string, any> = {
   hero: Layout,
+  hero_v2: Sparkles,
   text_block: Type,
   image: ImageIcon,
   grid: Grid,
+  card_grid: Grid,
   menu_list: List,
   session_list: Clock,
   booking_calendar: Calendar,
+  calendar: Calendar,
   container: Box,
   form_container: FormInput,
   button: MousePointer2,
+  features: Star,
+  stats: BarChart3,
+  class_schedule: Dumbbell,
+  testimonials: Users,
+  testimonials_carousel: Star,
+  pricing_table: CreditCard,
+  cta: ArrowRight,
+  divider: Divide,
+  spacer: Minus,
 };
 
 export function SortableBlock({ block }: SortableBlockProps) {
@@ -242,6 +254,177 @@ export function SortableBlock({ block }: SortableBlockProps) {
                     <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
                         <Box className="h-5 w-5" />
                         <span className="text-sm font-medium">Form Container</span>
+                    </div>
+                </div>
+            )}
+            {block.type === 'hero_v2' && (
+                <div className="h-36 rounded bg-gradient-to-r from-slate-800 to-slate-900 flex flex-col items-center justify-center text-white relative overflow-hidden">
+                    {block.background?.image?.url && (
+                        <img src={block.background.image.url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50" />
+                    )}
+                    <div className="relative z-10 text-center">
+                        {block.props.eyebrow && <span className="text-xs text-amber-400 block mb-1">{block.props.eyebrow}</span>}
+                        <span className="text-lg font-bold block">{block.props.title || 'Hero Title'}</span>
+                        {block.props.subtitle && <span className="text-xs opacity-80 block mt-1">{block.props.subtitle}</span>}
+                        <div className="flex gap-2 justify-center mt-2">
+                            {block.props.primaryButton && <span className="text-[10px] px-2 py-1 bg-amber-500 text-slate-900 rounded">{block.props.primaryButton}</span>}
+                            {block.props.secondaryButton && <span className="text-[10px] px-2 py-1 bg-white/20 rounded border border-white/30">{block.props.secondaryButton}</span>}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {block.type === 'features' && (() => {
+                const features = block.props.features || [];
+                const parsed = typeof features === 'string' ? (() => { try { return JSON.parse(features); } catch { return []; } })() : features;
+                return (
+                    <div className="grid grid-cols-2 gap-2 p-2 bg-slate-50 rounded dark:bg-slate-700/50">
+                        {(Array.isArray(parsed) ? parsed : []).slice(0, 4).map((f: any, i: number) => (
+                            <div key={i} className="flex items-center gap-2 p-2 bg-white rounded shadow-sm dark:bg-slate-600">
+                                <div className="w-6 h-6 bg-indigo-100 rounded flex items-center justify-center text-xs text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300">✓</div>
+                                <div className="min-w-0">
+                                    <div className="text-xs font-medium truncate dark:text-slate-200">{f.title || 'Feature'}</div>
+                                    <div className="text-[10px] text-slate-500 truncate">{f.description || ''}</div>
+                                </div>
+                            </div>
+                        ))}
+                        {(!Array.isArray(parsed) || parsed.length === 0) && <div className="col-span-2 text-center text-xs text-slate-400 py-2">No features defined</div>}
+                    </div>
+                );
+            })()}
+            {block.type === 'stats' && (() => {
+                const stats = block.props.stats || [];
+                const parsed = typeof stats === 'string' ? (() => { try { return JSON.parse(stats); } catch { return []; } })() : stats;
+                return (
+                    <div className="flex justify-around p-3 bg-slate-50 rounded dark:bg-slate-700/50">
+                        {(Array.isArray(parsed) ? parsed : []).slice(0, 4).map((s: any, i: number) => (
+                            <div key={i} className="text-center">
+                                <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{s.value || '0'}</div>
+                                <div className="text-[10px] text-slate-500">{s.label || 'Label'}</div>
+                            </div>
+                        ))}
+                        {(!Array.isArray(parsed) || parsed.length === 0) && <div className="text-xs text-slate-400">No stats defined</div>}
+                    </div>
+                );
+            })()}
+            {block.type === 'card_grid' && (() => {
+                const cards = block.props.cards || [];
+                const parsed = typeof cards === 'string' ? (() => { try { return JSON.parse(cards); } catch { return []; } })() : cards;
+                const cols = block.props.columns || 3;
+                return (
+                    <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+                        {(Array.isArray(parsed) ? parsed : []).slice(0, 3).map((c: any, i: number) => (
+                            <div key={i} className="p-2 bg-gradient-to-br from-white/80 to-white/50 rounded border border-slate-200 dark:from-slate-700/80 dark:to-slate-700/50 dark:border-slate-600">
+                                <div className="text-xs font-medium dark:text-slate-200">{c.title || 'Card'}</div>
+                                <div className="text-[10px] text-slate-500 truncate">{c.description || ''}</div>
+                            </div>
+                        ))}
+                        {(!Array.isArray(parsed) || parsed.length === 0) && Array.from({ length: cols }).map((_, i) => (
+                            <div key={i} className="h-14 bg-slate-100 rounded dark:bg-slate-700 flex items-center justify-center">
+                                <span className="text-xs text-slate-400">Card {i + 1}</span>
+                            </div>
+                        ))}
+                    </div>
+                );
+            })()}
+            {block.type === 'class_schedule' && (() => {
+                const classes = block.props.classes || [];
+                const parsed = typeof classes === 'string' ? (() => { try { return JSON.parse(classes); } catch { return []; } })() : classes;
+                return (
+                    <div className="space-y-1 p-2 bg-slate-800 rounded">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] text-amber-500 font-semibold uppercase">{block.props.subtitle || 'Upcoming Sessions'}</span>
+                            <span className="text-xs text-white font-bold">{block.props.title || 'Next Classes'}</span>
+                        </div>
+                        {(Array.isArray(parsed) ? parsed : []).slice(0, 3).map((c: any, i: number) => (
+                            <div key={i} className="flex items-center gap-2 text-xs text-white p-1.5 bg-slate-700/50 rounded">
+                                <span className="text-amber-500">{c.icon === 'Dumbbell' ? '💪' : c.icon === 'Sparkles' ? '✨' : c.icon === 'Zap' ? '⚡' : c.icon === 'Heart' ? '❤️' : '•'}</span>
+                                <span className="flex-1 truncate">{c.name || 'Class'}</span>
+                                <span className="text-slate-400">{c.time?.split(' - ')[0] || ''}</span>
+                            </div>
+                        ))}
+                        {(!Array.isArray(parsed) || parsed.length === 0) && <div className="text-[10px] text-slate-400 text-center py-1">No classes defined</div>}
+                    </div>
+                );
+            })()}
+            {block.type === 'calendar' && (
+                <div className="p-2 bg-slate-800 rounded">
+                    <div className="text-xs text-white font-bold mb-2">{block.props.title || 'Calendar'}</div>
+                    <div className="grid grid-cols-7 gap-1">
+                        {['M','T','W','T','F','S','S'].map((d, i) => (
+                            <div key={i} className="text-[8px] text-slate-500 text-center">{d}</div>
+                        ))}
+                        {Array.from({length: 14}).map((_, i) => (
+                            <div key={i} className="w-4 h-4 bg-slate-700 rounded text-[8px] text-white flex items-center justify-center">{i+1}</div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            {block.type === 'testimonials_carousel' && (() => {
+                const testimonials = block.props.testimonials || [];
+                const parsed = typeof testimonials === 'string' ? (() => { try { return JSON.parse(testimonials); } catch { return []; } })() : testimonials;
+                return (
+                    <div>
+                        <div className="text-center mb-2">
+                            <span className="text-[10px] text-amber-500 font-semibold uppercase">{block.props.subtitle || 'Testimonials'}</span>
+                            <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{block.props.title || 'Reviews'}</div>
+                        </div>
+                        <div className="flex gap-2">
+                            {(Array.isArray(parsed) ? parsed : []).slice(0, 2).map((t: any, i: number) => (
+                                <div key={i} className="flex-1 p-2 bg-slate-50 rounded shadow-sm dark:bg-slate-700">
+                                    <div className="text-amber-500 text-[10px] mb-1">{'★'.repeat(t.rating || 5)}</div>
+                                    <div className="text-[10px] text-slate-600 dark:text-slate-300 line-clamp-2">"{t.text || 'Review'}"</div>
+                                    <div className="text-[10px] text-slate-400 mt-1">— {t.name || 'User'}</div>
+                                </div>
+                            ))}
+                            {(!Array.isArray(parsed) || parsed.length === 0) && <div className="text-xs text-slate-400 py-2">No testimonials defined</div>}
+                        </div>
+                    </div>
+                );
+            })()}
+            {block.type === 'pricing_table' && (() => {
+                const plans = block.props.plans || [];
+                const parsed = typeof plans === 'string' ? (() => { try { return JSON.parse(plans); } catch { return []; } })() : plans;
+                return (
+                    <div>
+                        {block.props.title && <div className="text-xs font-bold text-center mb-2 dark:text-slate-200">{block.props.title}</div>}
+                        <div className="flex gap-2">
+                            {(Array.isArray(parsed) ? parsed : []).slice(0, 3).map((p: any, i: number) => (
+                                <div key={i} className={`flex-1 p-2 rounded text-center text-xs ${p.popular ? 'bg-indigo-100 border border-indigo-300 dark:bg-indigo-900/30 dark:border-indigo-700' : 'bg-slate-50 dark:bg-slate-700'}`}>
+                                    <div className="font-semibold dark:text-slate-200">{p.name || 'Plan'}</div>
+                                    <div className="text-indigo-600 font-bold dark:text-indigo-400">{p.price || '$0'}</div>
+                                    {p.popular && <div className="text-[8px] text-indigo-600 mt-1">★ Popular</div>}
+                                </div>
+                            ))}
+                            {(!Array.isArray(parsed) || parsed.length === 0) && <div className="text-xs text-slate-400 py-2">No plans defined</div>}
+                        </div>
+                    </div>
+                );
+            })()}
+            {block.type === 'cta' && (
+                <div className="p-4 rounded bg-gradient-to-r from-blue-500 to-purple-500 text-center text-white">
+                    <div className="text-sm font-bold">{block.props.title || 'CTA Title'}</div>
+                    {block.props.description && <div className="text-xs opacity-80 mt-1">{block.props.description}</div>}
+                    <div className="mt-2 px-3 py-1 bg-white text-slate-900 rounded inline-block text-xs">{block.props.buttonText || 'Get Started'}</div>
+                </div>
+            )}
+            {block.type === 'divider' && (
+                <div className="py-3 flex items-center justify-center">
+                    <div className="w-1/2 h-px" style={{ background: `linear-gradient(90deg, transparent, ${block.props.accentColor || '#6366f1'}40, transparent)` }}></div>
+                </div>
+            )}
+            {block.type === 'spacer' && (
+                <div className="flex items-center justify-center text-slate-400 text-xs" style={{ height: Math.min(Number(block.props.height) || 40, 80) }}>
+                    Spacer ({block.props.height || 40}px)
+                </div>
+            )}
+            {block.type === 'testimonials' && (
+                <div className="p-3 bg-amber-50 rounded border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                        <Users className="h-5 w-5" />
+                        <span className="text-sm font-medium">Testimonials</span>
+                    </div>
+                    <div className="mt-2 text-xs text-amber-600 dark:text-amber-500">
+                        Displays {block.props.count || 3} testimonials{block.props.showRatings ? ' with ratings' : ''}
                     </div>
                 </div>
             )}
