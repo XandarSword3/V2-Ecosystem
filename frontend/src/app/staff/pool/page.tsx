@@ -9,7 +9,7 @@ import {
   getOfflineTickets,
   createOfflinePoolEntry, 
   createOfflinePoolExit, 
-  createOfflineTicketValidation,
+  validateTicketOffline,
   createOfflineCashPayment
 } from '@/lib/offline/offline-sync';
 import { isOnline } from '@/lib/offline/offline-storage';
@@ -228,11 +228,16 @@ export default function StaffPoolPage() {
       
       // Offline support
       if (!isOnline()) {
-        await createOfflineTicketValidation(code);
-        toast.info('Working offline. Ticket validation queued.', { icon: '⏳' });
+        const result = await validateTicketOffline(code);
         
-        // Optimistic update
-        setTickets(prev => prev.map(t => t.ticket_number === code ? { ...t, status: 'used' } : t));
+        if (result.valid) {
+          toast.info('Working offline. Ticket validation queued.', { icon: '⏳' });
+          // Optimistic update
+          setTickets(prev => prev.map(t => t.ticket_number === code ? { ...t, status: 'used' } : t));
+        } else {
+          toast.error(result.reason || 'Validation failed offline', { icon: '🚫' });
+        }
+        
         setManualCode('');
         return;
       }
