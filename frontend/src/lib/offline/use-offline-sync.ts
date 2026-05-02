@@ -11,6 +11,7 @@ import {
   clearOfflineData,
   type SyncStatus,
 } from './offline-sync';
+import { startBackgroundRefresh, stopBackgroundRefresh } from './offline-hydration';
 
 /**
  * Hook for monitoring and controlling offline sync status
@@ -28,8 +29,12 @@ export function useOfflineSync() {
     // Subscribe to status updates
     const unsubscribe = subscribeToSyncStatus(setStatus);
 
+    // Start background refresh loop
+    startBackgroundRefresh();
+
     return () => {
       unsubscribe();
+      stopBackgroundRefresh();
     };
   }, []);
 

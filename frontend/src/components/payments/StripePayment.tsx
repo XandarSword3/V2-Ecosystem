@@ -12,6 +12,9 @@ import { paymentsApi } from '@/lib/api';
 
 // Initialize Stripe with the publishable key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+import { isOnline } from '@/lib/offline/offline-storage';
+import { WifiOff, AlertTriangle } from 'lucide-react';
+
 
 interface PaymentFormProps {
   clientSecret: string;
@@ -144,6 +147,37 @@ export default function StripePayment({
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  if (!isOnline()) {
+    return (
+      <div className="p-8 border-2 border-dashed border-orange-200 dark:border-orange-900/30 rounded-xl bg-orange-50 dark:bg-orange-900/10 text-center">
+        <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+          <WifiOff className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+        </div>
+        <h3 className="text-xl font-bold text-orange-900 dark:text-orange-200 mb-2">
+          Offline Mode Active
+        </h3>
+        <p className="text-orange-700 dark:text-orange-300 mb-6 max-w-sm mx-auto">
+          Card payments are currently disabled to ensure transaction security. 
+          Please use **Cash** or wait until connectivity is restored.
+        </p>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 justify-center text-sm text-orange-600 dark:text-orange-400 font-medium">
+            <AlertTriangle className="w-4 h-4" />
+            Queued actions will sync automatically
+          </div>
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="mt-4 text-slate-500 hover:text-slate-700 font-medium transition-colors"
+            >
+              Go Back
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     async function createIntent() {

@@ -160,20 +160,20 @@ function TableOrderContent() {
     }
 
     setSubmitting(true);
-    try {
-      const orderData = {
-        table_number: parseInt(tableNumber!),
-        // FIX Iter-3: i18n fallback
+    const orderData = {
+      table_number: parseInt(tableNumber!),
+      // FIX Iter-3: i18n fallback
       customer_name: customerName || `${tc('table')} ${tableNumber}`,
-        items: cart.map(item => ({
-          menu_item_id: item.id,
-          quantity: item.quantity,
-          unit_price: item.discount_price || item.price,
-          notes: item.notes,
-        })),
-        module_id: restaurantModule?.id,
-      };
+      items: cart.map(item => ({
+        menu_item_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.discount_price || item.price,
+        notes: item.notes,
+      })),
+      module_id: restaurantModule?.id,
+    };
 
+    try {
       await api.post('/restaurant/orders', orderData);
       // FIX Iter-3: i18n
       toast.success(t('order.submittedSuccessfully'));

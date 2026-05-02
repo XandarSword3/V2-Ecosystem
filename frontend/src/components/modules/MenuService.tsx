@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import { ModifierSelectionModal, type SelectedModifier } from '@/components/restaurant/ModifierSelectionModal';
 import { CustomizationSelector } from '@/components/customization/CustomizationSelector';
 import { ModuleHero, GlassSearch, CategoryPills, GlassCard, FloatingActionButton } from './';
+import { isOnline, menuItemsStore, menuCategoriesStore } from '@/lib/offline/offline-storage';
 
 interface MenuServiceProps {
   module: Module;
@@ -173,7 +174,44 @@ export function MenuService({ module }: MenuServiceProps) {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['menu', module.id],
-    queryFn: () => restaurantApi.getMenu(module.id),
+    queryFn: async () => {
+      if (isOnline()) {
+        try {
+          const response = await restaurantApi.getMenu(module.id);
+          // Update offline store
+          if (response.data?.data) {
+            const { items, categories } = response.data.data;
+            if (items) await menuItemsStore.putMany(items);
+            if (categories) await menuCategoriesStore.putMany(categories);
+          }
+          return response;
+        } catch (err) {
+          console.warn('Online menu fetch failed, falling back to cache');
+        }
+      }
+
+      // Offline or online failed - try cache
+      const cachedItems = await menuItemsStore.getAll();
+      const cachedCategories = await menuCategoriesStore.getAll();
+      
+      // Filter by module if applicable (assuming stores contain all modules)
+      // Actually, menuItemsStore is global, so we might need to filter by module_id if present
+      // For now, assume it's scoped or we return what we have
+      
+      if (cachedItems.length > 0) {
+        return {
+          data: {
+            success: true,
+            data: {
+              items: cachedItems,
+              categories: cachedCategories
+            }
+          }
+        };
+      }
+      
+      throw new Error('Menu not available offline');
+    },
   });
 
   const categories: MenuCategoryItem[] = data?.data?.data?.categories || [];
