@@ -6,10 +6,11 @@ import { useTranslations } from 'next-intl'; // IMPROVE Iter-25: i18n for pool p
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { 
-  getOfflineTickets, 
+  getOfflineTickets,
   createOfflinePoolEntry, 
   createOfflinePoolExit, 
-  createOfflineTicketValidation 
+  createOfflineTicketValidation,
+  createOfflineCashPayment
 } from '@/lib/offline/offline-sync';
 import { isOnline } from '@/lib/offline/offline-storage';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -855,6 +856,32 @@ export default function StaffPoolPage() {
               </div>
 
               <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
+                {selectedTicket.payment_status !== 'paid' && (
+                  <Button 
+                    variant="default"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={async () => {
+                      if (isOnline()) {
+                        await api.post('/payments/cash', { 
+                          referenceType: 'pool_ticket', 
+                          referenceId: selectedTicket.id, 
+                          amount: Number(selectedTicket.total_amount) || 0 
+                        });
+                        toast.success('Payment recorded');
+                      } else {
+                        await createOfflineCashPayment({ 
+                          referenceType: 'pool_ticket', 
+                          referenceId: selectedTicket.id, 
+                          amount: Number(selectedTicket.total_amount) || 0 
+                        });
+                        toast.info('Cash payment queued offline', { icon: '💵' });
+                      }
+                      setSelectedTicket(null);
+                    }}
+                  >
+                    Record Cash Payment
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => setSelectedTicket(null)}>
                   {tp('close')}
                 </Button>

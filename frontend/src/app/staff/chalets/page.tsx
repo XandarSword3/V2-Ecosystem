@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { bookingsStore, cacheManager, isOnline } from '@/lib/offline/offline-storage';
-import { createOfflineBookingStatusUpdate } from '@/lib/offline/offline-sync';
+import { createOfflineBookingStatusUpdate, createOfflineCashPayment } from '@/lib/offline/offline-sync';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -592,21 +592,45 @@ export default function StaffChaletsPage() {
                             <LogIn className="w-4 h-4 mr-2" /> {tc('checkInAction')}
                         </Button>
                     )}
-                     {selectedBooking.status === 'checked_in' && (
+                    {selectedBooking.status === 'checked_in' && (
                         <Button onClick={() => {updateBookingStatus(selectedBooking.id, 'checked_out'); setSelectedBooking(null);}}>
                             <LogOut className="w-4 h-4 mr-2" /> {tc('checkOutAction')}
                         </Button>
                     )}
                     {selectedBooking.status === 'pending' && (
-                        <>
-                             <Button onClick={() => {updateBookingStatus(selectedBooking.id, 'confirmed'); setSelectedBooking(null);}}>
-                                {tc('confirm')}
-                            </Button>
-                            <Button variant="danger" onClick={() => {updateBookingStatus(selectedBooking.id, 'cancelled'); setSelectedBooking(null);}}>
-                                {tc('cancel')}
-                            </Button>
-                        </>
+                        <Button variant="outline" onClick={() => {updateBookingStatus(selectedBooking.id, 'confirmed'); setSelectedBooking(null);}}>
+                            <CheckCircle2 className="w-4 h-4 mr-2" /> {tc('confirmAction')}
+                        </Button>
                     )}
+                    {selectedBooking.payment_status !== 'paid' && (
+                        <Button 
+                            variant="default"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={async () => {
+                                if (isOnline()) {
+                                    await api.post('/payments/cash', { 
+                                        referenceType: 'chalet_booking', 
+                                        referenceId: selectedBooking.id, 
+                                        amount: selectedBooking.total_amount 
+                                    });
+                                    toast.success('Payment recorded');
+                                } else {
+                                    await createOfflineCashPayment({ 
+                                        referenceType: 'chalet_booking', 
+                                        referenceId: selectedBooking.id, 
+                                        amount: selectedBooking.total_amount 
+                                    });
+                                    toast.info('Cash payment queued offline', { icon: '💵' });
+                                }
+                                setSelectedBooking(null);
+                            }}
+                        >
+                            Record Cash Payment
+                        </Button>
+                    )}
+                    <Button variant="outline" onClick={() => setSelectedBooking(null)}>
+                        {tCommon('close')}
+                    </Button>
               </div>
             </motion.div>    
           </div>

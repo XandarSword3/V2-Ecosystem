@@ -119,6 +119,8 @@ async function shouldHydrate(storeName: string, force: boolean): Promise<boolean
  * Fetch and store all chalets and their current status
  */
 async function hydrateChalets(force: boolean): Promise<void> {
+  if (!force && await cacheManager.isFresh('chalets', STORE_CONFIG.chalets.ttl)) return;
+  
   try {
     const metadata = await cacheManager.getMetadata('chalets');
     const since = metadata?.lastSyncAt ? new Date(metadata.lastSyncAt).toISOString() : undefined;
@@ -143,6 +145,8 @@ async function hydrateChalets(force: boolean): Promise<void> {
  * Fetch and store today's bookings
  */
 async function hydrateTodayBookings(force: boolean): Promise<void> {
+  if (!force && await cacheManager.isFresh('bookings', STORE_CONFIG.bookings.ttl)) return;
+
   try {
     const metadata = await cacheManager.getMetadata('bookings');
     const since = metadata?.lastSyncAt ? new Date(metadata.lastSyncAt).toISOString() : undefined;
@@ -178,6 +182,8 @@ async function hydrateTodayBookings(force: boolean): Promise<void> {
  * Fetch and store pool sessions for today
  */
 async function hydratePoolSessions(force: boolean): Promise<void> {
+  if (!force && await cacheManager.isFresh('pool_sessions', STORE_CONFIG.pool_sessions.ttl)) return;
+
   try {
     const today = new Date().toISOString().split('T')[0];
     const response = await api.get(STORE_CONFIG.pool_sessions.endpoint, {
@@ -197,6 +203,8 @@ async function hydratePoolSessions(force: boolean): Promise<void> {
  * Fetch and store today's pool tickets for validation
  */
 async function hydrateTodayTickets(force: boolean): Promise<void> {
+  if (!force && await cacheManager.isFresh('tickets', STORE_CONFIG.tickets.ttl)) return;
+
   try {
     const response = await api.get(STORE_CONFIG.tickets.endpoint);
     if (response.data?.tickets) {
@@ -216,6 +224,8 @@ async function hydrateTodayTickets(force: boolean): Promise<void> {
  * Fetch and store housekeeping tasks assigned to current staff
  */
 async function hydrateMyHousekeepingTasks(force: boolean): Promise<void> {
+  if (!force && await cacheManager.isFresh('housekeeping_tasks', STORE_CONFIG.housekeeping_tasks.ttl)) return;
+
   try {
     const response = await api.get(STORE_CONFIG.housekeeping_tasks.endpoint);
     if (response.data?.tasks) {
@@ -235,6 +245,8 @@ async function hydrateMyHousekeepingTasks(force: boolean): Promise<void> {
  * Fetch and store menu items, categories, and modifiers
  */
 async function hydrateMenu(force: boolean): Promise<void> {
+  if (!force && await cacheManager.isFresh('menu', STORE_CONFIG.menu.ttl)) return;
+
   try {
     const [menuResponse, modifiersResponse] = await Promise.all([
       api.get('/restaurant/menu'),
@@ -269,6 +281,8 @@ async function hydrateMenu(force: boolean): Promise<void> {
  * Fetch and store recent customers
  */
 async function hydrateCustomers(force: boolean): Promise<void> {
+  if (!force && await cacheManager.isFresh('customers', STORE_CONFIG.customers.ttl)) return;
+
   try {
     const metadata = await cacheManager.getMetadata('customers');
     const since = metadata?.lastSyncAt ? new Date(metadata.lastSyncAt).toISOString() : undefined;

@@ -10,7 +10,7 @@
 
 // IndexedDB Database Schema
 const DB_NAME = 'v2-offline-pos';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // Store names
 const STORES = {
@@ -29,6 +29,7 @@ const STORES = {
   TICKETS: 'tickets',
   HOUSEKEEPING_TASKS: 'housekeeping_tasks',
   CONFLICTS: 'conflicts',
+  OFFLINE_ACTIVITY: 'offline_activity',
 };
 
 interface SyncConflict {
@@ -54,6 +55,7 @@ interface SyncQueueItem {
   attempts: number;
   lastAttempt?: Date;
   status: SyncStatus;
+  priority?: 0 | 1 | 2; // 0=financial, 1=operational, 2=ui
   error?: string;
   serverVersion?: number;
 }
@@ -204,11 +206,17 @@ export function initDatabase(): Promise<IDBDatabase> {
         hkStore.createIndex('status', 'status', { unique: false });
       }
 
-      // Conflicts Store
       if (!db.objectStoreNames.contains(STORES.CONFLICTS)) {
         const conflictStore = db.createObjectStore(STORES.CONFLICTS, { keyPath: 'id' });
         conflictStore.createIndex('resolved', 'resolved', { unique: false });
         conflictStore.createIndex('entityType', 'entityType', { unique: false });
+      }
+
+      // Offline Activity Store
+      if (!db.objectStoreNames.contains(STORES.OFFLINE_ACTIVITY)) {
+        const activityStore = db.createObjectStore(STORES.OFFLINE_ACTIVITY, { keyPath: 'id' });
+        activityStore.createIndex('timestamp', 'timestamp', { unique: false });
+        activityStore.createIndex('type', 'type', { unique: false });
       }
     };
   });
@@ -365,6 +373,7 @@ export const poolSessionsStore = new OfflineStore<OfflineEntity>(STORES.POOL_SES
 export const ticketsStore = new OfflineStore<OfflineEntity>(STORES.TICKETS);
 export const housekeepingTasksStore = new OfflineStore<OfflineEntity>(STORES.HOUSEKEEPING_TASKS);
 export const conflictsStore = new OfflineStore<SyncConflict>(STORES.CONFLICTS);
+export const offlineActivityStore = new OfflineStore<OfflineEntity>(STORES.OFFLINE_ACTIVITY);
 
 /**
  * Sync Queue Management
@@ -386,7 +395,13 @@ export class SyncQueue {
   }
 
   async getPending(): Promise<SyncQueueItem[]> {
-    return this.store.getByIndex('status', 'pending');
+    const all = await this.store.getAll();
+    return all
+      .filter((i) => i.status === 'pending' || i.status === 'failed')
+      .sort((a, b) => 
+        (a.priority ?? 2) - (b.priority ?? 2) || 
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
   }
 
   async getFailed(): Promise<SyncQueueItem[]> {
@@ -464,6 +479,13 @@ export class CacheManager {
 
     const ageMs = Date.now() - new Date(metadata.lastSyncAt).getTime();
     return ageMs > maxAgeMinutes * 60 * 1000;
+  }
+
+  async isFresh(storeName: string, ttlMinutes: number): Promise<boolean> {
+    const meta = await this.getMetadata(storeName);
+    if (!meta?.lastSyncAt) return false;
+    const ageMs = Date.now() - new Date(meta.lastSyncAt).getTime();
+    return ageMs < ttlMinutes * 60 * 1000;
   }
 }
 
