@@ -14,15 +14,35 @@ import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModule
 import { Container } from '@/components/layout/Container';
 import { Button } from '@/components/ui/Button';
 
+interface ModuleWithLayout {
+  id: string;
+  template_type: 'menu_service' | 'multi_day_booking' | 'session_access';
+  name: string;
+  slug: string;
+  description?: string;
+  is_active: boolean;
+  sort_order: number;
+  settings?: {
+    layout?: any[];
+    showInNavigation?: boolean;
+    icon?: string;
+    theme?: string;
+    primaryColor?: string;
+    [key: string]: any;
+  };
+}
+
 export default function ModulePage() {
   const t = useTranslations('errors');
   const tCommon = useTranslations('common');
   const params = useParams();
 
   const router = useRouter();
-  const { modules, loading: isLoading } = useSiteSettings();
+  const { modules: cachedModules, loading: isLoading } = useSiteSettings();
   const [slug, setSlug] = useState<string>('');
   const [allModules, setAllModules] = useState<any[]>([]);
+  const [moduleWithLayout, setModuleWithLayout] = useState<ModuleWithLayout | null>(null);
+  const [fetchingLayout, setFetchingLayout] = useState(false);
 
   // Fetch all modules (including inactive) to check if module exists but is disabled
   useEffect(() => {
@@ -48,7 +68,40 @@ export default function ModulePage() {
     }
   }, [params]);
 
-  if (isLoading) {
+  // Fetch full module details including settings.layout
+  useEffect(() => {
+    const fetchModuleDetails = async () => {
+      if (!slug) return;
+      
+      // First check if we have it in cache with layout
+      const cached = cachedModules.find((m) => m.slug.toLowerCase() === slug);
+      if (cached?.settings?.layout) {
+        setModuleWithLayout(cached as ModuleWithLayout);
+        return;
+      }
+      
+      // Otherwise fetch from API
+      setFetchingLayout(true);
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+        const res = await fetch(`${baseUrl}/api/modules/${slug}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.data) {
+            setModuleWithLayout(data.data);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch module details:', error);
+      } finally {
+        setFetchingLayout(false);
+      }
+    };
+    
+    fetchModuleDetails();
+  }, [slug, cachedModules]);
+
+  if (isLoading || fetchingLayout) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-12 h-12 animate-spin text-primary-600" />
@@ -57,7 +110,8 @@ export default function ModulePage() {
   }
 
   // Check if module is active (case-insensitive comparison)
-  const currentModule = modules.find((m) => m.slug.toLowerCase() === slug);
+  // Prefer moduleWithLayout (has full settings from API) over cachedModules
+  const currentModule = moduleWithLayout || cachedModules.find((m) => m.slug.toLowerCase() === slug);
   
   // Check if module exists but is disabled
   const disabledModule = !currentModule && allModules.find((m) => m.slug.toLowerCase() === slug && !m.is_active);

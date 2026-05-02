@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { UIBlock, UIComponentType } from '@/types/module-builder';
+import { UIBlock, UIComponentType, CanvasMode } from '@/types/module-builder';
 
 interface ModuleBuilderStore {
   activeModuleId: string | null;
@@ -7,6 +7,7 @@ interface ModuleBuilderStore {
   selectedBlockId: string | null;
   isPreview: boolean;
   zoom: number;
+  canvasMode: CanvasMode;
   history: UIBlock[][];
   historyIndex: number;
   _futureStates: UIBlock[][];
@@ -17,6 +18,7 @@ interface ModuleBuilderStore {
   selectBlock: (id: string | null) => void;
   togglePreview: () => void;
   setZoom: (zoom: number) => void;
+  setCanvasMode: (mode: CanvasMode) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -52,6 +54,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
   selectedBlockId: null,
   isPreview: false,
   zoom: 100,
+  canvasMode: 'stack',
   history: [], // past states
   historyIndex: -1, // not used in new approach, keeping for compatibility
   _futureStates: [],
@@ -65,6 +68,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
   selectBlock: (id) => set({ selectedBlockId: id }),
   togglePreview: () => set((state) => ({ isPreview: !state.isPreview, selectedBlockId: null })),
   setZoom: (zoom) => set({ zoom: Math.max(50, Math.min(150, zoom)) }),
+  setCanvasMode: (mode) => set({ canvasMode: mode }),
 
   undo: () => set((state) => {
     if (state.history.length === 0) return state;
@@ -127,6 +131,58 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
         { name: 'Basic', price: '$10', features: ['Feature 1', 'Feature 2'] },
         { name: 'Pro', price: '$20', features: ['Feature 1', 'Feature 2', 'Feature 3'], popular: true }
       ]);
+    } else if (type === 'hero_v2') {
+      defaultProps.eyebrow = 'Welcome';
+      defaultProps.title = 'Hero Title';
+      defaultProps.subtitle = 'Discover our services';
+      defaultProps.primaryButton = 'Get Started';
+      defaultProps.align = 'center';
+    } else if (type === 'features') {
+      defaultProps.title = 'Our Features';
+      defaultProps.features = JSON.stringify([
+        { icon: 'Star', title: 'Feature 1', description: 'Description here' },
+        { icon: 'Heart', title: 'Feature 2', description: 'Description here' },
+        { icon: 'Zap', title: 'Feature 3', description: 'Description here' }
+      ]);
+    } else if (type === 'cta') {
+      defaultProps.title = 'Ready to get started?';
+      defaultProps.buttonText = 'Get Started';
+      defaultProps.align = 'center';
+    } else if (type === 'class_schedule') {
+      defaultProps.title = 'Next Classes';
+      defaultProps.subtitle = 'UPCOMING SESSIONS';
+      defaultProps.classes = JSON.stringify([
+        { id: '1', name: 'Class 1', time: '09:00 AM', trainer: 'Trainer', category: 'Category', icon: 'Dumbbell' },
+        { id: '2', name: 'Class 2', time: '11:00 AM', trainer: 'Trainer', category: 'Category', icon: 'Heart' }
+      ]);
+    } else if (type === 'calendar') {
+      defaultProps.title = 'Schedule';
+    } else if (type === 'testimonials_carousel') {
+      defaultProps.title = 'Testimonials';
+      defaultProps.subtitle = 'WHAT PEOPLE SAY';
+      defaultProps.testimonials = JSON.stringify([
+        { id: '1', text: 'Great experience!', name: 'John D.', role: 'Member', rating: 5, avatar: 'JD' },
+        { id: '2', text: 'Highly recommended!', name: 'Jane S.', role: 'Member', rating: 5, avatar: 'JS' },
+        { id: '3', text: 'Amazing service!', name: 'Bob M.', role: 'Member', rating: 5, avatar: 'BM' }
+      ]);
+    } else if (type === 'stats') {
+      defaultProps.title = 'Our Impact';
+      defaultProps.stats = JSON.stringify([
+        { value: '10K+', label: 'Happy Guests', icon: 'Users' },
+        { value: '50+', label: 'Activities', icon: 'Zap' },
+        { value: '99%', label: 'Satisfaction', icon: 'Heart' }
+      ]);
+    } else if (type === 'card_grid') {
+      defaultProps.title = 'Our Services';
+      defaultProps.cards = JSON.stringify([
+        { title: 'Service 1', description: 'Description', icon: 'Star' },
+        { title: 'Service 2', description: 'Description', icon: 'Heart' },
+        { title: 'Service 3', description: 'Description', icon: 'Zap' }
+      ]);
+    } else if (type === 'divider') {
+      defaultProps.accentColor = '#6366f1';
+    } else if (type === 'spacer') {
+      defaultProps.height = 40;
     }
 
     const newBlock: UIBlock = {

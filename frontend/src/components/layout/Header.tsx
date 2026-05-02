@@ -28,6 +28,94 @@ import { useTerminology } from '@/hooks/useTerminology';
 import { useSiteSettings } from '@/lib/settings-context';
 import { Container } from './Container';
 
+// Magnetic Nav Item Component
+interface NavItemProps {
+  item: {
+    name: string;
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+  };
+  pathname: string | null;
+}
+
+function NavItem({ item, pathname }: NavItemProps) {
+  const Icon = item.icon;
+  const isActive = pathname === item.href;
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <Link href={item.href} aria-current={isActive ? 'page' : undefined}>
+      <motion.div
+        onHoverStart={() => setIsHovered(true)}
+        onHoverEnd={() => setIsHovered(false)}
+        whileTap={{ scale: 0.95 }}
+        className={cn(
+          'relative flex items-center gap-2 px-4 py-2 rounded-xl transition-colors duration-300',
+          isActive
+            ? 'text-primary-700 dark:text-primary-300 font-medium'
+            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+        )}
+      >
+        {/* Animated background glow */}
+        <AnimatePresence>
+          {(isHovered || isActive) && (
+            <motion.div
+              layoutId="navGlow"
+              className="absolute inset-0 rounded-xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                background: isActive
+                  ? 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(99,102,241,0.05) 100%)'
+                  : 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)',
+                border: isActive
+                  ? '1px solid rgba(99,102,241,0.2)'
+                  : '1px solid rgba(255,255,255,0.3)',
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Icon with animation */}
+        <motion.div
+          animate={{ 
+            scale: isHovered ? 1.1 : 1,
+            rotate: isHovered ? -5 : 0,
+          }}
+          transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+          className="relative z-10"
+        >
+          <Icon className="h-4 w-4" aria-hidden="true" />
+        </motion.div>
+
+        {/* Label */}
+        <span className="relative z-10 text-sm font-medium">{item.name}</span>
+
+        {/* Active indicator dot */}
+        {isActive && (
+          <motion.div
+            layoutId="activeIndicator"
+            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary-500"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          />
+        )}
+
+        {/* Hover underline */}
+        <motion.div
+          className="absolute -bottom-0.5 left-2 right-2 h-0.5 bg-primary-500/50 rounded-full"
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: isHovered && !isActive ? 1 : 0 }}
+          transition={{ duration: 0.2 }}
+        />
+      </motion.div>
+    </Link>
+  );
+}
+
 // ... inside Header component
 export default function Header() {
   const { settings, modules } = useSiteSettings();
@@ -247,34 +335,11 @@ export default function Header() {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - Enhanced with magnetic hover */}
           <nav className="hidden lg:flex items-center gap-1" aria-label="Main navigation">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <motion.div
-                    whileHover={{ scale: 1.02, y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={cn(
-                      'flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300',
-                      isActive
-                        ? 'bg-primary-500/10 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 font-medium backdrop-blur-sm border border-primary-200/50 dark:border-primary-700/30'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60 hover:backdrop-blur-sm'
-                    )}
-                  >
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                    <span className="text-sm">{item.name}</span>
-                  </motion.div>
-                </Link>
-              );
-            })}
+            {navigation.map((item) => (
+              <NavItem key={item.href} item={item} pathname={pathname} />
+            ))}
           </nav>
 
           {/* Right Side Actions */}

@@ -2,14 +2,12 @@
 
 import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useModuleBuilderStore } from '@/stores/module-builder-store';
 import { BuilderCanvas } from '@/components/module-builder/BuilderCanvas';
 import { ComponentToolbar } from '@/components/module-builder/ComponentToolbar';
 import { PropertyPanel } from '@/components/module-builder/PropertyPanel';
 import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
-import { Loader2, ArrowLeft, Save, Eye, EyeOff, Undo2, Redo2, ZoomIn, ZoomOut } from 'lucide-react';
+import { Loader2, ArrowLeft, Save, Eye, EyeOff, Undo2, Redo2, ZoomIn, ZoomOut, Layers, LayoutList } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { modulesApi } from '@/lib/api';
@@ -25,9 +23,10 @@ export default function ModuleBuilderPage() {
     setLayout, 
     layout, 
     setActiveModuleId, 
-    selectedBlockId,
     isPreview,
     togglePreview,
+    canvasMode,
+    setCanvasMode,
     undo,
     redo,
     canUndo,
@@ -36,10 +35,11 @@ export default function ModuleBuilderPage() {
     setZoom,
   } = useModuleBuilderStore();
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['module', id],
     queryFn: () => modulesApi.getById(id),
-    staleTime: 0, // Always fetch fresh data when navigating to builder
+    staleTime: 0,
+    refetchOnMount: 'always', // Force refetch on navigation to prevent stale blank state
   });
 
   const saveMutation = useMutation({
@@ -74,7 +74,30 @@ export default function ModuleBuilderPage() {
   }, [data, id, setActiveModuleId, setLayout]);
 
   if (isLoading) {
-    return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
+    return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg font-bold text-red-500">Failed to load module</p>
+          <p className="text-sm text-slate-500 mt-2">{(error as Error).message}</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            Retry
+          </button>
+          <button
+            onClick={() => router.push('/admin/modules')}
+            className="mt-4 ml-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300"
+          >
+            Back to Modules
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -130,6 +153,25 @@ export default function ModuleBuilderPage() {
                     title="Zoom In"
                 >
                     <ZoomIn className="h-4 w-4" />
+                </button>
+            </div>
+
+            {/* Canvas Mode Toggle */}
+            <div className="flex items-center border border-slate-300 rounded-lg dark:border-slate-600 overflow-hidden">
+                <button
+                    onClick={() => setCanvasMode('stack')}
+                    className={`p-2 ${canvasMode === 'stack' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                    title="Stack Mode (vertical flow)"
+                >
+                    <LayoutList className="h-4 w-4" />
+                </button>
+                <div className="w-px h-6 bg-slate-300 dark:bg-slate-600" />
+                <button
+                    onClick={() => setCanvasMode('freeform')}
+                    className={`p-2 ${canvasMode === 'freeform' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                    title="Freeform Canvas (PowerPoint-style)"
+                >
+                    <Layers className="h-4 w-4" />
                 </button>
             </div>
 
