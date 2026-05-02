@@ -177,26 +177,43 @@ export default function HomePage() {
       {/* Hero Section */}
       <section ref={heroRef} className="relative min-h-[100vh] flex items-center justify-center pt-20 overflow-hidden">
         {/* Background Image from CMS */}
+        {/* Ken Burns Effect Background */}
         <AnimatePresence mode="wait">
           {currentSlide.imageUrl && (
             <motion.div
               key={currentSlide.id}
-              initial={{ opacity: 0, scale: 1.1 }}
+              initial={{ opacity: 0, scale: 1.2 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1 }}
-              className="absolute inset-0 z-0"
+              exit={{ opacity: 0, scale: 1.1 }}
+              transition={{ duration: 1.5, ease: [0.25, 0.1, 0.25, 1] }}
+              className="absolute inset-0 z-0 overflow-hidden"
             >
-              <Image
-                src={currentSlide.imageUrl}
-                alt={currentSlide.title || 'Hero background'}
-                fill
-                priority
-                className="object-cover"
-                sizes="100vw"
+              {/* Ken Burns slow zoom animation */}
+              <motion.div
+                className="absolute inset-0"
+                initial={{ scale: 1 }}
+                animate={{ scale: 1.1 }}
+                transition={{ duration: 20, ease: 'linear' }}
+              >
+                <Image
+                  src={currentSlide.imageUrl}
+                  alt={currentSlide.title || 'Hero background'}
+                  fill
+                  priority
+                  className="object-cover"
+                  sizes="100vw"
+                />
+              </motion.div>
+              {/* Multi-layer overlay for cinematic depth */}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/70" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/20" />
+              {/* Vignette effect */}
+              <div 
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: 'radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.4) 100%)',
+                }}
               />
-              {/* Overlay for better text readability */}
-              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -205,27 +222,32 @@ export default function HomePage() {
           className="absolute inset-0 z-0"
           style={{ y: heroY, opacity: heroOpacity }}
         >
-          {/* Floating decorative orbs - only show if no background image */}
-          {!currentSlide.imageUrl && [
-            { size: 'w-48 sm:w-64 lg:w-80', x: '10%', y: '20%', delay: 0 },
-            { size: 'w-32 sm:w-48 lg:w-64', x: '80%', y: '30%', delay: 1 },
-            { size: 'w-24 sm:w-32 lg:w-48', x: '20%', y: '70%', delay: 2 },
-            { size: 'w-40 sm:w-56 lg:w-72', x: '70%', y: '75%', delay: 0.5 },
+          {/* Cinematic floating orbs - always visible but adapt to background */}
+          {(true) && [
+            { size: 'w-64 sm:w-80 lg:w-96', x: '5%', y: '15%', delay: 0, blur: 'blur-3xl' },
+            { size: 'w-48 sm:w-64 lg:w-80', x: '75%', y: '25%', delay: 1.5, blur: 'blur-2xl' },
+            { size: 'w-32 sm:w-48 lg:w-64', x: '15%', y: '65%', delay: 0.8, blur: 'blur-2xl' },
+            { size: 'w-56 sm:w-72 lg:w-88', x: '65%', y: '70%', delay: 2.2, blur: 'blur-3xl' },
+            { size: 'w-24 sm:w-32 lg:w-48', x: '45%', y: '45%', delay: 3, blur: 'blur-xl' },
           ].map((orb, i) => (
             <motion.div
               key={i}
-              className={`absolute rounded-full ${orb.size}`}
+              className={`absolute rounded-full ${orb.size} ${orb.blur} pointer-events-none`}
               style={{
                 left: orb.x,
                 top: orb.y,
-                background: `radial-gradient(circle, var(--color-primary)20 0%, transparent 70%)`,
+                background: currentSlide.imageUrl 
+                  ? 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)'
+                  : `radial-gradient(circle, var(--color-primary)15 0%, transparent 70%)`,
               }}
               animate={{
-                y: [0, -30, 0],
-                scale: [1, 1.1, 1],
+                y: [0, -40, 0],
+                x: [0, 15, 0],
+                scale: [1, 1.15, 1],
+                opacity: [0.4, 0.7, 0.4],
               }}
               transition={{
-                duration: 6 + i,
+                duration: 8 + i * 2,
                 repeat: Infinity,
                 ease: 'easeInOut',
                 delay: orb.delay,
@@ -234,27 +256,57 @@ export default function HomePage() {
           ))}
         </motion.div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          {/* Weather Widget - Below hero text on mobile, top right on desktop */}
-          <div className="hidden sm:block absolute top-4 right-4 z-20">
+        {/* Weather Widget - Outside hero text container to prevent overlap */}
+        <div className="hidden sm:block absolute top-4 right-4 z-30 pointer-events-none">
+          <div className="pointer-events-auto">
             <WeatherWidget variant="compact" />
           </div>
+        </div>
 
-          {/* Slide indicators */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+
+          {/* Cinematic slide indicators with glow */}
           {heroSlides.length > 1 && (
-            <div className="absolute bottom-20 sm:bottom-28 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+            <div className="absolute bottom-24 sm:bottom-32 left-1/2 -translate-x-1/2 flex gap-3 z-20">
               {heroSlides.map((_, idx) => (
-                <button
+                <motion.button
                   key={idx}
                   onClick={() => setCurrentSlideIndex(idx)}
-                  className={`w-2 h-2 rounded-full transition-all ${idx === currentSlideIndex
-                    ? 'w-8 bg-white'
-                    : 'bg-white/50 hover:bg-white/75'
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.9 }}
+                  className={`h-2 rounded-full transition-all duration-500 ${idx === currentSlideIndex
+                    ? 'w-10 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]'
+                    : 'w-2 bg-white/40 hover:bg-white/70'
                     }`}
+                  animate={idx === currentSlideIndex ? {
+                    boxShadow: ['0 0 5px rgba(255,255,255,0.3)', '0 0 20px rgba(255,255,255,0.6)', '0 0 5px rgba(255,255,255,0.3)']
+                  } : {}}
+                  transition={{ duration: 2, repeat: Infinity }}
                 />
               ))}
             </div>
           )}
+
+          {/* Magnetic scroll indicator */}
+          <motion.div
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1 }}
+          >
+            <span className="text-xs text-white/60 tracking-widest uppercase">Scroll</span>
+            <motion.div
+              className="w-6 h-10 rounded-full border-2 border-white/40 flex justify-center pt-2"
+              animate={{ borderColor: ['rgba(255,255,255,0.4)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.4)'] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <motion.div
+                className="w-1.5 h-1.5 rounded-full bg-white"
+                animate={{ y: [0, 12, 0], opacity: [1, 0.3, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            </motion.div>
+          </motion.div>
 
           {/* Badge */}
           <motion.div

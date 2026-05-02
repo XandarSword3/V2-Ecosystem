@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { ModifierSelectionModal, type SelectedModifier } from '@/components/restaurant/ModifierSelectionModal';
 import { CustomizationSelector } from '@/components/customization/CustomizationSelector';
+import { ModuleHero, GlassSearch, CategoryPills, GlassCard, FloatingActionButton } from './';
 
 interface MenuServiceProps {
   module: Module;
@@ -285,51 +286,23 @@ export function MenuService({ module }: MenuServiceProps) {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Hero Section */}
-      <div 
-        className="relative overflow-hidden pt-24 pb-20"
-        style={{ background: `linear-gradient(to right, ${headerColor}, ${accentColor})` }}
-      >
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: -30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
-              <Sparkles className="w-4 h-4 text-white" />
-              <span className="text-white/90 text-sm font-medium">{module.description || t('authenticLebanese')}</span>
-            </div>
-            
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
-              {module.name}
-            </h1>
-          </motion.div>
-        </div>
-      </div>
+      {/* Hero Section - New glassmorphic component */}
+      <ModuleHero
+        title={module.name}
+        description={module.description || t('authenticLebanese')}
+        headerColor={headerColor}
+        accentColor={accentColor}
+        badgeText={isSnackBar ? 'Quick Bites' : 'Fresh & Delicious'}
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-6 relative z-10">
-        {/* Search Bar */}
-        <div className="max-w-md mx-auto mb-8">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={`Search ${module.name} menu...`}
-              className="w-full pl-12 pr-10 py-3 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-slate-900 dark:text-white placeholder:text-slate-400"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
+        {/* Search Bar - New glassmorphic component */}
+        <GlassSearch
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder={`Search ${module.name} menu...`}
+          className="mb-8"
+        />
 
         {/* Featured Dishes Section */}
         {featuredItems.length > 0 && !selectedCategory && (
@@ -426,130 +399,90 @@ export function MenuService({ module }: MenuServiceProps) {
           </div>
         )}
 
-        {/* Categories */}
-        <div className="flex flex-wrap gap-3 justify-center mb-10">
-          <button
-            onClick={() => setSelectedCategory(null)}
-            className={`px-6 py-3 rounded-full font-semibold transition-all ${
-              !selectedCategory 
-                ? 'text-white shadow-lg' 
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'
-            }`}
-            style={!selectedCategory ? { backgroundColor: headerColor } : {}}
-          >
-            All
-          </button>
-          {categories.map((cat: MenuCategoryItem) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-6 py-3 rounded-full font-semibold transition-all ${
-                selectedCategory === cat.id
-                  ? 'text-white shadow-lg' 
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'
-              }`}
-              style={selectedCategory === cat.id ? { backgroundColor: headerColor } : {}}
-            >
-              {translateContent(cat, 'name')}
-            </button>
-          ))}
+        {/* Categories - New glassmorphic component */}
+        <div className="mb-10">
+          <CategoryPills
+            categories={[
+              { id: null, name: 'All', count: items.length },
+              ...categories.map((cat: MenuCategoryItem) => ({
+                id: cat.id,
+                name: translateContent(cat, 'name'),
+                count: items.filter((item: MenuItemData) => item.category_id === cat.id).length,
+              })),
+            ]}
+            selectedId={selectedCategory}
+            onSelect={setSelectedCategory}
+            accentColor={accentColor}
+          />
         </div>
 
-        {/* Items Grid */}
+        {/* Items Grid - New glassmorphic cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredItems.map((item: MenuItemData) => (
-            <motion.div
+            <GlassCard
               key={item.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden"
+              imageUrl={item.image_url}
+              isFeatured={item.is_featured}
+              accentColor={accentColor}
+              onClick={() => handleItemClick(item)}
             >
-              {item.image_url && (
-                <div className="h-48 overflow-hidden">
-                  <img 
-                    src={item.image_url} 
-                    alt={translateContent(item, 'name')}
-                    className="w-full h-full object-cover transition-transform hover:scale-110 duration-500"
-                  />
-                </div>
-              )}
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                    {translateContent(item, 'name')}
-                  </h3>
-                  <span className="text-lg font-bold text-primary-600">
-                    {formatCurrency(item.price, currency)}
-                  </span>
-                </div>
-                <p className="text-slate-600 dark:text-slate-400 mb-4 line-clamp-2">
-                  {translateContent(item, 'description')}
-                </p>
-                
-                <div className="flex items-center justify-between mt-4">
-                  {getItemQuantity(item.id) > 0 ? (
-                    <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
-                      <button 
-                        onClick={() => removeFromCart(item.id)}
-                        className="p-2 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-colors"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="font-medium w-4 text-center">{getItemQuantity(item.id)}</span>
-                      <button 
-                        onClick={() => addToCart(item)}
-                        className="p-2 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleItemClick(item)}
-                      disabled={checkingCustomizations}
-                      className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {checkingCustomizations ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <ShoppingCart className="w-5 h-5" />
-                      )}
-                      {t('addToCart')}
-                    </button>
-                  )}
-                </div>
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                  {translateContent(item, 'name')}
+                </h3>
+                <span className="text-lg font-bold" style={{ color: accentColor }}>
+                  {formatCurrency(item.price, currency)}
+                </span>
               </div>
-            </motion.div>
+              <p className="text-slate-600 dark:text-slate-400 mb-4 line-clamp-2">
+                {translateContent(item, 'description')}
+              </p>
+              
+              <div className="flex items-center justify-between mt-4">
+                {getItemQuantity(item.id) > 0 ? (
+                  <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
+                    <button 
+                      onClick={() => removeFromCart(item.id)}
+                      className="p-2 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-colors"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="font-medium w-4 text-center">{getItemQuantity(item.id)}</span>
+                    <button 
+                      onClick={() => addToCart(item)}
+                      className="p-2 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleItemClick(item)}
+                    disabled={checkingCustomizations}
+                    className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {checkingCustomizations ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ShoppingCart className="w-5 h-5" />
+                    )}
+                    {t('addToCart')}
+                  </button>
+                )}
+              </div>
+            </GlassCard>
           ))}
         </div>
       </main>
 
-      {/* Floating Cart Bar */}
-      <AnimatePresence>
-        {cartCount > 0 && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-0 left-0 right-0 z-50 p-4"
-          >
-            <div className="max-w-lg mx-auto">
-              <button
-                onClick={() => router.push(`/${module.slug}/cart`)}
-                className="w-full flex items-center justify-between px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl shadow-2xl shadow-primary-600/30 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-white/20 rounded-full w-8 h-8 flex items-center justify-center">
-                    <span className="font-bold text-sm">{cartCount}</span>
-                  </div>
-                  <span className="font-semibold">View Cart</span>
-                </div>
-                <span className="font-bold text-lg">{formatCurrency(cartTotal, currency)}</span>
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Floating Cart Button - New glassmorphic component */}
+      <FloatingActionButton
+        count={cartCount}
+        onClick={() => router.push(`/${module.slug}/cart`)}
+        accentColor={accentColor}
+        position="bottom-center"
+        label={formatCurrency(cartTotal, currency)}
+      />
 
       {/* Modifier Selection Modal (Legacy) */}
       {selectedItemForModifiers && (

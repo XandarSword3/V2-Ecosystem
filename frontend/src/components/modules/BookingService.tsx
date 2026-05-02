@@ -14,6 +14,7 @@ import { SpotlightCard } from '@/components/effects/GlowingBorder';
 import { FloatingCard } from '@/components/effects/Card3D';
 import { GradientText, RevealHeading } from '@/components/effects/TextEffects';
 import { AnimatedCounter } from '@/components/effects/AnimatedCounter';
+import { ModuleHero, GlassSearch, CategoryPills, GlassCard } from './';
 
 interface BookingServiceProps {
   module: Module;
@@ -127,95 +128,14 @@ export function BookingService({ module }: BookingServiceProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50/50 via-white to-green-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {/* Hero Section with Aurora Effect */}
-      <div className="relative min-h-[50vh] overflow-hidden">
-        {/* Aurora Background */}
-        <div
-          className="absolute inset-0"
-          style={{ background: `linear-gradient(135deg, ${headerColor}, ${accentColor})` }}
-        >
-          {/* Animated Blobs */}
-          <motion.div
-            className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-40"
-            style={{ background: 'radial-gradient(circle, rgba(16, 185, 129, 0.6) 0%, transparent 70%)' }}
-            animate={{ x: [0, 50, 0], y: [0, 30, 0], scale: [1, 1.2, 1] }}
-            transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.div
-            className="absolute top-1/2 right-1/4 w-80 h-80 rounded-full opacity-40"
-            style={{ background: 'radial-gradient(circle, rgba(52, 211, 153, 0.6) 0%, transparent 70%)' }}
-            animate={{ x: [0, -40, 0], y: [0, -50, 0], scale: [1, 1.3, 1] }}
-            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-          />
-          <motion.div
-            className="absolute bottom-1/4 left-1/2 w-72 h-72 rounded-full opacity-30"
-            style={{ background: 'radial-gradient(circle, rgba(20, 184, 166, 0.6) 0%, transparent 70%)' }}
-            animate={{ x: [0, 60, 0], y: [0, 40, 0], scale: [1, 1.15, 1] }}
-            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-          />
-        </div>
-
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-black/10" />
-
-        {/* Wave Bottom */}
-        <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
-            <path d="M0 120L60 105C120 90 240 60 360 45C480 30 600 30 720 37.5C840 45 960 60 1080 67.5C1200 75 1320 75 1380 75L1440 75V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" className="fill-emerald-50/50 dark:fill-slate-900" />
-          </svg>
-        </div>
-
-        {/* Content */}
-        <motion.div
-          className="relative z-10 flex flex-col items-center justify-center min-h-[50vh] px-4 text-center"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-        >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
-            className="mb-6 inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/30"
-          >
-            <Sparkles className="w-5 h-5 text-yellow-300" />
-            <span className="text-white font-medium">{t('luxuryStay') || 'Premium Stay'}</span>
-          </motion.div>
-
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 drop-shadow-lg">
-            {module.name}
-          </h1>
-          <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto mb-10">
-            {module.description || t('subtitle')}
-          </p>
-
-          {/* Stats */}
-          <div className="flex flex-wrap justify-center gap-4 md:gap-6">
-            {[
-              { value: units.length, label: tCommon('chalets') || 'Units', icon: <Home className="w-5 h-5" /> },
-              { value: units.reduce((max, c) => Math.max(max, c.capacity || 0), 0), suffix: '+', label: tCommon('maxGuests') || 'Max Guests', icon: <Users className="w-5 h-5" /> },
-              { value: 5.0, label: tCommon('starRating') || 'Star Rating', icon: <Star className="w-5 h-5 fill-current" /> },
-            ].map((stat, index) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 + index * 0.1 }}
-                whileHover={{ y: -4, scale: 1.05 }}
-                className="bg-white/20 backdrop-blur-xl rounded-2xl px-8 py-4 border border-white/30 text-white"
-              >
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  {stat.icon}
-                  <span className="text-3xl font-bold">
-                    <AnimatedCounter value={stat.value} suffix={stat.suffix} duration={2} decimals={stat.value % 1 !== 0 ? 1 : 0} />
-                  </span>
-                </div>
-                <div className="text-sm text-white/80">{stat.label}</div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
+      {/* Hero Section - New glassmorphic component */}
+      <ModuleHero
+        title={module.name}
+        description={module.description || t('subtitle')}
+        headerColor={headerColor}
+        accentColor={accentColor}
+        badgeText={t('luxuryStay') || 'Premium Stay'}
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-6 relative z-10">
         {/* Units Grid */}

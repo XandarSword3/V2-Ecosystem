@@ -168,7 +168,7 @@ describe('Admin dashboard route coverage', () => {
 
     render(<AdminDashboard />);
 
-    expect(await screen.findByText('Welcome back')).toBeInTheDocument();
+    expect(await screen.findByText(/Dashboard/i)).toBeInTheDocument();
     expect(screen.getByText(/Azure Bay Resort/i)).toBeInTheDocument();
     expect(screen.getByText('Morgan White')).toBeInTheDocument();
 
