@@ -18,7 +18,6 @@ import {
 } from './offline-storage';
 import api from '@/lib/api';
 
-const MAX_CACHE_AGE_MINUTES = 60;
 
 /**
  * Configuration for offline stores: TTL in minutes and sync strategy
