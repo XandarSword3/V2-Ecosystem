@@ -302,21 +302,14 @@ export default function AdminDashboard() {
       variants={staggerContainer}
       className="space-y-8"
     >
-      {/* Welcome Header */}
+      {/* Dashboard Header */}
       <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            Welcome back
-            <motion.span
-              animate={{ rotate: [0, 14, -8, 14, -4, 10, 0] }}
-              transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-              className="inline-block"
-            >
-              👋
-            </motion.span>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
+            {businessName} Dashboard
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Here&apos;s what&apos;s happening at {businessName} today, <span className="font-medium text-slate-700 dark:text-slate-300">{user?.fullName}</span>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
+            Logged in as <span className="font-medium text-slate-700 dark:text-slate-300">{user?.fullName}</span> • {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
           </p>
         </div>
         <Button

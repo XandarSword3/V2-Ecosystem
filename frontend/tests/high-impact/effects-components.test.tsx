@@ -9,7 +9,6 @@ vi.mock('framer-motion', () => {
     set: vi.fn(),
     on: vi.fn(),
   });
-
   return {
     motion: new Proxy({}, { get: () => MotionStub }),
     AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
@@ -20,6 +19,12 @@ vi.mock('framer-motion', () => {
       typeof value === 'number' ? createMotionValue(value) : value,
     useMotionValue: (initial = 0) => createMotionValue(initial),
     useInView: () => true,
+    useReducedMotion: () => false,
+    useAnimation: () => ({
+      start: vi.fn(),
+      stop: vi.fn(),
+    }),
+    useCycle: (...items: any[]) => [items[0], vi.fn()],
   };
 });
 
@@ -57,8 +62,8 @@ import { Card3D, FloatingCard, TiltCard } from '../../src/components/effects/Car
 import { GlowingBorder, MagneticButton, SpotlightCard } from '../../src/components/effects/GlowingBorder';
 import LoadingScreen, {
   LoadingScreenWrapper,
-  PageLoader,
 } from '../../src/components/effects/LoadingScreen';
+import { PageLoader } from '../../src/components/ui/Skeleton';
 import PageTransition, {
   AnimatedSection,
   LuxuryReveal,

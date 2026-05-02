@@ -88,7 +88,7 @@ describe('Admin analytics reports route coverage', () => {
     anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     apiGetMock.mockImplementation((url: string, config?: { responseType?: string }) => {
-      if (url === '/reports/executive-overview') {
+      if (url === '/admin/reports/overview') {
         return Promise.resolve({ data: { data: executiveSeed } });
       }
 
@@ -96,7 +96,7 @@ describe('Admin analytics reports route coverage', () => {
         return Promise.resolve({ data: { data: customerCategorySeed } });
       }
 
-      if (url === '/reports/export-comprehensive') {
+      if (url === '/admin/reports/export') {
         if (config?.responseType === 'blob') {
           return Promise.resolve({ data: new Blob(['id,total\n1,100']) });
         }
@@ -130,7 +130,7 @@ describe('Admin analytics reports route coverage', () => {
 
     await waitFor(() => {
       expect(apiGetMock).toHaveBeenCalledWith(
-        '/reports/export-comprehensive',
+        '/admin/reports/export',
         expect.objectContaining({
           params: expect.any(Object),
           responseType: 'blob',
@@ -142,7 +142,7 @@ describe('Admin analytics reports route coverage', () => {
 
     await waitFor(() => {
       expect(apiGetMock).toHaveBeenCalledWith(
-        '/reports/export-comprehensive',
+        '/admin/reports/export',
         expect.objectContaining({
           params: expect.any(Object),
           responseType: 'json',
@@ -157,7 +157,7 @@ describe('Admin analytics reports route coverage', () => {
     const user = userEvent.setup();
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/reports/executive-overview') {
+      if (url === '/admin/reports/overview') {
         return Promise.resolve({ data: { data: executiveSeed } });
       }
 
