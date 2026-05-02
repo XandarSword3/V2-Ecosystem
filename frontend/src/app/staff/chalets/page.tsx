@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
+import { bookingsStore } from '@/lib/offline/offline-storage';
+import { createOfflineBookingStatusUpdate } from '@/lib/offline/offline-sync';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -101,9 +103,17 @@ export default function StaffChaletsPage() {
       });
       if (!signal?.aborted) setBookings(response.data.data || []); // FIX Iter-23: guard setState
     } catch (error: any) {
-      if (error?.name === 'CanceledError') return; // FIX Iter-23: ignore abort
-      toast.error(tCommon('errors.failedToLoad'));
-      setBookings([]);
+      if (error?.name === 'CanceledError') return;
+      
+      // Fallback to offline store
+      const offlineBookings = await bookingsStore.getAll();
+      if (offlineBookings.length > 0) {
+        setBookings(offlineBookings as unknown as ChaletBooking[]);
+        toast.info(tCommon('offline.showingCached'));
+      } else {
+        toast.error(tCommon('errors.failedToLoad'));
+        setBookings([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -139,7 +149,12 @@ export default function StaffChaletsPage() {
       );
       toast.success(tCommon('success.updated'));
     } catch (error) {
-      toast.error(tCommon('errors.failedToUpdate'));
+      // Offline fallback
+      await createOfflineBookingStatusUpdate(bookingId, newStatus);
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus as ChaletBooking['status'] } : b))
+      );
+      toast.warning(tCommon('offline.actionQueued'));
     }
   };
 

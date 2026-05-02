@@ -5,6 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl'; // IMPROVE Iter-25: i18n for pool page
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { 
+  getOfflineTickets, 
+  createOfflinePoolEntry, 
+  createOfflinePoolExit, 
+  createOfflineTicketValidation 
+} from '@/lib/offline/offline-sync';
+import { isOnline } from '@/lib/offline/offline-storage';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { CardSkeleton } from '@/components/ui/Skeleton';
@@ -105,6 +112,17 @@ export default function StaffPoolPage() {
       );
     } catch (error: any) {
       if (error?.name === 'CanceledError' || signal?.aborted) return;
+      
+      // Offline fallback
+      if (!isOnline()) {
+        const offlineTickets = await getOfflineTickets();
+        setTickets(offlineTickets as unknown as PoolTicket[]);
+        setCurrentlyInPool(
+          (offlineTickets as unknown as PoolTicket[]).filter((t) => t.status === 'active' && t.entry_time && !t.exit_time).length || 0
+        );
+        return;
+      }
+
       toast.error('Failed to load tickets');
       setTickets([]);
       setCurrentlyInPool(0);
@@ -185,6 +203,18 @@ export default function StaffPoolPage() {
       fetchTickets(); // Refresh the tickets list
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { error?: string } } };
+      
+      // Offline support
+      if (!isOnline()) {
+        await createOfflineTicketValidation(code);
+        toast.info('Working offline. Ticket validation queued.', { icon: '⏳' });
+        
+        // Optimistic update
+        setTickets(prev => prev.map(t => t.ticket_number === code ? { ...t, status: 'used' } : t));
+        setManualCode('');
+        return;
+      }
+
       const errorMessage = axiosError.response?.data?.error || 'Invalid ticket code';
       toast.error(errorMessage);
     }
@@ -210,7 +240,21 @@ export default function StaffPoolPage() {
       toast.success('Entry recorded!', { icon: '🏊' });
       playSound('entry');
     } catch (error) {
-      // FIX Iter-15: Show error instead of silently succeeding with mock data
+      if (!isOnline()) {
+        await createOfflinePoolEntry(ticketId);
+        const now = new Date().toTimeString().split(' ')[0];
+        setTickets((prev) =>
+          prev.map((t) =>
+            t.id === ticketId
+              ? { ...t, status: 'active' as const, entry_time: now }
+              : t
+          )
+        );
+        setCurrentlyInPool((prev) => prev + 1);
+        toast.info('Working offline. Entry queued.', { icon: '⏳' });
+        playSound('entry');
+        return;
+      }
       toast.error('Failed to record entry. Please try again.');
     }
   };
@@ -230,7 +274,21 @@ export default function StaffPoolPage() {
       toast.success('Exit recorded!', { icon: '👋' });
       playSound('exit');
     } catch (error) {
-      // FIX Iter-15: Show error instead of silently succeeding with mock data
+      if (!isOnline()) {
+        await createOfflinePoolExit(ticketId);
+        const now = new Date().toTimeString().split(' ')[0];
+        setTickets((prev) =>
+          prev.map((t) =>
+            t.id === ticketId
+              ? { ...t, status: 'used' as const, exit_time: now }
+              : t
+          )
+        );
+        setCurrentlyInPool((prev) => Math.max(0, prev - 1));
+        toast.info('Working offline. Exit queued.', { icon: '⏳' });
+        playSound('exit');
+        return;
+      }
       toast.error('Failed to record exit. Please try again.');
     }
   };

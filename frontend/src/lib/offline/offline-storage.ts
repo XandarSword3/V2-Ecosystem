@@ -23,6 +23,11 @@ const STORES = {
   SYNC_QUEUE: 'sync_queue',
   SETTINGS: 'settings',
   CACHE_METADATA: 'cache_metadata',
+  CHALETS: 'chalets',
+  BOOKINGS: 'bookings',
+  POOL_SESSIONS: 'pool_sessions',
+  TICKETS: 'tickets',
+  HOUSEKEEPING_TASKS: 'housekeeping_tasks',
 };
 
 // Sync queue item status
@@ -151,6 +156,41 @@ export function initDatabase(): Promise<IDBDatabase> {
       // Cache Metadata Store
       if (!db.objectStoreNames.contains(STORES.CACHE_METADATA)) {
         db.createObjectStore(STORES.CACHE_METADATA, { keyPath: 'storeName' });
+      }
+
+      // Chalets Store
+      if (!db.objectStoreNames.contains(STORES.CHALETS)) {
+        const chaletStore = db.createObjectStore(STORES.CHALETS, { keyPath: 'id' });
+        chaletStore.createIndex('status', 'status', { unique: false });
+      }
+
+      // Bookings Store
+      if (!db.objectStoreNames.contains(STORES.BOOKINGS)) {
+        const bookingStore = db.createObjectStore(STORES.BOOKINGS, { keyPath: 'id' });
+        bookingStore.createIndex('date', 'date', { unique: false });
+        bookingStore.createIndex('status', 'status', { unique: false });
+        bookingStore.createIndex('synced', 'synced', { unique: false });
+      }
+
+      // Pool Sessions Store
+      if (!db.objectStoreNames.contains(STORES.POOL_SESSIONS)) {
+        const poolStore = db.createObjectStore(STORES.POOL_SESSIONS, { keyPath: 'id' });
+        poolStore.createIndex('date', 'date', { unique: false });
+      }
+
+      // Tickets Store
+      if (!db.objectStoreNames.contains(STORES.TICKETS)) {
+        const ticketStore = db.createObjectStore(STORES.TICKETS, { keyPath: 'id' });
+        ticketStore.createIndex('session_id', 'session_id', { unique: false });
+        ticketStore.createIndex('qr_code', 'qr_code', { unique: true });
+        ticketStore.createIndex('synced', 'synced', { unique: false });
+      }
+
+      // Housekeeping Tasks Store
+      if (!db.objectStoreNames.contains(STORES.HOUSEKEEPING_TASKS)) {
+        const hkStore = db.createObjectStore(STORES.HOUSEKEEPING_TASKS, { keyPath: 'id' });
+        hkStore.createIndex('chalet_id', 'chalet_id', { unique: false });
+        hkStore.createIndex('status', 'status', { unique: false });
       }
     };
   });
@@ -284,6 +324,11 @@ export const modifiersStore = new OfflineStore<OfflineEntity>(STORES.MODIFIERS);
 export const customersStore = new OfflineStore<OfflineEntity>(STORES.CUSTOMERS);
 export const ordersStore = new OfflineStore<OfflineOrder>(STORES.ORDERS);
 export const paymentsStore = new OfflineStore<OfflineEntity>(STORES.PAYMENTS);
+export const chaletsStore = new OfflineStore<OfflineEntity>(STORES.CHALETS);
+export const bookingsStore = new OfflineStore<OfflineEntity>(STORES.BOOKINGS);
+export const poolSessionsStore = new OfflineStore<OfflineEntity>(STORES.POOL_SESSIONS);
+export const ticketsStore = new OfflineStore<OfflineEntity>(STORES.TICKETS);
+export const housekeepingTasksStore = new OfflineStore<OfflineEntity>(STORES.HOUSEKEEPING_TASKS);
 
 /**
  * Sync Queue Management

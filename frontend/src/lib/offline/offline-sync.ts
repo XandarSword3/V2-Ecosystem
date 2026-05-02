@@ -17,10 +17,16 @@ import {
   customersStore,
   ordersStore,
   paymentsStore,
+  chaletsStore,
+  bookingsStore,
+  poolSessionsStore,
+  ticketsStore,
+  housekeepingTasksStore,
   isOnline,
   onOnline,
   onOffline,
 } from './offline-storage';
+import { hydrateOfflineStores } from './offline-hydration';
 import api from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
@@ -86,6 +92,7 @@ export async function initOfflineSync(): Promise<void> {
 
   // Initial cache refresh if online
   if (isOnline()) {
+    await hydrateOfflineStores();
     await refreshAllCaches();
   }
 
@@ -114,6 +121,7 @@ export async function refreshAllCaches(): Promise<void> {
     await Promise.all([
       refreshMenuCache(),
       refreshCustomerCache(),
+      hydrateOfflineStores(),
     ]);
     
     updateStatus({ lastSyncAt: new Date(), error: null });
@@ -263,6 +271,15 @@ async function syncItem(item: { entityType: string; entityId: string; operation:
     case 'payment':
       endpoint = `${API_BASE}/api/v1/payments`;
       break;
+    case 'booking':
+      endpoint = `${API_BASE}/api/v1/chalets/staff/bookings/${entityId}/status`;
+      break;
+    case 'check-in':
+      endpoint = `${API_BASE}/api/v1/chalets/staff/bookings/${entityId}/check-in`;
+      break;
+    case 'pool-check-in':
+      endpoint = `${API_BASE}/api/v1/pool/staff/validate`;
+      break;
     default:
       throw new Error(`Unknown entity type: ${entityType}`);
   }
@@ -288,6 +305,11 @@ async function syncItem(item: { entityType: string; entityId: string; operation:
   });
 
   if (response.status >= 400) {
+    // Handle conflict detection
+    if (response.status === 409) {
+      await handleSyncConflict(item, response.data);
+      return;
+    }
     throw new Error(`HTTP ${response.status}`);
   }
 
@@ -302,6 +324,27 @@ async function syncItem(item: { entityType: string; entityId: string; operation:
         await ordersStore.put({ ...localOrder, id: result.id, synced: true });
       }
     }
+  }
+}
+
+/**
+ * Handle sync conflicts based on Phase 1 rules
+ */
+async function handleSyncConflict(item: any, serverData: any): Promise<void> {
+  const { entityType, entityId, data } = item;
+
+  switch (entityType) {
+    case 'booking':
+      // Chalet status: server wins on sync, flag mismatch for manager review
+      console.warn(`[Offline] Conflict detected for booking ${entityId}. Server data wins.`);
+      // We could add a 'flagged_for_review' field if the schema allowed
+      break;
+    case 'check-in':
+      // Check-ins: union merge - if already checked in, we just accept it
+      console.log(`[Offline] Check-in merge for ${entityId}.`);
+      break;
+    default:
+      console.warn(`[Offline] Unhandled conflict for ${entityType}`);
   }
 }
 
@@ -350,6 +393,163 @@ export async function createOfflineOrder(orderData: {
   }
 
   return offlineId;
+}
+
+/**
+ * Internal helper to update status and trigger sync if online
+ */
+async function publishSyncStatus(): Promise<void> {
+  const stats = await syncQueue.getStats();
+  updateStatus({
+    pendingCount: stats.pending,
+    failedCount: stats.failed,
+  });
+  if (isOnline() && stats.pending > 0) {
+    syncAll();
+  }
+}
+
+// --- Action Creators for Other Modules ---
+
+/**
+ * Update a booking status offline
+ */
+export async function createOfflineBookingStatusUpdate(bookingId: string, status: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'booking',
+    entityId: bookingId,
+    operation: 'update',
+    data: { status },
+  });
+  
+  // No store update needed here as the UI uses optimistic updates or re-fetches
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Update a housekeeping task status offline
+ */
+export async function createOfflineTaskStatusUpdate(taskId: string, status: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'housekeeping_task',
+    entityId: taskId,
+    operation: 'update',
+    data: { status },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Record a pool entry offline
+ */
+export async function createOfflinePoolEntry(ticketId: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'pool_ticket',
+    entityId: ticketId,
+    operation: 'update', // entry is an update to the ticket
+    data: { type: 'entry', entry_time: new Date().toISOString() },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Record a pool exit offline
+ */
+export async function createOfflinePoolExit(ticketId: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'pool_ticket',
+    entityId: ticketId,
+    operation: 'update', // exit is an update to the ticket
+    data: { type: 'exit', exit_time: new Date().toISOString() },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Validate a pool ticket offline
+ */
+export async function createOfflineTicketValidation(ticketNumber: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'pool_ticket',
+    entityId: ticketNumber,
+    operation: 'update', // validation is an update/check
+    data: { type: 'validate', ticketNumber },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+// --- Internal Sync Logic ---
+
+async function resolveSyncAction(item: any): Promise<any> {
+  const { entityType, entityId, operation, data } = item;
+
+  switch (entityType) {
+    case 'order':
+      return api.post('/restaurant/orders', data);
+    
+    case 'booking':
+      if (operation === 'update') {
+        return api.patch(`/chalets/bookings/${entityId}/status`, data);
+      }
+      break;
+
+    case 'housekeeping_task':
+      if (operation === 'update') {
+        const { status } = data;
+        let endpoint = `/housekeeping/tasks/${entityId}`;
+        let method: 'put' | 'post' = 'put';
+        
+        if (status === 'in_progress') {
+          endpoint = `/housekeeping/tasks/${entityId}/start`;
+          method = 'post';
+        } else if (status === 'completed') {
+          endpoint = `/housekeeping/tasks/${entityId}/complete`;
+          method = 'post';
+        }
+        
+        return method === 'post' ? api.post(endpoint, {}) : api.put(endpoint, { status });
+      }
+      break;
+
+    case 'pool_ticket':
+      if (operation === 'update') {
+        if (data.type === 'entry') {
+          return api.post(`/pool/tickets/${entityId}/entry`);
+        }
+        if (data.type === 'exit') {
+          return api.post(`/pool/tickets/${entityId}/exit`);
+        }
+        if (data.type === 'validate') {
+          return api.post('/pool/staff/validate', { ticketNumber: data.ticketNumber });
+        }
+      }
+      break;
+  }
+
+  throw new Error(`Unsupported sync action: ${entityType}/${operation}`);
+}
+
+/**
+ * Get pool tickets from cache
+ */
+export async function getOfflineTickets(): Promise<unknown[]> {
+  return ticketsStore.getAll();
+}
+
+/**
+ * Get housekeeping tasks from cache
+ */
+export async function getOfflineTasks(): Promise<unknown[]> {
+  return housekeepingTasksStore.getAll();
 }
 
 /**

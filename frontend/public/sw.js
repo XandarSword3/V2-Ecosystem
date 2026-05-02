@@ -1,286 +1,128 @@
-/// <reference lib="webworker" />
+/**
+ * V2 Resort Service Worker
+ * Powered by Workbox
+ */
 
-const CACHE_NAME = 'v2-resort-v1';
-const OFFLINE_URL = '/offline';
+importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js');
 
-// Assets to cache immediately on install
-const PRECACHE_ASSETS = [
-  '/',
-  '/offline',
-  '/manifest.json',
-  '/favicon.svg',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-];
+if (workbox) {
+  console.log('[SW] Workbox is loaded');
 
-// API routes that should use network-first strategy
-const API_ROUTES = ['/api/'];
+  const { registerRoute, NavigationRoute } = workbox.routing;
+  const { StaleWhileRevalidate, NetworkFirst, CacheFirst, NetworkOnly } = workbox.strategies;
+  const { ExpirationPlugin } = workbox.expiration;
+  const { CacheableResponsePlugin } = workbox.cacheableResponse;
+  const { BackgroundSyncPlugin } = workbox.backgroundSync;
 
-// Static assets that should use cache-first strategy
-const STATIC_EXTENSIONS = [
-  '.js',
-  '.css',
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.svg',
-  '.ico',
-  '.woff',
-  '.woff2',
-];
+  // Precache basic assets
+  const PRECACHE_NAME = 'v2-resort-precache-v1';
+  const OFFLINE_URL = '/offline';
 
-// Install event - cache essential assets
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Precaching assets');
-      return cache.addAll(PRECACHE_ASSETS);
-    })
-  );
-  // Activate immediately
-  self.skipWaiting();
-});
-
-// Activate event - clean up old caches
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => {
-            console.log('[SW] Deleting old cache:', name);
-            return caches.delete(name);
-          })
-      );
-    })
-  );
-  // Take control immediately
-  self.clients.claim();
-});
-
-// Fetch event - handle requests with appropriate strategy
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-
-  // Skip non-GET requests
-  if (request.method !== 'GET') {
-    return;
-  }
-
-  // Skip cross-origin requests
-  if (url.origin !== location.origin) {
-    return;
-  }
-
-  // API requests: Network-first, fallback to cache
-  if (API_ROUTES.some((route) => url.pathname.startsWith(route))) {
-    event.respondWith(networkFirst(request));
-    return;
-  }
-
-  // Static assets: Cache-first, fallback to network
-  if (STATIC_EXTENSIONS.some((ext) => url.pathname.endsWith(ext))) {
-    event.respondWith(cacheFirst(request));
-    return;
-  }
-
-  // Navigation requests: Network-first with offline fallback
-  if (request.mode === 'navigate') {
-    event.respondWith(navigationHandler(request));
-    return;
-  }
-
-  // Default: Network-first
-  event.respondWith(networkFirst(request));
-});
-
-// Network-first strategy
-async function networkFirst(request) {
-  try {
-    const networkResponse = await fetch(request);
-    
-    // Cache successful responses
-    if (networkResponse.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, networkResponse.clone());
-    }
-    
-    return networkResponse;
-  } catch {
-    // Fallback to cache
-    const cachedResponse = await caches.match(request);
-    if (cachedResponse) {
-      return cachedResponse;
-    }
-    return offlineFallbackResponse(request);
-  }
-}
-
-// Cache-first strategy
-async function cacheFirst(request) {
-  const cachedResponse = await caches.match(request);
-  if (cachedResponse) {
-    return cachedResponse;
-  }
-
-  try {
-    const networkResponse = await fetch(request);
-    
-    // Cache successful responses
-    if (networkResponse.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, networkResponse.clone());
-    }
-    
-    return networkResponse;
-  } catch {
-    // Return offline placeholder for images
-    if (request.destination === 'image') {
-      return new Response(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="#ddd" width="100" height="100"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="#999">Offline</text></svg>',
-        { headers: { 'Content-Type': 'image/svg+xml' } }
-      );
-    }
-    return offlineFallbackResponse(request);
-  }
-}
-
-async function offlineFallbackResponse(request) {
-  const accept = request.headers.get('accept') || '';
-  const isApiRequest = request.url.includes('/api/') || accept.includes('application/json');
-
-  if (request.mode === 'navigate' || accept.includes('text/html')) {
-    const offlinePage = await caches.match(OFFLINE_URL);
-    if (offlinePage) {
-      return offlinePage;
-    }
-
-    return new Response(
-      '<!DOCTYPE html><html><head><title>Offline</title></head><body><h1>You are offline</h1><p>Please check your internet connection and try again.</p><button onclick="location.reload()">Retry</button></body></html>',
-      { status: 503, headers: { 'Content-Type': 'text/html' } }
+  self.addEventListener('install', (event) => {
+    event.waitUntil(
+      caches.open(PRECACHE_NAME).then((cache) => {
+        return cache.addAll(['/', '/offline', '/manifest.json', '/favicon.svg']);
+      })
     );
-  }
-
-  if (isApiRequest) {
-    return new Response(
-      JSON.stringify({ success: false, error: 'Service unavailable while offline' }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-
-  return new Response('Service unavailable while offline', {
-    status: 503,
-    headers: { 'Content-Type': 'text/plain' },
   });
-}
 
-// Navigation handler - pass through to network for same-origin navigation
-// Only show offline fallback when genuinely offline AND network request fails
-async function navigationHandler(request) {
-  try {
-    const networkResponse = await fetch(request);
-    
-    // Cache successful navigation responses 
-    if (networkResponse.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, networkResponse.clone());
-    }
-    
-    return networkResponse;
-  } catch (error) {
-    // Try to serve a cached version of the SAME page first
-    const cachedResponse = await caches.match(request);
-    if (cachedResponse) {
-      return cachedResponse;
-    }
-    
-    // Only serve the generic offline page if truly no network available
-    // Do NOT show offline page if the server is just slow or recompiling
-    if (!self.navigator?.onLine) {
-      const offlineResponse = await caches.match(OFFLINE_URL);
-      if (offlineResponse) {
-        return offlineResponse;
-      }
-    }
-    
-    // Last resort: basic offline response
-    return new Response(
-      '<!DOCTYPE html><html><head><title>Offline</title></head><body><h1>You are offline</h1><p>Please check your internet connection and try again.</p><button onclick="location.reload()">Retry</button></body></html>',
-      { headers: { 'Content-Type': 'text/html' } }
-    );
-  }
-}
+  // Background Sync for Offline Actions
+  const bgSyncPlugin = new BackgroundSyncPlugin('v2-sync-queue', {
+    maxRetentionTime: 24 * 60, // Retry for max 24 Hours
+  });
 
-// Push notification handler
-self.addEventListener('push', (event) => {
-  if (!event.data) return;
+  // API Requests: Network First
+  registerRoute(
+    ({ url }) => url.pathname.startsWith('/api/v1/'),
+    new NetworkFirst({
+      cacheName: 'v2-api-cache',
+      plugins: [
+        new CacheableResponsePlugin({
+          statuses: [0, 200],
+        }),
+        new ExpirationPlugin({
+          maxEntries: 100,
+          maxAgeSeconds: 24 * 60 * 60, // 24 hours
+        }),
+      ],
+    })
+  );
 
-  const data = event.data.json();
-  const options = {
-    body: data.body || 'New notification from V2 Resort',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
-    vibrate: [100, 50, 100],
-    data: {
-      url: data.url || '/',
-      dateOfArrival: Date.now(),
-    },
-    actions: data.actions || [
-      { action: 'open', title: 'Open' },
-      { action: 'dismiss', title: 'Dismiss' },
-    ],
+  // Mutations (POST/PUT/PATCH/DELETE) with Background Sync
+  registerRoute(
+    ({ request }) => ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method),
+    new NetworkOnly({
+      plugins: [bgSyncPlugin],
+    }),
+    'POST'
+  );
+
+  // Static Assets: Cache First
+  registerRoute(
+    ({ request }) => 
+      request.destination === 'style' || 
+      request.destination === 'script' || 
+      request.destination === 'worker',
+    new StaleWhileRevalidate({
+      cacheName: 'v2-static-assets',
+    })
+  );
+
+  // Images: Cache First
+  registerRoute(
+    ({ request }) => request.destination === 'image',
+    new CacheFirst({
+      cacheName: 'v2-images',
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 60,
+          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
+        }),
+      ],
+    })
+  );
+
+  // Navigation: Network First with Offline Fallback
+  const navigationHandler = async (params) => {
+    const { request } = params;
+    try {
+      return await new NetworkFirst({
+        cacheName: 'v2-navigation',
+      }).handle(params);
+    } catch (error) {
+      return caches.match(OFFLINE_URL) || Response.error();
+    }
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'V2 Resort', options)
-  );
-});
+  registerRoute(new NavigationRoute(navigationHandler));
 
-// Notification click handler
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
+  // Push notifications
+  self.addEventListener('push', (event) => {
+    if (!event.data) return;
+    const data = event.data.json();
+    const options = {
+      body: data.body || 'V2 Resort Update',
+      icon: '/icons/icon-192x192.png',
+      badge: '/icons/icon-72x72.png',
+      vibrate: [100, 50, 100],
+      data: { url: data.url || '/' },
+    };
+    event.waitUntil(self.registration.showNotification(data.title || 'V2 Resort', options));
+  });
 
-  if (event.action === 'dismiss') {
-    return;
-  }
-
-  const urlToOpen = event.notification.data?.url || '/';
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Check if there's already a window open
-      for (const client of clientList) {
-        if (client.url.includes(urlToOpen) && 'focus' in client) {
-          return client.focus();
+  self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const urlToOpen = event.notification.data?.url || '/';
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes(urlToOpen) && 'focus' in client) return client.focus();
         }
-      }
-      // Open new window
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
-});
+        if (clients.openWindow) return clients.openWindow(urlToOpen);
+      })
+    );
+  });
 
-// Background sync for offline actions
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-bookings') {
-    event.waitUntil(syncBookings());
-  }
-  if (event.tag === 'sync-orders') {
-    event.waitUntil(syncOrders());
-  }
-});
-
-async function syncBookings() {
-  console.log('[SW] Syncing bookings...');
-  // Implementation would sync pending bookings from IndexedDB
-}
-
-async function syncOrders() {
-  console.log('[SW] Syncing orders...');
-  // Implementation would sync pending orders from IndexedDB
+} else {
+  console.log('[SW] Workbox failed to load');
 }
