@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { OfflineStatusIndicator } from '../../src/components/offline/OfflineStatusIndicator';
 import React from 'react';
 
@@ -15,7 +15,7 @@ vi.mock('next-intl', () => ({
 }));
 
 describe('OfflineStatusIndicator component', () => {
-  it('renders success indicator when online and synced (initial success pulse)', () => {
+  it('renders success indicator when online and synced (handles async effect)', async () => {
     useOfflineSyncMock.mockReturnValue({
       isOnline: true,
       isSyncing: false,
@@ -24,7 +24,11 @@ describe('OfflineStatusIndicator component', () => {
     });
 
     render(<OfflineStatusIndicator />);
-    expect(screen.getByText('syncSuccess')).toBeDefined();
+    
+    // Use waitFor because showSyncSuccess is set in a useEffect after first render
+    await waitFor(() => {
+      expect(screen.getByText('syncSuccess')).toBeDefined();
+    });
   });
 
   it('renders offline warning when offline', () => {
