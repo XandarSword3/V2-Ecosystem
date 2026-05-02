@@ -33,6 +33,7 @@ vi.mock('../../src/lib/offline/offline-storage', () => ({
   bookingsStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
   housekeepingTasksStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
   conflictsStore: { put: vi.fn(async () => undefined), getAll: vi.fn(async () => []) },
+  offlineActivityStore: { put: vi.fn(async () => undefined), getAll: vi.fn(async () => []) },
   cacheManager: { isStale: vi.fn(async () => true), updateMetadata: vi.fn(), getAllMetadata: vi.fn(async () => []) },
   isOnline: vi.fn(() => true),
 }));
