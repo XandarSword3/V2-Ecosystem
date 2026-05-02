@@ -5,6 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
+import { 
+  getOfflineTasks, 
+  createOfflineTaskStatusUpdate 
+} from '@/lib/offline/offline-sync';
+import { isOnline } from '@/lib/offline/offline-storage';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -135,6 +140,13 @@ export default function HousekeepingAdminPage() {
         setStaffPerformance(statsRes.data.data.staffPerformance || []);
       }
     } catch (error) {
+      // Offline fallback
+      if (!isOnline()) {
+        const offlineTasks = await getOfflineTasks();
+        setTasks(offlineTasks as unknown as Task[]);
+        toast.info('Working offline. Showing cached tasks.');
+        return;
+      }
       toast.error('Failed to load housekeeping data');
     } finally {
       setLoading(false);
@@ -214,6 +226,14 @@ export default function HousekeepingAdminPage() {
         loadData();
       }
     } catch (error) {
+      if (!isOnline()) {
+        await createOfflineTaskStatusUpdate(taskId, newStatus);
+        toast.info('Working offline. Task update queued.', { icon: '⏳' });
+        
+        // Optimistic update
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus as any } : t));
+        return;
+      }
       toast.error('Failed to update task');
     }
   };
