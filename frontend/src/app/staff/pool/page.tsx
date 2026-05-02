@@ -33,6 +33,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { MaintenanceTab } from './components/MaintenanceTab';
+import { DataFreshnessFooter } from '@/components/offline/DataFreshnessFooter';
 
 interface PoolTicket {
   id: string;
@@ -100,36 +101,56 @@ export default function StaffPoolPage() {
   );
 
   const fetchTickets = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const response = await api.get('/pool/staff/tickets/today', {
-        params: { date: new Date().toISOString().split('T')[0] },
-        signal,
-      });
-      if (signal?.aborted) return;
-      setTickets(response.data.data || []);
+    // 1. Load from offline store immediately
+    const offlineTickets = await getOfflineTickets();
+    if (offlineTickets.length > 0) {
+      const tickets = offlineTickets as unknown as PoolTicket[];
+      setTickets(tickets);
       setCurrentlyInPool(
-        response.data.data?.filter((t: PoolTicket) => t.status === 'active' && t.entry_time && !t.exit_time).length || 0
+        tickets.filter((t) => t.status === 'active' && t.entry_time && !t.exit_time).length || 0
       );
-    } catch (error: any) {
-      if (error?.name === 'CanceledError' || signal?.aborted) return;
-      
-      // Offline fallback
-      if (!isOnline()) {
-        const offlineTickets = await getOfflineTickets();
-        setTickets(offlineTickets as unknown as PoolTicket[]);
-        setCurrentlyInPool(
-          (offlineTickets as unknown as PoolTicket[]).filter((t) => t.status === 'active' && t.entry_time && !t.exit_time).length || 0
-        );
-        return;
-      }
-
-      toast.error('Failed to load tickets');
-      setTickets([]);
-      setCurrentlyInPool(0);
-    } finally {
-      if (!signal?.aborted) setLoading(false);
+      setLoading(false);
     }
-  }, []);
+
+    // 2. Refresh from API in background if online
+    if (isOnline()) {
+      try {
+        const response = await api.get('/pool/staff/tickets/today', {
+          params: { date: new Date().toISOString().split('T')[0] },
+          signal,
+        });
+        
+        if (!signal?.aborted) {
+          const freshData = response.data.data || [];
+          setTickets(freshData);
+          setCurrentlyInPool(
+            freshData.filter((t: PoolTicket) => t.status === 'active' && t.entry_time && !t.exit_time).length || 0
+          );
+          setLoading(false);
+          
+          // 3. Update offline store (handled by sync service or manually)
+          // We clear and replace for simplicity in this specific view
+          const { ticketsStore, cacheManager } = await import('@/lib/offline/offline-storage');
+          await ticketsStore.clear();
+          await ticketsStore.putMany(freshData);
+          await cacheManager.updateMetadata('tickets', freshData.length);
+        }
+      } catch (error: any) {
+        if (error?.name === 'CanceledError') return;
+        console.error('Background refresh failed:', error);
+        if (offlineTickets.length === 0) {
+          toast.error('Failed to load tickets');
+          setTickets([]);
+          setCurrentlyInPool(0);
+        }
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    } else if (offlineTickets.length === 0) {
+      toast.error('Failed to load tickets (offline)');
+      setLoading(false);
+    }
+  }, [isOnline]);
 
   const fetchCapacity = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -842,6 +863,12 @@ export default function StaffPoolPage() {
           </div>
         )}
       </AnimatePresence>
+      {/* Pool Ticket Details Modal ... */}
+      
+      {/* Footer */}
+      <footer className="mt-8">
+        <DataFreshnessFooter storeName="tickets" />
+      </footer>
     </motion.div>
   );
 }

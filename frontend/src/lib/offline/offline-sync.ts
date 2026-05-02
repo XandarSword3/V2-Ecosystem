@@ -276,10 +276,21 @@ export async function createOfflineOrder(orderData: {
  */
 async function publishSyncStatus(): Promise<void> {
   const stats = await syncQueue.getStats();
+  const allMetadata = await cacheManager.getAllMetadata();
+  
+  // Find the most recent sync time across all stores
+  let lastSyncAt = null;
+  if (allMetadata.length > 0) {
+    const times = allMetadata.map(m => new Date(m.lastSyncAt).getTime());
+    lastSyncAt = new Date(Math.max(...times));
+  }
+
   updateStatus({
     pendingCount: stats.pending,
     failedCount: stats.failed,
+    lastSyncAt,
   });
+
   if (isOnline() && stats.pending > 0) {
     syncAll();
   }
@@ -362,6 +373,101 @@ export async function createOfflineTaskStatusUpdate(taskId: string, status: stri
   await publishSyncStatus();
   return syncId;
 }
+
+/**
+ * Perform a guest check-in offline
+ */
+export async function createOfflineGuestCheckIn(bookingId: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'booking_check_in',
+    entityId: bookingId,
+    operation: 'update',
+    data: { status: 'checked_in' },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Perform a guest check-out offline
+ */
+export async function createOfflineGuestCheckOut(bookingId: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'booking_check_out',
+    entityId: bookingId,
+    operation: 'update',
+    data: { status: 'checked_out' },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Record an offline cash payment
+ */
+export async function createOfflinePaymentRecord(orderId: string, amount: number, method: string = 'cash'): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'payment',
+    entityId: orderId,
+    operation: 'create',
+    data: { amount, method, status: 'completed', offline: true },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Record an inventory adjustment offline
+ */
+export async function createOfflineInventoryAdjustment(itemId: string, adjustment: number, reason: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'inventory_adjustment',
+    entityId: itemId,
+    operation: 'update',
+    data: { adjustment, reason },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Record a maintenance log offline
+ */
+export async function createOfflineMaintenanceLog(data: {
+  type: string;
+  notes: string;
+  readings?: Record<string, string | number>;
+}): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'maintenance_log',
+    entityId: `log_${Date.now()}`,
+    operation: 'create',
+    data,
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Record a maintenance flag offline
+ */
+export async function createOfflineMaintenanceFlag(resourceType: string, resourceId: string, issue: string, priority: string = 'medium'): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'maintenance_flag',
+    entityId: `${resourceType}_${resourceId}`,
+    operation: 'create',
+    data: { resourceType, resourceId, issue, priority },
+  });
+  
+  await publishSyncStatus();
+  return syncId;
+}
+
 
 /**
  * Record a pool entry offline
@@ -472,6 +578,24 @@ async function resolveSyncAction(item: any): Promise<any> {
         }
       }
       break;
+
+    case 'booking_check_in':
+      return api.patch(`/chalets/staff/bookings/${entityId}/check-in`, data);
+    
+    case 'booking_check_out':
+      return api.patch(`/chalets/staff/bookings/${entityId}/check-out`, data);
+
+    case 'payment':
+      return api.post('/restaurant/payments', data);
+
+    case 'inventory_adjustment':
+      return api.patch(`/inventory/items/${entityId}/adjust`, data);
+
+    case 'maintenance_log':
+      return api.post('/pool/staff/maintenance', data);
+
+    case 'maintenance_flag':
+      return api.post('/maintenance/tickets', data);
   }
 
   throw new Error(`Unsupported sync action: ${entityType}/${operation}`);

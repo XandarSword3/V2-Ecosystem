@@ -25,6 +25,7 @@ import {
   RefreshCw,
   AlertCircle,
 } from 'lucide-react';
+import { isOnline, customersStore } from '@/lib/offline/offline-storage';
 import { toast } from 'sonner';
 
 interface CustomerData {
@@ -69,39 +70,72 @@ export default function CustomerLookupPage() {
     setNotFound(false);
 
     try {
-      const res = await api.get('/staff/customers/search', {
-        params: {
-          q: searchQuery.trim(),
-        },
-      });
-
-      const userData = res.data?.data?.[0];
-      if (res.data.success && userData) {
-        
-        // Fetch additional data
-        const [loyaltyRes, ordersRes] = await Promise.all([
-          api.get(`/loyalty/accounts/${userData.id}`).catch(() => ({ data: { data: null } })),
-          api.get('/restaurant/orders', { params: { userId: userData.id, limit: 5 } }).catch(() => ({ data: { data: [] } })),
-        ]);
-
-        setCustomer({
-          id: userData.id,
-          name: userData.name || userData.email?.split('@')[0] || 'Customer',
-          email: userData.email,
-          phone: userData.phone,
-          createdAt: userData.created_at,
-          loyaltyTier: userData.loyalty_tier || loyaltyRes.data.data?.tier_name,
-          loyaltyPoints: loyaltyRes.data.data?.total_points,
-          giftCardBalance: userData.total_lifetime_spend || 0,
-          recentOrders: (ordersRes.data.data || []).map((o: any) => ({
-            id: o.id,
-            type: 'Restaurant',
-            total: o.total || 0,
-            status: o.status,
-            date: o.created_at,
-          })),
-          recentBookings: [], // Would need separate API call
+      if (isOnline()) {
+        const res = await api.get('/staff/customers/search', {
+          params: {
+            q: searchQuery.trim(),
+          },
         });
+
+        const userData = res.data?.data?.[0];
+        if (res.data.success && userData) {
+          // Fetch additional data
+          const [loyaltyRes, ordersRes] = await Promise.all([
+            api.get(`/loyalty/accounts/${userData.id}`).catch(() => ({ data: { data: null } })),
+            api.get('/restaurant/orders', { params: { userId: userData.id, limit: 5 } }).catch(() => ({ data: { data: [] } })),
+          ]);
+
+          setCustomer({
+            id: userData.id,
+            name: userData.name || userData.email?.split('@')[0] || 'Customer',
+            email: userData.email,
+            phone: userData.phone,
+            createdAt: userData.created_at,
+            loyaltyTier: userData.loyalty_tier || loyaltyRes.data.data?.tier_name,
+            loyaltyPoints: loyaltyRes.data.data?.total_points,
+            giftCardBalance: userData.total_lifetime_spend || 0,
+            recentOrders: (ordersRes.data.data || []).map((o: any) => ({
+              id: o.id,
+              type: 'Restaurant',
+              total: o.total || 0,
+              status: o.status,
+              date: o.created_at,
+            })),
+            recentBookings: [],
+          });
+          
+          // Cache the found customer
+          await customersStore.put(userData);
+          return;
+        }
+      }
+
+      // Offline or not found online - search local store
+      const q = searchQuery.trim().toLowerCase();
+      const allCustomers = await customersStore.getAll() as any[];
+      const localMatch = allCustomers.find(c => 
+        (c.phone && c.phone.includes(q)) || 
+        (c.email && c.email.toLowerCase().includes(q)) || 
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.full_name && c.full_name.toLowerCase().includes(q))
+      );
+
+      if (localMatch) {
+        setCustomer({
+          id: localMatch.id,
+          name: localMatch.name || localMatch.full_name || localMatch.email?.split('@')[0] || 'Customer',
+          email: localMatch.email,
+          phone: localMatch.phone,
+          createdAt: localMatch.created_at || localMatch.createdAt,
+          loyaltyTier: localMatch.loyalty_tier,
+          loyaltyPoints: localMatch.loyalty_points,
+          giftCardBalance: 0,
+          recentOrders: [],
+          recentBookings: [],
+        });
+        if (!isOnline()) {
+          toast.info('Showing cached customer data (Offline)');
+        }
       } else {
         setNotFound(true);
       }
