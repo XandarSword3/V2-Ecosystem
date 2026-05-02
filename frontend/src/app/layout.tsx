@@ -8,6 +8,7 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/Footer';
 import { ModuleTransition } from '@/components/effects/ModuleTransition';
 import { LoadingScreenWrapper } from '@/components/effects/LoadingScreen';
+import { OfflineStatusIndicator } from '@/components/offline/OfflineStatusIndicator';
 import { JsonLd, generateResortSchema } from '@/lib/structured-data';
 
 const getBaseUrl = () => {
@@ -166,6 +167,7 @@ export default async function RootLayout({
             </main>
             <Footer />
             <Toaster position={isRtl ? 'top-left' : 'top-right'} richColors />
+            <OfflineStatusIndicator />
           </LoadingScreenWrapper>
         </Providers>
       </body>

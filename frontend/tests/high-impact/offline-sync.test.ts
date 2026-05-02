@@ -56,8 +56,12 @@ const paymentsStoreMock = vi.hoisted(() => ({
   clear: vi.fn(async () => undefined),
 }));
 
-const apiGetMock = vi.hoisted(() => vi.fn());
+const apiGetMock = vi.hoisted(() => vi.fn().mockResolvedValue({ data: {} }));
 const apiCallableMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../src/lib/offline/offline-hydration', () => ({
+  hydrateOfflineStores: vi.fn(async () => undefined),
+}));
 
 vi.mock('../../src/lib/offline/offline-storage', () => ({
   syncQueue: syncQueueMock,
@@ -105,6 +109,7 @@ describe('offline sync manager', () => {
     cacheManagerMock.isStale.mockResolvedValue(true);
 
     apiGetMock.mockReset();
+    apiGetMock.mockResolvedValue({ data: {} });
     apiGetMock
       .mockResolvedValueOnce({ data: { items: [], categories: [] } })
       .mockResolvedValueOnce({ data: { modifiers: [] } })
