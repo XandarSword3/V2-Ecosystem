@@ -56,7 +56,39 @@ const paymentsStoreMock = vi.hoisted(() => ({
   clear: vi.fn(async () => undefined),
 }));
 
+const chaletsStoreMock = vi.hoisted(() => ({
+  clear: vi.fn(async () => undefined),
+  putMany: vi.fn(async () => undefined),
+  getAll: vi.fn(async () => []),
+}));
+
+const bookingsStoreMock = vi.hoisted(() => ({
+  clear: vi.fn(async () => undefined),
+  putMany: vi.fn(async () => undefined),
+  getAll: vi.fn(async () => []),
+}));
+
+const poolSessionsStoreMock = vi.hoisted(() => ({
+  clear: vi.fn(async () => undefined),
+  putMany: vi.fn(async () => undefined),
+}));
+
+const ticketsStoreMock = vi.hoisted(() => ({
+  clear: vi.fn(async () => undefined),
+  putMany: vi.fn(async () => undefined),
+  getAll: vi.fn(async () => []),
+}));
+
+const housekeepingTasksStoreMock = vi.hoisted(() => ({
+  clear: vi.fn(async () => undefined),
+  putMany: vi.fn(async () => undefined),
+  getAll: vi.fn(async () => []),
+}));
+
 const apiGetMock = vi.hoisted(() => vi.fn().mockResolvedValue({ data: {} }));
+const apiPostMock = vi.hoisted(() => vi.fn().mockResolvedValue({ data: {} }));
+const apiPutMock = vi.hoisted(() => vi.fn().mockResolvedValue({ data: {} }));
+const apiPatchMock = vi.hoisted(() => vi.fn().mockResolvedValue({ data: {} }));
 const apiCallableMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/lib/offline/offline-hydration', () => ({
@@ -72,6 +104,11 @@ vi.mock('../../src/lib/offline/offline-storage', () => ({
   customersStore: customersStoreMock,
   ordersStore: ordersStoreMock,
   paymentsStore: paymentsStoreMock,
+  chaletsStore: chaletsStoreMock,
+  bookingsStore: bookingsStoreMock,
+  poolSessionsStore: poolSessionsStoreMock,
+  ticketsStore: ticketsStoreMock,
+  housekeepingTasksStore: housekeepingTasksStoreMock,
   isOnline: () => onlineState.value,
   onOnline: (callback: () => void) => {
     onlineListeners.add(callback);
@@ -84,9 +121,15 @@ vi.mock('../../src/lib/offline/offline-storage', () => ({
 }));
 
 vi.mock('@/lib/api', () => {
-  const callable = Object.assign(apiCallableMock, { get: apiGetMock });
+  const callable = Object.assign(apiCallableMock, { 
+    get: apiGetMock,
+    post: apiPostMock,
+    put: apiPutMock,
+    patch: apiPatchMock
+  });
   return {
     default: callable,
+    api: callable
   };
 });
 
@@ -114,6 +157,13 @@ describe('offline sync manager', () => {
       .mockResolvedValueOnce({ data: { items: [], categories: [] } })
       .mockResolvedValueOnce({ data: { modifiers: [] } })
       .mockResolvedValueOnce({ data: { users: [] } });
+
+    apiPostMock.mockReset();
+    apiPostMock.mockResolvedValue({ data: {} });
+    apiPutMock.mockReset();
+    apiPutMock.mockResolvedValue({ data: {} });
+    apiPatchMock.mockReset();
+    apiPatchMock.mockResolvedValue({ data: {} });
 
     apiCallableMock.mockReset();
     apiCallableMock.mockResolvedValue({ status: 200, data: { id: 'server-order-1' } });
@@ -220,5 +270,62 @@ describe('offline sync manager', () => {
     expect(syncQueueMock.clear).toHaveBeenCalled();
     expect(menuItemsStoreMock.clear).toHaveBeenCalled();
     expect(ordersStoreMock.clear).toHaveBeenCalled();
+  });
+
+  it('covers new action creators for Phase 2 (Housekeeping & Pool)', async () => {
+    const sync = await loadModule();
+
+    // 1. Housekeeping status update
+    await sync.createOfflineTaskStatusUpdate('task-1', 'completed');
+    expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: 'housekeeping_task',
+      operation: 'update',
+      data: { status: 'completed' }
+    }));
+
+    // 2. Pool entry
+    await sync.createOfflinePoolEntry('ticket-1');
+    expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: 'pool_ticket',
+      operation: 'update',
+      data: expect.objectContaining({ type: 'entry' })
+    }));
+
+    // 3. Pool validation
+    await sync.createOfflineTicketValidation('QR-123');
+    expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: 'pool_ticket',
+      operation: 'update',
+      data: expect.objectContaining({ type: 'validate' })
+    }));
+  });
+
+  it('resolves new Phase 2 entities during sync', async () => {
+    const sync = await loadModule();
+
+    syncQueueMock.getPending.mockResolvedValue([
+      {
+        id: 'sync-task',
+        entityType: 'housekeeping_task',
+        entityId: 't-1',
+        operation: 'update',
+        data: { status: 'in_progress' },
+      },
+      {
+        id: 'sync-pool',
+        entityType: 'pool_ticket',
+        entityId: 'p-1',
+        operation: 'update',
+        data: { type: 'entry' },
+      }
+    ] as never[]);
+
+    apiPostMock.mockResolvedValue({ status: 200, data: { success: true } });
+
+    await sync.syncAll();
+
+    // Verify correct endpoints were called
+    expect(apiPostMock).toHaveBeenCalledWith('/housekeeping/tasks/t-1/start', expect.anything());
+    expect(apiPostMock).toHaveBeenCalledWith('/pool/tickets/p-1/entry');
   });
 });
