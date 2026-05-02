@@ -663,6 +663,13 @@
     }
   },
   "adminCommon": {
+    "offline": {
+      "showingCached": "Mode hors ligne. Affichage des données en cache.",
+      "actionQueued": "Action mise en attente. Elle sera synchronisée automatiquement une fois en ligne.",
+      "syncing": "Synchronisation des actions en attente...",
+      "syncSuccess": "Actions hors ligne synchronisées avec succès.",
+      "syncError": "Échec de la synchronisation de certaines actions."
+    },
     "loading": "Chargement...",
     "saving": "Enregistrement...",
     "saved": "Enregistré!",

@@ -12,6 +12,7 @@ A state-of-the-art, monorepo-based resort management ecosystem designed for luxu
 - **📱 Multi-Platform**: Full-featured Next.js 14 web application and an Expo-based mobile companion (in progress).
 - **🛡️ Enterprise Security**: Role-Based Access Control (RBAC), 2FA, JWT with rotation, and full audit logging.
 - **🌐 Global Ready**: Native i18n support (EN/AR/FR) with RTL layout handling and multi-currency formatting.
+- **🔌 Offline Resilience**: Workbox-powered PWA with IndexedDB syncing, allowing critical staff operations during connectivity outages.
 
 ## 🏗️ Repository Structure
 
