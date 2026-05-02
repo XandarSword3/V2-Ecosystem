@@ -165,6 +165,14 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
         await updateLocalRecordSyncStatus(item.entityType, item.entityId, true);
         
         await syncQueue.remove(item.id);
+        
+        // Find and update the activity log entry for this entity
+        const activities = await offlineActivityStore.getAll();
+        const entry = activities.find((a: any) => a.entityId === item.entityId);
+        if (entry) {
+          await offlineActivityStore.put({ ...entry, syncedAt: new Date().toISOString() });
+        }
+        
         synced++;
       } catch (error: any) {
         console.error(`[Offline Sync] Item ${item.id} failed:`, error);
@@ -173,6 +181,14 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
         if (error.response?.status === 409) {
           await handleSyncConflict(item, error.response.data);
           await syncQueue.remove(item.id);
+          
+          // Find and update the activity log entry for this entity (conflicts also count as synced)
+          const activities = await offlineActivityStore.getAll();
+          const entry = activities.find((a: any) => a.entityId === item.entityId);
+          if (entry) {
+            await offlineActivityStore.put({ ...entry, syncedAt: new Date().toISOString() });
+          }
+          
           synced++;
           continue;
         }
