@@ -51,6 +51,7 @@ const cacheManagerMock = vi.hoisted(() => ({
   updateMetadata: vi.fn(async () => undefined),
   getMetadata: vi.fn(async () => undefined),
   isStale: vi.fn(async () => true),
+  isFresh: vi.fn(async () => false),
 }));
 
 vi.mock('../../src/lib/offline/offline-storage', () => ({
@@ -160,6 +161,7 @@ describe('offline hydration service', () => {
 
   it('skips hydration when data is not stale', async () => {
     cacheManagerMock.isStale = vi.fn().mockResolvedValue(false);
+    cacheManagerMock.isFresh = vi.fn().mockResolvedValue(true);
     
     await hydrateOfflineStores(false); // force = false
 

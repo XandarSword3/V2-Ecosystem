@@ -17,7 +17,7 @@ import {
 import { Order, statusFlow } from './types';
 
 import { isOnline, ordersStore, cacheManager } from '@/lib/offline/offline-storage';
-import { createOfflineOrderStatusUpdate, createOfflineOrder } from '@/lib/offline/offline-sync';
+import { createOfflineOrderStatusUpdate, createOfflineOrder, createOfflineCashPayment } from '@/lib/offline/offline-sync';
 import { DataFreshnessFooter } from '@/components/offline/DataFreshnessFooter';
 
 export interface KitchenViewProps {
@@ -437,25 +437,55 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
               </div>
             </div>
 
-            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex gap-3">
+            <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col gap-3">
+              <div className="flex gap-3">
+                {selectedOrder.status !== 'completed' && (
+                  <Button 
+                    className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                    onClick={async () => {
+                      if (isOnline()) {
+                        await api.post('/payments/cash', { 
+                          referenceType: 'restaurant_order', 
+                          referenceId: selectedOrder.id, 
+                          amount: selectedOrder.totalAmount 
+                        });
+                        toast.success('Payment recorded');
+                      } else {
+                        await createOfflineCashPayment({ 
+                          referenceType: 'restaurant_order', 
+                          referenceId: selectedOrder.id, 
+                          amount: selectedOrder.totalAmount 
+                        });
+                        toast.info('Cash payment queued offline', { icon: '💵' });
+                      }
+                      setSelectedOrder(null);
+                    }}
+                  >
+                    Record Cash Payment
+                  </Button>
+                )}
+                {selectedOrder.status !== 'completed' && (
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      const nextStatus = statusFlow[statusFlow.indexOf(selectedOrder.status) + 1];
+                      if (nextStatus) {
+                        updateOrderStatus(selectedOrder.id, nextStatus);
+                        setSelectedOrder(null);
+                      }
+                    }}
+                  >
+                    Advance Status
+                  </Button>
+                )}
+              </div>
               <Button
                 variant="outline"
-                className="flex-1"
+                className="w-full"
                 onClick={() => setSelectedOrder(null)}
               >
                 Close
               </Button>
-              {selectedOrder.status !== 'completed' && (
-                <Button
-                  className="flex-1"
-                  onClick={() => {
-                    const nextStatus = statusFlow[statusFlow.indexOf(selectedOrder.status) + 1];
-                    if (nextStatus) updateOrderStatus(selectedOrder.id, nextStatus);
-                  }}
-                >
-                  Advance Status
-                </Button>
-              )}
             </div>
           </div>
         </div>

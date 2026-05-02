@@ -22,6 +22,7 @@ import {
   ticketsStore,
   housekeepingTasksStore,
   conflictsStore,
+  offlineActivityStore,
   isOnline,
   onOnline,
   onOffline,
@@ -265,50 +266,183 @@ async function handleSyncConflict(item: any, serverData: any): Promise<void> {
 }
 
 /**
+ * Resolve a sync conflict (Phase 4)
+ */
+export async function resolveConflict(
+  conflictId: string,
+  resolution: 'accept_local' | 'accept_server'
+): Promise<void> {
+  const conflict = await conflictsStore.getById(conflictId);
+  if (!conflict) throw new Error('Conflict not found');
+
+  if (resolution === 'accept_local') {
+    // Re-queue the local write with elevated priority
+    await syncQueue.add({
+      entityType: conflict.entityType,
+      entityId: conflict.entityId,
+      operation: 'update',
+      data: { ...conflict.localData, _conflictOverride: true },
+      priority: 0, // Force sync immediately
+    });
+    await syncAll();
+  }
+  // accept_server: local data is already overwritten by background hydration, just mark resolved
+
+  await conflictsStore.put({ ...conflict, resolved: true });
+  updateStatus({ error: null });
+}
+
+/**
  * Create an offline order
  */
 export async function createOfflineOrder(orderData: {
+  moduleId: string;
   tableId?: string;
-  items: Array<{
-    menuItemId: string;
-    quantity: number;
-    notes?: string;
-    modifiers?: string[];
-  }>;
-  customerId?: string;
-  notes?: string;
+  tableNumber?: string;
+  items: Array<{ menuItemId: string; quantity: number; notes?: string; modifiers?: any[] }>;
+  customerName?: string;
+  paymentMethod?: string;
+  specialInstructions?: string;
 }): Promise<string> {
-  const offlineId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  const order = {
-    id: offlineId,
+  // Generate a temp ID so UI can reference it immediately
+  const tempId = `offline_${crypto.randomUUID()}`;
+
+  // Write to local store immediately so KitchenView shows it
+  await ordersStore.put({
+    id: tempId,
     ...orderData,
     status: 'pending',
-    created_at: new Date().toISOString(),
     synced: false,
-  };
-
-  // Save to local store
-  await ordersStore.put(order);
-
-  // Add to sync queue
-  await syncQueue.add({
-    entityType: 'order',
-    entityId: offlineId,
-    operation: 'create',
-    data: orderData,
+    createdAt: new Date().toISOString(),
+    isOfflineCreated: true,
   });
 
-  // Update pending count
-  const stats = await syncQueue.getStats();
-  updateStatus({ pendingCount: stats.pending });
+  const syncId = await syncQueue.add({
+    entityType: 'order',
+    entityId: tempId,
+    operation: 'create',
+    data: { ...orderData, tempId },
+    priority: 0, // Order creation is high priority
+  });
 
-  // Try to sync immediately if online
-  if (isOnline()) {
-    syncAll();
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'order',
+    entityId: tempId,
+    action: 'create',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
+  });
+
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Record an offline cash payment
+ */
+export async function createOfflineCashPayment(paymentData: {
+  referenceType: 'restaurant_order' | 'pool_ticket' | 'chalet_booking';
+  referenceId: string;
+  amount: number;
+  currency?: string;
+  customerName?: string;
+  notes?: string;
+}): Promise<string> {
+  const tempId = `offline_payment_${crypto.randomUUID()}`;
+
+  await paymentsStore.put({
+    id: tempId,
+    ...paymentData,
+    method: 'cash',
+    status: 'pending_sync',
+    synced: false,
+    recordedAt: new Date().toISOString(),
+  });
+
+  const syncId = await syncQueue.add({
+    entityType: 'payment',
+    entityId: tempId,
+    operation: 'create',
+    data: paymentData,
+    priority: 0, // Financial operations sync first
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'payment',
+    entityId: tempId,
+    action: 'create',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
+  });
+
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Local QR validation for pool staff
+ */
+export async function validateTicketOffline(ticketNumber: string): Promise<{
+  valid: boolean;
+  ticket?: any;
+  reason?: string;
+}> {
+  // Search local cache by ticket_number index
+  const allTickets = await ticketsStore.getAll();
+  const ticket = allTickets.find(
+    (t: any) => t.ticket_number === ticketNumber || t.qr_code === ticketNumber
+  );
+
+  if (!ticket) {
+    return { valid: false, reason: 'Ticket not found in offline cache. May need to sync.' };
   }
 
-  return offlineId;
+  const today = new Date().toISOString().split('T')[0];
+  const ticketDate = ticket.valid_date || ticket.ticket_date;
+
+  if (ticketDate && ticketDate !== today) {
+    return { valid: false, reason: 'Ticket is not valid for today.' };
+  }
+
+  if (ticket.status === 'used' || ticket.status === 'expired') {
+    return { valid: false, reason: `Ticket already ${ticket.status}.` };
+  }
+
+  if (ticket.status === 'cancelled') {
+    return { valid: false, reason: 'Ticket has been cancelled.' };
+  }
+
+  // Duplicate entry fraud check
+  if (ticket.entry_time && !ticket.exit_time) {
+    return { valid: false, reason: 'Ticket already checked in. Exit first.' };
+  }
+
+  // Mark as entered locally immediately (optimistic)
+  await ticketsStore.put({
+    ...ticket,
+    status: 'active',
+    entry_time: new Date().toISOString(),
+    synced: false,
+  });
+
+  // Queue the server confirmation
+  await createOfflinePoolEntry(ticket.id);
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'pool_ticket',
+    entityId: ticket.id,
+    action: 'validate',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
+  });
+
+  return { valid: true, ticket };
 }
 
 /**
@@ -347,6 +481,17 @@ export async function createOfflineBookingStatusUpdate(bookingId: string, status
     entityId: bookingId,
     operation: 'update',
     data: { status },
+    priority: 1,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'booking',
+    entityId: bookingId,
+    action: 'update',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   // Optimistic update to local store
@@ -365,6 +510,17 @@ export async function createOfflineOrderStatusUpdate(orderId: string, status: st
     entityId: orderId,
     operation: 'update',
     data: { status },
+    priority: 1,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'order_status',
+    entityId: orderId,
+    action: 'update',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   // Optimistic update to local store
@@ -383,6 +539,17 @@ export async function createOfflineTableStatusUpdate(tableId: string, status: st
     entityId: tableId,
     operation: 'update',
     data: { status },
+    priority: 2,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'table_status',
+    entityId: tableId,
+    action: 'update',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   await publishSyncStatus();
@@ -398,6 +565,17 @@ export async function createOfflineChaletStatusUpdate(chaletId: string, status: 
     entityId: chaletId,
     operation: 'update',
     data: { status },
+    priority: 2,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'chalet_status',
+    entityId: chaletId,
+    action: 'update',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   // Optimistic update to local store
@@ -416,6 +594,17 @@ export async function createOfflineTaskStatusUpdate(taskId: string, status: stri
     entityId: taskId,
     operation: 'update',
     data: { status },
+    priority: 1,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'housekeeping_task',
+    entityId: taskId,
+    action: 'update',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   // Optimistic update to local store
@@ -434,6 +623,17 @@ export async function createOfflineGuestCheckIn(bookingId: string): Promise<stri
     entityId: bookingId,
     operation: 'update',
     data: { status: 'checked_in' },
+    priority: 1,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'booking',
+    entityId: bookingId,
+    action: 'check_in',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   await publishSyncStatus();
@@ -449,6 +649,17 @@ export async function createOfflineGuestCheckOut(bookingId: string): Promise<str
     entityId: bookingId,
     operation: 'update',
     data: { status: 'checked_out' },
+    priority: 1,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'booking',
+    entityId: bookingId,
+    action: 'check_out',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   await publishSyncStatus();
@@ -471,7 +682,7 @@ export async function createOfflinePaymentRecord(orderId: string, amount: number
 }
 
 /**
- * Record an inventory adjustment offline
+ * Record an offline inventory adjustment
  */
 export async function createOfflineInventoryAdjustment(itemId: string, adjustment: number, reason: string): Promise<string> {
   const syncId = await syncQueue.add({
@@ -479,6 +690,17 @@ export async function createOfflineInventoryAdjustment(itemId: string, adjustmen
     entityId: itemId,
     operation: 'update',
     data: { adjustment, reason },
+    priority: 2,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'inventory',
+    entityId: itemId,
+    action: 'adjust',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   await publishSyncStatus();
@@ -498,6 +720,17 @@ export async function createOfflineMaintenanceLog(data: {
     entityId: `log_${Date.now()}`,
     operation: 'create',
     data,
+    priority: 2,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'maintenance',
+    entityId: `log_${Date.now()}`,
+    action: 'log',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   await publishSyncStatus();
@@ -513,6 +746,17 @@ export async function createOfflineMaintenanceFlag(resourceType: string, resourc
     entityId: `${resourceType}_${resourceId}`,
     operation: 'create',
     data: { resourceType, resourceId, issue, priority },
+    priority: 2,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'maintenance_flag',
+    entityId: `${resourceType}_${resourceId}`,
+    action: 'flag',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   await publishSyncStatus();
@@ -529,6 +773,17 @@ export async function createOfflinePoolEntry(ticketId: string): Promise<string> 
     entityId: ticketId,
     operation: 'update', // entry is an update to the ticket
     data: { type: 'entry', entry_time: new Date().toISOString() },
+    priority: 1,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'pool_ticket',
+    entityId: ticketId,
+    action: 'entry',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   await publishSyncStatus();
@@ -544,6 +799,17 @@ export async function createOfflinePoolExit(ticketId: string): Promise<string> {
     entityId: ticketId,
     operation: 'update', // exit is an update to the ticket
     data: { type: 'exit', exit_time: new Date().toISOString() },
+    priority: 1,
+  });
+
+  // Log activity
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'pool_ticket',
+    entityId: ticketId,
+    action: 'exit',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
   });
   
   await publishSyncStatus();
@@ -572,7 +838,23 @@ async function resolveSyncAction(item: any): Promise<any> {
 
   switch (entityType) {
     case 'order':
-      return api.post('/restaurant/orders', data);
+      if (operation === 'create') {
+        const response = await api.post('/restaurant/orders', data);
+        // Replace temp record with real server ID
+        const realId = response.data?.data?.id;
+        if (realId && data.tempId) {
+          const local = await ordersStore.getById(data.tempId);
+          if (local) {
+            await ordersStore.delete(data.tempId);
+            await ordersStore.put({ ...local, id: realId, synced: true });
+          }
+        }
+        return response;
+      }
+      if (operation === 'update') {
+        return api.patch(`/restaurant/staff/orders/${entityId}/status`, data);
+      }
+      break;
     
     case 'booking':
       if (operation === 'update') {
@@ -639,7 +921,10 @@ async function resolveSyncAction(item: any): Promise<any> {
       return api.patch(`/chalets/staff/bookings/${entityId}/check-out`, data);
 
     case 'payment':
-      return api.post('/restaurant/payments', data);
+      if (operation === 'create') {
+        return api.post('/payments/cash', data);
+      }
+      break;
 
     case 'inventory_adjustment':
       return api.patch(`/inventory/items/${entityId}/adjust`, data);
