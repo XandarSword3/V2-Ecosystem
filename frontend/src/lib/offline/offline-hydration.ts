@@ -39,22 +39,39 @@ const STORE_CONFIG: Record<string, { ttl: number; endpoint: string; queryParams?
  * @param force If true, bypasses TTL checks and refreshes all stores
  */
 export async function hydrateOfflineStores(force: boolean = false): Promise<void> {
-  console.log(`[Offline] Starting data hydration (force=${force})...`);
+  const storeNames = Object.keys(STORE_CONFIG);
+  const storesToHydrate = [];
   
-  const tasks = [
-    () => hydrateChalets(force),
-    () => hydrateTodayBookings(force),
-    () => hydratePoolSessions(force),
-    () => hydrateTodayTickets(force),
-    () => hydrateMyHousekeepingTasks(force),
-    () => hydrateMenu(force),
-    () => hydrateCustomers(force),
-  ];
+  for (const name of storeNames) {
+    if (await shouldHydrate(name, force)) {
+      storesToHydrate.push(name);
+    }
+  }
 
-  // Run in limited parallel to avoid hammering the API
+  if (storesToHydrate.length === 0) {
+    return;
+  }
+
+  console.log(`[Offline] Hydrating stale stores: ${storesToHydrate.join(', ')} (force=${force})...`);
+  
+  const hydrationMap: Record<string, (force: boolean) => Promise<void>> = {
+    chalets: hydrateChalets,
+    bookings: hydrateTodayBookings,
+    pool_sessions: hydratePoolSessions,
+    tickets: hydrateTodayTickets,
+    housekeeping_tasks: hydrateMyHousekeepingTasks,
+    menu: hydrateMenu,
+    customers: hydrateCustomers,
+  };
+
+  const tasks = storesToHydrate.map(name => {
+    const fn = hydrationMap[name];
+    return fn ? () => fn(force) : null;
+  }).filter(Boolean) as Array<() => Promise<void>>;
+
   await Promise.allSettled(tasks.map(task => task()));
   
-  console.log('[Offline] Hydration complete.');
+  console.log('[Offline] Hydration cycle complete.');
 }
 
 /**
@@ -90,15 +107,18 @@ async function shouldHydrate(storeName: string, force: boolean): Promise<boolean
   if (!config) return true;
   
   const isStale = await cacheManager.isStale(storeName, config.ttl);
-  return isStale;
+  if (!isStale) {
+    console.log(`[Offline] Cache for ${storeName} is still fresh. Skipping refresh.`);
+    return false;
+  }
+  
+  return true;
 }
 
 /**
  * Fetch and store all chalets and their current status
  */
 async function hydrateChalets(force: boolean): Promise<void> {
-  if (!(await shouldHydrate('chalets', force))) return;
-  
   try {
     const metadata = await cacheManager.getMetadata('chalets');
     const since = metadata?.lastSyncAt ? new Date(metadata.lastSyncAt).toISOString() : undefined;
@@ -123,8 +143,6 @@ async function hydrateChalets(force: boolean): Promise<void> {
  * Fetch and store today's bookings
  */
 async function hydrateTodayBookings(force: boolean): Promise<void> {
-  if (!(await shouldHydrate('bookings', force))) return;
-
   try {
     const metadata = await cacheManager.getMetadata('bookings');
     const since = metadata?.lastSyncAt ? new Date(metadata.lastSyncAt).toISOString() : undefined;
@@ -160,8 +178,6 @@ async function hydrateTodayBookings(force: boolean): Promise<void> {
  * Fetch and store pool sessions for today
  */
 async function hydratePoolSessions(force: boolean): Promise<void> {
-  if (!(await shouldHydrate('pool_sessions', force))) return;
-
   try {
     const today = new Date().toISOString().split('T')[0];
     const response = await api.get(STORE_CONFIG.pool_sessions.endpoint, {
@@ -181,8 +197,6 @@ async function hydratePoolSessions(force: boolean): Promise<void> {
  * Fetch and store today's pool tickets for validation
  */
 async function hydrateTodayTickets(force: boolean): Promise<void> {
-  if (!(await shouldHydrate('tickets', force))) return;
-
   try {
     const response = await api.get(STORE_CONFIG.tickets.endpoint);
     if (response.data?.tickets) {
@@ -202,8 +216,6 @@ async function hydrateTodayTickets(force: boolean): Promise<void> {
  * Fetch and store housekeeping tasks assigned to current staff
  */
 async function hydrateMyHousekeepingTasks(force: boolean): Promise<void> {
-  if (!(await shouldHydrate('housekeeping_tasks', force))) return;
-
   try {
     const response = await api.get(STORE_CONFIG.housekeeping_tasks.endpoint);
     if (response.data?.tasks) {
@@ -223,8 +235,6 @@ async function hydrateMyHousekeepingTasks(force: boolean): Promise<void> {
  * Fetch and store menu items, categories, and modifiers
  */
 async function hydrateMenu(force: boolean): Promise<void> {
-  if (!(await shouldHydrate('menu', force))) return;
-
   try {
     const [menuResponse, modifiersResponse] = await Promise.all([
       api.get('/restaurant/menu'),
@@ -259,8 +269,6 @@ async function hydrateMenu(force: boolean): Promise<void> {
  * Fetch and store recent customers
  */
 async function hydrateCustomers(force: boolean): Promise<void> {
-  if (!(await shouldHydrate('customers', force))) return;
-
   try {
     const metadata = await cacheManager.getMetadata('customers');
     const since = metadata?.lastSyncAt ? new Date(metadata.lastSyncAt).toISOString() : undefined;
