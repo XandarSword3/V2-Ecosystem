@@ -33,7 +33,7 @@ if (workbox) {
 
   // API Requests: Network First
   registerRoute(
-    ({ url }) => url.pathname.startsWith('/api/v1/'),
+    ({ url }) => url.pathname.startsWith('/api/'),
     new NetworkFirst({
       cacheName: 'v2-api-cache',
       plugins: [
@@ -49,13 +49,15 @@ if (workbox) {
   );
 
   // Mutations (POST/PUT/PATCH/DELETE) with Background Sync
-  registerRoute(
-    ({ request }) => ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method),
-    new NetworkOnly({
-      plugins: [bgSyncPlugin],
-    }),
-    'POST'
-  );
+  ['POST', 'PUT', 'PATCH', 'DELETE'].forEach(method => {
+    registerRoute(
+      ({ url }) => url.pathname.startsWith('/api/'),
+      new NetworkOnly({
+        plugins: [bgSyncPlugin],
+      }),
+      method
+    );
+  });
 
   // Static Assets: Cache First
   registerRoute(
