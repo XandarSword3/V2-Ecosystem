@@ -16,6 +16,9 @@ import {
 } from 'lucide-react';
 import { Order, statusFlow } from './types';
 
+import { isOnline } from '@/lib/offline/offline-storage';
+import { createOfflineOrderStatusUpdate } from '@/lib/offline/offline-sync';
+
 export interface KitchenViewProps {
   slug: string;
   moduleName: string;
@@ -107,6 +110,17 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
       toast.success(`Order updated to ${newStatus}`);
       setSelectedOrder(null);
     } catch (error) {
+      if (!isOnline()) {
+        await createOfflineOrderStatusUpdate(orderId, newStatus);
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.id === orderId ? { ...order, status: newStatus } : order
+          )
+        );
+        toast.info('Order updated offline', { icon: '⏳' });
+        setSelectedOrder(null);
+        return;
+      }
       toast.error('Failed to update order status');
     }
   };

@@ -28,7 +28,18 @@ const STORES = {
   POOL_SESSIONS: 'pool_sessions',
   TICKETS: 'tickets',
   HOUSEKEEPING_TASKS: 'housekeeping_tasks',
+  CONFLICTS: 'conflicts',
 };
+
+interface SyncConflict {
+  id: string; // entityType + entityId
+  entityType: string;
+  entityId: string;
+  localData: any;
+  serverData: any;
+  resolved: boolean;
+  createdAt: Date;
+}
 
 // Sync queue item status
 type SyncStatus = 'pending' | 'syncing' | 'completed' | 'failed' | 'conflict';
@@ -192,6 +203,13 @@ export function initDatabase(): Promise<IDBDatabase> {
         hkStore.createIndex('chalet_id', 'chalet_id', { unique: false });
         hkStore.createIndex('status', 'status', { unique: false });
       }
+
+      // Conflicts Store
+      if (!db.objectStoreNames.contains(STORES.CONFLICTS)) {
+        const conflictStore = db.createObjectStore(STORES.CONFLICTS, { keyPath: 'id' });
+        conflictStore.createIndex('resolved', 'resolved', { unique: false });
+        conflictStore.createIndex('entityType', 'entityType', { unique: false });
+      }
     };
   });
 }
@@ -329,6 +347,7 @@ export const bookingsStore = new OfflineStore<OfflineEntity>(STORES.BOOKINGS);
 export const poolSessionsStore = new OfflineStore<OfflineEntity>(STORES.POOL_SESSIONS);
 export const ticketsStore = new OfflineStore<OfflineEntity>(STORES.TICKETS);
 export const housekeepingTasksStore = new OfflineStore<OfflineEntity>(STORES.HOUSEKEEPING_TASKS);
+export const conflictsStore = new OfflineStore<SyncConflict>(STORES.CONFLICTS);
 
 /**
  * Sync Queue Management
