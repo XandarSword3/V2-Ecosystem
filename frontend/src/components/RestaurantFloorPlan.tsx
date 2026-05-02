@@ -31,6 +31,8 @@ import {
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useSocket } from '@/hooks/useSocket';
+import { isOnline } from '@/lib/offline/offline-storage';
+import { createOfflineTableStatusUpdate } from '@/lib/offline/offline-sync';
 
 interface TablePosition {
   x: number;
@@ -162,6 +164,18 @@ export function RestaurantFloorPlan({
       await api.put(`/restaurant/tables/${tableId}/status`, { status: newStatus });
       toast.success('Table status updated');
     } catch (error) {
+      if (!isOnline()) {
+        await createOfflineTableStatusUpdate(tableId, newStatus);
+        setTables(prev =>
+          prev.map(table =>
+            table.id === tableId
+              ? { ...table, status: newStatus as Table['status'] }
+              : table
+          )
+        );
+        toast.info('Table status updated offline', { icon: '⏳' });
+        return;
+      }
       toast.error('Failed to update table status');
     }
   };

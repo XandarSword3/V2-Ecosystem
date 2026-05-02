@@ -41,6 +41,8 @@ coverage-*/
 test-results/
 test-results*.json
 playwright-report/
+reports/
+strategic-analysis/
 screenshots/
 frontend/coverage/
 frontend/coverage-critical/

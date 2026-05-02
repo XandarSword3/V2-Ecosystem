@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
+import { isOnline } from '@/lib/offline/offline-storage';
+import { createOfflineOrder } from '@/lib/offline/offline-sync';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -179,6 +181,14 @@ function TableOrderContent() {
       setShowCart(false);
       setCustomerName('');
     } catch (error: any) {
+      if (!isOnline()) {
+        await createOfflineOrder(orderData as any);
+        toast.info(t('order.submittedOffline'), { icon: '⏳' });
+        setCart([]);
+        setShowCart(false);
+        setCustomerName('');
+        return;
+      }
       console.error('Order submission failed:', error);
       // FIX Iter-3: i18n
       toast.error(error.response?.data?.message || t('order.failedToSubmit'));

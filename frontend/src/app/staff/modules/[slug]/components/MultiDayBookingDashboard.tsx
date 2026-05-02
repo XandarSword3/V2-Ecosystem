@@ -22,6 +22,9 @@ import {
   Search,
 } from 'lucide-react';
 
+import { isOnline } from '@/lib/offline/offline-storage';
+import { createOfflineBookingStatusUpdate } from '@/lib/offline/offline-sync';
+
 export interface MultiDayBookingDashboardProps {
   slug: string;
   moduleName: string;
@@ -77,6 +80,13 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
       toast.success(`Booking ${status.replace('_', ' ')}`);
       setSelectedBooking(null);
     } catch (error) {
+      if (!isOnline()) {
+        await createOfflineBookingStatusUpdate(bookingId, status);
+        setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
+        toast.info('Booking updated offline', { icon: '⏳' });
+        setSelectedBooking(null);
+        return;
+      }
       toast.error('Failed to update booking');
     }
   };
