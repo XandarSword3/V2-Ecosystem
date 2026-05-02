@@ -142,11 +142,41 @@ export default function StripePayment({
   onError,
   onCancel,
 }: StripePaymentProps) {
-  // FIX Iter-10: memoize onError to prevent infinite useEffect re-runs
   const stableOnError = useCallback(onError, []);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function createIntent() {
+      if (!isOnline()) return; // Don't create intent if offline
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await paymentsApi.createPaymentIntent({
+          amount,
+          referenceType,
+          referenceId,
+        });
+
+        if (response.data?.success && response.data?.data?.clientSecret) {
+          setClientSecret(response.data.data.clientSecret);
+        } else {
+          throw new Error('Failed to create payment intent');
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
+        setError(errorMessage);
+        stableOnError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (amount > 0 && !clientSecret) {
+      createIntent();
+    }
+  }, [amount, referenceType, referenceId, clientSecret, stableOnError]);
 
   if (!isOnline()) {
     return (
@@ -178,34 +208,6 @@ export default function StripePayment({
       </div>
     );
   }
-
-  useEffect(() => {
-    async function createIntent() {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await paymentsApi.createPaymentIntent({
-          amount,
-          referenceType,
-          referenceId,
-        });
-
-        if (response.data?.success && response.data?.data?.clientSecret) {
-          setClientSecret(response.data.data.clientSecret);
-        } else {
-          throw new Error('Failed to create payment intent');
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
-        setError(errorMessage);
-        stableOnError(errorMessage); // FIX Iter-10: use stable ref
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    createIntent();
-  }, [amount, referenceType, referenceId, stableOnError]); // FIX Iter-10: use stableOnError
 
   if (loading) {
     return (
