@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatTime } from '@/lib/utils';
+import { resolveConflict as resolveConflictAction } from '@/lib/offline/offline-sync';
 
 interface Conflict {
   id: string;
@@ -49,27 +50,11 @@ export default function ConflictDashboard() {
     loadConflicts();
   }, []);
 
-  const resolveConflict = async (id: string, resolution: 'local' | 'server') => {
+  const resolveConflict = async (id: string, resolution: 'accept_local' | 'accept_server') => {
     try {
-      if (resolution === 'server') {
-        await conflictsStore.delete(id);
-        setConflicts(prev => prev.filter(c => c.id !== id));
-        toast.success('Conflict resolved (Server data kept)');
-      } else {
-        const conflict = conflicts.find(c => c.id === id);
-        if (conflict) {
-          // Re-queue the local data with an override flag
-          await syncQueue.add({
-            entityType: conflict.entityType,
-            entityId: conflict.entityId,
-            operation: 'update', // or 'create' depending on context, but usually update for conflicts
-            data: { ...conflict.localData, _conflictOverride: true },
-          });
-          await conflictsStore.delete(id);
-          setConflicts(prev => prev.filter(c => c.id !== id));
-          toast.success('Conflict re-queued (Overriding server)');
-        }
-      }
+      await resolveConflictAction(id, resolution);
+      setConflicts(prev => prev.filter(c => c.id !== id));
+      toast.success(resolution === 'accept_local' ? 'Conflict re-queued (Overriding server)' : 'Conflict resolved (Server data kept)');
     } catch (error) {
       toast.error('Failed to resolve conflict');
     }
@@ -191,18 +176,16 @@ export default function ConflictDashboard() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => resolveConflict(conflict.id, 'server')}
-                    className="text-slate-600"
+                    onClick={() => resolveConflict(conflict.id, 'accept_server')}
                   >
-                    Keep Server (Discard Local)
+                    Accept Server Version
                   </Button>
                   <Button 
-                    variant="default" 
+                    variant="destructive" 
                     size="sm"
-                    onClick={() => resolveConflict(conflict.id, 'local')}
-                    className="bg-primary hover:bg-primary/90"
+                    onClick={() => resolveConflict(conflict.id, 'accept_local')}
                   >
-                    Keep Local (Override Server)
+                    Force My Version
                   </Button>
                 </div>
               </CardContent>
