@@ -128,8 +128,8 @@ export async function refreshAllCaches(): Promise<void> {
   if (!isOnline()) return;
 
   try {
-    // Note: hydrateOfflineStores now includes menu and customer data
-    await hydrateOfflineStores();
+    // Force hydration when manually requested
+    await hydrateOfflineStores(true);
     
     updateStatus({ lastSyncAt: new Date(), error: null });
   } catch (error) {
