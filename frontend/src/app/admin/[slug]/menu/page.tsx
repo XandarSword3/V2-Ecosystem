@@ -33,7 +33,7 @@ import {
   Layers,
   Check,
   Package,
-  Download,
+  Upload,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -315,7 +315,7 @@ export default function DynamicMenuPage() {
             onClick={() => router.push(`/admin/${slug}/menu/import`)}
             className="flex items-center gap-2"
           >
-            <Download className="w-4 h-4" />
+            <Upload className="w-4 h-4" />
             Import Menu
           </Button>
           <Button
