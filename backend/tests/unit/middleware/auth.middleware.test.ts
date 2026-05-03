@@ -16,6 +16,17 @@ vi.mock('../../../src/database/connection', () => ({
 
 import { getSupabase } from '../../../src/database/connection';
 
+// Mock cache
+vi.mock('../../../src/utils/cache', () => ({
+  cache: {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(true),
+    isAvailable: vi.fn().mockReturnValue(true)
+  }
+}));
+
+import { cache } from '../../../src/utils/cache';
+
 describe('Auth Middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -196,32 +207,41 @@ describe('Auth Middleware', () => {
   });
 
   describe('optionalAuth', () => {
-    it('should set user if valid token provided', () => {
-      const mockPayload = { userId: 'user-1', roles: ['customer'] };
+    it('should set user if valid token provided', async () => {
+      const mockPayload = { userId: 'user-1', roles: ['customer'], tokenVersion: 1 };
       vi.mocked(verifyToken).mockReturnValue(mockPayload as any);
+
+      const mockUser = { id: 'user-1', token_version: 1, is_active: true };
+      const supabaseMock = {
+        from: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: mockUser, error: null })
+      };
+      vi.mocked(getSupabase).mockReturnValue(supabaseMock as any);
 
       const { req, res, next } = createMockReqRes({});
       (req as any).headers = { authorization: 'Bearer valid-token' };
       (req as any).user = undefined;
 
-      optionalAuth(req, res, next);
+      await optionalAuth(req, res, next);
 
-      expect(req.user).toEqual(expect.objectContaining(mockPayload));
+      expect(req.user).toEqual(expect.objectContaining({ ...mockPayload, id: 'user-1' }));
       expect(next).toHaveBeenCalled();
     });
 
-    it('should continue without user if no token', () => {
+    it('should continue without user if no token', async () => {
       const { req, res, next } = createMockReqRes({});
       (req as any).headers = {};
       (req as any).user = undefined;
 
-      optionalAuth(req, res, next);
+      await optionalAuth(req, res, next);
 
       expect(req.user).toBeUndefined();
       expect(next).toHaveBeenCalled();
     });
 
-    it('should continue without user if token invalid', () => {
+    it('should continue without user if token invalid', async () => {
       vi.mocked(verifyToken).mockImplementation(() => {
         throw new Error('Invalid token');
       });
@@ -230,7 +250,7 @@ describe('Auth Middleware', () => {
       (req as any).headers = { authorization: 'Bearer invalid-token' };
       (req as any).user = undefined;
 
-      optionalAuth(req, res, next);
+      await optionalAuth(req, res, next);
 
       expect(req.user).toBeUndefined();
       expect(next).toHaveBeenCalled();

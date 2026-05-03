@@ -696,10 +696,7 @@ describe('User Controller', () => {
   describe('listUsers', () => {
     it('should list users with pagination and search', async () => {
       const mockUsers = [{ id: 'u1', email: 'a@a.com', user_roles: [] }];
-      const mockChain = createChainableMock(mockUsers, null);
-      // Hack to make it return count as well
-      const originalThen = mockChain.then;
-      mockChain.then = (resolve: any) => resolve({ data: mockUsers, error: null, count: 1 });
+      const mockChain = createChainableMock(mockUsers, null, 1);
       
       const mockSupabase = {
         from: vi.fn().mockReturnValue(mockChain)
