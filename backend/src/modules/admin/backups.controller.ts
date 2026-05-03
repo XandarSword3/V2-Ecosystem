@@ -19,7 +19,15 @@ export const createBackup = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const getBackups = asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.userId;
         const backups = await BackupService.listBackups();
+        
+        await logActivity({
+            user_id: userId,
+            action: 'VIEW_BACKUPS',
+            resource: 'backups'
+        });
+        
         res.json({ success: true, data: backups });
 });
 
@@ -57,6 +65,14 @@ export const getDownloadUrl = asyncHandler(async (req: Request, res: Response) =
             .createSignedUrl(backup.storage_path, 3600); // 1 hour link
 
         if (error) throw error;
+        const userId = req.user!.userId;
+
+        await logActivity({
+            user_id: userId,
+            action: 'DOWNLOAD_BACKUP',
+            resource: 'backups',
+            resource_id: id
+        });
 
         res.json({ success: true, data: { downloadUrl: data.signedUrl } });
 });

@@ -216,7 +216,7 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
     // Perform all updates
     for (const update of updates) {
       const timestamp = new Date().toISOString();
-      let { error } = await supabase
+      const { error } = await supabase
         .from('site_settings')
         .upsert(
           {
@@ -227,32 +227,6 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
           },
           { onConflict: 'key' }
         );
-
-      // Compatibility fallback for legacy schemas that don't expose audit columns.
-      if (error && /updated_by|schema cache|column/i.test(String(error.message || error.details || ''))) {
-        ({ error } = await supabase
-          .from('site_settings')
-          .upsert(
-            {
-              key: update.key,
-              value: update.value,
-              updated_at: timestamp,
-            },
-            { onConflict: 'key' }
-          ));
-      }
-
-      if (error && /updated_at|schema cache|column/i.test(String(error.message || error.details || ''))) {
-        ({ error } = await supabase
-          .from('site_settings')
-          .upsert(
-            {
-              key: update.key,
-              value: update.value,
-            },
-            { onConflict: 'key' }
-          ));
-      }
 
       if (error) {
         logger.error(`Failed to update ${update.key}:`, error);
@@ -311,6 +285,7 @@ export const updateHomepageSettings = asyncHandler(async (req: Request, res: Res
       key: 'homepage',
       value: homepageData,
       updated_at: new Date().toISOString(),
+      updated_by: (req.user as any)?.userId || 'system',
     }, { onConflict: 'key' });
 
   if (error) {
@@ -357,6 +332,7 @@ export const updateTaxSettings = asyncHandler(async (req: Request, res: Response
       key: 'tax_configuration',
       value: taxData,
       updated_at: new Date().toISOString(),
+      updated_by: (req.user as any)?.userId || 'system',
     }, { onConflict: 'key' });
 
   if (error) {
