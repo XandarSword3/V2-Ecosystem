@@ -19,6 +19,15 @@ describe('Menu Import Parsers', () => {
       expect(result.items[1].category).toBe('drinks');
     });
 
+    it('should map ingredients to description', () => {
+      const data = [
+        { name: 'Pizza', price: 10, ingredients: ['Tomato', 'Cheese'] }
+      ];
+      const result = parser.parseJsonImport(data);
+      expect(result.successful).toBe(1);
+      expect(result.items[0].description).toBe('Tomato, Cheese');
+    });
+
     it('should handle snake_case fields', () => {
       const data = [{ name: 'Burger', price: 8, is_available: false }];
       const result = parser.parseJsonImport(data);
