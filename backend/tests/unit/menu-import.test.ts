@@ -6,15 +6,17 @@ vi.mock('axios');
 
 describe('Menu Import Parsers', () => {
   describe('parseJsonImport', () => {
-    it('should parse valid JSON menu items', () => {
-      const data = [
-        { name: 'Pizza', price: 10, category: 'Main' },
-        { name: 'Soda', price: 2, category: 'Drinks', description: 'Cold' }
-      ];
+    it('should handle nested category-keyed objects', () => {
+      const data = {
+        menu: {
+          pizzas: [{ name: 'Margherita', price: 12 }],
+          drinks: [{ name: 'Cola', price: 2 }]
+        }
+      };
       const result = parser.parseJsonImport(data);
       expect(result.successful).toBe(2);
-      expect(result.items[0].name).toBe('Pizza');
-      expect(result.items[1].description).toBe('Cold');
+      expect(result.items[0].category).toBe('pizzas');
+      expect(result.items[1].category).toBe('drinks');
     });
 
     it('should handle snake_case fields', () => {
