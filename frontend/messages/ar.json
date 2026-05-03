@@ -835,11 +835,6 @@
       "purchaseDate": "تاريخ الشراء",
       "refreshing": "جاري التحديث..."
     },
-      "ticketMarkedUsed": "Ticket marked as used",
-      "failedToMarkUsed": "Failed to mark ticket as used",
-      "ticketCancelled": "Ticket cancelled successfully",
-      "failedToCancel": "Failed to cancel ticket"
-    },
     "sessions": {
       "title": "Sessions",
       "manageSessions": "Manage booking sessions and time slots",

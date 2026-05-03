@@ -461,4 +461,7 @@ router.post('/admin/items/:menuItemId/modifiers', authenticate, restaurantProper
 // Admin - Inventory items for linking (helper)
 router.get('/admin/modifiers/inventory-items', authenticate, restaurantPropertyScope, authorize(...adminRoles), modifiersController.getInventoryItems);
 
+import menuImportRoutes from './menu-import.routes.js';
+router.use('/', menuImportRoutes);
+
 export default router;
