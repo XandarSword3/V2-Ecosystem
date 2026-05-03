@@ -584,6 +584,16 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
       current = current.add(1, 'day');
     }
 
+    // Apply Chalet-level discount if applicable
+    const chaletDiscount = chalet.discount_price ? parseFloat(chalet.discount_price) : null;
+    if (chaletDiscount !== null) {
+      // If the total nightly rate is higher than the discount rate * nights, use discount rate
+      const discountedBaseAmount = chaletDiscount * numberOfNights;
+      if (discountedBaseAmount < baseAmount) {
+        baseAmount = discountedBaseAmount;
+      }
+    }
+
     // Calculate add-ons amount
     let addOnsAmount = 0;
     const addOnItems: Array<{ add_on_id: string; quantity: number; unit_price: number; subtotal: number }> = [];

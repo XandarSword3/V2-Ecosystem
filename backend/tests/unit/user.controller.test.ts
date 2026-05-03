@@ -647,4 +647,78 @@ describe('User Controller', () => {
       });
     });
   });
+
+  // ============================================
+  // GET MY STATEMENT TESTS
+  // ============================================
+
+  describe('getMyStatement', () => {
+    it('should return user statement across all modules', async () => {
+      const userId = 'user-123';
+      const mockRows = [{ id: 'row-1', created_at: '2024-01-01T10:00:00Z' }];
+      
+      const mockSupabase = {
+        from: vi.fn().mockReturnValue(createChainableMock(mockRows))
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      const { getMyStatement } = await import('../../src/modules/users/user.controller.js');
+      const { req, res, next } = createMockReqRes({
+        query: { from: '2024-01-01', to: '2024-01-31' }
+      });
+      req.user = { userId, role: 'customer' } as any;
+
+      await getMyStatement(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: expect.any(Array)
+      }));
+      // Verify it called from() for at least one module
+      expect(mockSupabase.from).toHaveBeenCalledWith('restaurant_orders');
+    });
+
+    it('should return 401 if user is not authenticated', async () => {
+      const { getMyStatement } = await import('../../src/modules/users/user.controller.js');
+      const { req, res, next } = createMockReqRes();
+      req.user = undefined;
+
+      await getMyStatement(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+    });
+  });
+
+  // ============================================
+  // LIST USERS TESTS
+  // ============================================
+
+  describe('listUsers', () => {
+    it('should list users with pagination and search', async () => {
+      const mockUsers = [{ id: 'u1', email: 'a@a.com', user_roles: [] }];
+      const mockChain = createChainableMock(mockUsers, null);
+      // Hack to make it return count as well
+      const originalThen = mockChain.then;
+      mockChain.then = (resolve: any) => resolve({ data: mockUsers, error: null, count: 1 });
+      
+      const mockSupabase = {
+        from: vi.fn().mockReturnValue(mockChain)
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      const { listUsers } = await import('../../src/modules/users/user.controller.js');
+      const { req, res, next } = createMockReqRes({
+        query: { page: '2', limit: '10', search: 'test@' }
+      });
+
+      await listUsers(req, res, next);
+
+      expect(mockChain.range).toHaveBeenCalledWith(10, 19);
+      expect(mockChain.or).toHaveBeenCalledWith(expect.stringContaining('test@'));
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        pagination: expect.objectContaining({ total: 1, page: 2 })
+      }));
+    });
+  });
 });

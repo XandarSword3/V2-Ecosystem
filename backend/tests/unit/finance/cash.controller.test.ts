@@ -164,42 +164,101 @@ describe('Cash Controller', () => {
   });
 
   describe('recordTransaction', () => {
-    it('should record a cash transaction', async () => {
-      const mockTransaction = {
-        id: 'txn-1',
-        drawer_id: 'drawer-1',
-        type: 'pay_in',
-        amount: 50,
-        reason: 'Float adjustment'
-      };
-
+    it('should record a pay_in transaction and update balance', async () => {
+      const drawerData = { current_balance: 100 };
+      const tableMocks: Record<string, any> = {};
       const mockSupabase = {
-        from: vi.fn().mockReturnValue({
-          insert: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: mockTransaction, error: null })
-            })
-          }),
-          update: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ error: null })
-          })
+        from: vi.fn().mockImplementation((table) => {
+          if (!tableMocks[table]) {
+            tableMocks[table] = createChainableMock();
+            if (table === 'cash_drawers') {
+              tableMocks[table].single = vi.fn().mockResolvedValue({ data: drawerData, error: null });
+            }
+          }
+          return tableMocks[table];
         })
       };
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
 
       const { req, res, next } = createMockReqRes({
-        body: {
-          drawerId: 'drawer-1',
-          type: 'pay_in',
-          amount: 50,
-          reason: 'Float adjustment'
-        },
+        body: { drawerId: 'drawer-1', type: 'pay_in', amount: 50, reason: 'Add float' },
         user: { id: 'user-1', role: 'manager', userId: 'user-1' }
       });
 
       await cashController.recordTransaction(req, res, next);
 
-      expect(mockSupabase.from).toHaveBeenCalledWith('cash_transactions');
+      expect(res.status).toHaveBeenCalledWith(201);
+      // Verify balance update was called with 150 (100 + 50)
+      const drawersMock = tableMocks['cash_drawers'];
+      expect(drawersMock.update).toHaveBeenCalledWith(expect.objectContaining({
+        current_balance: 150
+      }));
+    });
+
+    it('should record a pay_out transaction and update balance correctly', async () => {
+      const drawerData = { current_balance: 100 };
+      const tableMocks: Record<string, any> = {};
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => {
+          if (!tableMocks[table]) {
+            tableMocks[table] = createChainableMock();
+            if (table === 'cash_drawers') {
+              tableMocks[table].single = vi.fn().mockResolvedValue({ data: drawerData, error: null });
+            }
+          }
+          return tableMocks[table];
+        })
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      const { req, res, next } = createMockReqRes({
+        body: { drawerId: 'drawer-1', type: 'pay_out', amount: 30, reason: 'Buy supplies' },
+        user: { id: 'user-1', role: 'manager', userId: 'user-1' }
+      });
+
+      await cashController.recordTransaction(req, res, next);
+
+      // Verify balance update was called with 70 (100 - 30)
+      const drawersMock = tableMocks['cash_drawers'];
+      expect(drawersMock.update).toHaveBeenCalledWith(expect.objectContaining({
+        current_balance: 70
+      }));
+    });
+  });
+
+  describe('getDrawers', () => {
+    it('should fetch all cash drawers', async () => {
+      const mockDrawers = [{ id: 'drawer-1' }, { id: 'drawer-2' }];
+      const mockSupabase = {
+        from: vi.fn().mockReturnValue(createChainableMock(mockDrawers))
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      const { req, res, next } = createMockReqRes({
+        query: {}
+      });
+
+      await cashController.getDrawers(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith({ success: true, data: mockDrawers });
+    });
+
+    it('should filter drawers by status', async () => {
+      const mockDrawers = [{ id: 'drawer-1', status: 'open' }];
+      const queryMock = createChainableMock(mockDrawers);
+      const mockSupabase = {
+        from: vi.fn().mockReturnValue(queryMock)
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      const { req, res, next } = createMockReqRes({
+        query: { status: 'open' }
+      });
+
+      await cashController.getDrawers(req, res, next);
+
+      expect(queryMock.eq).toHaveBeenCalledWith('status', 'open');
+      expect(res.json).toHaveBeenCalledWith({ success: true, data: mockDrawers });
     });
   });
 });

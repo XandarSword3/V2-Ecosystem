@@ -116,7 +116,9 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
       if (!snackItem) throw new Error(`Item ${item.itemId} not found`);
       if (!snackItem.is_available) throw new Error(`${snackItem.name} is not available`);
 
-      const unitPrice = parseFloat(snackItem.price);
+      const basePrice = parseFloat(snackItem.price);
+      const discountPrice = snackItem.discount_price ? parseFloat(snackItem.discount_price) : null;
+      const unitPrice = (discountPrice !== null && discountPrice < basePrice) ? discountPrice : basePrice;
 
       return {
         snack_item_id: item.itemId,
@@ -222,10 +224,14 @@ export const createStaffOrder = asyncHandler(async (req: Request, res: Response)
       if (!dbItem || !dbItem.is_available) {
         throw new Error(`Snack item ${resolvedId} is unavailable`);
       }
+      const basePrice = parseFloat(dbItem.price);
+      const discountPrice = dbItem.discount_price ? parseFloat(dbItem.discount_price) : null;
+      const unitPrice = (discountPrice !== null && discountPrice < basePrice) ? discountPrice : basePrice;
+
       return {
         itemId: resolvedId,
         name: dbItem.name,
-        unitPrice: parseFloat(dbItem.price),
+        unitPrice,
         quantity: item.quantity,
       };
     });
@@ -254,7 +260,9 @@ export const createStaffOrder = asyncHandler(async (req: Request, res: Response)
     const insertItemsPayload = body.items.map((item) => {
       const resolvedId = item.itemId || item.item_id || '';
       const dbItem = itemMap.get(resolvedId);
-      const unitPrice = parseFloat(dbItem.price);
+      const basePrice = parseFloat(dbItem.price);
+      const discountPrice = dbItem.discount_price ? parseFloat(dbItem.discount_price) : null;
+      const unitPrice = (discountPrice !== null && discountPrice < basePrice) ? discountPrice : basePrice;
       return {
         order_id: order.id,
         snack_item_id: resolvedId,

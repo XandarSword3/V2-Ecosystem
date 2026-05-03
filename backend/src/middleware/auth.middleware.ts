@@ -1,37 +1,63 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from "../modules/auth/auth.utils.js";
-import { getSupabase } from "../database/supabase.js";
+import { getSupabase } from "../database/connection.js";
+import { asyncHandler } from "./async-handler.js";
 import { logger } from "../utils/logger.js";
 // Express Request type extension is defined in src/types/index.ts
 
-export function authenticate(req: Request, res: Response, next: NextFunction) {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      logger.warn('Auth failure: No token provided', {
-        path: req.path,
-        method: req.method,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-      return res.status(401).json({ success: false, error: 'No token provided' });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const payload = verifyToken(token);
-    req.user = { ...payload, id: payload.userId };
-    next();
-  } catch (error) {
-    logger.warn('Auth failure: Invalid or expired token', {
+export const authenticate = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    logger.warn('Auth failure: No token provided', {
       path: req.path,
       method: req.method,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
-      error: error instanceof Error ? error.message : 'Unknown error',
     });
+    return res.status(401).json({ success: false, error: 'No token provided' });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  let payload;
+  try {
+    payload = verifyToken(token);
+  } catch (err) {
+    logger.warn('Auth failure: Invalid token', { error: err instanceof Error ? err.message : String(err) });
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
-}
+  
+  // Security Hardening: Check token version against database
+  // This allows global session invalidation and per-user session killing
+  const supabase = getSupabase();
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('token_version, is_active')
+    .eq('id', payload.userId)
+    .single();
+
+  if (error || !user) {
+    logger.warn('Auth failure: User not found or DB error', { userId: payload.userId });
+    return res.status(401).json({ success: false, error: 'User not found' });
+  }
+
+  if (!user.is_active) {
+    logger.warn('Auth failure: Account deactivated', { userId: payload.userId });
+    return res.status(401).json({ success: false, error: 'Account deactivated' });
+  }
+
+  // If token version doesn't match current DB version, it's a stale session
+  if (payload.tokenVersion !== undefined && user.token_version !== undefined && payload.tokenVersion < user.token_version) {
+    logger.warn('Auth failure: Stale session (version mismatch)', { 
+      userId: payload.userId, 
+      tokenVer: payload.tokenVersion, 
+      dbVer: user.token_version 
+    });
+    return res.status(401).json({ success: false, error: 'Session expired, please log in again' });
+  }
+
+  req.user = { ...payload, id: payload.userId };
+  next();
+});
 
 export function authorize(...args: (string | string[])[]) {
   const allowedRoles = args.flat();
