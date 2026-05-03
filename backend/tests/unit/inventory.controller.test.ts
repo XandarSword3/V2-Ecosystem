@@ -138,6 +138,32 @@ describe('Inventory Controller', () => {
     });
   });
 
+  describe('updateCategory', () => {
+    it('should update an existing category', async () => {
+      mockRequest.params = { categoryId: 'cat-1' };
+      mockRequest.body = { name: 'Updated Name' };
+      
+      mockBuilder.queueResponse({ id: 'cat-1', name: 'Updated Name' }, null);
+      
+      await controller.updateCategory(mockRequest as Request, mockResponse as Response);
+      
+      expect(responseJson.success).toBe(true);
+      expect(responseJson.data.name).toBe('Updated Name');
+    });
+  });
+
+  describe('deleteCategory', () => {
+    it('should delete a category', async () => {
+      mockRequest.params = { categoryId: 'cat-1' };
+      
+      mockBuilder.queueResponse({ id: 'cat-1' }, null);
+      
+      await controller.deleteCategory(mockRequest as Request, mockResponse as Response);
+      
+      expect(responseJson.success).toBe(true);
+    });
+  });
+
   describe('createCategory', () => {
     it('should create a new category', async () => {
       mockRequest.body = {

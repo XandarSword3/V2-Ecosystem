@@ -15,7 +15,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const DEV_CREDENTIALS = {
   ADMIN_EMAIL: 'admin@v2resort.com',
   ADMIN_PASSWORD: 'admin123',
-  STAFF_EMAIL: 'restaurant.staff@v2resort.com',
+  STAFF_EMAIL: 'staff@v2resort.com',
   STAFF_PASSWORD: 'staff123',
 };
 
@@ -66,6 +66,10 @@ export const e2eCredentials = {
   admin: {
     email: process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com',
     password: process.env.E2E_ADMIN_PASSWORD || 'Admin123!',
+  },
+  staff: {
+    email: process.env.E2E_STAFF_EMAIL || 'staff@v2resort.com',
+    password: process.env.E2E_STAFF_PASSWORD || 'staff123',
   },
   customer: {
     email: process.env.E2E_CUSTOMER_EMAIL || 'customer@test.com',
