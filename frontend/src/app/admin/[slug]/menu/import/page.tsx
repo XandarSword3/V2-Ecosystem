@@ -78,6 +78,7 @@ export default function MenuImportPage() {
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState<'json' | 'csv' | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [categoryMap, setCategoryMap] = useState<Record<string, string | null>>({});
@@ -277,49 +278,81 @@ export default function MenuImportPage() {
               </TabsContent>
 
               <TabsContent value="json">
-                <Card>
+                <Card 
+                  className={`transition-colors duration-200 ${isDragging === 'json' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging('json'); }}
+                  onDragLeave={() => setIsDragging(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(null);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && file.name.endsWith('.json')) setJsonFile(file);
+                    else toast.error('Please drop a valid .json file');
+                  }}
+                >
                   <CardContent className="p-12 flex flex-col items-center justify-center space-y-6 border-2 border-dashed border-slate-200 dark:border-slate-700">
                     <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
                       <FileJson className="w-8 h-8 text-blue-500" />
                     </div>
                     <div className="text-center">
-                      <p className="font-bold">Drop your JSON file here</p>
+                      <p className="font-bold">{jsonFile ? jsonFile.name : 'Drop your JSON file here'}</p>
                       <p className="text-sm text-slate-500">Only .json files are supported</p>
                     </div>
                     <input 
                       type="file" 
+                      id="json-input"
                       accept=".json"
                       onChange={(e) => setJsonFile(e.target.files?.[0] || null)}
-                      className="text-sm"
+                      className="hidden"
                     />
-                    <Button 
-                      onClick={() => handleParse('json')} 
-                      disabled={loading || !jsonFile}
-                    >
-                      {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Parse File →
-                    </Button>
+                    <div className="flex gap-4">
+                      <Button variant="outline" onClick={() => document.getElementById('json-input')?.click()}>
+                        Choose File
+                      </Button>
+                      <Button 
+                        onClick={() => handleParse('json')} 
+                        disabled={loading || !jsonFile}
+                      >
+                        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Parse File →
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
 
               <TabsContent value="csv">
-                <Card>
+                <Card 
+                  className={`transition-colors duration-200 ${isDragging === 'csv' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging('csv'); }}
+                  onDragLeave={() => setIsDragging(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(null);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && (file.name.endsWith('.csv') || file.type === 'text/csv')) setCsvFile(file);
+                    else toast.error('Please drop a valid .csv file');
+                  }}
+                >
                   <CardContent className="p-12 flex flex-col items-center justify-center space-y-6 border-2 border-dashed border-slate-200 dark:border-slate-700">
                     <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
                       <FileSpreadsheet className="w-8 h-8 text-emerald-500" />
                     </div>
                     <div className="text-center">
-                      <p className="font-bold">Drop your CSV file here</p>
+                      <p className="font-bold">{csvFile ? csvFile.name : 'Drop your CSV file here'}</p>
                       <p className="text-sm text-slate-500">Only .csv files are supported</p>
                     </div>
                     <input 
                       type="file" 
+                      id="csv-input"
                       accept=".csv"
                       onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
-                      className="text-sm"
+                      className="hidden"
                     />
                     <div className="flex gap-4">
+                      <Button variant="outline" onClick={() => document.getElementById('csv-input')?.click()}>
+                        Choose File
+                      </Button>
                       <Button variant="outline" onClick={downloadTemplate} className="flex items-center gap-2">
                         <Download className="w-4 h-4" />
                         Download Template
