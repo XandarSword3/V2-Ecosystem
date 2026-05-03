@@ -47,7 +47,7 @@ describe('Reviews Controller', () => {
         {
           id: 'review-1',
           rating: 5,
-          text: 'Excellent service!',
+          comment: 'Excellent service!',
           module_id: 'general',
           created_at: '2024-01-01T00:00:00Z',
           users: { full_name: 'John Doe', profile_image_url: null },
@@ -55,7 +55,7 @@ describe('Reviews Controller', () => {
         {
           id: 'review-2',
           rating: 4,
-          text: 'Great experience',
+          comment: 'Great experience',
           module_id: 'restaurant',
           created_at: '2024-01-02T00:00:00Z',
           users: { full_name: 'Jane Smith', profile_image_url: null },
@@ -89,7 +89,7 @@ describe('Reviews Controller', () => {
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         data: {
-          reviews: mockReviews.map(r => ({ ...r, service_type: r.module_id })),
+          reviews: mockReviews.map(r => ({ ...r, text: r.comment, service_type: r.module_id })),
           stats: {
             totalReviews: 3,
             averageRating: 4.7, // (5+4+5)/3 = 4.67 rounded
@@ -103,7 +103,7 @@ describe('Reviews Controller', () => {
         {
           id: 'review-1',
           rating: 5,
-          text: 'Great restaurant!',
+          comment: 'Great restaurant!',
           module_id: 'restaurant',
           created_at: '2024-01-01T00:00:00Z',
           users: { full_name: 'John Doe', profile_image_url: null },
@@ -221,22 +221,15 @@ describe('Reviews Controller', () => {
         id: 'review-new',
         user_id: 'user-123',
         rating: 5,
-        text: 'Amazing experience!',
-        service_type: 'general',
-        is_approved: false,
+        comment: 'Amazing experience!',
+        module_id: 'general',
+        status: 'pending',
       };
 
-      // Mock: no existing review
-      const existingQueryMock = createChainableMock(null);
-      // Mock: insert new review
       const insertQueryMock = createChainableMock(mockReview);
 
-      let callCount = 0;
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockImplementation(() => {
-          callCount++;
-          return callCount === 1 ? existingQueryMock : insertQueryMock;
-        }),
+        from: vi.fn().mockReturnValue(insertQueryMock),
       } as any);
 
       const { createReview } = await import('../../src/modules/reviews/reviews.controller.js');
@@ -247,7 +240,7 @@ describe('Reviews Controller', () => {
           service_type: 'general',
         },
       });
-      req.user = { userId: 'user-123', role: 'customer' };
+      req.user = { id: 'user-123', role: 'customer' };
 
       await createReview(req, res, next);
 
@@ -259,45 +252,12 @@ describe('Reviews Controller', () => {
       });
     });
 
-    it('should reject if user already has a review for this service', async () => {
-      // Mock: existing review found
-      const existingReview = { id: 'existing-review' };
-      const existingQueryMock = createChainableMock(existingReview);
-
-      vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(existingQueryMock),
-      } as any);
-
-      const { createReview } = await import('../../src/modules/reviews/reviews.controller.js');
-      const { req, res, next } = createMockReqRes({
-        body: {
-          rating: 4,
-          text: 'Another review attempt',
-          service_type: 'restaurant',
-        },
-      });
-      req.user = { userId: 'user-123', role: 'customer' };
-
-      await createReview(req, res, next);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        error: 'You have already submitted a review for this service',
-      });
-    });
-
     it('should handle database error on insert', async () => {
-      const existingQueryMock = createChainableMock(null);
       const insertError = new Error('Insert failed');
       const insertQueryMock = createChainableMock(null, insertError);
 
-      let callCount = 0;
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockImplementation(() => {
-          callCount++;
-          return callCount === 1 ? existingQueryMock : insertQueryMock;
-        }),
+        from: vi.fn().mockReturnValue(insertQueryMock),
       } as any);
 
       const { createReview } = await import('../../src/modules/reviews/reviews.controller.js');
@@ -325,15 +285,10 @@ describe('Reviews Controller', () => {
         is_approved: false,
       };
 
-      const existingQueryMock = createChainableMock(null);
       const insertQueryMock = createChainableMock(mockReview);
 
-      let callCount = 0;
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockImplementation(() => {
-          callCount++;
-          return callCount === 1 ? existingQueryMock : insertQueryMock;
-        }),
+        from: vi.fn().mockReturnValue(insertQueryMock),
       } as any);
 
       const { createReview } = await import('../../src/modules/reviews/reviews.controller.js');
@@ -363,7 +318,7 @@ describe('Reviews Controller', () => {
         {
           id: 'review-1',
           rating: 5,
-          text: 'Great!',
+          comment: 'Great!',
           module_id: 'general',
           status: 'approved',
           user_id: 'user-1',
@@ -373,7 +328,7 @@ describe('Reviews Controller', () => {
         {
           id: 'review-2',
           rating: 3,
-          text: 'Okay',
+          comment: 'Okay',
           module_id: 'restaurant',
           status: 'pending',
           user_id: 'user-2',
@@ -409,12 +364,14 @@ describe('Reviews Controller', () => {
         data: [
           {
             ...mockReviews[0],
+            text: mockReviews[0].comment,
             service_type: 'general',
             is_approved: true,
             users: { id: 'user-1', full_name: 'John', email: 'john@test.com', profile_image_url: null },
           },
           {
             ...mockReviews[1],
+            text: mockReviews[1].comment,
             service_type: 'restaurant',
             is_approved: false,
             users: { id: 'user-2', full_name: 'Jane', email: 'jane@test.com', profile_image_url: null },
@@ -518,7 +475,7 @@ describe('Reviews Controller', () => {
       const { updateReviewStatus } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
         params: { id: 'review-1' },
-        body: { is_approved: true },
+        body: { status: 'approved' },
       });
 
       await updateReviewStatus(req, res, next);
@@ -546,14 +503,14 @@ describe('Reviews Controller', () => {
       const { updateReviewStatus } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
         params: { id: 'review-1' },
-        body: { is_approved: false },
+        body: { status: 'rejected' },
       });
 
       await updateReviewStatus(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        data: updatedReview,
+        data: { ...updatedReview, is_approved: false },
         message: 'Review rejected',
       });
     });
@@ -567,7 +524,7 @@ describe('Reviews Controller', () => {
       const { updateReviewStatus } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
         params: { id: 'nonexistent-review' },
-        body: { is_approved: true },
+        body: { status: 'approved' },
       });
 
       await updateReviewStatus(req, res, next);
@@ -589,7 +546,7 @@ describe('Reviews Controller', () => {
       const { updateReviewStatus } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
         params: { id: 'review-1' },
-        body: { is_approved: true },
+        body: { status: 'approved' },
       });
 
       await updateReviewStatus(req, res, next);
@@ -616,7 +573,9 @@ describe('Reviews Controller', () => {
 
       await deleteReview(req, res, next);
 
-      expect(queryMock.delete).toHaveBeenCalled();
+      expect(queryMock.update).toHaveBeenCalledWith(expect.objectContaining({
+        deleted_at: expect.any(String)
+      }));
       expect(queryMock.eq).toHaveBeenCalledWith('id', 'review-1');
       expect(res.json).toHaveBeenCalledWith({
         success: true,

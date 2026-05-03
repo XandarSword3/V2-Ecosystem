@@ -9,31 +9,47 @@ vi.mock('../../../src/modules/auth/auth.utils', () => ({
 import { verifyToken } from '../../../src/modules/auth/auth.utils';
 import { authenticate, authorize, optionalAuth } from '../../../src/middleware/auth.middleware';
 
+// Mock getSupabase
+vi.mock('../../../src/database/connection', () => ({
+  getSupabase: vi.fn()
+}));
+
+import { getSupabase } from '../../../src/database/connection';
+
 describe('Auth Middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('authenticate', () => {
-    it('should authenticate valid token', () => {
-      const mockPayload = { userId: 'user-1', roles: ['admin'] };
+    it('should authenticate valid token', async () => {
+      const mockPayload = { userId: 'user-1', roles: ['admin'], tokenVersion: 1 };
       vi.mocked(verifyToken).mockReturnValue(mockPayload as any);
+
+      const mockUser = { id: 'user-1', token_version: 1, is_active: true };
+      const supabaseMock = {
+        from: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: mockUser, error: null })
+      };
+      vi.mocked(getSupabase).mockReturnValue(supabaseMock as any);
 
       const { req, res, next } = createMockReqRes({});
       (req as any).headers = { authorization: 'Bearer valid-token' };
 
-      authenticate(req, res, next);
+      await authenticate(req, res, next);
 
       expect(verifyToken).toHaveBeenCalledWith('valid-token');
-      expect(req.user).toEqual(expect.objectContaining(mockPayload));
+      expect(req.user).toEqual(expect.objectContaining({ ...mockPayload, id: 'user-1' }));
       expect(next).toHaveBeenCalled();
     });
 
-    it('should reject request without auth header', () => {
+    it('should reject request without auth header', async () => {
       const { req, res, next } = createMockReqRes({});
       (req as any).headers = {};
 
-      authenticate(req, res, next);
+      await authenticate(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({
@@ -43,11 +59,11 @@ describe('Auth Middleware', () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('should reject request without Bearer prefix', () => {
+    it('should reject request without Bearer prefix', async () => {
       const { req, res, next } = createMockReqRes({});
       (req as any).headers = { authorization: 'Basic credentials' };
 
-      authenticate(req, res, next);
+      await authenticate(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({
@@ -56,7 +72,7 @@ describe('Auth Middleware', () => {
       });
     });
 
-    it('should reject invalid token', () => {
+    it('should reject invalid token', async () => {
       vi.mocked(verifyToken).mockImplementation(() => {
         throw new Error('Invalid token');
       });
@@ -64,12 +80,62 @@ describe('Auth Middleware', () => {
       const { req, res, next } = createMockReqRes({});
       (req as any).headers = { authorization: 'Bearer invalid-token' };
 
-      authenticate(req, res, next);
+      await authenticate(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({
         success: false,
         error: 'Invalid or expired token'
+      });
+    });
+
+    it('should reject stale session (token version mismatch)', async () => {
+      const mockPayload = { userId: 'user-1', roles: ['admin'], tokenVersion: 1 };
+      vi.mocked(verifyToken).mockReturnValue(mockPayload as any);
+
+      const mockUser = { id: 'user-1', token_version: 2, is_active: true };
+      const supabaseMock = {
+        from: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: mockUser, error: null })
+      };
+      vi.mocked(getSupabase).mockReturnValue(supabaseMock as any);
+
+      const { req, res, next } = createMockReqRes({});
+      (req as any).headers = { authorization: 'Bearer stale-token' };
+
+      await authenticate(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Session expired, please log in again'
+      });
+    });
+
+    it('should reject deactivated account', async () => {
+      const mockPayload = { userId: 'user-1', roles: ['admin'], tokenVersion: 1 };
+      vi.mocked(verifyToken).mockReturnValue(mockPayload as any);
+
+      const mockUser = { id: 'user-1', token_version: 1, is_active: false };
+      const supabaseMock = {
+        from: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: mockUser, error: null })
+      };
+      vi.mocked(getSupabase).mockReturnValue(supabaseMock as any);
+
+      const { req, res, next } = createMockReqRes({});
+      (req as any).headers = { authorization: 'Bearer deactivated-token' };
+
+      await authenticate(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Account deactivated'
       });
     });
   });
