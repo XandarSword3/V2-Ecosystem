@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection.js";
-import { emitToAll } from "../../socket/index";
-import { logActivity } from "../../utils/activityLogger";
+import { emitToAll } from "../../socket/index.js";
+import { logActivity } from "../../utils/activityLogger.js";
 import { logger } from "../../utils/logger.js";
 import { 
   createUserSchema, 
@@ -1612,10 +1612,12 @@ export const getCustomerAnalytics = asyncHandler(async (req: Request, res: Respo
     const customerStats = new Map<string, { name: string, revenue: number, count: number, firstDate: string }>();
 
     allTransactions.forEach(t => {
-      const stats = customerStats.get(t.customer_id) || { name: t.customer_name, revenue: 0, count: 0, firstDate: t.created_at };
-      stats.revenue += parseFloat(t.total_amount);
+      if (!t.customer_id) return;
+      const stats = customerStats.get(t.customer_id) || { name: t.customer_name || 'Unknown', revenue: 0, count: 0, firstDate: t.created_at };
+      const amount = parseFloat(t.total_amount || '0');
+      stats.revenue += isNaN(amount) ? 0 : amount;
       stats.count += 1;
-      if (dayjs(t.created_at).isBefore(dayjs(stats.firstDate))) {
+      if (t.created_at && (!stats.firstDate || dayjs(t.created_at).isBefore(dayjs(stats.firstDate)))) {
         stats.firstDate = t.created_at;
       }
       customerStats.set(t.customer_id, stats);
@@ -1629,16 +1631,20 @@ export const getCustomerAnalytics = asyncHandler(async (req: Request, res: Respo
       .slice(0, 10);
 
     // New vs Returning logic for the selected range
-    const rangeStart = start.toISOString();
     let newCustomers = 0;
     let returningCustomers = 0;
 
     customersInRange.forEach(c => {
       // Check if they had ANY transaction in the selected range
-      const hasTransactionInRange = allTransactions.some(t => t.customer_id === c.id && dayjs(t.created_at).isAfter(start) && dayjs(t.created_at).isBefore(end));
+      const hasTransactionInRange = allTransactions.some(t => 
+        t.customer_id === c.id && 
+        t.created_at &&
+        dayjs(t.created_at).isAfter(start) && 
+        dayjs(t.created_at).isBefore(end)
+      );
 
       if (hasTransactionInRange) {
-        if (dayjs(c.firstDate).isBefore(start)) {
+        if (c.firstDate && dayjs(c.firstDate).isBefore(start)) {
           returningCustomers++;
         } else {
           newCustomers++;

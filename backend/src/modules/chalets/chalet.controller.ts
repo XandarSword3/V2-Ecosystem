@@ -11,6 +11,7 @@ import { getRedis } from '../../config/session-store.js';
 import { config } from '../../config/index.js';
 import Stripe from 'stripe';
 import bcrypt from 'bcryptjs';
+import { resolvePrice } from "../../utils/pricing.js";
 
 // Distributed booking lock using Redis (falls back to in-memory for non-Redis environments)
 // Ensures only one booking request per chalet is processed at a time, even across server instances
@@ -585,14 +586,9 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
     }
 
     // Apply Chalet-level discount if applicable
-    const chaletDiscount = chalet.discount_price ? parseFloat(chalet.discount_price) : null;
-    if (chaletDiscount !== null) {
-      // If the total nightly rate is higher than the discount rate * nights, use discount rate
-      const discountedBaseAmount = chaletDiscount * numberOfNights;
-      if (discountedBaseAmount < baseAmount) {
-        baseAmount = discountedBaseAmount;
-      }
-    }
+    // Bug fix: use resolvePrice to handle falsy values (like 0) correctly
+    const unitPrice = resolvePrice(baseAmount / numberOfNights, chalet.discount_price);
+    baseAmount = unitPrice * numberOfNights;
 
     // Calculate add-ons amount
     let addOnsAmount = 0;
