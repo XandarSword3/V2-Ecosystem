@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
@@ -33,6 +33,7 @@ import {
   Layers,
   Check,
   Package,
+  Download,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -100,6 +101,7 @@ interface Category {
 
 export default function DynamicMenuPage() {
   const params = useParams();
+  const router = useRouter();
   const { modules } = useSiteSettings();
   const t = useTranslations('admin');
   
@@ -307,6 +309,14 @@ export default function DynamicMenuPage() {
           <Button variant="outline" onClick={() => fetchData()} className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4" />
             Refresh
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/admin/${slug}/menu/import`)}
+            className="flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Import Menu
           </Button>
           <Button
             onClick={openCreateModal}
