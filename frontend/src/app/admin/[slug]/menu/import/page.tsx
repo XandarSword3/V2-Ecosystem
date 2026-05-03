@@ -37,6 +37,7 @@ import {
 interface ModifierOption {
   name: string;
   price: number;
+  modifierType?: 'add' | 'remove' | 'swap';
 }
 
 interface ModifierGroup {

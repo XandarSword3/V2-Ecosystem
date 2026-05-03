@@ -16,7 +16,7 @@ export const parseImport = asyncHandler(async (req: Request, res: Response) => {
     const buffer = req.file.buffer;
     const mimeType = req.file.mimetype;
     
-    if (mimeType === 'application/json') {
+    if (mimeType === 'application/json' || req.file.originalname.endsWith('.json')) {
       result = parser.parseJsonImport(JSON.parse(buffer.toString()));
     } else if (mimeType === 'text/csv' || req.file.originalname.endsWith('.csv')) {
       result = await parser.parseCsvImport(buffer);
@@ -80,11 +80,18 @@ export const commitImport = asyncHandler(async (req: Request, res: Response) => 
     }
 
     return menuService.createMenuItem({
-      ...item,
+      name: item.name,
+      price: item.price,
+      description: item.description,
       categoryId,
       moduleId,
-      price: item.price
-    });
+      isAvailable: item.is_available,
+      discountPrice: item.discount_price,
+      preparationTimeMinutes: item.preparation_time,
+      calories: item.calories,
+      allergens: item.allergens,
+      // Modifiers are handled separately or as part of the item in the service
+    } as any);
   });
 
   const settleResults = await Promise.allSettled(importPromises);
