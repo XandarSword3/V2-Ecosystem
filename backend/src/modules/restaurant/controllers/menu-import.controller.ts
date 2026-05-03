@@ -10,32 +10,36 @@ import { getSupabase } from '../../../database/connection.js';
  * Handles initial parsing of menu data from various sources
  */
 export const parseImport = asyncHandler(async (req: Request, res: Response) => {
-  let result;
-
-  if (req.file) {
-    const buffer = req.file.buffer;
-    const mimeType = req.file.mimetype;
-    
-    if (mimeType === 'application/json' || req.file.originalname.endsWith('.json')) {
-      result = parser.parseJsonImport(JSON.parse(buffer.toString()));
-    } else if (mimeType === 'text/csv' || req.file.originalname.endsWith('.csv')) {
-      result = await parser.parseCsvImport(buffer);
+  let result: any;
+  try {
+    if (req.file) {
+      const buffer = req.file.buffer;
+      const mimeType = req.file.mimetype;
+      
+      if (mimeType === 'application/json' || req.file.originalname.endsWith('.json')) {
+        result = parser.parseJsonImport(JSON.parse(buffer.toString()));
+      } else if (mimeType === 'text/csv' || req.file.originalname.endsWith('.csv')) {
+        result = await parser.parseCsvImport(buffer);
+      } else {
+        return res.status(400).json({ success: false, errors: ['Unsupported file type. Use JSON or CSV.'] });
+      }
+    } else if (req.body.text) {
+      result = await parser.parseLlmImport(req.body.text);
+    } else if (req.body.json) {
+      result = parser.parseJsonImport(req.body.json);
     } else {
-      return res.status(400).json({ success: false, errors: ['Unsupported file type. Use JSON or CSV.'] });
+      return res.status(400).json({ success: false, errors: ['No data provided for parsing.'] });
     }
-  } else if (req.body.text) {
-    result = await parser.parseLlmImport(req.body.text);
-  } else if (req.body.json) {
-    result = parser.parseJsonImport(req.body.json);
-  } else {
-    return res.status(400).json({ success: false, errors: ['No data provided for parsing.'] });
-  }
 
-  if (result.successful === 0 && result.errors.length > 0) {
-    return res.status(422).json({ success: false, ...result });
-  }
+    if (result.successful === 0 && result.errors.length > 0) {
+      return res.status(422).json({ success: false, ...result });
+    }
 
-  res.json({ success: true, data: result });
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    logger.error('Import Parse Controller Error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 /**
