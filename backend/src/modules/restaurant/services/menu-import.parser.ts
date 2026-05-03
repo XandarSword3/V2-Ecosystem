@@ -12,10 +12,38 @@ export function parseJsonImport(rawData: any): ImportResult {
   const warnings: string[] = [];
   const errors: string[] = [];
 
-  const dataArray = Array.isArray(rawData) ? rawData : (rawData.items || []);
+  let dataArray: any[] = [];
 
-  if (!Array.isArray(dataArray)) {
-    return { items: [], warnings: [], errors: ['Invalid JSON format: expected an array of items'], totalParsed: 0, successful: 0 };
+  if (Array.isArray(rawData)) {
+    dataArray = rawData;
+  } else if (rawData.items && Array.isArray(rawData.items)) {
+    dataArray = rawData.items;
+  } else if (rawData.menu && typeof rawData.menu === 'object') {
+    // Handle { menu: { category: [items] } }
+    Object.entries(rawData.menu).forEach(([category, val]: [string, any]) => {
+      if (Array.isArray(val)) {
+        val.forEach(item => {
+          if (typeof item === 'object') {
+            dataArray.push({ ...item, category });
+          }
+        });
+      }
+    });
+  } else if (typeof rawData === 'object') {
+    // Handle { category: [items] }
+    Object.entries(rawData).forEach(([category, val]: [string, any]) => {
+      if (Array.isArray(val)) {
+        val.forEach(item => {
+          if (typeof item === 'object') {
+            dataArray.push({ ...item, category });
+          }
+        });
+      }
+    });
+  }
+
+  if (dataArray.length === 0) {
+    return { items: [], warnings: [], errors: ['Invalid JSON format: could not find an array of items or category-keyed objects'], totalParsed: 0, successful: 0 };
   }
 
   dataArray.forEach((item: any, index: number) => {
