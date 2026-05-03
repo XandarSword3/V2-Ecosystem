@@ -8,6 +8,9 @@ import { Readable } from 'stream';
  * Validates and sanitizes a raw JSON import
  */
 export function parseJsonImport(rawData: any): ImportResult {
+  if (!rawData || typeof rawData !== 'object') {
+    return { items: [], warnings: [], errors: ['Invalid JSON: Expected an object or array'], totalParsed: 0, successful: 0 };
+  }
   const items: ImportedMenuItem[] = [];
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -213,7 +216,7 @@ function validateAndMapItem(raw: any): ImportedMenuItem {
     name: String(name).trim(),
     price: isNaN(price) ? 0 : price,
     category: String(category).trim(),
-    description: raw.description || raw.Description,
+    description: raw.description || raw.Description || (Array.isArray(raw.ingredients) ? raw.ingredients.join(', ') : raw.ingredients),
     is_available: raw.is_available !== undefined ? Boolean(raw.is_available) : true,
     discount_price: raw.discount_price ? parseFloat(String(raw.discount_price)) : undefined,
     preparation_time: raw.preparation_time ? parseInt(String(raw.preparation_time)) : undefined,
