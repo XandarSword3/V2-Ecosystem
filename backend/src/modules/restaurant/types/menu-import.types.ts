@@ -5,6 +5,7 @@
 export interface ModifierOption {
   name: string;
   price: number;
+  modifierType?: 'add' | 'remove' | 'swap';
 }
 
 export interface ModifierGroup {

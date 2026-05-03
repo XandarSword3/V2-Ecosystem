@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import { ImportedMenuItem, ImportResult } from '../types/menu-import.types.js';
 import { logger } from '../../../utils/logger.js';
 import axios from 'axios';
+import { Readable } from 'stream';
 
 /**
  * Validates and sanitizes a raw JSON import
@@ -48,7 +49,7 @@ export async function parseCsvImport(buffer: Buffer): Promise<ImportResult> {
   
   try {
     const workbook = new ExcelJS.Workbook();
-    await workbook.csv.read(new (require('stream').Readable)({
+    await workbook.csv.read(new Readable({
       read() {
         this.push(buffer);
         this.push(null);
@@ -203,7 +204,8 @@ function parseModifiers(raw: any): any {
     is_required: Boolean(group.is_required),
     options: Array.isArray(group.options) ? group.options.map((opt: any) => ({
       name: String(opt.name),
-      price: parseFloat(String(opt.price || 0))
+      price: parseFloat(String(opt.price || 0)),
+      modifierType: (opt.modifierType as any) || 'add'
     })) : []
   }));
 }
