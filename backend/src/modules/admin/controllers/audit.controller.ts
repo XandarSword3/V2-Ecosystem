@@ -6,6 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection';
+import { logActivity } from '../../../utils/activityLogger';
 
 interface ActivityLogRow {
   id: string;
@@ -33,6 +34,14 @@ function safeParseJson(value: unknown): unknown {
 export const getAuditLogs = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { limit = 50, offset = 0 } = req.query;
+    const userId = (req.user as any)?.userId || 'system';
+
+    // Log the access to audit logs
+    await logActivity({
+      user_id: userId,
+      action: 'VIEW_AUDIT_LOGS',
+      resource: 'audit_logs',
+    });
 
     const { data: logs, error } = await supabase
       .from('audit_logs')
