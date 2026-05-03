@@ -1,42 +1,71 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Default config for local development. Runs smoke tests only.
-
 /**
- * E2E Test Configuration
+ * Unified E2E Test Configuration
  * 
  * Environment Variables:
  *   FRONTEND_URL - Frontend URL (default: http://localhost:3000)
  *   API_URL - Backend API URL (default: http://localhost:3005)
- *   E2E_ADMIN_EMAIL - Admin email for testing
- *   E2E_ADMIN_PASSWORD - Admin password for testing
+ *   RUN_ALL_TESTS - Set to 'true' to run full suite including exploratory tests
+ *   TEST_MODE - 'admin' | 'all' | 'rebrand' | 'default'
  * 
  * Running Tests:
- *   1. Start backend: cd v2-resort/backend && npm run dev
- *   2. Start frontend: cd v2-resort/frontend && npm run dev
- *   3. Run tests: npx playwright test
- * 
- * Or use webServer config below (uncomment) for automated startup.
+ *   npx playwright test
  */
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const API_URL = process.env.API_URL || 'http://localhost:3005';
+const RUN_ALL_TESTS = process.env.RUN_ALL_TESTS === 'true';
+const TEST_MODE = process.env.TEST_MODE || 'default';
+
+const exploratorySuites = [
+  '**/workflows/**/*.spec.ts',
+  '**/features/**/*.spec.ts',
+  '**/complete-feature-coverage.spec.ts',
+  '**/customer-flows.spec.ts',
+  '**/cms-sync-hardened.spec.ts',
+  '**/cms-settings-comprehensive.spec.ts',
+  '**/admin-systematic.spec.ts',
+  '**/auth-apple.spec.ts',
+  '**/iteration-*.spec.ts',
+  '**/iteration-*-test.spec.ts',
+  '**/stress-behavior.spec.ts',
+  '**/system_flow.spec.ts',
+  '**/verification_inventory.spec.ts',
+  '**/module-builder*.spec.ts',
+];
+
+const getTestIgnore = () => {
+  const ignores = ['**/simulation/**', '**/node_modules/**'];
+  if (!RUN_ALL_TESTS && TEST_MODE !== 'all') {
+    ignores.push(...exploratorySuites);
+  }
+  return ignores;
+};
+
+const getOutputFile = () => {
+  switch (TEST_MODE) {
+    case 'admin': return 'test-results/admin-results.json';
+    case 'all': return 'test-results/all-results.json';
+    case 'rebrand': return 'test-results/rebrand-results.json';
+    default: return 'test-results/smoke-results.json';
+  }
+};
 
 export default defineConfig({
   testDir: './tests',
-  testIgnore: ['**/simulation/**', '**/node_modules/**'],
+  testIgnore: getTestIgnore(),
   timeout: 120000,
   expect: {
     timeout: 15000
   },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: 1, // One retry for flaky network tests
+  retries: 1,
   workers: process.env.CI ? 4 : undefined,
   reporter: [
     ['list'],
     ['html', { open: 'never' }],
-    ['json', { outputFile: 'test-results/phase3-results.json' }]
+    ['json', { outputFile: getOutputFile() }]
   ],
   use: {
     baseURL: FRONTEND_URL,
@@ -53,19 +82,4 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // Uncomment below to auto-start servers (requires proper build)
-  // webServer: [
-  //   {
-  //     command: 'cd backend && npm run dev',
-  //     url: API_URL,
-  //     timeout: 60000,
-  //     reuseExistingServer: !process.env.CI,
-  //   },
-  //   {
-  //     command: 'cd frontend && npm run dev',
-  //     url: FRONTEND_URL,
-  //     timeout: 120000,
-  //     reuseExistingServer: !process.env.CI,
-  //   },
-  // ],
 });

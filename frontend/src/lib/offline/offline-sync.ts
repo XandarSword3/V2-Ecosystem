@@ -156,6 +156,18 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
 
   try {
     const pending = await syncQueue.getPending();
+    if (pending.length === 0) {
+      updateStatus({ isSyncing: false });
+      return { synced: 0, failed: 0 };
+    }
+
+    // Optimization: Fetch all activities once and create a Map for O(1) lookup
+    const activities = await offlineActivityStore.getAll();
+    const activityMap = new Map();
+    activities.forEach((a: any) => {
+      // Use a composite key or just entityId if it's unique enough for pending items
+      activityMap.set(a.entityId, a);
+    });
     
     for (const item of pending) {
       try {
@@ -167,10 +179,12 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
         await syncQueue.remove(item.id);
         
         // Find and update the activity log entry for this entity
-        const activities = await offlineActivityStore.getAll();
-        const entry = activities.find((a: any) => a.entityId === item.entityId);
+        const entry = activityMap.get(item.entityId);
         if (entry) {
-          await offlineActivityStore.put({ ...entry, syncedAt: new Date().toISOString() });
+          const updatedEntry = { ...entry, syncedAt: new Date().toISOString() };
+          await offlineActivityStore.put(updatedEntry);
+          // Update map to keep it in sync for subsequent items with same entityId
+          activityMap.set(item.entityId, updatedEntry);
         }
         
         synced++;
@@ -183,10 +197,11 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
           await syncQueue.remove(item.id);
           
           // Find and update the activity log entry for this entity (conflicts also count as synced)
-          const activities = await offlineActivityStore.getAll();
-          const entry = activities.find((a: any) => a.entityId === item.entityId);
+          const entry = activityMap.get(item.entityId);
           if (entry) {
-            await offlineActivityStore.put({ ...entry, syncedAt: new Date().toISOString() });
+            const updatedEntry = { ...entry, syncedAt: new Date().toISOString() };
+            await offlineActivityStore.put(updatedEntry);
+            activityMap.set(item.entityId, updatedEntry);
           }
           
           synced++;
