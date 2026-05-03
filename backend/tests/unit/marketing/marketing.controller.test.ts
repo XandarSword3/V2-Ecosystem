@@ -23,6 +23,7 @@ vi.mock('../../../src/modules/marketing/marketing.service', () => ({
     createCampaign: vi.fn(),
     getCampaigns: vi.fn(),
     getCampaignAnalytics: vi.fn(),
+    getJourneyAnalytics: vi.fn(),
     sendCampaign: vi.fn(),
     scheduleCampaign: vi.fn(),
     cancelCampaign: vi.fn(),
@@ -199,6 +200,26 @@ describe('Marketing Controller', () => {
     });
   });
 
+  describe('removeFromSegment', () => {
+    it('should remove guests from segment', async () => {
+      vi.mocked(marketingAutomationService.removeFromSegment).mockResolvedValue(3);
+
+      const { req, res, next } = createMockReqRes({
+        params: { segmentId: 'seg-1' },
+        body: { guestIds: ['guest-1', 'guest-2', 'guest-3'] }
+      });
+
+      await marketingController.removeFromSegment(req, res, next);
+
+      expect(marketingAutomationService.removeFromSegment).toHaveBeenCalledWith('seg-1', ['guest-1', 'guest-2', 'guest-3']);
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: { removed: 3 },
+        message: 'Removed 3 guests from segment'
+      });
+    });
+  });
+
   describe('createCampaign', () => {
     it('should create a new campaign', async () => {
       const mockCampaign = {
@@ -275,6 +296,363 @@ describe('Marketing Controller', () => {
         success: true,
         data: mockAnalytics
       });
+    });
+  });
+
+  describe('Automations', () => {
+    it('should create an automation', async () => {
+      const mockAutomation = { id: 'auto-1', name: 'Post-stay' };
+      vi.mocked(marketingAutomationService.createAutomation).mockResolvedValue(mockAutomation);
+
+      const { req, res, next } = createMockReqRes({
+        params: { propertyId: 'prop-1' },
+        body: { name: 'Post-stay', triggerEvent: 'CHECK_OUT', templateId: 'tpl-1' }
+      });
+
+      await marketingController.createAutomation(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockAutomation,
+        message: 'Automation created successfully'
+      });
+    });
+
+    it('should trigger an automation', async () => {
+      const { req, res, next } = createMockReqRes({
+        params: { automationId: 'auto-1' },
+        body: { guestId: 'guest-1' }
+      });
+
+      await marketingController.triggerAutomation(req, res, next);
+
+      expect(marketingAutomationService.triggerAutomation).toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Automation triggered' });
+    });
+  });
+
+  describe('Journeys', () => {
+    it('should create a journey', async () => {
+      const mockJourney = { id: 'jr-1', name: 'Welcome Journey' };
+      vi.mocked(marketingAutomationService.createJourney).mockResolvedValue(mockJourney);
+
+      const { req, res, next } = createMockReqRes({
+        params: { propertyId: 'prop-1' },
+        body: { name: 'Welcome Journey', journeyType: 'automation' }
+      });
+
+      await marketingController.createJourney(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+    });
+
+    it('should activate a journey', async () => {
+      const { req, res, next } = createMockReqRes({
+        params: { journeyId: 'jr-1' }
+      });
+
+      await marketingController.activateJourney(req, res, next);
+
+      expect(marketingAutomationService.activateJourney).toHaveBeenCalledWith('jr-1');
+      expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Journey activated' });
+    });
+
+    it('should pause a journey', async () => {
+      const { req, res, next } = createMockReqRes({
+        params: { journeyId: 'jr-1' }
+      });
+
+      await marketingController.pauseJourney(req, res, next);
+
+      expect(marketingAutomationService.pauseJourney).toHaveBeenCalledWith('jr-1');
+      expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Journey paused' });
+    });
+
+    it('should get journey analytics', async () => {
+      vi.mocked(marketingAutomationService.getJourneyAnalytics).mockResolvedValue({ enrolled: 10 });
+
+      const { req, res, next } = createMockReqRes({
+        params: { journeyId: 'jr-1' }
+      });
+
+      await marketingController.getJourneyAnalytics(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith({ success: true, data: { enrolled: 10 } });
+    });
+  });
+  describe('getCampaignAnalytics', () => {
+    it('should return campaign analytics', async () => {
+      const mockAnalytics = {
+        sent: 1000,
+        delivered: 980,
+        opened: 350,
+        clicked: 120,
+        unsubscribed: 5
+      };
+      vi.mocked(marketingAutomationService.getCampaignAnalytics).mockResolvedValue(mockAnalytics);
+
+      const { req, res, next } = createMockReqRes({
+        params: { campaignId: 'camp-1' }
+      });
+
+      await marketingController.getCampaignAnalytics(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockAnalytics
+      });
+    });
+  });
+
+  describe('Campaign Operations', () => {
+    it('should send a campaign', async () => {
+      vi.mocked(marketingAutomationService.sendCampaign).mockResolvedValue({ queued: 50, failed: 0 });
+
+      const { req, res, next } = createMockReqRes({
+        params: { campaignId: 'camp-1' }
+      });
+
+      await marketingController.sendCampaign(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: { queued: 50, failed: 0 },
+        message: 'Queued 50 emails'
+      });
+    });
+
+    it('should schedule a campaign', async () => {
+      const { req, res, next } = createMockReqRes({
+        params: { campaignId: 'camp-1' },
+        body: { scheduledAt: '2024-12-25T10:00:00Z' }
+      });
+
+      await marketingController.scheduleCampaign(req, res, next);
+
+      expect(marketingAutomationService.scheduleCampaign).toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Campaign scheduled'
+      });
+    });
+
+    it('should cancel a campaign', async () => {
+      const { req, res, next } = createMockReqRes({
+        params: { campaignId: 'camp-1' }
+      });
+
+      await marketingController.cancelCampaign(req, res, next);
+
+      expect(marketingAutomationService.cancelCampaign).toHaveBeenCalledWith('camp-1');
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Campaign cancelled'
+      });
+    });
+  });
+
+  describe('Templates', () => {
+    it('should create a template', async () => {
+      const mockTemplate = { id: 'tpl-1', name: 'Welcome' };
+      vi.mocked(marketingAutomationService.createTemplate).mockResolvedValue(mockTemplate);
+
+      const { req, res, next } = createMockReqRes({
+        params: { propertyId: 'prop-1' },
+        body: { name: 'Welcome', content: 'Hello!' }
+      });
+
+      await marketingController.createTemplate(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockTemplate,
+        message: 'Template created successfully'
+      });
+    });
+
+    it('should get templates', async () => {
+      const mockTemplates = [{ id: 'tpl-1' }];
+      vi.mocked(marketingAutomationService.getTemplates).mockResolvedValue(mockTemplates);
+
+      const { req, res, next } = createMockReqRes({
+        params: { propertyId: 'prop-1' },
+        query: { category: 'welcome' }
+      });
+
+      await marketingController.getTemplates(req, res, next);
+
+      expect(marketingAutomationService.getTemplates).toHaveBeenCalledWith('prop-1', 'welcome');
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockTemplates
+      });
+    });
+  });
+
+  describe('Tracking', () => {
+    it('should track email open and return pixel', async () => {
+      const { req, res, next } = createMockReqRes({
+        params: { sendId: 'send-1' }
+      });
+      req.ip = '127.0.0.1';
+      req.headers['user-agent'] = 'Vitest';
+
+      await marketingController.trackEmailOpen(req, res, next);
+
+      expect(marketingAutomationService.trackOpen).toHaveBeenCalledWith('send-1', '127.0.0.1', 'Vitest');
+      expect(res.set).toHaveBeenCalledWith('Content-Type', 'image/gif');
+      expect(res.send).toHaveBeenCalled();
+    });
+
+    it('should track email click and redirect', async () => {
+      const targetUrl = 'https://example.com/promo';
+      const { req, res, next } = createMockReqRes({
+        params: { sendId: 'send-1' },
+        query: { url: targetUrl }
+      });
+      req.ip = '127.0.0.1';
+      req.headers['user-agent'] = 'Vitest';
+
+      await marketingController.trackEmailClick(req, res, next);
+
+      expect(marketingAutomationService.trackClick).toHaveBeenCalledWith('send-1', targetUrl, '127.0.0.1', 'Vitest');
+      expect(res.redirect).toHaveBeenCalledWith(targetUrl);
+    });
+
+    it('should return 400 for invalid click URL protocol', async () => {
+      const targetUrl = 'javascript:alert(1)';
+      const { req, res, next } = createMockReqRes({
+        params: { sendId: 'send-1' },
+        query: { url: targetUrl }
+      });
+
+      await marketingController.trackEmailClick(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+  });
+
+  describe('Promo Codes', () => {
+    it('should create a promo code', async () => {
+      const mockPromo = { id: 'promo-1', code: 'SUMMER20' };
+      vi.mocked(marketingAutomationService.createPromoCode).mockResolvedValue(mockPromo);
+
+      const { req, res, next } = createMockReqRes({
+        params: { propertyId: 'prop-1' },
+        body: { code: 'SUMMER20', discountType: 'percentage', discountValue: 20 }
+      });
+
+      await marketingController.createPromoCode(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockPromo,
+        message: 'Promo code created'
+      });
+    });
+
+    it('should validate a promo code', async () => {
+      const mockResult = { valid: true, discount: 10 };
+      vi.mocked(marketingAutomationService.validatePromoCode).mockResolvedValue(mockResult);
+
+      const { req, res, next } = createMockReqRes({
+        params: { propertyId: 'prop-1' },
+        body: { code: 'SUMMER20', guestId: 'guest-1' }
+      });
+
+      await marketingController.validatePromoCode(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockResult
+      });
+    });
+  });
+
+  describe('cancelCampaign', () => {
+    it('should cancel campaign successfully', async () => {
+      const { cancelCampaign } = await import('../../../src/modules/marketing/marketing.controller.js');
+      const { req, res, next } = createMockReqRes({ params: { campaignId: 'c1' } });
+      
+      await cancelCampaign(req, res, next);
+      
+      expect(marketingAutomationService.cancelCampaign).toHaveBeenCalledWith('c1');
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, message: 'Campaign cancelled' }));
+    });
+  });
+
+  describe('createAutomation', () => {
+    it('should create automation successfully', async () => {
+      const { createAutomation } = await import('../../../src/modules/marketing/marketing.controller.js');
+      const { req, res, next } = createMockReqRes({ 
+        params: { propertyId: 'p1' },
+        body: { name: 'Welcome', triggerEvent: 'guest_checkin', templateId: 't1' }
+      });
+      
+      const mockAutomation = { id: 'a1', name: 'Welcome' };
+      vi.mocked(marketingAutomationService.createAutomation).mockResolvedValue(mockAutomation as any);
+      
+      await createAutomation(req, res, next);
+      
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, data: mockAutomation }));
+    });
+  });
+
+  describe('trackEmailOpen', () => {
+    it('should track email open and return pixel', async () => {
+      const { trackEmailOpen } = await import('../../../src/modules/marketing/marketing.controller.js');
+      const { req, res, next } = createMockReqRes({ params: { sendId: 's1' } });
+      
+      await trackEmailOpen(req, res, next);
+      
+      expect(marketingAutomationService.trackOpen).toHaveBeenCalled();
+      expect(res.set).toHaveBeenCalledWith('Content-Type', 'image/gif');
+      expect(res.send).toHaveBeenCalled();
+    });
+
+    it('should return pixel even if tracking fails', async () => {
+      const { trackEmailOpen } = await import('../../../src/modules/marketing/marketing.controller.js');
+      const { req, res, next } = createMockReqRes({ params: { sendId: 's1' } });
+      
+      vi.mocked(marketingAutomationService.trackOpen).mockRejectedValue(new Error('DB Error'));
+      
+      await trackEmailOpen(req, res, next);
+      
+      expect(res.set).toHaveBeenCalledWith('Content-Type', 'image/gif');
+      expect(res.send).toHaveBeenCalled();
+    });
+  });
+
+  describe('getAutomations', () => {
+    it('should return automations for a property', async () => {
+      const { getAutomations } = await import('../../../src/modules/marketing/marketing.controller.js');
+      const { req, res, next } = createMockReqRes({ params: { propertyId: 'p1' } });
+      
+      const mockAutomations = [{ id: 'a1', name: 'Welcome' }];
+      vi.mocked(marketingAutomationService.getAutomations).mockResolvedValue(mockAutomations as any);
+      
+      await getAutomations(req, res, next);
+      
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, data: mockAutomations }));
+    });
+  });
+
+  describe('triggerAutomation', () => {
+    it('should trigger automation manually', async () => {
+      const { triggerAutomation } = await import('../../../src/modules/marketing/marketing.controller.js');
+      const { req, res, next } = createMockReqRes({ 
+        params: { automationId: 'a1' },
+        body: { guestId: 'g1', triggerData: { x: 1 } }
+      });
+      
+      await triggerAutomation(req, res, next);
+      
+      expect(marketingAutomationService.triggerAutomation).toHaveBeenCalledWith('a1', 'g1', undefined, { x: 1 });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, message: 'Automation triggered' }));
     });
   });
 });

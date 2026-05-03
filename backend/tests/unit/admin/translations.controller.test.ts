@@ -74,6 +74,24 @@ vi.mock('../../../src/utils/logger.js', () => ({
   },
 }));
 
+vi.mock('fs', () => ({
+  promises: {
+    access: vi.fn().mockResolvedValue(undefined),
+    readdir: vi.fn().mockResolvedValue(['en.json', 'ar.json']),
+    readFile: vi.fn().mockImplementation((path) => {
+      if (path.endsWith('en.json')) return Promise.resolve(JSON.stringify({ common: { save: 'Save' } }));
+      if (path.endsWith('ar.json')) return Promise.resolve(JSON.stringify({ common: { save: 'حفظ' } }));
+      return Promise.resolve('{}');
+    }),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('path', () => ({
+  resolve: vi.fn().mockImplementation((...args) => args.join('/')),
+  join: vi.fn().mockImplementation((...args) => args.join('/')),
+}));
+
 import * as translationsController from '../../../src/modules/admin/translations.controller';
 import { translateText, getTranslationStatus } from '../../../src/services/translation.service';
 

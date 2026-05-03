@@ -208,4 +208,98 @@ describe('Admin Controller', () => {
      });
   });
 
+  describe('getAuditLogs', () => {
+    it('should return paginated activity logs', async () => {
+      const mockLogs = [{ id: 'l1', action: 'login', user_id: 'u1' }];
+      const queryBuilder = createChainableMock(mockLogs, null, 1);
+
+      vi.mocked(getSupabase).mockReturnValue({
+        from: vi.fn().mockReturnValue(queryBuilder)
+      } as any);
+
+      const { getAuditLogs } = await import('../../src/modules/admin/admin.controller.js');
+      const { req, res, next } = createMockReqRes({ query: { page: '1', limit: '10' } });
+
+      await getAuditLogs(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: mockLogs,
+        pagination: expect.any(Object)
+      }));
+    });
+  });
+
+  describe('getOverviewReport', () => {
+    it('should return overview stats', async () => {
+      const { getOverviewReport } = await import('../../src/modules/admin/admin.controller.js');
+      const { req, res, next } = createMockReqRes();
+
+      const mockSupabase = {
+        from: vi.fn().mockReturnValue(createChainableMock([{ id: 1 }])),
+        rpc: vi.fn().mockReturnValue(createChainableMock([{ id: 1 }]))
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      await getOverviewReport(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true
+      }));
+    });
+  });
+
+  describe('getOccupancyReport', () => {
+    it('should return occupancy stats', async () => {
+      const { getOccupancyReport } = await import('../../src/modules/admin/admin.controller.js');
+      const { req, res, next } = createMockReqRes({ query: { range: 'month' } });
+
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'chalets') return createChainableMock(null, null, 10);
+          if (table === 'chalet_bookings') return createChainableMock([{ number_of_nights: 5, status: 'confirmed' }]);
+          if (table === 'pool_sessions') return createChainableMock([{ max_capacity: 100 }]);
+          if (table === 'pool_tickets') return createChainableMock([{ number_of_guests: 10, status: 'confirmed' }]);
+          return createChainableMock([]);
+        })
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      await getOccupancyReport(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          chalets: expect.any(Object),
+          pool: expect.any(Object)
+        })
+      }));
+    });
+  });
+
+  describe('getCustomerAnalytics', () => {
+    it('should return customer analytics', async () => {
+      const { getCustomerAnalytics } = await import('../../src/modules/admin/admin.controller.js');
+      const { req, res, next } = createMockReqRes({ query: { range: 'month' } });
+
+      const mockTransactions = [
+        { customer_id: 'c1', customer_name: 'C1', total_amount: '100', created_at: new Date().toISOString() }
+      ];
+      
+      const mockSupabase = {
+        from: vi.fn().mockReturnValue(createChainableMock(mockTransactions))
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      await getCustomerAnalytics(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          topCustomers: expect.any(Array),
+          customerRetention: expect.any(Object)
+        })
+      }));
+    });
+  });
 });

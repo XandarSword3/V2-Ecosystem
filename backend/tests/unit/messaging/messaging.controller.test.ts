@@ -19,7 +19,12 @@ vi.mock('../../../src/modules/messaging/messaging.service', () => ({
     markConversationRead: vi.fn(),
     sendMessage: vi.fn(),
     getConversationMessages: vi.fn(),
+    getMessagingAnalytics: vi.fn(),
   },
+}));
+
+vi.mock('../../../src/database/connection.js', () => ({
+  getSupabase: vi.fn(),
 }));
 
 import { messagingService } from '../../../src/modules/messaging/messaging.service';
@@ -39,7 +44,11 @@ import {
   markConversationRead,
   sendMessage,
   getConversationMessages,
+  getMessagingAnalytics,
+  submitInquiry,
 } from '../../../src/modules/messaging/messaging.controller';
+import { getSupabase } from '../../../src/database/connection.js';
+import { createChainableMock } from '../utils';
 
 describe('Messaging Controller', () => {
   beforeEach(() => {
@@ -458,6 +467,60 @@ describe('Messaging Controller', () => {
 
         expect(messagingService.getConversationMessages).toHaveBeenCalledWith('conv-1', 1, 50);
       });
+    });
+  });
+
+  describe('Analytics', () => {
+    it('should return messaging analytics', async () => {
+      const mockAnalytics = { sent: 100, delivered: 95 };
+      vi.mocked(messagingService.getMessagingAnalytics).mockResolvedValue(mockAnalytics);
+
+      const { req, res, next } = createMockReqRes({
+        params: { propertyId: 'prop-1' },
+        query: { startDate: '2024-01-01', endDate: '2024-01-31' }
+      });
+
+      await getMessagingAnalytics(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith({ success: true, data: mockAnalytics });
+    });
+  });
+
+  describe('Public Inquiries', () => {
+    it('should submit inquiry successfully', async () => {
+      const mockInquiry = { id: 'inq-1' };
+      const mockSupabase = {
+        from: vi.fn().mockReturnValue(createChainableMock(mockInquiry))
+      };
+      vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
+
+      const { req, res, next } = createMockReqRes({
+        body: {
+          name: 'John Doe',
+          email: 'john@example.com',
+          subject: 'Question',
+          message: 'Hello world'
+        }
+      });
+
+      await submitInquiry(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockInquiry,
+        message: 'Inquiry submitted successfully'
+      });
+    });
+
+    it('should return 400 if required fields are missing', async () => {
+      const { req, res, next } = createMockReqRes({
+        body: { name: 'John' }
+      });
+
+      await submitInquiry(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(400);
     });
   });
 });

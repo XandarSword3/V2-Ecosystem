@@ -342,4 +342,50 @@ describe('LoyaltyController', () => {
       }));
     });
   });
+
+  // ── adjustPointsByAccountId ─────────────────────────────────
+
+  describe('adjustPointsByAccountId', () => {
+    it('should adjust points using accountId in params', async () => {
+      resolveQueue = [
+        { data: [{ success: true, adjustment: 100, new_balance: 500, tier_name: 'Gold' }], error: null },
+      ];
+      const req = createReq({
+        params: { accountId: 'acc-123' },
+        body: { points: 100, reason: 'Admin reward' }
+      });
+      const res = createRes();
+
+      await controller.adjustPointsByAccountId(req, res);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({ adjustment: 100, newBalance: 500 })
+      }));
+    });
+  });
+
+  // ── getStats ────────────────────────────────────────────────
+
+  describe('getStats', () => {
+    it('should return loyalty statistics', async () => {
+      resolveQueue = [
+        { count: 10, error: null }, // totalMembers count
+        { data: [{ tier_id: 't1', loyalty_tiers: { name: 'Bronze' } }], error: null }, // tierStats
+        { data: [{ available_points: 1000, lifetime_points: 2000 }], error: null }, // pointsData
+      ];
+      const req = createReq();
+      const res = createRes();
+
+      await controller.getStats(req, res);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          summary: expect.objectContaining({
+            total_members: 10,
+            total_outstanding_points: 1000
+          })
+        })
+      }));
+    });
+  });
 });

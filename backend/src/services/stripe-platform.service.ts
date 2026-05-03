@@ -244,7 +244,7 @@ export class StripePlatformService {
     // Get or create customer
     const customer = await this.getOrCreateCustomer(userId, receiptEmail);
 
-    // Create PaymentIntent with platform-specific metadata
+    // Create PaymentIntent with platform-specific metadata and idempotency key
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: currency.toLowerCase(),
@@ -274,6 +274,9 @@ export class StripePlatformService {
       },
       // Capture method - can be changed to 'manual' for auth-then-capture flow
       capture_method: 'automatic',
+    }, {
+      // FIX Iteration 10: Use idempotency key to prevent double charges on retries/loops
+      idempotencyKey: `pi_${referenceType}_${referenceId}_${amount}`,
     });
 
     logger.info(`PaymentIntent created`, {
