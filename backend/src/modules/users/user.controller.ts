@@ -56,7 +56,7 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
       .select(`
         id, email, full_name, phone, profile_image_url, preferred_language, 
         is_active, created_at, updated_at,
-        user_roles!left(role:roles(name))
+        user_roles!user_id!left(role:roles(name))
       `)
       .eq('id', userId)
       .single();
@@ -168,7 +168,7 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
       .from('users')
       .select(`
         id, email, full_name, phone, profile_image_url, is_active, created_at, updated_at,
-        user_roles!left(role:roles(id, name))
+        user_roles!user_id!left(role:roles(id, name))
       `, { count: 'exact' });
 
     if (search) {
@@ -242,7 +242,7 @@ export const getUserById = asyncHandler(async (req: Request, res: Response) => {
       .select(`
         id, email, full_name, phone, profile_image_url, preferred_language,
         is_active, created_at, updated_at, last_login_at,
-        user_roles!left(role:roles(id, name, display_name))
+        user_roles!user_id!left(role:roles(id, name, display_name))
       `)
       .eq('id', id)
       .single();
