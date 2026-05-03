@@ -276,7 +276,8 @@ export class StripePlatformService {
       capture_method: 'automatic',
     }, {
       // FIX Iteration 10: Use idempotency key to prevent double charges on retries/loops
-      idempotencyKey: `pi_${referenceType}_${referenceId}_${amount}`,
+      // Amount is excluded to protect against scenarios where retries might have different amounts (e.g. discount changes)
+      idempotencyKey: `pi_${referenceType}_${referenceId}`,
     });
 
     logger.info(`PaymentIntent created`, {

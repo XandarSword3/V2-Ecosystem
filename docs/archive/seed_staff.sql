@@ -29,10 +29,9 @@ SELECT
   true
 FROM new_users
 ON CONFLICT (email) DO UPDATE SET
-  password_hash = EXCLUDED.password_hash,
   email_verified = true,
   is_active = true
-RETURNING id, email;
+RETURNING id, email
 )
 INSERT INTO user_roles (user_id, role_id)
 SELECT 

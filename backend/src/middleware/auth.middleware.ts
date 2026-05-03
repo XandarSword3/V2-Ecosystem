@@ -3,7 +3,39 @@ import { verifyToken } from "../modules/auth/auth.utils.js";
 import { getSupabase } from "../database/connection.js";
 import { asyncHandler } from "./async-handler.js";
 import { logger } from "../utils/logger.js";
-// Express Request type extension is defined in src/types/index.ts
+import { cache } from "../utils/cache.js";
+
+// Cache TTL for user status in seconds
+const USER_STATUS_CACHE_TTL = 30;
+
+/**
+ * Helper to fetch and cache user authentication status
+ */
+async function getUserStatus(userId: string) {
+  const cacheKey = `user_auth_status:${userId}`;
+  
+  // Try to get from cache first
+  const cached = await cache.get<{ token_version: number; is_active: boolean }>(cacheKey);
+  if (cached) return cached;
+
+  const supabase = getSupabase();
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('token_version, is_active')
+    .eq('id', userId)
+    .single();
+
+  if (error || !user) return null;
+
+  const status = {
+    token_version: user.token_version ?? 0,
+    is_active: !!user.is_active
+  };
+
+  // Cache for a short duration
+  await cache.set(cacheKey, status, USER_STATUS_CACHE_TTL);
+  return status;
+}
 
 export const authenticate = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -28,16 +60,11 @@ export const authenticate = asyncHandler(async (req: Request, res: Response, nex
   
   // Security Hardening: Check token version against database
   // This allows global session invalidation and per-user session killing
-  const supabase = getSupabase();
-  const { data: user, error } = await supabase
-    .from('users')
-    .select('token_version, is_active')
-    .eq('id', payload.userId)
-    .single();
+  const user = await getUserStatus(payload.userId);
 
-  if (error || !user) {
-    logger.warn('Auth failure: User not found or DB error', { userId: payload.userId });
-    return res.status(401).json({ success: false, error: 'User not found' });
+  if (!user) {
+    logger.warn('Auth failure: User not found or inactive', { userId: payload.userId });
+    return res.status(401).json({ success: false, error: 'Account not found or session invalid' });
   }
 
   if (!user.is_active) {
@@ -45,8 +72,9 @@ export const authenticate = asyncHandler(async (req: Request, res: Response, nex
     return res.status(401).json({ success: false, error: 'Account deactivated' });
   }
 
-  // If token version doesn't match current DB version, it's a stale session
-  if (payload.tokenVersion !== undefined && user.token_version !== undefined && payload.tokenVersion < user.token_version) {
+  // If token version is missing or doesn't match current DB version, it's a stale session
+  // Bug fix: missing version should be treated as stale, and use strict inequality
+  if (payload.tokenVersion === undefined || payload.tokenVersion !== user.token_version) {
     logger.warn('Auth failure: Stale session (version mismatch)', { 
       userId: payload.userId, 
       tokenVer: payload.tokenVersion, 
@@ -144,16 +172,23 @@ export function requireDbPermission(permissionSlug: string) {
   };
 }
 
-export function optionalAuth(req: Request, res: Response, next: NextFunction) {
+export const optionalAuth = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
       const payload = verifyToken(token);
-      req.user = { ...payload, id: payload.userId };
+      
+      // Still perform the DB check to ensure token is valid and version is current
+      const user = await getUserStatus(payload.userId);
+      
+      if (user && user.is_active && payload.tokenVersion !== undefined && payload.tokenVersion === user.token_version) {
+        req.user = { ...payload, id: payload.userId };
+      }
     }
-  } catch {
-    // Token invalid, continue without user
+  } catch (err) {
+    // Token invalid or session stale, continue without user
+    // We don't log warnings for optionalAuth failures to avoid log noise
   }
   next();
-}
+});
