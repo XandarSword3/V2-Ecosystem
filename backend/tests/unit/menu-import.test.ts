@@ -41,12 +41,18 @@ describe('Menu Import Parsers', () => {
 
   describe('parseCsvImport', () => {
     it('should parse CSV buffer into items', async () => {
-      const csvContent = 'name,price,category\nPizza,12.99,Main\nSalad,8.50,Side';
+      const csvContent = 'name,price,category,allergens\nPizza,12.99,Main,"gluten,dairy"\nSalad,8.50,Side,\n,invalid,Category';
       const buffer = Buffer.from(csvContent);
       const result = await parser.parseCsvImport(buffer);
+      
+      expect(result.totalParsed).toBe(3);
       expect(result.successful).toBe(2);
       expect(result.items[0].name).toBe('Pizza');
+      expect(result.items[0].allergens).toContain('gluten');
+      expect(result.items[0].allergens).toContain('dairy');
       expect(result.items[1].category).toBe('Side');
+      expect(result.errors.length).toBe(1);
+      expect(result.errors[0]).toContain('Row 4: Missing required field: name');
     });
   });
 
