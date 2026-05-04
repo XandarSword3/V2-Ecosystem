@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
@@ -35,6 +36,7 @@ import {
   Timer,
   TrendingUp,
   BarChart3,
+  Upload,
 } from 'lucide-react';
 
 interface Task {
@@ -88,6 +90,7 @@ interface StaffPerformance {
 }
 
 export default function HousekeepingAdminPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('tasks');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
@@ -290,6 +293,10 @@ export default function HousekeepingAdminPage() {
           <Button onClick={() => loadData()} variant="outline" className="gap-2">
             <RefreshCw className="w-4 h-4" />
             Refresh
+          </Button>
+          <Button onClick={() => router.push('/admin/housekeeping/import')} variant="outline" className="gap-2">
+            <Upload className="w-4 h-4" />
+            Import Templates
           </Button>
           <Button onClick={() => setShowCreateModal(true)} className="gap-2">
             <Plus className="w-4 h-4" />

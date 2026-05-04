@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { api, API_BASE_URL } from '@/lib/api';
@@ -30,6 +31,7 @@ import {
   Medal,
   Award,
   ChevronRight,
+  Upload,
 } from 'lucide-react';
 
 interface LoyaltyTier {
@@ -112,6 +114,7 @@ interface LoyaltySettings {
 }
 
 export default function LoyaltyAdminPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [tiers, setTiers] = useState<LoyaltyTier[]>([]);
   const [accounts, setAccounts] = useState<LoyaltyAccount[]>([]);
@@ -456,7 +459,11 @@ export default function LoyaltyAdminPage() {
 
         {/* Tiers Tab */}
         <TabsContent value="tiers" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => router.push('/admin/loyalty/import')}>
+              <Upload className="w-4 h-4 mr-2" />
+              Import
+            </Button>
             <Button onClick={() => { setEditingTier(null); setShowTierModal(true); }}>
               <Plus className="w-4 h-4 mr-2" />
               Add Tier

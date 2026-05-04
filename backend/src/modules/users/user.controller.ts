@@ -51,12 +51,12 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
 
     const supabase = getSupabase();
     
+    // Fetch user data
     const { data: user, error } = await supabase
       .from('users')
       .select(`
         id, email, full_name, phone, profile_image_url, preferred_language, 
-        is_active, created_at, updated_at,
-        user_roles!user_id!left(role:roles(name))
+        is_active, created_at, updated_at
       `)
       .eq('id', userId)
       .single();
@@ -66,15 +66,20 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
       return;
     }
 
-    // Extract role names - Supabase joins return arrays
-    interface RoleJoinData { role?: { name: string }[] | { name: string } | null }
-    const userData = user as typeof user & { user_roles?: RoleJoinData[] };
-    const roles = userData.user_roles?.map(ur => {
-      const role = ur.role;
-      if (!role) return undefined;
-      if (Array.isArray(role)) return role[0]?.name;
-      return (role as { name: string }).name;
-    }).filter(Boolean) as string[] || [];
+    // Fetch user roles separately
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('role:roles(name)')
+      .eq('user_id', userId);
+
+    // Extract role names
+    interface RoleData { name: string }
+    const roles = (userRoles || [])
+      .map((ur: { role?: RoleData | RoleData[] | null }) => {
+        const role = Array.isArray(ur.role) ? ur.role[0] : ur.role;
+        return role?.name;
+      })
+      .filter((name: string | undefined): name is string => Boolean(name)) || [];
 
     res.json({
       success: true,
@@ -167,8 +172,7 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
     let query = supabase
       .from('users')
       .select(`
-        id, email, full_name, phone, profile_image_url, is_active, created_at, updated_at,
-        user_roles!user_id!left(role:roles(id, name))
+        id, email, full_name, phone, profile_image_url, is_active, created_at, updated_at
       `, { count: 'exact' });
 
     if (search) {
@@ -190,9 +194,8 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
       return;
     }
 
-    // Process users to extract roles - Supabase joins return arrays
-    interface RoleJoinData { role?: { id: string; name: string }[] | { id: string; name: string } | null }
-    const processedUsers = ((users || []) as Array<typeof users[0] & { user_roles?: RoleJoinData[] }>).map(user => ({
+    // Return users without roles for list view (roles available in detail view)
+    const processedUsers = (users || []).map(user => ({
       id: user.id,
       email: user.email,
       full_name: user.full_name,
@@ -201,12 +204,7 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
       is_active: user.is_active,
       created_at: user.created_at,
       updated_at: user.updated_at,
-      roles: user.user_roles?.map(ur => {
-        const role = ur.role;
-        if (!role) return undefined;
-        if (Array.isArray(role)) return role[0]?.name;
-        return (role as { name: string }).name;
-      }).filter(Boolean) || []
+      roles: [] as string[]
     }));
 
     res.json({
@@ -237,12 +235,12 @@ export const getUserById = asyncHandler(async (req: Request, res: Response) => {
 
     const supabase = getSupabase();
     
+    // Fetch user data
     const { data: user, error } = await supabase
       .from('users')
       .select(`
         id, email, full_name, phone, profile_image_url, preferred_language,
-        is_active, created_at, updated_at, last_login_at,
-        user_roles!user_id!left(role:roles(id, name, display_name))
+        is_active, created_at, updated_at, last_login_at
       `)
       .eq('id', id)
       .single();
@@ -252,11 +250,16 @@ export const getUserById = asyncHandler(async (req: Request, res: Response) => {
       return;
     }
 
-    // Extract roles - Supabase joins return arrays
-    interface RoleJoinData { role?: { id: string; name: string; display_name: string }[] | { id: string; name: string; display_name: string } | null }
-    const userData = user as typeof user & { user_roles?: RoleJoinData[] };
-    const roles = userData.user_roles
-      ?.map(ur => {
+    // Fetch user roles separately
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('role:roles(id, name, display_name)')
+      .eq('user_id', id);
+
+    // Extract roles
+    interface RoleData { id: string; name: string; display_name: string }
+    const roles = (userRoles || [])
+      .map((ur: { role?: RoleData | RoleData[] | null }) => {
         const role = Array.isArray(ur.role) ? ur.role[0] : ur.role;
         return role ? { id: role.id, name: role.name, displayName: role.display_name } : null;
       })
