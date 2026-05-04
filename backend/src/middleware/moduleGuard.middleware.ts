@@ -94,38 +94,3 @@ export function requireModule(moduleSlug: string) {
   };
 }
 
-/**
- * Map of route prefixes to module slugs
- */
-export const moduleRouteMap: Record<string, string> = {
-  '/api/restaurant': 'restaurant',
-  '/api/pool': 'pool',
-  '/api/chalets': 'chalets',
-  '/api/snack': 'snack-bar'
-};
-
-/**
- * Dynamic module guard that checks the route prefix
- * Use this as a catch-all middleware
- */
-export async function dynamicModuleGuard(req: Request, res: Response, next: NextFunction) {
-  const path = req.path;
-  
-  for (const [prefix, moduleSlug] of Object.entries(moduleRouteMap)) {
-    if (path.startsWith(prefix.replace('/api', ''))) {
-      const isActive = await getModuleStatus(moduleSlug);
-      
-      if (!isActive) {
-        logger.info(`Blocked request to disabled module: ${moduleSlug}, path: ${path}`);
-        return res.status(503).json({
-          success: false,
-          error: 'This feature is currently unavailable',
-          code: 'MODULE_DISABLED'
-        });
-      }
-      break;
-    }
-  }
-  
-  next();
-}
