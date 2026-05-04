@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { couponController } from './coupon.controller.js';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import couponImportRoutes from './coupon-import.routes.js';
 
 const router = Router();
 
@@ -19,5 +20,8 @@ router.get('/:id', authenticate, authorize('admin', 'super_admin'), couponContro
 router.post('/', authenticate, authorize('admin', 'super_admin'), couponController.createCoupon.bind(couponController));
 router.put('/:id', authenticate, authorize('admin', 'super_admin'), couponController.updateCoupon.bind(couponController));
 router.delete('/:id', authenticate, authorize('admin', 'super_admin'), couponController.deleteCoupon.bind(couponController));
+
+// Import routes
+router.use('/import', couponImportRoutes);
 
 export default router;

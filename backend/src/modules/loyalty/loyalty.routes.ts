@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { loyaltyController } from './loyalty.controller';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import loyaltyImportRoutes from './loyalty-import.routes.js';
 
 const router = Router();
 
@@ -39,5 +40,8 @@ router.put('/tiers/:tierId', authenticate, authorize('admin', 'super_admin'), lo
 // FIX: Iteration 3 - Add POST /tiers and DELETE /tiers/:tierId (frontend admin panel needs full tier CRUD)
 router.post('/tiers', authenticate, authorize('admin', 'super_admin'), loyaltyController.createTier.bind(loyaltyController));
 router.delete('/tiers/:tierId', authenticate, authorize('admin', 'super_admin'), loyaltyController.deleteTier.bind(loyaltyController));
+
+// Import routes
+router.use('/import', loyaltyImportRoutes);
 
 export default router;

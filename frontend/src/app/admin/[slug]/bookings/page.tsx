@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
@@ -28,6 +28,7 @@ import {
   LogOut,
   Eye,
   X,
+  Upload,
 } from 'lucide-react';
 
 interface Booking {
@@ -71,6 +72,7 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
 
 export default function DynamicBookingsPage() {
   const params = useParams();
+  const router = useRouter();
   const { modules } = useSiteSettings();
   const tc = useTranslations('adminCommon');
   const rawSlug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
@@ -153,10 +155,16 @@ export default function DynamicBookingsPage() {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentModule.name} {tc('bookings.title')}</h1>
           <p className="text-slate-500 dark:text-slate-400">{tc('bookings.manageReservations')}</p>
         </div>
-        <Button variant="outline" onClick={() => fetchBookings()}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          {tc('refresh')}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => fetchBookings()}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            {tc('refresh')}
+          </Button>
+          <Button variant="outline" onClick={() => router.push(`/admin/${currentModule?.slug}/chalets/import`)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
