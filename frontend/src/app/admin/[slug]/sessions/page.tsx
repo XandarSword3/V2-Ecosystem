@@ -213,10 +213,9 @@ export default function DynamicSessionsPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => router.push(`/admin/${slug}/pool/import`)}
-            className="flex items-center gap-2"
+            onClick={() => router.push(`/admin/${slug}/sessions/import`)}
           >
-            <Upload className="w-4 h-4" />
+            <Upload className="w-4 h-4 mr-2" />
             Import
           </Button>
           <Button onClick={openCreateModal} className="flex items-center gap-2 bg-gradient-to-r from-primary-500 to-secondary-600 text-white">
