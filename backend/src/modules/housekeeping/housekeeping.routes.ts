@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { housekeepingController } from './housekeeping.controller.js';
 import { housekeepingAdvancedController } from './housekeeping-advanced.controller.js';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import housekeepingImportRoutes from './housekeeping-import.routes.js';
 
 const router = Router();
 
@@ -63,5 +64,8 @@ router.put('/tasks/:taskId/supplies', ...adminAuth, housekeepingAdvancedControll
 router.get('/room-readiness', ...adminAuth, housekeepingAdvancedController.getRoomReadinessDashboard.bind(housekeepingAdvancedController));
 router.get('/staff-workload', ...adminAuth, housekeepingAdvancedController.getStaffWorkload.bind(housekeepingAdvancedController));
 router.post('/auto-assign', ...adminAuth, housekeepingAdvancedController.autoAssignTasks.bind(housekeepingAdvancedController));
+
+// Import routes
+router.use('/import', housekeepingImportRoutes);
 
 export default router;
