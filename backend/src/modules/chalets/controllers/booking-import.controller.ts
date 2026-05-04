@@ -1,13 +1,14 @@
 /**
- * Chalets Import Controller
+ * Booking Engine Import Controller (multi_day_booking engine type)
+ * Handles imports for chalets, accommodations, and any multi_day_booking module
  */
 
 import { Request, Response } from 'express';
 import { asyncHandler } from '../../../middleware/async-handler.js';
-import * as parser from '../services/chalet-import.parser.js';
+import * as parser from '../services/booking-import.parser.js';
 import { getSupabase } from '../../../database/connection.js';
 import { logger } from '../../../utils/logger.js';
-import { ImportedChalet, ChaletCommitImportRequest } from '../types/chalet-import.types.js';
+import { ImportedAccommodation, BookingCommitImportRequest } from '../types/booking-import.types.js';
 
 /**
  * Parse chalet import data
@@ -49,8 +50,7 @@ export const parseImport = asyncHandler(async (req: Request, res: Response) => {
  * Commit chalets to database
  */
 export const commitImport = asyncHandler(async (req: Request, res: Response) => {
-  const { items, moduleId: _moduleId } = req.body as ChaletCommitImportRequest;
-  // _moduleId is available if schema supports module linkage in future
+  const { items, moduleId } = req.body as BookingCommitImportRequest;
 
   if (!items || !Array.isArray(items)) {
     return res.status(400).json({ success: false, error: 'Missing required items array' });
@@ -65,9 +65,9 @@ export const commitImport = asyncHandler(async (req: Request, res: Response) => 
     addOnsCreated: 0,
   };
 
-  const importPromises = items.map(async (item: ImportedChalet) => {
-    // Create the chalet
-    // Note: Schema doesn't have module_id on chalets table - moduleId is ignored
+  const importPromises = items.map(async (item: ImportedAccommodation) => {
+    // Create the accommodation with module linkage
+    // All multi_day_booking items are linked to their module via module_id
     const { data: chalet, error: chaletError } = await supabase
       .from('chalets')
       .insert({
@@ -81,8 +81,7 @@ export const commitImport = asyncHandler(async (req: Request, res: Response) => 
         amenities: item.amenities || [],
         images: item.images || [],
         is_active: item.isActive !== undefined ? item.isActive : true,
-        // Note: weeklyDiscount is not in chalets table - stored in chalet_price_rules
-        // policies fields are not in chalets table schema - would need schema extension
+        module_id: moduleId, // Engine-type based: links to the module
       })
       .select()
       .single();

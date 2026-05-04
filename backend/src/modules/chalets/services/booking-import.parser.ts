@@ -1,8 +1,8 @@
 /**
- * Chalets Import Parser
+ * Booking Engine Import Parser (multi_day_booking engine type)
  */
 
-import { ImportedChalet, ChaletImportResult, ChaletAddOn, ChaletPolicy } from '../types/chalet-import.types.js';
+import { ImportedAccommodation, BookingImportResult, AccommodationAddOn, AccommodationPolicy } from '../types/booking-import.types.js';
 import { logger } from '../../../utils/logger.js';
 import { callLlmParser, LLM_SYSTEM_PROMPTS } from '../../shared/import/llm-parser.utils.js';
 
@@ -44,7 +44,7 @@ function parseAmenities(raw: unknown): string[] | undefined {
   return undefined;
 }
 
-function parseAddOns(raw: unknown): ChaletAddOn[] | undefined {
+function parseAddOns(raw: unknown): AccommodationAddOn[] | undefined {
   if (!raw || !Array.isArray(raw)) return undefined;
 
   return raw.map((addon: Record<string, unknown>) => ({
@@ -55,11 +55,11 @@ function parseAddOns(raw: unknown): ChaletAddOn[] | undefined {
   }));
 }
 
-function parsePolicies(raw: unknown): ChaletPolicy | undefined {
+function parsePolicies(raw: unknown): AccommodationPolicy | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
 
   const policy = raw as Record<string, unknown>;
-  const result: ChaletPolicy = {};
+  const result: AccommodationPolicy = {};
 
   if (policy.checkInTime || policy.check_in_time || policy.checkin) {
     result.checkInTime = convertTo24Hour(String(policy.checkInTime || policy.check_in_time || policy.checkin));
@@ -89,7 +89,7 @@ function parseImages(raw: unknown): string[] | undefined {
   return undefined;
 }
 
-function validateAndMapItem(raw: Record<string, unknown>): ImportedChalet {
+function validateAndMapItem(raw: Record<string, unknown>): ImportedAccommodation {
   const warnings: string[] = [];
 
   const name = raw.name || raw.Name;
@@ -146,12 +146,12 @@ function validateAndMapItem(raw: Record<string, unknown>): ImportedChalet {
   };
 }
 
-export function parseJsonImport(rawData: unknown): ChaletImportResult {
+export function parseJsonImport(rawData: unknown): BookingImportResult {
   if (!rawData || typeof rawData !== 'object') {
     return { items: [], warnings: [], errors: ['Invalid JSON: Expected an object or array'], totalParsed: 0, successful: 0 };
   }
 
-  const items: ImportedChalet[] = [];
+  const items: ImportedAccommodation[] = [];
   const warnings: string[] = [];
   const errors: string[] = [];
   let dataArray: Record<string, unknown>[] = [];
@@ -190,7 +190,7 @@ export function parseJsonImport(rawData: unknown): ChaletImportResult {
   };
 }
 
-export async function parseLlmImport(userInput: string): Promise<ChaletImportResult> {
+export async function parseLlmImport(userInput: string): Promise<BookingImportResult> {
   try {
     const rawJson = await callLlmParser(LLM_SYSTEM_PROMPTS.chalets, userInput);
     return parseJsonImport(rawJson);

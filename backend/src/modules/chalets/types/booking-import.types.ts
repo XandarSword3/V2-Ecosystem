@@ -1,15 +1,16 @@
 /**
- * Chalets Import Type Definitions
+ * Booking Engine Import Type Definitions (multi_day_booking engine type)
+ * Handles chalets, accommodations, rooms, villas, etc.
  */
 
-export interface ChaletAddOn {
+export interface AccommodationAddOn {
   name: string;
   price: number;
   pricingType: 'per_night' | 'one_time' | 'per_person';
   description?: string;
 }
 
-export interface ChaletPolicy {
+export interface AccommodationPolicy {
   checkInTime?: string;
   checkOutTime?: string;
   cancellationHours?: number;
@@ -17,7 +18,7 @@ export interface ChaletPolicy {
   smokingAllowed?: boolean;
 }
 
-export interface ImportedChalet {
+export interface ImportedAccommodation {
   name: string;
   description?: string;
   maxGuests: number;
@@ -27,8 +28,8 @@ export interface ImportedChalet {
   weekendPrice?: number;
   weeklyDiscount?: number;
   amenities?: string[];
-  policies?: ChaletPolicy;
-  addOns?: ChaletAddOn[];
+  policies?: AccommodationPolicy;
+  addOns?: AccommodationAddOn[];
   images?: string[];
   isActive?: boolean;
   // Internal tracking
@@ -36,15 +37,15 @@ export interface ImportedChalet {
   _parseWarnings?: string[];
 }
 
-export interface ChaletImportResult {
-  items: ImportedChalet[];
+export interface BookingImportResult {
+  items: ImportedAccommodation[];
   warnings: string[];
   errors: string[];
   totalParsed: number;
   successful: number;
 }
 
-export interface ChaletCommitImportRequest {
-  items: ImportedChalet[];
+export interface BookingCommitImportRequest {
+  items: ImportedAccommodation[];
   moduleId?: string;
 }
