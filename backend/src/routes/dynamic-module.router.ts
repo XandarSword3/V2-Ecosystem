@@ -155,7 +155,7 @@ function buildMenuServiceRouter(router: Router): void {
       });
 
       const { data: created, error: createError } = await supabase
-        .from('restaurant_orders')
+        .from('orders')
         .insert({
           module_id: mounted.id,
           customer_id: req.user?.userId ?? null,
@@ -183,7 +183,7 @@ function buildMenuServiceRouter(router: Router): void {
 
       const supabase = getSupabase();
       const { data, error } = await supabase
-        .from('restaurant_orders')
+        .from('orders')
         .select('id, customer_id, status, total_amount, created_at')
         .eq('module_id', mounted.id)
         .order('created_at', { ascending: false })
@@ -206,7 +206,7 @@ function buildMenuServiceRouter(router: Router): void {
 
       const supabase = getSupabase();
       const { data, error } = await supabase
-        .from('restaurant_orders')
+        .from('orders')
         .select('id, customer_id, status, total_amount, created_at')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -235,7 +235,7 @@ function buildMenuServiceRouter(router: Router): void {
 
       const supabase = getSupabase();
       const { data: current, error: currentError } = await supabase
-        .from('restaurant_orders')
+        .from('orders')
         .select('id, status')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -257,7 +257,7 @@ function buildMenuServiceRouter(router: Router): void {
       }
 
       const { data, error } = await supabase
-        .from('restaurant_orders')
+        .from('orders')
         .update({ status: transition.targetState, updated_at: new Date().toISOString() })
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -284,7 +284,7 @@ function buildMultiDayBookingRouter(router: Router): void {
       const supabase = getSupabase();
       const { start, end } = req.query;
       let query = supabase
-        .from('chalets')
+        .from('bookable_units')
         .select('id, name, is_available, module_id')
         .eq('module_id', mounted.id);
 
@@ -309,29 +309,29 @@ function buildMultiDayBookingRouter(router: Router): void {
       }
 
       const supabase = getSupabase();
-      const { chalet_id, check_in_date, check_out_date, total_amount } = req.body ?? {};
-      if (!chalet_id || !check_in_date || !check_out_date) {
-        return res.status(400).json({ success: false, error: 'chalet_id, check_in_date and check_out_date are required' });
+      const { unit_id, check_in_date, check_out_date, total_amount } = req.body ?? {};
+      if (!unit_id || !check_in_date || !check_out_date) {
+        return res.status(400).json({ success: false, error: 'unit_id, check_in_date and check_out_date are required' });
       }
 
       const pricing = await engineService.calculatePricing(
         mounted.template_type,
-        [{ itemId: String(chalet_id), name: 'booking', quantity: 1, unitPrice: asNumber(total_amount, 0) }],
+        [{ itemId: String(unit_id), name: 'booking', quantity: 1, unitPrice: asNumber(total_amount, 0) }],
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
 
       const { data, error } = await supabase
-        .from('chalet_bookings')
+        .from('bookings')
         .insert({
           module_id: mounted.id,
-          chalet_id,
+          unit_id,
           customer_id: req.user?.userId ?? null,
           check_in_date,
           check_out_date,
           status: 'pending',
           total_amount: pricing.totalAmount,
         })
-        .select('id, module_id, chalet_id, customer_id, status, total_amount')
+        .select('id, module_id, unit_id, customer_id, status, total_amount')
         .single();
 
       if (error) throw error;
@@ -350,8 +350,8 @@ function buildMultiDayBookingRouter(router: Router): void {
       }
       const supabase = getSupabase();
       const { data, error } = await supabase
-        .from('chalet_bookings')
-        .select('id, chalet_id, customer_id, status, total_amount, check_in_date, check_out_date')
+        .from('bookings')
+        .select('id, unit_id, customer_id, status, total_amount, check_in_date, check_out_date')
         .eq('module_id', mounted.id)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -371,8 +371,8 @@ function buildMultiDayBookingRouter(router: Router): void {
       }
       const supabase = getSupabase();
       const { data, error } = await supabase
-        .from('chalet_bookings')
-        .select('id, chalet_id, customer_id, status, total_amount, check_in_date, check_out_date')
+        .from('bookings')
+        .select('id, unit_id, customer_id, status, total_amount, check_in_date, check_out_date')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .maybeSingle();
@@ -398,7 +398,7 @@ function buildMultiDayBookingRouter(router: Router): void {
 
       const supabase = getSupabase();
       const { data: current, error: currentError } = await supabase
-        .from('chalet_bookings')
+        .from('bookings')
         .select('id, status')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -420,7 +420,7 @@ function buildMultiDayBookingRouter(router: Router): void {
       }
 
       const { data, error } = await supabase
-        .from('chalet_bookings')
+        .from('bookings')
         .update({ status: transition.targetState, updated_at: new Date().toISOString() })
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -445,7 +445,7 @@ function buildSessionAccessRouter(router: Router): void {
       }
       const supabase = getSupabase();
       const { data, error } = await supabase
-        .from('pool_sessions')
+        .from('sessions')
         .select('id, name, date, start_time, end_time, max_capacity, current_count, module_id')
         .eq('module_id', mounted.id)
         .order('date', { ascending: true });
@@ -478,7 +478,7 @@ function buildSessionAccessRouter(router: Router): void {
       );
 
       const { data, error } = await supabase
-        .from('pool_tickets')
+        .from('tickets')
         .insert({
           module_id: mounted.id,
           session_id,
@@ -505,7 +505,7 @@ function buildSessionAccessRouter(router: Router): void {
       }
       const supabase = getSupabase();
       const { data, error } = await supabase
-        .from('pool_tickets')
+        .from('tickets')
         .select('id, session_id, customer_id, status, total_amount, created_at')
         .eq('module_id', mounted.id)
         .order('created_at', { ascending: false })
@@ -526,7 +526,7 @@ function buildSessionAccessRouter(router: Router): void {
       }
       const supabase = getSupabase();
       const { data, error } = await supabase
-        .from('pool_tickets')
+        .from('tickets')
         .select('id, session_id, customer_id, status, total_amount, created_at')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -548,7 +548,7 @@ function buildSessionAccessRouter(router: Router): void {
       }
       const supabase = getSupabase();
       const { data: ticket, error: readError } = await supabase
-        .from('pool_tickets')
+        .from('tickets')
         .select('id, status')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -569,7 +569,7 @@ function buildSessionAccessRouter(router: Router): void {
       }
 
       const { data, error } = await supabase
-        .from('pool_tickets')
+        .from('tickets')
         .update({ status: transition.targetState, validated_at: new Date().toISOString() })
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)

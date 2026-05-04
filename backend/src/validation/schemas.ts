@@ -237,10 +237,7 @@ export const createUserSchema = z.object({
   phone: phoneSchema,
   roles: z.array(z.enum([
     'customer', 'admin', 'super_admin',
-    'restaurant_staff', 'restaurant_admin',
-    'chalet_staff', 'chalet_admin',
-    'pool_staff', 'pool_admin',
-    'snack_bar_staff', 'snack_bar_admin'
+    'staff', 'manager'
   ])).min(1, 'At least one role is required').default(['customer']),
 });
 

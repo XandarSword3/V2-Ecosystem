@@ -8,7 +8,7 @@ const router = Router();
 router.use(authenticate);
 
 // Staff roles that can access module operations
-const staffRoles = ['admin', 'super_admin', 'manager', 'hotel_staff', 'restaurant_staff', 'pool_staff', 'housekeeping'];
+const staffRoles = ['admin', 'super_admin', 'manager', 'staff'];
 
 // Unified scanner + staff customer lookup
 router.post('/scan', authorize(...staffRoles), moduleStaffController.scanCode);
