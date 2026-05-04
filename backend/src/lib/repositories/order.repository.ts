@@ -1,38 +1,38 @@
 /**
- * Restaurant Repository - Supabase Implementation
+ * Order Repository - Supabase Implementation
  * 
- * Handles all database operations for restaurant orders, menu items, and tables.
+ * Handles all database operations for orders and tables.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { 
-  RestaurantRepository, 
-  RestaurantOrder, 
-  RestaurantOrderItem, 
+  OrderRepository, 
+  Order, 
+  OrderItem, 
   RestaurantMenuItem, 
   RestaurantTable 
 } from '../container/types.js';
 
-export function createRestaurantRepository(supabase: SupabaseClient): RestaurantRepository {
+export function createOrderRepository(supabase: SupabaseClient): OrderRepository {
   return {
     // ============================================
     // ORDER OPERATIONS
     // ============================================
 
-    async createOrder(order: Omit<RestaurantOrder, 'id' | 'created_at' | 'updated_at'>): Promise<RestaurantOrder> {
+    async createOrder(order: Omit<Order, 'id' | 'created_at' | 'updated_at'>): Promise<Order> {
       const { data, error } = await supabase
-        .from('restaurant_orders')
+        .from('orders')
         .insert(order)
         .select()
         .single();
 
       if (error) throw error;
-      return data as RestaurantOrder;
+      return data as Order;
     },
 
-    async getOrderById(id: string): Promise<RestaurantOrder | null> {
+    async getOrderById(id: string): Promise<Order | null> {
       const { data, error } = await supabase
-        .from('restaurant_orders')
+        .from('orders')
         .select('*')
         .eq('id', id)
         .single();
@@ -41,12 +41,12 @@ export function createRestaurantRepository(supabase: SupabaseClient): Restaurant
         if (error.code === 'PGRST116') return null;
         throw error;
       }
-      return data as RestaurantOrder;
+      return data as Order;
     },
 
-    async getOrderByNumber(orderNumber: string): Promise<RestaurantOrder | null> {
+    async getOrderByNumber(orderNumber: string): Promise<Order | null> {
       const { data, error } = await supabase
-        .from('restaurant_orders')
+        .from('orders')
         .select('*')
         .eq('order_number', orderNumber)
         .single();
@@ -55,12 +55,12 @@ export function createRestaurantRepository(supabase: SupabaseClient): Restaurant
         if (error.code === 'PGRST116') return null;
         throw error;
       }
-      return data as RestaurantOrder;
+      return data as Order;
     },
 
-    async getOrders(filters: { status?: string; date?: string; moduleId?: string }): Promise<RestaurantOrder[]> {
+    async getOrders(filters: { status?: string; date?: string; moduleId?: string }): Promise<Order[]> {
       let query = supabase
-        .from('restaurant_orders')
+        .from('orders')
         .select('*')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
@@ -91,14 +91,14 @@ export function createRestaurantRepository(supabase: SupabaseClient): Restaurant
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as RestaurantOrder[];
+      return (data || []) as Order[];
     },
 
-    async getLiveOrders(moduleId?: string): Promise<RestaurantOrder[]> {
+    async getLiveOrders(moduleId?: string): Promise<Order[]> {
       const activeStatuses = ['pending', 'confirmed', 'preparing', 'ready'];
 
       let query = supabase
-        .from('restaurant_orders')
+        .from('orders')
         .select('*')
         .in('status', activeStatuses)
         .order('created_at', { ascending: true });
@@ -109,23 +109,23 @@ export function createRestaurantRepository(supabase: SupabaseClient): Restaurant
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as RestaurantOrder[];
+      return (data || []) as Order[];
     },
 
-    async getOrdersByCustomer(customerId: string): Promise<RestaurantOrder[]> {
+    async getOrdersByCustomer(customerId: string): Promise<Order[]> {
       const { data, error } = await supabase
-        .from('restaurant_orders')
+        .from('orders')
         .select('*')
         .eq('customer_id', customerId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as RestaurantOrder[];
+      return (data || []) as Order[];
     },
 
-    async updateOrder(id: string, updates: Partial<RestaurantOrder>): Promise<RestaurantOrder> {
+    async updateOrder(id: string, updates: Partial<Order>): Promise<Order> {
       const { data, error } = await supabase
-        .from('restaurant_orders')
+        .from('orders')
         .update({
           ...updates,
           updated_at: new Date().toISOString(),
@@ -135,31 +135,31 @@ export function createRestaurantRepository(supabase: SupabaseClient): Restaurant
         .single();
 
       if (error) throw error;
-      return data as RestaurantOrder;
+      return data as Order;
     },
 
     // ============================================
     // ORDER ITEMS OPERATIONS
     // ============================================
 
-    async createOrderItems(items: Omit<RestaurantOrderItem, 'id' | 'created_at'>[]): Promise<RestaurantOrderItem[]> {
+    async createOrderItems(items: Omit<OrderItem, 'id' | 'created_at'>[]): Promise<OrderItem[]> {
       const { data, error } = await supabase
-        .from('restaurant_order_items')
+        .from('order_items')
         .insert(items)
         .select();
 
       if (error) throw error;
-      return (data || []) as RestaurantOrderItem[];
+      return (data || []) as OrderItem[];
     },
 
-    async getOrderItems(orderId: string): Promise<RestaurantOrderItem[]> {
+    async getOrderItems(orderId: string): Promise<OrderItem[]> {
       const { data, error } = await supabase
-        .from('restaurant_order_items')
+        .from('order_items')
         .select('*')
         .eq('order_id', orderId);
 
       if (error) throw error;
-      return (data || []) as RestaurantOrderItem[];
+      return (data || []) as OrderItem[];
     },
 
     // ============================================
@@ -217,7 +217,7 @@ export function createRestaurantRepository(supabase: SupabaseClient): Restaurant
 
     async getTableById(id: string): Promise<RestaurantTable | null> {
       const { data, error } = await supabase
-        .from('restaurant_tables')
+        .from('tables')
         .select('*')
         .eq('id', id)
         .single();
@@ -231,7 +231,7 @@ export function createRestaurantRepository(supabase: SupabaseClient): Restaurant
 
     async getTables(moduleId?: string): Promise<RestaurantTable[]> {
       let query = supabase
-        .from('restaurant_tables')
+        .from('tables')
         .select('*')
         .order('table_number');
 
@@ -246,7 +246,7 @@ export function createRestaurantRepository(supabase: SupabaseClient): Restaurant
 
     async updateTable(id: string, updates: Partial<RestaurantTable>): Promise<RestaurantTable> {
       const { data, error } = await supabase
-        .from('restaurant_tables')
+        .from('tables')
         .update({
           ...updates,
           updated_at: new Date().toISOString(),
@@ -266,4 +266,4 @@ export function createRestaurantRepository(supabase: SupabaseClient): Restaurant
   };
 }
 
-export type { RestaurantRepository };
+export type { OrderRepository };
