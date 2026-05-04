@@ -18,25 +18,8 @@ export const Roles = {
   // Guest role - unauthenticated users with limited access
   GUEST: 'guest',
   
-  // Staff roles - module-specific
-  RESTAURANT_STAFF: 'restaurant_staff',
-  SNACK_BAR_STAFF: 'snack_bar_staff',
-  CHALET_STAFF: 'chalet_staff',
-  POOL_STAFF: 'pool_staff',
-  HOUSEKEEPING_STAFF: 'housekeeping_staff',
-  BAR_STAFF: 'bar_staff',
-  KITCHEN_STAFF: 'kitchen_staff',
-  
-  // Specialized staff roles (used in authorize() calls across the system)
-  CHEF: 'chef',
-  SERVER: 'server',
-  FRONT_DESK: 'front_desk',
-  
-  // Admin roles - module-specific elevated privileges
-  RESTAURANT_ADMIN: 'restaurant_admin',
-  SNACK_BAR_ADMIN: 'snack_bar_admin',
-  CHALET_ADMIN: 'chalet_admin',
-  POOL_ADMIN: 'pool_admin',
+  // Staff roles - engine-neutral generic staff role
+  STAFF: 'staff',
   
   // Manager role - cross-module oversight
   MANAGER: 'manager',
@@ -166,29 +149,15 @@ export type Permission = typeof Permissions[keyof typeof Permissions];
 // ============================================
 
 export const RolePermissions: Record<Role, (Permission | '*')[]> = {
-  // Guest - minimal permissions
+  // Guest - minimal permissions for browsing
   [Roles.GUEST]: [
-    Permissions.RESTAURANT_MENU_READ,
-    Permissions.CHALET_READ,
-    Permissions.POOL_SESSION_READ,
-    Permissions.SNACK_MENU_READ,
+    Permissions.REVIEW_READ,
   ],
 
   // Customer - basic user permissions
   [Roles.CUSTOMER]: [
     Permissions.USER_READ_SELF,
     Permissions.USER_UPDATE_SELF,
-    Permissions.RESTAURANT_MENU_READ,
-    Permissions.RESTAURANT_ORDER_CREATE,
-    Permissions.RESTAURANT_ORDER_READ_OWN,
-    Permissions.CHALET_READ,
-    Permissions.CHALET_BOOKING_CREATE,
-    Permissions.CHALET_BOOKING_READ_OWN,
-    Permissions.POOL_SESSION_READ,
-    Permissions.POOL_TICKET_CREATE,
-    Permissions.POOL_TICKET_READ_OWN,
-    Permissions.SNACK_MENU_READ,
-    Permissions.SNACK_ORDER_CREATE,
     Permissions.PAYMENT_CREATE,
     Permissions.PAYMENT_READ_OWN,
     Permissions.LOYALTY_READ_SELF,
@@ -202,210 +171,16 @@ export const RolePermissions: Record<Role, (Permission | '*')[]> = {
     Permissions.DEVICE_REGISTER,
   ],
 
-  // Restaurant Staff
-  [Roles.RESTAURANT_STAFF]: [
+  // Staff - generic staff role for all modules
+  [Roles.STAFF]: [
     Permissions.USER_READ_SELF,
     Permissions.USER_UPDATE_SELF,
-    Permissions.RESTAURANT_MENU_READ,
-    Permissions.RESTAURANT_ORDER_READ_ALL,
-    Permissions.RESTAURANT_ORDER_UPDATE,
     Permissions.PAYMENT_RECORD_CASH,
     Permissions.LOYALTY_EARN,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Kitchen Staff
-  [Roles.KITCHEN_STAFF]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.RESTAURANT_MENU_READ,
-    Permissions.RESTAURANT_ORDER_READ_ALL,
-    Permissions.RESTAURANT_ORDER_UPDATE,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Bar Staff
-  [Roles.BAR_STAFF]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.RESTAURANT_MENU_READ,
-    Permissions.SNACK_MENU_READ,
-    Permissions.RESTAURANT_ORDER_READ_ALL,
-    Permissions.SNACK_ORDER_READ_ALL,
-    Permissions.RESTAURANT_ORDER_UPDATE,
-    Permissions.SNACK_ORDER_UPDATE,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_EARN,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Snack Bar Staff
-  [Roles.SNACK_BAR_STAFF]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.SNACK_MENU_READ,
-    Permissions.SNACK_ORDER_READ_ALL,
-    Permissions.SNACK_ORDER_UPDATE,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_EARN,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Chalet Staff
-  [Roles.CHALET_STAFF]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.CHALET_READ,
-    Permissions.CHALET_BOOKING_READ_ALL,
-    Permissions.CHALET_BOOKING_UPDATE,
     Permissions.HOUSEKEEPING_TASK_READ,
     Permissions.HOUSEKEEPING_TASK_UPDATE,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_EARN,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Pool Staff
-  [Roles.POOL_STAFF]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.POOL_SESSION_READ,
-    Permissions.POOL_TICKET_READ_ALL,
-    Permissions.POOL_TICKET_VALIDATE,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_EARN,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Housekeeping Staff
-  [Roles.HOUSEKEEPING_STAFF]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.HOUSEKEEPING_TASK_READ,
-    Permissions.HOUSEKEEPING_TASK_UPDATE,
-    Permissions.CHALET_READ,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Chef - kitchen management (elevated kitchen_staff with menu read/write)
-  [Roles.CHEF]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.RESTAURANT_MENU_READ,
-    Permissions.RESTAURANT_MENU_WRITE,
-    Permissions.RESTAURANT_ORDER_READ_ALL,
-    Permissions.RESTAURANT_ORDER_UPDATE,
-    Permissions.SNACK_MENU_READ,
-    Permissions.SNACK_ORDER_READ_ALL,
     Permissions.INVENTORY_READ,
     Permissions.INVENTORY_UPDATE,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Server - front-of-house restaurant staff (order handling + cash payments)
-  [Roles.SERVER]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.RESTAURANT_MENU_READ,
-    Permissions.RESTAURANT_ORDER_CREATE,
-    Permissions.RESTAURANT_ORDER_READ_ALL,
-    Permissions.RESTAURANT_ORDER_UPDATE,
-    Permissions.PAYMENT_CREATE,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_EARN,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Front Desk - reception/kiosk operations (bookings + check-in + payments)
-  [Roles.FRONT_DESK]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.CHALET_READ,
-    Permissions.CHALET_BOOKING_CREATE,
-    Permissions.CHALET_BOOKING_READ_ALL,
-    Permissions.CHALET_BOOKING_UPDATE,
-    Permissions.POOL_SESSION_READ,
-    Permissions.POOL_TICKET_CREATE,
-    Permissions.POOL_TICKET_READ_ALL,
-    Permissions.POOL_TICKET_VALIDATE,
-    Permissions.PAYMENT_CREATE,
-    Permissions.PAYMENT_READ_ALL,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_EARN,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Restaurant Admin
-  [Roles.RESTAURANT_ADMIN]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.RESTAURANT_MENU_READ,
-    Permissions.RESTAURANT_MENU_WRITE,
-    Permissions.RESTAURANT_ORDER_READ_ALL,
-    Permissions.RESTAURANT_ORDER_UPDATE,
-    Permissions.RESTAURANT_CATEGORY_MANAGE,
-    Permissions.RESTAURANT_TABLE_MANAGE,
-    Permissions.RESTAURANT_STATS,
-    Permissions.PAYMENT_READ_ALL,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_READ_ANY,
-    Permissions.LOYALTY_EARN,
-    Permissions.LOYALTY_REDEEM,
-    Permissions.INVENTORY_READ,
-    Permissions.INVENTORY_UPDATE,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Snack Bar Admin
-  [Roles.SNACK_BAR_ADMIN]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.SNACK_MENU_READ,
-    Permissions.SNACK_MENU_WRITE,
-    Permissions.SNACK_ORDER_READ_ALL,
-    Permissions.SNACK_ORDER_UPDATE,
-    Permissions.PAYMENT_READ_ALL,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_READ_ANY,
-    Permissions.LOYALTY_EARN,
-    Permissions.LOYALTY_REDEEM,
-    Permissions.INVENTORY_READ,
-    Permissions.INVENTORY_UPDATE,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Chalet Admin
-  [Roles.CHALET_ADMIN]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.CHALET_READ,
-    Permissions.CHALET_WRITE,
-    Permissions.CHALET_BOOKING_READ_ALL,
-    Permissions.CHALET_BOOKING_UPDATE,
-    Permissions.CHALET_BOOKING_CANCEL,
-    Permissions.CHALET_PRICING_MANAGE,
-    Permissions.CHALET_STATS,
-    Permissions.HOUSEKEEPING_TASK_MANAGE,
-    Permissions.PAYMENT_READ_ALL,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_READ_ANY,
-    Permissions.LOYALTY_EARN,
-    Permissions.DEVICE_REGISTER,
-  ],
-
-  // Pool Admin
-  [Roles.POOL_ADMIN]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.POOL_SESSION_READ,
-    Permissions.POOL_SESSION_MANAGE,
-    Permissions.POOL_TICKET_READ_ALL,
-    Permissions.POOL_TICKET_VALIDATE,
-    Permissions.POOL_STATS,
-    Permissions.PAYMENT_READ_ALL,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_READ_ANY,
-    Permissions.LOYALTY_EARN,
     Permissions.DEVICE_REGISTER,
   ],
 
@@ -414,51 +189,25 @@ export const RolePermissions: Record<Role, (Permission | '*')[]> = {
     Permissions.USER_READ_SELF,
     Permissions.USER_UPDATE_SELF,
     Permissions.USER_READ_ANY,
-    // Restaurant
-    Permissions.RESTAURANT_MENU_READ,
-    Permissions.RESTAURANT_ORDER_READ_ALL,
-    Permissions.RESTAURANT_STATS,
-    // Chalets
-    Permissions.CHALET_READ,
-    Permissions.CHALET_BOOKING_READ_ALL,
-    Permissions.CHALET_STATS,
-    // Pool
-    Permissions.POOL_SESSION_READ,
-    Permissions.POOL_TICKET_READ_ALL,
-    Permissions.POOL_STATS,
-    // Snack
-    Permissions.SNACK_MENU_READ,
-    Permissions.SNACK_ORDER_READ_ALL,
-    // Payments
     Permissions.PAYMENT_READ_ALL,
-    // Loyalty
+    Permissions.PAYMENT_RECORD_CASH,
     Permissions.LOYALTY_READ_ANY,
     Permissions.LOYALTY_ADJUST,
-    // Support
+    Permissions.LOYALTY_EARN,
     Permissions.SUPPORT_TICKET_READ_ALL,
     Permissions.SUPPORT_TICKET_RESPOND,
-    // Reviews
     Permissions.REVIEW_MODERATE,
-    // Housekeeping
     Permissions.HOUSEKEEPING_TASK_MANAGE,
-    // Inventory
     Permissions.INVENTORY_READ,
     Permissions.INVENTORY_MANAGE,
-    // Admin
     Permissions.ADMIN_DASHBOARD,
     Permissions.ADMIN_REPORTS,
-    Permissions.NOTIFICATION_SEND,
     Permissions.DEVICE_REGISTER,
   ],
 
-  // Admin - full admin access
+  // Admin - full system access except super-admin-only operations
   [Roles.ADMIN]: [
-    Permissions.USER_READ_SELF,
-    Permissions.USER_UPDATE_SELF,
-    Permissions.USER_READ_ANY,
-    Permissions.USER_UPDATE_ANY,
-    Permissions.USER_MANAGE_ROLES,
-    // All module permissions
+    '*', // All permissions
     ...Object.values(Permissions).filter(p => 
       p.startsWith('restaurant:') ||
       p.startsWith('chalet:') ||
@@ -575,10 +324,6 @@ export function isSuperAdmin(roles: string[]): boolean {
  */
 export function isAdmin(roles: string[]): boolean {
   const adminRoles = [
-    Roles.RESTAURANT_ADMIN,
-    Roles.SNACK_BAR_ADMIN,
-    Roles.CHALET_ADMIN,
-    Roles.POOL_ADMIN,
     Roles.MANAGER,
     Roles.ADMIN,
     Roles.SUPER_ADMIN,
@@ -591,17 +336,7 @@ export function isAdmin(roles: string[]): boolean {
  */
 export function isStaff(roles: string[]): boolean {
   const staffRoles = [
-    Roles.RESTAURANT_STAFF,
-    Roles.SNACK_BAR_STAFF,
-    Roles.CHALET_STAFF,
-    Roles.POOL_STAFF,
-    Roles.HOUSEKEEPING_STAFF,
-    Roles.BAR_STAFF,
-    Roles.KITCHEN_STAFF,
-    Roles.RESTAURANT_ADMIN,
-    Roles.SNACK_BAR_ADMIN,
-    Roles.CHALET_ADMIN,
-    Roles.POOL_ADMIN,
+    Roles.STAFF,
     Roles.MANAGER,
     Roles.ADMIN,
     Roles.SUPER_ADMIN,
