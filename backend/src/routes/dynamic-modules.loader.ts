@@ -5,7 +5,6 @@ import { buildModuleRouter } from './dynamic-module.router.js';
 
 const dynamicModulesRouter = express.Router();
 const dynamicModuleMounts = new Set<string>();
-const STATIC_MODULE_SLUGS = new Set(['restaurant', 'pool', 'chalets']);
 
 interface ActiveModuleRow {
   id: string;
@@ -38,11 +37,6 @@ export async function loadDynamicModules(): Promise<void> {
 
   (modules as ActiveModuleRow[] | null)?.forEach((module) => {
     if (!module.slug || !module.template_type) return;
-
-    if (STATIC_MODULE_SLUGS.has(module.slug)) {
-      logger.warn(`[Dynamic Modules] Conflict detected for slug '${module.slug}'. Static route kept, dynamic mount skipped.`);
-      return;
-    }
 
     const moduleRouter = buildModuleRouter(module.template_type);
     dynamicModulesRouter.use(

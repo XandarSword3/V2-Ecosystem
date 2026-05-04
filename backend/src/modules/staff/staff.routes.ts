@@ -10,7 +10,7 @@ router.use(authenticate);
 // Staff roles
 const adminRoles = ['admin', 'super_admin'];
 const managerRoles = ['admin', 'super_admin', 'manager'];
-const staffRoles = ['admin', 'super_admin', 'manager', 'hotel_staff', 'restaurant_staff', 'pool_staff', 'housekeeping'];
+const staffRoles = ['admin', 'super_admin', 'manager', 'staff'];
 
 // ============================================
 // Staff Shifts Management

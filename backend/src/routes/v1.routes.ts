@@ -15,10 +15,6 @@
 import { Router, Request, Response } from 'express';
 import authRoutes from '../modules/auth/auth.routes.js';
 import userRoutes from '../modules/users/user.routes.js';
-import restaurantRoutes from '../modules/restaurant/restaurant.routes.js';
-import snackRoutes from '../modules/snack/snack.routes.js';
-import chaletRoutes from '../modules/chalets/chalet.routes.js';
-import poolRoutes from '../modules/pool/pool.routes.js';
 import paymentRoutes from '../modules/payments/payment.routes.js';
 import adminRoutes from '../modules/admin/admin.routes.js';
 import reviewsRoutes from '../modules/reviews/reviews.routes.js';
@@ -32,10 +28,7 @@ import managerRoutes from '../modules/manager/manager.routes.js';
 import moduleStaffRoutes from '../modules/staff/module-staff.routes.js';
 import devicesRoutes from '../modules/devices/devices.routes.js';
 import promotionsRoutes from '../modules/promotions/promotions.routes.js';
-import { requireModule } from '../middleware/moduleGuard.middleware.js';
-
-// NEW: Generic Routes & Terminology
-import genericRoutes from './generic.routes.js';
+// NEW: Terminology System
 import terminologyRoutes from './terminology.routes.js';
 
 const router = Router();
@@ -51,15 +44,8 @@ router.get('/', (_req: Request, res: Response) => {
     endpoints: {
       auth: '/api/v1/auth',
       users: '/api/v1/users',
-      // New Generic Endpoints
-      units: '/api/v1/units',
-      facilities: '/api/v1/facilities',
-      dining: '/api/v1/dining',
+      modules: '/api/v1/modules',
       terminology: '/api/v1/terminology',
-      // Legacy Endpoints
-      restaurant: '/api/v1/restaurant',
-      chalets: '/api/v1/chalets',
-      pool: '/api/v1/pool',
     },
   });
 });
@@ -75,17 +61,10 @@ router.use('/support', supportRoutes);
 // NEW: Terminology System
 router.use('/terminology', terminologyRoutes);
 
-// NEW: Generic White-Label Routes (Mixed in)
-router.use('/', genericRoutes); // Mounts /units, /facilities, /dining
-
 // Staff Module Operations (dynamic routes for all module types)
 router.use('/staff', moduleStaffRoutes);
 
-// Legacy Module-protected routes (Kept for backward compatibility)
-router.use('/restaurant', requireModule('restaurant'), restaurantRoutes);
-router.use('/snack', requireModule('snack-bar'), snackRoutes);
-router.use('/chalets', requireModule('chalets'), chaletRoutes);
-router.use('/pool', requireModule('pool'), poolRoutes);
+// All module routes now served exclusively via dynamic module router
 
 // Feature routes
 router.use('/loyalty', loyaltyRoutes);

@@ -16,7 +16,7 @@ router.get('/me', authenticate, paymentController.getMyPayments);
 router.get('/:id/receipt', authenticate, paymentController.getPaymentReceipt);
 
 // Staff routes (record cash payments) - rate limited to prevent abuse
-const staffRoles = ['restaurant_staff', 'snack_bar_staff', 'chalet_staff', 'pool_staff', 'restaurant_admin', 'snack_bar_admin', 'chalet_admin', 'pool_admin', 'super_admin'];
+const staffRoles = ['staff', 'manager', 'admin', 'super_admin'];
 router.post('/record-cash', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.recordCashPayment);
 router.post('/record-manual', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.recordManualPayment);
 
