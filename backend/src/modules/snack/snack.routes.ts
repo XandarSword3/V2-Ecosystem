@@ -3,7 +3,6 @@ import { authenticate, authorize, optionalAuth } from '../../middleware/auth.mid
 import { rateLimits } from '../../middleware/userRateLimit.middleware.js';
 import { requireModulePropertyAccess } from '../../middleware/propertyAccess.middleware.js';
 import * as snackController from './snack.controller.js';
-import snackImportRoutes from './snack-import.routes.js';
 
 const router = Router();
 const snackPropertyScope = requireModulePropertyAccess('snack');
@@ -39,8 +38,5 @@ router.post('/admin/items', authenticate, snackPropertyScope, authorize(...admin
 router.put('/admin/items/:id', authenticate, snackPropertyScope, authorize(...adminRoles), snackController.updateItem);
 router.delete('/admin/items/:id', authenticate, snackPropertyScope, authorize(...adminRoles), snackController.deleteItem);
 router.patch('/admin/items/:id/availability', authenticate, snackPropertyScope, authorize(...adminRoles), snackController.toggleAvailability);
-
-// Import routes
-router.use('/import', snackImportRoutes);
 
 export default router;
