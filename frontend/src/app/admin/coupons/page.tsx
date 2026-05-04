@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -29,6 +30,7 @@ import {
   Tag,
   Users,
   ShoppingCart,
+  Upload,
 } from 'lucide-react';
 
 interface Coupon {
@@ -58,6 +60,7 @@ interface CouponStats {
 }
 
 export default function CouponsAdminPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('coupons');
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [stats, setStats] = useState<CouponStats | null>(null);
@@ -290,6 +293,10 @@ export default function CouponsAdminPage() {
           <Button onClick={() => loadData()} variant="outline" className="gap-2">
             <RefreshCw className="w-4 h-4" />
             Refresh
+          </Button>
+          <Button onClick={() => router.push('/admin/coupons/import')} variant="outline" className="gap-2">
+            <Upload className="w-4 h-4" />
+            Import
           </Button>
           <Button onClick={() => { resetForm(); setEditingCoupon(null); setShowCreateModal(true); }} className="gap-2">
             <Plus className="w-4 h-4" />

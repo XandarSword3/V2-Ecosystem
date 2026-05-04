@@ -3,6 +3,7 @@ import { authenticate, authorize, optionalAuth } from "../../middleware/auth.mid
 import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
 import { requireModulePropertyAccess } from '../../middleware/propertyAccess.middleware.js';
 import * as chaletController from "./chalet.controller";
+import chaletImportRoutes from './chalet-import.routes.js';
 
 const router = Router();
 const chaletsPropertyScope = requireModulePropertyAccess('chalets');
@@ -66,5 +67,8 @@ router.get('/', chaletController.getChalets);
 router.get('/:id', chaletController.getChalet);
 router.get('/:id/availability', chaletController.getAvailability);
 router.get('/:id/daily-prices', chaletController.getDailyPrices);
+
+// Import routes
+router.use('/import', chaletImportRoutes);
 
 export default router;

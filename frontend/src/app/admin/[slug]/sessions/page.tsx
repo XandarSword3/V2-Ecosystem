@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
@@ -28,6 +28,7 @@ import {
   Sun,
   Sunset,
   Moon,
+  Upload,
 } from 'lucide-react';
 
 interface Session {
@@ -64,6 +65,7 @@ const getSessionIcon = (startTime: string) => {
 
 export default function DynamicSessionsPage() {
   const params = useParams();
+  const router = useRouter();
   const { modules } = useSiteSettings();
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
   const currentModule = modules.find(m => m.slug === slug);
@@ -208,6 +210,14 @@ export default function DynamicSessionsPage() {
           <Button variant="outline" onClick={fetchSessions} className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4" />
             Refresh
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/admin/${slug}/pool/import`)}
+            className="flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Import
           </Button>
           <Button onClick={openCreateModal} className="flex items-center gap-2 bg-gradient-to-r from-primary-500 to-secondary-600 text-white">
             <Plus className="w-4 h-4" />

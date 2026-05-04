@@ -5,6 +5,7 @@ import { requireModulePropertyAccess } from '../../middleware/propertyAccess.mid
 // Import from refactored controllers
 import * as poolController from "./controllers/index";
 import membershipRoutes from './membership.controller';
+import poolImportRoutes from './pool-import.routes.js';
 
 const router = Router();
 const poolPropertyScope = requireModulePropertyAccess('pool');
@@ -55,5 +56,8 @@ router.post('/admin/sessions/:id/capacity/override', authenticate, poolPropertyS
 
 // Membership routes (mount entire membership sub-router)
 router.use('/memberships', membershipRoutes);
+
+// Import routes
+router.use('/import', poolImportRoutes);
 
 export default router;
