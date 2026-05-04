@@ -160,7 +160,7 @@ export default function DynamicBookingsPage() {
             <RefreshCw className="w-4 h-4 mr-2" />
             {tc('refresh')}
           </Button>
-          <Button variant="outline" onClick={() => router.push(`/admin/${currentModule?.slug}/chalets/import`)}>
+          <Button variant="outline" onClick={() => router.push(`/admin/${currentModule?.slug}/bookings/import`)}>
             <Upload className="w-4 h-4 mr-2" />
             Import
           </Button>
