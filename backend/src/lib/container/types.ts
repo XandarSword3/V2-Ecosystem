@@ -169,10 +169,10 @@ export interface AuthRepository {
 }
 
 // ============================================
-// RESTAURANT REPOSITORY TYPES
+// ORDER REPOSITORY TYPES
 // ============================================
 
-export interface RestaurantOrder {
+export interface Order {
   id: string;
   order_number: string;
   customer_id?: string;
@@ -212,7 +212,7 @@ export interface SelectedModifier {
   inventoryQuantity?: number;
 }
 
-export interface RestaurantOrderItem {
+export interface OrderItem {
   id: string;
   order_id: string;
   menu_item_id: string;
@@ -280,19 +280,19 @@ export interface RestaurantTable {
   updated_at: string;
 }
 
-export interface RestaurantRepository {
+export interface OrderRepository {
   // Order operations
-  createOrder(order: Omit<RestaurantOrder, 'id' | 'created_at' | 'updated_at'>): Promise<RestaurantOrder>;
-  getOrderById(id: string): Promise<RestaurantOrder | null>;
-  getOrderByNumber(orderNumber: string): Promise<RestaurantOrder | null>;
-  getOrders(filters: { status?: string; date?: string; moduleId?: string }): Promise<RestaurantOrder[]>;
-  getLiveOrders(moduleId?: string): Promise<RestaurantOrder[]>;
-  getOrdersByCustomer(customerId: string): Promise<RestaurantOrder[]>;
-  updateOrder(id: string, data: Partial<RestaurantOrder>): Promise<RestaurantOrder>;
+  createOrder(order: Omit<Order, 'id' | 'created_at' | 'updated_at'>): Promise<Order>;
+  getOrderById(id: string): Promise<Order | null>;
+  getOrderByNumber(orderNumber: string): Promise<Order | null>;
+  getOrders(filters: { status?: string; date?: string; moduleId?: string }): Promise<Order[]>;
+  getLiveOrders(moduleId?: string): Promise<Order[]>;
+  getOrdersByCustomer(customerId: string): Promise<Order[]>;
+  updateOrder(id: string, data: Partial<Order>): Promise<Order>;
 
   // Order items operations
-  createOrderItems(items: Omit<RestaurantOrderItem, 'id' | 'created_at'>[]): Promise<RestaurantOrderItem[]>;
-  getOrderItems(orderId: string): Promise<RestaurantOrderItem[]>;
+  createOrderItems(items: Omit<OrderItem, 'id' | 'created_at'>[]): Promise<OrderItem[]>;
+  getOrderItems(orderId: string): Promise<OrderItem[]>;
 
   // Menu item operations
   getMenuItemById(id: string): Promise<RestaurantMenuItem | null>;
@@ -2763,7 +2763,7 @@ export interface Container {
   // Repositories
   poolRepository: PoolRepository;
   authRepository: AuthRepository;
-  restaurantRepository: RestaurantRepository;
+  orderRepository: OrderRepository;
   menuRepository: MenuRepository;
   chaletRepository: ChaletRepository;
   reviewRepository: ReviewRepository;

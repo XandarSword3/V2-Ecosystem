@@ -6,9 +6,9 @@
  */
 
 import type {
-  RestaurantRepository,
-  RestaurantOrder,
-  RestaurantOrderItem,
+  OrderRepository,
+  Order,
+  OrderItem,
   RestaurantMenuItem,
   EmailService,
   LoggerService,
@@ -53,12 +53,12 @@ export interface CreateOrderInput {
 }
 
 export interface OrderResult {
-  order: RestaurantOrder;
-  items: RestaurantOrderItem[];
+  order: Order;
+  items: OrderItem[];
 }
 
 export interface OrderServiceDeps {
-  restaurantRepository: RestaurantRepository;
+  restaurantRepository: OrderRepository;
   emailService: EmailService;
   logger: LoggerService;
   activityLogger: ActivityLoggerService;
@@ -67,7 +67,7 @@ export interface OrderServiceDeps {
 }
 
 // Valid status transitions
-const VALID_TRANSITIONS: Record<RestaurantOrder['status'], RestaurantOrder['status'][]> = {
+const VALID_TRANSITIONS: Record<Order['status'], Order['status'][]> = {
   pending: ['confirmed', 'cancelled'],
   confirmed: ['preparing', 'cancelled'],
   preparing: ['ready', 'cancelled'],
@@ -98,12 +98,12 @@ function generateOrderNumber(): string {
 export interface OrderService {
   createOrder(input: CreateOrderInput): Promise<OrderResult>;
   getOrderById(id: string): Promise<OrderResult | null>;
-  getOrderByNumber(orderNumber: string): Promise<RestaurantOrder | null>;
-  getOrders(filters: { status?: string; orderType?: string }): Promise<RestaurantOrder[]>;
-  getLiveOrders(): Promise<RestaurantOrder[]>;
-  getOrdersByCustomer(customerId: string): Promise<RestaurantOrder[]>;
-  updateOrderStatus(id: string, status: RestaurantOrder['status'], userId?: string): Promise<RestaurantOrder>;
-  cancelOrder(id: string, reason: string, userId?: string): Promise<RestaurantOrder>;
+  getOrderByNumber(orderNumber: string): Promise<Order | null>;
+  getOrders(filters: { status?: string; orderType?: string }): Promise<Order[]>;
+  getLiveOrders(): Promise<Order[]>;
+  getOrdersByCustomer(customerId: string): Promise<Order[]>;
+  updateOrderStatus(id: string, status: Order['status'], userId?: string): Promise<Order>;
+  cancelOrder(id: string, reason: string, userId?: string): Promise<Order>;
 }
 
 // ============================================
@@ -189,7 +189,7 @@ export function createOrderService(deps: OrderServiceDeps): OrderService {
         payment_status: 'pending',
         payment_method: input.paymentMethod,
         special_instructions: input.specialInstructions,
-      } as Omit<RestaurantOrder, 'id' | 'created_at' | 'updated_at'>);
+      } as Omit<Order, 'id' | 'created_at' | 'updated_at'>);
 
       // Create order items
       const orderItemsData = input.items.map(item => {
@@ -201,7 +201,7 @@ export function createOrderService(deps: OrderServiceDeps): OrderService {
           unit_price: menuItem.price,
           subtotal: (parseFloat(menuItem.price) * item.quantity).toFixed(2),
           special_instructions: item.specialInstructions,
-        } as Omit<RestaurantOrderItem, 'id' | 'created_at'>;
+        } as Omit<OrderItem, 'id' | 'created_at'>;
       });
 
       const items = await restaurantRepository.createOrderItems(orderItemsData);
@@ -239,23 +239,23 @@ export function createOrderService(deps: OrderServiceDeps): OrderService {
       return { order, items };
     },
 
-    async getOrderByNumber(orderNumber: string): Promise<RestaurantOrder | null> {
+    async getOrderByNumber(orderNumber: string): Promise<Order | null> {
       return restaurantRepository.getOrderByNumber(orderNumber);
     },
 
-    async getOrders(filters: { status?: string; orderType?: string }): Promise<RestaurantOrder[]> {
+    async getOrders(filters: { status?: string; orderType?: string }): Promise<Order[]> {
       return restaurantRepository.getOrders({ status: filters.status });
     },
 
-    async getLiveOrders(): Promise<RestaurantOrder[]> {
+    async getLiveOrders(): Promise<Order[]> {
       return restaurantRepository.getLiveOrders();
     },
 
-    async getOrdersByCustomer(customerId: string): Promise<RestaurantOrder[]> {
+    async getOrdersByCustomer(customerId: string): Promise<Order[]> {
       return restaurantRepository.getOrdersByCustomer(customerId);
     },
 
-    async updateOrderStatus(id: string, status: RestaurantOrder['status'], userId?: string): Promise<RestaurantOrder> {
+    async updateOrderStatus(id: string, status: Order['status'], userId?: string): Promise<Order> {
       const order = await restaurantRepository.getOrderById(id);
       if (!order) {
         throw new OrderServiceError('Order not found', 'ORDER_NOT_FOUND', 404);
@@ -292,7 +292,7 @@ export function createOrderService(deps: OrderServiceDeps): OrderService {
       return updated;
     },
 
-    async cancelOrder(id: string, reason: string, userId?: string): Promise<RestaurantOrder> {
+    async cancelOrder(id: string, reason: string, userId?: string): Promise<Order> {
       const order = await restaurantRepository.getOrderById(id);
       if (!order) {
         throw new OrderServiceError('Order not found', 'ORDER_NOT_FOUND', 404);

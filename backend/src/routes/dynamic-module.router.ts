@@ -1,10 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { requireModule } from '../middleware/moduleGuard.middleware.js';
+import { asyncHandler } from '../middleware/async-handler.js';
 import { getSupabase } from '../database/connection.js';
 import { getEngineService } from '../engines/engine-service.js';
 import { logger } from '../utils/logger.js';
 import { requirePropertyAccess } from '../middleware/propertyAccess.middleware.js';
+
+// Import parsers
+import * as menuServiceParser from '../modules/shared/import/menu-service-import.parser.js';
+import * as sessionAccessParser from '../modules/shared/import/session-access-import.parser.js';
+import * as multiDayBookingParser from '../modules/shared/import/multi-day-booking-import.parser.js';
 
 type TemplateType = 'menu_service' | 'multi_day_booking' | 'session_access' | 'subscription' | 'membership_access';
 
@@ -746,12 +752,335 @@ function buildSubscriptionRouter(router: Router): void {
   });
 }
 
+/**
+ * Build import routes for all engine types
+ * Handles parse (POST /import/parse) and commit (POST /import/commit)
+ */
+function buildImportRouter(router: Router, templateType: TemplateType): void {
+  // POST /import/parse - Parse import data (file upload, JSON, or LLM text)
+  router.post(
+    '/import/parse',
+    authorize('admin', 'super_admin'),
+    asyncHandler(async (req: DynamicRequest, res: Response) => {
+      try {
+        const mountedModule = req.mountedModule!;
+        const engineType = mountedModule.template_type as TemplateType;
+        let result: { items: unknown[]; warnings: string[]; errors: string[]; totalParsed: number; successful: number } | null = null;
+
+        // Handle file upload or text input
+        if (req.file) {
+          const buffer = req.file.buffer;
+          const mimeType = req.file.mimetype;
+
+          if (mimeType === 'application/json' || req.file.originalname.endsWith('.json')) {
+            const jsonData = JSON.parse(buffer.toString());
+            result = await parseImportForEngine(engineType, jsonData, 'json');
+          } else if (mimeType === 'text/csv' || req.file.originalname.endsWith('.csv')) {
+            result = await parseImportForEngine(engineType, buffer, 'csv');
+          } else {
+            return res.status(400).json({ success: false, errors: ['Unsupported file type. Use JSON or CSV.'] });
+          }
+        } else if (req.body.text) {
+          // LLM text parsing
+          result = await parseImportForEngine(engineType, req.body.text, 'llm');
+        } else if (req.body.json) {
+          // Direct JSON input
+          result = await parseImportForEngine(engineType, req.body.json, 'json');
+        } else {
+          return res.status(400).json({ success: false, errors: ['No data provided for parsing.'] });
+        }
+
+        if (!result || (result.successful === 0 && result.errors.length > 0)) {
+          return res.status(422).json({ success: false, ...result });
+        }
+
+        res.json({ success: true, data: result });
+      } catch (error) {
+        logger.error('[Import Router] Parse failed:', error);
+        const message = error instanceof Error ? error.message : String(error);
+        res.status(500).json({ success: false, error: message });
+      }
+    })
+  );
+
+  // POST /import/commit - Commit parsed data to database
+  router.post(
+    '/import/commit',
+    authorize('admin', 'super_admin'),
+    asyncHandler(async (req: DynamicRequest, res: Response) => {
+      try {
+        const mountedModule = req.mountedModule!;
+        const engineType = mountedModule.template_type as TemplateType;
+        const { items, moduleId } = req.body;
+
+        if (!items || !Array.isArray(items) || items.length === 0) {
+          return res.status(400).json({ success: false, error: 'No items to commit' });
+        }
+
+        const finalModuleId = moduleId || mountedModule.id;
+        const result = await commitImportForEngine(engineType, items, finalModuleId);
+
+        res.json(result);
+      } catch (error) {
+        logger.error('[Import Router] Commit failed:', error);
+        const message = error instanceof Error ? error.message : String(error);
+        res.status(500).json({ success: false, error: message });
+      }
+    })
+  );
+}
+
+/**
+ * Parse import data based on engine type
+ */
+async function parseImportForEngine(
+  engineType: TemplateType,
+  data: unknown,
+  format: 'json' | 'csv' | 'llm'
+): Promise<{ items: unknown[]; warnings: string[]; errors: string[]; totalParsed: number; successful: number }> {
+  switch (engineType) {
+    case 'menu_service':
+      if (format === 'llm') {
+        return await menuServiceParser.parseLlmImport(data as string);
+      } else if (format === 'csv') {
+        return await menuServiceParser.parseCsvImport(data as Buffer);
+      } else {
+        return menuServiceParser.parseJsonImport(data);
+      }
+    case 'session_access':
+      if (format === 'llm') {
+        return await sessionAccessParser.parseLlmImport(data as string);
+      } else {
+        return sessionAccessParser.parseJsonImport(data);
+      }
+    case 'multi_day_booking':
+      if (format === 'llm') {
+        return await multiDayBookingParser.parseLlmImport(data as string);
+      } else {
+        return multiDayBookingParser.parseJsonImport(data);
+      }
+    default:
+      return {
+        items: [],
+        warnings: [],
+        errors: [`Import not supported for engine type: ${engineType}`],
+        totalParsed: 0,
+        successful: 0,
+      };
+  }
+}
+
+/**
+ * Commit import data to database based on engine type
+ */
+async function commitImportForEngine(
+  engineType: TemplateType,
+  items: unknown[],
+  moduleId: string
+): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
+  const supabase = getSupabase();
+
+  switch (engineType) {
+    case 'menu_service': {
+      // Menu service commit: Create categories and menu items
+      const results = {
+        created: 0,
+        failed: 0,
+        errors: [] as string[],
+      };
+
+      // Get unique categories
+      const categoryNames = [...new Set((items as Array<{ category: string }>).map(i => i.category).filter(Boolean))];
+      const categoryMap = new Map<string, string>();
+
+      // Create or find categories
+      for (const name of categoryNames) {
+        const { data: existing } = await supabase
+          .from('menu_categories')
+          .select('id')
+          .eq('name', name)
+          .eq('module_id', moduleId)
+          .single();
+
+        if (existing) {
+          categoryMap.set(name, existing.id);
+        } else {
+          const { data: newCat, error } = await supabase
+            .from('menu_categories')
+            .insert({ name, module_id: moduleId })
+            .select('id')
+            .single();
+
+          if (error) {
+            results.errors.push(`Failed to create category ${name}: ${error.message}`);
+          } else if (newCat) {
+            categoryMap.set(name, newCat.id);
+          }
+        }
+      }
+
+      // Create menu items
+      for (const item of items as Array<{
+        name: string;
+        price: number;
+        category: string;
+        description?: string;
+        is_available?: boolean;
+        discount_price?: number;
+        preparation_time?: number;
+        calories?: number;
+        allergens?: string[];
+        ingredients?: Array<{ name: string; estimatedQuantity: number; estimatedUnit: string }>;
+      }>) {
+        const categoryId = categoryMap.get(item.category);
+        if (!categoryId) {
+          results.failed++;
+          results.errors.push(`Category not found for ${item.name}`);
+          continue;
+        }
+
+        const { error } = await supabase.from('menu_items').insert({
+          name: item.name,
+          price: item.price,
+          description: item.description,
+          category_id: categoryId,
+          module_id: moduleId,
+          is_available: item.is_available ?? true,
+          discount_price: item.discount_price,
+          preparation_time_minutes: item.preparation_time,
+          calories: item.calories,
+          allergens: item.allergens,
+        });
+
+        if (error) {
+          results.failed++;
+          results.errors.push(`${item.name}: ${error.message}`);
+        } else {
+          results.created++;
+        }
+      }
+
+      return { success: true, data: results };
+    }
+
+    case 'session_access': {
+      // Session access commit: Create sessions
+      const results = {
+        created: 0,
+        failed: 0,
+        errors: [] as string[],
+      };
+
+      for (const item of items as Array<{
+        name: string;
+        startTime: string;
+        endTime: string;
+        adultPrice: number;
+        childPrice?: number;
+        capacity: number;
+        genderRestriction?: 'mixed' | 'male' | 'female';
+        daysOfWeek?: number[];
+        isActive?: boolean;
+        memberDiscount?: number;
+        description?: string;
+      }>) {
+        const { error } = await supabase.from('sessions').insert({
+          name: item.name,
+          start_time: item.startTime,
+          end_time: item.endTime,
+          adult_price: item.adultPrice,
+          child_price: item.childPrice,
+          max_capacity: item.capacity,
+          gender_restriction: item.genderRestriction || 'mixed',
+          days_of_week: item.daysOfWeek || [0, 1, 2, 3, 4, 5, 6],
+          is_active: item.isActive ?? true,
+          member_discount: item.memberDiscount,
+          description: item.description,
+          module_id: moduleId,
+        });
+
+        if (error) {
+          results.failed++;
+          results.errors.push(`${item.name}: ${error.message}`);
+        } else {
+          results.created++;
+        }
+      }
+
+      return { success: true, data: results };
+    }
+
+    case 'multi_day_booking': {
+      // Multi-day booking commit: Create bookable units
+      const results = {
+        created: 0,
+        failed: 0,
+        errors: [] as string[],
+      };
+
+      for (const item of items as Array<{
+        name: string;
+        description?: string;
+        maxGuests: number;
+        bedrooms?: number;
+        bathrooms?: number;
+        basePrice: number;
+        weekendPrice?: number;
+        weeklyDiscount?: number;
+        amenities?: string[];
+        policies?: {
+          checkInTime?: string;
+          checkOutTime?: string;
+          cancellationHours?: number;
+          petFriendly?: boolean;
+          smokingAllowed?: boolean;
+        };
+        isActive?: boolean;
+      }>) {
+        const { error } = await supabase.from('bookable_units').insert({
+          name: item.name,
+          description: item.description,
+          max_guests: item.maxGuests,
+          bedrooms: item.bedrooms,
+          bathrooms: item.bathrooms,
+          base_price: item.basePrice,
+          weekend_price: item.weekendPrice,
+          weekly_discount: item.weeklyDiscount,
+          amenities: item.amenities,
+          check_in_time: item.policies?.checkInTime,
+          check_out_time: item.policies?.checkOutTime,
+          cancellation_hours: item.policies?.cancellationHours,
+          pet_friendly: item.policies?.petFriendly,
+          smoking_allowed: item.policies?.smokingAllowed,
+          is_active: item.isActive ?? true,
+          module_id: moduleId,
+        });
+
+        if (error) {
+          results.failed++;
+          results.errors.push(`${item.name}: ${error.message}`);
+        } else {
+          results.created++;
+        }
+      }
+
+      return { success: true, data: results };
+    }
+
+    default:
+      return { success: false, error: `Import commit not supported for engine type: ${engineType}` };
+  }
+}
+
 export function buildModuleRouter(templateType: string): Router {
   const router = Router();
   const normalizedType = templateType as TemplateType;
 
   // Every dynamic route is auth-protected and module-guarded.
   router.use(authenticate, requireMountedModule, enforceMountedModuleActive, enforceMountedModulePropertyAccess);
+
+  // Import routes (available for all engine types)
+  buildImportRouter(router, normalizedType);
 
   switch (normalizedType) {
     case 'menu_service':

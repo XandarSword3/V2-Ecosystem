@@ -53,7 +53,7 @@ export async function callLlmParser(systemPrompt: string, userInput: string): Pr
  * Base system prompts for different module imports
  */
 export const LLM_SYSTEM_PROMPTS = {
-  restaurant: `You are a menu parsing expert. Convert the following unstructured text into a structured JSON array of menu items.
+  menu_service: `You are a menu parsing expert. Convert the following unstructured text into a structured JSON array of menu items.
 Each item must follow this schema:
 {
   "name": string (required),
@@ -87,39 +87,7 @@ Rules:
 4. If ingredients or components are mentioned or strongly implied by the item name (e.g. 'Cheese Pizza' implies mozzarella, dough, tomato sauce), add an 'ingredients' array. Each ingredient: { name, estimatedQuantity, estimatedUnit }. Use sensible restaurant quantities (e.g. mozzarella: 80g, dough: 200g). If you cannot reasonably infer ingredients, omit the field.
 5. If a modifier option is an ingredient (e.g. 'extra cheese +$1.50'), add inventoryItemName to the option with the ingredient name.`,
 
-  snackBar: `You are a snack bar menu parsing expert. Convert unstructured text into a structured JSON array of snack items.
-Each item must follow this schema:
-{
-  "name": string (required),
-  "price": number (required),
-  "category": string (required, must be one of: drinks, snacks, ice_cream, sandwiches, other),
-  "description": string (optional),
-  "is_available": boolean (default true),
-  "discount_price": number (optional),
-  "calories": number (optional),
-  "allergens": string[] (optional),
-  "variants": [
-    {
-      "name": string (e.g., 'Small', 'Medium', 'Large'),
-      "price": number
-    }
-  ] (optional),
-  "ingredients": [
-    {
-      "name": string,
-      "estimatedQuantity": number,
-      "estimatedUnit": string (one of: 'g', 'ml', 'piece', 'kg', 'l')
-    }
-  ] (optional)
-}
-Rules:
-1. Prices must be numbers.
-2. For drinks, extract size variants if present (small/medium/large with prices).
-3. Categories MUST be one of: drinks, snacks, ice_cream, sandwiches, other.
-4. Extract ingredients where inferable.
-5. Respond ONLY with the JSON array. No preamble or markdown.`,
-
-  poolSessions: `You are a pool session configuration parsing expert. Convert unstructured text into a structured JSON array of pool sessions.
+  session_access: `You are a session-based access configuration parsing expert. Convert unstructured text into a structured JSON array of sessions.
 Each session must follow this schema:
 {
   "name": string (required, e.g., "Morning Session"),
@@ -127,7 +95,7 @@ Each session must follow this schema:
   "endTime": string (required, "HH:MM" 24hr format),
   "adultPrice": number (required),
   "childPrice": number (optional),
-  "capacity": number (required, max concurrent swimmers),
+  "capacity": number (required, max concurrent users),
   "genderRestriction": "mixed" | "male" | "female" (optional, default "mixed"),
   "daysOfWeek": number[] (optional, 0=Sun to 6=Sat, empty means all days),
   "isActive": boolean (default true),
@@ -140,10 +108,10 @@ Rules:
 3. Gender restriction: use "mixed" unless specified otherwise.
 4. Respond ONLY with the JSON array. No preamble or markdown.`,
 
-  chalets: `You are a chalet/accommodation parsing expert. Convert unstructured text into a structured JSON array of chalet units.
-Each chalet must follow this schema:
+  multi_day_booking: `You are an accommodation/bookable unit parsing expert. Convert unstructured text into a structured JSON array of bookable units.
+Each unit must follow this schema:
 {
-  "name": string (required, e.g., "Chalet A", "Sunset Villa"),
+  "name": string (required, e.g., "Unit A", "Sunset Villa"),
   "description": string (optional),
   "maxGuests": number (required),
   "bedrooms": number (optional),
