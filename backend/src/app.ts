@@ -17,7 +17,6 @@ import { authenticate, authorize } from './middleware/auth.middleware.js';
 // Module Routes imports
 import adminRoutes from './modules/admin/admin.routes.js';
 import authRoutes from './modules/auth/auth.routes.js';
-import chaletRoutes from './modules/chalets/chalet.routes.js';
 import couponRoutes from './modules/coupons/coupon.routes.js';
 import deviceRoutes from './modules/devices/devices.routes.js';
 import giftCardRoutes from './modules/giftcards/giftcard.routes.js';
@@ -26,10 +25,7 @@ import inventoryRoutes from './modules/inventory/inventory.routes.js';
 import loyaltyRoutes from './modules/loyalty/loyalty.routes.js';
 import managerRoutes from './modules/manager/manager.routes.js';
 import paymentRoutes from './modules/payments/payment.routes.js';
-import poolRoutes from './modules/pool/pool.routes.js';
-import restaurantRoutes from './modules/restaurant/restaurant.routes.js';
 import reviewRoutes from './modules/reviews/reviews.routes.js';
-import snackRoutes from './modules/snack/snack.routes.js';
 import staffRoutes from './modules/staff/staff.routes.js';
 import moduleStaffRoutes from './modules/staff/module-staff.routes.js';
 import supportRoutes from './modules/support/support.routes.js';
@@ -40,7 +36,6 @@ import bookingModRoutes from './modules/bookings/booking-modification.controller
 // White-Label & AI Accessibility Routes
 import publicRoutes from './modules/public/public.routes.js';
 import terminologyRoutes from './routes/terminology.routes.js';
-import genericRoutes from './routes/generic.routes.js';
 import translationRoutes from './routes/translation.routes.js';
 import docsRoutes from './routes/docs.routes.js';
 import searchRoutes from './routes/search.routes.js';
@@ -126,8 +121,7 @@ apiRouter.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new D
 // API Module Routes mount points
 apiRouter.use('/admin', adminRoutes);
 apiRouter.use('/auth', authRoutes);
-apiRouter.use('/bookings', bookingModRoutes); // FIX: Iteration 5 - Mount missing bookings routes
-apiRouter.use('/chalets', chaletRoutes);
+apiRouter.use('/bookings', bookingModRoutes);
 apiRouter.use('/coupons', couponRoutes);
 apiRouter.use('/devices', deviceRoutes);
 apiRouter.use('/giftcards', giftCardRoutes);
@@ -136,10 +130,7 @@ apiRouter.use('/inventory', inventoryRoutes);
 apiRouter.use('/loyalty', loyaltyRoutes);
 apiRouter.use('/manager', managerRoutes);
 apiRouter.use('/payments', paymentRoutes);
-apiRouter.use('/pool', poolRoutes);
-apiRouter.use('/restaurant', restaurantRoutes);
 apiRouter.use('/reviews', reviewRoutes);
-apiRouter.use('/snack', snackRoutes);
 apiRouter.use('/staff', staffRoutes);
 apiRouter.use('/staff', moduleStaffRoutes); // FIX: Mount dynamic module staff routes (room-service, hotel-rooms, spa, etc.)
 apiRouter.use('/support', supportRoutes);
@@ -149,12 +140,9 @@ apiRouter.use('/search', searchRoutes);
 // White-Label Routes
 apiRouter.use('/terminology', terminologyRoutes);
 apiRouter.use('/translations', translationRoutes);
-apiRouter.use('/', genericRoutes);
 
 // New Modules
 import financeRoutes from './modules/finance/finance.routes.js';
-import modifiersRoutes from './modules/restaurant/modifiers.routes.js';
-import waitlistRoutes from './modules/restaurant/waitlist.routes.js';
 import customizationRoutes from './modules/customization/routes/customization.routes.js';
 import paymentPlatformRoutes from './modules/payments/payment.v1.routes.js';
 
@@ -189,10 +177,8 @@ import messagingRoutes from './modules/messaging/messaging.routes.js';
 import i18nRoutes from './modules/i18n/i18n.routes.js';
 
 apiRouter.use('/finance', financeRoutes);
-apiRouter.use('/restaurant/modifiers', modifiersRoutes);
-apiRouter.use('/restaurant/waitlist', waitlistRoutes);
 
-// Unified Customization System - for ALL modules (restaurant, chalets, pool, snack bar, future modules)
+// Unified Customization System - engine-neutral, serves all modules via dynamic routing
 apiRouter.use('/customizations', customizationRoutes);
 
 // Integration Routes

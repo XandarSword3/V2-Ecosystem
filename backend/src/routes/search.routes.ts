@@ -16,34 +16,30 @@ router.get('/orders', authenticate, authorize('staff', 'manager', 'admin', 'supe
       return nextQuery;
     };
 
-    let restaurantQ = applyFilters(supabase.from('restaurant_orders').select('id, customer_id, customer_name, total_amount, status, created_at, module_id, order_number'));
-    let chaletQ = applyFilters(supabase.from('chalet_bookings').select('id, customer_id, customer_name, total_amount, status, created_at, chalet_id, booking_number'));
-    let poolQ = applyFilters(supabase.from('pool_tickets').select('id, customer_id, customer_name, total_amount, status, created_at, session_id, ticket_number'));
-    let snackQ = applyFilters(supabase.from('snack_orders').select('id, customer_id, customer_name, total_amount, status, created_at, order_number'));
+    let ordersQ = applyFilters(supabase.from('orders').select('id, customer_id, customer_name, total_amount, status, created_at, module_id, order_number'));
+    let bookingsQ = applyFilters(supabase.from('bookings').select('id, customer_id, customer_name, total_amount, status, created_at, unit_id, booking_number'));
+    let ticketsQ = applyFilters(supabase.from('tickets').select('id, customer_id, customer_name, total_amount, status, created_at, session_id, ticket_number'));
 
     if (customer_id) {
-      restaurantQ = restaurantQ.eq('customer_id', customer_id);
-      chaletQ = chaletQ.eq('customer_id', customer_id);
-      poolQ = poolQ.eq('customer_id', customer_id);
-      snackQ = snackQ.eq('customer_id', customer_id);
+      ordersQ = ordersQ.eq('customer_id', customer_id);
+      bookingsQ = bookingsQ.eq('customer_id', customer_id);
+      ticketsQ = ticketsQ.eq('customer_id', customer_id);
     }
     if (q) {
-      restaurantQ = restaurantQ.ilike('customer_name', `%${q}%`);
-      chaletQ = chaletQ.ilike('customer_name', `%${q}%`);
-      poolQ = poolQ.ilike('customer_name', `%${q}%`);
-      snackQ = snackQ.ilike('customer_name', `%${q}%`);
+      ordersQ = ordersQ.ilike('customer_name', `%${q}%`);
+      bookingsQ = bookingsQ.ilike('customer_name', `%${q}%`);
+      ticketsQ = ticketsQ.ilike('customer_name', `%${q}%`);
     }
     if (module) {
-      restaurantQ = restaurantQ.eq('module_id', module);
+      ordersQ = ordersQ.eq('module_id', module);
     }
 
-    const [restaurantRes, chaletRes, poolRes, snackRes] = await Promise.all([restaurantQ, chaletQ, poolQ, snackQ]);
+    const [ordersRes, bookingsRes, ticketsRes] = await Promise.all([ordersQ, bookingsQ, ticketsQ]);
 
     const combined = [
-      ...(restaurantRes.data || []).map((row: any) => ({ ...row, type: 'restaurant_order' })),
-      ...(chaletRes.data || []).map((row: any) => ({ ...row, type: 'chalet_booking' })),
-      ...(poolRes.data || []).map((row: any) => ({ ...row, type: 'pool_ticket' })),
-      ...(snackRes.data || []).map((row: any) => ({ ...row, type: 'snack_order' })),
+      ...(ordersRes.data || []).map((row: any) => ({ ...row, type: 'order' })),
+      ...(bookingsRes.data || []).map((row: any) => ({ ...row, type: 'booking' })),
+      ...(ticketsRes.data || []).map((row: any) => ({ ...row, type: 'ticket' })),
     ].sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime());
 
     res.json({ success: true, data: combined });
