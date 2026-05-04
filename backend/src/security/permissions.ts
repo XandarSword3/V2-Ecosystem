@@ -208,12 +208,6 @@ export const RolePermissions: Record<Role, (Permission | '*')[]> = {
   // Admin - full system access except super-admin-only operations
   [Roles.ADMIN]: [
     '*', // All permissions
-    ...Object.values(Permissions).filter(p => 
-      p.startsWith('restaurant:') ||
-      p.startsWith('chalet:') ||
-      p.startsWith('pool:') ||
-      p.startsWith('snack:')
-    ),
     // All payment permissions
     Permissions.PAYMENT_CREATE,
     Permissions.PAYMENT_READ_OWN,

@@ -29,8 +29,8 @@ export default function BookingsImportPage() {
   return (
     <ImportWizard<AccommodationItem>
       title={`Import ${currentModule.name} Accommodations`}
-      parseEndpoint="/chalets/import/parse"
-      commitEndpoint="/chalets/import/commit"
+      parseEndpoint={`/api/modules/${slug}/import/parse`}
+      commitEndpoint={`/api/modules/${slug}/import/commit`}
       llmPlaceholder={`Paste your accommodation data here. Examples:
 
 Chalet Name: Ocean View Villa
