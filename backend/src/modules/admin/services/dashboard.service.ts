@@ -10,28 +10,17 @@ interface DashboardStats {
   revenueChange: number;
   bookingsChange: number;
   guestsChange: number;
-  restaurantRevenue: number;
-  snackRevenue: number;
-  chaletRevenue: number;
-  poolRevenue: number;
+  revenueByEngine: Record<string, number>;
   todayStats: {
-    restaurantOrders: number;
-    snackOrders: number;
-    chaletBookings: number;
-    poolTickets: number;
-    restaurantRevenue: number;
-    snackRevenue: number;
-    chaletRevenue: number;
-    poolRevenue: number;
+    transactionCountByEngine: Record<string, number>;
+    revenueByEngine: Record<string, number>;
   };
 }
 
 interface RevenueDataPoint {
   date: string;
-  restaurant: number;
-  snack: number;
-  chalet: number;
-  pool: number;
+  revenueByEngine: Record<string, number>;
+  total: number;
 }
 
 interface RecentOrder {
@@ -47,7 +36,7 @@ interface RecentOrder {
 export class DashboardService {
   private supabase = getSupabase();
 
-  async getDashboardStats(): Promise<DashboardStats> {
+  async getDashboardStats(propertyId?: string): Promise<DashboardStats> {
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
     const yesterday = dayjs().subtract(1, 'day').startOf('day').toISOString();
@@ -55,194 +44,123 @@ export class DashboardService {
     const lastWeekStart = dayjs().subtract(7, 'day').startOf('day').toISOString();
     const lastWeekEnd = dayjs().subtract(7, 'day').endOf('day').toISOString();
 
-    const [
-      restaurantOrdersResult,
-      restaurantRevenueResult,
-      snackOrdersResult,
-      snackRevenueResult,
-      chaletBookingsResult,
-      chaletRevenueResult,
-      poolTicketsResult,
-      poolRevenueResult,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      _usersResult,
-      yesterdayOrdersResult,
-      yesterdayRevenueResult,
-      lastWeekBookingsResult,
-      yesterdayTicketsResult
-    ] = await Promise.all([
-      this.supabase.from('restaurant_orders')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', today)
-        .lte('created_at', endOfDay),
-      this.supabase.from('restaurant_orders')
-        .select('total_amount')
+    // Single queries against transactions table
+    const pFilter = propertyId || '';
+    const [todayTxRes, yesterdayTxRes, lastWeekBookingsRes, yesterdayGuestsRes] = await Promise.all([
+      this.supabase.from('transactions')
+        .select('engine_type, amount')
         .gte('created_at', today)
         .lte('created_at', endOfDay)
-        .eq('payment_status', 'paid'),
-      this.supabase.from('snack_orders')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', today)
-        .lte('created_at', endOfDay),
-      this.supabase.from('snack_orders')
-        .select('total_amount')
-        .gte('created_at', today)
-        .lte('created_at', endOfDay)
-        .eq('payment_status', 'paid'),
-      this.supabase.from('chalet_bookings')
-        .select('id', { count: 'exact', head: true })
-        .gte('check_in_date', today)
-        .lte('check_in_date', endOfDay),
-      this.supabase.from('chalet_bookings')
-        .select('total_amount')
-        .gte('check_in_date', today)
-        .lte('check_in_date', endOfDay)
-        .eq('payment_status', 'paid'),
-      this.supabase.from('pool_tickets')
-        .select('id', { count: 'exact', head: true })
-        .gte('ticket_date', today)
-        .lte('ticket_date', endOfDay),
-      this.supabase.from('pool_tickets')
-        .select('total_amount')
-        .gte('ticket_date', today)
-        .lte('ticket_date', endOfDay)
-        .eq('payment_status', 'paid'),
-      this.supabase.from('users')
-        .select('id', { count: 'exact', head: true }),
-      this.supabase.from('restaurant_orders')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', yesterday)
-        .lte('created_at', endOfYesterday),
-      this.supabase.from('restaurant_orders')
-        .select('total_amount')
+        .neq('status', 'cancelled')
+        .eq('property_id', pFilter),
+      this.supabase.from('transactions')
+        .select('engine_type, amount')
         .gte('created_at', yesterday)
         .lte('created_at', endOfYesterday)
-        .eq('payment_status', 'paid'),
-      this.supabase.from('chalet_bookings')
+        .neq('status', 'cancelled')
+        .eq('property_id', pFilter),
+      this.supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .gte('check_in_date', lastWeekStart)
-        .lte('check_in_date', lastWeekEnd),
-      this.supabase.from('pool_tickets')
+        .eq('engine_type', 'time_exclusive_reservation')
+        .gte('created_at', lastWeekStart)
+        .lte('created_at', lastWeekEnd)
+        .neq('status', 'cancelled')
+        .eq('property_id', pFilter),
+      this.supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .gte('ticket_date', yesterday)
-        .lte('ticket_date', endOfYesterday)
+        .eq('engine_type', 'shared_capacity_access')
+        .gte('created_at', yesterday)
+        .lte('created_at', endOfYesterday)
+        .neq('status', 'cancelled')
+        .eq('property_id', pFilter)
     ]);
 
-    interface AmountRow { total_amount: number | null }
-    const restaurantRevenue = (restaurantRevenueResult.data as AmountRow[] || [])
-      .reduce((sum: number, o) => sum + (Number(o.total_amount) || 0), 0);
-    const snackRevenue = (snackRevenueResult.data as AmountRow[] || [])
-      .reduce((sum: number, o) => sum + (Number(o.total_amount) || 0), 0);
-    const chaletRevenue = (chaletRevenueResult.data as AmountRow[] || [])
-      .reduce((sum: number, b) => sum + (Number(b.total_amount) || 0), 0);
-    const poolRevenue = (poolRevenueResult.data as AmountRow[] || [])
-      .reduce((sum: number, t) => sum + (Number(t.total_amount) || 0), 0);
+    const todayTx = todayTxRes.data || [];
+    const yesterdayTx = yesterdayTxRes.data || [];
 
-    const todayOrders = (restaurantOrdersResult.count || 0) + (snackOrdersResult.count || 0);
-    const todayRevenue = restaurantRevenue + snackRevenue + chaletRevenue + poolRevenue;
+    // Aggregate by engine type
+    const revenueByEngine: Record<string, number> = {};
+    const txCountByEngine: Record<string, number> = {};
+    for (const tx of todayTx) {
+      const engine = tx.engine_type;
+      revenueByEngine[engine] = (revenueByEngine[engine] || 0) + (Number(tx.amount) || 0);
+      txCountByEngine[engine] = (txCountByEngine[engine] || 0) + 1;
+    }
 
-    const yesterdayOrders = yesterdayOrdersResult.count || 0;
-    const yesterdayRevenue = (yesterdayRevenueResult.data as AmountRow[] || [])
-      .reduce((sum: number, o) => sum + (Number(o.total_amount) || 0), 0);
-    const lastWeekBookings = lastWeekBookingsResult.count || 0;
-    const yesterdayTickets = yesterdayTicketsResult.count || 0;
+    const yesterdayRevenueByEngine: Record<string, number> = {};
+    const yesterdayTxCountByEngine: Record<string, number> = {};
+    for (const tx of yesterdayTx) {
+      const engine = tx.engine_type;
+      yesterdayRevenueByEngine[engine] = (yesterdayRevenueByEngine[engine] || 0) + (Number(tx.amount) || 0);
+      yesterdayTxCountByEngine[engine] = (yesterdayTxCountByEngine[engine] || 0) + 1;
+    }
 
-    const ordersChange = yesterdayOrders > 0 
-      ? Math.round(((todayOrders - yesterdayOrders) / yesterdayOrders) * 100) 
+    const todayOrders = Object.values(txCountByEngine).reduce((s, c) => s + c, 0);
+    const todayRevenue = Object.values(revenueByEngine).reduce((s, r) => s + r, 0);
+    const yesterdayOrders = Object.values(yesterdayTxCountByEngine).reduce((s, c) => s + c, 0);
+    const yesterdayRevenue = Object.values(yesterdayRevenueByEngine).reduce((s, r) => s + r, 0);
+    const lastWeekBookings = lastWeekBookingsRes.count || 0;
+    const yesterdayGuests = yesterdayGuestsRes.count || 0;
+
+    const ordersChange = yesterdayOrders > 0
+      ? Math.round(((todayOrders - yesterdayOrders) / yesterdayOrders) * 100)
       : 0;
-    const revenueChange = yesterdayRevenue > 0 
-      ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100) 
+    const revenueChange = yesterdayRevenue > 0
+      ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
       : 0;
-    const bookingsChange = lastWeekBookings > 0 
-      ? Math.round((((chaletBookingsResult.count || 0) - lastWeekBookings) / lastWeekBookings) * 100) 
+    const bookingsChange = lastWeekBookings > 0
+      ? Math.round((((txCountByEngine['time_exclusive_reservation'] || 0) - lastWeekBookings) / lastWeekBookings) * 100)
       : 0;
-    const guestsChange = yesterdayTickets > 0 
-      ? Math.round((((poolTicketsResult.count || 0) - yesterdayTickets) / yesterdayTickets) * 100) 
+    const guestsChange = yesterdayGuests > 0
+      ? Math.round((((txCountByEngine['shared_capacity_access'] || 0) - yesterdayGuests) / yesterdayGuests) * 100)
       : 0;
 
     return {
       totalOrders: todayOrders,
       totalRevenue: todayRevenue,
-      totalBookings: chaletBookingsResult.count || 0,
-      totalGuests: poolTicketsResult.count || 0,
+      totalBookings: txCountByEngine['time_exclusive_reservation'] || 0,
+      totalGuests: txCountByEngine['shared_capacity_access'] || 0,
       ordersChange,
       revenueChange,
       bookingsChange,
       guestsChange,
-      restaurantRevenue,
-      snackRevenue,
-      chaletRevenue,
-      poolRevenue,
+      revenueByEngine,
       todayStats: {
-        restaurantOrders: restaurantOrdersResult.count || 0,
-        snackOrders: snackOrdersResult.count || 0,
-        chaletBookings: chaletBookingsResult.count || 0,
-        poolTickets: poolTicketsResult.count || 0,
-        restaurantRevenue,
-        snackRevenue,
-        chaletRevenue,
-        poolRevenue
+        transactionCountByEngine: txCountByEngine,
+        revenueByEngine
       }
     };
   }
 
   async getRecentOrders(limit = 10): Promise<RecentOrder[]> {
     const { data } = await this.supabase
-      .from('restaurant_orders')
-      .select('id, order_number, customer_name, status, total_amount, created_at, items:restaurant_order_items(id)')
+      .from('transactions')
+      .select('id, reference_table, status, amount, created_at, metadata')
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    interface OrderWithItems {
-      id: string;
-      order_number: string;
-      customer_name: string;
-      status: string;
-      total_amount: number;
-      created_at: string;
-      items?: Array<{ id: string }>;
-    }
-
-    return ((data || []) as OrderWithItems[]).map(order => ({
-      id: order.id,
-      order_number: order.order_number,
-      customer_name: order.customer_name,
-      status: order.status,
-      total_amount: order.total_amount,
-      created_at: order.created_at,
-      itemCount: order.items?.length || 0
+    return ((data || []) as Array<{ id: string; reference_table: string; status: string; amount: number; created_at: string; metadata: Record<string, any> }>).map(tx => ({
+      id: tx.id,
+      order_number: tx.metadata?.order_number || tx.metadata?.booking_number || tx.metadata?.ticket_number || tx.id.slice(0, 8),
+      customer_name: tx.metadata?.customer_name || '',
+      status: tx.status,
+      total_amount: tx.amount,
+      created_at: tx.created_at,
+      itemCount: 0
     }));
   }
 
-  async getRevenueByPeriod(startDate: string, endDate: string, granularity: 'day' | 'week' | 'month' = 'day'): Promise<RevenueDataPoint[]> {
-    const [restaurantData, snackData, chaletData, poolData] = await Promise.all([
-      this.supabase.from('restaurant_orders')
-        .select('created_at, total_amount')
-        .gte('created_at', startDate)
-        .lte('created_at', endDate)
-        .eq('payment_status', 'paid'),
-      this.supabase.from('snack_orders')
-        .select('created_at, total_amount')
-        .gte('created_at', startDate)
-        .lte('created_at', endDate)
-        .eq('payment_status', 'paid'),
-      this.supabase.from('chalet_bookings')
-        .select('check_in_date, total_amount')
-        .gte('check_in_date', startDate)
-        .lte('check_in_date', endDate)
-        .eq('payment_status', 'paid'),
-      this.supabase.from('pool_tickets')
-        .select('ticket_date, total_amount')
-        .gte('ticket_date', startDate)
-        .lte('ticket_date', endDate)
-        .eq('payment_status', 'paid')
-    ]);
+  async getRevenueByPeriod(startDate: string, endDate: string, granularity: 'day' | 'week' | 'month' = 'day', propertyId?: string): Promise<RevenueDataPoint[]> {
+    let query = this.supabase.from('transactions')
+      .select('engine_type, amount, created_at')
+      .gte('created_at', startDate)
+      .lte('created_at', endDate)
+      .neq('status', 'cancelled');
+    if (propertyId) query = query.eq('property_id', propertyId);
+    const { data } = await query;
 
-    // Group by date
     const revenueMap = new Map<string, RevenueDataPoint>();
-    
-    interface DateAmount { created_at?: string; check_in_date?: string; ticket_date?: string; total_amount: number }
-    
+
     const getDateKey = (date: string): string => {
       const d = dayjs(date);
       switch (granularity) {
@@ -252,33 +170,13 @@ export class DashboardService {
       }
     };
 
-    ((restaurantData.data || []) as DateAmount[]).forEach(item => {
-      const key = getDateKey(item.created_at || '');
-      const existing = revenueMap.get(key) || { date: key, restaurant: 0, snack: 0, chalet: 0, pool: 0 };
-      existing.restaurant += Number(item.total_amount) || 0;
+    for (const tx of (data || [])) {
+      const key = getDateKey(tx.created_at);
+      const existing = revenueMap.get(key) || { date: key, revenueByEngine: {}, total: 0 };
+      existing.revenueByEngine[tx.engine_type] = (existing.revenueByEngine[tx.engine_type] || 0) + (Number(tx.amount) || 0);
+      existing.total += Number(tx.amount) || 0;
       revenueMap.set(key, existing);
-    });
-
-    ((snackData.data || []) as DateAmount[]).forEach(item => {
-      const key = getDateKey(item.created_at || '');
-      const existing = revenueMap.get(key) || { date: key, restaurant: 0, snack: 0, chalet: 0, pool: 0 };
-      existing.snack += Number(item.total_amount) || 0;
-      revenueMap.set(key, existing);
-    });
-
-    ((chaletData.data || []) as DateAmount[]).forEach(item => {
-      const key = getDateKey(item.check_in_date || '');
-      const existing = revenueMap.get(key) || { date: key, restaurant: 0, snack: 0, chalet: 0, pool: 0 };
-      existing.chalet += Number(item.total_amount) || 0;
-      revenueMap.set(key, existing);
-    });
-
-    ((poolData.data || []) as DateAmount[]).forEach(item => {
-      const key = getDateKey(item.ticket_date || '');
-      const existing = revenueMap.get(key) || { date: key, restaurant: 0, snack: 0, chalet: 0, pool: 0 };
-      existing.pool += Number(item.total_amount) || 0;
-      revenueMap.set(key, existing);
-    });
+    }
 
     return Array.from(revenueMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   }

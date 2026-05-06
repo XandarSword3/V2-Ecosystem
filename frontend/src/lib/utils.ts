@@ -108,6 +108,11 @@ export function formatNumber(num: number | undefined | null): string {
   return new Intl.NumberFormat('en-US').format(num);
 }
 
+export function formatPercent(value: number | undefined | null, decimals: number = 1): string {
+  if (value === undefined || value === null) return '0%';
+  return `${value.toFixed(decimals)}%`;
+}
+
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';

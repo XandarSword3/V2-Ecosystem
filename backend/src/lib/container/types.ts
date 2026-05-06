@@ -953,7 +953,7 @@ export interface SocketEmitter {
 
 export type PaymentMethod = 'card' | 'cash' | 'bank_transfer' | 'other';
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'cancelled';
-export type ReferenceType = 'order' | 'booking' | 'pool_ticket' | 'snack_order';
+export type ReferenceType = 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
 
 export interface Payment {
   id: string;

@@ -358,6 +358,27 @@ export class OfflineStore<T extends { id: string }> {
     });
   }
 
+  // Generic key-value operations for flexible stores
+  async get(id: string): Promise<T | undefined> {
+    return this.getById(id);
+  }
+
+  // Cache-specific helpers
+  async isStale(id: string, ttlMinutes: number): Promise<boolean> {
+    const item = await this.getById(id);
+    if (!item) return true;
+    const lastSync = (item as unknown as { lastSyncAt?: string }).lastSyncAt;
+    if (!lastSync) return true;
+    const ageMs = Date.now() - new Date(lastSync).getTime();
+    return ageMs > ttlMinutes * 60 * 1000;
+  }
+
+  async updateMetadata(id: string, metadata: Partial<T>): Promise<void> {
+    const existing = await this.getById(id);
+    const updated = { ...existing, ...metadata, id } as T;
+    await this.put(updated);
+  }
+
 }
 
 // Export store instances
@@ -374,6 +395,12 @@ export const ticketsStore = new OfflineStore<OfflineEntity>(STORES.TICKETS);
 export const housekeepingTasksStore = new OfflineStore<OfflineEntity>(STORES.HOUSEKEEPING_TASKS);
 export const conflictsStore = new OfflineStore<SyncConflict>(STORES.CONFLICTS);
 export const offlineActivityStore = new OfflineStore<OfflineEntity>(STORES.OFFLINE_ACTIVITY);
+
+// Generic key-value store for dynamic module data (moduleId:endpoint -> data)
+export const moduleDataStore = new OfflineStore<{ id: string; moduleId: string; endpoint: string; data: unknown[]; hydratedAt: string }>('module_data');
+
+// Generic cache metadata store with flexible metadata object
+export const moduleCacheStore = new OfflineStore<{ id: string; lastSyncAt: string; [key: string]: unknown }>('module_cache');
 
 /**
  * Sync Queue Management
