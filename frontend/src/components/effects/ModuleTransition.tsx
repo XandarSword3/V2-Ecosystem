@@ -321,7 +321,7 @@ const ConstellationConnect = ({ primary, secondary }: { primary: string; seconda
     {/* Connecting lines */}
     <svg className="absolute inset-0 w-full h-full">
       <motion.path
-        d="M 10% 40% Q 30% 20% 50% 40% T 90% 40%"
+        d="M 100 200 Q 300 100 500 200 T 900 200"
         stroke={secondary}
         strokeWidth="1"
         fill="none"

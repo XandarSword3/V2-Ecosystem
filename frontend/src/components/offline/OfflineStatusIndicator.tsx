@@ -3,17 +3,20 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wifi, WifiOff, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { WifiOff, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useOfflineSync } from '@/lib/offline';
 
 export function OfflineStatusIndicator() {
   const t = useTranslations('adminCommon.offline');
   const { isOnline, isSyncing, pendingCount, lastSyncAt, error } = useOfflineSync();
   const [showSyncSuccess, setShowSyncSuccess] = useState(false);
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState<Date | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 30000); // Refresh every 30s
+    setMounted(true);
+    setNow(new Date());
+    const interval = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -26,6 +29,7 @@ export function OfflineStatusIndicator() {
   }, [isOnline, pendingCount, isSyncing, error]);
 
   const getStalenessColor = (date: Date) => {
+    if (!now) return 'bg-green-600 text-white';
     const minutes = (now.getTime() - new Date(date).getTime()) / 60000;
     if (minutes < 15) return 'bg-green-600 text-white';
     if (minutes < 60) return 'bg-yellow-500 text-white';
@@ -33,6 +37,7 @@ export function OfflineStatusIndicator() {
   };
 
   const getTimeAgo = (date: Date) => {
+    if (!now) return 'just now';
     const minutes = Math.floor((now.getTime() - new Date(date).getTime()) / 60000);
     if (minutes < 1) return 'just now';
     if (minutes < 60) return `${minutes}m ago`;
@@ -40,6 +45,11 @@ export function OfflineStatusIndicator() {
     return `${hours}h ago`;
   };
 
+
+  // Prevent hydration mismatch - don't render until client-side
+  if (!mounted) {
+    return <div className="fixed bottom-4 right-4 z-50 pointer-events-none" />;
+  }
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end pointer-events-none">
@@ -127,7 +137,7 @@ export function OfflineStatusIndicator() {
   );
 }
 
-function Clock(props: any) {
+function Clock(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}

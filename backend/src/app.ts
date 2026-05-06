@@ -32,6 +32,8 @@ import supportRoutes from './modules/support/support.routes.js';
 import userRoutes from './modules/users/user.routes.js';
 // FIX: Iteration 5 - Import booking modification routes (were never mounted, all /bookings/* returned 404)
 import bookingModRoutes from './modules/bookings/booking-modification.controller.js';
+// FIX: Analytics routes - were never mounted, causing 404s on /analytics/*
+import { analyticsRoutes } from './modules/analytics/analytics.routes.js';
 
 // White-Label & AI Accessibility Routes
 import publicRoutes from './modules/public/public.routes.js';
@@ -213,6 +215,8 @@ apiRouter.use('/mobile-checkin', mobileCheckinRoutes);
 apiRouter.use('/kiosk', kioskRoutes);
 apiRouter.use('/messaging', messagingRoutes);
 apiRouter.use('/i18n', i18nRoutes);
+// FIX: Mount analytics routes - executive cockpit, metrics, reports
+apiRouter.use('/analytics', analyticsRoutes);
 apiRouter.use(getDynamicModulesRouter());
 
 // Channel Webhooks - FIXED

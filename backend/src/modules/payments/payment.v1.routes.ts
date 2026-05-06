@@ -21,7 +21,7 @@ const router = Router();
 const createPaymentIntentSchema = z.object({
   amount: z.number().min(50, 'Amount must be at least 50 cents'),
   currency: z.string().length(3).optional().default('EUR'),
-  referenceType: z.enum(['order', 'booking', 'pool_ticket', 'snack_order']),
+  referenceType: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement']),
   referenceId: z.string().uuid('Invalid reference ID'),
   description: z.string().max(500).optional(),
   receiptEmail: z.string().email().optional(),
