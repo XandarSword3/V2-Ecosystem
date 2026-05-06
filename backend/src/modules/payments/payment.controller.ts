@@ -7,6 +7,7 @@ import { logger } from "../../utils/logger.js";
 import { createPaymentIntentSchema, recordCashPaymentSchema, recordManualPaymentSchema, validateBody } from "../../validation/schemas.js";
 import { awardLoyaltyPointsForPayment } from './loyalty-integration.js';
 import { getEngineService } from '../../engines/engine-service.js';
+import { normalizeReferenceType } from './reference-type-adapter.js';
 
 const getStripeInstance = async () => {
   const supabase = getSupabase();
@@ -113,7 +114,11 @@ export async function handleStripeWebhook(req: Request, res: Response) {
   switch (event.type) {
     case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const { referenceType, referenceId } = paymentIntent.metadata;
+      const rawReferenceType = paymentIntent.metadata.referenceType;
+      const referenceId = paymentIntent.metadata.referenceId;
+      
+      // CRITICAL SAFETY: Normalize legacy reference types from Stripe metadata
+      const referenceType = normalizeReferenceType(rawReferenceType);
 
       // Idempotency check: prevent duplicate processing via Ledger
       const { data: existingLedgerEntry } = await supabase
@@ -201,7 +206,11 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const { referenceType, referenceId } = paymentIntent.metadata;
+      const rawReferenceType = paymentIntent.metadata.referenceType;
+      const referenceId = paymentIntent.metadata.referenceId;
+      
+      // CRITICAL SAFETY: Normalize legacy reference types from Stripe metadata
+      const referenceType = normalizeReferenceType(rawReferenceType);
 
       const { error: paymentError } = await supabase
         .from('payments')
@@ -344,32 +353,27 @@ async function updateReferencePaymentStatus(
 ) {
   const supabase = getSupabase();
 
-  switch (referenceType) {
-    case 'restaurant_order':
-      await supabase
-        .from('restaurant_orders')
-        .update({ payment_status: status, updated_at: new Date().toISOString() })
-        .eq('id', referenceId);
-      break;
-    case 'snack_order':
-      await supabase
-        .from('snack_orders')
-        .update({ payment_status: status, updated_at: new Date().toISOString() })
-        .eq('id', referenceId);
-      break;
-    case 'chalet_booking':
-      await supabase
-        .from('chalet_bookings')
-        .update({ payment_status: status, updated_at: new Date().toISOString() })
-        .eq('id', referenceId);
-      break;
-    case 'pool_ticket':
-      await supabase
-        .from('pool_tickets')
-        .update({ payment_status: status, updated_at: new Date().toISOString() })
-        .eq('id', referenceId);
-      break;
+  // Use the transactions table to find the reference_table for this transaction
+  const { data: tx } = await supabase
+    .from('transactions')
+    .select('reference_table')
+    .eq('id', referenceId)
+    .single();
+
+  const refTable = tx?.reference_table;
+  if (refTable) {
+    // Update the source table's payment_status for backward compatibility
+    await supabase
+      .from(refTable)
+      .update({ payment_status: status, updated_at: new Date().toISOString() })
+      .eq('id', referenceId);
   }
+
+  // Also update the transactions table status
+  await supabase
+    .from('transactions')
+    .update({ status })
+    .eq('id', referenceId);
 }
 
 export const recordCashPayment = asyncHandler(async (req: Request, res: Response) => {

@@ -1,5 +1,6 @@
 import { getSupabase } from "../../database/connection.js";
 import { logger } from "../../utils/logger.js";
+import { normalizeReferenceType } from "./reference-type-adapter.js";
 
 /**
  * Award loyalty points to a user after a successful payment.
@@ -9,11 +10,14 @@ import { logger } from "../../utils/logger.js";
  * SELECT→UPDATE sequence to prevent race conditions from concurrent webhooks.
  */
 export async function awardLoyaltyPointsForPayment(
-  referenceType: string,
+  rawReferenceType: string,
   referenceId: string,
   amountDollars: number
 ): Promise<void> {
   const supabase = getSupabase();
+  
+  // CRITICAL: Normalize legacy reference types from webhooks
+  const referenceType = normalizeReferenceType(rawReferenceType);
 
   try {
     // Get loyalty settings to check if loyalty is enabled and get points_per_dollar
@@ -30,47 +34,15 @@ export async function awardLoyaltyPointsForPayment(
 
     const pointsPerDollar = settings.points_per_dollar || 1;
 
-    // Find the user ID based on the reference type and ID
+    // Find the user ID from the unified transactions table
     let userId: string | null = null;
 
-    switch (referenceType) {
-      case 'restaurant_order': {
-        const { data: order } = await supabase
-          .from('restaurant_orders')
-          .select('user_id')
-          .eq('id', referenceId)
-          .single();
-        userId = order?.user_id;
-        break;
-      }
-      case 'snack_order': {
-        const { data: order } = await supabase
-          .from('snack_orders')
-          .select('user_id')
-          .eq('id', referenceId)
-          .single();
-        userId = order?.user_id;
-        break;
-      }
-      case 'chalet_booking': {
-        const { data: booking } = await supabase
-          .from('chalet_bookings')
-          .select('user_id')
-          .eq('id', referenceId)
-          .single();
-        userId = booking?.user_id;
-        break;
-      }
-      case 'pool_ticket': {
-        const { data: ticket } = await supabase
-          .from('pool_tickets')
-          .select('user_id')
-          .eq('id', referenceId)
-          .single();
-        userId = ticket?.user_id;
-        break;
-      }
-    }
+    const { data: tx } = await supabase
+      .from('transactions')
+      .select('customer_id')
+      .eq('id', referenceId)
+      .single();
+    userId = tx?.customer_id || null;
 
     if (!userId) {
       logger.info(`No user found for ${referenceType}:${referenceId}, skipping loyalty points`);

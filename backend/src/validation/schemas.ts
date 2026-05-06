@@ -204,19 +204,19 @@ export const createSnackOrderSchema = z.object({
 export const createPaymentIntentSchema = z.object({
   amount: z.number().positive().max(100000, 'Amount exceeds maximum allowed'),
   currency: z.enum(['usd', 'lbp', 'eur']).default('usd'),
-  referenceType: z.enum(['restaurant_order', 'snack_order', 'chalet_booking', 'pool_ticket']),
+  referenceType: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement']),
   referenceId: uuidSchema,
 });
 
 export const recordCashPaymentSchema = z.object({
-  referenceType: z.enum(['restaurant_order', 'snack_order', 'chalet_booking', 'pool_ticket']),
+  referenceType: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement']),
   referenceId: uuidSchema,
   amount: z.number().positive().max(100000),
   notes: sanitizedString(500).optional(),
 });
 
 export const recordManualPaymentSchema = z.object({
-  referenceType: z.enum(['restaurant_order', 'snack_order', 'chalet_booking', 'pool_ticket']),
+  referenceType: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement']),
   referenceId: uuidSchema,
   amount: z.number().positive().max(100000),
   method: z.enum(['cash', 'whish', 'omt', 'other_transfer']),

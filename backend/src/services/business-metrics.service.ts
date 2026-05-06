@@ -20,12 +20,8 @@ export interface BookingMetrics {
 
 export interface RevenueMetrics {
   total_revenue: number;
-  accommodation_revenue: number;
-  food_revenue: number;
-  pool_revenue: number;
-  other_revenue: number;
+  revenue_by_engine: Record<string, number>;
   revenue_by_day: Array<{ date: string; amount: number }>;
-  revenue_by_payment_method: Record<string, number>;
   average_transaction_value: number;
   refunds_total: number;
 }
@@ -42,12 +38,10 @@ export interface UserMetrics {
 }
 
 export interface OperationalMetrics {
-  orders_today: number;
-  orders_pending: number;
-  orders_completed: number;
-  average_order_time: number; // in minutes
-  pool_tickets_today: number;
-  pool_capacity_utilization: number;
+  transactions_today: number;
+  transactions_pending: number;
+  transactions_completed: number;
+  transactions_by_engine: Record<string, number>;
   staff_online: number;
   active_sessions: number;
 }
@@ -158,21 +152,16 @@ class BusinessMetricsService {
 
     const periodStart = this.getPeriodStart(period);
 
-    // Get transactions
+    // Get transactions from unified table
     const { data: transactions } = await supabase
       .from('transactions')
-      .select('amount, type, payment_method, created_at, status')
-      .gte('created_at', periodStart)
-      .eq('status', 'completed');
+      .select('amount, engine_type, created_at, status')
+      .gte('created_at', periodStart);
 
     const metrics: RevenueMetrics = {
       total_revenue: 0,
-      accommodation_revenue: 0,
-      food_revenue: 0,
-      pool_revenue: 0,
-      other_revenue: 0,
+      revenue_by_engine: {},
       revenue_by_day: [],
-      revenue_by_payment_method: {},
       average_transaction_value: 0,
       refunds_total: 0,
     };
@@ -180,36 +169,18 @@ class BusinessMetricsService {
     const revenueByDate = new Map<string, number>();
 
     for (const tx of transactions || []) {
-      if (tx.amount > 0) {
+      if (tx.amount > 0 && !['cancelled', 'refunded'].includes(tx.status)) {
         metrics.total_revenue += tx.amount;
 
-        // Categorize revenue
-        switch (tx.type) {
-          case 'booking':
-          case 'accommodation':
-            metrics.accommodation_revenue += tx.amount;
-            break;
-          case 'order':
-          case 'food':
-            metrics.food_revenue += tx.amount;
-            break;
-          case 'pool_ticket':
-          case 'pool':
-            metrics.pool_revenue += tx.amount;
-            break;
-          default:
-            metrics.other_revenue += tx.amount;
-        }
-
-        // Group by payment method
-        const method = tx.payment_method || 'unknown';
-        metrics.revenue_by_payment_method[method] =
-          (metrics.revenue_by_payment_method[method] || 0) + tx.amount;
+        // Categorize by engine_type
+        const engine = tx.engine_type || 'other';
+        metrics.revenue_by_engine[engine] =
+          (metrics.revenue_by_engine[engine] || 0) + tx.amount;
 
         // Group by date
         const date = tx.created_at.split('T')[0];
         revenueByDate.set(date, (revenueByDate.get(date) || 0) + tx.amount);
-      } else {
+      } else if (['cancelled', 'refunded'].includes(tx.status)) {
         metrics.refunds_total += Math.abs(tx.amount);
       }
     }
@@ -220,7 +191,7 @@ class BusinessMetricsService {
       .sort((a, b) => a.date.localeCompare(b.date));
 
     // Calculate average
-    const positiveTransactions = transactions?.filter((t) => t.amount > 0) || [];
+    const positiveTransactions = transactions?.filter((t) => t.amount > 0 && !['cancelled', 'refunded'].includes(t.status)) || [];
     if (positiveTransactions.length > 0) {
       metrics.average_transaction_value =
         metrics.total_revenue / positiveTransactions.length;
@@ -306,14 +277,10 @@ class BusinessMetricsService {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const [ordersData, poolTickets, staffOnline, activeSessions] = await Promise.all([
+    const [txData, staffOnline, activeSessions] = await Promise.all([
       supabase
-        .from('orders')
-        .select('status, created_at, completed_at')
-        .gte('created_at', todayStart.toISOString()),
-      supabase
-        .from('pool_tickets')
-        .select('id', { count: 'exact', head: true })
+        .from('transactions')
+        .select('status, engine_type')
         .gte('created_at', todayStart.toISOString()),
       supabase
         .from('users')
@@ -323,29 +290,18 @@ class BusinessMetricsService {
       this.getActiveSessionCount(),
     ]);
 
-    const orders = ordersData.data || [];
-    const completedOrders = orders.filter((o) => o.status === 'completed');
-
-    // Calculate average order time
-    let totalTime = 0;
-    let orderCount = 0;
-    for (const order of completedOrders) {
-      if (order.completed_at && order.created_at) {
-        const duration =
-          new Date(order.completed_at).getTime() -
-          new Date(order.created_at).getTime();
-        totalTime += duration;
-        orderCount++;
-      }
+    const txs = txData.data || [];
+    const transactionsByEngine: Record<string, number> = {};
+    for (const tx of txs) {
+      const engine = tx.engine_type || 'other';
+      transactionsByEngine[engine] = (transactionsByEngine[engine] || 0) + 1;
     }
 
     const metrics: OperationalMetrics = {
-      orders_today: orders.length,
-      orders_pending: orders.filter((o) => o.status === 'pending').length,
-      orders_completed: completedOrders.length,
-      average_order_time: orderCount > 0 ? totalTime / orderCount / 60000 : 0, // Convert to minutes
-      pool_tickets_today: poolTickets.count || 0,
-      pool_capacity_utilization: 0, // Would need pool capacity data
+      transactions_today: txs.length,
+      transactions_pending: txs.filter((t) => t.status === 'pending').length,
+      transactions_completed: txs.filter((t) => t.status === 'completed').length,
+      transactions_by_engine: transactionsByEngine,
       staff_online: staffOnline.count || 0,
       active_sessions: activeSessions,
     };
@@ -461,13 +417,13 @@ class BusinessMetricsService {
       '# TYPE v2resort_users_active_24h gauge',
       `v2resort_users_active_24h ${users.active_users_24h}`,
       '',
-      '# HELP v2resort_orders_today Orders placed today',
-      '# TYPE v2resort_orders_today gauge',
-      `v2resort_orders_today ${operational.orders_today}`,
+      '# HELP v2resort_transactions_today Transactions placed today',
+      '# TYPE v2resort_transactions_today gauge',
+      `v2resort_transactions_today ${operational.transactions_today}`,
       '',
-      '# HELP v2resort_orders_pending Pending orders',
-      '# TYPE v2resort_orders_pending gauge',
-      `v2resort_orders_pending ${operational.orders_pending}`,
+      '# HELP v2resort_transactions_pending Pending transactions',
+      '# TYPE v2resort_transactions_pending gauge',
+      `v2resort_transactions_pending ${operational.transactions_pending}`,
       '',
       '# HELP v2resort_staff_online Staff members currently online',
       '# TYPE v2resort_staff_online gauge',
