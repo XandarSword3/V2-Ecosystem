@@ -245,11 +245,16 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
           icon: Monitor,
           translationKey: 'nav.kioskDevices'
         },
-        { 
-          name: t('nav.reports'), 
-          href: '/admin/reports', 
+        {
+          name: t('nav.reports') || 'Reports',
+          href: '/admin/cockpit',
           icon: BarChart3,
-          translationKey: 'nav.reports'
+          translationKey: 'nav.reports',
+          children: [
+            { name: 'Executive Cockpit', href: '/admin/cockpit', translationKey: 'nav.executiveCockpit' },
+            { name: 'Financial Reports', href: '/admin/financial-reports', translationKey: 'nav.financialReports' },
+            { name: 'Alert Management', href: '/admin/alerts', translationKey: 'nav.alertManagement' },
+          ]
         },
         { 
           name: t('nav.modules'), 

@@ -25,7 +25,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 // Valid payment methods and statuses
 const VALID_METHODS: PaymentMethod[] = ['card', 'cash', 'bank_transfer', 'other'];
 const VALID_STATUSES: PaymentStatus[] = ['pending', 'completed', 'failed', 'refunded', 'cancelled'];
-const VALID_REFERENCE_TYPES: ReferenceType[] = ['order', 'booking', 'pool_ticket', 'snack_order'];
+const VALID_REFERENCE_TYPES: ReferenceType[] = ['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement'];
 
 // Supported currencies
 const SUPPORTED_CURRENCIES = ['EUR', 'USD', 'GBP'];

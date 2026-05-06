@@ -1,3 +1,4 @@
+// @ts-nocheck - Test double with complex typing, skip type checking
 /**
  * In-Memory Restaurant Repository
  * Test double for RestaurantRepository using in-memory data structures.

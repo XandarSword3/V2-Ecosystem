@@ -87,8 +87,8 @@ export interface CreatePaymentIntentInput {
   platform: PaymentPlatform;
   /** User ID for metadata */
   userId: string;
-  /** Reference type (order, booking, etc.) */
-  referenceType: 'order' | 'booking' | 'pool_ticket' | 'snack_order';
+  /** Reference type (engine type) */
+  referenceType: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
   /** Reference ID */
   referenceId: string;
   /** Optional description */
