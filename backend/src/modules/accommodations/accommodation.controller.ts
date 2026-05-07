@@ -9,6 +9,7 @@ import { logActivity } from "../../utils/activityLogger.js";
 import { emitToUnit } from "../../socket/index.js";
 import dayjs from 'dayjs';
 import { terminologyService } from '../../services/terminology.service.js';
+import { getEngineService } from '../../engines/engine-service.js';
 
 // Helper to get dynamic term
 const getTerm = async (key: string, def: string) => {
@@ -152,9 +153,53 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
             return res.status(400).json({ success: false, error: 'Unit is already booked' });
         }
 
-        // ... (Pricing Logic - simplified for brevity, assume similar structure using accommodation_price_rules) ...
-        const baseAmount = parseFloat(unit.base_price) * numberOfNights; // Simplified
-        const totalAmount = baseAmount; // + addOns
+        // Use engine framework for pricing calculation
+        const engineService = getEngineService();
+        
+        // Prepare line items for engine pricing
+        const lineItems = [
+            {
+                id: unitId,
+                name: unit.name || 'Accommodation Unit',
+                quantity: numberOfNights,
+                unitPrice: parseFloat(unit.base_price),
+                type: 'accommodation'
+            }
+        ];
+        
+        // Add add-ons if selected
+        if (selectedAddOns && Array.isArray(selectedAddOns)) {
+            selectedAddOns.forEach((addOn: any) => {
+                lineItems.push({
+                    id: addOn.id,
+                    name: addOn.name,
+                    quantity: addOn.quantity || 1,
+                    unitPrice: parseFloat(addOn.price || 0),
+                    type: 'addon'
+                });
+            });
+        }
+        
+        // Prepare pricing context
+        const pricingContext = {
+            propertyId: unit.property_id,
+            customerId: req.user?.userId || undefined,
+            moduleId: unit.module_id,
+            checkInDate: checkIn.toISOString(),
+            checkOutDate: checkOut.toISOString(),
+            numberOfGuests,
+            staffId: req.user?.userId || undefined
+        };
+        
+        // Calculate pricing using engine
+        const pricingResult = await engineService.calculatePricing(
+            'multi_day_booking',
+            lineItems,
+            pricingContext
+        );
+        
+        const totalAmount = pricingResult.totalAmount;
+        const baseAmount = pricingResult.subtotal;
 
         // Create Booking
         const { data: booking, error: bookingError } = await supabase

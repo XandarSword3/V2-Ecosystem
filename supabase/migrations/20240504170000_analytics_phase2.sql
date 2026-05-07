@@ -27,11 +27,14 @@ CREATE TABLE IF NOT EXISTS alert_definitions (
 ALTER TABLE alert_definitions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can only see alerts for their property
-CREATE POLICY alert_definitions_property_isolation ON alert_definitions
-    FOR ALL
-    USING (property_id IN (
-        SELECT property_id FROM user_property_access WHERE user_id = auth.uid()
-    ));
+DO $$ BEGIN
+    CREATE POLICY alert_definitions_property_isolation ON alert_definitions
+        FOR ALL
+        USING (property_id IN (
+            SELECT property_id FROM user_property_access WHERE user_id = auth.uid()
+        ));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- Create index for performance
 CREATE INDEX idx_alert_definitions_property ON alert_definitions(property_id);
@@ -56,11 +59,14 @@ CREATE TABLE IF NOT EXISTS alert_history (
 
 ALTER TABLE alert_history ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY alert_history_property_isolation ON alert_history
-    FOR ALL
-    USING (property_id IN (
-        SELECT property_id FROM user_property_access WHERE user_id = auth.uid()
-    ));
+DO $$ BEGIN
+    CREATE POLICY alert_history_property_isolation ON alert_history
+        FOR ALL
+        USING (property_id IN (
+            SELECT property_id FROM user_property_access WHERE user_id = auth.uid()
+        ));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 CREATE INDEX idx_alert_history_property ON alert_history(property_id);
 CREATE INDEX idx_alert_history_active ON alert_history(property_id, status) WHERE status = 'active';
@@ -139,11 +145,14 @@ CREATE TABLE IF NOT EXISTS guest_rfm_scores (
 
 ALTER TABLE guest_rfm_scores ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY guest_rfm_property_isolation ON guest_rfm_scores
-    FOR ALL
-    USING (property_id IN (
-        SELECT property_id FROM user_property_access WHERE user_id = auth.uid()
-    ));
+DO $$ BEGIN
+    CREATE POLICY guest_rfm_property_isolation ON guest_rfm_scores
+        FOR ALL
+        USING (property_id IN (
+            SELECT property_id FROM user_property_access WHERE user_id = auth.uid()
+        ));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 CREATE INDEX idx_guest_rfm_property ON guest_rfm_scores(property_id);
 CREATE INDEX idx_guest_rfm_segment ON guest_rfm_scores(property_id, segment);
@@ -169,11 +178,14 @@ CREATE TABLE IF NOT EXISTS saved_queries (
 
 ALTER TABLE saved_queries ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY saved_queries_property_isolation ON saved_queries
-    FOR ALL
-    USING (property_id IN (
-        SELECT property_id FROM user_property_access WHERE user_id = auth.uid()
-    ) OR created_by = auth.uid() OR is_public = true);
+DO $$ BEGIN
+    CREATE POLICY saved_queries_property_isolation ON saved_queries
+        FOR ALL
+        USING (property_id IN (
+            SELECT property_id FROM user_property_access WHERE user_id = auth.uid()
+        ) OR created_by = auth.uid() OR is_public = true);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 CREATE INDEX idx_saved_queries_property ON saved_queries(property_id);
 CREATE INDEX idx_saved_queries_user ON saved_queries(created_by);

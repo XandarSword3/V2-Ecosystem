@@ -281,6 +281,14 @@ export class PricingPipeline {
       })),
       loyaltyPointsEarned,
       depositAmount: round(depositAmount),
+      // Economics reporting fields
+      staffId: context.staffId,
+      propertyId: context.propertyId,
+      moduleId: context.moduleId,
+      promoCodeUsed: context.promoCodeUsed || context.couponCode,
+      cancellationReason: context.cancellationReason,
+      refundAmount: context.refundAmount,
+      refundReason: context.refundReason,
     };
 
     // Validate invariant
