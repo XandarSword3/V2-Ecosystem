@@ -1180,13 +1180,94 @@
     "totalOrders": "Total Orders",
     "totalBookings": "Total Bookings",
     "totalUsers": "Total Users",
-    "registeredAccounts": "Registered Accounts",
+    "restaurantOrders": "Restaurant Orders",
+    "snackBarOrders": "Snack Bar Orders",
     "chaletBookings": "Chalet Bookings",
     "poolSessions": "Pool Sessions",
     "newCustomers": "New Customers",
     "exportReport": "Export Report",
     "exported": "Report exported successfully",
     "dateRange": "Date Range",
+    "economics": {
+      "title": "Economics Reports",
+      "subtitle": "Financial performance and analytics",
+      "revenueOverTime": "Revenue Over Time",
+      "moduleBreakdown": "Revenue by Module",
+      "cancellationAnalysis": "Cancellation Analysis",
+      "staffPerformance": "Staff Performance",
+      "promoEffectiveness": "Promotion Effectiveness",
+      "occupancyReport": "Occupancy Report",
+      "averageTransactionValue": "Average Transaction Value",
+      "refundAnalysis": "Refund Analysis",
+      "period": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "lastWeek": "Last Week",
+        "lastMonth": "Last Month",
+        "lastQuarter": "Last Quarter",
+        "lastYear": "Last Year",
+        "custom": "Custom Range"
+      },
+      "metrics": {
+        "grossRevenue": "Gross Revenue",
+        "netRevenue": "Net Revenue",
+        "refunds": "Refunds",
+        "discounts": "Discounts",
+        "taxes": "Taxes",
+        "serviceCharges": "Service Charges",
+        "cancellations": "Cancellations",
+        "cancellationRate": "Cancellation Rate",
+        "staffTransactions": "Staff Transactions",
+        "promoUsage": "Promo Usage",
+        "promoRevenue": "Promo Revenue",
+        "occupancyRate": "Occupancy Rate",
+        "averageOrderValue": "Average Order Value"
+      },
+      "charts": {
+        "revenueChart": "Revenue Chart",
+        "transactionVolume": "Transaction Volume",
+        "topStaff": "Top Performing Staff",
+        "popularPromos": "Popular Promotions",
+        "cancellationReasons": "Cancellation Reasons",
+        "refundReasons": "Refund Reasons"
+      },
+      "tables": {
+        "staff": {
+          "name": "Staff Name",
+          "transactions": "Transactions",
+          "revenue": "Revenue",
+          "averageValue": "Average Value",
+          "commission": "Commission"
+        },
+        "promotions": {
+          "code": "Promo Code",
+          "usage": "Usage Count",
+          "discount": "Total Discount",
+          "revenue": "Generated Revenue",
+          "roi": "ROI"
+        },
+        "cancellations": {
+          "reason": "Reason",
+          "count": "Count",
+          "percentage": "Percentage",
+          "revenueLost": "Revenue Lost"
+        }
+      },
+      "filters": {
+        "property": "Property",
+        "module": "Module",
+        "staff": "Staff Member",
+        "promoCode": "Promo Code",
+        "cancellationReason": "Cancellation Reason"
+      },
+      "export": {
+        "csv": "Export to CSV",
+        "pdf": "Export to PDF",
+        "excel": "Export to Excel",
+        "includeCharts": "Include Charts",
+        "summaryOnly": "Summary Only"
+      }
+    },
     "errors": {
       "failedToLoad": "Failed to fetch reports data",
       "failedToExport": "Failed to export report"

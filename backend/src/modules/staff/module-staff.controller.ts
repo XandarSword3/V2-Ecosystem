@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
+import { validateBody } from '../../validation/schemas.js';
+import { emitToUnit } from '../../socket/index.js';
+import { getEngineService } from '../../engines/engine-service.js';
 
 /**
  * Dynamic Module Staff Controller
@@ -267,23 +270,54 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     }
 
     // Update the order — actual table is restaurant_orders
-    // Columns: completed_at, cancelled_at exist; actual_ready_time for ready; estimated_ready_time for preparing
-    const { data: order, error } = await supabase
+    // Use engine framework for state transitions
+    const engineService = getEngineService();
+    
+    // Get current order to determine state transition
+    const { data: currentOrder, error: fetchError } = await supabase
       .from('restaurant_orders')
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
+      .select('status, module_id')
+      .eq('id', orderId)
+      .single();
+      
+    if (fetchError || !currentOrder) throw fetchError || new Error('Order not found');
+    
+    // Map status to engine action
+    let engineAction: string;
+    switch (status) {
+      case 'preparing': engineAction = 'start_preparation'; break;
+      case 'ready': engineAction = 'mark_ready'; break;
+      case 'served': engineAction = 'mark_served'; break;
+      case 'completed': engineAction = 'complete'; break;
+      case 'cancelled': engineAction = 'cancel'; break;
+      default: throw new Error(`Invalid status: ${status}`);
+    }
+    
+    // Execute state transition via engine
+    const transitionResult = await engineService.transitionState(
+      'menu_service',
+      currentOrder.status,
+      engineAction,
+      'staff',
+      { 
+        orderId,
+        staffId: userId,
         ...(status === 'preparing' ? { estimated_ready_time: new Date(Date.now() + 20 * 60000).toISOString() } : {}),
         ...(status === 'ready' ? { actual_ready_time: new Date().toISOString() } : {}),
         ...(status === 'served' ? { served_at: new Date().toISOString() } : {}),
         ...(status === 'completed' ? { completed_at: new Date().toISOString() } : {}),
         ...(status === 'cancelled' ? { cancelled_at: new Date().toISOString() } : {}),
-      })
+      }
+    );
+    
+    // Get updated order
+    const { data: order, error: updateError } = await supabase
+      .from('restaurant_orders')
+      .select('*')
       .eq('id', orderId)
-      .select()
       .single();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     // Log activity (non-critical, don't fail if table doesn't exist)
     try {
@@ -426,20 +460,41 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
       .eq('id', bookingId)
       .single();
 
-    // Update booking
-    const { data: booking, error } = await supabase
-      .from('chalet_bookings')
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
+    // Use engine framework for state transitions
+    const engineService = getEngineService();
+    
+    // Map status to engine action
+    let engineAction: string;
+    switch (status) {
+      case 'confirmed': engineAction = 'confirm'; break;
+      case 'checked_in': engineAction = 'check_in'; break;
+      case 'checked_out': engineAction = 'check_out'; break;
+      case 'cancelled': engineAction = 'cancel'; break;
+      default: throw new Error(`Invalid status: ${status}`);
+    }
+    
+    // Execute state transition via engine
+    const transitionResult = await engineService.transitionState(
+      'multi_day_booking',
+      currentBooking?.status || 'pending',
+      engineAction,
+      'staff',
+      { 
+        bookingId,
+        staffId: userId,
         ...(status === 'checked_in' ? { actual_check_in: new Date().toISOString() } : {}),
         ...(status === 'checked_out' ? { actual_check_out: new Date().toISOString() } : {}),
-      })
+      }
+    );
+    
+    // Get updated booking
+    const { data: booking, error: updateError } = await supabase
+      .from('chalet_bookings')
+      .select('*')
       .eq('id', bookingId)
-      .select()
       .single();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     // If checked out, trigger housekeeping
     if (status === 'checked_out' && currentBooking?.chalet_id) {
@@ -458,8 +513,8 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
           cleaning_status: 'dirty',
           updated_at: new Date().toISOString(),
         }).eq('id', currentBooking.chalet_id);
-      } catch (hkError) {
-        logger.error('Error creating housekeeping task:', hkError);
+      } catch (error) {
+        logger.error('Failed to create housekeeping task:', error);
       }
     }
 
@@ -630,18 +685,39 @@ export async function recordEntry(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Invalid module for entry operations' });
     }
 
-    // Update ticket with entry time
-    const { data: ticket, error } = await supabase
+    // Use engine framework for state transition
+    const engineService = getEngineService();
+    
+    // Get current ticket to determine state transition
+    const { data: currentTicket, error: fetchError } = await supabase
       .from('pool_tickets')
-      .update({
-        entry_time: new Date().toISOString(),
-        status: 'used',
-      })
+      .select('status, session_id')
       .eq('id', ticketId)
+      .single();
+      
+    if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
+    
+    // Execute state transition via engine (entry = validate/use)
+    const transitionResult = await engineService.transitionState(
+      'session_access',
+      currentTicket.status,
+      'validate',
+      'staff',
+      { 
+        ticketId,
+        entryTime: new Date().toISOString(),
+        sessionId: currentTicket.session_id
+      }
+    );
+    
+    // Get updated ticket
+    const { data: ticket, error: updateError } = await supabase
+      .from('pool_tickets')
       .select('*, session:pool_sessions!session_id(id, name)')
+      .eq('id', ticketId)
       .single();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     res.json({ success: true, data: ticket });
   } catch (error: any) {
@@ -670,17 +746,39 @@ export async function recordExit(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Invalid module for exit operations' });
     }
 
-    // Update ticket with exit time
-    const { data: ticket, error } = await supabase
+    // Use engine framework for state transition
+    const engineService = getEngineService();
+    
+    // Get current ticket to determine state transition
+    const { data: currentTicket, error: fetchError } = await supabase
       .from('pool_tickets')
-      .update({
-        exit_time: new Date().toISOString(),
-      })
+      .select('status, session_id')
       .eq('id', ticketId)
+      .single();
+      
+    if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
+    
+    // Execute state transition via engine (exit = complete)
+    const transitionResult = await engineService.transitionState(
+      'session_access',
+      currentTicket.status,
+      'complete',
+      'staff',
+      { 
+        ticketId,
+        exitTime: new Date().toISOString(),
+        sessionId: currentTicket.session_id
+      }
+    );
+    
+    // Get updated ticket
+    const { data: ticket, error: updateError } = await supabase
+      .from('pool_tickets')
       .select('*, session:pool_sessions!session_id(id, name)')
+      .eq('id', ticketId)
       .single();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     res.json({ success: true, data: ticket });
   } catch (error: any) {
