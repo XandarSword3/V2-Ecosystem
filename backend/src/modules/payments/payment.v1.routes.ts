@@ -519,33 +519,119 @@ router.post(
 
       // Handle different event types
       switch (event.type) {
-        case 'payment_intent.succeeded':
+        case 'payment_intent.succeeded': {
           const paymentIntent = event.data.object as any;
           logger.info('Payment succeeded', {
             paymentIntentId: paymentIntent.id,
             amount: paymentIntent.amount,
             metadata: paymentIntent.metadata,
           });
-          // TODO: Update order/booking status
+          
+          // Update transaction status using engine framework
+          const engineService = require('../engines/engine-service.js').EngineService;
+          const engine = engineService.getInstance();
+          
+          if (paymentIntent.metadata?.reference_id && paymentIntent.metadata?.reference_table) {
+            try {
+              const result = await engine.transitionState(
+                paymentIntent.metadata.engine_type || 'instant_transaction',
+                'pending',
+                'confirm',
+                'system',
+                { paymentIntentId: paymentIntent.id }
+              );
+              logger.info('Transaction status updated via engine', {
+                reference_id: paymentIntent.metadata.reference_id,
+                result: result
+              });
+            } catch (error: any) {
+              logger.error('Failed to update transaction status via engine', {
+                error: error?.message || String(error),
+                reference_id: paymentIntent.metadata.reference_id
+              });
+            }
+          }
           break;
+        }
 
-        case 'payment_intent.payment_failed':
+        case 'payment_intent.payment_failed': {
           const failedPayment = event.data.object as any;
           logger.warn('Payment failed', {
             paymentIntentId: failedPayment.id,
             error: failedPayment.last_payment_error?.message,
           });
-          // TODO: Notify user, update status
+          
+          // Update transaction status using engine framework
+          const engineService = require('../engines/engine-service.js').EngineService;
+          const engine = engineService.getInstance();
+          
+          if (failedPayment.metadata?.reference_id && failedPayment.metadata?.reference_table) {
+            try {
+              const result = await engine.transitionState(
+                failedPayment.metadata.engine_type || 'instant_transaction',
+                'pending',
+                'cancel',
+                'system',
+                { 
+                  paymentIntentId: failedPayment.id,
+                  failureReason: failedPayment.last_payment_error?.message || 'Payment failed'
+                }
+              );
+              logger.info('Transaction status updated via engine', {
+                reference_id: failedPayment.metadata.reference_id,
+                result: result
+              });
+              
+              // TODO: Send notification to user about payment failure
+              // This would connect to notifications module
+              
+            } catch (error: any) {
+              logger.error('Failed to update transaction status via engine', {
+                error: error?.message || String(error),
+                reference_id: failedPayment.metadata.reference_id
+              });
+            }
+          }
           break;
+        }
 
-        case 'charge.refunded':
+        case 'charge.refunded': {
           const refund = event.data.object as any;
           logger.info('Charge refunded', {
             chargeId: refund.id,
             amount: refund.amount_refunded,
           });
-          // TODO: Update order/booking status
+          
+          // Update transaction status using engine framework
+          const engineService = require('../engines/engine-service.js').EngineService;
+          const engine = engineService.getInstance();
+          
+          if (refund.metadata?.reference_id && refund.metadata?.reference_table) {
+            try {
+              const result = await engine.transitionState(
+                refund.metadata.engine_type || 'instant_transaction',
+                'completed',
+                'refund',
+                'system',
+                { 
+                  refundId: refund.id,
+                  refundAmount: refund.amount_refunded,
+                  refundReason: refund.reason || 'Customer requested refund'
+                }
+              );
+              logger.info('Transaction status updated via engine', {
+                reference_id: refund.metadata.reference_id,
+                result: result
+              });
+            } catch (error: any) {
+              logger.error('Failed to update transaction status via engine', {
+                error: error?.message || String(error),
+                reference_id: refund.metadata.reference_id
+              });
+            }
+          }
           break;
+        }
 
         default:
           logger.debug('Unhandled webhook event', { type: event.type });
