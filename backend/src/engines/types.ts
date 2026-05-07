@@ -68,21 +68,23 @@ export interface PricingConfig {
   decimalPlaces: number;
 }
 
-export interface PricingContext {
-  moduleId?: UUID;
-  engineType?: EngineType;
-  conditions?: Record<string, unknown>;
-  customerId?: UUID;
-  couponCode?: string;
-  giftCardCodes?: string[];
-  loyaltyPointsToRedeem?: number;
-  // Economics reporting context
+export interface EconomicsReporting {
   staffId?: UUID;
   propertyId?: UUID;
   cancellationReason?: string;
   refundReason?: string;
   promoCodeUsed?: string;
   refundAmount?: number;
+  moduleId?: UUID;
+}
+
+export interface PricingContext extends EconomicsReporting {
+  engineType?: EngineType;
+  conditions?: Record<string, unknown>;
+  customerId?: UUID;
+  couponCode?: string;
+  giftCardCodes?: string[];
+  loyaltyPointsToRedeem?: number;
 }
 
 export interface DiscountBreakdown {
@@ -94,7 +96,7 @@ export interface DiscountBreakdown {
   metadata?: Record<string, unknown>;
 }
 
-export interface PricingResult {
+export interface PricingResult extends EconomicsReporting {
   subtotal: number;
   taxAmount: number;
   taxRate: number;
@@ -115,14 +117,6 @@ export interface PricingResult {
   }>;
   loyaltyPointsEarned: number;
   depositAmount: number;
-  // Economics reporting fields
-  staffId?: UUID;
-  cancellationReason?: string;
-  promoCodeUsed?: string;
-  refundAmount?: number;
-  refundReason?: string;
-  propertyId?: UUID;
-  moduleId?: UUID;
 }
 
 export interface InteractionContract {
@@ -143,23 +137,11 @@ export interface EngineDefinition<TStatus extends string = string> {
   stateMachine: StateMachineDefinition<TStatus>;
   pricing: PricingConfig;
   interactions: InteractionContract[];
-  dataExtraction?: {
-    staffAttribution?: {
-      enabled: boolean;
-      fields: string[];
-      description: string;
-    };
-    cancellationTracking?: {
-      enabled: boolean;
-      fields: string[];
-      description: string;
-    };
-    promoEffectiveness?: {
-      enabled: boolean;
-      fields: string[];
-      description: string;
-    };
-  };
+  dataExtraction?: Record<string, {
+    enabled: boolean;
+    fields: string[];
+    description: string;
+  }>;
 }
 
 export type InstantTransactionStatus =

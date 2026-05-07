@@ -163,20 +163,20 @@ export const ongoingEntitlementEngine: EngineDefinition<OngoingEntitlementStatus
   interactions: ongoingEntitlementInteractions,
   // Economics data extraction capabilities
   dataExtraction: {
-    staffAttribution: {
+    churnTracking: {
       enabled: true,
-      fields: ['staffId', 'propertyId', 'moduleId'],
-      description: 'Extract staff performance and property attribution data'
+      fields: ['churnReason', 'activeMonths', 'lifetimeValue'],
+      description: 'Track subscription cancellations and customer retention'
     },
-    cancellationTracking: {
+    renewalPatterns: {
       enabled: true,
-      fields: ['cancellationReason', 'refundAmount', 'refundReason'],
-      description: 'Track cancellation patterns and refund data'
+      fields: ['autoRenewing', 'renewalCount', 'billingCycle'],
+      description: 'Analyze subscription term lengths'
     },
-    promoEffectiveness: {
+    engagementTracking: {
       enabled: true,
-      fields: ['promoCodeUsed', 'discountAmount'],
-      description: 'Measure promotion effectiveness and discount impact'
+      fields: ['usageFrequency', 'lastActiveDate'],
+      description: 'Measure member engagement with their entitlement'
     }
   }
 };
