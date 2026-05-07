@@ -517,6 +517,10 @@ router.post(
         eventType: event.type,
       });
 
+      // Update transaction status using engine framework
+      const engineService = require('../engines/engine-service.js').EngineService;
+      const engine = engineService.getInstance();
+
       // Handle different event types
       switch (event.type) {
         case 'payment_intent.succeeded': {
@@ -526,10 +530,6 @@ router.post(
             amount: paymentIntent.amount,
             metadata: paymentIntent.metadata,
           });
-          
-          // Update transaction status using engine framework
-          const engineService = require('../engines/engine-service.js').EngineService;
-          const engine = engineService.getInstance();
           
           if (paymentIntent.metadata?.reference_id && paymentIntent.metadata?.reference_table) {
             try {
@@ -554,16 +554,12 @@ router.post(
           break;
         }
 
-        case 'payment_intent.payment_failed': {
+        case 'payment_intent.payment_failed':
           const failedPayment = event.data.object as any;
           logger.warn('Payment failed', {
             paymentIntentId: failedPayment.id,
             error: failedPayment.last_payment_error?.message,
           });
-          
-          // Update transaction status using engine framework
-          const engineService = require('../engines/engine-service.js').EngineService;
-          const engine = engineService.getInstance();
           
           if (failedPayment.metadata?.reference_id && failedPayment.metadata?.reference_table) {
             try {
@@ -593,18 +589,13 @@ router.post(
             }
           }
           break;
-        }
 
-        case 'charge.refunded': {
+        case 'charge.refunded':
           const refund = event.data.object as any;
           logger.info('Charge refunded', {
             chargeId: refund.id,
             amount: refund.amount_refunded,
           });
-          
-          // Update transaction status using engine framework
-          const engineService = require('../engines/engine-service.js').EngineService;
-          const engine = engineService.getInstance();
           
           if (refund.metadata?.reference_id && refund.metadata?.reference_table) {
             try {
@@ -631,7 +622,6 @@ router.post(
             }
           }
           break;
-        }
 
         default:
           logger.debug('Unhandled webhook event', { type: event.type });
