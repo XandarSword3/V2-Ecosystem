@@ -905,15 +905,23 @@ export const scanCode = asyncHandler(async (req: Request, res: Response) => {
   const type = parsed.type;
   const id = parsed.id;
 
-  if (type === 'pool_ticket') {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-    let query = supabase.from('pool_tickets').select('*');
-    query = isUuid ? query.eq('id', id) : query.eq('ticket_number', id);
-    const { data, error } = await query.single();
-    if (error || !data) {
-      return res.status(404).json({ valid: false, type, entity: null, message: 'Pool ticket not found' });
-    }
+  // Validate by reference_id (unified approach)
+const { data, error } = await supabase
+  .from('transactions')
+  .select('*')
+  .eq('reference_id', id)
+  .single();
+
+if (error || !data) {
+  return res.status(404).json({ valid: false, type: 'transaction', entity: null, message: 'Transaction not found' });
+}
+
+// Verify engine_type matches expected type
+if (data && !['shared_capacity_access', 'instant_transaction', 'time_exclusive_reservation'].includes(data.engine_type)) {
+  return res.status(400).json({ valid: false, type: 'transaction', entity: null, message: 'Invalid transaction type for pool ticket validation' });
+}
     return res.json({ valid: true, type, entity: data, message: 'Pool ticket is valid' });
+  }
   }
 
   if (type === 'chalet_booking') {
@@ -925,7 +933,7 @@ export const scanCode = asyncHandler(async (req: Request, res: Response) => {
     if (error || !data) {
       return res.status(404).json({ valid: false, type, entity: null, message: 'Chalet booking not found' });
     }
-    return res.json({ valid: true, type, entity: data, message: 'Chalet booking found' });
+    return res.json({ valid: true, type, entity: data, message: 'Chalet booking is valid' });
   }
 
   if (type === 'restaurant_order') {
@@ -957,6 +965,7 @@ export const scanCode = asyncHandler(async (req: Request, res: Response) => {
     type,
     entity: null,
     message: `Unsupported QR type: ${type}`,
+});
   });
 });
 
@@ -988,11 +997,8 @@ export const searchCustomers = asyncHandler(async (req: Request, res: Response) 
   }
 
   const customerIds = rows.map((u) => u.id);
-  const [restaurantOrders, poolTickets, chaletBookings, snackOrders, memberships, loyaltyAccounts] = await Promise.all([
-    supabase.from('restaurant_orders').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
-    supabase.from('pool_tickets').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
-    supabase.from('chalet_bookings').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
-    supabase.from('snack_orders').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
+  const [transactions, memberships, loyaltyAccounts] = await Promise.all([
+    supabase.from('transactions').select('customer_id,total_amount,created_at,staff_id').in('customer_id', customerIds),
     supabase.from('pool_memberships').select('customer_id,status').in('customer_id', customerIds),
     supabase.from('loyalty_accounts').select('user_id,tier_name').in('user_id', customerIds),
   ]);
@@ -1015,9 +1021,7 @@ export const searchCustomers = asyncHandler(async (req: Request, res: Response) 
     });
   };
 
-  rollupFinancialRows((restaurantOrders.data as any[]) || []);
-  rollupFinancialRows((poolTickets.data as any[]) || []);
-  rollupFinancialRows((chaletBookings.data as any[]) || []);
+  rollupFinancialRows((transactions.data as any[]) || []);
   rollupFinancialRows((snackOrders.data as any[]) || []);
 
   ((memberships.data as any[]) || []).forEach((m) => {
