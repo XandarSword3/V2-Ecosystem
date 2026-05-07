@@ -161,4 +161,22 @@ export const ongoingEntitlementEngine: EngineDefinition<OngoingEntitlementStatus
   stateMachine: ongoingEntitlementStateMachine,
   pricing: ongoingEntitlementPricing,
   interactions: ongoingEntitlementInteractions,
+  // Economics data extraction capabilities
+  dataExtraction: {
+    staffAttribution: {
+      enabled: true,
+      fields: ['staffId', 'propertyId', 'moduleId'],
+      description: 'Extract staff performance and property attribution data'
+    },
+    cancellationTracking: {
+      enabled: true,
+      fields: ['cancellationReason', 'refundAmount', 'refundReason'],
+      description: 'Track cancellation patterns and refund data'
+    },
+    promoEffectiveness: {
+      enabled: true,
+      fields: ['promoCodeUsed', 'discountAmount'],
+      description: 'Measure promotion effectiveness and discount impact'
+    }
+  }
 };
