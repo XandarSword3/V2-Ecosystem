@@ -130,47 +130,22 @@ export const updatePoolTicketSchema = z.object({
   numberOfGuests: z.number().int().min(1).max(20).optional(),
 });
 
-// ============ RESTAURANT ORDER SCHEMAS ============
+// ============ TRANSACTION SCHEMAS ============
 
-// Schema for selected modifiers in order items
-const selectedModifierSchema = z.object({
-  optionId: uuidSchema,
-  optionName: z.string().max(100).optional().default(''),
-  groupId: uuidSchema,
-  groupName: z.string().max(100).optional().default(''),
-  modifierType: z.enum(['add', 'remove', 'swap']).optional().default('add'),
-  priceAdjustment: z.number().optional().default(0),
-  quantity: z.number().int().min(1).max(10).optional().default(1),
-  inventoryItemId: uuidSchema.optional(),
-  inventoryQuantity: z.number().optional(),
-});
-
-export const orderItemSchema = z.object({
-  menuItemId: uuidSchema,
-  quantity: z.number().int().min(1).max(50, 'Maximum 50 of each item'),
+// Schema for transaction operations
+const transactionItemSchema = z.object({
+  referenceId: uuidSchema,
+  quantity: z.number().int().min(1).max(50).optional(),
   notes: sanitizedString(500).optional(),
-  customizations: z.array(z.string().max(100)).optional(),
-  selectedModifiers: z.array(selectedModifierSchema).optional(),
-  modifierTotal: z.number().optional(),
 });
 
-// FIX: Iteration 1 - Added discount fields to schema so they go through Zod validation
-// instead of being read from raw req.body (which bypassed sanitization).
-const giftCardRedemptionSchema = z.object({
-  code: z.string().min(1).max(50),
-  amount: z.number().positive().max(100000),
-});
-
-export const createRestaurantOrderSchema = z.object({
-  orderType: z.enum(['dine_in', 'takeaway', 'delivery', 'room_service']),
-  tableNumber: z.string().max(20).optional(),
-  chaletNumber: z.string().max(50).optional(),
+export const createTransactionSchema = z.object({
+  engineType: z.enum(['instant_transaction', 'shared_capacity_access', 'time_exclusive_reservation', 'ongoing_entitlement']),
   customerName: nameSchema.optional(),
-  customerPhone: phoneSchema,
-  items: z.array(orderItemSchema).min(1, 'Order must have at least one item'),
+  customerPhone: phoneSchema.optional(),
+  items: z.array(transactionItemSchema).min(1, 'Transaction must have at least one item'),
   specialInstructions: sanitizedString(500).optional(),
-  paymentMethod: z.enum(['cash', 'card', 'online', 'room_charge']).optional(),
-  taxExempt: z.boolean().optional(),
+  paymentMethod: z.enum(['cash', 'card', 'online']).optional(),
   // Discount integration fields (validated, not raw)
   couponCode: z.string().max(50).optional(),
   giftCardRedemptions: z.array(giftCardRedemptionSchema).max(5).optional(),
@@ -178,24 +153,8 @@ export const createRestaurantOrderSchema = z.object({
   loyaltyPointsDollarValue: z.number().min(0).max(100000).optional(),
 });
 
-export const updateOrderStatusSchema = z.object({
+export const updateTransactionStatusSchema = z.object({
   status: z.enum(['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivered', 'completed', 'cancelled']),
-  notes: sanitizedString(500).optional(),
-});
-
-// ============ SNACK ORDER SCHEMAS ============
-
-export const snackOrderItemSchema = z.object({
-  itemId: uuidSchema,
-  quantity: z.number().int().min(1).max(50),
-  notes: sanitizedString(200).optional(),
-});
-
-export const createSnackOrderSchema = z.object({
-  customerName: nameSchema.optional(),
-  customerPhone: phoneSchema,
-  items: z.array(snackOrderItemSchema).min(1, 'Order must have at least one item'),
-  paymentMethod: z.enum(['cash', 'card']),
   notes: sanitizedString(500).optional(),
 });
 

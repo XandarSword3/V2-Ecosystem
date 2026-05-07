@@ -26,14 +26,11 @@ export class ShiftsController {
     const sumRows = (rows: Array<{ total_amount?: string | number | null }> | null | undefined) =>
       (rows || []).reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
 
-    const [restaurantRes, snackRes, chaletRes, poolRes] = await Promise.all([
-      supabase.from('restaurant_orders').select('id,total_amount').eq('created_by', staffId).gte('created_at', start).lte('created_at', end),
-      supabase.from('snack_orders').select('id,total_amount').eq('created_by', staffId).gte('created_at', start).lte('created_at', end),
-      supabase.from('chalet_bookings').select('id,total_amount').eq('created_by', staffId).gte('created_at', start).lte('created_at', end),
-      supabase.from('pool_tickets').select('id,total_amount').eq('created_by', staffId).gte('created_at', start).lte('created_at', end),
+    const [transactionsRes] = await Promise.all([
+      supabase.from('transactions').select('id,total_amount').eq('staff_id', staffId).gte('created_at', start).lte('created_at', end),
     ]);
 
-    const rows = [restaurantRes.data, snackRes.data, chaletRes.data, poolRes.data];
+    const rows = [transactionsRes.data];
     const ordersProcessed = rows.reduce((sum, batch) => sum + (batch?.length || 0), 0);
     const revenueHandled = sumRows(restaurantRes.data as any[]) + sumRows(snackRes.data as any[]) + sumRows(chaletRes.data as any[]) + sumRows(poolRes.data as any[]);
     return { ordersProcessed, revenueHandled };
