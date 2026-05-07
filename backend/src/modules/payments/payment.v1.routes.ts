@@ -523,7 +523,7 @@ router.post(
 
       // Handle different event types
       switch (event.type) {
-        case 'payment_intent.succeeded': {
+        case 'payment_intent.succeeded':
           const paymentIntent = event.data.object as any;
           logger.info('Payment succeeded', {
             paymentIntentId: paymentIntent.id,
@@ -552,7 +552,6 @@ router.post(
             }
           }
           break;
-        }
 
         case 'payment_intent.payment_failed':
           const failedPayment = event.data.object as any;
