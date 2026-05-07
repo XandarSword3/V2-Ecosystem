@@ -66,9 +66,9 @@ export async function createBookingTransactional(
   bookingData: Record<string, unknown>,
   addOnItems: Array<{ add_on_id: string; quantity: number; unit_price: number; subtotal: number }>
 ): Promise<{ booking: Record<string, unknown>; addOns: Record<string, unknown>[] }> {
-  // Insert booking
-  const { data: booking, error: bookingError } = await ctx.supabase
-    .from('chalet_bookings')
+  // Insert transaction
+  const { data: transaction, error: transactionError } = await ctx.supabase
+    .from('transactions')
     .insert(bookingData)
     .select()
     .single();

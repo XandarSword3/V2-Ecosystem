@@ -59,26 +59,14 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
         .eq('id', userId)
         .single(),
       
-      // Restaurant orders
-      supabase.from('restaurant_orders')
-        .select('id, order_number, status, total_amount, payment_status, customer_name, customer_phone, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false }),
-      
-      // Snack orders
-      supabase.from('snack_orders')
-        .select('id, order_number, status, total_amount, payment_status, customer_name, customer_phone, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false }),
-      
-      // Chalet bookings
-      supabase.from('chalet_bookings')
-        .select('id, confirmation_number, status, check_in_date, check_out_date, total_amount, payment_status, guest_name, guest_email, guest_phone, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false }),
+      // All user transactions (unified)
+      supabase.from('transactions')
+        .select('id, engine_type, order_number, ticket_number, booking_number, status, amount, payment_status, customer_name, customer_phone, created_at, reference_id, reference_table')
+        .eq('customer_id', userId)
+        .order('created_at', { ascending: false })
       
       // Pool tickets
-      supabase.from('pool_tickets')
+      supabase.from('pool_tickets'),
         .select('id, ticket_number, status, ticket_date, number_of_guests, total_amount, payment_status, guest_name, guest_email, guest_phone, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false }),
