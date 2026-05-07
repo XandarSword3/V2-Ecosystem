@@ -523,7 +523,7 @@ router.post(
 
       // Handle different event types
       switch (event.type) {
-        case 'payment_intent.succeeded':
+        case 'payment_intent.succeeded': {
           const paymentIntent = event.data.object as any;
           logger.info('Payment succeeded', {
             paymentIntentId: paymentIntent.id,
@@ -552,8 +552,9 @@ router.post(
             }
           }
           break;
+        }
 
-        case 'payment_intent.payment_failed':
+        case 'payment_intent.payment_failed': {
           const failedPayment = event.data.object as any;
           logger.warn('Payment failed', {
             paymentIntentId: failedPayment.id,
@@ -588,8 +589,9 @@ router.post(
             }
           }
           break;
+        }
 
-        case 'charge.refunded':
+        case 'charge.refunded': {
           const refund = event.data.object as any;
           logger.info('Charge refunded', {
             chargeId: refund.id,
@@ -621,6 +623,7 @@ router.post(
             }
           }
           break;
+        }
 
         default:
           logger.debug('Unhandled webhook event', { type: event.type });
