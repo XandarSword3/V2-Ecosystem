@@ -294,8 +294,21 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     }
     
     // Execute state transition via engine
+    // Read module config to determine the correct engine type dynamically
+    const { data: moduleConfig } = await supabase
+      .from('modules')
+      .select('template_type')
+      .eq('id', currentOrder.module_id)
+      .single();
+    
+    // We import TEMPLATE_TO_ENGINE from the engines types. Actually, we'll map manually or dynamically
+    const engineType = moduleConfig?.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
+                       moduleConfig?.template_type === 'session_access' ? 'shared_capacity_access' :
+                       moduleConfig?.template_type === 'subscription' ? 'ongoing_entitlement' : 
+                       'instant_transaction'; // default for menu_service/pos
+
     const transitionResult = await engineService.transitionState(
-      'menu_service',
+      engineType,
       currentOrder.status,
       engineAction,
       'staff',
@@ -474,8 +487,19 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
     }
     
     // Execute state transition via engine
+    const { data: moduleConfig } = await supabase
+      .from('modules')
+      .select('template_type')
+      .eq('id', module.id)
+      .single();
+
+    const engineType = moduleConfig?.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
+                       moduleConfig?.template_type === 'session_access' ? 'shared_capacity_access' :
+                       moduleConfig?.template_type === 'subscription' ? 'ongoing_entitlement' : 
+                       'instant_transaction';
+
     const transitionResult = await engineService.transitionState(
-      'multi_day_booking',
+      engineType,
       currentBooking?.status || 'pending',
       engineAction,
       'staff',
@@ -698,8 +722,13 @@ export async function recordEntry(req: Request, res: Response) {
     if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
     
     // Execute state transition via engine (entry = validate/use)
+    const engineType = module.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
+                       module.template_type === 'session_access' ? 'shared_capacity_access' :
+                       module.template_type === 'subscription' ? 'ongoing_entitlement' : 
+                       'instant_transaction';
+
     const transitionResult = await engineService.transitionState(
-      'session_access',
+      engineType,
       currentTicket.status,
       'validate',
       'staff',
@@ -759,8 +788,13 @@ export async function recordExit(req: Request, res: Response) {
     if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
     
     // Execute state transition via engine (exit = complete)
+    const engineType = module.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
+                       module.template_type === 'session_access' ? 'shared_capacity_access' :
+                       module.template_type === 'subscription' ? 'ongoing_entitlement' : 
+                       'instant_transaction';
+
     const transitionResult = await engineService.transitionState(
-      'session_access',
+      engineType,
       currentTicket.status,
       'complete',
       'staff',

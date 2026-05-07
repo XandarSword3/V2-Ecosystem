@@ -172,17 +172,17 @@ export const timeExclusiveReservationEngine: EngineDefinition<TimeExclusiveReser
     staffAttribution: {
       enabled: true,
       fields: ['staffId', 'propertyId', 'moduleId'],
-      description: 'Extract staff performance and property attribution data'
+      description: 'Extract staff performance for check-ins/check-outs'
     },
     cancellationTracking: {
       enabled: true,
-      fields: ['cancellationReason', 'refundAmount', 'refundReason'],
-      description: 'Track cancellation patterns and refund data'
+      fields: ['cancellationReason', 'refundAmount', 'refundReason', 'advanceNoticeHours'],
+      description: 'Track booking cancellations and lead times'
     },
-    promoEffectiveness: {
+    bookingPatterns: {
       enabled: true,
-      fields: ['promoCodeUsed', 'discountAmount'],
-      description: 'Measure promotion effectiveness and discount impact'
+      fields: ['bookingPeriod', 'stayDuration', 'numberOfGuests', 'advanceBookingDays'],
+      description: 'Analyze length of stay and booking windows'
     }
   }
 };

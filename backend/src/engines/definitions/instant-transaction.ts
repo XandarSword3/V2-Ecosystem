@@ -172,17 +172,17 @@ export const instantTransactionEngine: EngineDefinition<InstantTransactionStatus
     staffAttribution: {
       enabled: true,
       fields: ['staffId', 'propertyId', 'moduleId'],
-      description: 'Extract staff performance and property attribution data'
-    },
-    cancellationTracking: {
-      enabled: true,
-      fields: ['cancellationReason', 'refundAmount', 'refundReason'],
-      description: 'Track cancellation patterns and refund data'
+      description: 'Extract staff sales performance and tips'
     },
     promoEffectiveness: {
       enabled: true,
-      fields: ['promoCodeUsed', 'discountAmount'],
-      description: 'Measure promotion effectiveness and discount impact'
+      fields: ['promoCodeUsed', 'discountAmount', 'upsellSuccess'],
+      description: 'Measure promotion effectiveness on POS orders'
+    },
+    orderMetrics: {
+      enabled: true,
+      fields: ['averageOrderValue', 'itemCount', 'preparationTime'],
+      description: 'Measure transaction sizes and fulfillment speed'
     }
   }
 };
