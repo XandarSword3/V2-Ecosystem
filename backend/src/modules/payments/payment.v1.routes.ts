@@ -14,6 +14,7 @@ import { authenticate as requireAuth } from '../../middleware/auth.middleware.js
 import { requirePermission } from '../../middleware/permission.middleware.js';
 import { logger } from '../../utils/logger.js';
 import { userRateLimit as rateLimiter } from '../../middleware/userRateLimit.middleware.js';
+import { getEngineService } from '../../engines/engine-service.js';
 
 const router = Router();
 
@@ -518,8 +519,7 @@ router.post(
       });
 
       // Update transaction status using engine framework
-      const engineService = require('../engines/engine-service.js').EngineService;
-      const engine = engineService.getInstance();
+      const engineService = getEngineService();
 
       // Handle different event types
       switch (event.type) {
@@ -533,7 +533,7 @@ router.post(
           
           if (paymentIntent.metadata?.reference_id && paymentIntent.metadata?.reference_table) {
             try {
-              const result = await engine.transitionState(
+              const result = await engineService.transitionState(
                 paymentIntent.metadata.engine_type || 'instant_transaction',
                 'pending',
                 'confirm',
@@ -563,7 +563,7 @@ router.post(
           
           if (failedPayment.metadata?.reference_id && failedPayment.metadata?.reference_table) {
             try {
-              const result = await engine.transitionState(
+              const result = await engineService.transitionState(
                 failedPayment.metadata.engine_type || 'instant_transaction',
                 'pending',
                 'cancel',
@@ -600,7 +600,7 @@ router.post(
           
           if (refund.metadata?.reference_id && refund.metadata?.reference_table) {
             try {
-              const result = await engine.transitionState(
+              const result = await engineService.transitionState(
                 refund.metadata.engine_type || 'instant_transaction',
                 'completed',
                 'refund',
