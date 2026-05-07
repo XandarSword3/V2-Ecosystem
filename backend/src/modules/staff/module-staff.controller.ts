@@ -4,6 +4,7 @@ import { logger } from '../../utils/logger.js';
 import { validateBody } from '../../validation/schemas.js';
 import { emitToUnit } from '../../socket/index.js';
 import { getEngineService } from '../../engines/engine-service.js';
+import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 
 /**
  * Dynamic Module Staff Controller
@@ -301,11 +302,8 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       .eq('id', currentOrder.module_id)
       .single();
     
-    // We import TEMPLATE_TO_ENGINE from the engines types. Actually, we'll map manually or dynamically
-    const engineType = moduleConfig?.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
-                       moduleConfig?.template_type === 'session_access' ? 'shared_capacity_access' :
-                       moduleConfig?.template_type === 'subscription' ? 'ongoing_entitlement' : 
-                       'instant_transaction'; // default for menu_service/pos
+    // Use TEMPLATE_TO_ENGINE constant for consistent mapping
+    const engineType = TEMPLATE_TO_ENGINE[moduleConfig?.template_type] || 'instant_transaction';
 
     const transitionResult = await engineService.transitionState(
       engineType,
@@ -493,10 +491,7 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
       .eq('id', module.id)
       .single();
 
-    const engineType = moduleConfig?.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
-                       moduleConfig?.template_type === 'session_access' ? 'shared_capacity_access' :
-                       moduleConfig?.template_type === 'subscription' ? 'ongoing_entitlement' : 
-                       'instant_transaction';
+    const engineType = TEMPLATE_TO_ENGINE[moduleConfig?.template_type] || 'instant_transaction';
 
     const transitionResult = await engineService.transitionState(
       engineType,
@@ -722,10 +717,7 @@ export async function recordEntry(req: Request, res: Response) {
     if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
     
     // Execute state transition via engine (entry = validate/use)
-    const engineType = module.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
-                       module.template_type === 'session_access' ? 'shared_capacity_access' :
-                       module.template_type === 'subscription' ? 'ongoing_entitlement' : 
-                       'instant_transaction';
+    const engineType = TEMPLATE_TO_ENGINE[module.template_type] || 'instant_transaction';
 
     const transitionResult = await engineService.transitionState(
       engineType,
@@ -788,10 +780,7 @@ export async function recordExit(req: Request, res: Response) {
     if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
     
     // Execute state transition via engine (exit = complete)
-    const engineType = module.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
-                       module.template_type === 'session_access' ? 'shared_capacity_access' :
-                       module.template_type === 'subscription' ? 'ongoing_entitlement' : 
-                       'instant_transaction';
+    const engineType = TEMPLATE_TO_ENGINE[module.template_type] || 'instant_transaction';
 
     const transitionResult = await engineService.transitionState(
       engineType,
