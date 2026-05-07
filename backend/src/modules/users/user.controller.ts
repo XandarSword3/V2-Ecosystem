@@ -402,20 +402,23 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
       return q;
     };
 
-    const [restaurant, pool, chalets, snack, loyalty, giftcards] = await Promise.all([
-      applyDateFilters(supabase.from('restaurant_orders').select('id,order_number,total_amount,status,created_at').eq('customer_id', userId)),
-      applyDateFilters(supabase.from('pool_tickets').select('id,ticket_number,total_amount,status,created_at,session_id').eq('customer_id', userId)),
-      applyDateFilters(supabase.from('chalet_bookings').select('id,booking_number,total_amount,status,created_at,chalet_id').eq('customer_id', userId)),
-      applyDateFilters(supabase.from('snack_orders').select('id,order_number,total_amount,status,created_at').eq('customer_id', userId)),
+    const [transactions, loyalty, giftcards] = await Promise.all([
+      applyDateFilters(supabase
+        .from('transactions')
+        .select('id,engine_type,amount,status,created_at,order_number,ticket_number,booking_number,reference_id,reference_table,customer_name,customer_phone,table_id,session_id,chalet_id,staff_id')
+        .eq('customer_id', userId)
+        .in('engine_type', ['instant_transaction', 'shared_capacity_access', 'time_exclusive_reservation'])),
       applyDateFilters(supabase.from('loyalty_transactions').select('id,points,type,created_at,reference_id,reference_type').eq('user_id', userId)),
       applyDateFilters(supabase.from('gift_card_transactions').select('id,amount,created_at').eq('user_id', userId)),
     ]);
 
     const rows = [
-      ...(restaurant.data || []).map((row: any) => ({ type: 'restaurant_order', ...row })),
-      ...(pool.data || []).map((row: any) => ({ type: 'pool_ticket', ...row })),
-      ...(chalets.data || []).map((row: any) => ({ type: 'chalet_booking', ...row })),
-      ...(snack.data || []).map((row: any) => ({ type: 'snack_order', ...row })),
+      ...(transactions.data || []).map((row: any) => ({ 
+        type: row.engine_type === 'instant_transaction' ? 'restaurant_order' : 
+              row.engine_type === 'shared_capacity_access' ? 'pool_ticket' : 
+              row.engine_type === 'time_exclusive_reservation' ? 'chalet_booking' : 'transaction',
+        ...row 
+      })),
       ...(loyalty.data || []).map((row: any) => ({ type: 'loyalty_transaction', ...row })),
       ...(giftcards.data || []).map((row: any) => ({ type: 'gift_card_transaction', ...row })),
     ].sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime());

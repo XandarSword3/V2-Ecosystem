@@ -46,17 +46,17 @@ export async function getModuleOrders(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Module is not a menu service' });
     }
 
-    // Build query for orders — actual table is restaurant_orders (shared across all menu_service modules)
+    // Build query for orders — use transactions table for instant_transaction engine
     let query = supabase
-      .from('restaurant_orders')
+      .from('transactions')
       .select(`
-        id, order_number, customer_id, order_type, status, total_amount,
-        table_id, special_instructions, created_at,
-        customer:users!customer_id(id, full_name),
-        items:restaurant_order_items(id, quantity, unit_price, special_instructions, menu_items(id, name))
+        id, order_number, customer_id, engine_type, status, amount as total_amount,
+        created_at, reference_id, reference_table,
+        customer_name, customer_phone, table_id, staff_id, metadata
       `)
+      .eq('engine_type', 'instant_transaction')
       .eq('module_id', moduleId || module.id)
-      .is('deleted_at', null);
+      .order('created_at', { ascending: false });
 
     // Filter by status
     if (status) {
