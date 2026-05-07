@@ -132,20 +132,20 @@ export const sharedCapacityAccessEngine: EngineDefinition<SharedCapacityAccessSt
   interactions: sharedCapacityAccessInteractions,
   // Economics data extraction capabilities
   dataExtraction: {
-    staffAttribution: {
+    capacityUtilization: {
       enabled: true,
-      fields: ['staffId', 'propertyId', 'moduleId'],
-      description: 'Extract staff performance and property attribution data'
+      fields: ['sessionTime', 'occupancyRate', 'turnawayCount'],
+      description: 'Measure peak hours and capacity limits'
     },
     cancellationTracking: {
       enabled: true,
-      fields: ['cancellationReason', 'refundAmount', 'refundReason'],
-      description: 'Track cancellation patterns and refund data'
+      fields: ['cancellationReason', 'refundAmount', 'noShow'],
+      description: 'Track ticket cancellations and no-shows'
     },
-    promoEffectiveness: {
+    salesPatterns: {
       enabled: true,
-      fields: ['promoCodeUsed', 'discountAmount'],
-      description: 'Measure promotion effectiveness and discount impact'
+      fields: ['walkInVsPrebooked', 'groupSize', 'addonsPurchased'],
+      description: 'Analyze ticket purchasing behavior'
     }
   }
 };
