@@ -41,7 +41,11 @@ $$;
 -- 2. Clean up redundant policies from previous migrations
 -- We prefer the "hardened_" prefix for consistency
 DROP POLICY IF EXISTS manager_admin_manage_cash_drawers ON cash_drawers;
-DROP POLICY IF EXISTS manager_admin_manage_cash_drawer_transactions ON cash_drawer_transactions;
+
+DO $$ BEGIN
+    DROP POLICY IF EXISTS manager_admin_manage_cash_drawer_transactions ON cash_drawer_transactions;
+EXCEPTION WHEN undefined_table THEN null;
+END $$;
 
 -- 3. Audit Log Fix
 -- Migration 190000 might have failed if user_id was NOT NULL (it isn't, but let's be safe)

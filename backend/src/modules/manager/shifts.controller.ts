@@ -32,7 +32,7 @@ export class ShiftsController {
 
     const rows = [transactionsRes.data];
     const ordersProcessed = rows.reduce((sum, batch) => sum + (batch?.length || 0), 0);
-    const revenueHandled = sumRows(restaurantRes.data as any[]) + sumRows(snackRes.data as any[]) + sumRows(chaletRes.data as any[]) + sumRows(poolRes.data as any[]);
+    const revenueHandled = sumRows(transactionsRes.data as any[]);
     return { ordersProcessed, revenueHandled };
   }
 

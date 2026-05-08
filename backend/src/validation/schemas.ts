@@ -132,6 +132,12 @@ export const updatePoolTicketSchema = z.object({
 
 // ============ TRANSACTION SCHEMAS ============
 
+// Schema for gift card redemption
+export const giftCardRedemptionSchema = z.object({
+  giftCardId: uuidSchema,
+  amount: z.number().positive().max(100000, 'Amount exceeds maximum allowed'),
+});
+
 // Schema for transaction operations
 const transactionItemSchema = z.object({
   referenceId: uuidSchema,

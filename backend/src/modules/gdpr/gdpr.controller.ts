@@ -469,3 +469,59 @@ export async function getPrivacyDashboard(req: Request, res: Response): Promise<
     res.status(500).json({ error: message });
   }
 }
+
+// ==================== COOKIE CONSENT (Unauthenticated) ====================
+
+/**
+ * Record cookie consent from the frontend banner.
+ * This endpoint does NOT require authentication because cookie consent
+ * must be recordable before a user logs in (GDPR requirement).
+ *
+ * If the user is authenticated (Authorization header present), the consent
+ * is linked to their user_id. Otherwise it is stored as an anonymous record.
+ */
+export async function recordCookieConsent(req: Request, res: Response): Promise<void> {
+  try {
+    const { consent_version, categories_accepted, categories_rejected } = req.body;
+
+    if (!consent_version || !Array.isArray(categories_accepted)) {
+      res.status(400).json({
+        error: 'consent_version (string) and categories_accepted (string[]) are required'
+      });
+      return;
+    }
+
+    // Attempt to extract user_id from Authorization header if present
+    let userId: string | undefined;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        // Best-effort: decode JWT to get user ID without full auth middleware
+        const token = authHeader.split(' ')[1];
+        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+        userId = payload.sub || payload.id;
+      } catch {
+        // Token invalid or expired — proceed without user_id
+      }
+    }
+
+    const result = await gdprService.recordCookieConsent({
+      userId,
+      consentVersion: consent_version,
+      categoriesAccepted: categories_accepted,
+      categoriesRejected: categories_rejected || [],
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Cookie consent recorded',
+      id: result.id,
+    });
+  } catch (error) {
+    console.error('GDPR cookie consent recording error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to record consent';
+    res.status(500).json({ error: message });
+  }
+}

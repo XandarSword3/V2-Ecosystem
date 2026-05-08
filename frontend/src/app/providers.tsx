@@ -12,8 +12,10 @@ import { HydrateSettingsFromBackend } from '@/lib/hydrate-settings';
 import { DirectionSync } from '@/components/DirectionSync';
 import { ThemeInjector } from '@/components/ThemeInjector';
 import { WeatherEffects } from '@/components/effects/WeatherEffects';
-import { PageTracker } from '@/components/PageTracker';
+import { ConsentGatedPageTracker } from '@/components/PageTracker';
 import { PWAPrompt } from '@/components/pwa';
+import { ConsentProvider } from '@/context/ConsentContext';
+import { CookieConsentBanner } from '@/components/CookieConsentBanner';
 
 // Import all messages statically to avoid async loading issues
 import enMessages from '../../messages/en.json';
@@ -76,19 +78,23 @@ export function Providers({ children }: ProvidersProps) {
     <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC">
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <AuthProvider>
-            <SettingsProvider>
-              <HydrateSettingsFromBackend />
-              <ThemeInjector />
-              <WeatherEffects />
-              <DirectionSync />
-              <PageTracker />
-              <PWAPrompt />
-              <LoadingScreenWrapper>
-                {children}
-              </LoadingScreenWrapper>
-            </SettingsProvider>
-          </AuthProvider>
+          <ConsentProvider>
+            <AuthProvider>
+              <SettingsProvider>
+                <HydrateSettingsFromBackend />
+                <ThemeInjector />
+                <WeatherEffects />
+                <DirectionSync />
+                {/* GDPR: PageTracker sends browsing data over socket — gated behind functional consent */}
+                <ConsentGatedPageTracker />
+                <PWAPrompt />
+                <CookieConsentBanner />
+                <LoadingScreenWrapper>
+                  {children}
+                </LoadingScreenWrapper>
+              </SettingsProvider>
+            </AuthProvider>
+            </ConsentProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </NextIntlClientProvider>

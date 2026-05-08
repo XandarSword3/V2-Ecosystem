@@ -483,13 +483,13 @@ export class LoyaltyController {
         .in('reference_id', allReferenceIds);
 
       // Map engine_type to legacy names for response compatibility
-      const legacyTypeMap = {
+      const legacyTypeMap: Record<string, string> = {
         'instant_transaction': 'restaurant_order',
         'shared_capacity_access': 'pool_ticket',
         'time_exclusive_reservation': 'chalet_booking'
       };
 
-      const response = transactionData?.data?.map((row: any) => ({
+      const response = (transactions || [])?.map((row: any) => ({
         id: row.id,
         order_number: row.order_number || row.ticket_number || row.booking_number,
         total_amount: row.amount,
@@ -498,7 +498,7 @@ export class LoyaltyController {
       }));
 
       const sourceLookup = new Map<string, any>();
-      (transactionRefs.data || []).forEach((row: any) => sourceLookup.set(`${row.engine_type}:${row.id}`, row));
+      (transactions || []).forEach((row: any) => sourceLookup.set(`${row.engine_type}:${row.id}`, row));
 
       const enrichedTransactions = (transactions || []).map((row: any) => {
         const key = row.engine_type && row.reference_id ? `${row.engine_type}:${row.reference_id}` : '';
