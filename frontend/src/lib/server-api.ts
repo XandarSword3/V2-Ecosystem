@@ -180,6 +180,7 @@ export interface SiteSettings {
   logo?: string;
   openingHours?: Record<string, { open: string; close: string }>;
   socialLinks?: Record<string, string>;
+  dpaAgreements?: Record<string, { status: boolean; dateCompleted: string; reference: string; }>;
 }
 
 export async function getSiteSettings(): Promise<SiteSettings> {

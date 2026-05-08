@@ -5,6 +5,12 @@ import { useSocket } from './socket';
 import { ResortTheme } from './theme-config';
 import { settingsLogger } from './logger';
 
+export interface DPAAgreement {
+  status: boolean;
+  dateCompleted: string;
+  reference: string;
+}
+
 export interface SiteSettings {
   // General
   resortName: string;
@@ -89,6 +95,14 @@ export interface SiteSettings {
   footer?: FooterConfig | null;
   navbar?: NavbarConfig | null;
   homepage?: HomepageConfig | null;
+
+  // Compliance
+  dpaAgreements?: {
+    stripe?: DPAAgreement;
+    twilio?: DPAAgreement;
+    sentry?: DPAAgreement;
+    [key: string]: DPAAgreement | undefined;
+  };
 }
 
 // Homepage CMS
