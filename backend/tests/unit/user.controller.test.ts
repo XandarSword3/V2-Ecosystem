@@ -59,12 +59,22 @@ describe('User Controller', () => {
         is_active: true,
         created_at: '2024-01-01T00:00:00Z',
         updated_at: null,
-        user_roles: [{ role: { name: 'customer' } }],
       };
+      const mockUserRoles = [
+        { role: { name: 'customer' } },
+      ];
 
-      const queryMock = createChainableMock(mockUser);
+      const userQueryMock = createChainableMock(mockUser);
+      const rolesQueryMock = createChainableMock(mockUserRoles);
+
+      let callCount = 0;
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(queryMock),
+        from: vi.fn().mockImplementation((table) => {
+          callCount++;
+          if (table === 'users') return userQueryMock;
+          if (table === 'user_roles') return rolesQueryMock;
+          return createChainableMock(null);
+        }),
       } as any);
 
       const { getProfile } = await import('../../src/modules/users/user.controller.js');
@@ -128,15 +138,21 @@ describe('User Controller', () => {
         is_active: true,
         created_at: '2024-01-01T00:00:00Z',
         updated_at: null,
-        user_roles: [
-          { role: { name: 'admin' } },
-          { role: { name: 'staff' } },
-        ],
       };
+      const mockUserRoles = [
+        { role: { name: 'admin' } },
+        { role: { name: 'staff' } },
+      ];
 
-      const queryMock = createChainableMock(mockUser);
+      const userQueryMock = createChainableMock(mockUser);
+      const rolesQueryMock = createChainableMock(mockUserRoles);
+
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(queryMock),
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'users') return userQueryMock;
+          if (table === 'user_roles') return rolesQueryMock;
+          return createChainableMock(null);
+        }),
       } as any);
 
       const { getProfile } = await import('../../src/modules/users/user.controller.js');
@@ -296,7 +312,6 @@ describe('User Controller', () => {
           is_active: true,
           created_at: '2024-01-01T00:00:00Z',
           updated_at: null,
-          user_roles: [{ role: { id: 'role-1', name: 'customer' } }],
         },
         {
           id: 'user-2',
@@ -307,7 +322,6 @@ describe('User Controller', () => {
           is_active: true,
           created_at: '2024-01-02T00:00:00Z',
           updated_at: null,
-          user_roles: [{ role: { id: 'role-2', name: 'staff' } }],
         },
       ];
 
@@ -326,8 +340,8 @@ describe('User Controller', () => {
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         data: expect.arrayContaining([
-          expect.objectContaining({ id: 'user-1', roles: ['customer'] }),
-          expect.objectContaining({ id: 'user-2', roles: ['staff'] }),
+          expect.objectContaining({ id: 'user-1', roles: [] }),
+          expect.objectContaining({ id: 'user-2', roles: [] }),
         ]),
         pagination: {
           page: 1,
@@ -444,12 +458,20 @@ describe('User Controller', () => {
         created_at: '2024-01-01T00:00:00Z',
         updated_at: null,
         last_login_at: '2024-01-15T10:30:00Z',
-        user_roles: [{ role: { id: 'role-1', name: 'customer', display_name: 'Customer' } }],
       };
+      const mockUserRoles = [
+        { role: { id: 'role-1', name: 'customer', display_name: 'Customer' } },
+      ];
 
-      const queryMock = createChainableMock(mockUser);
+      const userQueryMock = createChainableMock(mockUser);
+      const rolesQueryMock = createChainableMock(mockUserRoles);
+
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(queryMock),
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'users') return userQueryMock;
+          if (table === 'user_roles') return rolesQueryMock;
+          return createChainableMock(null);
+        }),
       } as any);
 
       const { getUserById } = await import('../../src/modules/users/user.controller.js');
@@ -675,7 +697,7 @@ describe('User Controller', () => {
         data: expect.any(Array)
       }));
       // Verify it called from() for at least one module
-      expect(mockSupabase.from).toHaveBeenCalledWith('restaurant_orders');
+      expect(mockSupabase.from).toHaveBeenCalledWith('transactions');
     });
 
     it('should return 401 if user is not authenticated', async () => {

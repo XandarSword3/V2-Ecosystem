@@ -283,12 +283,11 @@ describe('DashboardService', () => {
       const mockOrders = [
         { 
           id: 'o-1', 
-          order_number: 'R-001', 
-          customer_name: 'John',
+          reference_table: 'restaurant_orders',
           status: 'pending',
-          total_amount: 50,
+          amount: 50,
           created_at: '2024-01-01',
-          items: [{ id: 'i-1' }, { id: 'i-2' }]
+          metadata: { order_number: 'R-001', customer_name: 'John' }
         }
       ];
       
@@ -302,7 +301,8 @@ describe('DashboardService', () => {
       const result = await service.getRecentOrders(5);
       
       expect(result).toHaveLength(1);
-      expect(result[0].itemCount).toBe(2);
+      expect(result[0].order_number).toBe('R-001');
+      expect(result[0].itemCount).toBe(0);
     });
   });
 });

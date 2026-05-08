@@ -39,6 +39,7 @@ vi.mock('@/components/ui/Accordion', () => ({
 }));
 
 import { CookieConsentBanner } from '../../src/components/CookieConsentBanner';
+import { ConsentProvider } from '../../src/context/ConsentContext';
 
 const CONSENT_STORAGE_KEY = 'cookie-consent';
 
@@ -53,7 +54,11 @@ describe('CookieConsentBanner behavior', () => {
   it('shows banner and accepts all cookie categories', async () => {
     const user = userEvent.setup();
 
-    render(<CookieConsentBanner />);
+    render(
+      <ConsentProvider>
+        <CookieConsentBanner />
+      </ConsentProvider>
+    );
 
     expect(screen.getByText('We use cookies')).toBeInTheDocument();
 
@@ -64,10 +69,10 @@ describe('CookieConsentBanner behavior', () => {
     });
 
     const stored = JSON.parse(localStorage.getItem(CONSENT_STORAGE_KEY) || '{}');
-    expect(stored.necessary).toBe(true);
-    expect(stored.functional).toBe(true);
-    expect(stored.analytics).toBe(true);
-    expect(stored.marketing).toBe(true);
+    expect(stored.categories.necessary).toBe(true);
+    expect(stored.categories.functional).toBe(true);
+    expect(stored.categories.analytics).toBe(true);
+    expect(stored.categories.marketing).toBe(true);
 
     const dataLayerEvents = (window as any).dataLayer;
     expect(dataLayerEvents[dataLayerEvents.length - 1]).toEqual(
@@ -88,48 +93,60 @@ describe('CookieConsentBanner behavior', () => {
   it('rejects non-essential cookies and revokes marketing consent', async () => {
     const user = userEvent.setup();
 
-    render(<CookieConsentBanner />);
+    render(
+      <ConsentProvider>
+        <CookieConsentBanner />
+      </ConsentProvider>
+    );
 
-    await user.click(screen.getByRole('button', { name: 'Reject Non-Essential' }));
+    await user.click(screen.getByRole('button', { name: 'Reject All' }));
 
     const stored = JSON.parse(localStorage.getItem(CONSENT_STORAGE_KEY) || '{}');
-    expect(stored.necessary).toBe(true);
-    expect(stored.functional).toBe(false);
-    expect(stored.analytics).toBe(false);
-    expect(stored.marketing).toBe(false);
+    expect(stored.categories.necessary).toBe(true);
+    expect(stored.categories.functional).toBe(false);
+    expect(stored.categories.analytics).toBe(false);
+    expect(stored.categories.marketing).toBe(false);
 
     expect((window as any)['ga-disable-GA_MEASUREMENT_ID']).toBe(true);
     expect((window as any).fbq).toHaveBeenCalledWith('consent', 'revoke');
   });
 
-  it('honors stored consent when version matches and does not show the banner', () => {
+  it('honors stored consent when version matches and does not show the banner', async () => {
     localStorage.setItem(
       CONSENT_STORAGE_KEY,
       JSON.stringify({
-        necessary: true,
-        functional: true,
-        analytics: false,
-        marketing: false,
+        categories: {
+          necessary: true,
+          functional: true,
+          analytics: false,
+          marketing: false,
+        },
         timestamp: Date.now(),
         version: '1.0',
       })
     );
 
-    render(<CookieConsentBanner />);
+    render(
+      <ConsentProvider>
+        <CookieConsentBanner />
+      </ConsentProvider>
+    );
 
     expect(screen.queryByText('We use cookies')).not.toBeInTheDocument();
 
-    const dataLayerEvents = (window as any).dataLayer;
-    expect(dataLayerEvents[dataLayerEvents.length - 1]).toEqual(
-      expect.objectContaining({
-        event: 'consent_update',
-        consent: expect.objectContaining({
-          necessary: true,
-          functional: true,
-          analytics: false,
-          marketing: false,
-        }),
-      })
-    );
+    await waitFor(() => {
+      const dataLayerEvents = (window as any).dataLayer;
+      expect(dataLayerEvents[dataLayerEvents.length - 1]).toEqual(
+        expect.objectContaining({
+          event: 'consent_update',
+          consent: expect.objectContaining({
+            necessary: true,
+            functional: true,
+            analytics: false,
+            marketing: false,
+          }),
+        })
+      );
+    });
   });
 });

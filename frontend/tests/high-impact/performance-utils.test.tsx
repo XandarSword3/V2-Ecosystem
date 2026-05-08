@@ -198,6 +198,13 @@ describe('performance utilities', () => {
   });
 
   it('reports web vitals to gtag when available', () => {
+    localStorage.setItem(
+      'cookie-consent',
+      JSON.stringify({
+        categories: { analytics: true },
+      })
+    );
+
     const gtag = vi.fn();
     Object.defineProperty(window, 'gtag', {
       value: gtag,

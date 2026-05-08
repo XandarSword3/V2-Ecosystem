@@ -12,8 +12,7 @@ import {
   positiveIntSchema,
   paginationSchema,
   purchasePoolTicketSchema,
-  createSnackOrderSchema,
-  createRestaurantOrderSchema,
+  createTransactionSchema,
   createPaymentIntentSchema,
   recordCashPaymentSchema,
 } from '../../src/validation/schemas';
@@ -183,61 +182,33 @@ describe('Validation Schemas (Source)', () => {
     });
   });
 
-  describe('createSnackOrderSchema', () => {
-    it('should accept valid snack order', () => {
-      const validOrder = {
-        customerName: 'Jane Doe',
-        customerPhone: '+1234567890',
+  describe('createTransactionSchema', () => {
+    it('should accept valid transaction', () => {
+      const validTransaction = {
+        engineType: 'instant_transaction',
         items: [
-          { itemId: '123e4567-e89b-12d3-a456-426614174000', quantity: 2 }
+          { referenceId: '123e4567-e89b-12d3-a456-426614174000' }
         ],
-        paymentMethod: 'cash',
       };
-      expect(createSnackOrderSchema.safeParse(validOrder).success).toBe(true);
+      expect(createTransactionSchema.safeParse(validTransaction).success).toBe(true);
     });
 
     it('should reject empty items array', () => {
-      const emptyOrder = {
-        customerName: 'Jane Doe',
+      const emptyTransaction = {
+        engineType: 'instant_transaction',
         items: [],
-        paymentMethod: 'cash',
       };
-      expect(createSnackOrderSchema.safeParse(emptyOrder).success).toBe(false);
-    });
-  });
-
-  describe('createRestaurantOrderSchema', () => {
-    it('should accept valid restaurant order', () => {
-      const validOrder = {
-        orderType: 'dine_in',
-        tableNumber: '5',
-        items: [
-          { menuItemId: '123e4567-e89b-12d3-a456-426614174000', quantity: 1 }
-        ],
-      };
-      expect(createRestaurantOrderSchema.safeParse(validOrder).success).toBe(true);
+      expect(createTransactionSchema.safeParse(emptyTransaction).success).toBe(false);
     });
 
-    it('should accept takeaway order', () => {
-      const takeawayOrder = {
-        orderType: 'takeaway',
-        customerName: 'John Doe',
-        customerPhone: '+1234567890',
+    it('should reject invalid engine type', () => {
+      const invalid = {
+        engineType: 'invalid_type',
         items: [
-          { menuItemId: '123e4567-e89b-12d3-a456-426614174000', quantity: 2 }
+          { referenceId: '123e4567-e89b-12d3-a456-426614174000' }
         ],
       };
-      expect(createRestaurantOrderSchema.safeParse(takeawayOrder).success).toBe(true);
-    });
-
-    it('should reject invalid order type', () => {
-      const invalidOrder = {
-        orderType: 'invalid_type',
-        items: [
-          { menuItemId: '123e4567-e89b-12d3-a456-426614174000', quantity: 1 }
-        ],
-      };
-      expect(createRestaurantOrderSchema.safeParse(invalidOrder).success).toBe(false);
+      expect(createTransactionSchema.safeParse(invalid).success).toBe(false);
     });
   });
 
@@ -246,7 +217,7 @@ describe('Validation Schemas (Source)', () => {
       const validPayment = {
         amount: 50,
         currency: 'usd',
-        referenceType: 'restaurant_order',
+        referenceType: 'instant_transaction',
         referenceId: '123e4567-e89b-12d3-a456-426614174000',
       };
       expect(createPaymentIntentSchema.safeParse(validPayment).success).toBe(true);
@@ -255,7 +226,7 @@ describe('Validation Schemas (Source)', () => {
     it('should default currency to usd', () => {
       const payment = {
         amount: 50,
-        referenceType: 'snack_order',
+        referenceType: 'shared_capacity_access',
         referenceId: '123e4567-e89b-12d3-a456-426614174000',
       };
       const result = createPaymentIntentSchema.parse(payment);
@@ -265,7 +236,7 @@ describe('Validation Schemas (Source)', () => {
     it('should reject amount exceeding maximum', () => {
       const invalidPayment = {
         amount: 100001,
-        referenceType: 'chalet_booking',
+        referenceType: 'time_exclusive_reservation',
         referenceId: '123e4567-e89b-12d3-a456-426614174000',
       };
       expect(createPaymentIntentSchema.safeParse(invalidPayment).success).toBe(false);
@@ -275,7 +246,7 @@ describe('Validation Schemas (Source)', () => {
   describe('recordCashPaymentSchema', () => {
     it('should accept valid cash payment', () => {
       const validPayment = {
-        referenceType: 'pool_ticket',
+        referenceType: 'shared_capacity_access',
         referenceId: '123e4567-e89b-12d3-a456-426614174000',
         amount: 25.50,
       };
@@ -284,7 +255,7 @@ describe('Validation Schemas (Source)', () => {
 
     it('should accept optional notes', () => {
       const paymentWithNotes = {
-        referenceType: 'restaurant_order',
+        referenceType: 'instant_transaction',
         referenceId: '123e4567-e89b-12d3-a456-426614174000',
         amount: 100,
         notes: 'Paid in full',
