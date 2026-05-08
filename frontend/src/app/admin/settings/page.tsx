@@ -18,6 +18,8 @@ import {
   CreditCard,
   Globe,
   Package,
+  ShieldCheck,
+  ExternalLink,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -106,6 +108,7 @@ export default function AdminSettingsPage() {
     { id: 'hours' as const, label: 'Business Hours', icon: Clock },
     ...moduleSpecificTabs,
     { id: 'legal' as const, label: 'Legal Pages', icon: FileText },
+    { id: 'compliance' as const, label: 'GDPR & Compliance', icon: ShieldCheck },
   ];
 
   const renderTabContent = () => {
@@ -398,6 +401,112 @@ export default function AdminSettingsPage() {
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                   No refund policy set - recommended for booking services
                 </p>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'compliance':
+        const dpaData = formSettings.dpaAgreements || {};
+        const updateDPA = (service: string, field: string, value: any) => {
+          setFormSettings({
+            ...formSettings,
+            dpaAgreements: {
+              ...dpaData,
+              [service]: {
+                ...(dpaData[service] || { status: false, dateCompleted: '', reference: '' }),
+                [field]: value
+              }
+            }
+          });
+        };
+
+        const renderDPAItem = (id: string, name: string, url: string, description: string) => {
+          const data = dpaData[id] || { status: false, dateCompleted: '', reference: '' };
+          return (
+            <div className="p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl mb-4">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h4 className="text-lg font-semibold flex items-center gap-2">
+                    {name}
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-700 flex items-center text-sm font-normal">
+                      <ExternalLink className="w-3 h-3 ml-1 mr-1" /> View Dashboard
+                    </a>
+                  </h4>
+                  <p className="text-sm text-slate-500">{description}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium">Agreement Accepted?</label>
+                  <input 
+                    type="checkbox" 
+                    checked={data.status || false}
+                    onChange={(e) => updateDPA(id, 'status', e.target.checked)}
+                    className="w-5 h-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+
+              {data.status && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                      Date Completed
+                    </label>
+                    <input
+                      type="date"
+                      value={data.dateCompleted || ''}
+                      onChange={(e) => updateDPA(id, 'dateCompleted', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                      Reference Number / Confirmation
+                    </label>
+                    <input
+                      type="text"
+                      value={data.reference || ''}
+                      onChange={(e) => updateDPA(id, 'reference', e.target.value)}
+                      placeholder="e.g. Agreement ID or Signer Email"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900/50 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <ShieldCheck className="w-6 h-6 text-green-600" />
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Data Processing Agreements (DPAs)</h3>
+              </div>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                To maintain GDPR compliance, you must legally accept Data Processing Agreements with all third-party sub-processors used by the platform. This tab serves as an internal audit trail to track when these agreements were accepted.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {renderDPAItem(
+                'stripe',
+                'Stripe (Payments)',
+                'https://dashboard.stripe.com/settings/compliance',
+                'Processes customer payment information and billing data.'
+              )}
+              {renderDPAItem(
+                'twilio',
+                'Twilio (SMS & Comms)',
+                'https://console.twilio.com/us1/account/trust-hub/compliance',
+                'Processes customer phone numbers for SMS notifications.'
+              )}
+              {renderDPAItem(
+                'sentry',
+                'Sentry (Error Tracking)',
+                'https://sentry.io/settings/account/legal/dpa/',
+                'Processes application errors which may temporarily contain PII.'
               )}
             </div>
           </div>
