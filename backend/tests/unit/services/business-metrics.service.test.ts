@@ -100,25 +100,23 @@ describe('BusinessMetricsService', () => {
   describe('getRevenueMetrics', () => {
     it('should return revenue metrics', async () => {
       const mockTransactions = [
-        { amount: 500, type: 'accommodation', payment_method: 'card', created_at: '2024-01-15T10:00:00Z', status: 'completed' },
-        { amount: 100, type: 'food', payment_method: 'cash', created_at: '2024-01-15T11:00:00Z', status: 'completed' },
-        { amount: 50, type: 'pool', payment_method: 'card', created_at: '2024-01-15T12:00:00Z', status: 'completed' },
+        { amount: 500, engine_type: 'time_exclusive_reservation', created_at: '2024-01-15T10:00:00Z', status: 'completed' },
+        { amount: 100, engine_type: 'instant_transaction', created_at: '2024-01-15T11:00:00Z', status: 'completed' },
+        { amount: 50, engine_type: 'shared_capacity_access', created_at: '2024-01-15T12:00:00Z', status: 'completed' },
       ];
 
       vi.mocked(supabase.from).mockReturnValue({
         select: vi.fn().mockReturnValue({
-          gte: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: mockTransactions, error: null }),
-          }),
+          gte: vi.fn().mockResolvedValue({ data: mockTransactions, error: null }),
         }),
       } as any);
 
       const result = await businessMetricsService.getRevenueMetrics();
 
       expect(result.total_revenue).toBe(650);
-      expect(result.accommodation_revenue).toBe(500);
-      expect(result.food_revenue).toBe(100);
-      expect(result.pool_revenue).toBe(50);
+      expect(result.revenue_by_engine).toHaveProperty('time_exclusive_reservation');
+      expect(result.revenue_by_engine).toHaveProperty('instant_transaction');
+      expect(result.revenue_by_engine).toHaveProperty('shared_capacity_access');
     });
   });
 
@@ -181,9 +179,9 @@ describe('BusinessMetricsService', () => {
       const result = await businessMetricsService.getOperationalMetrics();
 
       expect(result).toBeDefined();
-      expect(result).toHaveProperty('orders_today');
-      expect(result).toHaveProperty('orders_pending');
-      expect(result).toHaveProperty('orders_completed');
+      expect(result).toHaveProperty('transactions_today');
+      expect(result).toHaveProperty('transactions_pending');
+      expect(result).toHaveProperty('transactions_completed');
     });
   });
 

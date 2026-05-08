@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Cookie, Shield, BarChart, Target } from 'lucide-react';
 import {
   Dialog,
@@ -111,19 +111,38 @@ export function CookieConsentBanner() {
     consent,
   } = useConsent();
 
-  // Local toggle state for the customise dialog
+  // Local toggle state for the customise dialog.
+  // Synced from ConsentContext whenever the dialog opens.
   const [localCategories, setLocalCategories] = useState<ConsentCategories>({
     necessary: true,
-    functional: consent?.categories.functional ?? false,
-    analytics: consent?.categories.analytics ?? false,
-    marketing: consent?.categories.marketing ?? false,
+    functional: false,
+    analytics: false,
+    marketing: false,
   });
 
-  const handleToggle = (category: keyof ConsentCategories) => {
-    if (category === 'necessary') return; // Cannot disable necessary cookies
-    setLocalCategories(prev => ({ ...prev, [category]: !prev[category] }));
+  // Re-sync local toggles with the current consent state every time
+  // the customise dialog is opened (handles reopens after accept/reject).
+  useEffect(() => {
+    if (showCustomise) {
+      setLocalCategories({
+        necessary: true,
+        functional: consent?.categories.functional ?? false,
+        analytics: consent?.categories.analytics ?? false,
+        marketing: consent?.categories.marketing ?? false,
+      });
+    }
+  }, [showCustomise, consent]);
+
+  // Toggle a single category — only mutates local state.
+  // The save is deferred until the user explicitly clicks "Save Preferences".
+  const handleToggle = (category: keyof ConsentCategories, checked: boolean) => {
+    if (category === 'necessary') return;
+    setLocalCategories(prev => ({ ...prev, [category]: checked }));
   };
 
+  // Persist the current local toggle state as the user's consent decision.
+  // By the time the user clicks this button, React has re-rendered with all
+  // accumulated toggle changes, so localCategories is up-to-date.
   const handleSavePreferences = () => {
     savePreferences(localCategories);
   };
@@ -233,7 +252,7 @@ export function CookieConsentBanner() {
                     </AccordionTrigger>
                     <Switch
                       checked={localCategories[category.id]}
-                      onCheckedChange={() => handleToggle(category.id)}
+                      onCheckedChange={(checked) => handleToggle(category.id, checked)}
                       disabled={category.required}
                       className="ml-4"
                     />

@@ -45,11 +45,15 @@ describe('User Controller', () => {
         is_active: true,
         created_at: '2024-01-01T00:00:00Z',
         updated_at: null,
-        user_roles: [{ role: { name: 'customer' } }],
       };
+      const mockUserRoles = [{ role: { name: 'customer' } }];
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(createChainableMock(mockUser)),
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'users') return createChainableMock(mockUser);
+          if (table === 'user_roles') return createChainableMock(mockUserRoles);
+          return createChainableMock(null);
+        }),
       } as any);
 
       req.user = { userId: 'user-123', role: 'customer' };
@@ -177,7 +181,6 @@ describe('User Controller', () => {
           is_active: true,
           created_at: '2024-01-01T00:00:00Z',
           updated_at: null,
-          user_roles: [{ role: { name: 'customer' } }],
         },
         {
           id: 'user-2',
@@ -188,7 +191,6 @@ describe('User Controller', () => {
           is_active: true,
           created_at: '2024-01-02T00:00:00Z',
           updated_at: null,
-          user_roles: [{ role: { name: 'staff' } }],
         },
       ];
 
@@ -268,13 +270,15 @@ describe('User Controller', () => {
         created_at: '2024-01-01T00:00:00Z',
         updated_at: null,
         last_login_at: null,
-        user_roles: [{ role: { id: 'role-1', name: 'customer', display_name: 'Customer' } }],
       };
+      const mockUserRoles = [{ role: { id: 'role-1', name: 'customer', display_name: 'Customer' } }];
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(
-          createChainableMock(mockUser)
-        ),
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'users') return createChainableMock(mockUser);
+          if (table === 'user_roles') return createChainableMock(mockUserRoles);
+          return createChainableMock(null);
+        }),
       } as any);
 
       req.params = { id: '123e4567-e89b-12d3-a456-426614174000' };

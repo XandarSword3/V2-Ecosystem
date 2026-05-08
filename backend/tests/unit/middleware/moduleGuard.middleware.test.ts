@@ -16,7 +16,7 @@ vi.mock('../../../src/utils/logger.js', () => ({
 }));
 
 import { getSupabase } from '../../../src/database/connection';
-import { requireModule, clearModuleCache, dynamicModuleGuard, moduleRouteMap } from '../../../src/middleware/moduleGuard.middleware';
+import { requireModule, clearModuleCache } from '../../../src/middleware/moduleGuard.middleware';
 
 describe('ModuleGuard Middleware', () => {
   beforeEach(() => {
@@ -144,55 +144,5 @@ describe('ModuleGuard Middleware', () => {
     });
   });
 
-  describe('dynamicModuleGuard', () => {
-    it('should allow request for active module based on path', async () => {
-      vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(createChainableMock({ is_active: true }))
-      } as any);
-
-      const { req, res, next } = createMockReqRes({});
-      (req as any).path = '/restaurant/menu';
-
-      await dynamicModuleGuard(req, res, next);
-
-      expect(next).toHaveBeenCalled();
-    });
-
-    it('should block request for disabled module based on path', async () => {
-      vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(createChainableMock({ is_active: false }))
-      } as any);
-
-      // Clear cache to ensure fresh DB call
-      clearModuleCache();
-
-      const { req, res, next } = createMockReqRes({});
-      (req as any).path = '/pool/tickets';
-
-      await dynamicModuleGuard(req, res, next);
-
-      expect(res.status).toHaveBeenCalledWith(503);
-      expect(next).not.toHaveBeenCalled();
-    });
-
-    it('should allow request for unmatched path', async () => {
-      const { req, res, next } = createMockReqRes({});
-      (req as any).path = '/api/admin/settings';
-
-      await dynamicModuleGuard(req, res, next);
-
-      expect(next).toHaveBeenCalled();
-    });
-  });
-
-  describe('moduleRouteMap', () => {
-    it('should have expected module mappings', () => {
-      expect(moduleRouteMap).toEqual({
-        '/api/restaurant': 'restaurant',
-        '/api/pool': 'pool',
-        '/api/chalets': 'chalets',
-        '/api/snack': 'snack-bar'
-      });
-    });
-  });
 });
+

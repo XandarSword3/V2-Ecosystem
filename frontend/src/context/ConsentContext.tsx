@@ -123,6 +123,34 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
   const [showCustomise, setShowCustomise] = useState(false);
   const initialised = useRef(false);
 
+  // Apply side effects (GTM, FB, Events)
+  const applyConsentEffects = useCallback((categories: ConsentCategories, record: ConsentRecord) => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('consent-updated', { detail: record }));
+
+      // Update dataLayer for GTM/GA4
+      const dataLayer = (window as any).dataLayer = (window as any).dataLayer || [];
+      dataLayer.push({
+        event: 'consent_update',
+        consent: categories
+      });
+
+      // Update FB Pixel
+      if (typeof (window as any).fbq === 'function') {
+        if (!categories.marketing) {
+          (window as any).fbq('consent', 'revoke');
+        } else {
+          (window as any).fbq('consent', 'grant');
+        }
+      }
+
+      // Handle GA disable if analytics is rejected
+      if (!categories.analytics) {
+        (window as any)['ga-disable-GA_MEASUREMENT_ID'] = true;
+      }
+    }
+  }, []);
+
   // Read persisted consent on mount
   useEffect(() => {
     if (initialised.current) return;
@@ -134,6 +162,7 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
         const parsed = JSON.parse(stored) as ConsentRecord;
         if (parsed.version === CONSENT_VERSION) {
           setConsent(parsed);
+          applyConsentEffects(parsed.categories, parsed);
           return;
         }
       }
@@ -143,7 +172,7 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
 
     // No valid consent — show banner
     setShowBanner(true);
-  }, []);
+  }, [applyConsentEffects]);
 
   // Persist & broadcast consent
   const persistConsent = useCallback((categories: ConsentCategories) => {
@@ -166,11 +195,9 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
     // Fire-and-forget backend recording
     recordConsentToBackend(categories, CONSENT_VERSION);
 
-    // Dispatch a custom event so other parts of the app can react
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('consent-updated', { detail: record }));
-    }
-  }, []);
+    // Apply side effects
+    applyConsentEffects(categories, record);
+  }, [applyConsentEffects]);
 
   const acceptAll = useCallback(() => {
     persistConsent(ALL_CATEGORIES);

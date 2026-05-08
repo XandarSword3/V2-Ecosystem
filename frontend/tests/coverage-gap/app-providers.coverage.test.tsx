@@ -94,6 +94,7 @@ vi.mock('@/components/effects/WeatherEffects', () => ({
 
 vi.mock('@/components/PageTracker', () => ({
   PageTracker: () => <div data-testid="page-tracker" />,
+  ConsentGatedPageTracker: () => <div data-testid="consent-gated-page-tracker" />
 }));
 
 vi.mock('@/components/pwa', () => ({
@@ -132,7 +133,7 @@ describe('App providers coverage', () => {
     expect(screen.getByTestId('theme-injector')).toBeInTheDocument();
     expect(screen.getByTestId('weather-effects')).toBeInTheDocument();
     expect(screen.getByTestId('direction-sync')).toBeInTheDocument();
-    expect(screen.getByTestId('page-tracker')).toBeInTheDocument();
+    expect(screen.getByTestId('consent-gated-page-tracker')).toBeInTheDocument();
     expect(screen.getByTestId('pwa-prompt')).toBeInTheDocument();
     expect(getLocaleFromCookieMock).toHaveBeenCalledTimes(2);
   });

@@ -51,7 +51,7 @@ describe('MenuImportPage', () => {
     const textarea = screen.getByPlaceholderText(/Paste your menu here/i);
     fireEvent.change(textarea, { target: { value: 'Pizza 10' } });
     
-    const parseButton = screen.getByText('Parse Menu →');
+    const parseButton = screen.getByText('Parse →');
     fireEvent.click(parseButton);
 
     await waitFor(() => {
@@ -70,7 +70,7 @@ describe('MenuImportPage', () => {
     const textarea = screen.getByPlaceholderText(/Paste your menu here/i);
     fireEvent.change(textarea, { target: { value: 'garbage' } });
     
-    const parseButton = screen.getByText('Parse Menu →');
+    const parseButton = screen.getByText('Parse →');
     fireEvent.click(parseButton);
 
     // Toast is checked via mock call
