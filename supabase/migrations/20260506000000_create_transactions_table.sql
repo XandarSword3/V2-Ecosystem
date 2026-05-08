@@ -147,7 +147,7 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_sync_transaction ON chalet_bookings;
 CREATE TRIGGER trg_sync_transaction
-    AFTER INSERT OR UPDATE OF status, payment_status, total_price ON chalet_bookings
+    AFTER INSERT OR UPDATE OF status, payment_status ON chalet_bookings
     FOR EACH ROW EXECUTE FUNCTION sync_transaction_from_chalet_booking();
 
 -- pool_tickets → transactions
@@ -180,7 +180,7 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_sync_transaction ON pool_tickets;
 CREATE TRIGGER trg_sync_transaction
-    AFTER INSERT OR UPDATE OF status, payment_status, total_price ON pool_tickets
+    AFTER INSERT OR UPDATE OF status, payment_status ON pool_tickets
     FOR EACH ROW EXECUTE FUNCTION sync_transaction_from_pool_ticket();
 
 -- snack_orders → transactions (if table exists)

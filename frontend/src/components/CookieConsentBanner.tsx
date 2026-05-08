@@ -1,10 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Switch } from '@/components/ui/Switch';
-import { Label } from '@/components/ui/Label';
-import { Checkbox } from '@/components/ui/Checkbox';
-import { Cookie, Shield, BarChart, Target, Info } from 'lucide-react';
+import { useState } from 'react';
+import { Cookie, Shield, BarChart, Target } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,22 +17,16 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/Accordion';
-import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/Switch';
+import { useConsent, type ConsentCategories } from '@/context/ConsentContext';
+import Link from 'next/link';
 
-interface CookieConsent {
-  necessary: boolean;
-  functional: boolean;
-  analytics: boolean;
-  marketing: boolean;
-  timestamp: number;
-  version: string;
-}
+// ---------------------------------------------------------------------------
+// Cookie category metadata — used by both the banner and /cookie-policy page
+// ---------------------------------------------------------------------------
 
-const CONSENT_VERSION = '1.0';
-const CONSENT_STORAGE_KEY = 'cookie-consent';
-
-interface CookieCategory {
-  id: keyof Omit<CookieConsent, 'timestamp' | 'version'>;
+export interface CookieCategoryMeta {
+  id: keyof ConsentCategories;
   name: string;
   description: string;
   icon: React.ReactNode;
@@ -43,183 +34,114 @@ interface CookieCategory {
   cookies: { name: string; purpose: string; duration: string }[];
 }
 
-const COOKIE_CATEGORIES: CookieCategory[] = [
+export const COOKIE_CATEGORIES: CookieCategoryMeta[] = [
   {
     id: 'necessary',
     name: 'Strictly Necessary',
-    description: 'These cookies are essential for the website to function properly. They enable basic functions like page navigation, access to secure areas, and session management. The website cannot function properly without these cookies.',
+    description:
+      'These cookies are essential for the website to function properly. They enable basic functions like page navigation, access to secure areas, and session management. The website cannot function properly without these cookies.',
     icon: <Shield className="h-5 w-5" />,
     required: true,
     cookies: [
-      { name: 'session_id', purpose: 'Maintains user session', duration: 'Session' },
-      { name: 'csrf_token', purpose: 'Security token for form submissions', duration: 'Session' },
-      { name: 'auth_token', purpose: 'Authentication token', duration: '30 days' },
+      { name: 'cookie-consent', purpose: 'Stores your cookie consent preferences', duration: 'Persistent' },
+      { name: 'accessToken', purpose: 'Authentication token (localStorage)', duration: 'Session' },
+      { name: 'refreshToken', purpose: 'Token refresh (localStorage)', duration: '30 days' },
+      { name: 'user', purpose: 'Cached user profile (localStorage)', duration: 'Session' },
+      // GDPR: theme localStorage is classified as strictly necessary to prevent
+      // a flash of wrong theme colours. See layout.tsx inline script.
+      { name: 'v2-resort-theme', purpose: 'Prevents flash of wrong theme on page load', duration: 'Persistent' },
+      { name: 'theme', purpose: 'Light/dark mode preference to prevent flicker', duration: 'Persistent' },
     ],
   },
   {
     id: 'functional',
     name: 'Functional',
-    description: 'These cookies enable enhanced functionality and personalization, such as remembering your preferences, language settings, and login details.',
+    description:
+      'These cookies enable enhanced functionality and personalization, such as remembering your preferences, language settings, and live page tracking for staff dashboards.',
     icon: <Cookie className="h-5 w-5" />,
     required: false,
     cookies: [
-      { name: 'lang', purpose: 'Stores language preference', duration: '1 year' },
-      { name: 'theme', purpose: 'Stores theme preference', duration: '1 year' },
-      { name: 'remember_me', purpose: 'Enables persistent login', duration: '30 days' },
+      { name: 'NEXT_LOCALE', purpose: 'Stores language preference', duration: '1 year' },
+      { name: 'pwa-install-dismissed', purpose: 'Remembers PWA install prompt dismissal', duration: 'Persistent' },
+      { name: 'v2-settings-updated', purpose: 'Cross-tab settings synchronisation', duration: 'Transient' },
+      { name: 'sidebar-categories', purpose: 'Admin sidebar expanded/collapsed state', duration: 'Persistent' },
     ],
   },
   {
     id: 'analytics',
     name: 'Analytics',
-    description: 'These cookies help us understand how visitors interact with our website by collecting and reporting information anonymously. This helps us improve our services.',
+    description:
+      'These cookies help us understand how visitors interact with our website by collecting and reporting information anonymously. This helps us improve our services.',
     icon: <BarChart className="h-5 w-5" />,
     required: false,
     cookies: [
-      { name: '_ga', purpose: 'Google Analytics tracking', duration: '2 years' },
-      { name: '_gid', purpose: 'Google Analytics session tracking', duration: '24 hours' },
-      { name: 'plausible', purpose: 'Privacy-friendly analytics', duration: '1 year' },
+      // No analytics cookies are currently active. When Sentry or Google
+      // Analytics is enabled in the future, add entries here and gate
+      // initialisation behind this consent category.
+      { name: '(none active)', purpose: 'No analytics cookies are currently set', duration: 'N/A' },
     ],
   },
   {
     id: 'marketing',
     name: 'Marketing',
-    description: 'These cookies are used to track visitors across websites. The intention is to display ads that are relevant and engaging for the individual user.',
+    description:
+      'These cookies are used to track visitors across websites. The intention is to display ads that are relevant and engaging for the individual user.',
     icon: <Target className="h-5 w-5" />,
     required: false,
     cookies: [
-      { name: '_fbp', purpose: 'Facebook pixel tracking', duration: '90 days' },
-      { name: 'ads_prefs', purpose: 'Advertising preferences', duration: '2 years' },
+      // No marketing cookies are currently active.
+      { name: '(none active)', purpose: 'No marketing cookies are currently set', duration: 'N/A' },
     ],
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function CookieConsentBanner() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-  const [consent, setConsent] = useState<CookieConsent>({
+  const {
+    showBanner,
+    showCustomise,
+    openCustomise,
+    closeCustomise,
+    acceptAll,
+    rejectAll,
+    savePreferences,
+    consent,
+  } = useConsent();
+
+  // Local toggle state for the customise dialog
+  const [localCategories, setLocalCategories] = useState<ConsentCategories>({
     necessary: true,
-    functional: false,
-    analytics: false,
-    marketing: false,
-    timestamp: 0,
-    version: CONSENT_VERSION,
+    functional: consent?.categories.functional ?? false,
+    analytics: consent?.categories.analytics ?? false,
+    marketing: consent?.categories.marketing ?? false,
   });
 
-  useEffect(() => {
-    // Check for existing consent
-    const stored = localStorage.getItem(CONSENT_STORAGE_KEY);
-    
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as CookieConsent;
-        
-        // Check if consent version matches
-        if (parsed.version === CONSENT_VERSION) {
-          setConsent(parsed);
-          applyConsent(parsed);
-          return;
-        }
-      } catch {
-        // Invalid stored consent
-      }
-    }
-    
-    // Show banner if no valid consent
-    setIsOpen(true);
-  }, []);
-
-  const applyConsent = (consentData: CookieConsent) => {
-    // Apply consent settings
-    if (typeof window !== 'undefined') {
-      // Update data layer for analytics
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({
-        event: 'consent_update',
-        consent: {
-          necessary: consentData.necessary,
-          functional: consentData.functional,
-          analytics: consentData.analytics,
-          marketing: consentData.marketing,
-        },
-      });
-
-      // Enable/disable tracking based on consent
-      if (!consentData.analytics) {
-        // Disable Google Analytics
-        window['ga-disable-GA_MEASUREMENT_ID'] = true;
-      }
-
-      if (!consentData.marketing) {
-        // Disable Facebook Pixel
-        window.fbq?.('consent', 'revoke');
-      } else {
-        window.fbq?.('consent', 'grant');
-      }
-    }
-  };
-
-  const saveConsent = (consentData: CookieConsent) => {
-    const updatedConsent = {
-      ...consentData,
-      timestamp: Date.now(),
-      version: CONSENT_VERSION,
-    };
-    
-    // FIX Iter-13: Guard localStorage.setItem — throws in Safari private browsing or when quota exceeded
-    try {
-      localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(updatedConsent));
-    } catch {
-      // localStorage unavailable or full — continue with in-memory consent
-    }
-    setConsent(updatedConsent);
-    applyConsent(updatedConsent);
-    setIsOpen(false);
-  };
-
-  const handleAcceptAll = () => {
-    saveConsent({
-      necessary: true,
-      functional: true,
-      analytics: true,
-      marketing: true,
-      timestamp: Date.now(),
-      version: CONSENT_VERSION,
-    });
-  };
-
-  const handleRejectNonEssential = () => {
-    saveConsent({
-      necessary: true,
-      functional: false,
-      analytics: false,
-      marketing: false,
-      timestamp: Date.now(),
-      version: CONSENT_VERSION,
-    });
+  const handleToggle = (category: keyof ConsentCategories) => {
+    if (category === 'necessary') return; // Cannot disable necessary cookies
+    setLocalCategories(prev => ({ ...prev, [category]: !prev[category] }));
   };
 
   const handleSavePreferences = () => {
-    saveConsent(consent);
+    savePreferences(localCategories);
   };
 
-  const handleToggle = (
-    category: keyof Omit<CookieConsent, 'timestamp' | 'version'>
-  ) => {
-    if (category === 'necessary') return; // Cannot disable necessary cookies
-    
-    setConsent(prev => ({
-      ...prev,
-      [category]: !prev[category],
-    }));
-  };
-
-  if (!isOpen) return null;
+  if (!showBanner && !showCustomise) return null;
 
   return (
     <>
-      {/* Simple Banner */}
-      {!showDetails && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background border-t shadow-lg">
+      {/* ----------------------------------------------------------------- */}
+      {/* Simple Banner                                                     */}
+      {/* ----------------------------------------------------------------- */}
+      {showBanner && !showCustomise && (
+        <div
+          id="cookie-consent-banner"
+          role="dialog"
+          aria-label="Cookie consent"
+          className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background border-t shadow-lg animate-in slide-in-from-bottom duration-300"
+        >
           <div className="container mx-auto max-w-6xl">
             <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
               <div className="flex items-start gap-3 flex-1">
@@ -227,25 +149,41 @@ export function CookieConsentBanner() {
                 <div>
                   <h3 className="font-semibold">We use cookies</h3>
                   <p className="text-sm text-muted-foreground">
-                    We use cookies to improve your experience, analyze site traffic, and for marketing. 
-                    By clicking "Accept All", you consent to our use of cookies.{' '}
-                    <button
-                      onClick={() => setShowDetails(true)}
+                    We use cookies to improve your experience and for core site
+                    functionality. By clicking &quot;Accept All&quot;, you
+                    consent to our use of cookies.{' '}
+                    <Link
+                      href="/cookie-policy"
                       className="text-primary underline hover:no-underline"
                     >
-                      Learn more
-                    </button>
+                      Cookie Policy
+                    </Link>
+                    {' · '}
+                    <Link
+                      href="/privacy"
+                      className="text-primary underline hover:no-underline"
+                    >
+                      Privacy Policy
+                    </Link>
                   </p>
                 </div>
               </div>
               <div className="flex gap-2 w-full md:w-auto">
-                <Button variant="outline" onClick={handleRejectNonEssential}>
-                  Reject Non-Essential
+                <Button
+                  id="cookie-reject-all"
+                  variant="outline"
+                  onClick={rejectAll}
+                >
+                  Reject All
                 </Button>
-                <Button variant="outline" onClick={() => setShowDetails(true)}>
-                  Customize
+                <Button
+                  id="cookie-customise"
+                  variant="outline"
+                  onClick={openCustomise}
+                >
+                  Customise
                 </Button>
-                <Button onClick={handleAcceptAll}>
+                <Button id="cookie-accept-all" onClick={acceptAll}>
                   Accept All
                 </Button>
               </div>
@@ -254,8 +192,10 @@ export function CookieConsentBanner() {
         </div>
       )}
 
-      {/* Detailed Preferences Modal */}
-      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+      {/* ----------------------------------------------------------------- */}
+      {/* Detailed Preferences Modal                                        */}
+      {/* ----------------------------------------------------------------- */}
+      <Dialog open={showCustomise} onOpenChange={open => { if (!open) closeCustomise(); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -263,7 +203,15 @@ export function CookieConsentBanner() {
               Cookie Preferences
             </DialogTitle>
             <DialogDescription>
-              Manage your cookie preferences. You can enable or disable different types of cookies below.
+              Manage your cookie preferences. You can enable or disable
+              different types of cookies below. Read our{' '}
+              <Link
+                href="/cookie-policy"
+                className="text-primary underline hover:no-underline"
+              >
+                Cookie Policy
+              </Link>{' '}
+              for full details.
             </DialogDescription>
           </DialogHeader>
 
@@ -284,7 +232,7 @@ export function CookieConsentBanner() {
                       </div>
                     </AccordionTrigger>
                     <Switch
-                      checked={consent[category.id]}
+                      checked={localCategories[category.id]}
                       onCheckedChange={() => handleToggle(category.id)}
                       disabled={category.required}
                       className="ml-4"
@@ -299,9 +247,15 @@ export function CookieConsentBanner() {
                         <table className="w-full text-sm">
                           <thead className="bg-muted">
                             <tr>
-                              <th className="px-3 py-2 text-left font-medium">Cookie</th>
-                              <th className="px-3 py-2 text-left font-medium">Purpose</th>
-                              <th className="px-3 py-2 text-left font-medium">Duration</th>
+                              <th className="px-3 py-2 text-left font-medium">
+                                Cookie
+                              </th>
+                              <th className="px-3 py-2 text-left font-medium">
+                                Purpose
+                              </th>
+                              <th className="px-3 py-2 text-left font-medium">
+                                Duration
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
@@ -311,7 +265,9 @@ export function CookieConsentBanner() {
                                   {cookie.name}
                                 </td>
                                 <td className="px-3 py-2">{cookie.purpose}</td>
-                                <td className="px-3 py-2">{cookie.duration}</td>
+                                <td className="px-3 py-2">
+                                  {cookie.duration}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -325,15 +281,13 @@ export function CookieConsentBanner() {
           </div>
 
           <DialogFooter className="flex gap-2 sm:gap-2">
-            <Button variant="outline" onClick={handleRejectNonEssential}>
-              Reject Non-Essential
+            <Button variant="outline" onClick={rejectAll}>
+              Reject All
             </Button>
-            <Button variant="outline" onClick={handleAcceptAll}>
+            <Button variant="outline" onClick={acceptAll}>
               Accept All
             </Button>
-            <Button onClick={handleSavePreferences}>
-              Save Preferences
-            </Button>
+            <Button onClick={handleSavePreferences}>Save Preferences</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -341,57 +295,9 @@ export function CookieConsentBanner() {
   );
 }
 
-// Utility function to check consent
-export function hasConsent(
-  category: keyof Omit<CookieConsent, 'timestamp' | 'version'>
-): boolean {
-  if (typeof window === 'undefined') return false;
-  
-  const stored = localStorage.getItem(CONSENT_STORAGE_KEY);
-  if (!stored) return false;
-  
-  try {
-    const consent = JSON.parse(stored) as CookieConsent;
-    return consent[category] === true;
-  } catch {
-    return false;
-  }
-}
-
-// Hook for accessing consent state
-export function useCookieConsent() {
-  const [consent, setConsent] = useState<CookieConsent | null>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(CONSENT_STORAGE_KEY);
-    if (stored) {
-      try {
-        setConsent(JSON.parse(stored));
-      } catch {
-        setConsent(null);
-      }
-    }
-  }, []);
-
-  return {
-    consent,
-    hasConsent: (category: keyof Omit<CookieConsent, 'timestamp' | 'version'>) => 
-      consent?.[category] ?? false,
-    resetConsent: () => {
-      localStorage.removeItem(CONSENT_STORAGE_KEY);
-      setConsent(null);
-      window.location.reload();
-    },
-  };
-}
-
-// Extend window type for tracking libraries
-declare global {
-  interface Window {
-    dataLayer?: any[];
-    fbq?: (...args: any[]) => void;
-    'ga-disable-GA_MEASUREMENT_ID'?: boolean;
-  }
-}
-
+// Re-export for backward compatibility
 export default CookieConsentBanner;
+
+// Re-export consent types and hook for convenience
+export { useConsent } from '@/context/ConsentContext';
+export type { ConsentCategories } from '@/context/ConsentContext';

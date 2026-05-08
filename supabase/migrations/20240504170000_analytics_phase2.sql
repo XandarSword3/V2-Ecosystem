@@ -37,8 +37,8 @@ EXCEPTION WHEN duplicate_object THEN null;
 END $$;
 
 -- Create index for performance
-CREATE INDEX idx_alert_definitions_property ON alert_definitions(property_id);
-CREATE INDEX idx_alert_definitions_active ON alert_definitions(property_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_alert_definitions_property ON alert_definitions(property_id);
+CREATE INDEX IF NOT EXISTS idx_alert_definitions_active ON alert_definitions(property_id, is_active);
 
 -- Alert history table
 CREATE TABLE IF NOT EXISTS alert_history (
@@ -68,9 +68,9 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;
 
-CREATE INDEX idx_alert_history_property ON alert_history(property_id);
-CREATE INDEX idx_alert_history_active ON alert_history(property_id, status) WHERE status = 'active';
-CREATE INDEX idx_alert_history_triggered ON alert_history(triggered_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alert_history_property ON alert_history(property_id);
+CREATE INDEX IF NOT EXISTS idx_alert_history_active ON alert_history(property_id, status) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_alert_history_triggered ON alert_history(triggered_at DESC);
 
 -- =============================================
 -- GOVERNED METRICS LAYER
@@ -154,9 +154,9 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;
 
-CREATE INDEX idx_guest_rfm_property ON guest_rfm_scores(property_id);
-CREATE INDEX idx_guest_rfm_segment ON guest_rfm_scores(property_id, segment);
-CREATE INDEX idx_guest_rfm_scores ON guest_rfm_scores(property_id, r_score, f_score, m_score);
+CREATE INDEX IF NOT EXISTS idx_guest_rfm_property ON guest_rfm_scores(property_id);
+CREATE INDEX IF NOT EXISTS idx_guest_rfm_segment ON guest_rfm_scores(property_id, segment);
+CREATE INDEX IF NOT EXISTS idx_guest_rfm_scores ON guest_rfm_scores(property_id, r_score, f_score, m_score);
 
 -- =============================================
 -- SAVED QUERIES (Query Builder)
@@ -187,8 +187,8 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;
 
-CREATE INDEX idx_saved_queries_property ON saved_queries(property_id);
-CREATE INDEX idx_saved_queries_user ON saved_queries(created_by);
+CREATE INDEX IF NOT EXISTS idx_saved_queries_property ON saved_queries(property_id);
+CREATE INDEX IF NOT EXISTS idx_saved_queries_user ON saved_queries(created_by);
 
 -- =============================================
 -- FUNCTIONS
@@ -204,11 +204,17 @@ END;
 $$ language 'plpgsql';
 
 -- Create triggers for updated_at
-CREATE TRIGGER update_alert_definitions_updated_at BEFORE UPDATE ON alert_definitions
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$ BEGIN
+    CREATE TRIGGER update_alert_definitions_updated_at BEFORE UPDATE ON alert_definitions
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
-CREATE TRIGGER update_metric_definitions_updated_at BEFORE UPDATE ON metric_definitions
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$ BEGIN
+    CREATE TRIGGER update_metric_definitions_updated_at BEFORE UPDATE ON metric_definitions
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 COMMENT ON TABLE alert_definitions IS 'Alert threshold definitions for KPI monitoring';
 COMMENT ON TABLE alert_history IS 'Historical record of triggered alerts';

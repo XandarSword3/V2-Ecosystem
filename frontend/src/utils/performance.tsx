@@ -488,14 +488,32 @@ export function reportWebVitals(metric: {
     console.log(`[Web Vitals] ${name}: ${value.toFixed(2)}ms`);
   }
 
-  // Report to analytics in production
-  if (typeof window !== 'undefined' && window.gtag) {
+  // Report to analytics in production — GDPR: only if analytics consent granted
+  // The hasAnalyticsConsent() check reads the cookie-consent localStorage key
+  // to verify the user has opted into analytics cookies before sending data
+  // to any third-party analytics service (Google Analytics / gtag).
+  if (typeof window !== 'undefined' && window.gtag && hasAnalyticsConsent()) {
     window.gtag('event', name, {
       event_category: 'Web Vitals',
       event_label: label || id,
       value: Math.round(name === 'CLS' ? value * 1000 : value),
       non_interaction: true
     });
+  }
+}
+
+/**
+ * GDPR: Check if the user has granted analytics consent before sending
+ * data to third-party analytics services.
+ */
+function hasAnalyticsConsent(): boolean {
+  try {
+    const stored = localStorage.getItem('cookie-consent');
+    if (!stored) return false;
+    const consent = JSON.parse(stored);
+    return consent?.categories?.analytics === true;
+  } catch {
+    return false;
   }
 }
 
