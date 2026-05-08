@@ -35,7 +35,7 @@ function createMockContainer(paymentRepo: InMemoryPaymentRepository): Container 
 function createTestPayment(overrides: Partial<Payment> = {}): Payment {
   return {
     id: TEST_PAYMENT_ID,
-    reference_type: 'order',
+    reference_type: 'instant_transaction',
     reference_id: TEST_ORDER_ID,
     amount: '100.00',
     currency: 'EUR',
@@ -69,7 +69,7 @@ describe('PaymentService', () => {
   describe('recordPayment', () => {
     it('should record a payment successfully', async () => {
       const result = await paymentService.recordPayment({
-        referenceType: 'order',
+        referenceType: 'instant_transaction',
         referenceId: TEST_ORDER_ID,
         amount: 100,
         method: 'card',
@@ -77,7 +77,7 @@ describe('PaymentService', () => {
 
       expect(result).toBeDefined();
       expect(result.id).toBeDefined();
-      expect(result.reference_type).toBe('order');
+      expect(result.reference_type).toBe('instant_transaction');
       expect(result.reference_id).toBe(TEST_ORDER_ID);
       expect(result.amount).toBe('100.00');
       expect(result.currency).toBe('EUR');
@@ -87,7 +87,7 @@ describe('PaymentService', () => {
 
     it('should record payment with string amount', async () => {
       const result = await paymentService.recordPayment({
-        referenceType: 'booking',
+        referenceType: 'time_exclusive_reservation',
         referenceId: TEST_BOOKING_ID,
         amount: '250.50',
         method: 'cash',
@@ -98,7 +98,7 @@ describe('PaymentService', () => {
 
     it('should record payment with custom currency', async () => {
       const result = await paymentService.recordPayment({
-        referenceType: 'order',
+        referenceType: 'instant_transaction',
         referenceId: TEST_ORDER_ID,
         amount: 100,
         currency: 'USD',
@@ -110,7 +110,7 @@ describe('PaymentService', () => {
 
     it('should record payment with notes', async () => {
       const result = await paymentService.recordPayment({
-        referenceType: 'order',
+        referenceType: 'instant_transaction',
         referenceId: TEST_ORDER_ID,
         amount: 100,
         method: 'card',
@@ -122,7 +122,7 @@ describe('PaymentService', () => {
 
     it('should record payment with processedBy', async () => {
       const result = await paymentService.recordPayment({
-        referenceType: 'order',
+        referenceType: 'instant_transaction',
         referenceId: TEST_ORDER_ID,
         amount: 100,
         method: 'card',
@@ -134,7 +134,7 @@ describe('PaymentService', () => {
 
     it('should record payment with Stripe IDs', async () => {
       const result = await paymentService.recordPayment({
-        referenceType: 'order',
+        referenceType: 'instant_transaction',
         referenceId: TEST_ORDER_ID,
         amount: 100,
         method: 'card',
@@ -171,7 +171,7 @@ describe('PaymentService', () => {
     it('should throw error for invalid reference ID', async () => {
       await expect(
         paymentService.recordPayment({
-          referenceType: 'order',
+          referenceType: 'instant_transaction',
           referenceId: 'invalid-id',
           amount: 100,
           method: 'card',
@@ -182,7 +182,7 @@ describe('PaymentService', () => {
     it('should throw error for empty reference ID', async () => {
       await expect(
         paymentService.recordPayment({
-          referenceType: 'order',
+          referenceType: 'instant_transaction',
           referenceId: '',
           amount: 100,
           method: 'card',
@@ -193,7 +193,7 @@ describe('PaymentService', () => {
     it('should throw error for zero amount', async () => {
       await expect(
         paymentService.recordPayment({
-          referenceType: 'order',
+          referenceType: 'instant_transaction',
           referenceId: TEST_ORDER_ID,
           amount: 0,
           method: 'card',
@@ -204,7 +204,7 @@ describe('PaymentService', () => {
     it('should throw error for negative amount', async () => {
       await expect(
         paymentService.recordPayment({
-          referenceType: 'order',
+          referenceType: 'instant_transaction',
           referenceId: TEST_ORDER_ID,
           amount: -100,
           method: 'card',
@@ -215,7 +215,7 @@ describe('PaymentService', () => {
     it('should throw error for non-numeric string amount', async () => {
       await expect(
         paymentService.recordPayment({
-          referenceType: 'order',
+          referenceType: 'instant_transaction',
           referenceId: TEST_ORDER_ID,
           amount: 'abc' as unknown as number,
           method: 'card',
@@ -226,7 +226,7 @@ describe('PaymentService', () => {
     it('should throw error for unsupported currency', async () => {
       await expect(
         paymentService.recordPayment({
-          referenceType: 'order',
+          referenceType: 'instant_transaction',
           referenceId: TEST_ORDER_ID,
           amount: 100,
           currency: 'JPY',
@@ -238,7 +238,7 @@ describe('PaymentService', () => {
     it('should throw error for invalid payment method', async () => {
       await expect(
         paymentService.recordPayment({
-          referenceType: 'order',
+          referenceType: 'instant_transaction',
           referenceId: TEST_ORDER_ID,
           amount: 100,
           method: 'bitcoin' as PaymentMethod,
@@ -249,7 +249,7 @@ describe('PaymentService', () => {
     it('should throw error for invalid processedBy ID', async () => {
       await expect(
         paymentService.recordPayment({
-          referenceType: 'order',
+          referenceType: 'instant_transaction',
           referenceId: TEST_ORDER_ID,
           amount: 100,
           method: 'card',
@@ -262,7 +262,7 @@ describe('PaymentService', () => {
       const methods: PaymentMethod[] = ['card', 'cash', 'bank_transfer', 'other'];
       for (const method of methods) {
         const result = await paymentService.recordPayment({
-          referenceType: 'order',
+          referenceType: 'instant_transaction',
           referenceId: TEST_ORDER_ID,
           amount: 100,
           method,
@@ -272,7 +272,7 @@ describe('PaymentService', () => {
     });
 
     it('should accept all valid reference types', async () => {
-      const types: ReferenceType[] = ['order', 'booking', 'pool_ticket', 'snack_order'];
+      const types: ReferenceType[] = ['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement'];
       for (const refType of types) {
         const result = await paymentService.recordPayment({
           referenceType: refType,
@@ -291,7 +291,7 @@ describe('PaymentService', () => {
   describe('processPayment', () => {
     it('should process and complete a payment', async () => {
       const result = await paymentService.processPayment({
-        referenceType: 'order',
+        referenceType: 'instant_transaction',
         referenceId: TEST_ORDER_ID,
         amount: 100,
         method: 'card',
@@ -304,7 +304,7 @@ describe('PaymentService', () => {
 
     it('should process payment with notes', async () => {
       const result = await paymentService.processPayment({
-        referenceType: 'booking',
+        referenceType: 'time_exclusive_reservation',
         referenceId: TEST_BOOKING_ID,
         amount: 500,
         method: 'cash',
@@ -319,7 +319,7 @@ describe('PaymentService', () => {
     it('should throw error for invalid processedBy', async () => {
       await expect(
         paymentService.processPayment({
-          referenceType: 'order',
+          referenceType: 'instant_transaction',
           referenceId: TEST_ORDER_ID,
           amount: 100,
           method: 'card',
@@ -369,24 +369,24 @@ describe('PaymentService', () => {
         createTestPayment({
           id: '33333333-3333-3333-3333-333333333333',
           reference_id: TEST_BOOKING_ID,
-          reference_type: 'booking',
+          reference_type: 'time_exclusive_reservation',
         })
       );
     });
 
     it('should get payments for order', async () => {
-      const result = await paymentService.getPaymentsForReference('order', TEST_ORDER_ID);
+      const result = await paymentService.getPaymentsForReference('instant_transaction', TEST_ORDER_ID);
       expect(result.length).toBe(2);
     });
 
     it('should get payments for booking', async () => {
-      const result = await paymentService.getPaymentsForReference('booking', TEST_BOOKING_ID);
+      const result = await paymentService.getPaymentsForReference('time_exclusive_reservation', TEST_BOOKING_ID);
       expect(result.length).toBe(1);
     });
 
     it('should return empty array for no payments', async () => {
       const result = await paymentService.getPaymentsForReference(
-        'pool_ticket',
+        'shared_capacity_access',
         TEST_ORDER_ID
       );
       expect(result.length).toBe(0);
@@ -400,7 +400,7 @@ describe('PaymentService', () => {
 
     it('should throw error for invalid reference ID', async () => {
       await expect(
-        paymentService.getPaymentsForReference('order', 'invalid')
+        paymentService.getPaymentsForReference('instant_transaction', 'invalid')
       ).rejects.toThrow('Invalid reference ID format');
     });
   });
@@ -430,7 +430,7 @@ describe('PaymentService', () => {
           id: '33333333-3333-3333-3333-333333333333',
           method: 'bank_transfer',
           status: 'refunded',
-          reference_type: 'booking',
+          reference_type: 'time_exclusive_reservation',
           reference_id: TEST_BOOKING_ID,
         })
       );
@@ -443,9 +443,9 @@ describe('PaymentService', () => {
     });
 
     it('should filter by reference type', async () => {
-      const result = await paymentService.listPayments({ referenceType: 'booking' });
+      const result = await paymentService.listPayments({ referenceType: 'time_exclusive_reservation' });
       expect(result.payments.length).toBe(1);
-      expect(result.payments[0].reference_type).toBe('booking');
+      expect(result.payments[0].reference_type).toBe('time_exclusive_reservation');
     });
 
     it('should filter by method', async () => {
@@ -751,7 +751,7 @@ describe('PaymentService', () => {
         })
       );
 
-      const total = await paymentService.getTotalPaidForReference('order', TEST_ORDER_ID);
+      const total = await paymentService.getTotalPaidForReference('instant_transaction', TEST_ORDER_ID);
       expect(total).toBe(150);
     });
 
@@ -771,12 +771,12 @@ describe('PaymentService', () => {
         })
       );
 
-      const total = await paymentService.getTotalPaidForReference('order', TEST_ORDER_ID);
+      const total = await paymentService.getTotalPaidForReference('instant_transaction', TEST_ORDER_ID);
       expect(total).toBe(100);
     });
 
     it('should return 0 for no payments', async () => {
-      const total = await paymentService.getTotalPaidForReference('order', TEST_ORDER_ID);
+      const total = await paymentService.getTotalPaidForReference('instant_transaction', TEST_ORDER_ID);
       expect(total).toBe(0);
     });
   });
@@ -790,7 +790,7 @@ describe('PaymentService', () => {
         })
       );
 
-      const result = await paymentService.isFullyPaid('order', TEST_ORDER_ID, 100);
+      const result = await paymentService.isFullyPaid('instant_transaction', TEST_ORDER_ID, 100);
       expect(result).toBe(true);
     });
 
@@ -803,7 +803,7 @@ describe('PaymentService', () => {
       );
 
       // Overpayment should not be fully paid (excess)
-      const result = await paymentService.isFullyPaid('order', TEST_ORDER_ID, 100);
+      const result = await paymentService.isFullyPaid('instant_transaction', TEST_ORDER_ID, 100);
       expect(result).toBe(false);
     });
 
@@ -815,12 +815,12 @@ describe('PaymentService', () => {
         })
       );
 
-      const result = await paymentService.isFullyPaid('order', TEST_ORDER_ID, 100);
+      const result = await paymentService.isFullyPaid('instant_transaction', TEST_ORDER_ID, 100);
       expect(result).toBe(false);
     });
 
     it('should return false for no payments', async () => {
-      const result = await paymentService.isFullyPaid('order', TEST_ORDER_ID, 100);
+      const result = await paymentService.isFullyPaid('instant_transaction', TEST_ORDER_ID, 100);
       expect(result).toBe(false);
     });
 
@@ -832,7 +832,7 @@ describe('PaymentService', () => {
         })
       );
 
-      const result = await paymentService.isFullyPaid('order', TEST_ORDER_ID, 99.99);
+      const result = await paymentService.isFullyPaid('instant_transaction', TEST_ORDER_ID, 99.99);
       expect(result).toBe(true);
     });
   });

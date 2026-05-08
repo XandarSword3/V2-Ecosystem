@@ -137,16 +137,13 @@ describe('Payment Controller', () => {
         amount: '50.00',
         method: 'cash',
         status: 'completed',
-        reference_type: 'restaurant_order',
+        reference_type: 'instant_transaction',
         reference_id: 'order-123',
         notes: 'Original payment',
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn()
-          .mockReturnValueOnce(createChainableMock(mockPayment))
-          .mockReturnValueOnce(createChainableMock(null))
-          .mockReturnValueOnce(createChainableMock(null)),
+        from: vi.fn().mockReturnValue(createChainableMock(mockPayment)),
       } as any);
 
       req.params = { id: 'payment-123' };
