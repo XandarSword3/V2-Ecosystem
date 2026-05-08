@@ -4,7 +4,11 @@ import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 
 const router = Router();
 
-// All routes require authentication
+// ==================== UNAUTHENTICATED ROUTES ====================
+// Cookie consent must be recordable before login (GDPR requirement)
+router.post('/cookie-consent', gdprController.recordCookieConsent);
+
+// All remaining routes require authentication
 router.use(authenticate);
 
 // ==================== USER ROUTES ====================

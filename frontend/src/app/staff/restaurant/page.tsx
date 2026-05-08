@@ -9,7 +9,7 @@ import { formatCurrency, formatTime, getOrderStatusColor } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { isOnline } from '@/lib/offline/offline-storage';
 import { createOfflineOrderStatusUpdate } from '@/lib/offline/offline-sync';
-import { RestaurantFloorPlan } from '@/components/RestaurantFloorPlan';
+import { FloorPlan } from '@/components/FloorPlan';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import {
@@ -178,7 +178,7 @@ export default function RestaurantKitchenPage() {
       </div>
 
       {activeTab === 'floor_plan' ? (
-        <RestaurantFloorPlan />
+        <FloorPlan />
       ) : (
         <>
       {/* Status Summary */}

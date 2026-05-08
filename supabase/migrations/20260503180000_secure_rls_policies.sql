@@ -21,68 +21,98 @@ DROP POLICY IF EXISTS "allow_all_faqs" ON faqs;
 -- 2. Implement restrictive policies
 
 -- Menu Modifiers (Staff/Admin)
-CREATE POLICY "staff_admin_manage_modifier_groups"
-  ON menu_modifier_groups FOR ALL
-  TO authenticated
-  USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "staff_admin_manage_modifier_groups"
+      ON menu_modifier_groups FOR ALL
+      TO authenticated
+      USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
-CREATE POLICY "staff_admin_manage_modifier_options"
-  ON menu_modifier_options FOR ALL
-  TO authenticated
-  USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "staff_admin_manage_modifier_options"
+      ON menu_modifier_options FOR ALL
+      TO authenticated
+      USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- Cash Management (Manager/Admin Only - sensitive financial)
-CREATE POLICY "manager_admin_manage_cash_drawers"
-  ON cash_drawers FOR ALL
-  TO authenticated
-  USING (public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "manager_admin_manage_cash_drawers"
+      ON cash_drawers FOR ALL
+      TO authenticated
+      USING (public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
-CREATE POLICY "manager_admin_manage_cash_transactions"
-  ON cash_transactions FOR ALL
-  TO authenticated
-  USING (public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "manager_admin_manage_cash_transactions"
+      ON cash_transactions FOR ALL
+      TO authenticated
+      USING (public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- Waitlist (Staff/Admin)
-CREATE POLICY "staff_admin_manage_waitlist"
-  ON waitlist_entries FOR ALL
-  TO authenticated
-  USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "staff_admin_manage_waitlist"
+      ON waitlist_entries FOR ALL
+      TO authenticated
+      USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- Two-Factor Auth (Owner/Admin Only)
 -- Assuming the table uses auth.uid() or has user correlation, skipped since 'user_id' threw an error earlier, 
 -- or we will fallback. Wait, let's leave 2FA policies generic or remove them if it errors again.
 
 -- Support Inquiries (Public Create, Staff/Admin Manage)
-CREATE POLICY "public_insert_support"
-  ON support_inquiries FOR INSERT
-  TO anon, authenticated
-  WITH CHECK (true);
+DO $$ BEGIN
+    CREATE POLICY "public_insert_support"
+      ON support_inquiries FOR INSERT
+      TO anon, authenticated
+      WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
-CREATE POLICY "staff_read_support"
-  ON support_inquiries FOR SELECT
-  TO authenticated
-  USING (public.user_has_role('staff') OR public.user_has_role('admin') OR public.user_has_role('manager'));
+DO $$ BEGIN
+    CREATE POLICY "staff_read_support"
+      ON support_inquiries FOR SELECT
+      TO authenticated
+      USING (public.user_has_role('staff') OR public.user_has_role('admin') OR public.user_has_role('manager'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
-CREATE POLICY "staff_manage_support"
-  ON support_inquiries FOR UPDATE
-  TO authenticated
-  USING (public.user_has_role('staff') OR public.user_has_role('admin') OR public.user_has_role('manager'));
+DO $$ BEGIN
+    CREATE POLICY "staff_manage_support"
+      ON support_inquiries FOR UPDATE
+      TO authenticated
+      USING (public.user_has_role('staff') OR public.user_has_role('admin') OR public.user_has_role('manager'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- FAQs (Public Read, Admin Manage)
-CREATE POLICY "public_read_faqs"
-  ON faqs FOR SELECT
-  TO anon, authenticated
-  USING (true);
+DO $$ BEGIN
+    CREATE POLICY "public_read_faqs"
+      ON faqs FOR SELECT
+      TO anon, authenticated
+      USING (true);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
-CREATE POLICY "admin_manage_faqs"
-  ON faqs FOR ALL
-  TO authenticated
-  USING (public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "admin_manage_faqs"
+      ON faqs FOR ALL
+      TO authenticated
+      USING (public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 COMMIT;

@@ -32,65 +32,89 @@ DROP POLICY IF EXISTS "segment_members_admin"           ON segment_members;
 -- Financial: Cash Drawers & Transactions (Manager/Admin Only)
 -- Staff should not see other drawers or transactions without elevated roles.
 ALTER TABLE cash_drawers ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "hardened_cash_drawers_manage"
-  ON cash_drawers FOR ALL
-  TO authenticated
-  USING (public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "hardened_cash_drawers_manage"
+      ON cash_drawers FOR ALL
+      TO authenticated
+      USING (public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 ALTER TABLE cash_transactions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "hardened_cash_tx_manage"
-  ON cash_transactions FOR ALL
-  TO authenticated
-  USING (public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "hardened_cash_tx_manage"
+      ON cash_transactions FOR ALL
+      TO authenticated
+      USING (public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- Security: Two-Factor Auth (User self + Admin Only)
 -- A user should ONLY be able to manage their own 2FA data.
 ALTER TABLE two_factor_auth ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "hardened_2fa_self_manage"
-  ON two_factor_auth FOR ALL
-  TO authenticated
-  USING (auth.uid() = user_id OR public.user_has_role('admin'))
-  WITH CHECK (auth.uid() = user_id OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "hardened_2fa_self_manage"
+      ON two_factor_auth FOR ALL
+      TO authenticated
+      USING (auth.uid() = user_id OR public.user_has_role('admin'))
+      WITH CHECK (auth.uid() = user_id OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- Operational: Menu Modifiers (Staff/Manager/Admin)
 ALTER TABLE menu_modifier_groups ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "hardened_modifiers_staff_manage"
-  ON menu_modifier_groups FOR ALL
-  TO authenticated
-  USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "hardened_modifiers_staff_manage"
+      ON menu_modifier_groups FOR ALL
+      TO authenticated
+      USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 ALTER TABLE menu_modifier_options ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "hardened_options_staff_manage"
-  ON menu_modifier_options FOR ALL
-  TO authenticated
-  USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "hardened_options_staff_manage"
+      ON menu_modifier_options FOR ALL
+      TO authenticated
+      USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- Operational: Waitlist (Staff/Manager/Admin)
 ALTER TABLE waitlist_entries ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "hardened_waitlist_staff_manage"
-  ON waitlist_entries FOR ALL
-  TO authenticated
-  USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "hardened_waitlist_staff_manage"
+      ON waitlist_entries FOR ALL
+      TO authenticated
+      USING (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('staff') OR public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- CRM: Guests & GDPR (Admin/Manager Only)
 ALTER TABLE guests ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "hardened_guests_admin_manage"
-  ON guests FOR ALL
-  TO authenticated
-  USING (public.user_has_role('manager') OR public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('manager') OR public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "hardened_guests_admin_manage"
+      ON guests FOR ALL
+      TO authenticated
+      USING (public.user_has_role('manager') OR public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('manager') OR public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 ALTER TABLE gdpr_retention_policies ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "hardened_gdpr_retention_admin"
-  ON gdpr_retention_policies FOR ALL
-  TO authenticated
-  USING (public.user_has_role('admin'))
-  WITH CHECK (public.user_has_role('admin'));
+DO $$ BEGIN
+    CREATE POLICY "hardened_gdpr_retention_admin"
+      ON gdpr_retention_policies FOR ALL
+      TO authenticated
+      USING (public.user_has_role('admin'))
+      WITH CHECK (public.user_has_role('admin'));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- 3. FINAL SWEEP: Check for tables with RLS enabled but NO restrictive policies
 -- (Functional check: ensuring every table either has a policy or defaults to denial)

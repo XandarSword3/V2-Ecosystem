@@ -73,24 +73,24 @@ export async function createBookingTransactional(
     .select()
     .single();
 
-  if (bookingError || !booking) {
-    throw new Error(`Failed to create booking: ${bookingError?.message || 'Unknown error'}`);
+  if (transactionError || !transaction) {
+    throw new Error(`Failed to create transaction: ${transactionError?.message || 'Unknown error'}`);
   }
 
   // Register rollback handler
   ctx.rollbackHandlers.push(async () => {
     await ctx.supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .delete()
-      .eq('id', booking.id);
-    logger.info(`Rolled back booking ${booking.id}`);
+      .eq('id', transaction.id);
+    logger.info(`Rolled back transaction ${transaction.id}`);
   });
 
   // Insert add-ons if present
   let addOns: Record<string, unknown>[] = [];
   if (addOnItems.length > 0) {
     const addOnsData = addOnItems.map(item => ({
-      booking_id: booking.id,
+      transaction_id: transaction.id,
       add_on_id: item.add_on_id,
       quantity: item.quantity,
       unit_price: item.unit_price,
@@ -98,12 +98,12 @@ export async function createBookingTransactional(
     }));
 
     const { data: addOnsResult, error: addOnsError } = await ctx.supabase
-      .from('chalet_booking_add_ons')
+      .from('transaction_add_ons')
       .insert(addOnsData)
       .select();
 
     if (addOnsError) {
-      throw new Error(`Failed to create booking add-ons: ${addOnsError.message}`);
+      throw new Error(`Failed to create transaction add-ons: ${addOnsError.message}`);
     }
 
     addOns = addOnsResult || [];
@@ -111,14 +111,14 @@ export async function createBookingTransactional(
     // Register rollback handler for add-ons
     ctx.rollbackHandlers.push(async () => {
       await ctx.supabase
-        .from('chalet_booking_add_ons')
+        .from('transaction_add_ons')
         .delete()
-        .eq('booking_id', booking.id);
-      logger.info(`Rolled back add-ons for booking ${booking.id}`);
+        .eq('transaction_id', transaction.id);
+      logger.info(`Rolled back add-ons for transaction ${transaction.id}`);
     });
   }
 
-  return { booking: booking as Record<string, unknown>, addOns };
+  return { booking: transaction as Record<string, unknown>, addOns };
 }
 
 /**

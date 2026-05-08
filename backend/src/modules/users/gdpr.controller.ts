@@ -45,9 +45,7 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
     // Fetch all user data in parallel
     const [
       userResult,
-      restaurantOrdersResult,
-      snackOrdersResult,
-      chaletBookingsResult,
+      transactionsResult,
       poolTicketsResult,
       reviewsResult,
       supportTicketsResult,
@@ -63,10 +61,10 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
       supabase.from('transactions')
         .select('id, engine_type, order_number, ticket_number, booking_number, status, amount, payment_status, customer_name, customer_phone, created_at, reference_id, reference_table')
         .eq('customer_id', userId)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }),
       
       // Pool tickets
-      supabase.from('pool_tickets'),
+      supabase.from('pool_tickets')
         .select('id, ticket_number, status, ticket_date, number_of_guests, total_amount, payment_status, guest_name, guest_email, guest_phone, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false }),
@@ -99,11 +97,11 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
     const userData: UserData = {
       profile: userResult.data,
       orders: {
-        restaurant_orders: restaurantOrdersResult.data || [],
-        snack_orders: snackOrdersResult.data || []
+        restaurant_orders: (transactionsResult.data || []).filter(t => t.engine_type === 'instant_transaction'),
+        snack_orders: (transactionsResult.data || []).filter(t => t.engine_type === 'instant_transaction')
       },
       bookings: {
-        chalet_bookings: chaletBookingsResult.data || [],
+        chalet_bookings: (transactionsResult.data || []).filter(t => t.engine_type === 'time_exclusive_reservation'),
         pool_tickets: poolTicketsResult.data || []
       },
       reviews: reviewsResult.data || [],

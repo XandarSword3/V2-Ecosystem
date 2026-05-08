@@ -87,6 +87,7 @@ export default function Footer() {
                 links: [
                     { label: tFooter('privacyPolicy'), href: '/privacy' },
                     { label: tFooter('termsOfService'), href: '/terms' },
+                    { label: 'Cookie Policy', href: '/cookie-policy' },
                     { label: tFooter('cancellationPolicy'), href: '/cancellation' }
                 ]
             }
