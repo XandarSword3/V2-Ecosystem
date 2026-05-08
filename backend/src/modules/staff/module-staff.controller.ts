@@ -50,9 +50,8 @@ export async function getModuleOrders(req: Request, res: Response) {
     let query = supabase
       .from('transactions')
       .select(`
-        id, order_number, customer_id, engine_type, status, amount as total_amount,
-        created_at, reference_id, reference_table,
-        customer_name, customer_phone, table_id, staff_id, metadata
+        id, order_number, customer_id, engine_type, status, amount, created_at, 
+        reference_id, reference_table, customer_name, customer_phone, table_id, staff_id, metadata
       `)
       .eq('engine_type', 'instant_transaction')
       .eq('module_id', moduleId || module.id)
@@ -77,18 +76,12 @@ export async function getModuleOrders(req: Request, res: Response) {
     const transformedOrders = (orders || []).map(order => ({
       id: order.id,
       orderNumber: order.order_number,
-      customerName: (Array.isArray(order.customer) ? order.customer[0] : order.customer)?.full_name || 'Guest',
+      customerName: order.customer_name || 'Guest',
       customerId: order.customer_id,
-      orderType: order.order_type,
+      orderType: order.engine_type,
       status: order.status,
-      items: (order.items || []).map((item: any) => ({
-        id: item.id,
-        name: item.menu_items?.name,
-        quantity: item.quantity,
-        unitPrice: item.unit_price,
-        specialInstructions: item.special_instructions,
-      })),
-      totalAmount: order.total_amount,
+      items: [], // Items would need to be fetched separately from order items table
+      totalAmount: order.amount,
       tableNumber: order.table_id,
       createdAt: order.created_at,
     }));

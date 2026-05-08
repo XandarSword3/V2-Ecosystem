@@ -920,9 +920,7 @@ if (error || !data) {
 if (data && !['shared_capacity_access', 'instant_transaction', 'time_exclusive_reservation'].includes(data.engine_type)) {
   return res.status(400).json({ valid: false, type: 'transaction', entity: null, message: 'Invalid transaction type for pool ticket validation' });
 }
-    return res.json({ valid: true, type, entity: data, message: 'Pool ticket is valid' });
-  }
-  }
+return res.json({ valid: true, type, entity: data, message: 'Pool ticket is valid' });
 
   if (type === 'chalet_booking') {
     const { data, error } = await supabase
@@ -966,7 +964,6 @@ if (data && !['shared_capacity_access', 'instant_transaction', 'time_exclusive_r
     entity: null,
     message: `Unsupported QR type: ${type}`,
 });
-  });
 });
 
 /**
@@ -1022,7 +1019,6 @@ export const searchCustomers = asyncHandler(async (req: Request, res: Response) 
   };
 
   rollupFinancialRows((transactions.data as any[]) || []);
-  rollupFinancialRows((snackOrders.data as any[]) || []);
 
   ((memberships.data as any[]) || []).forEach((m) => {
     if (!membershipByCustomer[m.customer_id]) {

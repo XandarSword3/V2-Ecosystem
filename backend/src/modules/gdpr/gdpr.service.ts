@@ -840,3 +840,62 @@ export async function cleanupExpiredExports(): Promise<number> {
   return cleaned;
 }
 
+// ==================== IP HASHING (GDPR Data Minimisation) ====================
+
+/**
+ * Hash an IP address using SHA-256 with a salt.
+ * GDPR Article 5(1)(c) requires data minimisation — storing full IP addresses
+ * when only a record of the network context is needed violates this principle.
+ * We hash the IP so the record is non-reversible but still useful for
+ * detecting duplicate consent submissions from the same network.
+ */
+function hashIpAddress(ip: string | undefined): string | null {
+  if (!ip) return null;
+  // Use a static salt to allow duplicate detection without storing raw IPs
+  const salt = process.env.GDPR_IP_HASH_SALT || 'v2-gdpr-consent-salt';
+  return crypto.createHash('sha256').update(`${salt}:${ip}`).digest('hex').substring(0, 16);
+}
+
+// ==================== COOKIE CONSENT RECORDING ====================
+
+export interface CookieConsentInput {
+  userId?: string;
+  consentVersion: string;
+  categoriesAccepted: string[];
+  categoriesRejected: string[];
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+/**
+ * Record a cookie consent decision.
+ * Works for both authenticated and anonymous users.
+ * IP addresses are hashed before storage per GDPR data minimisation.
+ */
+export async function recordCookieConsent(input: CookieConsentInput): Promise<{ id: string }> {
+  const client = supabase;
+
+  const hashedIp = hashIpAddress(input.ipAddress);
+
+  const { data, error } = await client
+    .from('gdpr_cookie_consents')
+    .insert({
+      user_id: input.userId || null,
+      consent_version: input.consentVersion,
+      categories_accepted: input.categoriesAccepted,
+      categories_rejected: input.categoriesRejected,
+      ip_address_hash: hashedIp,
+      user_agent: input.userAgent?.substring(0, 512) || null, // Truncate user-agent
+      granted_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Failed to record cookie consent:', error);
+    throw new Error('Failed to record cookie consent');
+  }
+
+  return { id: data.id };
+}
+

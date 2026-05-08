@@ -105,8 +105,31 @@ export default async function RootLayout({
     openingHours: ['10:00-23:00'],
   });
 
-  // Theme detection script that runs BEFORE React hydrates
-  // This prevents the "flash of wrong theme" on initial load
+  // --------------------------------------------------------------------------
+  // GDPR: Theme detection script — classified as STRICTLY NECESSARY
+  //
+  // This inline script reads two localStorage keys before React hydrates:
+  //   - 'v2-resort-theme' — the colour theme (beach, mountain, etc.)
+  //   - 'theme' — light/dark mode
+  //
+  // Justification for strictly-necessary classification:
+  //   1. These keys contain no personal data — only UI preference strings
+  //   2. Without this script, every page load produces a visible flash of the
+  //      wrong colour scheme, which degrades core functionality
+  //   3. The ePrivacy Directive Article 5(3) exempts storage that is "strictly
+  //      necessary" for the service the user has requested
+  //   4. No data is transmitted to any server — read-only from localStorage
+  //
+  // If Sentry is enabled in the future, its client initialisation MUST be
+  // gated behind analytics consent. Create sentry.client.config.ts and wrap
+  // Sentry.init() with a consent check:
+  //   import { hasConsent } from '@/context/ConsentContext';
+  //   if (hasConsent('analytics')) { Sentry.init({...}); }
+  //
+  // If Google Analytics or any third-party analytics script is added, it MUST
+  // only be loaded after analytics consent is granted via the ConsentContext.
+  // No analytics scripts are currently active on this platform.
+  // --------------------------------------------------------------------------
   const themeScript = `
 (function() {
   try {

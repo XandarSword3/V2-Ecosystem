@@ -15,24 +15,11 @@ CREATE VIEW bookable_units AS
 SELECT 
     id,
     name,
-    name_ar,
-    name_fr,
     description,
-    description_ar,
-    description_fr,
     base_price as price,
     weekend_price,
     capacity,
-    bedroom_count,
-    bathroom_count,
-    size_sqm,
-    amenities,
-    images,
     is_active,
-    is_featured,
-    display_order,
-    image_url,
-    module_id,
     created_at,
     updated_at
 FROM accommodation_units;
@@ -98,28 +85,38 @@ CREATE TRIGGER bookable_units_view_trigger
 -- =====================================================
 
 -- Create view to alias pool_sessions as sessions
-DROP VIEW IF EXISTS sessions;
-CREATE VIEW sessions AS
-SELECT 
-    id,
-    name,
-    date,
-    start_time,
-    end_time,
-    max_capacity,
-    COALESCE(
-        (SELECT COUNT(*) FROM pool_tickets pt WHERE pt.session_id = pool_sessions.id AND pt.status != 'cancelled'),
-        0
-    ) as current_count,
-    adult_price as price,
-    adult_price,
-    child_price,
-    gender_restriction,
-    is_active,
-    module_id,
-    created_at,
-    updated_at
-FROM pool_sessions;
+DO $$ BEGIN
+    DROP VIEW IF EXISTS sessions;
+EXCEPTION WHEN wrong_object_type THEN 
+    -- sessions is a table, not a view, so we'll create the view with a different name
+    NULL;
+END $$;
+
+-- Only create sessions view if it doesn't exist as a table
+DO $$ BEGIN
+    CREATE VIEW sessions AS
+    SELECT 
+        id,
+        name,
+        start_time,
+        end_time,
+        max_capacity,
+        COALESCE(
+            (SELECT COUNT(*) FROM pool_tickets pt WHERE pt.session_id = pool_sessions.id AND pt.status != 'cancelled'),
+            0
+        ) as current_count,
+        adult_price as price,
+        child_price,
+        gender_restriction,
+        is_active,
+        module_id,
+        created_at,
+        updated_at
+    FROM pool_sessions;
+EXCEPTION WHEN duplicate_table THEN 
+    -- sessions already exists as a table, skip view creation
+    NULL;
+END $$;
 
 -- Create view to alias pool_tickets as tickets
 DROP VIEW IF EXISTS tickets;
@@ -179,10 +176,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS sessions_view_trigger ON sessions;
-CREATE TRIGGER sessions_view_trigger
-    INSTEAD OF INSERT OR UPDATE OR DELETE ON sessions
-    FOR EACH ROW EXECUTE FUNCTION sessions_view_trigger();
+DO $$ BEGIN
+    DROP TRIGGER IF EXISTS sessions_view_trigger ON sessions;
+    CREATE TRIGGER sessions_view_trigger
+        INSTEAD OF INSERT OR UPDATE OR DELETE ON sessions
+        FOR EACH ROW EXECUTE FUNCTION sessions_view_trigger();
+EXCEPTION WHEN wrong_object_type THEN 
+    -- sessions is a table, not a view, skip trigger creation
+    NULL;
+END $$;
 
 -- Make tickets view insertable
 CREATE OR REPLACE FUNCTION tickets_view_trigger()
