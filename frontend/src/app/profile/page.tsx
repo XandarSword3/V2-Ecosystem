@@ -35,9 +35,12 @@ import {
   Loader2,
   Package,
   X,
+  FileDown,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
-type TabType = 'profile' | 'orders' | 'snacks' | 'bookings' | 'tickets' | 'statement' | 'payments';
+type TabType = 'profile' | 'orders' | 'snacks' | 'bookings' | 'tickets' | 'statement' | 'payments' | 'privacy';
 
 interface OrderRecord {
   id: string;
@@ -123,6 +126,9 @@ export default function ProfilePage() {
     phone: '',
     preferredLanguage: 'en',
   });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Fetch user orders
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
@@ -204,6 +210,40 @@ export default function ProfilePage() {
     logout();
   };
 
+  const handleExportData = async () => {
+    try {
+      setIsExporting(true);
+      const response = await api.post('/users/me/data/portable', {}, { responseType: 'blob' });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data as BlobPart]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `user-data-${user?.id}-${Date.now()}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      toast.success('Your data has been exported successfully.');
+    } catch (error) {
+      toast.error('Failed to export data. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      setIsDeleting(true);
+      await api.delete('/users/me/data', { data: { confirmDeletion: true } });
+      toast.success('Your account has been deleted. Anonymization will be completed within 30 days.', { duration: 8000 });
+      setShowDeleteConfirm(false);
+      setTimeout(() => logout(), 2000);
+    } catch (error) {
+      toast.error('Failed to delete account. Please contact support.');
+      setIsDeleting(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="max-w-4xl mx-auto py-8 px-4">
@@ -233,6 +273,7 @@ export default function ProfilePage() {
     { id: 'tickets' as TabType, label: t('tabs.tickets'), icon: Ticket },
     { id: 'statement' as TabType, label: 'Statement', icon: Calendar },
     { id: 'payments' as TabType, label: 'Payments', icon: Shield },
+    { id: 'privacy' as TabType, label: 'Privacy & Data', icon: Shield },
   ];
 
   return (
@@ -748,7 +789,79 @@ export default function ProfilePage() {
               </Card>
             </motion.div>
           )}
+
+          {activeTab === 'privacy' && (
+            <motion.div
+              key="privacy"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-blue-600" />
+                    Data Portability
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    Download a copy of your personal data, including profile information, bookings, orders, and consent history in JSON format.
+                  </p>
+                  <Button onClick={handleExportData} disabled={isExporting} className="flex items-center gap-2">
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                    {isExporting ? 'Preparing Download...' : 'Export My Data'}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-red-200 dark:border-red-900/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-500">
+                    <Trash2 className="w-5 h-5" />
+                    Right to Erasure
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    Permanently delete your account and personal data. This action cannot be undone. Some financial records may be anonymized rather than deleted to comply with local tax laws.
+                  </p>
+                  <Button variant="danger" onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2">
+                    <Trash2 className="w-4 h-4" />
+                    Delete My Account
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </AnimatePresence>
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6 shadow-2xl border border-red-100 dark:border-red-900/30">
+              <div className="flex items-center gap-3 text-red-600 dark:text-red-500 mb-4">
+                <AlertTriangle className="w-8 h-8" />
+                <h3 className="text-xl font-bold">Delete Account?</h3>
+              </div>
+              <p className="text-slate-600 dark:text-slate-300 mb-4">
+                This action is irreversible. Your profile, active bookings, and personal data will be permanently removed. Financial transactions will be anonymized and retained for 30 days per legal requirements.
+              </p>
+              <p className="text-slate-600 dark:text-slate-300 mb-6 text-sm bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                You will receive a confirmation email detailing the exact anonymization process. Consent records are retained strictly for audit compliance.
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting}>
+                  Cancel
+                </Button>
+                <Button variant="danger" onClick={handleDeleteAccount} disabled={isDeleting}>
+                  {isDeleting ? 'Deleting...' : 'Yes, Delete My Account'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </motion.div>
     </div>
   );
