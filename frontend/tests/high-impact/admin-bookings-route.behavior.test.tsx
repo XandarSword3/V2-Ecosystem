@@ -28,6 +28,7 @@ vi.mock('framer-motion', async () => {
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ slug: 'chalets' }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
 vi.mock('@/lib/settings-context', () => ({

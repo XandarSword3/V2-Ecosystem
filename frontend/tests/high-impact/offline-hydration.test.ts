@@ -2,73 +2,31 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const apiGetMock = vi.hoisted(() => vi.fn());
 
-const chaletsStoreMock = vi.hoisted(() => ({
+const moduleDataStoreMock = vi.hoisted(() => ({
   clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  count: vi.fn(async () => 0),
-}));
-const bookingsStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  count: vi.fn(async () => 0),
-}));
-const poolSessionsStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  count: vi.fn(async () => 0),
-}));
-const ticketsStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  count: vi.fn(async () => 0),
-}));
-const housekeepingTasksStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  count: vi.fn(async () => 0),
-}));
-const menuItemsStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  count: vi.fn(async () => 0),
-}));
-const menuCategoriesStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  count: vi.fn(async () => 0),
-}));
-const modifiersStoreMock = vi.hoisted(() => ({
-  clear: vi.fn(async () => undefined),
-  putMany: vi.fn(async () => undefined),
-  count: vi.fn(async () => 0),
-}));
-const customersStoreMock = vi.hoisted(() => ({
   put: vi.fn(async () => undefined),
-  count: vi.fn(async () => 0),
+  get: vi.fn(async () => null),
 }));
 
-const cacheManagerMock = vi.hoisted(() => ({
+const moduleCacheStoreMock = vi.hoisted(() => ({
+  clear: vi.fn(async () => undefined),
   updateMetadata: vi.fn(async () => undefined),
   getMetadata: vi.fn(async () => undefined),
   isStale: vi.fn(async () => true),
-  isFresh: vi.fn(async () => false),
+}));
+
+const customersStoreMock = vi.hoisted(() => ({
+  clear: vi.fn(async () => undefined),
+  put: vi.fn(async () => undefined),
+  count: vi.fn(async () => 0),
+  getAll: vi.fn(async () => []),
+  delete: vi.fn(async () => undefined),
 }));
 
 vi.mock('../../src/lib/offline/offline-storage', () => ({
-  chaletsStore: chaletsStoreMock,
-  bookingsStore: bookingsStoreMock,
-  poolSessionsStore: poolSessionsStoreMock,
-  ticketsStore: ticketsStoreMock,
-  housekeepingTasksStore: housekeepingTasksStoreMock,
-  menuItemsStore: menuItemsStoreMock,
-  menuCategoriesStore: menuCategoriesStoreMock,
-  modifiersStore: modifiersStoreMock,
+  moduleDataStore: moduleDataStoreMock,
+  moduleCacheStore: moduleCacheStoreMock,
   customersStore: customersStoreMock,
-  cacheManager: cacheManagerMock,
-  syncQueue: {
-    hasPending: vi.fn(() => false),
-  },
-  isOnline: vi.fn(() => true),
 }));
 
 vi.mock('@/lib/api', () => ({
@@ -77,95 +35,98 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import { hydrateOfflineStores } from '../../src/lib/offline/offline-hydration';
+import { hydrateOfflineStores, clearAllOfflineData } from '../../src/lib/offline/offline-hydration';
 
 describe('offline hydration service', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    moduleCacheStoreMock.isStale.mockResolvedValue(true);
     apiGetMock.mockResolvedValue({ data: {} });
+    await clearAllOfflineData(); // reset activeModules array
   });
 
-  it('hydrates all stores successfully and individually', async () => {
+  it('fetches active modules and hydrates them based on template_type', async () => {
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/chalets') return Promise.resolve({ data: { chalets: [{ id: 'c1' }] } });
-      if (url.includes('/chalets/staff/bookings')) return Promise.resolve({ data: { bookings: [{ id: 'b1' }] } });
-      if (url.includes('/pool/sessions')) return Promise.resolve({ data: { sessions: [{ id: 's1' }] } });
-      if (url === '/pool/staff/tickets/today') return Promise.resolve({ data: { tickets: [{ id: 't1' }] } });
-      if (url === '/housekeeping/my-tasks') return Promise.resolve({ data: { tasks: [{ id: 'h1' }] } });
+      if (url.includes('/admin/modules')) {
+        return Promise.resolve({
+          data: {
+            modules: [
+              { id: 'm1', slug: 'restaurant', name: 'Restaurant', template_type: 'menu_service', is_active: true },
+              { id: 'm2', slug: 'cabanas', name: 'Cabanas', template_type: 'multi_day_booking', is_active: true }
+            ]
+          }
+        });
+      }
+      if (url === '/v1/restaurant/items') return Promise.resolve({ data: [{ id: 'item1' }] });
+      if (url === '/v1/restaurant/modifiers') return Promise.resolve({ data: [{ id: 'mod1' }] });
+      if (url === '/v1/cabanas/bookable_units') return Promise.resolve({ data: [{ id: 'unit1' }] });
+      if (url === '/v1/cabanas/bookings') return Promise.resolve({ data: [{ id: 'booking1' }] });
+      if (url.includes('/users')) return Promise.resolve({ data: { users: [] } });
       return Promise.resolve({ data: {} });
     });
 
     await hydrateOfflineStores();
 
-    // Verify each store was cleared and populated individually
-    expect(chaletsStoreMock.putMany).toHaveBeenCalledWith([{ id: 'c1' }]);
-    expect(bookingsStoreMock.putMany).toHaveBeenCalledWith([{ id: 'b1' }]);
-    expect(poolSessionsStoreMock.putMany).toHaveBeenCalledWith([{ id: 's1' }]);
-    expect(ticketsStoreMock.putMany).toHaveBeenCalledWith([{ id: 't1' }]);
-    expect(housekeepingTasksStoreMock.putMany).toHaveBeenCalledWith([{ id: 'h1' }]);
-
-    expect(chaletsStoreMock.clear).toHaveBeenCalled();
-    expect(bookingsStoreMock.clear).toHaveBeenCalled();
-    expect(poolSessionsStoreMock.clear).toHaveBeenCalled();
-    expect(ticketsStoreMock.clear).toHaveBeenCalled();
-    expect(housekeepingTasksStoreMock.clear).toHaveBeenCalled();
+    // Verify it saved data to moduleDataStore
+    expect(moduleDataStoreMock.put).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'm1:items',
+      moduleId: 'm1',
+      endpoint: 'items',
+      data: [{ id: 'item1' }]
+    }));
+    expect(moduleDataStoreMock.put).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'm2:bookings',
+      moduleId: 'm2',
+      endpoint: 'bookings',
+      data: [{ id: 'booking1' }]
+    }));
   });
 
-  it('handles partial failures gracefully by continuing with other stores', async () => {
+  it('skips hydration when cache is fresh', async () => {
+    moduleCacheStoreMock.isStale.mockResolvedValue(false);
+    
     apiGetMock.mockImplementation((url: string) => {
-      // Fail chalets, succeed others with correct data keys
-      if (url === '/chalets') return Promise.reject(new Error('API Error'));
-      if (url.includes('/chalets/staff/bookings')) return Promise.resolve({ data: { bookings: [1] } });
-      if (url.includes('/pool/sessions')) return Promise.resolve({ data: { sessions: [1] } });
-      if (url === '/pool/staff/tickets/today') return Promise.resolve({ data: { tickets: [1] } });
-      if (url === '/housekeeping/my-tasks') return Promise.resolve({ data: { tasks: [1] } });
+      if (url.includes('/admin/modules')) {
+        return Promise.resolve({
+          data: {
+            modules: [{ id: 'm1', slug: 'test', template_type: 'menu_service', is_active: true }]
+          }
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
+
+    await hydrateOfflineStores(); // Not forced
+    
+    // Modules fetched, but their individual endpoints should NOT be fetched
+    expect(apiGetMock).not.toHaveBeenCalledWith('/v1/test/items');
+    expect(moduleDataStoreMock.put).not.toHaveBeenCalled();
+  });
+
+  it('continues hydration even if one module fails', async () => {
+    apiGetMock.mockImplementation((url: string) => {
+      if (url.includes('/admin/modules')) {
+        return Promise.resolve({
+          data: {
+            modules: [
+              { id: 'fail_mod', slug: 'fail', template_type: 'menu_service', is_active: true },
+              { id: 'ok_mod', slug: 'ok', template_type: 'session_access', is_active: true }
+            ]
+          }
+        });
+      }
+      if (url.includes('/v1/fail')) return Promise.reject(new Error('Network error'));
+      if (url.includes('/v1/ok/sessions')) return Promise.resolve({ data: [{ id: 'sess1' }] });
+      if (url.includes('/v1/ok/tickets')) return Promise.resolve({ data: [{ id: 'tick1' }] });
       return Promise.resolve({ data: {} });
     });
 
     await hydrateOfflineStores();
 
-    // Chalets should NOT have been updated
-    expect(chaletsStoreMock.putMany).not.toHaveBeenCalled();
-    
-    // BUT other 4 stores should have been updated EXACTLY once each
-    expect(bookingsStoreMock.putMany).toHaveBeenCalledTimes(1);
-    expect(poolSessionsStoreMock.putMany).toHaveBeenCalledTimes(1);
-    expect(ticketsStoreMock.putMany).toHaveBeenCalledTimes(1);
-    expect(housekeepingTasksStoreMock.putMany).toHaveBeenCalledTimes(1);
-  });
-
-  it('performs incremental sync when metadata exists', async () => {
-    const lastSyncAt = new Date('2024-01-01').toISOString();
-    cacheManagerMock.getMetadata = vi.fn().mockResolvedValue({ lastSyncAt });
-    cacheManagerMock.isStale = vi.fn().mockResolvedValue(true);
-
-    apiGetMock.mockResolvedValue({ 
-      data: { 
-        bookings: [{ id: 'b2' }],
-        isIncremental: true 
-      } 
-    });
-
-    await hydrateOfflineStores();
-
-    // Verify 'since' parameter was sent
-    expect(apiGetMock).toHaveBeenCalledWith(
-      expect.stringContaining('/bookings'), 
-      expect.objectContaining({ params: expect.objectContaining({ since: lastSyncAt }) })
-    );
-
-    // Verify we didn't clear the store for incremental update
-    expect(bookingsStoreMock.clear).not.toHaveBeenCalled();
-    expect(bookingsStoreMock.putMany).toHaveBeenCalledWith([{ id: 'b2' }]);
-  });
-
-  it('skips hydration when data is not stale', async () => {
-    cacheManagerMock.isStale = vi.fn().mockResolvedValue(false);
-    cacheManagerMock.isFresh = vi.fn().mockResolvedValue(true);
-    
-    await hydrateOfflineStores(false); // force = false
-
-    expect(apiGetMock).not.toHaveBeenCalled();
-    expect(chaletsStoreMock.putMany).not.toHaveBeenCalled();
+    // The ok_mod should still get hydrated
+    expect(moduleDataStoreMock.put).toHaveBeenCalledWith(expect.objectContaining({
+      moduleId: 'ok_mod',
+      endpoint: 'sessions'
+    }));
   });
 });
