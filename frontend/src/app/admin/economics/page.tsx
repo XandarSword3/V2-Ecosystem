@@ -39,6 +39,8 @@ export default function EconomicsPage() {
   const [grossNet, setGrossNet] = useState<any>({ gross: 0, net: 0, discounts: 0, refunds: 0 });
   const [volume, setVolume] = useState<{ overall: number }>({ overall: 0 });
   const [retention, setRetention] = useState<any>({ retentionRate: 0 });
+  const [topCustomers, setTopCustomers] = useState<any[]>([]);
+  const [repeatNew, setRepeatNew] = useState<any>({ repeat: 0, newCust: 0, total: 0 });
   
   // Insights
   const [crossModule, setCrossModule] = useState<any>(null);
@@ -53,7 +55,7 @@ export default function EconomicsPage() {
       
       const [
         resRevTime, resRevMod, resPeak, resStaff, resGross, resVol, resAvg,
-        resRet, resCross, resSlow, resPromo
+        resRet, resCross, resSlow, resPromo, resTop, resRep
       ] = await Promise.all([
         api.get('/economics/revenue', { params: { ...p.params, interval: 'day' } }),
         api.get('/economics/by-module', p),
@@ -61,11 +63,13 @@ export default function EconomicsPage() {
         api.get('/economics/staff-performance', p),
         api.get('/economics/gross-vs-net', p),
         api.get('/economics/volume', { params: { ...p.params, interval: 'day' } }),
-        api.get('/economics/average-transaction-value', p).catch(() => ({ data: { data: { overall: 0 } } })), // graceful fallback if not perfectly matched
+        api.get('/economics/average-transaction-value', p),
         api.get('/economics/retention', p),
         api.get('/economics/cross-module-patterns', p),
         api.get('/economics/slow-periods', p),
         api.get('/economics/promo-effectiveness', p),
+        api.get('/economics/top-customers', { params: { ...p.params, limit: 5 } }),
+        api.get('/economics/repeat-vs-new', p),
       ]);
 
       setRevenueTime(resRevTime.data.data);
@@ -81,6 +85,8 @@ export default function EconomicsPage() {
       setCrossModule(resCross.data.data);
       setSlowPeriods(resSlow.data.data);
       setPromoEffect(resPromo.data.data);
+      setTopCustomers(resTop.data.data);
+      setRepeatNew(resRep.data.data);
 
     } catch (err: any) {
       console.error(err);
@@ -308,6 +314,61 @@ export default function EconomicsPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </section>
+
+          {/* Section 4: Customer Insights */}
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col">
+              <div className="p-6 border-b">
+                <h3 className="text-lg font-semibold">Top Customers</h3>
+              </div>
+              <div className="overflow-x-auto flex-1">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="p-4 font-medium">Customer</th>
+                      <th className="p-4 font-medium text-right">Transactions</th>
+                      <th className="p-4 font-medium text-right">Spend</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {topCustomers.length > 0 ? topCustomers.map((c) => (
+                      <tr key={c.customer_id} className="hover:bg-slate-50">
+                        <td className="p-4 font-medium">{c.customer_name || 'Anonymous'}</td>
+                        <td className="p-4 text-right">{c.transactions}</td>
+                        <td className="p-4 text-right font-medium">{formatCurrency(c.spend)}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={3} className="p-4 text-center text-slate-400">No customer data</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl border shadow-sm">
+              <h3 className="text-lg font-semibold mb-6">Repeat vs New Customers</h3>
+              {repeatNew.total > 0 ? (
+                <div className="flex flex-col gap-4">
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-3xl font-bold text-emerald-600">{((repeatNew.repeat / repeatNew.total) * 100).toFixed(1)}%</p>
+                      <p className="text-sm text-slate-500">Repeat Customer Rate</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-slate-800">{repeatNew.repeat} Repeat</p>
+                      <p className="font-medium text-slate-800">{repeatNew.newCust} New</p>
+                    </div>
+                  </div>
+                  <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden flex">
+                    <div className="h-full bg-emerald-500" style={{ width: `${(repeatNew.repeat / repeatNew.total) * 100}%` }}></div>
+                    <div className="h-full bg-blue-400" style={{ width: `${(repeatNew.newCust / repeatNew.total) * 100}%` }}></div>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center text-slate-400">No data</div>
+              )}
             </div>
           </section>
 
