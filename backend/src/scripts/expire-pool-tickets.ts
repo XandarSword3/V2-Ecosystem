@@ -23,10 +23,11 @@ async function expirePoolTickets() {
 
     // Find all valid tickets where the ticket_date is before today
     const { data: expiredTickets, error: fetchError } = await supabase
-      .from('pool_tickets')
-      .select('id, ticket_number, ticket_date, session_id')
+      .from('transactions')
+      .select('id, ticket_number, metadata')
+      .eq('engine_type', 'shared_capacity_access')
       .eq('status', 'valid')
-      .lt('ticket_date', today);
+      .filter('metadata->>ticket_date', 'lt', today);
 
     if (fetchError) {
       logger.error('Failed to fetch expired tickets:', fetchError);
@@ -44,7 +45,7 @@ async function expirePoolTickets() {
     const ticketIds = expiredTickets.map(t => t.id);
     
     const { error: updateError } = await supabase
-      .from('pool_tickets')
+      .from('transactions')
       .update({ 
         status: 'expired',
         updated_at: new Date().toISOString()
@@ -62,12 +63,12 @@ async function expirePoolTickets() {
     const auditEntries = expiredTickets.map(ticket => ({
       user_id: 'system',
       action: 'ticket_expired',
-      resource: 'pool_ticket',
+      resource: 'transaction',
       resource_id: ticket.id,
       new_value: JSON.stringify({ 
         ticket_number: ticket.ticket_number,
         expired_by: 'scheduled_job',
-        original_date: ticket.ticket_date 
+        original_date: (ticket.metadata as any)?.ticket_date 
       }),
     }));
 

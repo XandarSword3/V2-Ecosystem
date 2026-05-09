@@ -8,13 +8,13 @@ import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 
 /**
  * Dynamic Module Staff Controller
- * Handles staff operations for any module type based on slug
- * This replaces hardcoded /restaurant/staff/orders, /chalets/staff/bookings etc
+ * Handles staff operations for any module type based on slug.
+ * All operational data is stored in the unified `transactions` table.
  * 
- * TABLE MAPPINGS (actual DB table names):
- *  - menu_service orders → restaurant_orders / restaurant_order_items / menu_items
- *  - multi_day_booking → chalet_bookings / chalets
- *  - session_access → pool_sessions / pool_tickets
+ * ENGINE TYPE MAPPINGS:
+ *  - menu_service orders → engine_type: 'instant_transaction'
+ *  - multi_day_booking   → engine_type: 'time_exclusive_reservation'
+ *  - session_access      → engine_type: 'shared_capacity_access'
  */
 
 // ============================================
@@ -213,10 +213,19 @@ export async function mergeModuleTables(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Both source and target tables must have open tabs' });
     }
 
-    await supabase
-      .from('restaurant_orders')
-      .update({ tab_id: targetTab.id })
-      .eq('tab_id', sourceTab.id);
+    // Reassign all orders from source tab to target tab (via metadata)
+    const { data: ordersToMove } = await supabase
+      .from('transactions')
+      .select('id, metadata')
+      .eq('engine_type', 'instant_transaction')
+      .contains('metadata', { tab_id: sourceTab.id });
+
+    for (const order of ordersToMove || []) {
+      await supabase
+        .from('transactions')
+        .update({ metadata: { ...(order.metadata as Record<string, any>), tab_id: targetTab.id } })
+        .eq('id', order.id);
+    }
 
     await supabase
       .from('restaurant_tabs')
@@ -263,14 +272,15 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Invalid status' });
     }
 
-    // Update the order — actual table is restaurant_orders
+    // Update the order in the unified transactions table
     // Use engine framework for state transitions
     const engineService = getEngineService();
     
     // Get current order to determine state transition
     const { data: currentOrder, error: fetchError } = await supabase
-      .from('restaurant_orders')
+      .from('transactions')
       .select('status, module_id')
+      .eq('engine_type', 'instant_transaction')
       .eq('id', orderId)
       .single();
       
@@ -316,7 +326,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     
     // Get updated order
     const { data: order, error: updateError } = await supabase
-      .from('restaurant_orders')
+      .from('transactions')
       .select('*')
       .eq('id', orderId)
       .single();
@@ -372,15 +382,15 @@ export async function getModuleBookings(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Module is not a booking service' });
     }
 
-    // Build query — actual table is chalet_bookings
+    // Build query — actual table is transactions
     let query = supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .select(`
-        id, booking_number, customer_id, chalet_id, check_in_date, check_out_date, status,
-        total_amount, number_of_guests, special_requests, created_at, customer_name, customer_email,
-        chalet:chalets!chalet_id(id, name, capacity),
+        *,
+        unit:accommodation_units!reference_id(id, name, capacity),
         user:users!customer_id(id, full_name, email, phone)
-      `);
+      `)
+      .eq('engine_type', 'time_exclusive_reservation');
 
     // Filter by date (check-in or check-out on this date)
     if (date) {
@@ -402,20 +412,21 @@ export async function getModuleBookings(req: Request, res: Response) {
     if (error) throw error;
 
     // Transform for frontend
+    // Transform for frontend
     const transformedBookings = (bookings || []).map(booking => ({
       id: booking.id,
       bookingNumber: booking.booking_number,
       guestName: booking.customer_name || (Array.isArray((booking as any).user) ? (booking as any).user[0] : (booking as any).user)?.full_name || 'Guest',
       guestEmail: booking.customer_email || (Array.isArray((booking as any).user) ? (booking as any).user[0] : (booking as any).user)?.email,
       guestPhone: (Array.isArray((booking as any).user) ? (booking as any).user[0] : (booking as any).user)?.phone,
-      unitId: booking.chalet_id,
-      unitName: (Array.isArray((booking as any).chalet) ? (booking as any).chalet[0] : (booking as any).chalet)?.name || 'Unit',
-      checkIn: booking.check_in_date,
-      checkOut: booking.check_out_date,
+      unitId: booking.reference_id,
+      unitName: (Array.isArray((booking as any).unit) ? (booking as any).unit[0] : (booking as any).unit)?.name || 'Unit',
+      checkIn: booking.metadata?.check_in_date,
+      checkOut: booking.metadata?.check_out_date,
       status: booking.status,
-      totalPrice: (booking as any).total_amount,
-      guestCount: (booking as any).number_of_guests,
-      specialRequests: booking.special_requests,
+      totalPrice: (booking as any).amount,
+      guestCount: (booking as any).metadata?.number_of_guests,
+      specialRequests: booking.metadata?.special_requests,
       createdAt: booking.created_at,
     }));
 
@@ -457,10 +468,10 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Invalid status' });
     }
 
-    // Get current booking — actual table is chalet_bookings
+    // Get current booking from unified transactions
     const { data: currentBooking } = await supabase
-      .from('chalet_bookings')
-      .select('status, chalet_id, booking_number')
+      .from('transactions')
+      .select('status, reference_id, booking_number')
       .eq('id', bookingId)
       .single();
 
@@ -501,7 +512,7 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
     
     // Get updated booking
     const { data: booking, error: updateError } = await supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .select('*')
       .eq('id', bookingId)
       .single();
@@ -509,22 +520,22 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
     if (updateError) throw updateError;
 
     // If checked out, trigger housekeeping
-    if (status === 'checked_out' && currentBooking?.chalet_id) {
-      // This will be handled by a database trigger or can be called here
+    if (status === 'checked_out' && currentBooking?.reference_id) {
       try {
         await supabase.from('housekeeping_tasks').insert({
-          chalet_id: currentBooking.chalet_id,
+          unit_id: currentBooking.reference_id,
           task_type: 'turnover',
           priority: 'high',
           status: 'pending',
           notes: `Auto-generated from checkout. Booking #${booking.booking_number}`,
-          booking_id: bookingId,
+          reference_id: bookingId,
+          reference_table: 'transactions'
         });
 
-        await supabase.from('chalets').update({
+        await supabase.from('accommodation_units').update({
           cleaning_status: 'dirty',
           updated_at: new Date().toISOString(),
-        }).eq('id', currentBooking.chalet_id);
+        }).eq('id', currentBooking.reference_id);
       } catch (error) {
         logger.error('Failed to create housekeeping task:', error);
       }
@@ -578,13 +589,14 @@ export async function getModuleSessions(req: Request, res: Response) {
     // Get sessions for today or specified date
     const targetDate = date || new Date().toISOString().split('T')[0];
 
-    // Actual table is pool_sessions / pool_tickets
+    // Actual table is pool_sessions / transactions
     const { data: sessions, error } = await supabase
       .from('pool_sessions')
       .select(`
         id, name, start_time, end_time, capacity, current_count, status,
-        tickets:pool_tickets(id, ticket_number, status, user_id, user:users!user_id(full_name))
+        tickets:transactions(id, ticket_number, status, customer_id, user:users!customer_id(full_name))
       `)
+      .filter('tickets.engine_type', 'eq', 'shared_capacity_access')
       .eq('date', targetDate)
       .order('start_time', { ascending: true });
 
@@ -617,14 +629,15 @@ export async function validateModuleTicket(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Invalid module for ticket validation' });
     }
 
-    // Find the ticket — actual table is pool_tickets
+    // Find the ticket from unified transactions
     const { data: ticket, error } = await supabase
-      .from('pool_tickets')
+      .from('transactions')
       .select(`
-        id, ticket_number, status, customer_id, customer_name, session_id, entry_time, exit_time,
-        session:pool_sessions!session_id(id, name, max_capacity)
+        id, ticket_number, status, customer_id, customer_name, metadata,
+        session:pool_sessions!reference_id(id, name, capacity)
       `)
       .eq('ticket_number', ticketNumber)
+      .eq('engine_type', 'shared_capacity_access')
       .single();
 
     if (error || !ticket) {
@@ -662,8 +675,8 @@ export async function validateModuleTicket(req: Request, res: Response) {
           status: ticket.status,
           guestName: ticket.customer_name || 'Guest',
           sessionName: session?.name,
-          entryTime: ticket.entry_time,
-          exitTime: ticket.exit_time,
+          entryTime: ticket.metadata?.entry_time,
+          exitTime: ticket.metadata?.exit_time,
         }
       }
     });
@@ -700,11 +713,12 @@ export async function recordEntry(req: Request, res: Response) {
     // Use engine framework for state transition
     const engineService = getEngineService();
     
-    // Get current ticket to determine state transition
+    // Get current ticket from unified transactions
     const { data: currentTicket, error: fetchError } = await supabase
-      .from('pool_tickets')
-      .select('status, session_id')
+      .from('transactions')
+      .select('status, reference_id')
       .eq('id', ticketId)
+      .eq('engine_type', 'shared_capacity_access')
       .single();
       
     if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
@@ -720,14 +734,14 @@ export async function recordEntry(req: Request, res: Response) {
       { 
         ticketId,
         entryTime: new Date().toISOString(),
-        sessionId: currentTicket.session_id
+        sessionId: currentTicket.reference_id
       }
     );
     
     // Get updated ticket
     const { data: ticket, error: updateError } = await supabase
-      .from('pool_tickets')
-      .select('*, session:pool_sessions!session_id(id, name)')
+      .from('transactions')
+      .select('*, session:pool_sessions!reference_id(id, name)')
       .eq('id', ticketId)
       .single();
 
@@ -763,11 +777,12 @@ export async function recordExit(req: Request, res: Response) {
     // Use engine framework for state transition
     const engineService = getEngineService();
     
-    // Get current ticket to determine state transition
+    // Get current ticket from unified transactions
     const { data: currentTicket, error: fetchError } = await supabase
-      .from('pool_tickets')
-      .select('status, session_id')
+      .from('transactions')
+      .select('status, reference_id')
       .eq('id', ticketId)
+      .eq('engine_type', 'shared_capacity_access')
       .single();
       
     if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
@@ -783,14 +798,14 @@ export async function recordExit(req: Request, res: Response) {
       { 
         ticketId,
         exitTime: new Date().toISOString(),
-        sessionId: currentTicket.session_id
+        sessionId: currentTicket.reference_id
       }
     );
     
     // Get updated ticket
     const { data: ticket, error: updateError } = await supabase
-      .from('pool_tickets')
-      .select('*, session:pool_sessions!session_id(id, name)')
+      .from('transactions')
+      .select('*, session:pool_sessions!reference_id(id, name)')
       .eq('id', ticketId)
       .single();
 
@@ -881,14 +896,15 @@ export async function getTodaysTickets(req: Request, res: Response) {
     const targetDate = (date as string) || new Date().toISOString().split('T')[0];
 
     let query = supabase
-      .from('pool_tickets')
+      .from('transactions')
       .select(`
-        id, ticket_number, customer_name, customer_phone, number_of_guests,
-        status, payment_status, entry_time, exit_time, total_amount,
-        session:pool_sessions!session_id(id, name, start_time, end_time)
+        id, ticket_number, customer_name, customer_phone,
+        status, payment_status, amount, created_at, metadata,
+        session:pool_sessions!reference_id(id, name, start_time, end_time)
       `)
       .eq('module_id', module.id)
-      .eq('ticket_date', targetDate)
+      .eq('engine_type', 'shared_capacity_access')
+      .eq('metadata->>ticket_date', targetDate) // Date is in metadata for tickets
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -906,12 +922,12 @@ export async function getTodaysTickets(req: Request, res: Response) {
         ticketNumber: t.ticket_number,
         customerName: t.customer_name,
         customerPhone: t.customer_phone,
-        guests: t.number_of_guests,
+        guests: t.metadata?.number_of_guests,
         status: t.status,
         paymentStatus: t.payment_status,
-        entryTime: t.entry_time,
-        exitTime: t.exit_time,
-        totalAmount: t.total_amount,
+        entryTime: t.metadata?.entry_time,
+        exitTime: t.metadata?.exit_time,
+        totalAmount: t.amount,
         sessionName: (Array.isArray(t.session) ? t.session[0] : t.session)?.name,
         sessionTime: `${(Array.isArray(t.session) ? t.session[0] : t.session)?.start_time} - ${(Array.isArray(t.session) ? t.session[0] : t.session)?.end_time}`,
       })),
@@ -1032,49 +1048,19 @@ export async function scanCode(req: Request, res: Response) {
       });
     }
 
-    const { type, id } = parsed;
+    const { id } = parsed;
 
-    if (type === 'pool_ticket') {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-      let query = supabase.from('pool_tickets').select('*');
-      query = isUuid ? query.eq('id', id) : query.eq('ticket_number', id);
-      const { data, error } = await query.single();
-      if (error || !data) {
-        return res.status(404).json({ valid: false, type, entity: null, message: 'Pool ticket not found' });
-      }
-      return res.json({ valid: true, type, entity: data, message: 'Pool ticket is valid' });
+    // Validate by reference_id or ticket_number (unified approach)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+    let query = supabase.from('transactions').select('*');
+    query = isUuid ? query.eq('id', id) : query.eq('ticket_number', id);
+    
+    const { data, error } = await query.single();
+    if (error || !data) {
+      return res.status(404).json({ valid: false, entity: null, message: 'Resource not found' });
     }
-
-    if (type === 'chalet_booking') {
-      const { data, error } = await supabase.from('chalet_bookings').select('*').eq('id', id).single();
-      if (error || !data) {
-        return res.status(404).json({ valid: false, type, entity: null, message: 'Chalet booking not found' });
-      }
-      return res.json({ valid: true, type, entity: data, message: 'Chalet booking found' });
-    }
-
-    if (type === 'restaurant_order') {
-      const { data, error } = await supabase.from('restaurant_orders').select('*').eq('id', id).single();
-      if (error || !data) {
-        return res.status(404).json({ valid: false, type, entity: null, message: 'Restaurant order not found' });
-      }
-      return res.json({ valid: true, type, entity: data, message: 'Restaurant order found' });
-    }
-
-    if (type === 'membership') {
-      const { data, error } = await supabase.from('pool_memberships').select('*').eq('id', id).single();
-      if (error || !data) {
-        return res.status(404).json({ valid: false, type, entity: null, message: 'Membership not found' });
-      }
-      return res.json({ valid: true, type, entity: data, message: 'Membership found' });
-    }
-
-    return res.status(400).json({
-      valid: false,
-      type,
-      entity: null,
-      message: `Unsupported QR type: ${type}`,
-    });
+    
+    return res.json({ valid: true, type: data.engine_type, entity: data, message: 'Scan successful' });
   } catch (error: any) {
     logger.error('Error scanning QR code:', error);
     res.status(500).json({ valid: false, message: 'Failed to scan code' });
@@ -1107,13 +1093,10 @@ export async function searchCustomers(req: Request, res: Response) {
     }
 
     const customerIds = rows.map((u) => u.id);
-    const [restaurantOrders, poolTickets, chaletBookings, snackOrders, memberships, loyaltyAccounts] = await Promise.all([
-      supabase.from('restaurant_orders').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
-      supabase.from('pool_tickets').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
-      supabase.from('chalet_bookings').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
-      supabase.from('snack_orders').select('customer_id,total_amount,created_at').in('customer_id', customerIds),
-      supabase.from('pool_memberships').select('customer_id,status').in('customer_id', customerIds),
-      supabase.from('loyalty_accounts').select('user_id,tier_name').in('user_id', customerIds),
+    const [transactions, memberships, loyaltyAccounts] = await Promise.all([
+      supabase.from('transactions').select('customer_id, amount, created_at').in('customer_id', customerIds),
+      supabase.from('pool_memberships').select('customer_id, status').in('customer_id', customerIds),
+      supabase.from('loyalty_accounts').select('user_id, tier_name').in('user_id', customerIds),
     ]);
 
     const spendByCustomer: Record<string, number> = {};
@@ -1134,10 +1117,7 @@ export async function searchCustomers(req: Request, res: Response) {
       });
     };
 
-    rollupFinancialRows((restaurantOrders.data as any[]) || []);
-    rollupFinancialRows((poolTickets.data as any[]) || []);
-    rollupFinancialRows((chaletBookings.data as any[]) || []);
-    rollupFinancialRows((snackOrders.data as any[]) || []);
+    rollupFinancialRows((transactions.data as any[]) || []);
 
     ((memberships.data as any[]) || []).forEach((m) => {
       if (!membershipByCustomer[m.customer_id]) membershipByCustomer[m.customer_id] = m.status || 'inactive';

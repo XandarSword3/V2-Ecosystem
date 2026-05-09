@@ -46,6 +46,7 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
     const lastWeekEnd = dayjs().subtract(7, 'day').endOf('day').toISOString();
 
     // Today's stats - run queries in parallel
+    // Today's stats - run queries in parallel
     const [
       restaurantOrdersResult,
       restaurantRevenueResult,
@@ -63,78 +64,90 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
       yesterdayTicketsResult
     ] = await Promise.all([
       // Restaurant orders count
-      supabase.from('restaurant_orders')
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('reference_table', 'restaurant_orders')
         .gte('created_at', today)
         .lte('created_at', endOfDay),
       // Restaurant revenue
-      supabase.from('restaurant_orders')
-        .select('total_amount')
+      supabase.from('transactions')
+        .select('total_amount:amount')
+        .eq('reference_table', 'restaurant_orders')
         .gte('created_at', today)
         .lte('created_at', endOfDay)
-        .eq('payment_status', 'paid'),
+        .eq('status', 'completed'),
       // Snack orders count
-      supabase.from('snack_orders')
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('reference_table', 'snack_orders')
         .gte('created_at', today)
         .lte('created_at', endOfDay),
       // Snack revenue
-      supabase.from('snack_orders')
-        .select('total_amount')
+      supabase.from('transactions')
+        .select('total_amount:amount')
+        .eq('reference_table', 'snack_orders')
         .gte('created_at', today)
         .lte('created_at', endOfDay)
-        .eq('payment_status', 'paid'),
+        .eq('status', 'completed'),
       // Chalet bookings count
-      supabase.from('chalet_bookings')
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .gte('check_in_date', today)
-        .lte('check_in_date', endOfDay),
+        .eq('engine_type', 'time_exclusive_reservation')
+        .gte('created_at', today)
+        .lte('created_at', endOfDay),
       // Chalet revenue
-      supabase.from('chalet_bookings')
-        .select('total_amount')
-        .gte('check_in_date', today)
-        .lte('check_in_date', endOfDay)
-        .eq('payment_status', 'paid'),
+      supabase.from('transactions')
+        .select('total_amount:amount')
+        .eq('engine_type', 'time_exclusive_reservation')
+        .gte('created_at', today)
+        .lte('created_at', endOfDay)
+        .eq('status', 'completed'),
       // Pool tickets count
-      supabase.from('pool_tickets')
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .gte('ticket_date', today)
-        .lte('ticket_date', endOfDay),
+        .eq('engine_type', 'shared_capacity_access')
+        .gte('created_at', today)
+        .lte('created_at', endOfDay),
       // Pool revenue
-      supabase.from('pool_tickets')
-        .select('total_amount')
-        .gte('ticket_date', today)
-        .lte('ticket_date', endOfDay)
-        .eq('payment_status', 'paid'),
+      supabase.from('transactions')
+        .select('total_amount:amount')
+        .eq('engine_type', 'shared_capacity_access')
+        .gte('created_at', today)
+        .lte('created_at', endOfDay)
+        .eq('status', 'completed'),
       // Total users
       supabase.from('users')
         .select('id', { count: 'exact', head: true }),
-      // Recent orders (with item count)
-      supabase.from('restaurant_orders')
-        .select('id, order_number, customer_name, status, total_amount, created_at, items:restaurant_order_items(id)')
+      // Recent orders (from transactions)
+      supabase.from('transactions')
+        .select('id, order_number, status, total_amount:amount, created_at, metadata')
         .order('created_at', { ascending: false })
         .limit(5),
       // Yesterday orders
-      supabase.from('restaurant_orders')
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('reference_table', 'restaurant_orders')
         .gte('created_at', yesterday)
         .lte('created_at', endOfYesterday),
       // Yesterday revenue
-      supabase.from('restaurant_orders')
-        .select('total_amount')
+      supabase.from('transactions')
+        .select('total_amount:amount')
+        .eq('reference_table', 'restaurant_orders')
         .gte('created_at', yesterday)
         .lte('created_at', endOfYesterday)
-        .eq('payment_status', 'paid'),
+        .eq('status', 'completed'),
       // Last week bookings
-      supabase.from('chalet_bookings')
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .gte('check_in_date', lastWeekStart)
-        .lte('check_in_date', lastWeekEnd),
+        .eq('engine_type', 'time_exclusive_reservation')
+        .gte('created_at', lastWeekStart)
+        .lte('created_at', lastWeekEnd),
       // Yesterday tickets
-      supabase.from('pool_tickets')
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .gte('ticket_date', yesterday)
-        .lte('ticket_date', endOfYesterday)
+        .eq('engine_type', 'shared_capacity_access')
+        .gte('created_at', yesterday)
+        .lte('created_at', endOfYesterday)
     ]);
 
     // Calculate totals using type-safe function
@@ -217,26 +230,30 @@ export const getRevenueStats = asyncHandler(async (req: Request, res: Response) 
       chaletResult,
       poolResult
     ] = await Promise.all([
-      supabase.from('restaurant_orders')
-        .select('total_amount, created_at')
+      supabase.from('transactions')
+        .select('total_amount:amount, created_at')
+        .eq('reference_table', 'restaurant_orders')
         .gte('created_at', start)
         .lte('created_at', end)
-        .eq('payment_status', 'paid'),
-      supabase.from('snack_orders')
-        .select('total_amount, created_at')
+        .eq('status', 'completed'),
+      supabase.from('transactions')
+        .select('total_amount:amount, created_at')
+        .eq('reference_table', 'snack_orders')
         .gte('created_at', start)
         .lte('created_at', end)
-        .eq('payment_status', 'paid'),
-      supabase.from('chalet_bookings')
-        .select('total_amount, created_at')
+        .eq('status', 'completed'),
+      supabase.from('transactions')
+        .select('total_amount:amount, created_at')
+        .eq('engine_type', 'time_exclusive_reservation')
         .gte('created_at', start)
         .lte('created_at', end)
-        .eq('payment_status', 'paid'),
-      supabase.from('pool_tickets')
-        .select('total_amount, created_at')
+        .eq('status', 'completed'),
+      supabase.from('transactions')
+        .select('total_amount:amount, created_at')
+        .eq('engine_type', 'shared_capacity_access')
         .gte('created_at', start)
         .lte('created_at', end)
-        .eq('payment_status', 'paid')
+        .eq('status', 'completed')
     ]);
 
     // Group by day

@@ -174,19 +174,16 @@ async function collectUserData(userId: string): Promise<Record<string, any>> {
     .single();
   data.profile = user;
 
-  // Reservations/Bookings
-  const { data: reservations } = await client
-    .from('reservations')
+  // Transactions (Unified source for Bookings, Tickets, and Orders)
+  const { data: transactions } = await client
+    .from('transactions')
     .select('*')
     .eq('user_id', userId);
-  data.reservations = reservations || [];
-
-  // Orders
-  const { data: orders } = await client
-    .from('orders')
-    .select('*, order_items(*)')
-    .eq('user_id', userId);
-  data.orders = orders || [];
+  
+  const txs = transactions || [];
+  data.reservations = txs.filter(t => t.engine_type === 'time_exclusive_reservation');
+  data.orders = txs.filter(t => t.engine_type === 'instant_transaction');
+  data.tickets = txs.filter(t => t.engine_type === 'shared_capacity_access');
 
   // Payments (sanitized - no full card numbers)
   const { data: payments } = await client
@@ -266,8 +263,9 @@ This archive contains all personal data associated with your account.
 
 Files included:
 - profile.json: Your account information
-- reservations.json: Your booking history
-- orders.json: Your purchase history
+- reservations.json: Your booking history (Accommodation)
+- orders.json: Your purchase history (Restaurant/Retail)
+- tickets.json: Your access history (Pool/Events)
 - payments.json: Your payment records (card numbers redacted)
 - consents.json: Your consent preferences
 - support_tickets.json: Your support requests

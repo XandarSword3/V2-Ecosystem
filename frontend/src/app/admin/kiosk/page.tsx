@@ -223,7 +223,7 @@ export default function KioskAdminPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {kiosks.filter(k => k.status === 'online').length}
+                {kiosks.filter((k: KioskDevice) => k.status === 'online').length}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Online</p>
             </div>
@@ -236,7 +236,7 @@ export default function KioskAdminPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {kiosks.filter(k => k.status === 'maintenance').length}
+                {kiosks.filter((k: KioskDevice) => k.status === 'maintenance').length}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Maintenance</p>
             </div>
@@ -249,7 +249,7 @@ export default function KioskAdminPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {kiosks.filter(k => k.status === 'error').length}
+                {kiosks.filter((k: KioskDevice) => k.status === 'error').length}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Errors</p>
             </div>
@@ -297,7 +297,7 @@ export default function KioskAdminPage() {
                     </button>
                   </td>
                 </tr>
-              ) : kiosks.map((kiosk) => (
+              ) : kiosks.map((kiosk: KioskDevice) => (
                 <tr key={kiosk.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">

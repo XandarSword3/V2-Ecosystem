@@ -78,7 +78,8 @@ export class PoolSessionRepository extends BaseRepository<PoolSession> {
 
 export class PoolTicketRepository extends BaseRepository<PoolTicket> {
   constructor() {
-    super('pool_tickets');
+    super('transactions');
+    this.baseFilters = { engine_type: 'shared_capacity_access' };
   }
 
   /** Find tickets for a specific session. */
@@ -86,22 +87,21 @@ export class PoolTicketRepository extends BaseRepository<PoolTicket> {
     sessionId: string,
     options?: FindManyOptions,
   ): Promise<PoolTicket[]> {
-    return this.findMany(
-      { session_id: sessionId },
-      { orderBy: 'created_at', ascending: false, ...options },
-    );
+    const { data, error } = await this.getQuery()
+      .contains('metadata', { session_id: sessionId })
+      .order('created_at', { ascending: false });
+
+    if (error) throw new Error(`[transactions] findBySession failed: ${error.message}`);
+    return (data as PoolTicket[]) ?? [];
   }
 
   /** Find tickets for a specific date. */
   async findByDate(date: string): Promise<PoolTicket[]> {
-    const { data, error } = await this.getClient()
-      .from(this.tableName)
-      .select('*')
-      .gte('ticket_date', `${date}T00:00:00`)
-      .lt('ticket_date', `${date}T23:59:59`)
+    const { data, error } = await this.getQuery()
+      .contains('metadata', { ticket_date: date })
       .order('created_at', { ascending: false });
 
-    if (error) throw new Error(`[pool_tickets] findByDate failed: ${error.message}`);
+    if (error) throw new Error(`[transactions] findByDate failed: ${error.message}`);
     return (data as PoolTicket[]) ?? [];
   }
 
@@ -112,28 +112,30 @@ export class PoolTicketRepository extends BaseRepository<PoolTicket> {
   ): Promise<PoolTicket[]> {
     return this.findMany(
       { customer_id: customerId },
-      { orderBy: 'ticket_date', ascending: false, ...options },
+      { orderBy: 'created_at', ascending: false, ...options },
     );
   }
 
   /** Find valid (non-expired, non-cancelled) tickets for a session on a date. */
   async findValidForSession(sessionId: string, date: string): Promise<PoolTicket[]> {
-    const { data, error } = await this.getClient()
-      .from(this.tableName)
-      .select('*')
-      .eq('session_id', sessionId)
-      .eq('status', 'valid')
-      .gte('ticket_date', `${date}T00:00:00`)
-      .lt('ticket_date', `${date}T23:59:59`);
+    const { data, error } = await this.getQuery()
+      .contains('metadata', { session_id: sessionId, ticket_date: date })
+      .eq('status', 'valid');
 
-    if (error) throw new Error(`[pool_tickets] findValidForSession failed: ${error.message}`);
+    if (error) throw new Error(`[transactions] findValidForSession failed: ${error.message}`);
     return (data as PoolTicket[]) ?? [];
   }
 
   /** Count guests for a session on a given date. */
   async countGuestsForSession(sessionId: string, date: string): Promise<number> {
     const tickets = await this.findValidForSession(sessionId, date);
-    return tickets.reduce((sum, t) => sum + t.number_of_guests, 0);
+    // Note: number_of_guests is likely in metadata now if not explicit
+    return tickets.reduce((sum, t) => {
+      const guests = typeof t.metadata?.number_of_guests === 'number' 
+        ? t.metadata.number_of_guests 
+        : (t.number_of_guests || 0);
+      return sum + Number(guests);
+    }, 0);
   }
 }
 

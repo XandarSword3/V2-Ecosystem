@@ -178,8 +178,8 @@ export class BackupService {
 
         const coreTables = [
             'users', 'roles', 'user_roles', 'permissions', 'role_permissions',
-            'modules', 'site_settings', 'chalets', 'chalet_bookings', 'chalet_price_rules',
-            'pool_sessions', 'pool_tickets', 'menu_items', 'menu_categories', 'orders',
+            'modules', 'site_settings', 'accommodation_units', 'transactions',
+            'pool_sessions', 'menu_items', 'menu_categories',
             'payments', 'reviews', 'support_tickets'
         ];
 
@@ -207,7 +207,7 @@ export class BackupService {
         // 1. Core Users & Roles
         // 2. Settings & Content
         // 3. Operational Data (Bookings, etc)
-        const priorityTables = ['users', 'roles', 'site_settings', 'modules', 'menu_categories'];
+        const priorityTables = ['users', 'roles', 'site_settings', 'modules', 'menu_categories', 'accommodation_units'];
         const tableNames = Object.keys(backupData.tables);
         
         // Sort tables: priority ones first, then alphabetical

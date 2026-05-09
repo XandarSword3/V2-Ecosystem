@@ -44,7 +44,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
     // Get recent restaurant orders with error handling
     try {
       const { data: recentOrders } = await supabase
-        .from('restaurant_orders')
+        .from('transactions').eq('engine_type', 'instant_transaction')
         .select('id, order_number, status, created_at')
         .gte('created_at', oneDayAgo.toISOString())
         .order('created_at', { ascending: false })
@@ -69,7 +69,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
     // Get recent chalet bookings with error handling
     try {
       const { data: recentBookings } = await supabase
-        .from('chalet_bookings')
+        .from('transactions').eq('engine_type', 'time_exclusive_reservation')
         .select('id, chalet_id, check_in_date, status, created_at')
         .gte('created_at', oneDayAgo.toISOString())
         .order('created_at', { ascending: false })

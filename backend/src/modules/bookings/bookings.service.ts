@@ -365,28 +365,40 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   // Calculate pricing
   const pricing = await calculateBookingPrice(chaletId, checkInDate, checkOutDate, addOns);
 
-  // Create booking
+  // Create transaction
   const { data: booking, error: bookingError } = await supabase
-    .from('chalet_bookings')
+    .from('transactions')
     .insert({
       booking_number: generateBookingNumber(),
-      chalet_id: chaletId,
+      module_id: chalet.module_id, // Ensure module_id is passed
+      engine_type: 'time_exclusive_reservation',
+      property_id: chalet.property_id,
       customer_id: customerId,
-      customer_name: customerName,
-      customer_email: customerEmail,
-      customer_phone: customerPhone,
-      check_in_date: checkIn.toISOString(),
-      check_out_date: checkOut.toISOString(),
-      number_of_guests: numberOfGuests,
-      number_of_nights: pricing.numberOfNights,
-      base_amount: pricing.baseAmount.toFixed(2),
-      add_ons_amount: pricing.addOnsAmount.toFixed(2),
-      deposit_amount: pricing.depositAmount.toFixed(2),
-      total_amount: pricing.totalAmount.toFixed(2),
+      amount: pricing.totalAmount,
+      tax_amount: 0, // Should be calculated
+      service_charge: 0,
+      discount_amount: 0,
+      net_amount: pricing.totalAmount,
+      currency: 'USD',
       status: 'pending',
       payment_status: 'pending',
       payment_method: paymentMethod,
-      special_requests: specialRequests,
+      staff_id: null,
+      metadata: {
+        chalet_id: chaletId,
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
+        check_in_date: checkIn.toISOString(),
+        check_out_date: checkOut.toISOString(),
+        number_of_guests: numberOfGuests,
+        number_of_nights: pricing.numberOfNights,
+        base_amount: pricing.baseAmount.toFixed(2),
+        add_ons_amount: pricing.addOnsAmount.toFixed(2),
+        deposit_amount: pricing.depositAmount.toFixed(2),
+        special_requests: specialRequests,
+        add_ons: pricing.addOnItems
+      }
     })
     .select()
     .single();
@@ -428,8 +440,9 @@ export async function getBookingById(id: string): Promise<Booking | null> {
   const supabase = getSupabase();
 
   const { data, error } = await supabase
-    .from('chalet_bookings')
+    .from('transactions')
     .select('*')
+    .eq('engine_type', 'time_exclusive_reservation')
     .eq('id', id)
     .maybeSingle();
 
@@ -448,8 +461,9 @@ export async function getBookingByNumber(bookingNumber: string): Promise<Booking
   const supabase = getSupabase();
 
   const { data, error } = await supabase
-    .from('chalet_bookings')
+    .from('transactions')
     .select('*')
+    .eq('engine_type', 'time_exclusive_reservation')
     .eq('booking_number', bookingNumber)
     .maybeSingle();
 
@@ -468,12 +482,13 @@ export async function getBookings(filters: BookingFilters): Promise<Booking[]> {
   const supabase = getSupabase();
 
   let query = supabase
-    .from('chalet_bookings')
+    .from('transactions')
     .select('*')
+    .eq('engine_type', 'time_exclusive_reservation')
     .order('created_at', { ascending: false });
 
   if (filters.chaletId) {
-    query = query.eq('chalet_id', filters.chaletId);
+    query = query.filter('metadata->>chalet_id', 'eq', filters.chaletId);
   }
 
   if (filters.status) {
@@ -481,11 +496,11 @@ export async function getBookings(filters: BookingFilters): Promise<Booking[]> {
   }
 
   if (filters.startDate) {
-    query = query.gte('check_in_date', filters.startDate);
+    query = query.filter('metadata->>check_in_date', 'gte', filters.startDate);
   }
 
   if (filters.endDate) {
-    query = query.lte('check_in_date', filters.endDate);
+    query = query.filter('metadata->>check_in_date', 'lte', filters.endDate);
   }
 
   const { data, error } = await query;
@@ -505,8 +520,9 @@ export async function getBookingsByCustomer(customerId: string): Promise<Booking
   const supabase = getSupabase();
 
   const { data, error } = await supabase
-    .from('chalet_bookings')
+    .from('transactions')
     .select('*')
+    .eq('engine_type', 'time_exclusive_reservation')
     .eq('customer_id', customerId)
     .order('created_at', { ascending: false });
 
@@ -527,16 +543,18 @@ export async function getTodayBookings(): Promise<TodayBookings> {
 
   const [checkInsResult, checkOutsResult] = await Promise.all([
     supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .select('*')
-      .gte('check_in_date', `${today}T00:00:00Z`)
-      .lte('check_in_date', `${today}T23:59:59Z`)
+      .eq('engine_type', 'time_exclusive_reservation')
+      .filter('metadata->>check_in_date', 'gte', `${today}T00:00:00Z`)
+      .filter('metadata->>check_in_date', 'lte', `${today}T23:59:59Z`)
       .in('status', ['confirmed', 'pending']),
     supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .select('*')
-      .gte('check_out_date', `${today}T00:00:00Z`)
-      .lte('check_out_date', `${today}T23:59:59Z`)
+      .eq('engine_type', 'time_exclusive_reservation')
+      .filter('metadata->>check_out_date', 'gte', `${today}T00:00:00Z`)
+      .filter('metadata->>check_out_date', 'lte', `${today}T23:59:59Z`)
       .eq('status', 'checked_in'),
   ]);
 
@@ -566,7 +584,7 @@ export async function updateBooking(
   }
 
   const { data, error } = await supabase
-    .from('chalet_bookings')
+    .from('transactions')
     .update({
       ...updates,
       updated_at: new Date().toISOString(),
@@ -623,11 +641,14 @@ export async function cancelBooking(
   }
 
   const { data, error } = await supabase
-    .from('chalet_bookings')
+    .from('transactions')
     .update({
       status: transitionResult.targetState,
-      cancelled_at: new Date().toISOString(),
-      cancellation_reason: reason,
+      metadata: {
+        ...(booking.metadata as Record<string, any> || {}),
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: reason
+      },
       updated_at: new Date().toISOString(),
     })
     .eq('id', bookingId)
@@ -677,11 +698,14 @@ export async function checkIn(bookingId: string, staffId: string): Promise<Booki
   }
 
   const { data, error } = await supabase
-    .from('chalet_bookings')
+    .from('transactions')
     .update({
       status: transitionResult.targetState,
-      checked_in_at: new Date().toISOString(),
-      checked_in_by: staffId,
+      metadata: {
+        ...(booking.metadata as Record<string, any> || {}),
+        checked_in_at: new Date().toISOString(),
+        checked_in_by: staffId
+      },
       updated_at: new Date().toISOString(),
     })
     .eq('id', bookingId)
@@ -727,11 +751,14 @@ export async function checkOut(bookingId: string, staffId: string): Promise<Book
   }
 
   const { data, error } = await supabase
-    .from('chalet_bookings')
+    .from('transactions')
     .update({
       status: transitionResult.targetState,
-      checked_out_at: new Date().toISOString(),
-      checked_out_by: staffId,
+      metadata: {
+        ...(booking.metadata as Record<string, any> || {}),
+        checked_out_at: new Date().toISOString(),
+        checked_out_by: staffId
+      },
       updated_at: new Date().toISOString(),
     })
     .eq('id', bookingId)
@@ -763,9 +790,10 @@ export async function checkAvailability(
   const supabase = getSupabase();
 
   const { data: bookings, error } = await supabase
-    .from('chalet_bookings')
-    .select('id, check_in_date, check_out_date, status')
-    .eq('chalet_id', chaletId)
+    .from('transactions')
+    .select('id, metadata, status')
+    .eq('engine_type', 'time_exclusive_reservation')
+    .filter('metadata->>chalet_id', 'eq', chaletId)
     .not('status', 'in', '("cancelled","no_show")');
 
   if (error) {
@@ -776,9 +804,9 @@ export async function checkAvailability(
   const checkIn = dayjs(checkInDate);
   const checkOut = dayjs(checkOutDate);
 
-  const hasOverlap = (bookings || []).some((booking: { check_in_date: string; check_out_date: string }) => {
-    const bIn = dayjs(booking.check_in_date);
-    const bOut = dayjs(booking.check_out_date);
+  const hasOverlap = (bookings || []).some((booking: any) => {
+    const bIn = dayjs(booking.metadata?.check_in_date);
+    const bOut = dayjs(booking.metadata?.check_out_date);
     return checkIn.isBefore(bOut) && checkOut.isAfter(bIn);
   });
 
@@ -796,11 +824,12 @@ export async function getAvailability(
   const supabase = getSupabase();
 
   const { data: bookings, error } = await supabase
-    .from('chalet_bookings')
-    .select('check_in_date, check_out_date, status')
-    .eq('chalet_id', chaletId)
-    .gte('check_out_date', startDate)
-    .lte('check_in_date', endDate)
+    .from('transactions')
+    .select('metadata, status')
+    .eq('engine_type', 'time_exclusive_reservation')
+    .filter('metadata->>chalet_id', 'eq', chaletId)
+    .filter('metadata->>check_out_date', 'gte', startDate)
+    .filter('metadata->>check_in_date', 'lte', endDate)
     .not('status', 'in', '("cancelled","no_show")');
 
   if (error) {
@@ -813,8 +842,8 @@ export async function getAvailability(
   for (const booking of bookings || []) {
     if (['cancelled', 'no_show'].includes(booking.status)) continue;
 
-    let current = dayjs(booking.check_in_date);
-    const checkout = dayjs(booking.check_out_date);
+    let current = dayjs(booking.metadata?.check_in_date);
+    const checkout = dayjs(booking.metadata?.check_out_date);
 
     while (current.isBefore(checkout)) {
       blockedDates.push(current.format('YYYY-MM-DD'));

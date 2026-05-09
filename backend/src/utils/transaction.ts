@@ -129,10 +129,18 @@ export async function createOrderTransactional(
   orderData: Record<string, unknown>,
   orderItems: Array<Record<string, unknown>>
 ): Promise<{ order: Record<string, unknown>; items: Record<string, unknown>[] }> {
-  // Insert order
+  // Insert order into unified transactions
+  const finalOrderData = {
+    ...orderData,
+    metadata: {
+      ...(orderData.metadata as Record<string, unknown> || {}),
+      items: orderItems
+    }
+  };
+
   const { data: order, error: orderError } = await ctx.supabase
-    .from('restaurant_orders')
-    .insert(orderData)
+    .from('transactions')
+    .insert(finalOrderData)
     .select()
     .single();
 
@@ -143,40 +151,11 @@ export async function createOrderTransactional(
   // Register rollback handler
   ctx.rollbackHandlers.push(async () => {
     await ctx.supabase
-      .from('restaurant_orders')
+      .from('transactions')
       .delete()
       .eq('id', order.id);
     logger.info(`Rolled back order ${order.id}`);
   });
 
-  // Insert order items
-  let items: Record<string, unknown>[] = [];
-  if (orderItems.length > 0) {
-    const itemsData = orderItems.map(item => ({
-      ...item,
-      order_id: order.id,
-    }));
-
-    const { data: itemsResult, error: itemsError } = await ctx.supabase
-      .from('restaurant_order_items')
-      .insert(itemsData)
-      .select();
-
-    if (itemsError) {
-      throw new Error(`Failed to create order items: ${itemsError.message}`);
-    }
-
-    items = itemsResult || [];
-
-    // Register rollback handler for items
-    ctx.rollbackHandlers.push(async () => {
-      await ctx.supabase
-        .from('restaurant_order_items')
-        .delete()
-        .eq('order_id', order.id);
-      logger.info(`Rolled back items for order ${order.id}`);
-    });
-  }
-
-  return { order: order as Record<string, unknown>, items };
+  return { order: order as Record<string, unknown>, items: orderItems };
 }

@@ -407,53 +407,27 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
         }
       };
 
-      // Get menu item IDs for this module to delete orders referencing them
-      const { data: menuItems } = await supabase
-        .from('menu_items')
-        .select('id')
-        .eq('module_id', id);
-      
-      const menuItemIds = menuItems?.map(item => item.id) || [];
-      
-      // Delete order_items that reference menu items from this module
-      if (menuItemIds.length > 0) {
-        try {
-          const { data: orderItems } = await supabase
-            .from('order_items')
-            .select('order_id')
-            .in('menu_item_id', menuItemIds);
-          
-          const orderIds = [...new Set(orderItems?.map(oi => oi.order_id) || [])];
-          
-          if (orderIds.length > 0) {
-            // Delete order items first
-            const { error: oiError } = await supabase
-              .from('order_items')
-              .delete()
-              .in('menu_item_id', menuItemIds);
-            
-            if (oiError) {
-              errors.push(`order_items: ${oiError.message}`);
-            } else {
-              deletedCounts['order_items'] = orderIds.length;
-            }
-            
-            // Then delete orders that have no remaining items
-            // (checking each order)
-            for (const orderId of orderIds) {
-              const { count } = await supabase
-                .from('order_items')
-                .select('id', { count: 'exact', head: true })
-                .eq('order_id', orderId);
-              
-              if (count === 0) {
-                await supabase.from('restaurant_orders').delete().eq('id', orderId);
-              }
-            }
+      // Delete all transactions associated with this module
+      try {
+        const { count } = await supabase
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('module_id', id);
+
+        if (count && count > 0) {
+          const { error: delError } = await supabase
+            .from('transactions')
+            .delete()
+            .eq('module_id', id);
+
+          if (delError) {
+            errors.push(`transactions: ${delError.message}`);
+          } else {
+            deletedCounts['transactions'] = count;
           }
-        } catch (e: any) {
-          errors.push(`order cascade: ${e.message}`);
         }
+      } catch (e: any) {
+        errors.push(`transaction cascade: ${e.message}`);
       }
 
       // CASCADE DELETE: Delete all dependent data in correct order
@@ -462,10 +436,8 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
         'menu_items',
         'menu_categories',
         'snack_items',
-        'pool_tickets',
         'pool_sessions',
-        'chalets',
-        'chalet_bookings',
+        'accommodation_units',
         'reviews',
         'pages',
       ];

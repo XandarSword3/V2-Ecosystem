@@ -154,26 +154,13 @@ export class CouponController {
 
       // Check first order only
       if (c.first_order_only && userId) {
-        // Check restaurant orders
-        const { count: restaurantCount } = await supabase
-          .from('restaurant_orders')
+        // Check all transactions for this user
+        const { count: totalOrders } = await supabase
+          .from('transactions')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId);
+          .eq('customer_id', userId);
 
-        // Check chalet bookings
-        const { count: chaletCount } = await supabase
-          .from('chalet_bookings')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId);
-
-        // Check pool passes
-        const { count: poolCount } = await supabase
-          .from('pool_passes')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId);
-
-        const totalOrders = (restaurantCount || 0) + (chaletCount || 0) + (poolCount || 0);
-        if (totalOrders > 0) {
+        if (totalOrders && totalOrders > 0) {
           return res.json({
             success: false,
             error: 'This coupon is only valid for first orders',
@@ -258,28 +245,18 @@ export class CouponController {
       const discountAmount = parseFloat(row.discount_amount) || 0;
 
       // Also update the order with coupon discount (Bug #7 fix)
-      let ordersTable = 'restaurant_orders';
-      if (orderType === 'snack') {
-        ordersTable = 'snack_orders';
-      } else if (orderType === 'chalets') {
-        ordersTable = 'chalet_bookings';
-      } else if (orderType === 'pool') {
-        ordersTable = 'pool_tickets';
-      }
+      const ordersTable = 'transactions';
 
       if (orderType === 'restaurant' || orderType === 'snack') {
         const { data: currentOrder } = await supabase
           .from(ordersTable)
-          .select('subtotal, tax_amount, service_charge, delivery_fee, discount_amount')
+          .select('amount')
           .eq('id', orderId)
           .single();
 
         if (currentOrder) {
           const newTotalAmount =
-            parseFloat(currentOrder.subtotal || 0) +
-            parseFloat(currentOrder.tax_amount || 0) +
-            parseFloat(currentOrder.service_charge || 0) +
-            parseFloat(currentOrder.delivery_fee || 0) -
+            parseFloat(currentOrder.amount || 0) -
             discountAmount;
 
           const { error: orderUpdateError } = await supabase

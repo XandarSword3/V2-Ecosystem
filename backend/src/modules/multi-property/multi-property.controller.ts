@@ -147,20 +147,32 @@ export async function switchProperty(req: Request, res: Response): Promise<void>
 export async function grantPropertyAccess(req: Request, res: Response): Promise<void> {
   try {
     const grantedBy = req.user?.id;
-    const { user_id, property_id, access_level, is_primary, expires_at } = req.body;
+    const { email, user_id, property_id, access_level, is_primary, expires_at } = req.body;
 
     if (!grantedBy) {
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
 
-    if (!user_id || !property_id || !access_level) {
-      res.status(400).json({ error: 'user_id, property_id, and access_level are required' });
+    let targetUserId = user_id;
+
+    // If email is provided instead of user_id, find the user
+    if (email && !targetUserId) {
+      const { data: user, error: userError } = await multiPropertyService.getUserByEmail(email);
+      if (userError || !user) {
+        res.status(404).json({ error: 'User with this email not found' });
+        return;
+      }
+      targetUserId = user.id;
+    }
+
+    if (!targetUserId || !property_id || !access_level) {
+      res.status(400).json({ error: 'user_id (or email), property_id, and access_level are required' });
       return;
     }
 
     const access = await multiPropertyService.grantPropertyAccess(
-      user_id,
+      targetUserId,
       property_id,
       access_level,
       grantedBy,
@@ -179,14 +191,14 @@ export async function grantPropertyAccess(req: Request, res: Response): Promise<
 
 export async function revokePropertyAccess(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, property_id } = req.body;
+    const { userId, propertyId } = req.params;
 
-    if (!user_id || !property_id) {
-      res.status(400).json({ error: 'user_id and property_id are required' });
+    if (!userId || !propertyId) {
+      res.status(400).json({ error: 'userId and propertyId are required' });
       return;
     }
 
-    await multiPropertyService.revokePropertyAccess(user_id, property_id);
+    await multiPropertyService.revokePropertyAccess(userId, propertyId);
 
     res.json({
       success: true,
@@ -194,6 +206,40 @@ export async function revokePropertyAccess(req: Request, res: Response): Promise
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to revoke access';
+    res.status(400).json({ error: message });
+  }
+}
+
+export async function getPropertyStaff(req: Request, res: Response): Promise<void> {
+  try {
+    const { propertyId } = req.params;
+
+    const staff = await multiPropertyService.getPropertyStaff(propertyId);
+
+    res.json({
+      success: true,
+      staff
+    });
+  } catch (error) {
+    console.error('Error in getPropertyStaff:', error);
+    const message = error instanceof Error ? error.message : 'Failed to get property staff';
+    res.status(500).json({ error: message });
+  }
+}
+
+export async function updateProperty(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    const property = await multiPropertyService.updatePropertyDetails(id, updates);
+
+    res.json({
+      success: true,
+      property
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update property';
     res.status(400).json({ error: message });
   }
 }

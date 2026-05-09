@@ -130,8 +130,9 @@ router.get(
       
       const supabase = getSupabase();
       const { data: booking, error: bookingError } = await supabase
-        .from('chalet_bookings')
-        .select('check_in_date, total_price')
+        .from('transactions')
+        .select('metadata, amount')
+        .eq('engine_type', 'time_exclusive_reservation')
         .eq('id', id)
         .maybeSingle();
 
@@ -144,9 +145,10 @@ router.get(
         });
       }
 
-      const policy = getCancellationPolicy(new Date(booking.check_in_date || new Date()));
+      const checkInDate = (booking.metadata as any)?.check_in_date;
+      const policy = getCancellationPolicy(checkInDate ? new Date(checkInDate) : new Date());
       const refundAmount = Math.round(
-        (Number(booking.total_price) * policy.refundPercentage) / 100
+        (Number(booking.amount) * policy.refundPercentage) / 100
       );
 
       res.json({

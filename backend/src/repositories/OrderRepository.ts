@@ -47,14 +47,12 @@ export interface RestaurantOrderItem {
 
 export class OrderRepository extends BaseRepository<RestaurantOrder> {
   constructor() {
-    super('restaurant_orders');
+    super('transactions');
+    this.baseFilters = { engine_type: 'instant_transaction' };
   }
 
   async findByOrderNumber(orderNumber: string): Promise<RestaurantOrder | null> {
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from(this.tableName)
-      .select('*')
+    const { data, error } = await this.getQuery()
       .eq('order_number', orderNumber)
       .single();
 
@@ -63,62 +61,29 @@ export class OrderRepository extends BaseRepository<RestaurantOrder> {
   }
 
   async findByCustomerId(customerId: string, options?: FindManyOptions): Promise<RestaurantOrder[]> {
-    const supabase = getSupabase();
-    let query = supabase
-      .from(this.tableName)
-      .select('*')
-      .eq('customer_id', customerId);
-
-    if (options?.limit) query = query.limit(options.limit);
-    if (options?.orderBy) {
-      const [field, direction] = options.orderBy.split(' ');
-      query = query.order(field, { ascending: direction === 'asc' });
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return (data || []) as RestaurantOrder[];
+    return this.findMany(
+      { customer_id: customerId },
+      { orderBy: 'created_at', ascending: false, ...options },
+    );
   }
 
   async findByTableId(tableId: string, options?: FindManyOptions): Promise<RestaurantOrder[]> {
-    const supabase = getSupabase();
-    let query = supabase
-      .from(this.tableName)
-      .select('*')
-      .eq('table_id', tableId);
+    const { data, error } = await this.getQuery()
+      .contains('metadata', { table_id: tableId });
 
-    if (options?.limit) query = query.limit(options.limit);
-    if (options?.orderBy) {
-      const [field, direction] = options.orderBy.split(' ');
-      query = query.order(field, { ascending: direction === 'asc' });
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
     return (data || []) as RestaurantOrder[];
   }
 
   async findByStatus(status: string, options?: FindManyOptions): Promise<RestaurantOrder[]> {
-    const supabase = getSupabase();
-    let query = supabase
-      .from(this.tableName)
-      .select('*')
-      .eq('status', status);
-
-    if (options?.limit) query = query.limit(options.limit);
-    if (options?.orderBy) {
-      const [field, direction] = options.orderBy.split(' ');
-      query = query.order(field, { ascending: direction === 'asc' });
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return (data || []) as RestaurantOrder[];
+    return this.findMany(
+      { status },
+      { orderBy: 'created_at', ascending: true, ...options },
+    );
   }
 
   async updateStatus(id: string, status: string): Promise<RestaurantOrder> {
-    const supabase = getSupabase();
-    const { data, error } = await supabase
+    const { data, error } = await this.getClient()
       .from(this.tableName)
       .update({ 
         status,
@@ -133,8 +98,7 @@ export class OrderRepository extends BaseRepository<RestaurantOrder> {
   }
 
   async updatePaymentStatus(id: string, paymentStatus: string): Promise<RestaurantOrder> {
-    const supabase = getSupabase();
-    const { data, error } = await supabase
+    const { data, error } = await this.getClient()
       .from(this.tableName)
       .update({ 
         payment_status: paymentStatus,
@@ -150,59 +114,68 @@ export class OrderRepository extends BaseRepository<RestaurantOrder> {
 }
 
 // =============================================
-// ORDER ITEM REPOSITORY
+// ORDER ITEM REPOSITORY (Now proxied to transactions metadata)
 // =============================================
 
 export class OrderItemRepository extends BaseRepository<RestaurantOrderItem> {
   constructor() {
-    super('restaurant_order_items');
+    super('transactions');
+    this.baseFilters = { engine_type: 'instant_transaction' };
   }
 
   async findByOrderId(orderId: string): Promise<RestaurantOrderItem[]> {
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from(this.tableName)
-      .select('*')
-      .eq('order_id', orderId)
-      .order('created_at', { ascending: true });
+    const { data, error } = await this.getQuery()
+      .eq('id', orderId)
+      .single();
 
-    if (error) throw error;
-    return (data || []) as RestaurantOrderItem[];
+    if (error || !data) return [];
+    const metadata = (data as any).metadata || {};
+    return (metadata.items || []) as RestaurantOrderItem[];
   }
 
   async findByMenuItemId(menuItemId: string, options?: FindManyOptions): Promise<RestaurantOrderItem[]> {
-    const supabase = getSupabase();
-    let query = supabase
-      .from(this.tableName)
-      .select('*')
-      .eq('menu_item_id', menuItemId);
+    // This is more complex because items are inside metadata JSON array
+    const { data, error } = await this.getQuery()
+      .filter('metadata->items', 'cs', `[{"menu_item_id": "${menuItemId}"}]`);
 
-    if (options?.limit) query = query.limit(options.limit);
-    if (options?.orderBy) {
-      const [field, direction] = options.orderBy.split(' ');
-      query = query.order(field, { ascending: direction === 'asc' });
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
-    return (data || []) as RestaurantOrderItem[];
+    
+    // Flatten the items from all matching orders
+    const allItems: RestaurantOrderItem[] = [];
+    for (const order of (data || [])) {
+      const items = (order as any).metadata?.items || [];
+      allItems.push(...items.filter((i: any) => i.menu_item_id === menuItemId));
+    }
+    return allItems;
   }
 
   async createOrderItem(item: Omit<RestaurantOrderItem, 'id' | 'created_at'>): Promise<RestaurantOrderItem> {
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from(this.tableName)
-      .insert({
-        ...item,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+    // This should usually be handled during order creation, but if called separately:
+    const orderId = (item as any).order_id;
+    const { data: order } = await this.getClient().from('transactions').select('metadata').eq('id', orderId).single();
+    
+    const newItem = {
+      ...item,
+      id: uuidv4(),
+      created_at: new Date().toISOString()
+    };
 
-    if (error || !data) throw error || new Error('Failed to create order item');
-    return data as RestaurantOrderItem;
+    const newMetadata = {
+      ...((order as any)?.metadata || {}),
+      items: [...((order as any)?.metadata?.items || []), newItem]
+    };
+
+    await this.getClient()
+      .from('transactions')
+      .update({ metadata: newMetadata })
+      .eq('id', orderId);
+
+    return newItem as RestaurantOrderItem;
   }
 }
+
+// Helper for uuid
+import { v4 as uuidv4 } from 'uuid';
 
 // =============================================
 // RESTAURANT ORDER REPOSITORY (Specialized)
@@ -213,9 +186,7 @@ export class RestaurantOrderRepository extends OrderRepository {
     const order = await this.findById(orderId);
     if (!order) return null;
 
-    const orderItemRepo = new OrderItemRepository();
-    const items = await orderItemRepo.findByOrderId(orderId);
-
+    const items = (order as any).metadata?.items || [];
     return { ...order, items };
   }
 
@@ -236,30 +207,32 @@ export class RestaurantOrderRepository extends OrderRepository {
   }
 
   async createOrder(order: Omit<RestaurantOrder, 'id' | 'created_at'>, items?: Omit<RestaurantOrderItem, 'id' | 'created_at' | 'order_id'>[]): Promise<RestaurantOrder> {
-    const supabase = getSupabase();
-    
-    // Create the order first
-    const { data: orderData, error: orderError } = await supabase
+    const orderId = uuidv4();
+    const processedItems = (items || []).map(item => ({
+      ...item,
+      id: uuidv4(),
+      order_id: orderId,
+      created_at: new Date().toISOString()
+    }));
+
+    const { data: orderData, error: orderError } = await this.getClient()
       .from(this.tableName)
       .insert({
         ...order,
+        id: orderId,
+        engine_type: 'instant_transaction',
+        metadata: {
+          ...((order as any).metadata || {}),
+          items: processedItems,
+          table_id: (order as any).table_id,
+          order_type: (order as any).order_type
+        },
         created_at: new Date().toISOString()
       })
       .select()
       .single();
 
     if (orderError || !orderData) throw orderError || new Error('Failed to create order');
-
-    // Create items if provided
-    if (items && items.length > 0) {
-      const orderItemRepo = new OrderItemRepository();
-      for (const item of items) {
-        await orderItemRepo.createOrderItem({
-          ...item,
-          order_id: orderData.id
-        });
-      }
-    }
 
     return orderData as RestaurantOrder;
   }
