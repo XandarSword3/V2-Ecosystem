@@ -34,23 +34,23 @@ export async function awardLoyaltyPointsForPayment(
 
     const pointsPerDollar = settings.points_per_dollar || 1;
 
-    // Find the user ID from the unified transactions table
-    let userId: string | null = null;
-
+    // Find all necessary details from the unified transactions table
     const { data: tx } = await supabase
       .from('transactions')
-      .select('customer_id')
+      .select('customer_id, amount, engine_type, module_id, property_id')
       .eq('id', referenceId)
       .single();
-    userId = tx?.customer_id || null;
+
+    const userId = tx?.customer_id || null;
+    const transactionAmount = tx?.amount ? Number(tx.amount) : amountDollars;
 
     if (!userId) {
       logger.info(`No user found for ${referenceType}:${referenceId}, skipping loyalty points`);
       return;
     }
 
-    // Calculate base points
-    const basePoints = Math.floor(amountDollars * pointsPerDollar);
+    // Calculate base points using transaction amount to ensure accuracy across engine types
+    const basePoints = Math.floor(transactionAmount * pointsPerDollar);
     if (basePoints <= 0) {
       logger.info('Payment amount too small for points, skipping');
       return;
@@ -62,7 +62,7 @@ export async function awardLoyaltyPointsForPayment(
       'earn_loyalty_points_atomic',
       {
         p_user_id: userId,
-        p_order_total: amountDollars,
+        p_order_total: transactionAmount,
         p_order_id: referenceId,
         p_points_per_dollar: pointsPerDollar,
       }
