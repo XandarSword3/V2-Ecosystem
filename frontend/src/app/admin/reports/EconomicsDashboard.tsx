@@ -19,7 +19,7 @@ interface DateRange {
   label: string;
 }
 
-export default function EconomicsPage() {
+export default function EconomicsDashboard() {
   const t = useTranslations('admin.economics');
   const tCommon = useTranslations('common');
 
