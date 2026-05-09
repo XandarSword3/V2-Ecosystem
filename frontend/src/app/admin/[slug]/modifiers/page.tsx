@@ -103,10 +103,35 @@ export default function DynamicModifiersPage() {
     if (!currentModule) return;
     try {
       setLoading(true);
-      const groupsRes = await api.get('/restaurant/modifiers', { 
+      // Use unified customization API with module filter
+      const groupsRes = await api.get('/customization/groups', { 
         params: { moduleId: currentModule.id } 
       });
-      setGroups(groupsRes.data.data || []);
+      // Transform customization groups to modifier format
+      const customizationGroups = groupsRes.data.data || [];
+      const modifierGroups: ModifierGroup[] = customizationGroups.map((g: any) => ({
+        id: g.id,
+        name: g.name,
+        name_ar: g.name_localized?.ar,
+        description: g.description,
+        min_selections: g.min_selections || 0,
+        max_selections: g.max_selections || 1,
+        is_required: g.is_required || false,
+        allow_multiple_same: g.allow_multiple_same || false,
+        options: (g.options || []).map((o: any) => ({
+          id: o.id,
+          name: o.name,
+          name_ar: o.name_localized?.ar,
+          price_adjustment: o.price_adjustment || 0,
+          is_available: o.is_available !== false,
+          display_order: o.display_order || 0,
+          modifier_type: o.modifier_type || 'add',
+          max_quantity: o.max_quantity,
+          is_default: o.is_default,
+        })),
+        module_id: g.module_id,
+      }));
+      setGroups(modifierGroups);
     } catch (error) {
       toast.error('Failed to fetch modifier data');
       console.error(error);
@@ -173,11 +198,15 @@ export default function DynamicModifiersPage() {
         moduleId: currentModule?.id,
       };
 
+      const customizationPayload = {
+        ...payload,
+        name_localized: payload.nameAr ? { ar: payload.nameAr } : undefined,
+      };
       if (editingGroup) {
-        await api.put(`/restaurant/modifiers/${editingGroup.id}`, payload);
+        await api.put(`/customization/groups/${editingGroup.id}`, customizationPayload);
         toast.success('Modifier group updated');
       } else {
-        await api.post('/restaurant/modifiers', payload);
+        await api.post('/customization/groups', customizationPayload);
         toast.success('Modifier group created');
       }
       setShowGroupModal(false);
@@ -192,7 +221,7 @@ export default function DynamicModifiersPage() {
   const deleteGroup = async (groupId: string) => {
     if (!confirm('Delete this modifier group and all its options?')) return;
     try {
-      await api.delete(`/restaurant/modifiers/${groupId}`);
+      await api.delete(`/customization/groups/${groupId}`);
       toast.success('Modifier group deleted');
       fetchData();
     } catch (error) {
@@ -246,11 +275,16 @@ export default function DynamicModifiersPage() {
         isAvailable: optionForm.isAvailable,
       };
 
+      const optionPayload = {
+        ...payload,
+        name_localized: payload.nameAr ? { ar: payload.nameAr } : undefined,
+        group_id: selectedGroupId,
+      };
       if (editingOption) {
-        await api.put(`/restaurant/modifiers/options/${editingOption.id}`, payload);
+        await api.put(`/customization/options/${editingOption.id}`, optionPayload);
         toast.success('Modifier option updated');
       } else {
-        await api.post(`/restaurant/modifiers/${selectedGroupId}/options`, payload);
+        await api.post('/customization/options', optionPayload);
         toast.success('Modifier option created');
       }
       setShowOptionModal(false);
@@ -265,7 +299,7 @@ export default function DynamicModifiersPage() {
   const deleteOption = async (optionId: string) => {
     if (!confirm('Delete this modifier option?')) return;
     try {
-      await api.delete(`/restaurant/modifiers/options/${optionId}`);
+      await api.delete(`/customization/options/${optionId}`);
       toast.success('Modifier option deleted');
       fetchData();
     } catch (error) {
