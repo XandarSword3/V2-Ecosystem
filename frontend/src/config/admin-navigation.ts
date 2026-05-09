@@ -118,11 +118,6 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
           icon: LayoutDashboard,
           translationKey: 'nav.dashboard'
         },
-        { 
-          name: 'Economics', 
-          href: '/admin/economics', 
-          icon: TrendingUp,
-        },
       ],
       collapsible: false,
       defaultExpanded: true,
@@ -257,6 +252,7 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
           icon: BarChart3,
           translationKey: 'nav.reports',
           children: [
+            { name: 'Economics', href: '/admin/economics', translationKey: 'nav.economics' },
             { name: 'Executive Cockpit', href: '/admin/cockpit', translationKey: 'nav.executiveCockpit' },
             { name: 'Financial Reports', href: '/admin/financial-reports', translationKey: 'nav.financialReports' },
             { name: 'Alert Management', href: '/admin/alerts', translationKey: 'nav.alertManagement' },
