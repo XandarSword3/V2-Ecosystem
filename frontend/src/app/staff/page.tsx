@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
 import { useSiteSettings } from '@/lib/settings-context';
+import { useProperty } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
 import { useSocket } from '@/lib/socket';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -56,53 +57,70 @@ export default function StaffDashboard() {
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
-  interface OrderRecord {
+  interface TransactionRecord {
     id: string;
-    order_number?: string;
+    engine_type: 'instant_transaction' | 'shared_capacity_access' | 'time_exclusive_reservation' | 'ongoing_entitlement';
     status: string;
+    amount: number;
+    metadata: {
+      order_number?: string;
+      ticket_number?: string;
+      booking_number?: string;
+      customer_name?: string;
+    };
     updated_at?: string;
     created_at?: string;
   }
 
+  const { activeProperty } = useProperty();
+
   const fetchDashboardData = useCallback(async () => {
+    if (!activeProperty?.id) return;
+    
     try {
-      // Fetch orders for stats
-      const [restaurantRes, snackRes] = await Promise.all([
-        api.get('/restaurant/staff/orders/live').catch(() => ({ data: { data: [] } })),
-        api.get('/snack/staff/orders/live').catch(() => ({ data: { data: [] } })),
-      ]);
+      // Fetch live transactions from unified endpoint
+      const response = await api.get('/transactions/live', {
+        params: {
+          propertyId: activeProperty.id,
+          statuses: 'pending,confirmed,preparing,active,ready',
+        }
+      });
 
-      const allOrders: OrderRecord[] = [
-        ...(restaurantRes.data.data || []),
-        ...(snackRes.data.data || []),
-      ];
+      const allTransactions: TransactionRecord[] = response.data?.data || [];
 
-      const pending = allOrders.filter((o: OrderRecord) => 
-        ['pending', 'confirmed', 'preparing'].includes(o.status)
+      // Count by transaction status
+      const pending = allTransactions.filter((t: TransactionRecord) => 
+        ['pending', 'confirmed', 'preparing', 'active'].includes(t.status)
       ).length;
 
-      const completed = allOrders.filter((o: OrderRecord) => 
-        o.status === 'completed' && 
-        new Date(o.updated_at || '').toDateString() === new Date().toDateString()
+      const completed = allTransactions.filter((t: TransactionRecord) => 
+        ['completed', 'used', 'checked_out'].includes(t.status) && 
+        new Date(t.updated_at || '').toDateString() === new Date().toDateString()
       ).length;
 
       setStats({
         pendingOrders: pending,
         completedToday: completed,
-        issues: allOrders.filter((o: OrderRecord) => o.status === 'cancelled').length,
-        // FIX Iter-11: removed fake Math.random() metric — show dash until real data is available
+        issues: allTransactions.filter((t: TransactionRecord) => t.status === 'cancelled').length,
         avgResponseTime: '-',
       });
 
-      // Generate recent activity from orders
-      const activities: RecentActivity[] = allOrders
+      // Generate recent activity from transactions
+      const activities: RecentActivity[] = allTransactions
         .slice(0, 5)
-        .map((order: OrderRecord, index: number) => ({
-          id: order.id,
-          action: `Order #${order.order_number || order.id.slice(0, 8)} - ${order.status}`,
-          time: getRelativeTime(order.updated_at || order.created_at || ''),
-          type: order.status === 'completed' ? 'success' : order.status === 'cancelled' ? 'warning' : 'info',
-        }));
+        .map((tx: TransactionRecord, index: number) => {
+          const referenceNumber = tx.metadata.order_number || tx.metadata.ticket_number || tx.metadata.booking_number || tx.id.slice(0, 8);
+          const engineLabel = tx.engine_type === 'instant_transaction' ? 'Order' : 
+                             tx.engine_type === 'shared_capacity_access' ? 'Ticket' : 
+                             tx.engine_type === 'time_exclusive_reservation' ? 'Booking' : 'Membership';
+          return {
+            id: tx.id,
+            action: `${engineLabel} #${referenceNumber} - ${tx.status}`,
+            time: getRelativeTime(tx.updated_at || tx.created_at || ''),
+            type: ['completed', 'used', 'checked_out'].includes(tx.status) ? 'success' : 
+                  tx.status === 'cancelled' ? 'warning' : 'info',
+          };
+        });
 
       setRecentActivity(activities);
     } catch (error) {
@@ -110,7 +128,7 @@ export default function StaffDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeProperty?.id]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -126,45 +144,55 @@ export default function StaffDashboard() {
   // Real-time updates via WebSocket
   useEffect(() => {
     if (socket) {
-      socket.on('order:new', (order: OrderRecord) => {
+      // Listen for new transactions
+      socket.on('transaction:new', (tx: TransactionRecord) => {
+        // Only count if for this property
         setStats((prev) => ({
           ...prev,
           pendingOrders: prev.pendingOrders + 1,
         }));
+        const referenceNumber = tx.metadata.order_number || tx.metadata.ticket_number || tx.metadata.booking_number || tx.id.slice(0, 8);
+        const engineLabel = tx.engine_type === 'instant_transaction' ? 'Order' : 
+                           tx.engine_type === 'shared_capacity_access' ? 'Ticket' : 
+                           tx.engine_type === 'time_exclusive_reservation' ? 'Booking' : 'Membership';
         setRecentActivity((prev) => [
           {
-            id: order.id,
-            action: `New order #${order.order_number || order.id.slice(0, 8)} received`,
+            id: tx.id,
+            action: `New ${engineLabel.toLowerCase()} #${referenceNumber} received`,
             time: td('justNow'),
             type: 'info',
           },
           ...prev.slice(0, 4),
         ]);
-        toast.info(td('newOrderReceived'));
+        toast.info(td('newTransactionReceived'));
       });
 
-      socket.on('order:statusChanged', ({ orderId, status }: { orderId: string; status: string }) => {
-        if (status === 'completed') {
+      // Listen for transaction status changes
+      socket.on('transaction:statusChanged', ({ transactionId, status, engine_type }: { transactionId: string; status: string; engine_type: string }) => {
+        if (['completed', 'used', 'checked_out'].includes(status)) {
           setStats((prev) => ({
             ...prev,
             pendingOrders: Math.max(0, prev.pendingOrders - 1),
             completedToday: prev.completedToday + 1,
           }));
         }
+        const engineLabel = engine_type === 'instant_transaction' ? 'Order' : 
+                           engine_type === 'shared_capacity_access' ? 'Ticket' : 
+                           engine_type === 'time_exclusive_reservation' ? 'Booking' : 'Membership';
         setRecentActivity((prev) => [
           {
-            id: orderId,
-            action: `Order #${orderId.slice(0, 8)} ${status}`,
+            id: transactionId,
+            action: `${engineLabel} #${transactionId.slice(0, 8)} ${status}`,
             time: td('justNow'),
-            type: status === 'completed' ? 'success' : 'info',
+            type: ['completed', 'used', 'checked_out'].includes(status) ? 'success' : 'info',
           },
           ...prev.slice(0, 4),
         ]);
       });
 
       return () => {
-        socket.off('order:new');
-        socket.off('order:statusChanged');
+        socket.off('transaction:new');
+        socket.off('transaction:statusChanged');
       };
     }
   }, [socket]);

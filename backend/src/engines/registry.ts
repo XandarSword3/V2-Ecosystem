@@ -13,6 +13,7 @@
 import type { EngineType, EngineDefinition } from './types.js';
 import { TEMPLATE_TO_ENGINE } from './types.js';
 import { StateMachine } from './state-machine.js';
+import { deductInventorySideEffect, restoreInventorySideEffect } from './inventory-side-effects.js';
 
 // Import all engine definitions
 import { instantTransactionEngine } from './definitions/instant-transaction.js';
@@ -66,15 +67,28 @@ export function getEngineByTemplate(templateType: string): EngineDefinition {
  */
 export function createStateMachine(engineType: EngineType): StateMachine {
   const engine = getEngine(engineType);
-  return new StateMachine(engine.stateMachine);
+  const sm = new StateMachine(engine.stateMachine);
+  
+  // Register engine-specific side effects
+  if (engineType === 'instant_transaction') {
+    // Deduct inventory when order is confirmed (preparation starts)
+    sm.addSideEffect('confirm', deductInventorySideEffect);
+    // Restore inventory if order is cancelled
+    sm.addSideEffect('cancel', restoreInventorySideEffect);
+  }
+  
+  return sm;
 }
 
 /**
  * Create a StateMachine from a database template_type.
  */
 export function createStateMachineByTemplate(templateType: string): StateMachine {
-  const engine = getEngineByTemplate(templateType);
-  return new StateMachine(engine.stateMachine);
+  const engineType = resolveEngineType(templateType);
+  if (!engineType) {
+    throw new Error(`Unknown template type: '${templateType}'`);
+  }
+  return createStateMachine(engineType);
 }
 
 /**

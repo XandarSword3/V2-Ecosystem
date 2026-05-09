@@ -26,17 +26,23 @@ import {
 interface ValidationResult {
   success: boolean;
   message: string;
-  type?: 'pool_ticket' | 'chalet_booking' | 'restaurant_order' | 'membership';
-  entity?: {
+  transaction?: {
     id: string;
-    ticket_number?: string;
-    ticket_type?: string;
-    status?: string;
-    valid_date?: string;
-    booking_number?: string;
-    order_number?: string;
-    membership_number?: string;
-    users?: {
+    engine_type: 'instant_transaction' | 'shared_capacity_access' | 'time_exclusive_reservation' | 'ongoing_entitlement';
+    status: string;
+    amount: number;
+    metadata: {
+      qr_code?: string;
+      order_number?: string;
+      ticket_number?: string;
+      booking_number?: string;
+      membership_number?: string;
+      session_id?: string;
+      adults?: number;
+      children?: number;
+      customer_name?: string;
+    };
+    customer?: {
       full_name: string;
       email: string;
     };
@@ -75,8 +81,7 @@ export default function StaffScannerPage() {
       const result: ValidationResult = {
         success: !!response.data.valid,
         message: response.data.message || t('ticketValidated'),
-        type: response.data.type,
-        entity: response.data.entity,
+        transaction: response.data.transaction || response.data.entity, // Support both new and legacy response
       };
       setLastResult(result);
       setScanHistory((prev) => [
@@ -103,29 +108,50 @@ export default function StaffScannerPage() {
     }
   };
 
-  const handleEntry = async () => {
-    if (lastResult?.type !== 'pool_ticket' || !lastResult.entity?.id) return;
+  const handleTransition = async (event: 'scan_entry' | 'scan_exit' | 'scan_validate') => {
+    if (!lastResult?.transaction?.id) return;
 
     try {
-      await api.post(`/pool/tickets/${lastResult.entity.id}/entry`);
-      toast.success(t('entryRecorded')); // IMPROVE Iter-9: i18n
+      await api.post('/engines/transition', {
+        transactionId: lastResult.transaction.id,
+        event,
+        context: {
+          scannedBy: 'staff', // Will be replaced with actual staff ID from auth context
+          timestamp: new Date().toISOString(),
+        },
+      });
+      toast.success(event === 'scan_entry' ? t('entryRecorded') : t('exitRecorded'));
       setLastResult(null);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || t('failedRecordEntry')); // IMPROVE Iter-9: i18n
+      toast.error(axiosError.response?.data?.message || t('failedRecordTransition'));
     }
   };
 
-  const handleExit = async () => {
-    if (lastResult?.type !== 'pool_ticket' || !lastResult.entity?.id) return;
+  const canTransition = (tx: ValidationResult['transaction']) => {
+    if (!tx) return false;
+    // shared_capacity_access: confirmed → active (entry), active → used (exit)
+    // time_exclusive_reservation: confirmed → checked_in
+    const transitionableStatuses = ['confirmed', 'active', 'ready'];
+    return transitionableStatuses.includes(tx.status);
+  };
 
-    try {
-      await api.post(`/pool/tickets/${lastResult.entity.id}/exit`);
-      toast.success(t('exitRecorded')); // IMPROVE Iter-9: i18n
-      setLastResult(null);
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || t('failedRecordExit')); // IMPROVE Iter-9: i18n
+  const getTransitionActions = (tx: ValidationResult['transaction']) => {
+    if (!tx) return [];
+    
+    switch (tx.engine_type) {
+      case 'shared_capacity_access':
+        if (tx.status === 'confirmed') return [{ event: 'scan_entry' as const, label: t('recordEntry') }];
+        if (tx.status === 'active') return [{ event: 'scan_exit' as const, label: t('recordExit') }];
+        return [];
+      case 'time_exclusive_reservation':
+        if (tx.status === 'confirmed') return [{ event: 'scan_validate' as const, label: t('recordCheckIn') }];
+        return [];
+      case 'instant_transaction':
+        if (tx.status === 'ready') return [{ event: 'scan_validate' as const, label: t('recordServed') }];
+        return [];
+      default:
+        return [];
     }
   };
 
@@ -139,13 +165,6 @@ export default function StaffScannerPage() {
     setLastResult(null);
   };
 
-  // IMPROVE Iter-9: i18n ticket type labels
-  const ticketTypeLabels: Record<string, string> = {
-    adult: t('adult'),
-    child: t('child'),
-    family: t('family'),
-    vip: t('vip'),
-  };
 
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-6">
@@ -233,50 +252,56 @@ export default function StaffScannerPage() {
                       </div>
                     </div>
 
-                    {lastResult.entity && (
+                    {lastResult.transaction && (
                       <>
                         <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                           <div className="flex items-center gap-2">
                             <Ticket className="w-4 h-4 text-slate-500" />
                             <span className="font-mono">
-                              {lastResult.entity.ticket_number
-                                || lastResult.entity.booking_number
-                                || lastResult.entity.order_number
-                                || lastResult.entity.membership_number
-                                || lastResult.entity.id}
+                              {lastResult.transaction.metadata.ticket_number
+                                || lastResult.transaction.metadata.booking_number
+                                || lastResult.transaction.metadata.order_number
+                                || lastResult.transaction.metadata.membership_number
+                                || lastResult.transaction.id.slice(0, 8)}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                              {lastResult.type === 'pool_ticket'
-                                ? (ticketTypeLabels[lastResult.entity.ticket_type || ''] || lastResult.entity.ticket_type)
-                                : lastResult.type}
+                              {lastResult.transaction.engine_type.replace(/_/g, ' ')}
+                            </span>
+                            <span className="px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300">
+                              {lastResult.transaction.status}
                             </span>
                           </div>
-                          {lastResult.entity.users && (
+                          {lastResult.transaction.customer?.full_name && (
                             <div className="flex items-center gap-2 col-span-2">
                               <User className="w-4 h-4 text-slate-500" />
-                              <span>{lastResult.entity.users.full_name}</span>
+                              <span>{lastResult.transaction.customer.full_name}</span>
                             </div>
                           )}
-                          {lastResult.entity.valid_date && (
+                          {lastResult.transaction.metadata.qr_code && (
                             <div className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4 text-slate-500" />
-                              <span>{new Date(lastResult.entity.valid_date).toLocaleDateString()}</span>
+                              <QrCode className="w-4 h-4 text-slate-500" />
+                              <span className="font-mono text-xs">{lastResult.transaction.metadata.qr_code}</span>
                             </div>
                           )}
                         </div>
 
-                        {lastResult.type === 'pool_ticket' && (
+                        {canTransition(lastResult.transaction) && (
                           <div className="flex gap-2">
-                            <Button onClick={handleEntry} className="flex-1">
-                              <LogIn className="w-4 h-4 mr-2" />
-                              {t('recordEntry')}
-                            </Button>
-                            <Button onClick={handleExit} variant="outline" className="flex-1">
-                              <LogOut className="w-4 h-4 mr-2" />
-                              {t('recordExit')}
-                            </Button>
+                            {getTransitionActions(lastResult.transaction).map((action) => (
+                              <Button 
+                                key={action.event}
+                                onClick={() => handleTransition(action.event)} 
+                                className="flex-1"
+                                variant={action.event === 'scan_exit' ? 'outline' : 'default'}
+                              >
+                                {action.event === 'scan_entry' && <LogIn className="w-4 h-4 mr-2" />}
+                                {action.event === 'scan_exit' && <LogOut className="w-4 h-4 mr-2" />}
+                                {action.event === 'scan_validate' && <CheckCircle2 className="w-4 h-4 mr-2" />}
+                                {action.label}
+                              </Button>
+                            ))}
                           </div>
                         )}
                       </>
