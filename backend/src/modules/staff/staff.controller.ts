@@ -902,7 +902,6 @@ export const scanCode = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 
-  const type = parsed.type;
   const id = parsed.id;
 
   // Validate by reference_id (unified approach)
@@ -913,14 +912,24 @@ const { data, error } = await supabase
   .single();
 
 if (error || !data) {
-  return res.status(404).json({ valid: false, type: 'transaction', entity: null, message: 'Transaction not found' });
+  return res.status(404).json({ valid: false, transaction: null, message: 'Transaction not found' });
 }
 
-// Verify engine_type matches expected type
-if (data && !['shared_capacity_access', 'instant_transaction', 'time_exclusive_reservation'].includes(data.engine_type)) {
-  return res.status(400).json({ valid: false, type: 'transaction', entity: null, message: 'Invalid transaction type for pool ticket validation' });
+// Verify engine_type is valid for scanning
+const validEngineTypes = ['shared_capacity_access', 'instant_transaction', 'time_exclusive_reservation', 'ongoing_entitlement'];
+if (data && !validEngineTypes.includes(data.engine_type)) {
+  return res.status(400).json({ 
+    valid: false, 
+    transaction: null, 
+    message: `Transaction type '${data.engine_type}' is not eligible for QR scanning` 
+  });
 }
-return res.json({ valid: true, type, entity: data, message: 'Pool ticket is valid' });
+
+return res.json({ 
+  valid: true, 
+  transaction: data, 
+  message: `Valid ${data.engine_type.replace(/_/g, ' ')} transaction` 
+});
 });
 
 /**

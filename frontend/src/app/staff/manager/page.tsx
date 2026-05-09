@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
+import { useProperty } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -134,18 +135,25 @@ export default function ManagerDashboard() {
     }
   }, [isAuthenticated, isLoading, isManager]);
 
+  const { activeProperty } = useProperty();
+
   const loadDashboardData = useCallback(async (signal?: AbortSignal) => {
+    if (!activeProperty?.id) return;
     setLoading(true);
     try {
       // FIX Iter-14: Pass AbortSignal to all API calls to cancel on unmount
-      // Phase 2: Also fetch dynamic module orders for aggregation
-      const [ordersRes, snackOrdersRes, modulesRes, staffRes, activityRes, weeklyOrdersRes, approvalsRes, todayShiftsRes, managerSummaryRes] = await Promise.all([
-        api.get('/restaurant/staff/orders/live', { signal }).catch(() => ({ data: { data: [] } })),
-        api.get('/snack/staff/orders/live', { signal }).catch(() => ({ data: { data: [] } })),
+      const [transactionsRes, modulesRes, staffRes, activityRes, weeklyOrdersRes, approvalsRes, todayShiftsRes, managerSummaryRes] = await Promise.all([
+        api.get('/transactions/live', { 
+          params: { 
+            propertyId: activeProperty.id,
+            statuses: 'pending,confirmed,preparing,active,ready'
+          },
+          signal 
+        }).catch(() => ({ data: { data: [] } })),
         api.get('/admin/modules', { signal }).catch(() => ({ data: { data: [] } })),
         api.get('/admin/users', { params: { role: 'staff' }, signal }).catch(() => ({ data: { data: [] } })),
-        api.get('/admin/audit-logs', { params: { limit: 50 }, signal }).catch(() => ({ data: { data: [] } })), // FIX: Iteration 12 - Was '/admin/audit/activity_logs' (404)
-        api.get('/admin/dashboard', { signal }).catch(() => ({ data: { data: null } })), // FIX: Iteration 12 - Was '/admin/dashboard/stats' (404)
+        api.get('/admin/audit-logs', { params: { limit: 50 }, signal }).catch(() => ({ data: { data: [] } })),
+        api.get('/admin/dashboard', { signal }).catch(() => ({ data: { data: null } })),
         api.get('/manager/approvals/pending', { signal }).catch(() => ({ data: { data: [] } })),
         api.get('/manager/shifts/today', { signal }).catch(() => ({ data: { data: [], summary: null } })),
         api.get('/manager/summary', { signal }).catch(() => ({ data: { data: [] } })),
@@ -153,43 +161,8 @@ export default function ManagerDashboard() {
       // FIX Iter-14: Bail out if aborted before processing results
       if (signal?.aborted) return;
 
-      // Fetch orders from dynamic menu_service modules (Cafe, Room Service, etc.)
+      const allTransactions = transactionsRes.data?.data || [];
       const allModules = modulesRes.data?.data || [];
-      const dynamicMenuModules = allModules.filter((m: any) => 
-        m.template_type === 'menu_service' && m.is_active && !['restaurant', 'snack-bar'].includes(m.slug)
-      );
-      const dynamicBookingModules = allModules.filter((m: any) =>
-        m.template_type === 'multi_day_booking' && m.is_active
-      );
-      const dynamicSessionModules = allModules.filter((m: any) =>
-        m.template_type === 'session_access' && m.is_active
-      );
-      
-      const dynamicOrderPromises = dynamicMenuModules.map((m: any) =>
-        api.get(`/staff/modules/${m.slug}/orders`, { signal }).catch(() => ({ data: { data: [] } }))
-      );
-      const dynamicBookingPromises = dynamicBookingModules.map((m: any) =>
-        api.get(`/staff/modules/${m.slug}/bookings`, { signal }).catch(() => ({ data: { data: [] } }))
-      );
-      const dynamicSessionPromises = dynamicSessionModules.map((m: any) =>
-        api.get(`/staff/modules/${m.slug}/sessions`, { signal }).catch(() => ({ data: { data: [] } }))
-      );
-      const [dynamicOrderResults, dynamicBookingResults, dynamicSessionResults] = await Promise.all([
-        Promise.all(dynamicOrderPromises),
-        Promise.all(dynamicBookingPromises),
-        Promise.all(dynamicSessionPromises),
-      ]);
-      if (signal?.aborted) return;
-
-      // Combine all orders from all sources
-      const restaurantOrders = ordersRes.data.data || [];
-      const snackOrders = snackOrdersRes.data.data || [];
-      const dynamicOrders = dynamicOrderResults.flatMap((r: any) => r.data?.data || []);
-      const orders = [...restaurantOrders, ...snackOrders, ...dynamicOrders];
-
-      // Aggregate booking and session data for manager overview
-      const allBookings = dynamicBookingResults.flatMap((r: any) => r.data?.data || []);
-      const allSessions = dynamicSessionResults.flatMap((r: any) => r.data?.data || []);
       const activeModulesList = allModules.filter((m: any) => m.is_active);
       setActiveModules(activeModulesList);
 
@@ -203,18 +176,20 @@ export default function ManagerDashboard() {
       setModuleSummary(summaryModules);
       setTodayShifts(todayShifts);
 
-      // Calculate stats from REAL orders data
-      const pending = orders.filter((o: any) => 
-        ['pending', 'confirmed', 'preparing'].includes(o.status)
+      // Calculate stats from unified transactions data
+      const pending = allTransactions.filter((t: any) => 
+        ['pending', 'confirmed', 'preparing', 'active'].includes(t.status)
       ).length;
       
-      const completed = orders.filter((o: any) => 
-        o.status === 'completed'
+      const completed = allTransactions.filter((t: any) => 
+        ['completed', 'used', 'checked_out'].includes(t.status)
       ).length;
       
-      const todayRevenue = orders
-        .filter((o: any) => o.status === 'completed' || o.payment_status === 'paid')
-        .reduce((sum: number, o: any) => sum + (o.total || o.total_amount || 0), 0);
+      const todayRevenue = allTransactions
+        .filter((t: any) => ['completed', 'used', 'checked_out'].includes(t.status) || t.payment_status === 'paid')
+        .reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+
+      const issues = allTransactions.filter((t: any) => t.status === 'cancelled').length;
 
       // Use real dashboard stats if available, otherwise calculate from orders
       const totalRevenue = dashboardStats?.totalRevenue || todayRevenue;
@@ -230,7 +205,7 @@ export default function ManagerDashboard() {
         pendingOrders: pending,
         completedToday: completed,
         activeStaff: activeStaffCount,
-        issues: orders.filter((o: any) => o.status === 'cancelled').length,
+        issues,
       });
 
       // Set real approvals from API
@@ -255,10 +230,10 @@ export default function ManagerDashboard() {
         }
       });
 
-      // Get real order counts per staff member
+      // Get real transaction counts per staff member
       const staffOrderCounts = new Map<string, number>();
-      orders.forEach((order: any) => {
-        const staffId = order.staff_id || order.assigned_to;
+      allTransactions.forEach((tx: any) => {
+        const staffId = tx.staff_id || tx.assigned_to;
         if (staffId) {
           staffOrderCounts.set(staffId, (staffOrderCounts.get(staffId) || 0) + 1);
         }
@@ -283,17 +258,17 @@ export default function ManagerDashboard() {
       if (dashboardStats?.weeklyData) {
         setPerformanceData(dashboardStats.weeklyData);
       } else {
-        // Group orders by day for real weekly performance
+        // Group transactions by day for real weekly performance
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const weekData = new Map<string, { orders: number; revenue: number }>();
         
-        orders.forEach((order: any) => {
-          const date = new Date(order.created_at);
+        allTransactions.forEach((tx: any) => {
+          const date = new Date(tx.created_at);
           const dayName = dayNames[date.getDay()];
           const existing = weekData.get(dayName) || { orders: 0, revenue: 0 };
           weekData.set(dayName, {
             orders: existing.orders + 1,
-            revenue: existing.revenue + (order.total || order.total_amount || 0)
+            revenue: existing.revenue + (tx.amount || 0)
           });
         });
 
@@ -314,7 +289,7 @@ export default function ManagerDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeProperty?.id]);
 
   useEffect(() => {
     if (!socket) return;

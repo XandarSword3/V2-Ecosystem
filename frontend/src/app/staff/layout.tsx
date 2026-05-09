@@ -79,37 +79,28 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
       name: 'Manager Dashboard',
       href: '/staff/manager',
       icon: Shield,
-      roles: ['super_admin', 'admin', 'restaurant_manager', 'chalet_manager', 'pool_manager', 'manager']
+      roles: ['super_admin', 'admin', 'manager']
     },
-    // Customer Lookup
+    // Customer Lookup - available to all staff
     {
       name: 'Customer Lookup',
       href: '/staff/customers',
       icon: Search,
-      roles: ['super_admin', 'admin', 'restaurant_staff', 'restaurant_admin', 'restaurant_manager', 'chalet_staff', 'chalet_admin', 'pool_staff', 'pool_admin']
+      roles: ['super_admin', 'admin', 'manager', 'staff']
     },
+    // Dynamic modules - roles based on module slug pattern
     ...modules.map(module => ({
       name: module.name,
       href: `/staff/modules/${module.slug}`,
       icon: ChefHat, // Default icon
-      roles: ['super_admin', 'admin', `${module.slug}_staff`, `${module.slug}_admin`,
-             // Explicitly map legacy roles to specific slugs for backward compatibility
-             module.slug === 'restaurant' ? 'restaurant_staff' : '',
-             module.slug === 'restaurant' ? 'restaurant_admin' : '',
-             module.slug === 'pool' ? 'pool_staff' : '',
-             module.slug === 'pool' ? 'pool_admin' : '',
-             module.slug === 'chalets' ? 'chalet_staff' : '',
-             module.slug === 'chalets' ? 'chalet_admin' : '',
-             module.slug === 'snack-bar' ? 'snack_bar_staff' : '',
-             module.slug === 'snack-bar' ? 'snack_bar_admin' : ''
-             ].filter(Boolean)
+      roles: ['super_admin', 'admin', 'manager', 'staff', `${module.slug}_staff`, `${module.slug}_admin`]
     })),
     // Static utilities
     { 
       name: t('nav.ticketScanner'), 
       href: '/staff/scanner', 
       icon: QrCode,
-      roles: ['pool_staff', 'pool_admin', 'super_admin']
+      roles: ['super_admin', 'admin', 'manager', 'staff'] // Available to all staff for unified scanning
     },
   ];
   const { user, logout, isAuthenticated, isLoading } = useAuth();
@@ -182,15 +173,11 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
       if (!isAuthenticated) {
         router.push('/login?redirect=/staff');
       } else if (user) {
-        // Verify user has at least one staff role
-        const staffRoles = [
-          'super_admin', 'admin',
-          'restaurant_staff', 'restaurant_admin',
-          'chalet_staff', 'chalet_admin',
-          'pool_staff', 'pool_admin',
-          'snack_bar_staff', 'snack_bar_admin'
-        ];
-        const hasStaffRole = user.roles?.some(role => staffRoles.includes(role));
+        // Verify user has at least one staff role (generic RBAC)
+        const staffRoles = ['super_admin', 'admin', 'manager', 'staff'];
+        const hasStaffRole = user.roles?.some(role => 
+          staffRoles.includes(role) || role.endsWith('_staff') || role.endsWith('_admin')
+        );
         if (!hasStaffRole) {
           toast.error('Access denied. Staff privileges required.');
           router.push('/');
