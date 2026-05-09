@@ -219,6 +219,10 @@ apiRouter.use('/i18n', i18nRoutes);
 apiRouter.use('/analytics', analyticsRoutes);
 apiRouter.use(getDynamicModulesRouter());
 
+// Economics Routes
+import { economicsRoutes } from './modules/economics/economics.routes.js';
+apiRouter.use('/economics', economicsRoutes);
+
 // Channel Webhooks - FIXED
 app.use('/webhooks/channels', channelWebhookRoutes);
 
