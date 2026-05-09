@@ -98,7 +98,7 @@ CREATE POLICY inventory_purchase_orders_isolation ON inventory_purchase_orders
 CREATE POLICY inventory_recipes_isolation ON inventory_recipes
   FOR ALL USING (user_has_property_access(auth.uid(), property_id));
 
--- 7. Grant permissions
+-- 7. Grant table permissions
 GRANT SELECT, INSERT, UPDATE, DELETE ON inventory_transactions TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON inventory_alerts TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON inventory_suppliers TO authenticated;
@@ -107,6 +107,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON inventory_wastage TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON inventory_variance TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON inventory_batches TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON inventory_recipes TO authenticated;
+
+-- Note: Sequence grants are handled automatically by Supabase for identity columns
 
 -- =============================================
 -- Migration complete

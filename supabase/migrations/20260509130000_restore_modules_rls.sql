@@ -21,4 +21,11 @@ CREATE POLICY modules_property_isolation ON modules
 
 -- Grant necessary permissions
 GRANT SELECT, INSERT, UPDATE, DELETE ON modules TO authenticated;
-GRANT USAGE ON SEQUENCE modules_id_seq TO authenticated;
+
+-- Grant sequence usage if sequence exists (may not exist if using UUID PK)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_sequences WHERE sequencename = 'modules_id_seq') THEN
+    GRANT USAGE ON SEQUENCE modules_id_seq TO authenticated;
+  END IF;
+END $$;
