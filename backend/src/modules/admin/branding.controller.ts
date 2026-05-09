@@ -130,7 +130,6 @@ router.put(
         key: 'branding',
         value: branding,
         updated_at: new Date().toISOString(),
-        updated_by: userId,
       }, {
         onConflict: 'key',
       });
