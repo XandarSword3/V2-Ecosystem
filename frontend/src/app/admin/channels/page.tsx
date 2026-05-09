@@ -21,6 +21,7 @@ import {
   MoreHorizontal
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useProperty } from '@/context/PropertyContext';
 import api from '@/lib/api';
 
 interface Channel {
@@ -155,15 +156,14 @@ export default function ChannelManagerPage() {
   const [connectForm, setConnectForm] = useState({ type: 'booking_com', hotelId: '', apiKey: '' });
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Helper to get property ID - in production this would come from context
-  const getPropertyId = () => '00000000-0000-0000-0000-000000000001';
+  const { activePropertyId } = useProperty();
 
   // Fetch channels (connections)
   const { data: channels = [], isLoading } = useQuery({
     queryKey: ['channels'],
     queryFn: async () => {
       try {
-        const propertyId = getPropertyId();
+        const propertyId = activePropertyId;
         const res = await api.get(`/channels/properties/${propertyId}/connections`);
         const data = res.data;
         setFetchError(null);
@@ -198,7 +198,7 @@ export default function ChannelManagerPage() {
     queryFn: async () => {
       try {
         // Get logs for each connection
-        const propertyId = getPropertyId();
+        const propertyId = activePropertyId;
         const res = await api.get(`/channels/properties/${propertyId}/connections`);
         const connections = res.data?.connections || [];
         
@@ -228,7 +228,7 @@ export default function ChannelManagerPage() {
   // Connect channel
   const connectMutation = useMutation({
     mutationFn: async (data: { type: string; hotelId: string; apiKey: string }) => {
-      const propertyId = getPropertyId();
+      const propertyId = activePropertyId;
       const res = await api.post(`/channels/properties/${propertyId}/connections`, {
         channel_code: (CHANNEL_CODE_MAP[data.type] || data.type).toUpperCase(),
         channel_name: channelNames[data.type] || data.type,

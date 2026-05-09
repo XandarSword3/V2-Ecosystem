@@ -11,6 +11,8 @@ import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { CurrencySwitcher } from '@/components/CurrencySwitcher';
+import { PropertySwitcher } from '@/components/PropertySwitcher';
+import { PropertyProvider } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
 import {
   Menu,
@@ -211,8 +213,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Mobile Header */}
+    <PropertyProvider>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+        {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-[200] backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/50 dark:border-slate-700/50 px-4 h-16 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <button
@@ -227,6 +230,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <span className="font-semibold text-slate-900 dark:text-white">Admin</span>
         </div>
         <div className="flex items-center gap-2">
+          <PropertySwitcher />
           <CurrencySwitcher />
           <ThemeToggle />
           <LanguageSwitcher />
@@ -486,6 +490,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            <PropertySwitcher />
             {/* Notifications */}
             <div className="relative z-[110]">
               <button
@@ -576,6 +581,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </div>
     </div>
+    </PropertyProvider>
   );
 }
 
