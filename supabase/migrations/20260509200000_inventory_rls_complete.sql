@@ -31,16 +31,9 @@ ALTER TABLE inventory_variance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_batches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_recipes ENABLE ROW LEVEL SECURITY;
 
--- 4. Create helper function for property access check
-CREATE OR REPLACE FUNCTION user_has_property_access(user_uuid UUID, prop_id UUID)
-RETURNS BOOLEAN AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM user_property_access 
-    WHERE user_id = user_uuid AND property_id = prop_id
-  );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- 4. Use existing user_has_property_access function
+-- Function already defined in 20260202100001_multi_location.sql with signature:
+-- user_has_property_access(user_uuid UUID, property_uuid UUID, required_level VARCHAR DEFAULT 'read')
 
 -- 5. Create join-based policies (tables linked to inventory_items)
 CREATE POLICY inventory_transactions_isolation ON inventory_transactions
