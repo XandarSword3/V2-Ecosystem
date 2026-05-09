@@ -17,18 +17,8 @@ DROP TABLE IF EXISTS tickets CASCADE;
 DROP TABLE IF EXISTS bookings CASCADE;
 DROP TABLE IF EXISTS orders CASCADE;
 
--- Ensure 'transactions' exists (it should, but just in case)
-CREATE TABLE IF NOT EXISTS transactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID REFERENCES properties(id),
-    module_id UUID REFERENCES modules(id),
-    user_id UUID REFERENCES users(id),
-    type VARCHAR(50), -- 'ticket', 'booking', 'order'
-    status VARCHAR(50),
-    total_amount DECIMAL(12,2),
-    metadata JSONB DEFAULT '{}',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- NOTE: The real 'transactions' table already exists with proper schema:
+-- engine_type, amount, customer_id, staff_id, reference_id, reference_table, metadata, etc.
+-- DO NOT recreate it here. This migration only cleans up the regressions.
 
 COMMIT;
