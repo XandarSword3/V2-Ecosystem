@@ -243,9 +243,12 @@ app.use(sentryErrorHandler());
 app.use((err: Error & { statusCode?: number; code?: string; isOperational?: boolean; errors?: unknown[]; details?: Record<string, unknown> }, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   // Log non-operational (unexpected) errors with full stack trace
   if (!err.isOperational) {
+    // Supabase returns plain objects, not Error instances — serialize fully
+    const errDetail = err instanceof Error
+      ? { message: err.message, stack: err.stack }
+      : JSON.parse(JSON.stringify(err));
     logger.error('Unexpected error:', {
-      error: err.message,
-      stack: err.stack,
+      error: errDetail,
       path: req.path,
       method: req.method,
       requestId: req.requestId,
@@ -292,3 +295,5 @@ export async function loadDynamicModules(): Promise<void> {
 }
 
 export default app;
+
+// Trigger backend restart for permission cache
