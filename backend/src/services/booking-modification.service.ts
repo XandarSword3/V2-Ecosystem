@@ -111,7 +111,7 @@ export async function cancelChaletBooking(
   try {
     const supabase = getSupabase();
     const { data: booking, error: bookingError } = await supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .select('*, chalet:chalets(*), user:users(*), payments(*)')
       .eq('id', bookingId)
       .maybeSingle();
@@ -127,7 +127,7 @@ export async function cancelChaletBooking(
     }
 
     // Verify ownership
-    if (booking.user_id !== userId) {
+    if (booking.customer_id !== userId) {
       return {
         success: false,
         message: 'Unauthorized to cancel this booking',
@@ -156,9 +156,10 @@ export async function cancelChaletBooking(
     }
 
     // Get cancellation policy
-    const policy = getCancellationPolicy(new Date(booking.check_in_date || new Date()));
+    const checkInDate = booking.metadata?.check_in_date ? new Date(booking.metadata.check_in_date) : new Date();
+    const policy = getCancellationPolicy(checkInDate);
     const { refundAmount, creditAmount } = calculateRefund(
-      Number(booking.total_price || 0),
+      Number(booking.amount || 0),
       policy
     );
 
@@ -202,7 +203,7 @@ export async function cancelChaletBooking(
       if (creditError) {
         // Log for reconciliation but don't block cancellation
         logger.error('Credit insert failed during cancellation', { bookingId, userId, creditAmount, error: creditError.message });
-        await logActivity({ user_id: userId, action: 'CANCELLATION_CREDIT_FAILED', resource: 'chalet_bookings', resource_id: bookingId, details: { creditAmount, error: creditError.message, stripeRefundId } });
+        await logActivity({ user_id: userId, action: 'CANCELLATION_CREDIT_FAILED', resource: 'transaction', resource_id: bookingId, details: { creditAmount, error: creditError.message, stripeRefundId } });
       } else {
         creditInsertId = creditData?.id;
       }
@@ -210,12 +211,15 @@ export async function cancelChaletBooking(
 
     // Step 2: Update booking status (critical state change)
     const { error: updateError } = await supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .update({
         status: BookingStatus.CANCELLED,
-        cancellation_reason: reason,
-        cancelled_at: new Date().toISOString(),
-        refund_amount: refundAmount,
+        metadata: {
+          ...(booking.metadata as Record<string, any> || {}),
+          cancellation_reason: reason,
+          cancelled_at: new Date().toISOString(),
+          refund_amount: refundAmount,
+        },
       })
       .eq('id', bookingId);
     if (updateError) {
@@ -225,16 +229,16 @@ export async function cancelChaletBooking(
         logger.warn('Rolled back credit insert after booking update failure', { bookingId, creditInsertId });
       }
       // Log for reconciliation — Stripe refund may have already occurred
-      await logActivity({ user_id: userId, action: 'CANCELLATION_DB_FAILED', resource: 'chalet_bookings', resource_id: bookingId, details: { error: updateError.message, stripeRefundId, creditRolledBack: !!creditInsertId } });
+      await logActivity({ user_id: userId, action: 'CANCELLATION_DB_FAILED', resource: 'transaction', resource_id: bookingId, details: { error: updateError.message, stripeRefundId, creditRolledBack: !!creditInsertId } });
       throw updateError;
     }
 
     // Audit log: successful cancellation
-    await logActivity({ user_id: userId, action: 'BOOKING_CANCELLED', resource: 'chalet_bookings', resource_id: bookingId, details: { refundAmount, creditAmount, stripeRefundId } });
+    await logActivity({ user_id: userId, action: 'BOOKING_CANCELLED', resource: 'transaction', resource_id: bookingId, details: { refundAmount, creditAmount, stripeRefundId } });
 
     // Send cancellation email
     await emailService.sendEmail({
-      to: booking.user.email,
+      to: booking.metadata?.customer_email || '',
       subject: 'Booking Cancellation Confirmation',
       html: generateCancellationEmail(booking, refundAmount, creditAmount),
     });
@@ -271,7 +275,7 @@ export async function modifyChaletBookingDates(
   try {
     const supabase = getSupabase();
     const { data: booking, error: bookingError } = await supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .select('*, chalet:chalets(*), user:users(*), payments(*)')
       .eq('id', bookingId)
       .maybeSingle();
@@ -281,7 +285,7 @@ export async function modifyChaletBookingDates(
       return { success: false, message: 'Booking not found' };
     }
 
-    if (booking.user_id !== userId) {
+    if (booking.customer_id !== userId) {
       return { success: false, message: 'Unauthorized to modify this booking' };
     }
 
@@ -292,13 +296,14 @@ export async function modifyChaletBookingDates(
 
     // Check availability for new dates
     const { data: conflictingBookings, error: conflictError } = await supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .select('id')
-      .eq('chalet_id', booking.chalet_id)
+      .eq('engine_type', 'time_exclusive_reservation')
+      .filter('metadata->>chalet_id', 'eq', booking.metadata?.chalet_id)
       .neq('id', bookingId)
       .in('status', [BookingStatus.CONFIRMED, BookingStatus.PENDING])
-      .lte('check_in_date', newCheckOut.toISOString())
-      .gte('check_out_date', newCheckIn.toISOString())
+      .filter('metadata->>check_in_date', 'lte', newCheckOut.toISOString())
+      .filter('metadata->>check_out_date', 'gte', newCheckIn.toISOString())
       .limit(1);
     if (conflictError) throw conflictError;
 
@@ -324,13 +329,17 @@ export async function modifyChaletBookingDates(
 
     // Update booking
     const { error: updateError } = await supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .update({
-        check_in_date: newCheckIn.toISOString(),
-        check_out_date: newCheckOut.toISOString(),
-        nights,
-        total_price: newTotalPrice,
-        modified_at: new Date().toISOString(),
+        amount: newTotalPrice,
+        net_amount: newTotalPrice,
+        metadata: {
+          ...(booking.metadata as Record<string, any> || {}),
+          check_in_date: newCheckIn.toISOString(),
+          check_out_date: newCheckOut.toISOString(),
+          nights,
+          modified_at: new Date().toISOString(),
+        }
       })
       .eq('id', bookingId);
     if (updateError) throw updateError;
@@ -380,8 +389,9 @@ export async function cancelPoolTicket(
   try {
     const supabase = getSupabase();
     const { data: ticket, error: ticketError } = await supabase
-      .from('pool_tickets')
-      .select('*, user:users(*), payment:payments(*)')
+      .from('transactions')
+      .select('*, payments(*)')
+      .eq('engine_type', 'shared_capacity_access')
       .eq('id', ticketId)
       .maybeSingle();
     if (ticketError) throw ticketError;
@@ -395,7 +405,7 @@ export async function cancelPoolTicket(
       };
     }
 
-    if (ticket.user_id !== userId) {
+    if (ticket.customer_id !== userId) {
       return {
         success: false,
         message: 'Unauthorized to cancel this ticket',
@@ -429,7 +439,7 @@ export async function cancelPoolTicket(
     // Full refund if more than 24 hours before, otherwise credit
     const hoursUntil = (ticketDate.getTime() - now.getTime()) / (1000 * 60 * 60);
     const refundType = hoursUntil >= 24 ? RefundType.FULL : RefundType.CREDIT;
-    const totalPrice = Number(ticket.total_price || 0);
+    const totalPrice = Number(ticket.amount || 0);
     const refundAmount = refundType === RefundType.FULL ? totalPrice : 0;
     const creditAmount = refundType === RefundType.CREDIT ? totalPrice : 0;
 
@@ -464,7 +474,7 @@ export async function cancelPoolTicket(
         .single();
       if (creditError) {
         logger.error('Credit insert failed during pool ticket cancellation', { ticketId, userId, creditAmount, error: creditError.message });
-        await logActivity({ user_id: userId, action: 'POOL_CREDIT_FAILED', resource: 'pool_tickets', resource_id: ticketId, details: { creditAmount, error: creditError.message, stripeRefundId } });
+        await logActivity({ user_id: userId, action: 'POOL_CREDIT_FAILED', resource: 'transaction', resource_id: ticketId, details: { creditAmount, error: creditError.message, stripeRefundId } });
       } else {
         creditInsertId = creditData?.id;
       }
@@ -472,11 +482,14 @@ export async function cancelPoolTicket(
 
     // Step 2: Update ticket status (critical state change)
     const { error: updateError } = await supabase
-      .from('pool_tickets')
+      .from('transactions')
       .update({
         status: 'CANCELLED',
-        cancelled_at: new Date().toISOString(),
-        cancellation_reason: reason,
+        metadata: {
+          ...(ticket.metadata as Record<string, any> || {}),
+          cancelled_at: new Date().toISOString(),
+          cancellation_reason: reason,
+        }
       })
       .eq('id', ticketId);
     if (updateError) {
@@ -485,12 +498,12 @@ export async function cancelPoolTicket(
         await supabase.from('user_credits').delete().eq('id', creditInsertId);
         logger.warn('Rolled back pool credit after ticket update failure', { ticketId, creditInsertId });
       }
-      await logActivity({ user_id: userId, action: 'POOL_CANCEL_DB_FAILED', resource: 'pool_tickets', resource_id: ticketId, details: { error: updateError.message, stripeRefundId, creditRolledBack: !!creditInsertId } });
+      await logActivity({ user_id: userId, action: 'POOL_CANCEL_DB_FAILED', resource: 'transaction', resource_id: ticketId, details: { error: updateError.message, stripeRefundId, creditRolledBack: !!creditInsertId } });
       throw updateError;
     }
 
     // Audit log: successful cancellation
-    await logActivity({ user_id: userId, action: 'POOL_TICKET_CANCELLED', resource: 'pool_tickets', resource_id: ticketId, details: { refundAmount, creditAmount, stripeRefundId } });
+    await logActivity({ user_id: userId, action: 'POOL_TICKET_CANCELLED', resource: 'transaction', resource_id: ticketId, details: { refundAmount, creditAmount, stripeRefundId } });
 
     // Send confirmation email
     await emailService.sendEmail({
@@ -527,8 +540,9 @@ export async function reschedulePoolTicket(
   try {
     const supabase = getSupabase();
     const { data: ticket, error: ticketError } = await supabase
-      .from('pool_tickets')
-      .select('*, user:users(*)')
+      .from('transactions')
+      .select('*, metadata')
+      .eq('engine_type', 'shared_capacity_access')
       .eq('id', ticketId)
       .maybeSingle();
     if (ticketError) throw ticketError;
@@ -547,9 +561,10 @@ export async function reschedulePoolTicket(
 
     // Check capacity for new date
     const { count: existingTicketsCount, error: countError } = await supabase
-      .from('pool_tickets')
+      .from('transactions')
       .select('*', { count: 'exact', head: true })
-      .eq('date', newDate.toISOString())
+      .eq('engine_type', 'shared_capacity_access')
+      .filter('metadata->>ticket_date', 'eq', newDate.toISOString())
       .eq('status', 'ACTIVE');
     if (countError) throw countError;
 
@@ -570,10 +585,13 @@ export async function reschedulePoolTicket(
 
     // Update ticket date
     const { error: updateError } = await supabase
-      .from('pool_tickets')
+      .from('transactions')
       .update({
-        date: newDate.toISOString(),
-        modified_at: new Date().toISOString(),
+        metadata: {
+          ...(ticket.metadata as Record<string, any> || {}),
+          ticket_date: newDate.toISOString(),
+          modified_at: new Date().toISOString(),
+        }
       })
       .eq('id', ticketId);
     if (updateError) throw updateError;
@@ -668,7 +686,7 @@ export async function applyCreditToBooking(
           }).eq('id', prev.creditId);
         }
         logger.error('Credit application failed, rolled back previous deductions', { bookingId, updateError: updateError.message, rolledBack: successfulUpdates.length });
-        await logActivity({ user_id: userId, action: 'CREDIT_APPLICATION_FAILED', resource: bookingType === 'chalet' ? 'chalet_bookings' : 'pool_tickets', resource_id: bookingId, details: { error: updateError.message, rolledBack: successfulUpdates.length } });
+        await logActivity({ user_id: userId, action: 'CREDIT_APPLICATION_FAILED', resource: 'transaction', resource_id: bookingId, details: { error: updateError.message, rolledBack: successfulUpdates.length } });
         throw updateError;
       }
 
@@ -752,10 +770,10 @@ function generateCancellationEmail(
     
     <h3>Booking Details</h3>
     <ul>
-      <li><strong>Property:</strong> ${booking.chalet.name}</li>
-      <li><strong>Check-in:</strong> ${new Date(booking.check_in_date).toLocaleDateString()}</li>
-      <li><strong>Check-out:</strong> ${new Date(booking.check_out_date).toLocaleDateString()}</li>
-      <li><strong>Original Amount:</strong> $${booking.total_price.toFixed(2)}</li>
+      <li><strong>Property ID:</strong> ${booking.metadata?.chalet_id}</li>
+      <li><strong>Check-in:</strong> ${new Date(booking.metadata?.check_in_date).toLocaleDateString()}</li>
+      <li><strong>Check-out:</strong> ${new Date(booking.metadata?.check_out_date).toLocaleDateString()}</li>
+      <li><strong>Original Amount:</strong> $${Number(booking.amount).toFixed(2)}</li>
     </ul>
     
     ${refundAmount > 0 ? `

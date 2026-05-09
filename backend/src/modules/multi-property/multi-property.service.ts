@@ -274,6 +274,34 @@ export async function revokePropertyAccess(
     .eq('property_id', propertyId);
 }
 
+export async function getUserByEmail(email: string): Promise<{ data: any | null; error: any }> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, email, full_name')
+    .eq('email', email)
+    .single();
+  return { data, error };
+}
+
+export async function getPropertyStaff(propertyId: string): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('user_property_access')
+    .select(`
+      user_id,
+      access_level,
+      granted_at,
+      users!user_id (
+        id,
+        email,
+        full_name
+      )
+    `)
+    .eq('property_id', propertyId);
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function grantGroupAccess(
   userId: string,
   groupId: string,

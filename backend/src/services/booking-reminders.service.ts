@@ -11,25 +11,15 @@ class BookingRemindersService {
     const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD');
 
     try {
-      // Query chalet bookings with chalet name for reminder emails
+      // Query booking transactions with metadata for reminder emails
       const { data: bookings, error } = await supabase
-        .from('chalet_bookings')
-        .select(`
-          id,
-          booking_number,
-          customer_name,
-          customer_email,
-          check_in_date,
-          check_out_date,
-          number_of_nights,
-          special_requests,
-          reminder_sent,
-          chalets (name)
-        `)
+        .from('transactions')
+        .select('id, booking_number, metadata, status')
+        .eq('engine_type', 'time_exclusive_reservation')
         .eq('status', 'confirmed')
-        .gte('check_in_date', `${tomorrow}T00:00:00`)
-        .lt('check_in_date', `${tomorrow}T23:59:59`)
-        .or('reminder_sent.is.null,reminder_sent.eq.false');
+        .filter('metadata->>check_in_date', 'gte', `${tomorrow}T00:00:00`)
+        .filter('metadata->>check_in_date', 'lt', `${tomorrow}T23:59:59`)
+        .or('metadata->>reminder_sent.is.null,metadata->>reminder_sent.eq.false');
 
       if (error) {
         logger.error('Failed to fetch bookings for reminders', error);
@@ -42,22 +32,22 @@ class BookingRemindersService {
 
       for (const booking of (bookings || []) as any[]) {
         try {
-          const chaletName = (booking as any).chalets?.name || 'Your Chalet';
+          const meta = booking.metadata || {};
           await emailService.sendPreArrivalReminder({
-            to: booking.customer_email,
-            guestName: booking.customer_name,
+            to: meta.customer_email,
+            guestName: meta.customer_name,
             bookingNumber: booking.booking_number,
-            chaletName,
-            checkInDate: booking.check_in_date,
-            checkOutDate: booking.check_out_date,
-            numberOfNights: booking.number_of_nights,
-            specialInstructions: booking.special_requests || '',
+            chaletName: meta.chalet_name || 'Your Accommodation',
+            checkInDate: meta.check_in_date,
+            checkOutDate: meta.check_out_date,
+            numberOfNights: meta.number_of_nights,
+            specialInstructions: meta.special_requests || '',
           } as any);
 
-          // Mark reminder as sent
+          // Mark reminder as sent in metadata
           await supabase
-            .from('chalet_bookings')
-            .update({ reminder_sent: true })
+            .from('transactions')
+            .update({ metadata: { ...meta, reminder_sent: true } })
             .eq('id', booking.id);
 
           sent++;

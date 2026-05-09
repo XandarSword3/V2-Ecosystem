@@ -50,118 +50,112 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
 
     // Today's stats - run queries in parallel
     const [
-      restaurantOrdersResult,
-      restaurantRevenueResult,
-      snackOrdersResult,
-      snackRevenueResult,
+      ordersResult,
+      revenueResult,
       chaletBookingsResult,
       chaletRevenueResult,
       poolTicketsResult,
       poolRevenueResult,
       usersResult,
       recentOrdersResult,
-      // Yesterday's stats for comparison
       yesterdayOrdersResult,
       yesterdayRevenueResult,
       lastWeekBookingsResult,
       yesterdayTicketsResult
     ] = await Promise.all([
-      // Restaurant orders count
-      supabase.from('restaurant_orders')
+      // All orders today (restaurant + snack merged)
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('engine_type', 'instant_transaction')
         .gte('created_at', today)
         .lte('created_at', endOfDay),
-      // Restaurant revenue
-      supabase.from('restaurant_orders')
-        .select('total_amount')
+      // All order revenue today
+      supabase.from('transactions')
+        .select('amount')
+        .eq('engine_type', 'instant_transaction')
         .gte('created_at', today)
         .lte('created_at', endOfDay)
         .eq('payment_status', 'paid'),
-      // Snack orders count
-      supabase.from('snack_orders')
+      // Accommodation bookings count (check-in today)
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('engine_type', 'time_exclusive_reservation')
+        .filter('metadata->>check_in_date', 'gte', today)
+        .filter('metadata->>check_in_date', 'lte', endOfDay),
+      // Accommodation revenue today
+      supabase.from('transactions')
+        .select('amount')
+        .eq('engine_type', 'time_exclusive_reservation')
+        .filter('metadata->>check_in_date', 'gte', today)
+        .filter('metadata->>check_in_date', 'lte', endOfDay)
+        .eq('payment_status', 'paid'),
+      // Pool tickets count (today)
+      supabase.from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('engine_type', 'shared_capacity_access')
         .gte('created_at', today)
         .lte('created_at', endOfDay),
-      // Snack revenue
-      supabase.from('snack_orders')
-        .select('total_amount')
+      // Pool revenue today
+      supabase.from('transactions')
+        .select('amount')
+        .eq('engine_type', 'shared_capacity_access')
         .gte('created_at', today)
         .lte('created_at', endOfDay)
-        .eq('payment_status', 'paid'),
-      // Chalet bookings count
-      supabase.from('chalet_bookings')
-        .select('id', { count: 'exact', head: true })
-        .gte('check_in_date', today)
-        .lte('check_in_date', endOfDay),
-      // Chalet revenue
-      supabase.from('chalet_bookings')
-        .select('total_amount')
-        .gte('check_in_date', today)
-        .lte('check_in_date', endOfDay)
-        .eq('payment_status', 'paid'),
-      // Pool tickets count
-      supabase.from('pool_tickets')
-        .select('id', { count: 'exact', head: true })
-        .gte('ticket_date', today)
-        .lte('ticket_date', endOfDay),
-      // Pool revenue
-      supabase.from('pool_tickets')
-        .select('total_amount')
-        .gte('ticket_date', today)
-        .lte('ticket_date', endOfDay)
         .eq('payment_status', 'paid'),
       // Total users
       supabase.from('users')
         .select('id', { count: 'exact', head: true }),
-      // Recent orders (with item count)
-      supabase.from('restaurant_orders')
-        .select('id, order_number, customer_name, status, total_amount, created_at, items:restaurant_order_items(id)')
+      // Recent orders (unified)
+      supabase.from('transactions')
+        .select('id, order_number, customer_name, status, amount, created_at, engine_type')
+        .eq('engine_type', 'instant_transaction')
         .order('created_at', { ascending: false })
         .limit(5),
-      // Yesterday orders (restaurant + snack)
-      supabase.from('restaurant_orders')
+      // Yesterday orders count
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('engine_type', 'instant_transaction')
         .gte('created_at', yesterday)
         .lte('created_at', endOfYesterday),
       // Yesterday revenue
-      supabase.from('restaurant_orders')
-        .select('total_amount')
+      supabase.from('transactions')
+        .select('amount')
+        .eq('engine_type', 'instant_transaction')
         .gte('created_at', yesterday)
         .lte('created_at', endOfYesterday)
         .eq('payment_status', 'paid'),
       // Last week bookings
-      supabase.from('chalet_bookings')
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .gte('check_in_date', lastWeekStart)
-        .lte('check_in_date', lastWeekEnd),
-      // Yesterday tickets
-      supabase.from('pool_tickets')
+        .eq('engine_type', 'time_exclusive_reservation')
+        .filter('metadata->>check_in_date', 'gte', lastWeekStart)
+        .filter('metadata->>check_in_date', 'lte', lastWeekEnd),
+      // Yesterday pool tickets
+      supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .gte('ticket_date', yesterday)
-        .lte('ticket_date', endOfYesterday)
+        .eq('engine_type', 'shared_capacity_access')
+        .gte('created_at', yesterday)
+        .lte('created_at', endOfYesterday)
     ]);
 
     // Calculate totals
-    const restaurantRevenue = (restaurantRevenueResult.data || []).reduce(
-      (sum, o) => sum + parseFloat(o.total_amount || 0), 0
-    );
-    const snackRevenue = (snackRevenueResult.data || []).reduce(
-      (sum, o) => sum + parseFloat(o.total_amount || 0), 0
+    const ordersRevenue = (revenueResult.data || []).reduce(
+      (sum: number, o: any) => sum + parseFloat(o.amount || 0), 0
     );
     const chaletRevenue = (chaletRevenueResult.data || []).reduce(
-      (sum, o) => sum + parseFloat(o.total_amount || 0), 0
+      (sum: number, o: any) => sum + parseFloat(o.amount || 0), 0
     );
     const poolRevenue = (poolRevenueResult.data || []).reduce(
-      (sum, o) => sum + parseFloat(o.total_amount || 0), 0
+      (sum: number, o: any) => sum + parseFloat(o.amount || 0), 0
     );
 
-    const totalOrders = (restaurantOrdersResult.count || 0) + (snackOrdersResult.count || 0);
-    const totalRevenue = restaurantRevenue + snackRevenue + chaletRevenue + poolRevenue;
+    const totalOrders = ordersResult.count || 0;
+    const totalRevenue = ordersRevenue + chaletRevenue + poolRevenue;
 
     // Yesterday's calculations
     const yesterdayOrders = yesterdayOrdersResult.count || 0;
     const yesterdayRevenue = (yesterdayRevenueResult.data || []).reduce(
-      (sum, o) => sum + parseFloat(o.total_amount || 0), 0
+      (sum: number, o: any) => sum + parseFloat(o.amount || 0), 0
     );
     const lastWeekBookings = lastWeekBookingsResult.count || 0;
     const yesterdayTickets = yesterdayTicketsResult.count || 0;
@@ -177,23 +171,21 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
     const bookingsTrend = calcTrend(chaletBookingsResult.count || 0, lastWeekBookings);
     const ticketsTrend = calcTrend(poolTicketsResult.count || 0, yesterdayTickets);
 
-    // Transform recent orders to camelCase for frontend
     interface RecentOrderResult {
       id: string;
       order_number: string;
       customer_name?: string | null;
       status: string;
-      total_amount: string;
+      amount: string;
       created_at: string;
-      items?: { id: string }[];
     }
     const recentOrders = ((recentOrdersResult.data || []) as RecentOrderResult[]).map((order) => ({
       id: order.id,
       orderNumber: order.order_number,
       customerName: order.customer_name,
       status: order.status,
-      totalAmount: parseFloat(order.total_amount) || 0,
-      itemCount: order.items?.length || 0,
+      totalAmount: parseFloat(order.amount) || 0,
+      itemCount: 0,
       createdAt: order.created_at,
     }));
 
@@ -207,14 +199,12 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
         totalUsers: usersResult.count || 0,
         recentOrders: recentOrders,
         revenueByUnit: {
-          restaurant: restaurantRevenue,
-          snackBar: snackRevenue,
+          orders: ordersRevenue,
           chalets: chaletRevenue,
           pool: poolRevenue,
         },
         breakdown: {
-          restaurantOrders: restaurantOrdersResult.count || 0,
-          snackOrders: snackOrdersResult.count || 0,
+          totalOrders: ordersResult.count || 0,
           chaletBookings: chaletBookingsResult.count || 0,
           poolTickets: poolTicketsResult.count || 0,
         },
@@ -1099,56 +1089,53 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
       restItemsResult,
       snackItemsResult
     ] = await Promise.all([
-      supabase.from('restaurant_orders')
+      supabase.from('transactions').eq('engine_type', 'instant_transaction')
         .select('id, status, total_amount, created_at')
         .gte('created_at', start)
         .lte('created_at', end)
         .limit(1000),
-      supabase.from('snack_orders')
+      supabase.from('transactions').eq('engine_type', 'instant_transaction')
         .select('id, status, total_amount, created_at')
         .gte('created_at', start)
         .lte('created_at', end)
         .limit(1000),
-      supabase.from('chalet_bookings')
+      supabase.from('transactions').eq('engine_type', 'time_exclusive_reservation')
         .select('id, payment_status, total_amount, created_at')
         .gte('created_at', start)
         .lte('created_at', end)
         .limit(1000),
-      supabase.from('pool_tickets')
+      supabase.from('transactions').eq('engine_type', 'shared_capacity_access')
         .select('id, payment_status, total_amount, created_at')
         .gte('created_at', start)
         .lte('created_at', end)
         .limit(1000),
       supabase.from('users')
         .select('id', { count: 'exact', head: true }),
-      // Fetch details for Top Items
-      supabase.from('restaurant_order_items')
-        .select('quantity, unit_price, menu_items(name), restaurant_orders!inner(created_at, status)')
-        .gte('restaurant_orders.created_at', start)
-        .lte('restaurant_orders.created_at', end)
-        .eq('restaurant_orders.status', 'completed'),
-      supabase.from('snack_order_items')
-        .select('quantity, unit_price, snack_items(name), snack_orders!inner(created_at, status)')
-        .gte('snack_orders.created_at', start)
-        .lte('snack_orders.created_at', end)
-        .eq('snack_orders.status', 'completed')
+      // Fetch completed orders for top items (items are in metadata.items)
+      supabase.from('transactions')
+        .eq('engine_type', 'instant_transaction')
+        .select('metadata, amount, status')
+        .eq('status', 'completed')
+        .gte('created_at', start)
+        .lte('created_at', end),
+      // Placeholder — snack is also instant_transaction, covered above
+      Promise.resolve({ data: [], error: null })
     ]);
 
-    const restaurantOrdersList = restaurantResult.data || [];
-    const snackOrdersList = snackResult.data || [];
+    const allInstantList = restaurantResult.data || [];
     const chaletBookingsList = chaletResult.data || [];
     const poolTicketsList = poolResult.data || [];
     const totalUsers = usersResult.count || 0;
 
     if (
-      restaurantOrdersList.length >= 1000 ||
-      snackOrdersList.length >= 1000 ||
+      allInstantList.length >= 1000 ||
+      
       chaletBookingsList.length >= 1000 ||
       poolTicketsList.length >= 1000
     ) {
       logger.warn('Admin overview report hit 1000-row safety limit for one or more datasets', {
-        restaurant: restaurantOrdersList.length,
-        snack: snackOrdersList.length,
+        instant: allInstantList.length,
+        
         chalets: chaletBookingsList.length,
         pool: poolTicketsList.length,
         start,
@@ -1157,21 +1144,21 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
     }
 
     // Calculate revenues
-    const restaurantRevenue = restaurantOrdersList
+    const ordersRevenue = allInstantList
       .filter(o => o.status === 'completed')
-      .reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
-    const snackRevenue = snackOrdersList
+      .reduce((sum, o) => sum + parseFloat(o.amount || '0'), 0);
+    const // merged into ordersRevenue
       .filter(o => o.status === 'completed')
-      .reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
+      .reduce((sum, o) => sum + parseFloat(o.amount || '0'), 0);
     const chaletRevenue = chaletBookingsList
       .filter(b => b.payment_status === 'paid')
-      .reduce((sum, b) => sum + parseFloat(b.total_amount || '0'), 0);
+      .reduce((sum, b) => sum + parseFloat(b.amount || '0'), 0);
     const poolRevenue = poolTicketsList
       .filter(t => t.payment_status === 'paid')
-      .reduce((sum, t) => sum + parseFloat(t.total_amount || '0'), 0);
+      .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
 
-    const totalRevenue = restaurantRevenue + snackRevenue + chaletRevenue + poolRevenue;
-    const totalOrders = restaurantOrdersList.length + snackOrdersList.length;
+    const totalRevenue = ordersRevenue + chaletRevenue + poolRevenue;
+    const totalOrders = allInstantList.length;
     const totalBookings = chaletBookingsList.length + poolTicketsList.length;
 
     // Process Top Items
@@ -1215,8 +1202,8 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
       monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + parseFloat(String(amount)));
     };
 
-    restaurantOrdersList.filter(o => o.status === 'completed').forEach(o => addToMonth(o.created_at, o.total_amount));
-    snackOrdersList.filter(o => o.status === 'completed').forEach(o => addToMonth(o.created_at, o.total_amount));
+    allInstantList.filter(o => o.status === 'completed').forEach(o => addToMonth(o.created_at, o.total_amount));
+    ([]).filter(o => o.status === 'completed').forEach(o => addToMonth(o.created_at, o.total_amount));
     chaletBookingsList.filter(b => b.payment_status === 'paid').forEach(b => addToMonth(b.created_at, b.total_amount));
     poolTicketsList.filter(t => t.payment_status === 'paid').forEach(t => addToMonth(t.created_at, t.total_amount));
 
@@ -1273,7 +1260,7 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
     switch (type) {
       case 'restaurant': {
         const { data: orders, error } = await supabase
-          .from('restaurant_orders')
+          .from('transactions').eq('engine_type', 'instant_transaction')
           .select('order_number, customer_name, order_type, status, subtotal, tax_amount, total_amount, payment_status, payment_method, created_at')
           .gte('created_at', start)
           .lte('created_at', end)
@@ -1298,7 +1285,7 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
 
       case 'chalets': {
         const { data: bookings, error } = await supabase
-          .from('chalet_bookings')
+          .from('transactions').eq('engine_type', 'time_exclusive_reservation')
           .select('booking_number, customer_name, customer_email, check_in_date, check_out_date, number_of_guests, number_of_nights, base_amount, total_amount, status, payment_status, created_at')
           .gte('created_at', start)
           .lte('created_at', end)
@@ -1325,7 +1312,7 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
 
       case 'pool': {
         const { data: tickets, error } = await supabase
-          .from('pool_tickets')
+          .from('transactions').eq('engine_type', 'shared_capacity_access')
           .select('ticket_number, customer_name, ticket_date, number_of_guests, total_amount, status, payment_status, created_at')
           .gte('created_at', start)
           .lte('created_at', end)
@@ -1348,7 +1335,7 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
 
       case 'snack': {
         const { data: orders, error } = await supabase
-          .from('snack_orders')
+          .from('transactions').eq('engine_type', 'instant_transaction')
           .select('order_number, customer_name, status, subtotal, total_amount, payment_status, created_at')
           .gte('created_at', start)
           .lte('created_at', end)
@@ -1433,7 +1420,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
 
     // Get recent restaurant orders
     const { data: recentOrders } = await supabase
-      .from('restaurant_orders')
+      .from('transactions').eq('engine_type', 'instant_transaction')
       .select('id, order_number, status, created_at')
       .gte('created_at', oneDayAgo.toISOString())
       .order('created_at', { ascending: false })
@@ -1456,7 +1443,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
 
     // Get recent chalet bookings
     const { data: recentBookings } = await supabase
-      .from('chalet_bookings')
+      .from('transactions').eq('engine_type', 'time_exclusive_reservation')
       .select('id, chalet_id, check_in_date, status, created_at')
       .gte('created_at', oneDayAgo.toISOString())
       .order('created_at', { ascending: false })
@@ -1530,7 +1517,7 @@ export const getOccupancyReport = asyncHandler(async (req: Request, res: Respons
     // 1. Chalet Occupancy
     const [chaletsResult, bookingsResult] = await Promise.all([
       supabase.from('chalets').select('id', { count: 'exact', head: true }).eq('is_active', true).is('deleted_at', null),
-      supabase.from('chalet_bookings')
+      supabase.from('transactions').eq('engine_type', 'time_exclusive_reservation')
         .select('number_of_nights, check_in_date, status')
         .gte('check_in_date', start.toISOString())
         .lte('check_in_date', end.toISOString())
@@ -1545,7 +1532,7 @@ export const getOccupancyReport = asyncHandler(async (req: Request, res: Respons
     // 2. Pool Occupancy
     const [sessionsResult, ticketsResult] = await Promise.all([
       supabase.from('pool_sessions').select('max_capacity').eq('is_active', true),
-      supabase.from('pool_tickets')
+      supabase.from('transactions').eq('engine_type', 'shared_capacity_access')
         .select('number_of_guests, status')
         .gte('ticket_date', start.toISOString())
         .lte('ticket_date', end.toISOString())
@@ -1594,10 +1581,10 @@ export const getCustomerAnalytics = asyncHandler(async (req: Request, res: Respo
     // Fetch transactions from all units to identify top customers
     // Since we don't have a single transactions table, we'll fetch from main tables
     const [restOrders, snackOrders, chaletBookings, poolTickets] = await Promise.all([
-      supabase.from('restaurant_orders').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('status', 'completed'),
-      supabase.from('snack_orders').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('status', 'completed'),
-      supabase.from('chalet_bookings').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('payment_status', 'paid'),
-      supabase.from('pool_tickets').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('payment_status', 'paid')
+      supabase.from('transactions').eq('engine_type', 'instant_transaction').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('status', 'completed'),
+      supabase.from('transactions').eq('engine_type', 'instant_transaction').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('status', 'completed'),
+      supabase.from('transactions').eq('engine_type', 'time_exclusive_reservation').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('payment_status', 'paid'),
+      supabase.from('transactions').eq('engine_type', 'shared_capacity_access').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('payment_status', 'paid')
     ]);
 
     const allTransactions = [
@@ -1613,7 +1600,7 @@ export const getCustomerAnalytics = asyncHandler(async (req: Request, res: Respo
     allTransactions.forEach(t => {
       if (!t.customer_id) return;
       const stats = customerStats.get(t.customer_id) || { name: t.customer_name || 'Unknown', revenue: 0, count: 0, firstDate: t.created_at };
-      const amount = parseFloat(t.total_amount || '0');
+      const amount = parseFloat(t.amount || '0');
       stats.revenue += isNaN(amount) ? 0 : amount;
       stats.count += 1;
       if (t.created_at && (!stats.firstDate || dayjs(t.created_at).isBefore(dayjs(stats.firstDate)))) {

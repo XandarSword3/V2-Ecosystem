@@ -353,34 +353,22 @@ export class ApprovalsController {
           break;
         }
 
-        case 'void':
-          // Cancel the order across all reference types
-          if (approval.reference_type === 'restaurant_order') {
-            await supabase
-              .from('restaurant_orders')
-              .update({
-                status: 'cancelled',
-                cancellation_reason: approval.description,
-                cancelled_at: new Date().toISOString(),
-              })
-              .eq('id', approval.reference_id);
-          } else if (approval.reference_type === 'chalet_booking') {
-            await supabase
-              .from('chalet_bookings')
-              .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
-              .eq('id', approval.reference_id);
-          } else if (approval.reference_type === 'pool_ticket') {
-            await supabase
-              .from('pool_tickets')
-              .update({ status: 'cancelled' })
-              .eq('id', approval.reference_id);
-          }
+        case 'void':          // Cancel the transaction across all engine types
+          await supabase
+            .from('transactions')
+            .update({
+              status: 'cancelled',
+              // Note: We avoid overwriting metadata here by only updating status
+              // Ideally we'd merge the reason into metadata via RPC
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', approval.reference_id);
           break;
-
+ 
         case 'discount':
         case 'price_adjustment':
           if (approval.reference_id) {
-            await supabase.from('audit_logs').insert({
+            await supabase.from('activity_logs').insert({ // Changed from audit_logs to activity_logs
               user_id: approval.reviewed_by,
               action: `${approval.type}_applied`,
               resource: approval.reference_type,
@@ -394,18 +382,16 @@ export class ApprovalsController {
             });
           }
           break;
-
+ 
         case 'comp':
-          if (approval.reference_type === 'restaurant_order') {
-            await supabase
-              .from('restaurant_orders')
-              .update({
-                payment_status: 'comped',
-                comp_reason: approval.description,
-                comped_at: new Date().toISOString(),
-              })
-              .eq('id', approval.reference_id);
-          }
+          await supabase
+            .from('transactions')
+            .update({
+              payment_status: 'comped',
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', approval.reference_id);
           break;
       }
 

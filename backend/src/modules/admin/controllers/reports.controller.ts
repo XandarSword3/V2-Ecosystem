@@ -62,56 +62,44 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
 
     const [currentRestaurant, currentChalets, currentPool, currentSnack, previousRestaurant, previousChalets, previousPool, previousSnack, monthlyRevenueRows, topItemsResult, usersResult] = await Promise.all([
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM restaurant_orders WHERE created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE reference_table = \'restaurant_orders\' AND created_at BETWEEN $1 AND $2',
         [startISO, endISO]
       ),
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM chalet_bookings WHERE created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE engine_type = \'time_exclusive_reservation\' AND created_at BETWEEN $1 AND $2',
         [startISO, endISO]
       ),
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM pool_tickets WHERE created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE engine_type = \'shared_capacity_access\' AND created_at BETWEEN $1 AND $2',
         [startISO, endISO]
       ),
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM snack_orders WHERE created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE reference_table = \'snack_orders\' AND created_at BETWEEN $1 AND $2',
         [startISO, endISO]
       ),
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM restaurant_orders WHERE created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE reference_table = \'restaurant_orders\' AND created_at BETWEEN $1 AND $2',
         [prevStartISO, prevEndISO]
       ),
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM chalet_bookings WHERE created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE engine_type = \'time_exclusive_reservation\' AND created_at BETWEEN $1 AND $2',
         [prevStartISO, prevEndISO]
       ),
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM pool_tickets WHERE created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE engine_type = \'shared_capacity_access\' AND created_at BETWEEN $1 AND $2',
         [prevStartISO, prevEndISO]
       ),
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM snack_orders WHERE created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE reference_table = \'snack_orders\' AND created_at BETWEEN $1 AND $2',
         [prevStartISO, prevEndISO]
       ),
       pool.query<{ month_key: string; revenue: string }>(`
         WITH all_items AS (
-          SELECT date_trunc('month', created_at) AS month_start, total_amount
-          FROM restaurant_orders
-          WHERE created_at BETWEEN $1 AND $2
-          UNION ALL
-          SELECT date_trunc('month', created_at) AS month_start, total_amount
-          FROM chalet_bookings
-          WHERE created_at BETWEEN $1 AND $2
-          UNION ALL
-          SELECT date_trunc('month', created_at) AS month_start, total_amount
-          FROM pool_tickets
-          WHERE created_at BETWEEN $1 AND $2
-          UNION ALL
-          SELECT date_trunc('month', created_at) AS month_start, total_amount
-          FROM snack_orders
+          SELECT date_trunc('month', created_at) AS month_start, amount
+          FROM transactions
           WHERE created_at BETWEEN $1 AND $2
         )
-        SELECT to_char(month_start, 'YYYY-MM') AS month_key, COALESCE(SUM(total_amount), 0) AS revenue
+        SELECT to_char(month_start, 'YYYY-MM') AS month_key, COALESCE(SUM(amount), 0) AS revenue
         FROM all_items
         GROUP BY month_start
         ORDER BY month_start
@@ -124,14 +112,15 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
         name: string | null;
       }>(`
         SELECT
-          roi.id,
-          roi.menu_item_id,
-          roi.quantity,
-          roi.unit_price,
-          mi.name
-        FROM restaurant_order_items roi
-        LEFT JOIN menu_items mi ON mi.id = roi.menu_item_id
-        ORDER BY roi.quantity DESC
+          item->>'id' as id,
+          item->>'menu_item_id' as menu_item_id,
+          (item->>'quantity')::int as quantity,
+          item->>'unit_price' as unit_price,
+          item->>'name' as name
+        FROM transactions,
+        jsonb_array_elements(metadata->'items') as item
+        WHERE engine_type = 'instant_transaction'
+        ORDER BY (item->>'quantity')::int DESC
         LIMIT 5
       `),
       pool.query<{ count: string | number }>('SELECT COUNT(*)::int AS count FROM users'),
@@ -198,19 +187,19 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
 
   // Current period queries
   const [ordersRes, chaletBookingsRes, poolTicketsRes, snackOrdersRes, usersRes] = await Promise.all([
-    supabase.from('restaurant_orders').select('id, total_amount, created_at').gte('created_at', startISO).lte('created_at', endISO),
-    supabase.from('chalet_bookings').select('id, total_amount, created_at').gte('created_at', startISO).lte('created_at', endISO),
-    supabase.from('pool_tickets').select('id, total_amount, created_at').gte('created_at', startISO).lte('created_at', endISO),
-    supabase.from('snack_orders').select('id, total_amount, created_at').gte('created_at', startISO).lte('created_at', endISO),
+    supabase.from('transactions').select('id, amount, created_at').eq('reference_table', 'restaurant_orders').gte('created_at', startISO).lte('created_at', endISO),
+    supabase.from('transactions').select('id, amount, created_at').eq('engine_type', 'time_exclusive_reservation').gte('created_at', startISO).lte('created_at', endISO),
+    supabase.from('transactions').select('id, amount, created_at').eq('engine_type', 'shared_capacity_access').gte('created_at', startISO).lte('created_at', endISO),
+    supabase.from('transactions').select('id, amount, created_at').eq('reference_table', 'snack_orders').gte('created_at', startISO).lte('created_at', endISO),
     supabase.from('users').select('id', { count: 'exact' }),
   ]);
 
   // Previous period for change calculation
   const [prevOrdersRes, prevChaletRes, prevPoolRes, prevSnackRes] = await Promise.all([
-    supabase.from('restaurant_orders').select('id, total_amount').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
-    supabase.from('chalet_bookings').select('id, total_amount').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
-    supabase.from('pool_tickets').select('id, total_amount').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
-    supabase.from('snack_orders').select('id, total_amount').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+    supabase.from('transactions').select('id, amount').eq('reference_table', 'restaurant_orders').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+    supabase.from('transactions').select('id, amount').eq('engine_type', 'time_exclusive_reservation').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+    supabase.from('transactions').select('id, amount').eq('engine_type', 'shared_capacity_access').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+    supabase.from('transactions').select('id, amount').eq('reference_table', 'snack_orders').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
   ]);
 
   const orders = ordersRes.data || [];
@@ -218,10 +207,10 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
   const poolTickets = poolTicketsRes.data || [];
   const snackOrders = snackOrdersRes.data || [];
 
-  const restaurantRevenue = orders.reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0);
-  const chaletRevenue = chaletBookings.reduce((sum: number, b: any) => sum + (Number(b.total_amount) || 0), 0);
-  const poolRevenue = poolTickets.reduce((sum: number, t: any) => sum + (Number(t.total_amount) || 0), 0);
-  const snackRevenue = snackOrders.reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0);
+  const restaurantRevenue = orders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0);
+  const chaletRevenue = chaletBookings.reduce((sum: number, b: any) => sum + (Number(b.amount) || 0), 0);
+  const poolRevenue = poolTickets.reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
+  const snackRevenue = snackOrders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0);
   const totalRevenue = restaurantRevenue + chaletRevenue + poolRevenue + snackRevenue;
   const totalOrders = orders.length + snackOrders.length;
   const totalBookings = chaletBookings.length + poolTickets.length;
@@ -232,7 +221,7 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
     ...(prevChaletRes.data || []),
     ...(prevPoolRes.data || []),
     ...(prevSnackRes.data || []),
-  ].reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
+  ].reduce((sum: number, r: any) => sum + (Number(r.amount) || 0), 0);
   const prevOrders = (prevOrdersRes.data || []).length + (prevSnackRes.data || []).length;
 
   const revenueChange = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
@@ -253,16 +242,13 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
       ...poolTickets.filter((t: any) => new Date(t.created_at) >= monthStart && new Date(t.created_at) <= monthEnd),
       ...snackOrders.filter((o: any) => new Date(o.created_at) >= monthStart && new Date(o.created_at) <= monthEnd),
     ];
-    const monthRevenue = allItems.reduce((sum: number, item: any) => sum + (Number(item.total_amount) || 0), 0);
+    const monthRevenue = allItems.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0);
     revenueByMonth.push({ month: monthLabel, revenue: monthRevenue });
   }
 
-  // Top items from restaurant orders
+  // Top items from transactions metadata
   const { data: topItemsData } = await supabase
-    .from('restaurant_order_items')
-    .select('menu_item_id, quantity, unit_price, menu_items(name)')
-    .order('quantity', { ascending: false })
-    .limit(5);
+    .rpc('get_top_menu_items', { limit_count: 5 });
 
   const topItems = (topItemsData || []).map((item: any) => ({
     name: item.menu_items?.name || 'Unknown',
@@ -302,14 +288,14 @@ export const getOccupancyReport = asyncHandler(async (req: Request, res: Respons
 
   // Chalets occupancy
   const [chaletsRes, chaletBookingsRes] = await Promise.all([
-    supabase.from('chalets').select('id', { count: 'exact' }).eq('is_active', true),
-    supabase.from('chalet_bookings').select('id, check_in_date, check_out_date').gte('check_in_date', startISO).lte('check_in_date', endISO),
+    supabase.from('accommodation_units').select('id', { count: 'exact' }).eq('is_active', true),
+    supabase.from('transactions').select('id, metadata').eq('engine_type', 'time_exclusive_reservation').gte('created_at', startISO).lte('created_at', endISO),
   ]);
   const activeChalets = chaletsRes.count || 0;
   const chaletBookings = chaletBookingsRes.data || [];
   const totalNights = chaletBookings.reduce((sum: number, b: any) => {
-    const checkIn = new Date(b.check_in_date);
-    const checkOut = new Date(b.check_out_date);
+    const checkIn = new Date(b.metadata?.check_in_date);
+    const checkOut = new Date(b.metadata?.check_out_date);
     return sum + Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
   }, 0);
   const daysInRange = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
@@ -324,11 +310,12 @@ export const getOccupancyReport = asyncHandler(async (req: Request, res: Respons
     .single();
   const dailyPoolCapacity = poolSettings?.value?.maxCapacity || poolSettings?.value?.max_capacity || 100;
   const { data: poolTickets } = await supabase
-    .from('pool_tickets')
-    .select('id, number_of_guests')
-    .gte('ticket_date', startISO)
-    .lte('ticket_date', endISO);
-  const totalTickets = (poolTickets || []).reduce((sum: number, t: any) => sum + (Number(t.number_of_guests) || 0), 0);
+    .from('transactions')
+    .select('id, metadata')
+    .eq('engine_type', 'shared_capacity_access')
+    .gte('created_at', startISO)
+    .lte('created_at', endISO);
+  const totalTickets = (poolTickets || []).reduce((sum: number, t: any) => sum + (Number(t.metadata?.number_of_guests) || 0), 0);
   const totalPoolCapacity = dailyPoolCapacity * daysInRange;
   const poolOccupancy = totalPoolCapacity > 0 ? (totalTickets / totalPoolCapacity) * 100 : 0;
 
@@ -360,17 +347,19 @@ export const getCustomersReport = asyncHandler(async (req: Request, res: Respons
 
   // Get orders with user info to find top customers
   const { data: orderData } = await supabase
-    .from('restaurant_orders')
-    .select('customer_id, customer_name, total_amount')
+    .from('transactions')
+    .select('customer_id, metadata, amount')
+    .eq('engine_type', 'instant_transaction')
     .gte('created_at', startISO)
     .lte('created_at', endISO);
 
   // Aggregate by customer
   const customerMap = new Map<string, { name: string; revenue: number; count: number }>();
   (orderData || []).forEach((order: any) => {
-    const customerKey = order.customer_id || `guest:${order.customer_name || 'Guest'}`;
-    const existing = customerMap.get(customerKey) || { name: order.customer_name || 'Guest', revenue: 0, count: 0 };
-    existing.revenue += Number(order.total_amount) || 0;
+    const customerName = order.metadata?.customer_name || 'Guest';
+    const customerKey = order.customer_id || `guest:${customerName}`;
+    const existing = customerMap.get(customerKey) || { name: customerName, revenue: 0, count: 0 };
+    existing.revenue += Number(order.amount) || 0;
     existing.count += 1;
     customerMap.set(customerKey, existing);
   });
@@ -382,7 +371,7 @@ export const getCustomersReport = asyncHandler(async (req: Request, res: Respons
 
   // Customer retention (new vs returning)
   const { data: prevUsers } = await supabase
-    .from('restaurant_orders')
+    .from('transactions')
     .select('customer_id')
     .lt('created_at', startISO)
     .not('customer_id', 'is', null);
@@ -419,23 +408,23 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
 
   switch (type) {
     case 'restaurant': {
-      const { data } = await supabase.from('restaurant_orders').select('id, order_number, total_amount, status, created_at').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
-      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.order_number || ''},${o.total_amount},${o.status},${o.created_at}`).join('\n');
+      const { data } = await supabase.from('transactions').select('id, order_number, amount, status, created_at').eq('reference_table', 'restaurant_orders').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
+      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.order_number || ''},${o.amount},${o.status},${o.created_at}`).join('\n');
       break;
     }
     case 'chalets': {
-      const { data } = await supabase.from('chalet_bookings').select('id, chalet_id, total_amount, status, check_in_date, check_out_date, created_at').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
-      csvData = 'ID,Chalet,Total,Status,Check In,Check Out,Created\n' + (data || []).map((b: any) => `${b.id},${b.chalet_id},${b.total_amount},${b.status},${b.check_in_date},${b.check_out_date},${b.created_at}`).join('\n');
+      const { data } = await supabase.from('transactions').select('id, metadata, amount, status, created_at').eq('engine_type', 'time_exclusive_reservation').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
+      csvData = 'ID,Chalet,Total,Status,Check In,Check Out,Created\n' + (data || []).map((b: any) => `${b.id},${b.metadata?.chalet_id || ''},${b.amount},${b.status},${b.metadata?.check_in_date || ''},${b.metadata?.check_out_date || ''},${b.created_at}`).join('\n');
       break;
     }
     case 'pool': {
-      const { data } = await supabase.from('pool_tickets').select('id, ticket_number, total_amount, status, number_of_guests, ticket_date').gte('ticket_date', startISO).lte('ticket_date', endISO).order('ticket_date', { ascending: false });
-      csvData = 'ID,Ticket,Total,Status,Guests,Date\n' + (data || []).map((t: any) => `${t.id},${t.ticket_number || ''},${t.total_amount},${t.status},${t.number_of_guests},${t.ticket_date}`).join('\n');
+      const { data } = await supabase.from('transactions').select('id, ticket_number, amount, status, metadata, created_at').eq('engine_type', 'shared_capacity_access').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
+      csvData = 'ID,Ticket,Total,Status,Guests,Date\n' + (data || []).map((t: any) => `${t.id},${t.ticket_number || ''},${t.amount},${t.status},${t.metadata?.number_of_guests || 0},${t.created_at}`).join('\n');
       break;
     }
     case 'snack': {
-      const { data } = await supabase.from('snack_orders').select('id, order_number, total_amount, status, created_at').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
-      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.order_number || ''},${o.total_amount},${o.status},${o.created_at}`).join('\n');
+      const { data } = await supabase.from('transactions').select('id, order_number, amount, status, created_at').eq('reference_table', 'snack_orders').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
+      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.order_number || ''},${o.amount},${o.status},${o.created_at}`).join('\n');
       break;
     }
     case 'users': {

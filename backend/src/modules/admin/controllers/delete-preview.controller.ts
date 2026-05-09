@@ -114,18 +114,18 @@ async function getUserDeletePreview(supabase: any, userId: string): Promise<Dele
     sessionsResult,
     rolesResult,
   ] = await Promise.all([
-    supabase.from('chalet_bookings').select('id, booking_number', { count: 'exact' }).eq('user_id', userId).limit(5),
-    supabase.from('restaurant_orders').select('id, order_number', { count: 'exact' }).eq('user_id', userId).limit(5),
-    supabase.from('pool_tickets').select('id, ticket_number', { count: 'exact' }).eq('user_id', userId).limit(5),
+    supabase.from('transactions').select('id, booking_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'time_exclusive_reservation').limit(5),
+    supabase.from('transactions').select('id, order_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'instant_transaction').limit(5),
+    supabase.from('transactions').select('id, ticket_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'shared_capacity_access').limit(5),
     supabase.from('reviews').select('id, rating', { count: 'exact' }).eq('user_id', userId).limit(5),
     supabase.from('user_sessions').select('id', { count: 'exact' }).eq('user_id', userId),
     supabase.from('user_roles').select('role_id', { count: 'exact' }).eq('user_id', userId),
   ]);
 
   const relatedEntities: RelatedEntity[] = [
-    { table: 'chalet_bookings', count: bookingsResult.count || 0, examples: bookingsResult.data?.map((b: any) => ({ id: b.id, identifier: b.booking_number })) },
-    { table: 'restaurant_orders', count: ordersResult.count || 0, examples: ordersResult.data?.map((o: any) => ({ id: o.id, identifier: o.order_number })) },
-    { table: 'pool_tickets', count: poolTicketsResult.count || 0, examples: poolTicketsResult.data?.map((t: any) => ({ id: t.id, identifier: t.ticket_number })) },
+    { table: 'bookings', count: bookingsResult.count || 0, examples: bookingsResult.data?.map((b: any) => ({ id: b.id, identifier: b.booking_number })) },
+    { table: 'orders', count: ordersResult.count || 0, examples: ordersResult.data?.map((o: any) => ({ id: o.id, identifier: o.order_number })) },
+    { table: 'tickets', count: poolTicketsResult.count || 0, examples: poolTicketsResult.data?.map((t: any) => ({ id: t.id, identifier: t.ticket_number })) },
     { table: 'reviews', count: reviewsResult.count || 0 },
     { table: 'user_sessions', count: sessionsResult.count || 0 },
     { table: 'user_roles', count: rolesResult.count || 0 },
@@ -178,9 +178,10 @@ async function getUserDeletePreview(supabase: any, userId: string): Promise<Dele
  */
 async function getBookingDeletePreview(supabase: any, bookingId: string): Promise<DeletePreviewResult> {
   const { data: booking, error } = await supabase
-    .from('chalet_bookings')
-    .select('id, booking_number, status, check_in_date, check_out_date, total_amount, user_id, created_at')
+    .from('transactions')
+    .select('id, booking_number, status, amount, customer_id, created_at')
     .eq('id', bookingId)
+    .eq('engine_type', 'time_exclusive_reservation')
     .single();
 
   if (error || !booking) {
@@ -188,8 +189,10 @@ async function getBookingDeletePreview(supabase: any, bookingId: string): Promis
   }
 
   const [paymentsResult, addOnsResult] = await Promise.all([
-    supabase.from('payments').select('id, amount', { count: 'exact' }).eq('booking_id', bookingId),
-    supabase.from('chalet_booking_addons').select('id', { count: 'exact' }).eq('booking_id', bookingId),
+    supabase.from('payments').select('id, amount', { count: 'exact' }).eq('reference_id', bookingId).eq('reference_table', 'transactions'),
+    // Addons are now in metadata or a separate table if they were not unified.
+    // Assuming they are in metadata for now.
+    Promise.resolve({ count: 0, data: [] })
   ]);
 
   const relatedEntities: RelatedEntity[] = [
@@ -256,7 +259,7 @@ async function getStaffDeletePreview(supabase: any, staffId: string): Promise<De
     supabase.from('staff_shifts').select('id', { count: 'exact' }).eq('staff_id', staffId),
     supabase.from('staff_assignments').select('id', { count: 'exact' }).eq('staff_id', staffId),
     supabase.from('housekeeping_tasks').select('id', { count: 'exact' }).eq('assigned_to', staffId),
-    supabase.from('restaurant_orders').select('id', { count: 'exact' }).eq('assigned_staff_id', staffId),
+    supabase.from('transactions').select('id', { count: 'exact' }).eq('staff_id', staffId),
   ]);
 
   const relatedEntities: RelatedEntity[] = [
@@ -316,7 +319,7 @@ async function getStaffDeletePreview(supabase: any, staffId: string): Promise<De
  */
 async function getChaletDeletePreview(supabase: any, chaletId: string): Promise<DeletePreviewResult> {
   const { data: chalet, error } = await supabase
-    .from('chalets')
+    .from('accommodation_units')
     .select('id, name, created_at')
     .eq('id', chaletId)
     .single();
@@ -325,10 +328,9 @@ async function getChaletDeletePreview(supabase: any, chaletId: string): Promise<
     throw new Error('Chalet not found');
   }
 
-  const [bookingsResult, addOnsResult, imagesResult] = await Promise.all([
-    supabase.from('chalet_bookings').select('id, booking_number, status', { count: 'exact' }).eq('chalet_id', chaletId).limit(10),
-    supabase.from('chalet_add_ons').select('id', { count: 'exact' }).eq('chalet_id', chaletId),
-    supabase.from('chalet_images').select('id', { count: 'exact' }).eq('chalet_id', chaletId),
+  const [bookingsResult, imagesResult] = await Promise.all([
+    supabase.from('transactions').select('id, booking_number, status', { count: 'exact' }).eq('reference_id', chaletId).eq('reference_table', 'accommodation_units').limit(10),
+    supabase.from('accommodation_unit_images').select('id', { count: 'exact' }).eq('unit_id', chaletId),
   ]);
 
   const activeBookings = bookingsResult.data?.filter((b: any) => 
@@ -336,9 +338,8 @@ async function getChaletDeletePreview(supabase: any, chaletId: string): Promise<
   ).length || 0;
 
   const relatedEntities: RelatedEntity[] = [
-    { table: 'chalet_bookings', count: bookingsResult.count || 0, examples: bookingsResult.data?.slice(0, 5).map((b: any) => ({ id: b.id, identifier: b.booking_number })) },
-    { table: 'chalet_add_ons', count: addOnsResult.count || 0 },
-    { table: 'chalet_images', count: imagesResult.count || 0 },
+    { table: 'bookings', count: bookingsResult.count || 0, examples: bookingsResult.data?.slice(0, 5).map((b: any) => ({ id: b.id, identifier: b.booking_number })) },
+    { table: 'images', count: imagesResult.count || 0 },
   ].filter(e => e.count > 0);
 
   const warnings: string[] = [];
@@ -389,7 +390,8 @@ async function getMenuItemDeletePreview(supabase: any, itemId: string): Promise<
   }
 
   const [orderItemsResult, inventoryResult] = await Promise.all([
-    supabase.from('restaurant_order_items').select('id', { count: 'exact' }).eq('menu_item_id', itemId),
+    // Check if item appears in any transaction metadata
+    supabase.from('transactions').select('id', { count: 'exact' }).filter('metadata->items', 'cs', `[{"menu_item_id": "${itemId}"}]`),
     supabase.from('inventory_recipes').select('id', { count: 'exact' }).eq('menu_item_id', itemId),
   ]);
 
@@ -444,12 +446,12 @@ async function getTableDeletePreview(supabase: any, tableId: string): Promise<De
   }
 
   const [ordersResult, reservationsResult] = await Promise.all([
-    supabase.from('restaurant_orders').select('id', { count: 'exact' }).eq('table_id', tableId),
+    supabase.from('transactions').select('id', { count: 'exact' }).filter('metadata->table_id', 'eq', tableId),
     supabase.from('table_reservations').select('id', { count: 'exact' }).eq('table_id', tableId),
   ]);
 
   const relatedEntities: RelatedEntity[] = [
-    { table: 'restaurant_orders', count: ordersResult.count || 0 },
+    { table: 'orders', count: ordersResult.count || 0 },
     { table: 'table_reservations', count: reservationsResult.count || 0 },
   ].filter(e => e.count > 0);
 
@@ -459,9 +461,9 @@ async function getTableDeletePreview(supabase: any, tableId: string): Promise<De
 
   // Check for active orders
   const { count: activeOrders } = await supabase
-    .from('restaurant_orders')
+    .from('transactions')
     .select('id', { count: 'exact' })
-    .eq('table_id', tableId)
+    .filter('metadata->table_id', 'eq', tableId)
     .in('status', ['pending', 'preparing', 'ready']);
 
   if (activeOrders && activeOrders > 0) {
@@ -512,17 +514,17 @@ async function getModuleDeletePreview(supabase: any, moduleId: string): Promise<
 
   if (module.type === 'multi_day') {
     const { count: bookingsCount } = await supabase
-      .from('chalet_bookings')
+      .from('transactions')
       .select('id', { count: 'exact' })
       .eq('module_id', moduleId);
     
     const { count: unitsCount } = await supabase
-      .from('chalets')
+      .from('accommodation_units')
       .select('id', { count: 'exact' })
       .eq('module_id', moduleId);
 
     relatedEntities = [
-      { table: 'units/chalets', count: unitsCount || 0 },
+      { table: 'units', count: unitsCount || 0 },
       { table: 'bookings', count: bookingsCount || 0 },
     ].filter(e => e.count > 0);
 
@@ -533,7 +535,7 @@ async function getModuleDeletePreview(supabase: any, moduleId: string): Promise<
     }
   } else if (module.type === 'restaurant') {
     const [ordersResult, tablesResult, menuResult] = await Promise.all([
-      supabase.from('restaurant_orders').select('id', { count: 'exact' }).eq('module_id', moduleId),
+      supabase.from('transactions').select('id', { count: 'exact' }).eq('module_id', moduleId),
       supabase.from('restaurant_tables').select('id', { count: 'exact' }).eq('module_id', moduleId),
       supabase.from('menu_items').select('id', { count: 'exact' }).eq('module_id', moduleId),
     ]);

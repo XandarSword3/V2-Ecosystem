@@ -24,45 +24,55 @@ DO $$
 DECLARE
     default_prop_id UUID;
 BEGIN
-    -- Prioritize primary property, fallback to first created
-    SELECT id INTO default_prop_id FROM properties ORDER BY is_primary DESC, created_at ASC LIMIT 1;
+    -- Fallback to first created property
+    SELECT id INTO default_prop_id FROM properties ORDER BY created_at ASC LIMIT 1;
     
     IF default_prop_id IS NOT NULL THEN
         -- Standard transactional/config tables
-        UPDATE restaurant_tables SET property_id = default_prop_id WHERE property_id IS NULL;
-        UPDATE inventory_items SET property_id = default_prop_id WHERE property_id IS NULL;
-        UPDATE inventory_categories SET property_id = default_prop_id WHERE property_id IS NULL;
-        UPDATE gift_cards SET property_id = default_prop_id WHERE property_id IS NULL;
-        UPDATE gift_card_templates SET property_id = default_prop_id WHERE property_id IS NULL;
-        UPDATE coupons SET property_id = default_prop_id WHERE property_id IS NULL;
-        UPDATE housekeeping_tasks SET property_id = default_prop_id WHERE property_id IS NULL;
-        UPDATE housekeeping_task_types SET property_id = default_prop_id WHERE property_id IS NULL;
-        UPDATE loyalty_members SET property_id = default_prop_id WHERE property_id IS NULL;
-        UPDATE loyalty_tiers SET property_id = default_prop_id WHERE property_id IS NULL;
-        UPDATE site_settings SET property_id = default_prop_id WHERE property_id IS NULL;
+        -- Use EXECUTE to avoid failing if table doesn't exist
+        EXECUTE 'UPDATE restaurant_tables SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        EXECUTE 'UPDATE inventory_items SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        EXECUTE 'UPDATE inventory_categories SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        EXECUTE 'UPDATE gift_cards SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        EXECUTE 'UPDATE gift_card_templates SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        EXECUTE 'UPDATE coupons SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        EXECUTE 'UPDATE housekeeping_tasks SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        EXECUTE 'UPDATE housekeeping_task_types SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        EXECUTE 'UPDATE loyalty_members SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        EXECUTE 'UPDATE loyalty_tiers SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        EXECUTE 'UPDATE site_settings SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
         
         -- System settings: only backfill non-system categories
         UPDATE system_settings SET property_id = default_prop_id 
         WHERE property_id IS NULL AND category NOT IN ('security', 'system');
     END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 -- 3. REFACTOR UNIQUE CONSTRAINTS TO BE PROPERTY-AWARE
 -- restaurant_tables: number should be unique per property
-ALTER TABLE IF EXISTS restaurant_tables DROP CONSTRAINT IF EXISTS restaurant_tables_number_key;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_tables_num_prop ON restaurant_tables(property_id, number);
+DO $$ BEGIN
+  ALTER TABLE IF EXISTS restaurant_tables DROP CONSTRAINT IF EXISTS restaurant_tables_number_key;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_tables_num_prop ON restaurant_tables(property_id, number);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- inventory_items: sku should be unique per property
-ALTER TABLE IF EXISTS inventory_items DROP CONSTRAINT IF EXISTS inventory_items_sku_key;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_items_sku_prop ON inventory_items(property_id, sku);
+DO $$ BEGIN
+  ALTER TABLE IF EXISTS inventory_items DROP CONSTRAINT IF EXISTS inventory_items_sku_key;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_items_sku_prop ON inventory_items(property_id, sku);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- coupons: code should be unique per property
-ALTER TABLE IF EXISTS coupons DROP CONSTRAINT IF EXISTS coupons_code_key;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_coupons_code_prop ON coupons(property_id, code);
+DO $$ BEGIN
+  ALTER TABLE IF EXISTS coupons DROP CONSTRAINT IF EXISTS coupons_code_key;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_coupons_code_prop ON coupons(property_id, code);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- gift_cards: code should be unique per property
-ALTER TABLE IF EXISTS gift_cards DROP CONSTRAINT IF EXISTS gift_cards_code_key;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_gift_cards_code_prop ON gift_cards(property_id, code);
+DO $$ BEGIN
+  ALTER TABLE IF EXISTS gift_cards DROP CONSTRAINT IF EXISTS gift_cards_code_key;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_gift_cards_code_prop ON gift_cards(property_id, code);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 4. ENABLE RLS AND ESTABLISH ISOLATION POLICIES
 -- We use the pre-existing user_has_property_access(user_id, property_id) function
@@ -71,10 +81,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_gift_cards_code_prop ON gift_cards(propert
 CREATE OR REPLACE FUNCTION apply_property_isolation(target_table TEXT)
 RETURNS VOID AS $$
 BEGIN
-    EXECUTE 'ALTER TABLE ' || target_table || ' ENABLE ROW LEVEL SECURITY';
-    EXECUTE 'DROP POLICY IF EXISTS ' || target_table || '_isolation ON ' || target_table;
-    EXECUTE 'CREATE POLICY ' || target_table || '_isolation ON ' || target_table || 
-            ' FOR ALL USING (user_has_property_access(auth.uid(), property_id))';
+    -- Check if it's a table (not a view)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = target_table AND table_type = 'BASE TABLE') THEN
+        EXECUTE 'ALTER TABLE ' || target_table || ' ENABLE ROW LEVEL SECURITY';
+        EXECUTE 'DROP POLICY IF EXISTS ' || target_table || '_isolation ON ' || target_table;
+        EXECUTE 'CREATE POLICY ' || target_table || '_isolation ON ' || target_table || 
+                ' FOR ALL USING (user_has_property_access(auth.uid(), property_id))';
+    END IF;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -91,6 +104,7 @@ SELECT apply_property_isolation('loyalty_members');
 SELECT apply_property_isolation('loyalty_tiers');
 SELECT apply_property_isolation('site_settings');
 SELECT apply_property_isolation('modules');
+-- These might be views or tables depending on the state, helper handles it
 SELECT apply_property_isolation('restaurant_orders');
 SELECT apply_property_isolation('chalet_bookings');
 SELECT apply_property_isolation('pool_tickets');

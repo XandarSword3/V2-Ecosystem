@@ -472,27 +472,26 @@ export class ShiftsController {
       const startIso = todayStart.toISOString();
       const endIso = todayEnd.toISOString();
 
-      const [restaurant, snack, chalets, pool, activeShifts] = await Promise.all([
-        supabase.from('restaurant_orders').select('id,total_amount,status,created_at'),
-        supabase.from('snack_orders').select('id,total_amount,status,created_at'),
-        supabase.from('chalet_bookings').select('id,total_amount,status,created_at'),
-        supabase.from('pool_tickets').select('id,total_amount,status,created_at'),
-        supabase.from('staff_shifts').select('id,status,department').eq('status', 'active'),
+      const [transactionsResult, activeShifts] = await Promise.all([
+        supabase.from('transactions').select('id, amount, status, created_at, engine_type, reference_table'),
+        supabase.from('staff_shifts').select('id, status, department').eq('status', 'active'),
       ]);
+
+      const transactions = transactionsResult.data || [];
 
       const withinToday = (createdAt?: string | null) => {
         if (!createdAt) return false;
         const ts = new Date(createdAt).getTime();
         return ts >= todayStart.getTime() && ts <= todayEnd.getTime();
       };
-      const sumAmount = (rows: any[]) => rows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
+      const sumAmount = (rows: any[]) => rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
       const activeStatuses = new Set(['pending', 'confirmed', 'preparing', 'ready', 'checked_in', 'valid', 'active']);
 
       const modules = [
-        { name: 'restaurant', rows: restaurant.data || [] },
-        { name: 'snack', rows: snack.data || [] },
-        { name: 'chalets', rows: chalets.data || [] },
-        { name: 'pool', rows: pool.data || [] },
+        { name: 'restaurant', rows: transactions.filter(t => t.engine_type === 'instant_transaction' && t.reference_table !== 'snack_orders') },
+        { name: 'snack', rows: transactions.filter(t => t.engine_type === 'instant_transaction' && t.reference_table === 'snack_orders') },
+        { name: 'chalets', rows: transactions.filter(t => t.engine_type === 'time_exclusive_reservation') },
+        { name: 'pool', rows: transactions.filter(t => t.engine_type === 'shared_capacity_access') },
       ].map((module) => {
         const todays = module.rows.filter((row: any) => withinToday(row.created_at));
         return {
