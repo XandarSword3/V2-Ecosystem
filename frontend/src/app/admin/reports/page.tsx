@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import Link from 'next/link';
+import EconomicsDashboard from './EconomicsDashboard';
 import {
   BarChart3,
   TrendingUp,
@@ -103,9 +104,23 @@ export default function AdminReportsPage() {
   const [occupancyData, setOccupancyData] = useState<OccupancyData | null>(null);
   const [customerData, setCustomerData] = useState<CustomerData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'economics'>('overview');
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'year'>('month');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const tab = searchParams.get('tab');
+    if (tab === 'economics') {
+      setActiveTab('economics');
+    }
+  }, []);
+
+  const handleTabChange = (tab: 'overview' | 'economics') => {
+    setActiveTab(tab);
+    window.history.pushState(null, '', `?tab=${tab}`);
+  };
 
   const fetchReports = useCallback(async () => {
     try {
@@ -157,7 +172,7 @@ export default function AdminReportsPage() {
     }
   };
 
-  if (loading) {
+  if (loading && activeTab !== 'economics') {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -174,7 +189,7 @@ export default function AdminReportsPage() {
   }
 
   // Handle case when no data is available
-  if (!reportData) {
+  if (!reportData && activeTab !== 'economics') {
     return (
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -202,10 +217,10 @@ export default function AdminReportsPage() {
     );
   }
 
-  const data = reportData;
-  const totalServiceRevenue = data.revenueByService ? Object.values(data.revenueByService).reduce((a, b) => a + b, 0) : 0;
-  const revenueByMonth = data.revenueByMonth || [];
-  const topItems = data.topItems || [];
+  const data = reportData!;
+  const totalServiceRevenue = data?.revenueByService ? Object.values(data.revenueByService).reduce((a, b) => a + b, 0) : 0;
+  const revenueByMonth = data?.revenueByMonth || [];
+  const topItems = data?.topItems || [];
 
   return (
     <motion.div
@@ -225,8 +240,31 @@ export default function AdminReportsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Module Tabs */}
+          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mr-2">
+            <button
+              onClick={() => handleTabChange('overview')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'overview'
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => handleTabChange('economics')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'economics'
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+            >
+              Economics
+            </button>
+          </div>
+
           {/* Date Range Selector */}
-          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+          {activeTab === 'overview' && (
+            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
             {(['week', 'month', 'year'] as const).map((range) => (
               <button
                 key={range}
@@ -240,7 +278,10 @@ export default function AdminReportsPage() {
               </button>
             ))}
           </div>
-          <Link href="/admin/reports/scheduled">
+          )}
+          {activeTab === 'overview' && (
+            <>
+              <Link href="/admin/reports/scheduled">
             <Button variant="outline">
               <CalendarClock className="w-4 h-4 mr-2" />
               Scheduled
@@ -269,10 +310,18 @@ export default function AdminReportsPage() {
               </div>
             )}
           </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Overview Stats */}
+      {activeTab === 'economics' ? (
+        <div className="-mx-6">
+          <EconomicsDashboard />
+        </div>
+      ) : (
+        <>
+          {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <motion.div variants={fadeInUp}>
           <Card className="relative overflow-hidden">
@@ -675,6 +724,8 @@ export default function AdminReportsPage() {
           </CardContent>
         </Card>
       </motion.div>
+        </>
+      )}
     </motion.div>
   );
 }
