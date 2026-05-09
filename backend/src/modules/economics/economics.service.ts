@@ -1,21 +1,5 @@
 import { getSupabase } from '../../database/connection.js';
 import dayjs from 'dayjs';
-import { z } from 'zod';
-
-export interface Transaction {
-  id: string;
-  engine_type: string;
-  module_id: string;
-  property_id: string;
-  amount: number | string;
-  status: string;
-  customer_id: string | null;
-  staff_id: string | null;
-  created_at: string;
-  discount_amount?: number | string;
-  promo_code?: string;
-  refund_amount?: number | string;
-}
 
 export interface DateRangeParams {
   from: string;
@@ -25,240 +9,145 @@ export interface DateRangeParams {
   engineType?: string;
 }
 
-// Ensure amount is parsed securely
-const toNum = (val: string | number | undefined | null): number => {
-  if (!val) return 0;
-  return typeof val === 'string' ? parseFloat(val) : val;
+const buildRpcParams = (params: DateRangeParams, extraParams: any = {}) => {
+  return {
+    p_from: params.from,
+    p_to: params.to,
+    p_property_id: params.propertyId || null,
+    p_module_id: params.moduleId || null,
+    p_engine_type: params.engineType || null,
+    ...extraParams
+  };
 };
-
-// Helper to fetch transactions with base filtering
-async function fetchTransactions(params: DateRangeParams) {
-  const supabase = getSupabase();
-  let query = supabase
-    .from('transactions')
-    .select('*')
-    .gte('created_at', params.from)
-    .lte('created_at', params.to);
-
-  if (params.propertyId) query = query.eq('property_id', params.propertyId);
-  if (params.moduleId) query = query.eq('module_id', params.moduleId);
-  if (params.engineType) query = query.eq('engine_type', params.engineType);
-
-  // Load a maximum of 50000 rows for in-memory processing to avoid limits
-  // In production, complex analytical queries should use SQL views/RPCs
-  query = query.limit(50000);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  
-  return (data || []) as Transaction[];
-}
 
 export const economicsService = {
   // Revenue Queries
   async getRevenueOverTime(params: DateRangeParams & { interval: 'hour' | 'day' | 'week' | 'month' }) {
-    const txs = await fetchTransactions(params);
-    const completed = txs.filter(t => t.status !== 'cancelled' && t.status !== 'refunded' && t.status !== 'void');
+    const { data, error } = await getSupabase().rpc('get_economics_revenue_over_time', buildRpcParams(params, { p_interval: params.interval }));
+    if (error) throw error;
 
     const groupedMap = new Map<string, Record<string, number>>();
-
-    completed.forEach(t => {
-      let format = 'YYYY-MM-DD';
-      if (params.interval === 'hour') format = 'YYYY-MM-DD HH:00';
-      if (params.interval === 'month') format = 'YYYY-MM';
-
-      const timeKey = dayjs(t.created_at).startOf(params.interval).format(format);
+    (data || []).forEach((row: any) => {
+      const timeKey = row.time;
       if (!groupedMap.has(timeKey)) groupedMap.set(timeKey, {});
-      
-      const timeData = groupedMap.get(timeKey)!;
-      const engine = t.engine_type || 'unknown';
-      timeData[engine] = (timeData[engine] || 0) + toNum(t.amount);
+      groupedMap.get(timeKey)![row.engine_type] = Number(row.revenue);
     });
 
-    const result = Array.from(groupedMap.entries()).map(([time, engines]) => ({
+    return Array.from(groupedMap.entries()).map(([time, engines]) => ({
       time,
       ...engines,
     })).sort((a, b) => a.time.localeCompare(b.time));
-
-    return result;
   },
 
   async getRevenueByModule(params: DateRangeParams) {
-    const txs = await fetchTransactions(params);
+    const { data, error } = await getSupabase().rpc('get_economics_revenue_by_module', buildRpcParams(params));
+    if (error) throw error;
     
-    const revenueMap = new Map<string, { revenue: number, count: number, moduleName: string, refundCount: number }>();
-    
-    txs.forEach(t => {
-      const module = t.module_id || 'unknown';
-      if (!revenueMap.has(module)) revenueMap.set(module, { revenue: 0, count: 0, moduleName: module, refundCount: 0 });
-      const current = revenueMap.get(module)!;
-      
-      if (t.status === 'refunded') {
-        current.refundCount += 1;
-      } else if (t.status !== 'cancelled' && t.status !== 'void') {
-        current.revenue += toNum(t.amount);
-        current.count += 1;
-      }
+    return (data || []).map((r: any) => {
+      const rev = Number(r.revenue);
+      const count = Number(r.transaction_count);
+      const refundCount = Number(r.refund_count);
+      const totalAttempts = count + refundCount;
+      return {
+        moduleName: r.module_name,
+        revenue: rev,
+        count: count,
+        averageValue: count > 0 ? rev / count : 0,
+        refundRate: totalAttempts > 0 ? (refundCount / totalAttempts) * 100 : 0
+      };
     });
-
-    return Array.from(revenueMap.values())
-      .map(r => {
-        const totalAttempts = r.count + r.refundCount;
-        return { 
-          ...r, 
-          averageValue: r.count > 0 ? r.revenue / r.count : 0,
-          refundRate: totalAttempts > 0 ? (r.refundCount / totalAttempts) * 100 : 0
-        };
-      })
-      .sort((a, b) => b.revenue - a.revenue);
   },
 
   async getRevenueByEngineType(params: DateRangeParams) {
-    const txs = await fetchTransactions(params);
-    const completed = txs.filter(t => t.status !== 'cancelled' && t.status !== 'refunded' && t.status !== 'void');
-    const revenueMap = new Map<string, number>();
-
-    completed.forEach(t => {
-      const engine = t.engine_type || 'unknown';
-      revenueMap.set(engine, (revenueMap.get(engine) || 0) + toNum(t.amount));
-    });
-
-    return Array.from(revenueMap.entries())
-      .map(([engine_type, revenue]) => ({ engine_type, revenue }))
-      .sort((a, b) => b.revenue - a.revenue);
+    const { data, error } = await getSupabase().rpc('get_economics_revenue_by_engine', buildRpcParams(params));
+    if (error) throw error;
+    
+    return (data || []).map((r: any) => ({
+      engine_type: r.engine_type,
+      revenue: Number(r.revenue)
+    }));
   },
 
   async getGrossVsNet(params: DateRangeParams) {
-    const txs = await fetchTransactions(params);
-    
-    let gross = 0;
-    let discounts = 0;
-    let refunds = 0;
-    let net = 0;
-
-    txs.forEach(t => {
-      const amount = toNum(t.amount);
-      const discount = toNum(t.discount_amount);
-      const refund = toNum(t.refund_amount);
-
-      if (t.status === 'refunded') {
-        refunds += amount;
-      } else if (t.status !== 'cancelled' && t.status !== 'void') {
-        net += amount;
-        discounts += discount;
-        gross += (amount + discount);
-      }
-    });
-
-    return { gross, discounts, refunds, net };
+    const { data, error } = await getSupabase().rpc('get_economics_gross_vs_net', buildRpcParams(params));
+    if (error) throw error;
+    if (!data || data.length === 0) return { gross: 0, net: 0, discounts: 0, refunds: 0 };
+    const r = data[0];
+    return {
+      gross: Number(r.gross),
+      net: Number(r.net),
+      discounts: Number(r.discounts),
+      refunds: Number(r.refunds)
+    };
   },
 
   // Volume Queries
   async getTransactionVolume(params: DateRangeParams & { interval: 'hour' | 'day' | 'week' | 'month' }) {
-    const txs = await fetchTransactions(params);
-    const groupedMap = new Map<string, number>();
-
-    txs.forEach(t => {
-      let format = 'YYYY-MM-DD';
-      if (params.interval === 'hour') format = 'YYYY-MM-DD HH:00';
-      if (params.interval === 'month') format = 'YYYY-MM';
-
-      const timeKey = dayjs(t.created_at).startOf(params.interval).format(format);
-      groupedMap.set(timeKey, (groupedMap.get(timeKey) || 0) + 1);
-    });
-
-    return Array.from(groupedMap.entries())
-      .map(([time, count]) => ({ time, count }))
-      .sort((a, b) => a.time.localeCompare(b.time));
+    const { data, error } = await getSupabase().rpc('get_economics_volume', buildRpcParams(params, { p_interval: params.interval }));
+    if (error) throw error;
+    return (data || []).map((r: any) => ({ time: r.time, count: Number(r.volume_count) }));
   },
 
   async getAverageTransactionValue(params: DateRangeParams) {
-    const txs = await fetchTransactions(params);
-    const completed = txs.filter(t => t.status !== 'cancelled' && t.status !== 'refunded' && t.status !== 'void');
+    const { data, error } = await getSupabase().rpc('get_economics_avg_value', buildRpcParams(params));
+    if (error) throw error;
     
     let totalRevenue = 0;
-    const engineMap = new Map<string, { revenue: number, count: number }>();
-
-    completed.forEach(t => {
-      const amount = toNum(t.amount);
-      const engine = t.engine_type || 'unknown';
-      totalRevenue += amount;
-      
-      if (!engineMap.has(engine)) engineMap.set(engine, { revenue: 0, count: 0 });
-      const current = engineMap.get(engine)!;
-      current.revenue += amount;
-      current.count += 1;
+    let totalCount = 0;
+    const byEngine = (data || []).map((r: any) => {
+      const rev = Number(r.revenue);
+      const c = Number(r.transaction_count);
+      totalRevenue += rev;
+      totalCount += c;
+      return { engine_type: r.engine_type, average: Number(r.average) };
     });
 
-    const overall = completed.length > 0 ? totalRevenue / completed.length : 0;
-    const byEngine = Array.from(engineMap.entries()).map(([engine_type, data]) => ({
-      engine_type,
-      average: data.count > 0 ? data.revenue / data.count : 0
-    }));
-
-    return { overall, byEngine };
+    return {
+      overall: totalCount > 0 ? totalRevenue / totalCount : 0,
+      byEngine
+    };
   },
 
   async getPeakHours(params: DateRangeParams) {
-    const txs = await fetchTransactions(params);
-    const completed = txs.filter(t => t.status !== 'cancelled' && t.status !== 'refunded' && t.status !== 'void');
-    
-    const hoursMap = new Map<number, { revenue: number, count: number }>();
-    for (let i = 0; i < 24; i++) hoursMap.set(i, { revenue: 0, count: 0 });
+    const { data, error } = await getSupabase().rpc('get_economics_peak_hours', buildRpcParams(params));
+    if (error) throw error;
 
-    completed.forEach(t => {
-      const hour = dayjs(t.created_at).hour();
-      const amount = toNum(t.amount);
-      const current = hoursMap.get(hour)!;
-      current.revenue += amount;
-      current.count += 1;
+    const days = Math.max(1, dayjs(params.to).diff(dayjs(params.from), 'day'));
+    
+    const hoursMap = new Map<number, any>();
+    for (let i = 0; i < 24; i++) hoursMap.set(i, { hour: i, averageRevenue: 0, transactionCount: 0 });
+
+    (data || []).forEach((r: any) => {
+      hoursMap.set(Number(r.hour_of_day), {
+        hour: Number(r.hour_of_day),
+        averageRevenue: Number(r.revenue) / days,
+        transactionCount: Number(r.transaction_count)
+      });
     });
 
-    // Calculate number of days in range for average
-    const days = Math.max(1, dayjs(params.to).diff(dayjs(params.from), 'day'));
-
-    return Array.from(hoursMap.entries()).map(([hour, data]) => ({
-      hour,
-      averageRevenue: data.revenue / days,
-      transactionCount: data.count
-    })).sort((a, b) => a.hour - b.hour);
+    return Array.from(hoursMap.values()).sort((a, b) => a.hour - b.hour);
   },
 
   // Customer Queries
   async getTopCustomers(params: DateRangeParams & { limit?: number }) {
-    const txs = await fetchTransactions(params);
-    const completed = txs.filter(t => t.status !== 'cancelled' && t.status !== 'refunded' && t.status !== 'void' && t.customer_id);
-    
-    const customerMap = new Map<string, { spend: number, transactions: number }>();
-    completed.forEach(t => {
-      const cust = t.customer_id!;
-      if (!customerMap.has(cust)) customerMap.set(cust, { spend: 0, transactions: 0 });
-      const current = customerMap.get(cust)!;
-      current.spend += toNum(t.amount);
-      current.transactions += 1;
-    });
-
-    return Array.from(customerMap.entries())
-      .map(([customer_id, data]) => ({ customer_id, ...data }))
-      .sort((a, b) => b.spend - a.spend)
-      .slice(0, params.limit || 10);
+    const { data, error } = await getSupabase().rpc('get_economics_top_customers', buildRpcParams(params, { p_limit: params.limit || 10 }));
+    if (error) throw error;
+    return (data || []).map((r: any) => ({
+      customer_id: r.customer_id,
+      customer_name: r.customer_name,
+      spend: Number(r.spend),
+      transactions: Number(r.transaction_count)
+    }));
   },
 
   async getRepeatVsNew(params: DateRangeParams) {
-    const txs = await fetchTransactions(params);
-    const completed = txs.filter(t => t.status !== 'cancelled' && t.status !== 'refunded' && t.status !== 'void' && t.customer_id);
+    const { data, error } = await getSupabase().rpc('get_economics_repeat_vs_new', buildRpcParams(params));
+    if (error) throw error;
     
-    const customerCounts = new Map<string, number>();
-    completed.forEach(t => {
-      const cust = t.customer_id!;
-      customerCounts.set(cust, (customerCounts.get(cust) || 0) + 1);
-    });
-
     let repeat = 0;
     let newCust = 0;
-
-    Array.from(customerCounts.values()).forEach(count => {
-      if (count > 1) repeat++;
+    (data || []).forEach((r: any) => {
+      if (Number(r.transaction_count) > 1) repeat++;
       else newCust++;
     });
 
@@ -273,23 +162,20 @@ export const economicsService = {
     const prevFrom = dayjs(params.from).subtract(diff, 'millisecond').toISOString();
     const prevTo = params.from;
 
-    const { data: prevTxs } = await supabase
-      .from('transactions')
-      .select('customer_id')
-      .gte('created_at', prevFrom)
-      .lte('created_at', prevTo)
-      .not('customer_id', 'is', null);
+    const { data: prevData, error: prevError } = await supabase.rpc('get_economics_repeat_vs_new', buildRpcParams({
+      from: prevFrom, to: prevTo, propertyId: params.propertyId, moduleId: params.moduleId, engineType: params.engineType
+    }));
+    if (prevError) throw prevError;
 
-    const prevCustomers = new Set((prevTxs || []).map(t => t.customer_id));
-    
+    const prevCustomers = new Set((prevData || []).map((t: any) => t.customer_id));
     if (prevCustomers.size === 0) return { retentionRate: 0, prevPeriodTotal: 0, returningCount: 0 };
 
-    const txs = await fetchTransactions(params);
-    const currentCustomers = new Set(txs.map(t => t.customer_id).filter(Boolean));
+    const { data: currData, error: currError } = await supabase.rpc('get_economics_repeat_vs_new', buildRpcParams(params));
+    if (currError) throw currError;
 
     let returning = 0;
-    prevCustomers.forEach(c => {
-      if (currentCustomers.has(c)) returning++;
+    (currData || []).forEach((r: any) => {
+      if (prevCustomers.has(r.customer_id)) returning++;
     });
 
     return {
@@ -301,62 +187,37 @@ export const economicsService = {
 
   // Staff Queries
   async getStaffPerformance(params: DateRangeParams) {
-    const txs = await fetchTransactions(params);
-    const completed = txs.filter(t => t.status !== 'cancelled' && t.status !== 'refunded' && t.status !== 'void' && t.staff_id);
+    const { data, error } = await getSupabase().rpc('get_economics_staff_performance', buildRpcParams(params));
+    if (error) throw error;
     
-    const staffMap = new Map<string, { transactions: number, revenue: number }>();
-    completed.forEach(t => {
-      const staff = t.staff_id!;
-      if (!staffMap.has(staff)) staffMap.set(staff, { transactions: 0, revenue: 0 });
-      const current = staffMap.get(staff)!;
-      current.transactions += 1;
-      current.revenue += toNum(t.amount);
+    return (data || []).map((r: any) => {
+      const txs = Number(r.transaction_count);
+      const cancels = Number(r.cancellation_count);
+      return {
+        staff_id: r.staff_id,
+        staff_name: r.staff_name,
+        transactions: txs,
+        revenue: Number(r.revenue),
+        cancellationRate: (txs + cancels) > 0 ? (cancels / (txs + cancels)) * 100 : 0
+      };
     });
-
-    return Array.from(staffMap.entries())
-      .map(([staff_id, data]) => ({ staff_id, ...data }))
-      .sort((a, b) => b.revenue - a.revenue);
   },
 
   async getCancellationsByStaff(params: DateRangeParams) {
-    const txs = await fetchTransactions(params);
-    
-    const staffMap = new Map<string, { total: number, cancelled: number }>();
-    txs.forEach(t => {
-      if (!t.staff_id) return;
-      const staff = t.staff_id;
-      if (!staffMap.has(staff)) staffMap.set(staff, { total: 0, cancelled: 0 });
-      const current = staffMap.get(staff)!;
-      current.total += 1;
-      if (t.status === 'cancelled') {
-        current.cancelled += 1;
-      }
-    });
-
-    return Array.from(staffMap.entries())
-      .map(([staff_id, data]) => ({
-        staff_id,
-        total: data.total,
-        cancelled: data.cancelled,
-        cancellationRate: data.total > 0 ? (data.cancelled / data.total) * 100 : 0
-      }))
-      .sort((a, b) => b.cancellationRate - a.cancellationRate);
+    // Already included in getStaffPerformance
+    return this.getStaffPerformance(params);
   },
 
   // Insight Queries
   async getCrossModulePatterns(params: DateRangeParams) {
-    const txs = await fetchTransactions(params);
-    const completed = txs.filter(t => t.status !== 'cancelled' && t.status !== 'refunded' && t.status !== 'void' && t.customer_id);
+    const { data, error } = await getSupabase().rpc('get_economics_cross_module', buildRpcParams(params));
+    if (error) throw error;
 
-    // map: customerId_day -> Set<engine_types>
     const customerDayEngines = new Map<string, Set<string>>();
-
-    completed.forEach(t => {
-      const day = dayjs(t.created_at).format('YYYY-MM-DD');
-      const key = `${t.customer_id}_${day}`;
+    (data || []).forEach((r: any) => {
+      const key = `${r.customer_id}_${r.day_date}`;
       if (!customerDayEngines.has(key)) customerDayEngines.set(key, new Set());
-      const set = customerDayEngines.get(key)!;
-      if (t.engine_type) set.add(t.engine_type);
+      customerDayEngines.get(key)!.add(r.engine_type);
     });
 
     const pairsCount = new Map<string, number>();
@@ -367,7 +228,6 @@ export const economicsService = {
       const arr = Array.from(engines).sort();
       if (arr.length > 1) {
         multiEngineDays++;
-        // count pairs
         for (let i = 0; i < arr.length; i++) {
           for (let j = i + 1; j < arr.length; j++) {
             const pair = `${arr[i]} & ${arr[j]}`;
@@ -402,22 +262,21 @@ export const economicsService = {
   },
 
   async getPromoEffectiveness(params: DateRangeParams) {
-    const txs = await fetchTransactions(params);
-    const completed = txs.filter(t => t.status !== 'cancelled' && t.status !== 'refunded' && t.status !== 'void');
+    const { data, error } = await getSupabase().rpc('get_economics_promo_effectiveness', buildRpcParams(params));
+    if (error) throw error;
 
     let withPromoVol = 0;
     let withPromoRev = 0;
     let noPromoVol = 0;
     let noPromoRev = 0;
 
-    completed.forEach(t => {
-      const amount = toNum(t.amount);
-      if (t.promo_code) {
-        withPromoVol++;
-        withPromoRev += amount;
+    (data || []).forEach((r: any) => {
+      if (r.has_promo) {
+        withPromoVol = Number(r.transaction_count);
+        withPromoRev = Number(r.revenue);
       } else {
-        noPromoVol++;
-        noPromoRev += amount;
+        noPromoVol = Number(r.transaction_count);
+        noPromoRev = Number(r.revenue);
       }
     });
 

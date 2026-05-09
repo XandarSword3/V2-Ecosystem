@@ -64,6 +64,12 @@ router.get('/gross-vs-net', asyncHandler(async (req: Request, res: Response) => 
   res.json({ success: true, data });
 }));
 
+router.get('/average-transaction-value', asyncHandler(async (req: Request, res: Response) => {
+  const params = parseParams(req);
+  const data = await economicsService.getAverageTransactionValue(params);
+  res.json({ success: true, data });
+}));
+
 router.get('/top-customers', asyncHandler(async (req: Request, res: Response) => {
   const params = parseParams(req);
   const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
@@ -74,6 +80,12 @@ router.get('/top-customers', asyncHandler(async (req: Request, res: Response) =>
 router.get('/retention', asyncHandler(async (req: Request, res: Response) => {
   const params = parseParams(req);
   const data = await economicsService.getCustomerRetentionRate(params);
+  res.json({ success: true, data });
+}));
+
+router.get('/repeat-vs-new', asyncHandler(async (req: Request, res: Response) => {
+  const params = parseParams(req);
+  const data = await economicsService.getRepeatVsNew(params);
   res.json({ success: true, data });
 }));
 
