@@ -223,7 +223,6 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
             key: update.key,
             value: update.value,
             updated_at: timestamp,
-            updated_by: userId,
           },
           { onConflict: 'key' }
         );
@@ -285,7 +284,6 @@ export const updateHomepageSettings = asyncHandler(async (req: Request, res: Res
       key: 'homepage',
       value: homepageData,
       updated_at: new Date().toISOString(),
-      updated_by: (req.user as any)?.userId || 'system',
     }, { onConflict: 'key' });
 
   if (error) {
@@ -332,7 +330,6 @@ export const updateTaxSettings = asyncHandler(async (req: Request, res: Response
       key: 'tax_configuration',
       value: taxData,
       updated_at: new Date().toISOString(),
-      updated_by: (req.user as any)?.userId || 'system',
     }, { onConflict: 'key' });
 
   if (error) {
