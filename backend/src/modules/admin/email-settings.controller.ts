@@ -134,8 +134,6 @@ router.put(
             value: setting.value,
             category: 'email',
             updated_at: new Date().toISOString(),
-            updated_by: userId,
-            created_by: userId,
           }, { onConflict: 'key' });
         if (upsertError) throw upsertError;
       }
