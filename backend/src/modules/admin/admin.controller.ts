@@ -997,7 +997,6 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
           key: update.key,
           value: update.value,
           updated_at: new Date().toISOString(),
-          updated_by: userId,
         }, { onConflict: 'key' });
       
       if (error) {
