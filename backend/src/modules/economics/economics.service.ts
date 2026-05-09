@@ -77,15 +77,23 @@ export const economicsService = {
   },
 
   async getGrossVsNet(params: DateRangeParams) {
-    const { data, error } = await getSupabase().rpc('get_economics_gross_vs_net', buildRpcParams(params));
+    const [{ data, error }, volume] = await Promise.all([
+      getSupabase().rpc('get_economics_gross_vs_net', buildRpcParams(params)),
+      this.getTransactionVolume({ ...params, interval: 'day' })
+    ]);
+    
     if (error) throw toError(error);
-    if (!data || data.length === 0) return { gross: 0, net: 0, discounts: 0, refunds: 0 };
+    
+    const transactionsCount = volume.reduce((sum: number, v: { count: number }) => sum + v.count, 0);
+    
+    if (!data || data.length === 0) return { gross: 0, net: 0, discounts: 0, refunds: 0, transactionsCount };
     const r = data[0];
     return {
       gross: Number(r.gross),
       net: Number(r.net),
       discounts: Number(r.discounts),
-      refunds: Number(r.refunds)
+      refunds: Number(r.refunds),
+      transactionsCount
     };
   },
 

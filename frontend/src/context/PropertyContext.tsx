@@ -37,9 +37,14 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       // Fetch accessible properties from backend
-      const res = await api.get('/admin/properties/access');
-      const data = res.data.data || [];
-      setProperties(data);
+      const res = await api.get('/multi-property/my-properties');
+      const data = res.data.properties || [];
+      setProperties(data.map((p: any) => ({
+        property_id: p.id,
+        access_level: p.access_level,
+        is_primary: p.is_primary,
+        property: p
+      })));
 
       if (data.length > 0) {
         const storedId = localStorage.getItem('activePropertyId');

@@ -18,6 +18,20 @@ router.post('/switch-property', multiPropertyController.switchProperty);
 // Create a new property
 router.post('/properties', authorize('super_admin'), multiPropertyController.createProperty);
 
+// Update property details
+router.patch('/properties/:id', authorize('manage', 'admin', 'super_admin'), multiPropertyController.updateProperty);
+
+// ==================== ACCESS MANAGEMENT ====================
+
+// Grant property access to user
+router.post('/grant-access', authorize('manage', 'admin', 'super_admin'), multiPropertyController.grantPropertyAccess);
+
+// Revoke property access from user
+router.delete('/access/:userId/:propertyId', authorize('manage', 'admin', 'super_admin'), multiPropertyController.revokePropertyAccess);
+
+// Get staff list for a property
+router.get('/staff/:propertyId', authorize('manage', 'admin', 'super_admin'), multiPropertyController.getPropertyStaff);
+
 // ==================== PROPERTY GROUPS (Admin) ====================
 
 // Get all property groups

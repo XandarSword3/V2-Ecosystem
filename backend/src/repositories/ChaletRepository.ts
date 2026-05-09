@@ -88,58 +88,53 @@ export interface ChaletAddOn {
 
 export class ChaletUnitRepository extends BaseRepository<Chalet> {
   constructor() {
-    super('chalets');
+    super('accommodation_units');
   }
 
-  /** Return only active, unblocked chalets. */
+  /** Return only active, unblocked accommodation units. */
   async findAvailable(): Promise<Chalet[]> {
-    const { data, error } = await this.getClient()
-      .from(this.tableName)
-      .select('*')
+    const { data, error } = await this.getQuery()
       .eq('is_active', true)
       .eq('is_blocked', false)
       .is('deleted_at', null)
       .order('name', { ascending: true });
 
-    if (error) throw new Error(`[chalets] findAvailable failed: ${error.message}`);
+    if (error) throw new Error(`[accommodation_units] findAvailable failed: ${error.message}`);
     return (data as Chalet[]) ?? [];
   }
 
-  /** Find chalets that can accommodate at least `guests` people. */
+  /** Find units that can accommodate at least `guests` people. */
   async findByCapacity(guests: number): Promise<Chalet[]> {
-    const { data, error } = await this.getClient()
-      .from(this.tableName)
-      .select('*')
+    const { data, error } = await this.getQuery()
       .gte('capacity', guests)
       .eq('is_active', true)
       .is('deleted_at', null)
       .order('capacity', { ascending: true });
 
-    if (error) throw new Error(`[chalets] findByCapacity failed: ${error.message}`);
+    if (error) throw new Error(`[accommodation_units] findByCapacity failed: ${error.message}`);
     return (data as Chalet[]) ?? [];
   }
 }
 
 export class ChaletBookingRepository extends BaseRepository<ChaletBooking> {
   constructor() {
-    super('chalet_bookings');
+    super('transactions');
+    this.baseFilters = { engine_type: 'time_exclusive_reservation' };
   }
 
-  /** Check whether a chalet is available for the given date range. */
+  /** Check whether an accommodation unit is available for the given date range. */
   async checkAvailability(
     chaletId: string,
     checkIn: string,
     checkOut: string,
   ): Promise<boolean> {
-    const { data, error } = await this.getClient()
-      .from(this.tableName)
-      .select('id')
-      .eq('chalet_id', chaletId)
+    const { data, error } = await this.getQuery()
+      .contains('metadata', { chalet_id: chaletId })
       .not('status', 'in', '("cancelled","no_show")')
-      .lt('check_in_date', checkOut)
-      .gt('check_out_date', checkIn);
+      .lt('metadata->>check_in_date', checkOut)
+      .gt('metadata->>check_out_date', checkIn);
 
-    if (error) throw new Error(`[chalet_bookings] checkAvailability failed: ${error.message}`);
+    if (error) throw new Error(`[transactions] checkAvailability failed: ${error.message}`);
     return !data || data.length === 0;
   }
 
@@ -148,10 +143,12 @@ export class ChaletBookingRepository extends BaseRepository<ChaletBooking> {
     chaletId: string,
     options?: FindManyOptions,
   ): Promise<ChaletBooking[]> {
-    return this.findMany(
-      { chalet_id: chaletId },
-      { orderBy: 'check_in_date', ascending: false, ...options },
-    );
+    const { data, error } = await this.getQuery()
+      .contains('metadata', { chalet_id: chaletId })
+      .order('created_at', { ascending: false });
+
+    if (error) throw new Error(`[transactions] findByChalet failed: ${error.message}`);
+    return (data as ChaletBooking[]) ?? [];
   }
 
   /** Find bookings for a specific customer. */
@@ -172,20 +169,18 @@ export class ChaletBookingRepository extends BaseRepository<ChaletBooking> {
   ): Promise<ChaletBooking[]> {
     return this.findMany(
       { status },
-      { orderBy: 'check_in_date', ascending: true, ...options },
+      { orderBy: 'created_at', ascending: true, ...options },
     );
   }
 
   /** Find bookings overlapping with a date range. */
   async findByDateRange(from: string, to: string): Promise<ChaletBooking[]> {
-    const { data, error } = await this.getClient()
-      .from(this.tableName)
-      .select('*')
-      .lt('check_in_date', to)
-      .gt('check_out_date', from)
-      .order('check_in_date', { ascending: true });
+    const { data, error } = await this.getQuery()
+      .lt('metadata->>check_in_date', to)
+      .gt('metadata->>check_out_date', from)
+      .order('metadata->>check_in_date', { ascending: true });
 
-    if (error) throw new Error(`[chalet_bookings] findByDateRange failed: ${error.message}`);
+    if (error) throw new Error(`[transactions] findByDateRange failed: ${error.message}`);
     return (data as ChaletBooking[]) ?? [];
   }
 }

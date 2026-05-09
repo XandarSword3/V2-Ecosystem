@@ -921,49 +921,6 @@ if (data && !['shared_capacity_access', 'instant_transaction', 'time_exclusive_r
   return res.status(400).json({ valid: false, type: 'transaction', entity: null, message: 'Invalid transaction type for pool ticket validation' });
 }
 return res.json({ valid: true, type, entity: data, message: 'Pool ticket is valid' });
-
-  if (type === 'chalet_booking') {
-    const { data, error } = await supabase
-      .from('chalet_bookings')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error || !data) {
-      return res.status(404).json({ valid: false, type, entity: null, message: 'Chalet booking not found' });
-    }
-    return res.json({ valid: true, type, entity: data, message: 'Chalet booking is valid' });
-  }
-
-  if (type === 'restaurant_order') {
-    const { data, error } = await supabase
-      .from('restaurant_orders')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error || !data) {
-      return res.status(404).json({ valid: false, type, entity: null, message: 'Restaurant order not found' });
-    }
-    return res.json({ valid: true, type, entity: data, message: 'Restaurant order found' });
-  }
-
-  if (type === 'membership') {
-    const { data, error } = await supabase
-      .from('pool_memberships')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error || !data) {
-      return res.status(404).json({ valid: false, type, entity: null, message: 'Membership not found' });
-    }
-    return res.json({ valid: true, type, entity: data, message: 'Membership found' });
-  }
-
-  return res.status(400).json({
-    valid: false,
-    type,
-    entity: null,
-    message: `Unsupported QR type: ${type}`,
-});
 });
 
 /**

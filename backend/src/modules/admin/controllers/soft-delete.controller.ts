@@ -9,7 +9,7 @@ import { logActivity } from '../../../utils/activityLogger.js';
  * Provides soft delete and restore functionality for critical entities
  */
 
-type SoftDeleteEntity = 'users' | 'chalet_bookings' | 'restaurant_orders' | 'pool_tickets' | 'chalets';
+type SoftDeleteEntity = 'users' | 'transactions' | 'accommodation_units';
 
 interface SoftDeletedRecord {
   id: string;
@@ -28,7 +28,7 @@ export const getDeletedRecords = asyncHandler(async (req: Request, res: Response
     const supabase = getSupabase();
 
     // Validate entity type
-    const validTypes: SoftDeleteEntity[] = ['users', 'chalet_bookings', 'restaurant_orders', 'pool_tickets', 'chalets'];
+    const validTypes: SoftDeleteEntity[] = ['users', 'transactions', 'accommodation_units'];
     if (!validTypes.includes(entityType as SoftDeleteEntity)) {
       res.status(400).json({
         success: false,
@@ -43,16 +43,10 @@ export const getDeletedRecords = asyncHandler(async (req: Request, res: Response
       case 'users':
         selectFields += ', email, full_name';
         break;
-      case 'chalet_bookings':
-        selectFields += ', booking_number, customer_name';
+      case 'transactions':
+        selectFields += ', ticket_number, order_number, booking_number, customer_name';
         break;
-      case 'restaurant_orders':
-        selectFields += ', order_number, customer_name';
-        break;
-      case 'pool_tickets':
-        selectFields += ', ticket_number, guest_name';
-        break;
-      case 'chalets':
+      case 'accommodation_units':
         selectFields += ', name';
         break;
     }
@@ -73,16 +67,10 @@ export const getDeletedRecords = asyncHandler(async (req: Request, res: Response
         case 'users':
           identifier = record.email || record.full_name;
           break;
-        case 'chalet_bookings':
-          identifier = record.booking_number;
+        case 'transactions':
+          identifier = record.ticket_number || record.order_number || record.booking_number || record.customer_name;
           break;
-        case 'restaurant_orders':
-          identifier = record.order_number;
-          break;
-        case 'pool_tickets':
-          identifier = record.ticket_number;
-          break;
-        case 'chalets':
+        case 'accommodation_units':
           identifier = record.name;
           break;
       }
@@ -112,7 +100,7 @@ export const restoreRecord = asyncHandler(async (req: Request, res: Response) =>
     const supabase = getSupabase();
 
     // Validate entity type
-    const validTypes: SoftDeleteEntity[] = ['users', 'chalet_bookings', 'restaurant_orders', 'pool_tickets', 'chalets'];
+    const validTypes: SoftDeleteEntity[] = ['users', 'transactions', 'accommodation_units'];
     if (!validTypes.includes(entityType as SoftDeleteEntity)) {
       res.status(400).json({
         success: false,
@@ -189,7 +177,7 @@ export const permanentDelete = asyncHandler(async (req: Request, res: Response) 
     }
 
     // Validate entity type
-    const validTypes: SoftDeleteEntity[] = ['users', 'chalet_bookings', 'restaurant_orders', 'pool_tickets', 'chalets'];
+    const validTypes: SoftDeleteEntity[] = ['users', 'transactions', 'accommodation_units'];
     if (!validTypes.includes(entityType as SoftDeleteEntity)) {
       res.status(400).json({
         success: false,
@@ -253,7 +241,7 @@ export const softDelete = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
     // Validate entity type
-    const validTypes: SoftDeleteEntity[] = ['users', 'chalet_bookings', 'restaurant_orders', 'pool_tickets', 'chalets'];
+    const validTypes: SoftDeleteEntity[] = ['users', 'transactions', 'accommodation_units'];
     if (!validTypes.includes(entityType as SoftDeleteEntity)) {
       res.status(400).json({
         success: false,

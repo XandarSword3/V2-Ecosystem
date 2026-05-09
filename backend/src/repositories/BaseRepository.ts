@@ -17,6 +17,8 @@ export type Row = { [key: string]: unknown };
  * All domain repositories extend this class.
  */
 export abstract class BaseRepository<T extends Row> {
+  protected baseFilters: Record<string, unknown> = {};
+
   constructor(protected tableName: string) {}
 
   /** Returns the lazily-initialized Supabase client. */
@@ -24,11 +26,18 @@ export abstract class BaseRepository<T extends Row> {
     return getSupabase();
   }
 
+  /** Helper to get a query with base filters applied. */
+  protected getQuery() {
+    let query = this.getClient().from(this.tableName).select('*');
+    for (const [key, value] of Object.entries(this.baseFilters)) {
+      query = query.eq(key, value);
+    }
+    return query;
+  }
+
   /** Find a single record by its primary key (`id`). */
   async findById(id: string): Promise<T | null> {
-    const { data, error } = await this.getClient()
-      .from(this.tableName)
-      .select('*')
+    const { data, error } = await this.getQuery()
       .eq('id', id)
       .maybeSingle();
 
@@ -43,7 +52,7 @@ export abstract class BaseRepository<T extends Row> {
     filters?: Record<string, unknown>,
     options?: FindManyOptions,
   ): Promise<T[]> {
-    let query = this.getClient().from(this.tableName).select('*');
+    let query = this.getQuery();
 
     if (filters) {
       for (const [key, value] of Object.entries(filters)) {
@@ -106,8 +115,7 @@ export abstract class BaseRepository<T extends Row> {
 
   /** Return the count of records matching optional equality filters. */
   async count(filters?: Record<string, unknown>): Promise<number> {
-    let query = this.getClient()
-      .from(this.tableName)
+    let query = this.getQuery()
       .select('*', { count: 'exact', head: true });
 
     if (filters) {

@@ -364,15 +364,16 @@ class SeasonalPricingService {
     if (itemType === 'chalets') {
       // Count booked chalets vs total
       const { count: totalChalets } = await supabase
-        .from('chalets')
+        .from('accommodation_units')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
+        .eq('is_active', true);
 
       const { count: bookedChalets } = await supabase
-        .from('chalet_bookings')
+        .from('transactions')
         .select('*', { count: 'exact', head: true })
-        .lte('check_in_date', dateString)
-        .gt('check_out_date', dateString)
+        .eq('engine_type', 'time_exclusive_reservation')
+        .filter('metadata->>check_in_date', 'lte', dateString)
+        .filter('metadata->>check_out_date', 'gt', dateString)
         .in('status', ['confirmed', 'checked_in']);
 
       if (totalChalets && totalChalets > 0) {

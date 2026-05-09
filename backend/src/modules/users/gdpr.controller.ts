@@ -15,12 +15,12 @@ interface UserData {
     updated_at?: string;
   };
   orders: {
-    restaurant_orders: unknown[];
-    snack_orders: unknown[];
+    instant_transactions: unknown[];
+    snack_transactions: unknown[];
   };
-  bookings: {
-    chalet_bookings: unknown[];
-    pool_tickets: unknown[];
+  reservations: {
+    accommodation_bookings: unknown[];
+    access_tickets: unknown[];
   };
   reviews: unknown[];
   support_tickets: unknown[];
@@ -52,14 +52,13 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
     const [
       userResult,
       transactionsResult,
-      poolTicketsResult,
+      consentsResult,
       reviewsResult,
       supportTicketsResult,
       activityLogsResult,
       loyaltyAccountsResult,
       loyaltyTxResult,
-      giftCardsResult,
-      consentsResult
+      giftCardsResult
     ] = await Promise.all([
       // User profile
       supabase.from('users')
@@ -73,11 +72,8 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
         .eq('customer_id', userId)
         .order('created_at', { ascending: false }),
       
-      // Pool tickets
-      supabase.from('pool_tickets')
-        .select('id, ticket_number, status, ticket_date, number_of_guests, total_amount, payment_status, guest_name, guest_email, guest_phone, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false }),
+      // GDPR Consents
+      supabase.from('gdpr_consents').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
       
       // Reviews
       supabase.from('reviews')
@@ -103,10 +99,7 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
       supabase.from('loyalty_transactions').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
       
       // Gift Cards
-      supabase.from('gift_cards').select('*').eq('purchaser_id', userId).order('created_at', { ascending: false }),
-      
-      // GDPR Consents
-      supabase.from('gdpr_consents').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+      supabase.from('gift_cards').select('*').eq('purchaser_id', userId).order('created_at', { ascending: false })
     ]);
 
     if (userResult.error || !userResult.data) {
@@ -117,12 +110,12 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
     const userData: UserData = {
       profile: userResult.data,
       orders: {
-        restaurant_orders: (transactionsResult.data || []).filter(t => t.engine_type === 'instant_transaction'),
-        snack_orders: (transactionsResult.data || []).filter(t => t.engine_type === 'instant_transaction')
+        instant_transactions: (transactionsResult.data || []).filter(t => t.engine_type === 'instant_transaction'),
+        snack_transactions: (transactionsResult.data || []).filter(t => t.engine_type === 'instant_transaction')
       },
-      bookings: {
-        chalet_bookings: (transactionsResult.data || []).filter(t => t.engine_type === 'time_exclusive_reservation'),
-        pool_tickets: poolTicketsResult.data || []
+      reservations: {
+        accommodation_bookings: (transactionsResult.data || []).filter(t => t.engine_type === 'time_exclusive_reservation'),
+        access_tickets: (transactionsResult.data || []).filter(t => t.engine_type === 'shared_capacity_access')
       },
       reviews: reviewsResult.data || [],
       support_tickets: supportTicketsResult.data || [],
@@ -165,10 +158,10 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
       exportedAt: new Date().toISOString(),
       dataTypes: [
         'profile',
-        'restaurant_orders',
-        'snack_orders',
-        'chalet_bookings',
-        'pool_tickets',
+        'instant_transactions',
+        'snack_transactions',
+        'accommodation_bookings',
+        'access_tickets',
         'reviews',
         'support_tickets',
         'activity_logs',
@@ -271,50 +264,15 @@ export const deleteUserData = asyncHandler(async (req: Request, res: Response) =
       .eq('user_id', userId);
     deletionResults.support_tickets = { deleted: ticketsCount || 0, error: ticketsError?.message };
 
-    // 5. Anonymize orders (keep for accounting but remove PII)
-    const { error: restOrderError, count: restOrderCount } = await supabase
-      .from('restaurant_orders')
+    // 5. Anonymize all transactions (unified)
+    const { error: txError, count: txCount } = await supabase
+      .from('transactions')
       .update({
-        customer_name: 'DELETED USER',
-        customer_phone: null,
-        customer_email: null,
-        user_id: null
+        customer_id: null,
+        metadata: { anonymized: true, anonymized_at: new Date().toISOString() }
       })
-      .eq('user_id', userId);
-    deletionResults.restaurant_orders_anonymized = { deleted: restOrderCount || 0, error: restOrderError?.message };
-
-    const { error: snackOrderError, count: snackOrderCount } = await supabase
-      .from('snack_orders')
-      .update({
-        customer_name: 'DELETED USER',
-        customer_phone: null,
-        user_id: null
-      })
-      .eq('user_id', userId);
-    deletionResults.snack_orders_anonymized = { deleted: snackOrderCount || 0, error: snackOrderError?.message };
-
-    // 6. Anonymize bookings
-    const { error: chaletError, count: chaletCount } = await supabase
-      .from('chalet_bookings')
-      .update({
-        guest_name: 'DELETED USER',
-        guest_email: null,
-        guest_phone: null,
-        user_id: null
-      })
-      .eq('user_id', userId);
-    deletionResults.chalet_bookings_anonymized = { deleted: chaletCount || 0, error: chaletError?.message };
-
-    const { error: poolError, count: poolCount } = await supabase
-      .from('pool_tickets')
-      .update({
-        guest_name: 'DELETED USER',
-        guest_email: null,
-        guest_phone: null,
-        user_id: null
-      })
-      .eq('user_id', userId);
-    deletionResults.pool_tickets_anonymized = { deleted: poolCount || 0, error: poolError?.message };
+      .eq('customer_id', userId);
+    deletionResults.transactions_anonymized = { deleted: txCount || 0, error: txError?.message };
 
     // 6b. Anonymize Gift Cards
     const { error: gcError, count: gcCount } = await supabase
