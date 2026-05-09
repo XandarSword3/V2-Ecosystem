@@ -114,3 +114,7 @@ archive/
 add_keys.js
 refactor_economics.js
 *.agent.js
+
+# Agent scratch space and schema dumps
+scratch/
+schema_dump.sql
