@@ -125,10 +125,10 @@ BEGIN
         'time_exclusive_reservation',
         NEW.property_id,
         COALESCE(NEW.payment_status, NEW.status, 'pending'),
-        COALESCE(NEW.total_price, 0),
-        COALESCE(NEW.total_price, 0),
+        COALESCE(NEW.total_amount, 0),
+        COALESCE(NEW.total_amount, 0),
         'USD',
-        NEW.user_id,
+        NEW.customer_id,
         NEW.id,
         'chalet_bookings',
         NEW.created_at,
@@ -184,56 +184,56 @@ CREATE TRIGGER trg_sync_transaction
     FOR EACH ROW EXECUTE FUNCTION sync_transaction_from_pool_ticket();
 
 -- snack_orders → transactions (if table exists)
+CREATE OR REPLACE FUNCTION sync_transaction_from_snack_order()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_engine_type VARCHAR(50);
+    v_property_id UUID;
+    v_template_type module_template_type;
+BEGIN
+    SELECT template_type, property_id
+    INTO v_template_type, v_property_id
+    FROM modules WHERE id = NEW.module_id;
+    
+    v_engine_type := CASE v_template_type
+        WHEN 'multi_day_booking' THEN 'time_exclusive_reservation'
+        WHEN 'session_access' THEN 'shared_capacity_access'
+        ELSE 'instant_transaction'
+    END CASE;
+
+    INSERT INTO transactions (module_id, engine_type, property_id, status, amount, tax_amount, discount_amount, net_amount, currency, customer_id, reference_id, reference_table, created_at, completed_at, metadata)
+    VALUES (
+        NEW.module_id,
+        v_engine_type,
+        COALESCE(NEW.property_id, v_property_id),
+        COALESCE(NEW.payment_status, NEW.status, 'pending'),
+        COALESCE(NEW.total_amount, 0),
+        COALESCE(NEW.tax_amount, 0),
+        COALESCE(NEW.discount_amount, 0),
+        COALESCE(NEW.total_amount, 0) - COALESCE(NEW.discount_amount, 0),
+        'USD',
+        NEW.customer_id,
+        NEW.id,
+        'snack_orders',
+        NEW.created_at,
+        NEW.completed_at,
+        jsonb_build_object('order_number', NEW.order_number)
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        status = EXCLUDED.status,
+        amount = EXCLUDED.amount,
+        tax_amount = EXCLUDED.tax_amount,
+        discount_amount = EXCLUDED.discount_amount,
+        net_amount = EXCLUDED.net_amount,
+        completed_at = EXCLUDED.completed_at,
+        metadata = EXCLUDED.metadata;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'snack_orders') THEN
-        CREATE OR REPLACE FUNCTION sync_transaction_from_snack_order()
-        RETURNS TRIGGER AS $$
-        DECLARE
-            v_engine_type VARCHAR(50);
-            v_property_id UUID;
-            v_template_type module_template_type;
-        BEGIN
-            SELECT template_type, property_id
-            INTO v_template_type, v_property_id
-            FROM modules WHERE id = NEW.module_id;
-            
-            v_engine_type := CASE v_template_type
-                WHEN 'multi_day_booking' THEN 'time_exclusive_reservation'
-                WHEN 'session_access' THEN 'shared_capacity_access'
-                ELSE 'instant_transaction'
-            END CASE;
-
-            INSERT INTO transactions (module_id, engine_type, property_id, status, amount, tax_amount, discount_amount, net_amount, currency, customer_id, reference_id, reference_table, created_at, completed_at, metadata)
-            VALUES (
-                NEW.module_id,
-                v_engine_type,
-                COALESCE(NEW.property_id, v_property_id),
-                COALESCE(NEW.payment_status, NEW.status, 'pending'),
-                COALESCE(NEW.total_amount, 0),
-                COALESCE(NEW.tax_amount, 0),
-                COALESCE(NEW.discount_amount, 0),
-                COALESCE(NEW.total_amount, 0) - COALESCE(NEW.discount_amount, 0),
-                'USD',
-                NEW.customer_id,
-                NEW.id,
-                'snack_orders',
-                NEW.created_at,
-                NEW.completed_at,
-                jsonb_build_object('order_number', NEW.order_number)
-            )
-            ON CONFLICT (id) DO UPDATE SET
-                status = EXCLUDED.status,
-                amount = EXCLUDED.amount,
-                tax_amount = EXCLUDED.tax_amount,
-                discount_amount = EXCLUDED.discount_amount,
-                net_amount = EXCLUDED.net_amount,
-                completed_at = EXCLUDED.completed_at,
-                metadata = EXCLUDED.metadata;
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-
         DROP TRIGGER IF EXISTS trg_sync_transaction ON snack_orders;
         CREATE TRIGGER trg_sync_transaction
             AFTER INSERT OR UPDATE OF status, payment_status, total_amount ON snack_orders
@@ -281,10 +281,10 @@ SELECT
     'time_exclusive_reservation',
     cb.property_id,
     COALESCE(cb.payment_status, cb.status, 'pending'),
-    COALESCE(cb.total_price, 0),
-    COALESCE(cb.total_price, 0),
+    COALESCE(cb.total_amount, 0),
+    COALESCE(cb.total_amount, 0),
     'USD',
-    cb.user_id,
+    cb.customer_id,
     cb.id,
     'chalet_bookings',
     cb.created_at,
@@ -321,27 +321,22 @@ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'snack_orders') THEN
         INSERT INTO transactions (module_id, engine_type, property_id, status, amount, tax_amount, discount_amount, net_amount, currency, customer_id, reference_id, reference_table, created_at, completed_at, metadata)
         SELECT
-            so.module_id,
-            CASE m.template_type
-                WHEN 'multi_day_booking' THEN 'time_exclusive_reservation'
-                WHEN 'session_access' THEN 'shared_capacity_access'
-                ELSE 'instant_transaction'
-            END,
-            COALESCE(so.property_id, m.property_id),
+            NULL,
+            'instant_transaction',
+            (SELECT id FROM properties LIMIT 1),
             COALESCE(so.payment_status, so.status, 'pending'),
             COALESCE(so.total_amount, 0),
             COALESCE(so.tax_amount, 0),
-            COALESCE(so.discount_amount, 0),
-            COALESCE(so.total_amount, 0) - COALESCE(so.discount_amount, 0),
+            0,
+            COALESCE(so.total_amount, 0),
             'USD',
-            so.customer_id,
+            NULL,
             so.id,
             'snack_orders',
             so.created_at,
-            so.completed_at,
+            NULL,
             jsonb_build_object('order_number', so.order_number)
         FROM snack_orders so
-        LEFT JOIN modules m ON so.module_id = m.id
         WHERE NOT EXISTS (
             SELECT 1 FROM transactions t WHERE t.reference_id = so.id AND t.reference_table = 'snack_orders'
         );

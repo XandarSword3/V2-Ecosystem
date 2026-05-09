@@ -20,15 +20,23 @@ const buildRpcParams = (params: DateRangeParams, extraParams: any = {}) => {
   };
 };
 
+const toError = (supabaseError: any): Error => {
+  const msg = supabaseError?.message || supabaseError?.hint || supabaseError?.code || JSON.stringify(supabaseError);
+  console.error('[Economics RPC Error]', JSON.stringify(supabaseError, null, 2));
+  const err = new Error(`Supabase RPC error: ${msg}`);
+  (err as any).cause = supabaseError;
+  return err;
+};
+
 export const economicsService = {
   // Revenue Queries
   async getRevenueOverTime(params: DateRangeParams & { interval: 'hour' | 'day' | 'week' | 'month' }) {
     const { data, error } = await getSupabase().rpc('get_economics_revenue_over_time', buildRpcParams(params, { p_interval: params.interval }));
-    if (error) throw error;
+    if (error) throw toError(error);
 
     const groupedMap = new Map<string, Record<string, number>>();
     (data || []).forEach((row: any) => {
-      const timeKey = row.time;
+      const timeKey = row.bucket;
       if (!groupedMap.has(timeKey)) groupedMap.set(timeKey, {});
       groupedMap.get(timeKey)![row.engine_type] = Number(row.revenue);
     });
@@ -41,7 +49,7 @@ export const economicsService = {
 
   async getRevenueByModule(params: DateRangeParams) {
     const { data, error } = await getSupabase().rpc('get_economics_revenue_by_module', buildRpcParams(params));
-    if (error) throw error;
+    if (error) throw toError(error);
     
     return (data || []).map((r: any) => {
       const rev = Number(r.revenue);
@@ -60,7 +68,7 @@ export const economicsService = {
 
   async getRevenueByEngineType(params: DateRangeParams) {
     const { data, error } = await getSupabase().rpc('get_economics_revenue_by_engine', buildRpcParams(params));
-    if (error) throw error;
+    if (error) throw toError(error);
     
     return (data || []).map((r: any) => ({
       engine_type: r.engine_type,
@@ -70,7 +78,7 @@ export const economicsService = {
 
   async getGrossVsNet(params: DateRangeParams) {
     const { data, error } = await getSupabase().rpc('get_economics_gross_vs_net', buildRpcParams(params));
-    if (error) throw error;
+    if (error) throw toError(error);
     if (!data || data.length === 0) return { gross: 0, net: 0, discounts: 0, refunds: 0 };
     const r = data[0];
     return {
@@ -84,13 +92,13 @@ export const economicsService = {
   // Volume Queries
   async getTransactionVolume(params: DateRangeParams & { interval: 'hour' | 'day' | 'week' | 'month' }) {
     const { data, error } = await getSupabase().rpc('get_economics_volume', buildRpcParams(params, { p_interval: params.interval }));
-    if (error) throw error;
-    return (data || []).map((r: any) => ({ time: r.time, count: Number(r.volume_count) }));
+    if (error) throw toError(error);
+    return (data || []).map((r: any) => ({ time: r.bucket, count: Number(r.volume_count) }));
   },
 
   async getAverageTransactionValue(params: DateRangeParams) {
     const { data, error } = await getSupabase().rpc('get_economics_avg_value', buildRpcParams(params));
-    if (error) throw error;
+    if (error) throw toError(error);
     
     let totalRevenue = 0;
     let totalCount = 0;
@@ -110,7 +118,7 @@ export const economicsService = {
 
   async getPeakHours(params: DateRangeParams) {
     const { data, error } = await getSupabase().rpc('get_economics_peak_hours', buildRpcParams(params));
-    if (error) throw error;
+    if (error) throw toError(error);
 
     const days = Math.max(1, dayjs(params.to).diff(dayjs(params.from), 'day'));
     
@@ -131,7 +139,7 @@ export const economicsService = {
   // Customer Queries
   async getTopCustomers(params: DateRangeParams & { limit?: number }) {
     const { data, error } = await getSupabase().rpc('get_economics_top_customers', buildRpcParams(params, { p_limit: params.limit || 10 }));
-    if (error) throw error;
+    if (error) throw toError(error);
     return (data || []).map((r: any) => ({
       customer_id: r.customer_id,
       customer_name: r.customer_name,
@@ -142,7 +150,7 @@ export const economicsService = {
 
   async getRepeatVsNew(params: DateRangeParams) {
     const { data, error } = await getSupabase().rpc('get_economics_repeat_vs_new', buildRpcParams(params));
-    if (error) throw error;
+    if (error) throw toError(error);
     
     let repeat = 0;
     let newCust = 0;
@@ -188,7 +196,7 @@ export const economicsService = {
   // Staff Queries
   async getStaffPerformance(params: DateRangeParams) {
     const { data, error } = await getSupabase().rpc('get_economics_staff_performance', buildRpcParams(params));
-    if (error) throw error;
+    if (error) throw toError(error);
     
     return (data || []).map((r: any) => {
       const txs = Number(r.transaction_count);
@@ -210,8 +218,12 @@ export const economicsService = {
 
   // Insight Queries
   async getCrossModulePatterns(params: DateRangeParams) {
-    const { data, error } = await getSupabase().rpc('get_economics_cross_module', buildRpcParams(params));
-    if (error) throw error;
+    const { data, error } = await getSupabase().rpc('get_economics_cross_module', {
+      p_from: params.from,
+      p_to: params.to,
+      p_property_id: params.propertyId || null
+    });
+    if (error) throw toError(error);
 
     const customerDayEngines = new Map<string, Set<string>>();
     (data || []).forEach((r: any) => {
@@ -263,7 +275,7 @@ export const economicsService = {
 
   async getPromoEffectiveness(params: DateRangeParams) {
     const { data, error } = await getSupabase().rpc('get_economics_promo_effectiveness', buildRpcParams(params));
-    if (error) throw error;
+    if (error) throw toError(error);
 
     let withPromoVol = 0;
     let withPromoRev = 0;
