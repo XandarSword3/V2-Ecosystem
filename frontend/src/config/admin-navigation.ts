@@ -31,6 +31,7 @@ import {
   UserCog,
   Cog,
   Search,
+  TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -116,6 +117,11 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
           href: '/admin', 
           icon: LayoutDashboard,
           translationKey: 'nav.dashboard'
+        },
+        { 
+          name: 'Economics', 
+          href: '/admin/economics', 
+          icon: TrendingUp,
         },
       ],
       collapsible: false,
