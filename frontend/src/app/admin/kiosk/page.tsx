@@ -15,6 +15,7 @@ import {
   Wrench
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useProperty } from '@/context/PropertyContext';
 import api from '@/lib/api';
 
 interface KioskDevice {
@@ -36,25 +37,11 @@ interface KioskDevice {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
 
-// Helper to get property ID from context (default to a known ID for now)
-function getDefaultPropertyId(): string {
-  // In production, this should come from user context or settings
-  return '00000000-0000-0000-0000-000000000001';
-}
-
-async function fetchKiosks(): Promise<KioskDevice[]> {
-  const propertyId = getDefaultPropertyId();
-  try {
-    const res = await api.get(`/kiosk/devices/property/${propertyId}?includeInactive=true`);
-    return res.data?.data || [];
-  } catch (err) {
-    console.warn('Failed to fetch kiosks:', err);
-    return [];
-  }
-}
+// Removed static fetchKiosks function to move it inside component for context access
 
 export default function KioskAdminPage() {
   const queryClient = useQueryClient();
+  const { activePropertyId } = useProperty();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedKiosk, setSelectedKiosk] = useState<KioskDevice | null>(null);
   const [newKioskForm, setNewKioskForm] = useState({
@@ -64,13 +51,23 @@ export default function KioskAdminPage() {
   });
 
   const { data: kiosks = [], isLoading, error } = useQuery({
-    queryKey: ['admin-kiosks'],
-    queryFn: fetchKiosks,
+    queryKey: ['admin-kiosks', activePropertyId],
+    queryFn: async () => {
+      if (!activePropertyId) return [];
+      try {
+        const res = await api.get(`/kiosk/devices/property/${activePropertyId}?includeInactive=true`);
+        return res.data?.data || [];
+      } catch (err) {
+        console.warn('Failed to fetch kiosks:', err);
+        return [];
+      }
+    },
+    enabled: !!activePropertyId
   });
 
   const registerKioskMutation = useMutation({
     mutationFn: async (data: { name: string; location: string; capabilities: string[] }) => {
-      const propertyId = getDefaultPropertyId();
+      const propertyId = activePropertyId;
       const res = await api.post(`/kiosk/devices/${propertyId}`, {
         deviceName: data.name,
         deviceCode: `KIOSK-${Date.now()}`,

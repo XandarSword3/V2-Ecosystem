@@ -12,6 +12,7 @@ import {
   DollarSign, Activity, Users, Clock, AlertCircle 
 } from 'lucide-react';
 import { startOfDay, endOfDay, subDays, format } from 'date-fns';
+import { useProperty } from '@/context/PropertyContext';
 
 interface DateRange {
   from: string;
@@ -22,6 +23,7 @@ interface DateRange {
 export default function EconomicsDashboard() {
   const t = useTranslations('admin.economics');
   const tCommon = useTranslations('common');
+  const { activePropertyId } = useProperty();
 
   const PRESETS: DateRange[] = [
     { label: tCommon('today', { defaultValue: 'Today' }), from: startOfDay(new Date()).toISOString(), to: endOfDay(new Date()).toISOString() },
@@ -55,7 +57,7 @@ export default function EconomicsDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const p = { params: { from: range.from, to: range.to } };
+      const p = { params: { from: range.from, to: range.to, propertyId: activePropertyId } };
       
       const [
         resRevTime, resRevMod, resPeak, resStaff, resGross, resVol, resAvg,
@@ -102,7 +104,7 @@ export default function EconomicsDashboard() {
 
   useEffect(() => {
     fetchData();
-  }, [range]);
+  }, [range, activePropertyId]);
 
   const formatCurrency = (val: number) => `$${(val || 0).toFixed(2)}`;
 
