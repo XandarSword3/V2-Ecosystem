@@ -33,6 +33,11 @@ export function requirePermission(permission: Permission) {
     }
 
     const userRoles = req.user.roles || [];
+
+    if (userRoles.includes('super_admin')) {
+      return next();
+    }
+
     const granted = userRoles.some((role) => permissionCache.hasPermission(role, permission));
     if (!granted) {
       logger.warn(`Permission denied: ${permission}`, {
@@ -68,6 +73,11 @@ export function requireAnyPermission(permissions: Permission[]) {
     }
 
     const userRoles = req.user.roles || [];
+
+    if (userRoles.includes('super_admin')) {
+      return next();
+    }
+
     const hasAny = permissions.some((perm) => userRoles.some((role) => permissionCache.hasPermission(role, perm)));
     
     if (!hasAny) {
@@ -102,6 +112,11 @@ export function requireAllPermissions(permissions: Permission[]) {
     }
 
     const userRoles = req.user.roles || [];
+
+    if (userRoles.includes('super_admin')) {
+      return next();
+    }
+
     const hasAll = permissions.every((perm) => userRoles.some((role) => permissionCache.hasPermission(role, perm)));
     
     if (!hasAll) {
@@ -139,6 +154,7 @@ export function attachPermissions(req: Request, res: Response, next: NextFunctio
  */
 export function canAccess(req: Request, permission: Permission): boolean {
   if (!req.user || !req.user.roles) return false;
+  if (req.user.roles.includes('super_admin')) return true;
   return req.user.roles.some((role) => permissionCache.hasPermission(role, permission));
 }
 

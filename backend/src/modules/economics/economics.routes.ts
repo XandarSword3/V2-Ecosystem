@@ -98,8 +98,8 @@ router.get('/staff-performance', asyncHandler(async (req: Request, res: Response
   ]);
   
   // Merge performance and cancellations
-  const data = performance.map(p => {
-    const cancelData = cancellations.find(c => c.staff_id === p.staff_id);
+  const data = performance.map((p: any) => {
+    const cancelData = cancellations.find((c: any) => c.staff_id === p.staff_id);
     return {
       ...p,
       cancellationRate: cancelData ? cancelData.cancellationRate : 0,
