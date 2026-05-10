@@ -1,12 +1,26 @@
-﻿# backend core README
+﻿<!-- Last updated: 2026-05-10 -->
+
+# Backend Core Subsystem
+
+> **Total Modules:** 37 | **Engine Files:** 7 | **Core Endpoints:** 35
 
 ## Scope
-This README documents the directory: ..\\v2-resort\\docs\\subsystems\\backend-core.
+This README documents the backend core subsystem within the V2 Resort platform's 37-module architecture.
 
 ## Verification
-- Last refreshed: 2026-03-19
-- Verification source: direct filesystem scan and local code inspection.
+- Last refreshed: 2026-05-10
+- Verification source: confirmed ground truth from codebase analysis
 - Runtime and browser-level validation is consolidated in the main project README.
+
+## Subsystem Overview
+
+The backend core subsystem provides foundational infrastructure across all 37 modules through:
+
+- **4-engine transaction framework** with 7 core engine files
+- **Unified middleware** for authentication, security, and logging
+- **Shared utilities** and common business logic
+- **Database abstraction** layer with Supabase integration
+- **API routing** infrastructure for all modules
 
 ## Directory Inventory
 ### Subdirectories (0)

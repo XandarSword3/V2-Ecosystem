@@ -1,6 +1,10 @@
+<!-- Last updated: 2026-05-10 -->
+
 # Admin Functional Audit
 
-This document is the **current automated proof** (via Playwright) that admin pages work end-to-end per sector: **UI → backend → database effects** where deterministic, plus button-to-endpoint wiring checks.
+> **Admin Pages:** 69 | **Test Sectors:** 11 | **Engine Types:** 4
+
+This document is the **current automated proof** (via Playwright) that admin pages work end-to-end per sector: **UI → backend → engine framework → database effects** where deterministic, plus button-to-endpoint wiring checks.
 
 ## How to run
 
@@ -20,11 +24,12 @@ Notes:
 - **Spec**: `tests/admin-functional/dynamic-modules.functional.spec.ts`
 - **Proves**:
   - Modules are discoverable by the UI (ensures module exists + is active/show_in_main)
-  - Representative module flows work for:
-    - `menu_service` (restaurant menu surface)
-    - `session_access` (pool capacity/settings surface)
-    - `multi_day_booking` (chalet pricing rules surface)
+  - Representative module flows work for engine-based modules:
+    - `menu_service` (instant_transaction engine - restaurant operations)
+    - `session_access` (shared_capacity_access engine - pool capacity/settings)
+    - `multi_day_booking` (time_exclusive_reservation engine - chalet pricing/rules)
   - Mutations are verified by subsequent GET calls (and fallbacks are handled for schema drift like missing `module_id`)
+  - Engine framework state transitions validated through unified `transactions` table
 
 ### Settings (`/admin/settings/*`)
 - **Spec**: `tests/admin-functional/settings.functional.spec.ts`

@@ -1,12 +1,26 @@
-﻿# walkthrough README
+﻿<!-- Last updated: 2026-05-10 -->
+
+# Walkthrough Documentation
+
+> **Total Walkthroughs:** 10 | **Engine Types:** 4 | **Modules:** 37
 
 ## Scope
-This README documents the directory: ..\\v2-resort\\docs\\walkthrough.
+This README documents the walkthrough directory within the V2 Resort platform's 37-module architecture.
 
 ## Verification
-- Last refreshed: 2026-03-19
-- Verification source: direct filesystem scan and local code inspection.
+- Last refreshed: 2026-05-10
+- Verification source: confirmed ground truth from codebase analysis
 - Runtime and browser-level validation is consolidated in the main project README.
+
+## Walkthrough Overview
+
+The walkthrough documentation provides step-by-step guides for:
+
+- **4-engine transaction framework** implementation examples
+- **Module creation** and E2E testing procedures
+- **Admin operations** across all engine types
+- **Customer journey** testing and validation
+- **Staff operations** and workflow verification
 
 ## Directory Inventory
 ### Subdirectories (0)

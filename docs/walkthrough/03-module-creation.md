@@ -8,10 +8,10 @@ Create at least one module of each available engine type to test the module syst
 
 | Engine Type | Internal Name | Description |
 |------------|---------------|-------------|
-| Instant Transaction | `menu_service` | Restaurant/bar/snack bar — order & pay |
-| Time-Exclusive Reservation | `multi_day_booking` | Chalets/villas/hotels — date-range bookings |
-| Shared Capacity Access | `session_access` | Pool/gym/spa — session-based tickets |
-| Ongoing Entitlement | `subscription` | Memberships (future, not tested) |
+| Instant Transaction | `instant_transaction` | Restaurant/bar/snack bar — order & pay |
+| Time-Exclusive Reservation | `time_exclusive_reservation` | Chalets/villas/hotels — date-range bookings |
+| Shared Capacity Access | `shared_capacity_access` | Pool/gym/spa — session-based tickets |
+| Ongoing Entitlement | `ongoing_entitlement` | Memberships/subscriptions (future, not tested) |
 
 ## Modules Created
 
