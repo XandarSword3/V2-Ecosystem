@@ -853,16 +853,18 @@ npm run test:module -- --name my-module
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under a **PROPRIETARY LICENSE** - see the [LICENSE](LICENSE) file for details.
 
 ### License Summary
 
-- **Commercial use** - Permitted
-- **Modification** - Permitted
-- **Distribution** - Permitted
-- **Private use** - Permitted
-- **Liability** - Disclaimed
-- **Warranty** - Disclaimed
+- **Commercial use** - Prohibited without explicit written permission
+- **Modification** - Prohibited without explicit written permission  
+- **Distribution** - Prohibited without explicit written permission
+- **Private use** - Prohibited without explicit written permission
+- **Liability** - Full copyright protection applies
+- **Warranty** - No warranty provided
+
+**⚠️ IMPORTANT**: This is proprietary software. Any unauthorized use, reproduction, or distribution will result in legal consequences.
 
 ## 🎯 Roadmap
 
