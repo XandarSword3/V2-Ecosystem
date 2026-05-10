@@ -2,6 +2,7 @@
   "name": "@v2-resort/frontend",
   "version": "1.0.0",
   "private": true,
+  "license": "PROPRIETARY",
   "scripts": {
     "dev": "next dev",
     "build": "npm --prefix ../shared run build && next build",
