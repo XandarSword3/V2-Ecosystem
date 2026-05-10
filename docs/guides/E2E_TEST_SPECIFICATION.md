@@ -1,9 +1,20 @@
+<!-- Last updated: 2026-05-10 -->
+
 # V2 Resort — Complete E2E Test Specification
 
-> **Generated from**: Exhaustive source-code and documentation analysis  
-> **Source files examined**: PHASE_1_SYSTEM_MAP.md (1054 lines), PHASE_2_VERIFICATION_PROGRAM.md (2604 lines), PHASE3_E2E_REPORT.md (520 lines), ARCHITECTURE.md, USER_GUIDE.md (526 lines), README_OVERVIEW.md, 41 backend route files, 6 frontend source files, 2 seed scripts, all directory structures  
-> **System**: Multi-module resort management platform  
-> **Stack**: Next.js 14 + Express.js 4.18 + Supabase PostgreSQL + Stripe + Socket.IO
+> **Modules**: 37 | **Engines**: 4 | **E2E Specs**: 90 | **Commits**: 257  
+> **Stack**: Next.js 14 + Express.js 4.18 + Supabase PostgreSQL 15 + Stripe + Socket.IO + 4-Engine Framework
+
+## Engine Type Reference
+
+| Label | Engine Type | Usage Pattern |
+|-------|-------------|---------------|
+| **A** | `instant_transaction` | POS orders, food service (restaurant, snack) |
+| **B** | `time_exclusive_reservation` | Multi-day bookings (chalets, rooms) |
+| **C** | `shared_capacity_access` | Session-based access (pool, gym) |
+| **D** | `ongoing_entitlement` | Subscriptions, memberships |
+
+**Note**: The unified `transactions` table powers all engine types. Legacy tables (`restaurant_orders`, `chalet_bookings`, `pool_tickets`, `snack_orders`) sync via database triggers.
 
 ---
 

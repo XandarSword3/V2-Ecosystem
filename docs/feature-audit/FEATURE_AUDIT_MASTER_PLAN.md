@@ -1,24 +1,32 @@
+<!-- Last updated: 2026-05-10 -->
+
 # Feature Audit Master Plan — V2 Resort Ecosystem
 
-**Created:** 2026-02-08
-**System:** V2 Resort — Full-stack resort management platform
+> **Modules:** 37 | **Engines:** 4 | **Commits:** 257 | **Migrations:** 158  
+> **Backend Tests:** 219 | **Frontend Tests:** 113 | **E2E Specs:** 90
+
+**Created:** 2026-02-08  
+**System:** V2 Resort — Full-stack resort management platform with 4-engine transaction framework  
 **Scope:** Micro-level audit (~550-650 features)
 
 ---
 
-## System Overview
+## System Overview (Ground Truth)
 
-| Metric | Count |
-|---|---|
-| Frontend Pages (`page.tsx`) | 103 |
-| Backend Modules | 38 |
-| API Endpoints | ~500+ |
-| Database Tables | ~130 |
-| External Integrations | 12 |
-| Existing Playwright Specs | 51+ |
-| Existing Backend Unit Tests | 229+ |
-| Supported Languages | 5 (EN, AR, FR, DE, IT) |
-| Themes | 6 (beach, mountain, sunset, forest, midnight, luxury) |
+| Metric | Count | Source |
+|---|---|------|
+| Frontend Pages (`page.tsx`) | **108** | Confirmed from frontend directory scan |
+| Backend Modules | **37** | Confirmed from subsystem registry |
+| API Endpoints | **711** | Confirmed from 40 route files (router.get/post/put/delete/patch) |
+| Database Tables | **255** | Confirmed from 255 CREATE TABLE statements across all migrations |
+| Active Migrations | **158** | Confirmed from supabase/migrations (timestamped files) |
+| External Integrations | **8** | Confirmed from backend/package.json (stripe, sentry, supabase, socket.io, intuit-oauth, nodemailer, twilio, axios) |
+| E2E Playwright Specs | **90** | Confirmed from tests/ directory |
+| Backend Unit Tests | **219** | Confirmed from backend/tests/ |
+| Frontend Unit Tests | **113** | Confirmed from frontend/tests/ |
+| Engine Types | **4** | instant_transaction, time_exclusive_reservation, shared_capacity_access, ongoing_entitlement |
+| Supported Languages | **20** | Confirmed from frontend/locales (20 locale files) |
+| Themes | 3 | Confirmed from frontend/src theme references |
 
 ### Tech Stack
 - **Frontend:** Next.js 14 (App Router), TypeScript, Tailwind CSS 3.4, Zustand, TanStack React Query v5, Radix UI, Framer Motion

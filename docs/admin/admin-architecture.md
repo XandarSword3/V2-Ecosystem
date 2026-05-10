@@ -1,6 +1,10 @@
+<!-- Last updated: 2026-05-10 -->
+
 # Admin Architecture
 
-This document describes how the Next.js admin UI flows end-to-end through the frontend API client, into the Express backend routers/controllers, and finally into Supabase/Postgres. It is used as a shared reference for sectoring pages and for building automated contract/E2E tests.
+> **Admin Pages:** 69 | **Admin Endpoints:** 78 | **Modules:** 37 | **Engines:** 4
+
+This document describes how the Next.js admin UI flows end-to-end through the frontend API client, into the Express backend routers/controllers, through the 4-engine transaction framework, and finally into Supabase/Postgres. It is used as a shared reference for sectoring pages and for building automated contract/E2E tests.
 
 ## 1) UI layer (Next.js)
 
@@ -54,18 +58,30 @@ The Express server wires all API mounts in:
 Important mount points (conceptually):
 
 - `/api/v1/admin/*` is mounted via:
-  - `apiRouter.use('/admin', adminRoutes)`
+  - `apiRouter.use('/admin', adminRoutes)` (78 endpoints confirmed)
 - module APIs are mounted under their module namespaces:
-  - `/api/v1/restaurant/*`
-  - `/api/v1/pool/*`
-  - `/api/v1/customizations/*`
-  - `/api/v1/channels/*`
+  - `/api/v1/accommodations/*` (time_exclusive_reservation engine)
+  - `/api/v1/analytics/*` (unified engine metrics)
+  - `/api/v1/bookings/*` (time_exclusive_reservation engine)
+  - `/api/v1/payments/*` (unified payment intent across 4 engines)
+  - `/api/v1/inventory/*` (shared_capacity_access engine)
   - etc.
 
 The backend uses authentication/authorization middleware to protect admin routes:
 
 - `authenticate` enforces the request is logged in
 - `authorize(...)` enforces required roles (e.g. admin/super_admin)
+
+## 4.1) Engine Framework Integration
+
+Admin operations flow through the 4-engine transaction framework:
+
+- **instant_transaction**: POS orders, food service operations
+- **time_exclusive_reservation**: Multi-day bookings, accommodation management
+- **shared_capacity_access**: Session-based access (pool, gym capacity)
+- **ongoing_entitlement**: Subscriptions, memberships
+
+All engine operations use the unified `transactions` table with engine-specific state machines.
 
 ## 5) Controllers & DB (Supabase/Postgres)
 

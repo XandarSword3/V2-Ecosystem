@@ -1,4 +1,8 @@
+<!-- Last updated: 2026-05-10 -->
+
 # Admin Pages Sector Map
+
+> **Total Admin Pages:** 69 | **Dynamic Modules:** 4 | **Engine Types:** 4
 
 > Generated: 2026-04-29T09:39:39.200Z
 
@@ -71,9 +75,9 @@
 - `/admin/properties` (frontend/src/app/admin/properties/page.tsx)
 - `/admin/terminology` (frontend/src/app/admin/terminology/page.tsx)
 
-## Dynamic Module Admin
+## Dynamic Module Admin (Engine-Based)
 
-### menu_service
+### menu_service (instant_transaction engine)
 
 - `/admin/[slug]/categories` (frontend/src/app/admin/[slug]/categories/page.tsx)
 - `/admin/[slug]/menu` (frontend/src/app/admin/[slug]/menu/page.tsx)
@@ -83,14 +87,14 @@
 - `/admin/[slug]/tables` (frontend/src/app/admin/[slug]/tables/page.tsx)
 - `/admin/[slug]/waitlist` (frontend/src/app/admin/[slug]/waitlist/page.tsx)
 
-### multi_day_booking
+### multi_day_booking (time_exclusive_reservation engine)
 
 - `/admin/[slug]` (frontend/src/app/admin/[slug]/page.tsx)
 - `/admin/[slug]/addons` (frontend/src/app/admin/[slug]/addons/page.tsx)
 - `/admin/[slug]/bookings` (frontend/src/app/admin/[slug]/bookings/page.tsx)
 - `/admin/[slug]/pricing` (frontend/src/app/admin/[slug]/pricing/page.tsx)
 
-### session_access
+### session_access (shared_capacity_access engine)
 
 - `/admin/[slug]/capacity` (frontend/src/app/admin/[slug]/capacity/page.tsx)
 - `/admin/[slug]/sessions` (frontend/src/app/admin/[slug]/sessions/page.tsx)

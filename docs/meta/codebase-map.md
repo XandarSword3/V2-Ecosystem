@@ -1,111 +1,265 @@
+<!-- Last updated: 2026-05-10 -->
+
 # 🗺️ Codebase Map & Structural Inventory
 
-> **Generated:** 2026-02-02T12:13:08.977Z
-> **Total Files:** 1504
-> **Total LOC:** 583024
+> **Total Commits:** 257 | **Backend Modules:** 37 | **Active Migrations:** 160 | **Engine Types:** 4
 
-## 📁 Directory Breakdown
+This document provides a structural overview of the V2 Resort platform codebase. For the authoritative module list, see [Subsystem Registry](./subsystem-registry.md).
 
-| Directory | Files | LOC | Primary Type |
-|-----------|-------|-----|--------------|
-| `mobile\dist-android\_expo\static\js\android` | 1 | 84851 | OTHER |
-| `backend\tests\unit` | 100 | 51869 | TEST |
-| `backend\src\lib\services` | 40 | 22501 | DOMAIN |
-| `frontend` | 25 | 21590 | CONFIG |
-| `mobile` | 21 | 21489 | CONFIG |
-| `backend` | 74 | 20681 | OTHER |
-| `docs\_archive\legacy-docs` | 22 | 19680 | LEGACY |
-| `backend\src\services` | 33 | 13168 | DOMAIN |
-| `frontend\messages` | 5 | 9927 | CONFIG |
-| `backend\src\lib\repositories` | 47 | 8410 | UTILS |
-| `docs\_archive\audit-reports` | 28 | 7726 | LEGACY |
-| `supabase\migrations` | 57 | 6749 | DATA |
-| `backend\src\database\migrations` | 29 | 6624 | DATA |
-| `tests` | 17 | 5881 | TEST |
-| `backend\src\modules\admin` | 12 | 5727 | LOGIC |
-| `frontend\src\components` | 23 | 5586 | UI |
-| `mobile\android` | 7 | 5127 | OTHER |
-| `docs\_archive\progress-tracking` | 6 | 4997 | LEGACY |
-| `backend\src\database` | 55 | 4978 | DATA |
-| `backend\tests\integration` | 16 | 4811 | TEST |
-| `tests\workflows` | 7 | 4639 | TEST |
-| `docs\_archive\strategic-analysis\01-system-audit` | 5 | 4621 | LEGACY |
-| `backend\tests\unit\controllers` | 13 | 4581 | TEST |
-| `.` | 17 | 4545 | CONFIG |
-| `frontend\src\lib` | 17 | 3541 | UTILS |
-| `docs` | 8 | 3233 | DOCS |
-| `backend\docs` | 6 | 3146 | DOCS |
-| `backend\src\modules\admin\controllers` | 11 | 3139 | API |
-| `backend\src\modules\auth` | 11 | 3033 | LOGIC |
-| `frontend\src\components\pos-templates` | 4 | 3030 | UI |
-| `backend\src\lib\container` | 2 | 3022 | UTILS |
-| `backend\src\middleware` | 19 | 2978 | LOGIC |
-| `tools\stress-test\bots` | 3 | 2976 | LOGIC |
-| `backend\src\docs` | 3 | 2894 | LOGIC |
-| `frontend\src\components\effects` | 10 | 2721 | UI |
-| `tools\stress-test` | 12 | 2599 | LOGIC |
-| `backend\src\modules\inventory` | 4 | 2570 | LOGIC |
-| `backend\src\modules\marketing` | 4 | 2502 | LOGIC |
-| `frontend\src\components\ui` | 28 | 2477 | UI |
-| `mobile\__tests__\store` | 3 | 2343 | TEST |
-| `backend\src\modules\reporting` | 4 | 2314 | LOGIC |
-| `backend\src\modules\housekeeping` | 3 | 2306 | LOGIC |
-| `backend\logs` | 2 | 2238 | OTHER |
-| `backend\tests` | 9 | 2144 | TEST |
-| `backend\src\scripts` | 30 | 2133 | LOGIC |
-| `backend\src\modules\kiosk` | 4 | 2040 | LOGIC |
-| `frontend\tests\components` | 12 | 2039 | TEST |
-| `backend\src\utils` | 10 | 2008 | UTILS |
-| `backend\src\modules\messaging` | 4 | 1969 | LOGIC |
-| `backend\src\modules\pool` | 4 | 1942 | LOGIC |
-| `frontend\src\components\module-builder` | 6 | 1914 | UI |
-| `docs\_archive\completion-reports` | 5 | 1903 | LEGACY |
-| `docs\meta` | 3 | 1886 | DOCS |
-| `mobile\src\components\ui` | 9 | 1784 | UI |
-| `backend\src\modules\revenue` | 4 | 1758 | LOGIC |
-| `backend\src\modules\reports` | 2 | 1723 | LOGIC |
-| `backend\src\modules\mobile-checkin` | 4 | 1679 | LOGIC |
-| `backend\src\modules\groups` | 4 | 1656 | LOGIC |
-| `backend\src\modules\i18n` | 4 | 1608 | LOGIC |
-| `docs\_archive\strategic-analysis\04-technical-plans` | 1 | 1602 | LEGACY |
-| `backend\src\modules\staff` | 3 | 1515 | LOGIC |
-| `backend\tests\unit\restaurant` | 5 | 1495 | TEST |
-| `mobile\app\(tabs)` | 6 | 1467 | LOGIC |
-| `mobile\src\store` | 4 | 1462 | LOGIC |
-| `backend\src\modules\channels` | 4 | 1441 | LOGIC |
-| `mobile\src\api` | 1 | 1436 | LOGIC |
-| `backend\src\modules\restaurant\controllers` | 4 | 1428 | API |
-| `backend\src\modules\payments` | 5 | 1416 | LOGIC |
-| `frontend\src\components\customer` | 4 | 1413 | UI |
-| `backend\src\modules\pool\controllers` | 5 | 1336 | API |
-| `backend\src\lib\controllers` | 5 | 1329 | API |
-| `frontend\src\app` | 5 | 1326 | LOGIC |
-| `frontend\src\app\admin\inventory` | 1 | 1321 | UI |
-| `backend\src\modules\gdpr` | 4 | 1308 | LOGIC |
-| `backend\src\modules\restaurant` | 6 | 1298 | API |
-| `mobile\__tests__\screens` | 7 | 1289 | TEST |
-| `backend\scripts` | 10 | 1278 | LOGIC |
-| `backend\tests\unit\services` | 6 | 1277 | TEST |
-| `backend\src\modules\chalets` | 3 | 1263 | LOGIC |
-| `backend\src\config` | 10 | 1259 | LOGIC |
-| `backend\tests\unit\auth` | 5 | 1253 | TEST |
-| `mobile\__tests__\__mocks__` | 2 | 1241 | TEST |
-| `mobile\__tests__\api` | 1 | 1231 | TEST |
-| `frontend\src\app\admin` | 2 | 1211 | UI |
-| `frontend\src\app\admin\settings\notifications` | 1 | 1174 | UI |
-| `backend\tests\integration\scenarios` | 5 | 1163 | TEST |
-| `backend\src\modules\integrations\quickbooks` | 4 | 1157 | LOGIC |
-| `frontend\src\styles` | 1 | 1112 | UI |
-| `mobile\__tests__\components` | 5 | 1093 | TEST |
-| `mobile\app\restaurant` | 4 | 1078 | LOGIC |
-| `frontend\src\app\admin\settings\translations` | 1 | 1076 | UI |
-| `backend\src\modules\restaurant\services` | 3 | 1074 | DOMAIN |
-| `backend\src\modules\manager` | 3 | 1046 | LOGIC |
-| `backend\src` | 7 | 1018 | LOGIC |
-| `backend\src\modules\loyalty` | 2 | 989 | LOGIC |
-| `frontend\src\app\restaurant` | 2 | 984 | UI |
-| `backend\src\modules\multi-property` | 4 | 975 | LOGIC |
-| `frontend\src\utils` | 2 | 969 | UTILS |
+---
+
+## 📁 Top-Level Structure
+
+```
+v2-resort/
+├── backend/              # Express.js API server (Node.js 20 + TypeScript 5.3)
+│   ├── src/
+│   │   ├── modules/      # 37 feature modules
+│   │   ├── engines/      # 4 unified transaction engines
+│   │   ├── services/     # Shared business services
+│   │   ├── database/     # Connection, migrations, seeding
+│   │   ├── middleware/   # Express middleware
+│   │   ├── routes/       # Route definitions
+│   │   └── socket/       # Socket.io real-time handlers
+│   ├── tests/            # 219 test files (unit + integration)
+│   └── docs/             # Backend-specific documentation
+│
+├── frontend/             # Next.js 14 application
+│   ├── src/
+│   │   ├── app/          # App Router (20+ routes)
+│   │   ├── components/   # React components
+│   │   ├── lib/          # Client utilities (API, socket, i18n)
+│   │   ├── stores/       # Zustand state stores
+│   │   └── types/        # Frontend TypeScript types
+│   ├── tests/            # 113 test files
+│   └── messages/         # i18n translation files (5 languages)
+│
+├── mobile/               # React Native 0.81.5 + Expo 54.0
+│   ├── app/              # Expo Router pages
+│   ├── src/
+│   │   ├── components/   # Mobile UI components
+│   │   ├── services/     # API services
+│   │   ├── store/        # State management
+│   │   └── api/          # API client
+│   └── __tests__/        # Jest test suites
+│
+├── shared/               # Shared TypeScript types
+│   └── types/            # API contracts, shared models
+│
+├── supabase/             # Database migrations
+│   └── migrations/       # 160 active SQL migrations
+│
+├── tests/                # Playwright E2E tests (90 spec files)
+│   ├── admin-functional/
+│   ├── e2e/
+│   ├── features/
+│   ├── phase3/           # Engine-aligned critical path
+│   ├── rebrand/
+│   ├── smoke/
+│   └── workflows/
+│
+├── docs/                 # Project documentation
+│   ├── architecture/     # System architecture docs
+│   ├── api/              # API documentation
+│   ├── guides/           # Development guides
+│   ├── meta/             # Codebase metadata
+│   └── feature-audit/    # Feature tracking
+│
+├── infrastructure/       # Infrastructure configuration
+├── nginx/                # Nginx configuration
+├── scripts/              # Utility scripts
+└── tools/                # Development tools
+    └── stress-test/      # Load testing suite
+```
+
+---
+
+## 🔧 Backend Modules (37)
+
+All modules in `backend/src/modules/`:
+
+```
+backend/src/modules/
+├── accommodations/       # Property inventory management
+├── admin/                # System administration
+├── analytics/            # Data aggregation and metrics
+├── auth/                 # Authentication and authorization
+├── bookings/             # Reservation management
+├── channels/             # OTA integration
+├── coupons/              # Discount codes
+├── customization/        # Theming and branding
+├── devices/              # Hardware integration
+├── economics/            # Pricing engine
+├── finance/              # Accounting and ledgers
+├── gdpr/                 # Data privacy compliance
+├── giftcards/            # Gift card management
+├── groups/               # Group bookings
+├── housekeeping/         # Cleaning schedules
+├── i18n/                 # Internationalization
+├── integrations/         # Third-party connectors
+├── inventory/            # Stock and BOM tracking
+├── kiosk/                # Self-service terminal
+├── loyalty/              # Points and tiers
+├── manager/              # Property manager dashboard
+├── marketing/            # Campaigns and automation
+├── messaging/            # Guest communication
+├── mobile-checkin/       # Self check-in
+├── multi-property/       # Multi-location support
+├── parity/               # Rate parity monitoring
+├── payments/             # Payment processing
+├── pos/                  # Point-of-sale
+├── promotions/           # Dynamic pricing
+├── public/               # Public API endpoints
+├── reporting/            # Report generation
+├── revenue/              # Revenue management
+├── reviews/              # Guest feedback
+├── shared/               # Shared utilities
+├── staff/                # Staff management
+├── support/              # Help desk
+└── users/                # User accounts
+```
+
+---
+
+## ⚡ Engine Framework
+
+Location: `backend/src/engines/`
+
+```
+backend/src/engines/
+├── definitions/
+│   ├── instant-transaction.ts          # menu_service template
+│   ├── time-exclusive-reservation.ts   # multi_day_booking template
+│   ├── shared-capacity-access.ts       # session_access template
+│   └── ongoing-entitlement.ts          # subscription template
+├── registry.ts                         # Engine registry and factory
+├── state-machine.ts                    # State machine implementation
+└── types.ts                            # Engine type definitions
+```
+
+**Engine-to-Module Mapping:**
+- `instant_transaction` → POS, inventory, menu services
+- `time_exclusive_reservation` → Accommodations, bookings, housekeeping
+- `shared_capacity_access` → Pool sessions, capacity management
+- `ongoing_entitlement` → Memberships, subscriptions
+
+---
+
+## 🧪 Test Structure
+
+### Backend Tests (219 files)
+```
+backend/tests/
+├── unit/                 # Unit tests by module
+│   ├── accommodations/
+│   ├── admin/
+│   ├── auth/
+│   ├── channels/
+│   ├── devices/
+│   ├── finance/
+│   ├── gdpr/
+│   ├── groups/
+│   ├── housekeeping/
+│   ├── marketing/
+│   ├── messaging/
+│   ├── mobile-checkin/
+│   ├── multi-property/
+│   ├── parity/
+│   ├── payments/
+│   ├── promotions/
+│   ├── reporting/
+│   ├── revenue/
+│   ├── staff/
+│   └── users/
+└── integration/          # Integration tests
+    └── scenarios/
+```
+
+### Frontend Tests (113 files)
+```
+frontend/tests/
+├── components/           # React component tests
+├── lib/                  # Utility tests
+├── pages/                # Page-level tests
+└── validation/           # Form validation tests
+```
+
+### E2E Tests (90 spec files)
+```
+tests/
+├── admin-functional/     # Admin workflow tests
+├── e2e/                  # General E2E
+├── features/             # Feature tests
+│   ├── admin/
+│   ├── cross-cutting/
+│   ├── customer/
+│   ├── manager/
+│   └── staff/
+├── phase3/               # Engine critical path
+│   ├── 00-public-pages.spec.ts
+│   ├── 01-engine-a-instant-transactions.spec.ts
+│   ├── 02-engine-b-reservations.spec.ts
+│   ├── 03-engine-c-capacity.spec.ts
+│   ├── 04-engine-d-entitlements.spec.ts
+│   ├── 05-admin-panel.spec.ts
+│   ├── 06-admin-db-effect.spec.ts
+│   ├── 06-staff-panel.spec.ts
+│   ├── 10-functional-restaurant.spec.ts
+│   ├── 11-functional-cart.spec.ts
+│   ├── 12-functional-admin.spec.ts
+│   ├── 13-functional-api.spec.ts
+│   ├── 20-journey-engine-a.spec.ts
+│   ├── 21-journey-engine-b.spec.ts
+│   ├── 22-journey-engine-c.spec.ts
+│   ├── 23-journey-engine-d.spec.ts
+│   └── 24-journey-cross-engine.spec.ts
+├── rebrand/              # White-label tests
+├── smoke/                # Production smoke tests
+├── utils/                # Test utilities
+└── workflows/            # Full workflow tests
+```
+
+---
+
+## 🗄️ Database & Migrations
+
+```
+supabase/
+└── migrations/
+    ├── 00000000000000_init_users.sql
+    ├── 00000000000001_base_schema_shim.sql
+    ├── 20240201000001_security_audit_tables.sql
+    ├── ... (157 more migrations)
+    └── DUPLICATE_DO_NOT_RUN_20260224000030_reverse_coupon_usage.sql
+```
+
+**Active migrations:** 160 (161 total minus 1 duplicate)
+
+---
+
+## 📦 Key Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `package.json` | Root workspace configuration |
+| `backend/package.json` | Express.js dependencies |
+| `frontend/package.json` | Next.js dependencies |
+| `mobile/package.json` | React Native dependencies |
+| `docker-compose.yml` | Postgres + Redis services |
+| `playwright.config.ts` | E2E test configuration |
+| `.github/workflows/ci.yml` | CI/CD pipeline |
+| `frontend/tailwind.config.js` | Tailwind CSS |
+| `backend/vitest.config.ts` | Backend test config |
+| `frontend/vitest.config.ts` | Frontend test config |
+
+---
+
+## 🔗 Related Documentation
+
+- [Subsystem Registry](./subsystem-registry.md) — Authoritative module list
+- [File Index](./file-index.md) — Flat file listing
+- [Architecture Overview](../architecture/ARCHITECTURE.md) — System design
+- [Testing Guide](../guides/TESTING.md) — Test infrastructure
 | `tools\stress-test\utils` | 3 | 969 | UTILS |
 | `frontend\src\lib\offline` | 4 | 966 | UTILS |
 | `docs\_archive\strategic-analysis\02-industry-research` | 2 | 943 | LEGACY |

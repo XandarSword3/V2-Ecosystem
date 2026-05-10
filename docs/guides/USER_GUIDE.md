@@ -11,10 +11,10 @@ The V2 Resort system consists of:
 ### Access URLs
 
 #### Development Environment
-- **Customer Website**: http://localhost:3002
-- **Staff Portal**: http://localhost:3002/staff
-- **Admin Dashboard**: http://localhost:3002/admin
-- **Backend API**: http://localhost:3001
+- **Customer Website**: http://localhost:3000
+- **Staff Portal**: http://localhost:3000/staff
+- **Admin Dashboard**: http://localhost:3000/admin
+- **Backend API**: http://localhost:3005
 
 #### Production Environment
 - **Customer Website**: https://v2resort.com

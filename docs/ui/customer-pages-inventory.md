@@ -1,4 +1,8 @@
-# Customer-facing page inventory (Tier 1–3)
+<!-- Last updated: 2026-05-10 -->
+
+# Customer-facing Page Inventory
+
+> **Total Frontend Pages:** 108 | **Engine Types:** 4 | **Customer Pages:** 39
 
 This inventory lists **customer-facing** Next.js routes under `frontend/src/app/*` and maps shared layout ownership. It **excludes** `/admin/*` and `/staff/*`.
 
