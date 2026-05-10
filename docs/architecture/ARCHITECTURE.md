@@ -1,129 +1,238 @@
+<!-- Last updated: 2026-05-10 -->
+
 # Architecture Overview
 
-This document provides a high-level overview of the V2 Resort platform architecture.
+> **Platform**: V2 Resort Management System | **Commits**: 257 | **Modules**: 37 | **Engines**: 4
+
+This document describes the unified engine architecture that powers all transactions in the V2 platform.
+
+---
 
 ## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           V2 Resort Platform                             │
+│                         V2 Resort Platform                               │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐   │
-│  │                 │     │                 │     │                 │   │
-│  │   Frontend      │────▶│   Backend       │────▶│   Supabase      │   │
-│  │   Next.js 14    │     │   Express.js    │     │   PostgreSQL    │   │
-│  │                 │     │                 │     │                 │   │
-│  └────────┬────────┘     └────────┬────────┘     └─────────────────┘   │
-│           │                       │                                     │
-│           │ WebSocket             │                                     │
-│           └───────────────────────┘                                     │
+│  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐    │
+│  │                 │     │   37 Modules    │     │                 │    │
+│  │   Frontend      │────▶│   4 Engines     │────▶│   Supabase      │    │
+│  │   Next.js 14    │     │   Express.js    │     │   PostgreSQL 15 │    │
+│  │   (Port 3005)   │     │   PostgreSQL 15 │     │                 │    │
+│  │                 │     │                 │     │  158 Migrations │    │
+│  └────────┬────────┘     └────────┬────────┘     └─────────────────┘    │
+│           │                       │                                      │
+│           │  WebSocket (Socket.io)                                     │
+│           └───────────────────────┘                                      │
 │                                                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    Third-Party Services                          │   │
-│  ├─────────────────┬─────────────────┬─────────────────────────────┤   │
-│  │  Stripe         │  Nodemailer     │  Sentry                     │   │
-│  │  (Payments)     │  (Email)        │  (Error Tracking)           │   │
-│  └─────────────────┴─────────────────┴─────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                    Unified Transaction Layer                      │    │
+│  ├───────────┬───────────────┬─────────────────┬─────────────────┤    │
+│  │ instant_  │ time_exclusive│ shared_capacity │ ongoing_        │    │
+│  │ transaction│ _reservation  │ _access         │ entitlement     │    │
+│  │ (POS)     │ (Bookings)    │ (Pool/Gym)      │ (Memberships)   │    │
+│  └───────────┴───────────────┴─────────────────┴─────────────────┘    │
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                    Third-Party Services                           │    │
+│  ├───────────────┬───────────────┬─────────────────────────────────┤    │
+│  │ Stripe        │ Nodemailer    │ Sentry                          │    │
+│  │ (Payments)    │ (Email)       │ (Error Tracking)                │    │
+│  └───────────────┴───────────────┴─────────────────────────────────┘    │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## The 4-Engine Abstraction
+
+All transactions in V2 flow through one of four unified engines. This replaces the legacy architecture where restaurant, pool, chalets, and snack were separate modules.
+
+| Engine Type | TypeScript Name | Template | Pattern | State Machine |
+|-------------|-----------------|----------|---------|---------------|
+| **Instant Transaction** | `instant_transaction` | `menu_service` | Point-of-sale, immediate fulfillment | `pending → confirmed → preparing → ready → delivered → completed` |
+| **Time-Exclusive Reservation** | `time_exclusive_reservation` | `multi_day_booking` | Date-range bookings with exclusive unit lock | `pending → confirmed → checked_in → checked_out` |
+| **Shared Capacity Access** | `shared_capacity_access` | `session_access` | Capacity-limited shared sessions | `valid → active → used` |
+| **Ongoing Entitlement** | `ongoing_entitlement` | `subscription` | Recurring memberships and subscriptions | `pending → active → paused → expired` |
+
+### Engine Definition Files
+
+```
+backend/src/engines/
+├── definitions/
+│   ├── instant-transaction.ts         # POS orders, food service
+│   ├── time-exclusive-reservation.ts  # Chalets, rooms
+│   ├── shared-capacity-access.ts      # Pool sessions, gym access
+│   └── ongoing-entitlement.ts         # Memberships, subscriptions
+├── registry.ts                        # Engine factory & mapping
+├── state-machine.ts                   # State transition logic
+└── types.ts                           # TypeScript definitions
+```
+
+---
+
+## Transaction Lifecycle
+
+Every transaction follows the same pipeline:
+
+```
+1. Client Request
+        ↓
+2. Dynamic Module Router (resolves template → engine)
+        ↓
+3. Engine Resolution (TEMPLATE_TO_ENGINE mapping)
+        ↓
+4. State Machine Creation (createStateMachine(engineType))
+        ↓
+5. Pricing Pipeline (calculatePricing with taxes, discounts, loyalty)
+        ↓
+6. Idempotency Guard (X-Idempotency-Key check)
+        ↓
+7. Payment Processing (Stripe integration)
+        ↓
+8. Unified Transaction Record (transactions table)
+        ↓
+9. Sync Trigger (updates source table: restaurant_orders, chalet_bookings, etc.)
+        ↓
+10. Real-time Event (Socket.io emit)
+        ↓
+11. Client Response (transaction_id, state, pricing breakdown)
+```
+
+---
 
 ## Directory Structure
 
 ```
 v2-resort/
-├── backend/              # Express.js API server
+├── backend/                 # Express.js API (Node 20, TypeScript 5.3)
 │   ├── src/
-│   │   ├── modules/      # Feature modules (auth, restaurant, pool, etc.)
-│   │   ├── services/     # Shared services (email, 2FA)
-│   │   ├── database/     # Database connection & seeding
-│   │   ├── middleware/   # Express middleware
-│   │   └── socket/       # Socket.io handlers
-│   └── tests/            # Backend E2E tests
+│   │   ├── modules/         # 37 feature modules
+│   │   ├── engines/         # 4 unified transaction engines
+│   │   ├── services/        # Shared business services
+│   │   ├── database/        # Connection, migrations, seeding
+│   │   ├── middleware/      # Express middleware
+│   │   ├── routes/          # Route definitions
+│   │   └── socket/          # Socket.io handlers
+│   └── tests/               # 219 test files
 │
-├── frontend/             # Next.js 14 application
+├── frontend/                # Next.js 14 (TypeScript 5.4)
 │   ├── src/
-│   │   ├── app/          # Next.js App Router pages
-│   │   ├── components/   # React components
-│   │   ├── lib/          # Client libraries (API, socket)
-│   │   ├── stores/       # Zustand state stores
-│   │   ├── types/        # Frontend TypeScript types
-│   │   └── i18n/         # Internationalization
-│   └── tests/            # Frontend unit tests
+│   │   ├── app/             # 20+ App Router routes
+│   │   ├── components/      # React components
+│   │   ├── lib/             # Client utilities
+│   │   ├── stores/          # Zustand state stores
+│   │   └── types/           # TypeScript types
+│   └── tests/               # 113 test files
 │
-├── shared/               # Shared TypeScript types
-│   └── types/            # API contracts, models
-│
-└── tools/                # Development & testing tools
-    └── stress-test/      # Load testing bots
+├── mobile/                  # React Native 0.81.5 + Expo 54.0
+├── shared/                  # Shared TypeScript types
+├── supabase/                # 158 active SQL migrations
+├── tests/                   # 90 Playwright E2E spec files
+└── docs/                    # Documentation
 ```
 
-## Feature Modules
+---
 
-| Module | Description | Key Features |
-|--------|-------------|--------------|
-| **Auth** | Authentication system | JWT, 2FA, OAuth |
-| **Restaurant** | Food ordering | Menu, orders, kitchen display |
-| **Pool** | Session booking | Time slots, capacity, gender restrictions |
-| **Chalets** | Accommodation | Multi-day booking, pricing |
-| **Payments** | Stripe integration | Checkout, refunds, webhooks |
-| **Admin** | Dashboard | User management, analytics |
-| **Module Builder** | Visual builder | Dynamic module creation |
+## Backend Modules (37)
 
-## Data Flow
+All modules located in `backend/src/modules/`:
 
-### 1. API Request Flow
+| Category | Modules |
+|----------|---------|
+| **Core** | auth, users, admin, shared |
+| **Commerce** | pos, inventory, payments, coupons, giftcards, promotions |
+| **Reservations** | accommodations, bookings, groups, housekeeping |
+| **Operations** | staff, manager, kiosk, devices, support |
+| **Marketing** | marketing, messaging, loyalty, reviews |
+| **Integrations** | channels, integrations, parity, multi-property, i18n |
+| **Analytics** | analytics, reporting, revenue, economics, finance |
+| **Compliance** | gdpr, public, mobile-checkin, customization |
 
-```
-Client → Auth Middleware → Route Handler → Service → Database → Response
-```
-
-### 2. Real-time Updates Flow
-
-```
-Kitchen → Backend → Socket.io → All Connected Clients
-```
-
-### 3. Payment Flow
-
-```
-Client → Checkout → Stripe → Webhook → Order Confirmed → Email
-```
+---
 
 ## Tech Stack
 
 ### Backend
-- **Runtime**: Node.js 20
+- **Runtime**: Node.js 20+
 - **Framework**: Express.js 4.18
 - **Language**: TypeScript 5.3
-- **Database**: Supabase PostgreSQL
-- **Real-time**: Socket.io 4.8
+- **Database**: PostgreSQL 15 (Supabase)
+- **ORM**: Drizzle 0.45
+- **Real-time**: Socket.io 4.8 + Redis Adapter
 - **Payments**: Stripe 14.25
-- **Email**: Nodemailer
-- **Security**: bcryptjs, JWT, otplib (2FA)
+- **Validation**: Zod 3.25
+- **Testing**: Vitest
+- **Security**: Helmet, CORS, CSRF, bcrypt, JWT, otplib
 
 ### Frontend
-- **Framework**: Next.js 14.2
+- **Framework**: Next.js 14.2 (App Router)
 - **Language**: TypeScript 5.4
 - **Styling**: Tailwind CSS 3.4
-- **State**: Zustand 4.5
+- **State**: Zustand 4.5, TanStack Query 5.28
+- **UI**: Radix UI, Framer Motion
 - **Forms**: React Hook Form + Zod
 - **i18n**: next-intl 3.26
+- **Testing**: Vitest
 
-### Testing
-- **Unit**: Vitest
-- **E2E**: Playwright
-- **Load**: Custom stress test bots
+### Mobile
+- **Framework**: React Native 0.81.5
+- **Platform**: Expo 54.0
+- **Testing**: Jest
 
-## Security
+### Infrastructure
+- **Database**: Supabase PostgreSQL
+- **Cache**: Redis 7
+- **CI/CD**: GitHub Actions (10 stages)
+- **E2E Testing**: Playwright (90 spec files)
 
-1. **Authentication**: JWT with refresh tokens
-2. **Authorization**: Role-based access control (RBAC)
+---
+
+## Security Architecture
+
+1. **Authentication**: JWT with refresh tokens, stored in httpOnly cookies
+2. **Authorization**: Role-based access control (RBAC) with 4 roles (admin, manager, staff, customer)
 3. **Encryption**: bcrypt password hashing (cost 12)
 4. **2FA**: TOTP-based two-factor authentication
-5. **Rate Limiting**: Per-route request limits
-6. **Input Validation**: Zod schemas on all inputs
+5. **Rate Limiting**: Per-route request limits via Redis
+6. **Input Validation**: Zod schemas on all API inputs
+7. **CSRF Protection**: Token-based CSRF for state-changing operations
+8. **Idempotency**: X-Idempotency-Key header for payment operations
+
+---
+
+## Data Flow Examples
+
+### Example 1: POS Order (Instant Transaction)
+```
+Customer → Frontend → POST /api/v1/payments/intent
+  → Engine: instant_transaction
+  → State: pending → confirmed
+  → Side Effect: Inventory deduction
+  → Table: restaurant_orders (via sync trigger)
+```
+
+### Example 2: Chalet Booking (Time-Exclusive Reservation)
+```
+Customer → Frontend → POST /api/bookings
+  → Engine: time_exclusive_reservation
+  → State: pending → confirmed → checked_in → checked_out
+  → Side Effect: Calendar hold, housekeeping schedule
+  → Table: chalet_bookings (via sync trigger)
+```
+
+### Example 3: Pool Session (Shared Capacity Access)
+```
+Customer → Frontend → POST /api/pool/tickets
+  → Engine: shared_capacity_access
+  → State: valid → active → used
+  → Side Effect: Capacity check, entry/exit logging
+  → Table: pool_tickets (via sync trigger)
+```
+
+---
 
 ## Deployment
 
@@ -134,20 +243,27 @@ Client → Checkout → Stripe → Webhook → Order Confirmed → Email
 docker-compose up -d
 
 # Or individually
-cd backend && npm run dev
-cd frontend && npm run dev
+cd backend && npm run dev     # Port 3005
+cd frontend && npm run dev    # Port 3000
 ```
+
+**Docker Services:**
+- `postgres` (postgres:15-alpine, port 5432)
+- `redis` (redis:7-alpine, port 6379)
 
 ### Production
 
 - **Frontend**: Vercel
 - **Backend**: Render / Railway / Docker
 - **Database**: Supabase Cloud
+- **Monitoring**: Sentry, OpenTelemetry
+
+---
 
 ## Related Documentation
 
-- [Backend README](backend/README.md)
-- [Frontend README](frontend/README.md)
-- [Testing Guide](TESTING.md)
-- [User Guide](USER_GUIDE.md)
-- [Development Time Estimation](DEVELOPMENT_TIME_ESTIMATION.md)
+- [Control Flow](./control-flow.md) — Request lifecycle through engines
+- [Dependency Graph](./dependency-graph.md) — Module dependencies
+- [Subsystem Registry](../meta/subsystem-registry.md) — Module listing
+- [Testing Guide](../guides/TESTING.md) — CI pipeline and test structure
+- [API Reference](../api/API.md) — Endpoint documentation

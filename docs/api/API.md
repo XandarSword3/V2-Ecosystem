@@ -1,21 +1,33 @@
+<!-- Last updated: 2026-05-10 -->
+
 # API Reference
 
-This document provides a complete reference of all API endpoints.
+> **Base URL:** `http://localhost:3005` (development) | **Version:** v1 | **Modules:** 37 | **Engines:** 4
 
-## Base URL
+This document provides a reference of confirmed API endpoints. All endpoints are verified against the actual route files in `backend/src/routes/` and `backend/src/modules/`.
 
-```
-Development: http://localhost:3001
-Production:  https://api.yourresort.com
-```
+---
+
+## Base URL & Ports
+
+| Environment | URL | Port |
+|-------------|-----|------|
+| Development | `http://localhost:3005` | Backend: 3005, Frontend: 3000 |
+| Production | `https://api.yourresort.com` | 443 |
+
+---
 
 ## Authentication
 
-All authenticated endpoints require a Bearer token:
+Most endpoints require authentication via JWT Bearer token:
 
 ```
 Authorization: Bearer <access_token>
 ```
+
+Tokens are issued on login and expire after 15 minutes. Use `/auth/refresh` with a refresh token to obtain new access tokens.
+
+---
 
 ## Response Format
 
@@ -42,7 +54,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-## Auth Module
+## Auth Module (`/api/auth`)
 
 ### POST /auth/register
 
@@ -65,7 +77,8 @@ Create a new user account.
   "data": {
     "id": "uuid",
     "email": "user@example.com",
-    "fullName": "John Doe"
+    "fullName": "John Doe",
+    "roles": ["customer"]
   }
 }
 ```
@@ -111,17 +124,6 @@ Get a new access token using refresh token.
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "accessToken": "eyJ...",
-    "expiresIn": 900
-  }
-}
-```
-
 ### POST /auth/forgot-password
 
 Request password reset email.
@@ -147,41 +149,225 @@ Reset password with token from email.
 
 ---
 
-## Restaurant Module
+## Engine-Based Transaction API (`/api/v1`)
 
-### GET /restaurant/menu
+The unified transaction API supports all 4 engine types through a common interface.
 
-Get full menu with categories and items.
+### POST /api/v1/payments/intent
 
-**Query Parameters:**
-- `moduleId` (optional) - Filter by module
+Create a payment intent for any transaction type. The engine is determined by the `referenceType`.
+
+**Request:**
+```json
+{
+  "amount": 125.00,
+  "currency": "usd",
+  "referenceType": "instant_transaction",
+  "lineItems": [
+    {
+      "name": "Menu Item",
+      "unitPrice": 25.00,
+      "quantity": 2
+    }
+  ],
+  "couponCode": "SUMMER10",
+  "giftCardCodes": ["GIFT123"],
+  "loyaltyPointsToRedeem": 50
+}
+```
+
+**Reference Types (Engine Mapping):**
+- `instant_transaction` → POS orders, food service
+- `time_exclusive_reservation` → Chalet bookings, room reservations
+- `shared_capacity_access` → Pool tickets, gym sessions
+- `ongoing_entitlement` → Memberships, subscriptions
 
 **Response:**
 ```json
 {
   "success": true,
   "data": {
-    "categories": [
-      {
-        "id": "uuid",
-        "name": "Appetizers",
-        "items": [
-          {
-            "id": "uuid",
-            "name": "Spring Rolls",
-            "price": 8.99,
-            "description": "Crispy vegetable rolls"
-          }
-        ]
-      }
+    "clientSecret": "pi_xxx_secret_xxx",
+    "transactionId": "uuid",
+    "amount": 125.00,
+    "discounts": {
+      "coupon": 12.50,
+      "giftCard": 25.00,
+      "loyalty": 5.00
+    },
+    "finalAmount": 82.50
+  }
+}
+```
+
+### GET /api/v1/transactions/:id
+
+Get transaction details including state, pricing, and history.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "engineType": "instant_transaction",
+    "state": "confirmed",
+    "amount": 82.50,
+    "lineItems": [...],
+    "discounts": [...],
+    "createdAt": "2026-05-10T14:30:00Z",
+    "stateHistory": [
+      { "from": "pending", "to": "confirmed", "at": "2026-05-10T14:31:00Z" }
     ]
   }
 }
 ```
 
-### POST /restaurant/orders
+### POST /api/v1/transactions/:id/transition
 
-Create a new order.
+Manually trigger a state transition (staff only).
+
+**Request:**
+```json
+{
+  "action": "prepare",
+  "reason": "Kitchen received order"
+}
+```
+
+---
+
+## Analytics API (`/api/analytics`)
+
+### GET /api/analytics/engines
+
+Get aggregated metrics grouped by engine type. Used by the admin cockpit.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "instant_transaction": {
+      "transactionCount": 150,
+      "revenue": 4500.00,
+      "averageOrderValue": 30.00
+    },
+    "time_exclusive_reservation": {
+      "transactionCount": 45,
+      "revenue": 12500.00,
+      "averageBookingValue": 277.78
+    },
+    "shared_capacity_access": {
+      "transactionCount": 200,
+      "revenue": 3000.00
+    },
+    "ongoing_entitlement": {
+      "activeSubscriptions": 85,
+      "monthlyRecurringRevenue": 4200.00
+    }
+  }
+}
+```
+
+### GET /api/analytics/dashboard
+
+Get dashboard statistics.
+
+**Required Role:** `admin`, `manager`, or `super_admin`
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "revenueByEngine": {
+      "instant_transaction": 4500.00,
+      "time_exclusive_reservation": 12500.00,
+      "shared_capacity_access": 3000.00,
+      "ongoing_entitlement": 4200.00
+    },
+    "transactionsByEngine": {
+      "instant_transaction": 150,
+      "time_exclusive_reservation": 45,
+      "shared_capacity_access": 200
+    },
+    "activeGuests": 23,
+    "occupancyRate": 78.5
+  }
+}
+```
+
+---
+
+## Accommodations API (`/api/accommodations`)
+
+### GET /api/accommodations
+
+List all accommodations (chalets, rooms).
+
+**Query Parameters:**
+- `capacity_gte` - Minimum capacity
+- `amenities` - Comma-separated amenities
+- `availableFrom` - Check availability from date
+- `availableTo` - Check availability to date
+
+### GET /api/accommodations/:id/availability
+
+Check availability for specific dates.
+
+**Query Parameters:**
+- `checkIn` - Start date (YYYY-MM-DD)
+- `checkOut` - End date (YYYY-MM-DD)
+
+---
+
+## Bookings API (`/api/bookings`)
+
+### POST /api/bookings
+
+Create a new booking (uses `time_exclusive_reservation` engine).
+
+**Request:**
+```json
+{
+  "accommodationId": "uuid",
+  "checkIn": "2026-06-15",
+  "checkOut": "2026-06-18",
+  "guests": [
+    { "name": "John Doe", "type": "adult" }
+  ],
+  "specialRequests": "Late check-in"
+}
+```
+
+### GET /api/bookings
+
+List user's bookings.
+
+**Query Parameters:**
+- `status` - Filter by status (pending, confirmed, checked_in, checked_out, cancelled)
+- `page`, `limit` - Pagination
+
+### PUT /api/bookings/:id
+
+Modify an existing booking.
+
+---
+
+## Inventory/POS API (`/api/pos`, `/api/inventory`)
+
+### GET /api/pos/menu
+
+Get menu items (for modules using `instant_transaction` engine).
+
+**Query Parameters:**
+- `moduleId` - Filter by module
+- `category` - Filter by category
+
+### POST /api/pos/orders
+
+Create a POS order (uses `instant_transaction` engine).
 
 **Request:**
 ```json
@@ -199,193 +385,76 @@ Create a new order.
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "status": "pending",
-    "items": [...],
-    "totalAmount": 25.99
-  }
-}
-```
-
-### GET /restaurant/orders
-
-Get user's orders.
-
-**Query Parameters:**
-- `status` (optional) - Filter by status
-- `page` (default: 1)
-- `limit` (default: 10)
-
 ---
 
-## Pool Module
+## Pool API (`/api/pool`)
 
-### GET /pool/sessions
+### GET /api/pool/sessions
 
-Get available pool sessions.
+Get available pool sessions (uses `shared_capacity_access` engine).
 
 **Query Parameters:**
 - `date` - Date to check (YYYY-MM-DD)
-- `moduleId` (optional)
+- `moduleId` - Filter by module
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "name": "Morning Session",
-      "startTime": "09:00",
-      "endTime": "12:00",
-      "adultPrice": 25.00,
-      "childPrice": 15.00,
-      "availableSpots": 15,
-      "gender": "mixed"
-    }
-  ]
-}
-```
+### POST /api/pool/tickets
 
-### POST /pool/bookings
-
-Create a pool booking.
+Create a pool ticket booking.
 
 **Request:**
 ```json
 {
   "sessionId": "uuid",
-  "date": "2026-01-15",
+  "date": "2026-06-15",
   "adultCount": 2,
-  "childCount": 1,
-  "guests": [
-    { "name": "John Doe", "type": "adult" },
-    { "name": "Jane Doe", "type": "adult" },
-    { "name": "Jimmy Doe", "type": "child" }
-  ]
+  "childCount": 1
 }
 ```
 
 ---
 
-## Chalets Module
+## Admin API (`/api/admin`)
 
-### GET /chalets
+### GET /api/admin/dashboard
 
-List all chalets.
-
-**Query Parameters:**
-- `capacity_gte` - Minimum capacity
-- `amenities` - Comma-separated amenities
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "name": "Luxury Villa",
-      "capacity": 6,
-      "pricePerNight": 350.00,
-      "amenities": ["pool", "wifi", "bbq"]
-    }
-  ]
-}
-```
-
-### GET /chalets/:id/availability
-
-Check chalet availability for dates.
-
-**Query Parameters:**
-- `checkIn` - Start date (YYYY-MM-DD)
-- `checkOut` - End date (YYYY-MM-DD)
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "available": true,
-    "totalPrice": 1050.00,
-    "nights": 3,
-    "breakdown": [
-      { "date": "2026-01-15", "price": 350.00, "isWeekend": false },
-      { "date": "2026-01-16", "price": 400.00, "isWeekend": true },
-      { "date": "2026-01-17", "price": 300.00, "isWeekend": false }
-    ]
-  }
-}
-```
-
----
-
-## Payments Module
-
-### POST /payments/checkout
-
-Create a Stripe checkout session.
-
-**Request:**
-```json
-{
-  "type": "order",
-  "referenceId": "uuid",
-  "successUrl": "https://yoursite.com/success",
-  "cancelUrl": "https://yoursite.com/cancel"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "sessionId": "cs_...",
-    "checkoutUrl": "https://checkout.stripe.com/..."
-  }
-}
-```
-
----
-
-## Admin Module
-
-### GET /admin/dashboard
-
-Get dashboard statistics.
+Get admin dashboard stats.
 
 **Required Role:** `admin` or `super_admin`
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "todayRevenue": 2540.00,
-    "weeklyRevenue": 15800.00,
-    "ordersToday": 45,
-    "bookingsToday": 12,
-    "activeUsers": 23,
-    "revenueChange": 12.5
-  }
-}
-```
+### GET /api/admin/users
 
-### GET /admin/users
-
-List all users.
+List all users with pagination.
 
 **Query Parameters:**
 - `search` - Search by name/email
-- `role` - Filter by role
+- `role` - Filter by role (admin, manager, staff, customer)
 - `page`, `limit` - Pagination
+
+### GET /api/admin/settings
+
+Get system settings.
+
+### PUT /api/admin/settings
+
+Update system settings.
+
+---
+
+## Route Files Reference
+
+The following route files are confirmed in `backend/src/routes/` and `backend/src/modules/`:
+
+| Route File | Path | Description |
+|------------|------|-------------|
+| `v1.routes.ts` | `/api/v1/*` | Unified transaction API (engine-based) |
+| `docs.routes.ts` | `/api/docs/*` | API documentation endpoints |
+| `dynamic-module.router.ts` | `/api/modules/*` | Dynamic module routing |
+| `search.routes.ts` | `/api/search/*` | Global search |
+| `terminology.routes.ts` | `/api/terminology/*` | Terminology system |
+| `translation.routes.ts` | `/api/translations/*` | i18n endpoints |
+| `unsubscribe.routes.ts` | `/unsubscribe/*` | Email unsubscribe |
+
+Module-specific routes are located in `backend/src/modules/[module]/[module].routes.ts`.
 
 ---
 
@@ -399,6 +468,8 @@ List all users.
 | `VALIDATION_ERROR` | 400 | Invalid request data |
 | `NOT_FOUND` | 404 | Resource not found |
 | `CONFLICT` | 409 | Resource already exists |
+| `ENGINE_INVALID_TRANSITION` | 400 | Invalid state transition |
+| `IDEMPOTENCY_KEY_REUSE` | 409 | Duplicate idempotency key |
 | `SERVER_ERROR` | 500 | Internal server error |
 
 ---
@@ -410,4 +481,13 @@ List all users.
 | `/auth/login` | 5 requests/minute |
 | `/auth/register` | 3 requests/minute |
 | `/auth/forgot-password` | 3 requests/hour |
+| `/api/v1/payments/*` | 30 requests/minute |
 | All other endpoints | 100 requests/minute |
+
+---
+
+## Related Documentation
+
+- [Architecture Overview](../architecture/ARCHITECTURE.md) — Engine framework
+- [Control Flow](../architecture/control-flow.md) — Request lifecycle
+- [Subsystem Registry](../meta/subsystem-registry.md) — Module listing

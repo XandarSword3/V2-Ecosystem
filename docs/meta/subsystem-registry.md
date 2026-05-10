@@ -1,88 +1,153 @@
+<!-- Last updated: 2026-05-10 -->
+
 # 📦 Subsystem Registry & Inventory
 
-> **Generated:** 2026-02-02T12:13:49.684Z
-> **Constraint:** No READMEs to be written until this registry is approved.
+> **Total Commits:** 257 | **Backend Modules:** 37 | **Active Migrations:** 158 | **Engine Types:** 4
 
-## 🚨 Critical Subsystems (>1000 LOC or Architectural Impact)
+This registry is the single source of truth for all modules in the V2 Resort platform. All other documentation references this file for module counts and listings.
 
-| Subsystem | LOC | Files | Category | Path |
-|-----------|-----|-------|----------|------|
-| **admin** | 32760 | 68 | Frontend Feature | `frontend\src\app\admin` |
-| **services** | 22501 | 40 | Backend Lib | `backend\src\lib\services` |
-| **admin** | 9716 | 28 | Backend Module | `backend\src\modules\admin` |
-| **repositories** | 8410 | 47 | Backend Lib | `backend\src\lib\repositories` |
-| **staff** | 6801 | 16 | Frontend Feature | `frontend\src\app\staff` |
-| **stress-test** | 6544 | 18 | Tooling | `tools\stress-test` |
-| **restaurant** | 3964 | 14 | Backend Module | `backend\src\modules\restaurant` |
-| **pool** | 3278 | 9 | Backend Module | `backend\src\modules\pool` |
-| **[slug]** | 3179 | 5 | Frontend Feature | `frontend\src\app\[slug]` |
-| **auth** | 3033 | 11 | Backend Module | `backend\src\modules\auth` |
-| **pos-templates** | 3030 | 4 | Frontend Component | `frontend\src\components\pos-templates` |
-| **container** | 3022 | 2 | Backend Lib | `backend\src\lib\container` |
-| **restaurant** | 3021 | 6 | Frontend Feature | `frontend\src\app\restaurant` |
-| **effects** | 2721 | 10 | Frontend Component | `frontend\src\components\effects` |
-| **inventory** | 2570 | 4 | Backend Module | `backend\src\modules\inventory` |
-| **marketing** | 2502 | 4 | Backend Module | `backend\src\modules\marketing` |
-| **ui** | 2477 | 28 | Frontend Component | `frontend\src\components\ui` |
-| **reporting** | 2314 | 4 | Backend Module | `backend\src\modules\reporting` |
-| **housekeeping** | 2306 | 3 | Backend Module | `backend\src\modules\housekeeping` |
-| **kiosk** | 2040 | 4 | Backend Module | `backend\src\modules\kiosk` |
-| **messaging** | 1969 | 4 | Backend Module | `backend\src\modules\messaging` |
-| **module-builder** | 1914 | 6 | Frontend Component | `frontend\src\components\module-builder` |
-| **components** | 1784 | 9 | Mobile Feature | `mobile\src\components` |
-| **revenue** | 1758 | 4 | Backend Module | `backend\src\modules\revenue` |
-| **reports** | 1723 | 2 | Backend Module | `backend\src\modules\reports` |
-| **mobile-checkin** | 1679 | 4 | Backend Module | `backend\src\modules\mobile-checkin` |
-| **groups** | 1656 | 4 | Backend Module | `backend\src\modules\groups` |
-| **i18n** | 1608 | 4 | Backend Module | `backend\src\modules\i18n` |
-| **staff** | 1515 | 3 | Backend Module | `backend\src\modules\staff` |
-| **store** | 1462 | 4 | Mobile Feature | `mobile\src\store` |
-| **channels** | 1441 | 4 | Backend Module | `backend\src\modules\channels` |
-| **api** | 1436 | 1 | Mobile Feature | `mobile\src\api` |
-| **payments** | 1416 | 5 | Backend Module | `backend\src\modules\payments` |
-| **customer** | 1413 | 4 | Frontend Component | `frontend\src\components\customer` |
-| **account** | 1348 | 3 | Frontend Feature | `frontend\src\app\account` |
-| **chalets** | 1346 | 3 | Frontend Feature | `frontend\src\app\chalets` |
-| **controllers** | 1329 | 5 | Backend Lib | `backend\src\lib\controllers` |
-| **gdpr** | 1308 | 4 | Backend Module | `backend\src\modules\gdpr` |
-| **snack-bar** | 1271 | 4 | Frontend Feature | `frontend\src\app\snack-bar` |
-| **chalets** | 1263 | 3 | Backend Module | `backend\src\modules\chalets` |
-| **integrations** | 1170 | 5 | Backend Module | `backend\src\modules\integrations` |
-| **pool** | 1060 | 3 | Frontend Feature | `frontend\src\app\pool` |
-| **manager** | 1046 | 3 | Backend Module | `backend\src\modules\manager` |
-| **loyalty** | 989 | 2 | Backend Module | `backend\src\modules\loyalty` |
-| **multi-property** | 975 | 4 | Backend Module | `backend\src\modules\multi-property` |
-| **offline** | 966 | 4 | Frontend Lib | `frontend\src\lib\offline` |
-| **admin** | 935 | 7 | Frontend Component | `frontend\src\components\admin` |
-| **parity** | 933 | 4 | Backend Module | `backend\src\modules\parity` |
-| **coupons** | 929 | 2 | Backend Module | `backend\src\modules\coupons` |
-| **giftcards** | 906 | 2 | Backend Module | `backend\src\modules\giftcards` |
-| **pos** | 889 | 2 | Frontend Lib | `frontend\src\lib\pos` |
-| **promotions** | 867 | 2 | Backend Module | `backend\src\modules\promotions` |
-| **users** | 854 | 3 | Backend Module | `backend\src\modules\users` |
-| **page.tsx** | 844 | 1 | Frontend Feature | `frontend\src\app\page.tsx` |
-| **services** | 743 | 4 | Mobile Feature | `mobile\src\services` |
-| **modules** | 733 | 3 | Frontend Component | `frontend\src\components\modules` |
-| **email.service.ts** | 703 | 1 | Backend Service | `backend\src\services\email.service.ts` |
-| **booking-modification.service.ts** | 691 | 1 | Backend Service | `backend\src\services\booking-modification.service.ts` |
-| **settings** | 668 | 2 | Frontend Component | `frontend\src\components\settings` |
-| **snack** | 632 | 2 | Backend Module | `backend\src\modules\snack` |
-| **restaurant-table.service.ts** | 625 | 1 | Backend Service | `backend\src\services\restaurant-table.service.ts` |
-| **pool-membership.service.ts** | 622 | 1 | Backend Service | `backend\src\services\pool-membership.service.ts` |
-| **profile** | 605 | 1 | Frontend Feature | `frontend\src\app\profile` |
-| **TestimonialsCarousel.tsx** | 588 | 1 | Frontend Component | `frontend\src\components\TestimonialsCarousel.tsx` |
-| **giftcards** | 578 | 1 | Frontend Feature | `frontend\src\app\giftcards` |
-| **KitchenDisplayBoard.tsx** | 557 | 1 | Frontend Component | `frontend\src\components\KitchenDisplayBoard.tsx` |
-| **kiosk** | 538 | 1 | Frontend Feature | `frontend\src\app\kiosk` |
-| **business-metrics.service.ts** | 537 | 1 | Backend Service | `backend\src\services\business-metrics.service.ts` |
-| **pushNotification.service.ts** | 531 | 1 | Backend Service | `backend\src\services\pushNotification.service.ts` |
-| **undefined** | 525 | 3 | Frontend Store | `frontend\src\store` |
-| **scheduled-reports.service.ts** | 524 | 1 | Backend Service | `backend\src\services\scheduled-reports.service.ts` |
-| **backup-verification.service.ts** | 523 | 1 | Backend Service | `backend\src\services\backup-verification.service.ts` |
-| **order** | 519 | 1 | Frontend Feature | `frontend\src\app\order` |
-| **chargeback.service.ts** | 518 | 1 | Backend Service | `backend\src\services\chargeback.service.ts` |
-| **email-analytics.service.ts** | 515 | 1 | Backend Service | `backend\src\services\email-analytics.service.ts` |
-| **layout** | 510 | 1 | Frontend Component | `frontend\src\components\layout` |
+---
+
+## � Backend Modules (37 Total)
+
+All modules are located in `backend/src/modules/`. Each module follows the standard structure: `controller.ts`, `routes.ts`, `index.ts`, and optional subdirectories for complex features.
+
+| Module | Path | Description | Engine Integration |
+|--------|------|-------------|-------------------|
+| **accommodations** | `backend/src/modules/accommodations/` | Property and room inventory management | `time_exclusive_reservation` pricing |
+| **admin** | `backend/src/modules/admin/` | System administration, dashboard, user management | Analytics aggregation |
+| **analytics** | `backend/src/modules/analytics/` | Data aggregation, metrics, and reporting engine | All engine types |
+| **auth** | `backend/src/modules/auth/` | Authentication, JWT, 2FA, session management | N/A |
+| **bookings** | `backend/src/modules/bookings/` | Reservation management and modification | `time_exclusive_reservation` state machine |
+| **channels** | `backend/src/modules/channels/` | OTA integration and channel management | Transaction sync |
+| **coupons** | `backend/src/modules/coupons/` | Discount codes and promotional pricing | All engine types |
+| **customization** | `backend/src/modules/customization/` | Visual theming and branding configuration | N/A |
+| **devices** | `backend/src/modules/devices/` | Hardware integration (POS, printers, scanners) | N/A |
+| **economics** | `backend/src/modules/economics/` | Pricing engine and revenue optimization | All engine types |
+| **finance** | `backend/src/modules/finance/` | Accounting, ledgers, financial reporting | Transaction ledger |
+| **gdpr** | `backend/src/modules/gdpr/` | Data privacy compliance and user data export | All transaction tables |
+| **giftcards** | `backend/src/modules/giftcards/` | Gift card issuance, redemption, tracking | All engine types |
+| **groups** | `backend/src/modules/groups/` | Group booking management and coordination | `time_exclusive_reservation` |
+| **housekeeping** | `backend/src/modules/housekeeping/` | Room cleaning schedules and task management | `time_exclusive_reservation` |
+| **i18n** | `backend/src/modules/i18n/` | Internationalization and translation management | N/A |
+| **integrations** | `backend/src/modules/integrations/` | Third-party service connectors | N/A |
+| **inventory** | `backend/src/modules/inventory/` | Stock tracking and BOM management | `instant_transaction` |
+| **kiosk** | `backend/src/modules/kiosk/` | Self-service terminal interface | All engine types |
+| **loyalty** | `backend/src/modules/loyalty/` | Points program and tier management | All engine types |
+| **manager** | `backend/src/modules/manager/` | Property manager dashboard and approvals | N/A |
+| **marketing** | `backend/src/modules/marketing/` | Campaigns, automation, and guest outreach | N/A |
+| **messaging** | `backend/src/modules/messaging/` | In-app and email communication | N/A |
+| **mobile-checkin** | `backend/src/modules/mobile-checkin/` | Guest self-check-in functionality | `time_exclusive_reservation` |
+| **multi-property** | `backend/src/modules/multi-property/` | Multi-location management | N/A |
+| **parity** | `backend/src/modules/parity/` | Rate parity monitoring and enforcement | `time_exclusive_reservation` |
+| **payments** | `backend/src/modules/payments/` | Payment processing and Stripe integration | All engine types |
+| **pos** | `backend/src/modules/pos/` | Point-of-sale terminal operations | `instant_transaction` |
+| **promotions** | `backend/src/modules/promotions/` | Dynamic pricing and promotional rules | All engine types |
+| **public** | `backend/src/modules/public/` | Public-facing API endpoints | N/A |
+| **reporting** | `backend/src/modules/reporting/` | Report generation and scheduling | All engine types |
+| **revenue** | `backend/src/modules/revenue/` | Revenue management and forecasting | All engine types |
+| **reviews** | `backend/src/modules/reviews/` | Guest feedback and review management | N/A |
+| **shared** | `backend/src/modules/shared/` | Shared utilities and common functions | N/A |
+| **staff** | `backend/src/modules/staff/` | Staff management and shift scheduling | N/A |
+| **support** | `backend/src/modules/support/` | Help desk and ticket management | N/A |
+| **users** | `backend/src/modules/users/` | User accounts, profiles, and preferences | N/A |
+
+---
+
+## 🎨 Frontend Application Routes
+
+The Next.js 14 frontend uses the App Router structure in `frontend/src/app/`.
+
+| Route | Purpose | Engine Context |
+|-------|---------|----------------|
+| `/[slug]` | Dynamic module routing | All engine types |
+| `/account` | User account management | N/A |
+| `/admin` | Administration dashboard | All engine types |
+| `/api` | API routes and webhooks | N/A |
+| `/cancellation` | Booking cancellation flow | `time_exclusive_reservation` |
+| `/cart` | Shopping cart and checkout | All engine types |
+| `/contact` | Contact form | N/A |
+| `/cookie-policy` | Legal page | N/A |
+| `/forgot-password` | Password recovery | N/A |
+| `/giftcards` | Gift card purchase | `instant_transaction` |
+| `/kiosk` | Self-service kiosk interface | All engine types |
+| `/login` | Authentication | N/A |
+| `/offline` | Offline fallback page | N/A |
+| `/order` | Order tracking | `instant_transaction` |
+| `/privacy` | Privacy policy | N/A |
+| `/profile` | User profile | N/A |
+| `/register` | Account creation | N/A |
+| `/reset-password` | Password reset | N/A |
+| `/staff` | Staff portal | All engine types |
+| `/terms` | Terms of service | N/A |
+
+---
+
+## ⚡ Engine Framework
+
+The V2 platform uses 4 unified engine types to handle all transaction patterns:
+
+| Engine Type | Template | Description | State Machine |
+|-------------|----------|-------------|---------------|
+| `instant_transaction` | `menu_service` | Point-of-sale transactions fulfilled immediately (food orders, snack bar) | `pending → confirmed → preparing → ready → delivered → completed` (or `cancelled`) |
+| `time_exclusive_reservation` | `multi_day_booking` | Date-range bookings that lock a unit exclusively (chalets, rooms) | `pending → confirmed → checked_in → checked_out` (or `cancelled`, `no_show`) |
+| `shared_capacity_access` | `session_access` | Capacity-limited sessions shared across guests (pool, gym) | `valid → active → used` (or `expired`, `cancelled`) |
+| `ongoing_entitlement` | `subscription` | Recurring memberships and subscriptions | `pending → active → paused` (or `expired`, `cancelled`) |
+
+**Engine Definition Files:**
+- `backend/src/engines/definitions/instant-transaction.ts`
+- `backend/src/engines/definitions/time-exclusive-reservation.ts`
+- `backend/src/engines/definitions/shared-capacity-access.ts`
+- `backend/src/engines/definitions/ongoing-entitlement.ts`
+
+**Engine Registry:** `backend/src/engines/registry.ts`
+
+---
+
+## 📊 Test Infrastructure
+
+| Test Category | Location | File Count |
+|---------------|----------|------------|
+| Backend Unit/Integration | `backend/tests/` | 219 |
+| Frontend Unit | `frontend/tests/` | 113 |
+| E2E Playwright | `tests/` | 90 |
+
+**E2E Test Suites:**
+- `tests/admin-functional/` — Admin workflow tests
+- `tests/e2e/` — End-to-end integration tests
+- `tests/features/` — Feature-specific tests
+- `tests/phase3/` — Engine-aligned critical path tests (00-24)
+- `tests/rebrand/` — White-label/rebranding tests
+- `tests/smoke/` — Production smoke tests
+- `tests/workflows/` — Full workflow tests
+
+---
+
+## 🗄️ Database & Infrastructure
+
+| Component | Technology | Details |
+|-----------|------------|---------|
+| Database | PostgreSQL 15 | Supabase-hosted, 160 active migrations |
+| Cache | Redis 7 | Session storage, rate limiting |
+| Backend | Node.js 20 + Express 4.18 | TypeScript 5.3 |
+| Frontend | Next.js 14.2 | TypeScript 5.4, Tailwind CSS 3.4 |
+| Mobile | React Native 0.81.5 + Expo 54.0 | iOS/Android apps |
+| Testing | Vitest + Playwright | Unit, integration, E2E |
+| CI/CD | GitHub Actions | 7-stage pipeline |
+
+**Docker Services:**
+- `postgres` (postgres:15-alpine, port 5432)
+- `redis` (redis:7-alpine, port 6379)
+
+---
+
+## 🔗 Related Documentation
+
+- [Architecture Overview](../architecture/ARCHITECTURE.md) — Engine framework details
+- [API Reference](../api/API.md) — Endpoint documentation
+- [Testing Guide](../guides/TESTING.md) — CI pipeline and test structure
+- [Codebase Map](./codebase-map.md) — Directory structure
+- [File Index](./file-index.md) — Flat file listing
 
 ## 🧩 Other Components / Support
 

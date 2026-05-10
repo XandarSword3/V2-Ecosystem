@@ -1,10 +1,41 @@
+<!-- Last updated: 2026-05-10 -->
+
 # 🗂️ File-Level Semantic Index
 
-> Classification logic applied. Review for accuracy.
+> **Total Commits:** 257 | **Modules:** 37 | **Engines:** 4 | **Files:** 1500+
 
-| Path | LOC | Type | Classification |
-|------|-----|------|----------------|
-| `backend\src\controllers\health.controller.ts` | 324 | .ts | **API** |
+This index provides a semantic classification of source files. For the authoritative module list, see [Subsystem Registry](./subsystem-registry.md).
+
+## Classification Legend
+
+| Type | Description |
+|------|-------------|
+| **API** | Route handlers, controllers, endpoints |
+| **CONFIG** | Configuration files, environment files, package manifests |
+| **CORE** | Application entry points, core module exports |
+| **DATA** | Database schemas, migrations, SQL files |
+| **DOMAIN** | Business logic, services, repositories |
+| **ENGINE** | Engine framework files (`backend/src/engines/`) |
+| **INFRA** | Infrastructure, deployment, Docker |
+| **LEGACY** | Legacy module implementations (being migrated to engines) |
+| **LOGIC** | Business logic modules |
+| **TEST** | Test files, spec files |
+| **UI** | Frontend components, pages, styles |
+| **UTILS** | Utility functions, helpers |
+
+## Engine Framework Files (4 Engine Types)
+
+| Path | LOC | Engine Type |
+|------|-----|-------------|
+| `backend/src/engines/definitions/instant-transaction.ts` | 188 | **ENGINE** |
+| `backend/src/engines/definitions/time-exclusive-reservation.ts` | 188 | **ENGINE** |
+| `backend/src/engines/definitions/shared-capacity-access.ts` | 151 | **ENGINE** |
+| `backend/src/engines/definitions/ongoing-entitlement.ts` | 182 | **ENGINE** |
+| `backend/src/engines/registry.ts` | 126 | **ENGINE** |
+| `backend/src/engines/state-machine.ts` | 296 | **ENGINE** |
+| `backend/src/engines/types.ts` | 176 | **ENGINE** |
+
+## File Index (Partial - Generated 2026-02-02)
 | `backend\src\lib\controllers\auth.controller.ts` | 252 | .ts | **API** |
 | `backend\src\lib\controllers\booking.controller.ts` | 459 | .ts | **API** |
 | `backend\src\lib\controllers\index.ts` | 21 | .ts | **API** |

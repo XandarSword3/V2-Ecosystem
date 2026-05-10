@@ -1,8 +1,12 @@
+<!-- Last updated: 2026-05-10 -->
+
 # Unified Customization System
+
+> **Total Modules:** 37 | **Engine Types:** 4 | **Customization Tables:** 4
 
 ## Overview
 
-The Unified Customization System is a module-agnostic engine that provides customization capabilities for **ALL** modules in the V2 Resort platform. This includes current modules (Restaurant, Snack Bar, Chalets, Pool) and any future modules (Spa, Activities, Rentals, Events, etc.).
+The Unified Customization System is a module-agnostic engine that provides customization capabilities for **ALL 37 modules** in the V2 Resort platform. This includes current modules across all 4 engine types and any future modules.
 
 ## Architecture
 

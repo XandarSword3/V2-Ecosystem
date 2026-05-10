@@ -1,4 +1,12 @@
+<!-- Last updated: 2026-05-10 -->
+
 # V2 Resort Development Environment Setup
+
+> **Modules:** 37 | **Engines:** 4 | **Migrations:** 158 | **Node:** 20.x
+
+This guide covers setting up the V2 Resort development environment with the 4-engine transaction framework.
+
+---
 
 ## Prerequisites
 
@@ -20,7 +28,7 @@
 
 ### 1. Clone and Install Dependencies
 
-```bash
+```powershell
 # Clone the repository
 git clone <repository-url>
 cd v2-resort
@@ -30,11 +38,11 @@ cd backend
 npm install
 
 # Install frontend dependencies
-cd ../frontend
+cd ..\frontend
 npm install
 
 # Install shared types
-cd ../shared
+cd ..\shared
 npm install
 
 # Return to root
@@ -43,24 +51,24 @@ cd ..
 
 ### 2. Environment Configuration
 
-```bash
+```powershell
 # Backend configuration
 cd backend
-cp .env.example .env
+copy .env.example .env
 
 # Frontend configuration
-cd ../frontend
-cp .env.example .env.local
+cd ..\frontend
+copy .env.example .env.local
 ```
 
 ### 3. Database Setup
 
 #### Option A: Local Supabase (Recommended for Development)
-```bash
+```powershell
 # Start Supabase locally
 npx supabase start
 
-# Run migrations
+# Run migrations (160 active migrations)
 npx supabase db reset
 ```
 
@@ -76,12 +84,12 @@ npx supabase db reset
 
 ### 4. Start Development Servers
 
-```bash
-# Terminal 1: Backend
+```powershell
+# Terminal 1: Backend (Port 3005)
 cd backend
 npm run dev
 
-# Terminal 2: Frontend
+# Terminal 2: Frontend (Port 3000)
 cd frontend
 npm run dev
 
@@ -91,10 +99,12 @@ docker run -d -p 6379:6379 redis:7-alpine
 
 ### 5. Verify Installation
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:3005/api
-- API Documentation: http://localhost:3005/api-docs
-- Supabase Studio: http://localhost:54323
+| Service | URL | Notes |
+|---------|-----|-------|
+| Frontend | http://localhost:3000 | Next.js 14 App |
+| Backend API | http://localhost:3005/api | Express.js API |
+| API Documentation | http://localhost:3005/api-docs | Swagger/OpenAPI |
+| Supabase Studio | http://localhost:54323 | Database GUI |
 
 ---
 
@@ -102,13 +112,13 @@ docker run -d -p 6379:6379 redis:7-alpine
 
 ### Backend (.env)
 
-```bash
+```powershell
 # Server
 PORT=3005
 NODE_ENV=development
 API_VERSION=v1
 
-# Database (Supabase)
+# Database (Supabase PostgreSQL 15)
 SUPABASE_URL=http://localhost:54321
 SUPABASE_ANON_KEY=your-local-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-local-service-key
@@ -121,7 +131,7 @@ JWT_REFRESH_EXPIRY=7d
 BCRYPT_ROUNDS=12
 SESSION_SECRET=your-session-secret-key-min-32-chars
 
-# Redis (Optional - for caching)
+# Redis 7 (Optional - for caching/sessions)
 REDIS_URL=redis://localhost:6379
 REDIS_ENABLED=true
 
@@ -152,7 +162,7 @@ LOG_LEVEL=debug
 
 ### Frontend (.env.local)
 
-```bash
+```powershell
 # API
 NEXT_PUBLIC_API_URL=http://localhost:3005/api
 NEXT_PUBLIC_WS_URL=ws://localhost:3005
@@ -174,30 +184,48 @@ NEXT_PUBLIC_GA_ID=
 
 ---
 
+## Engine Framework Development
+
+The V2 platform uses 4 unified engines for all transactions. When developing:
+
+| Engine | Reference Type | Development Notes |
+|--------|---------------|-------------------|
+| `instant_transaction` | POS orders, food service | Test with `/api/v1/payments/intent` |
+| `time_exclusive_reservation` | Chalet bookings, rooms | Test state transitions |
+| `shared_capacity_access` | Pool sessions, gym | Test capacity limits |
+| `ongoing_entitlement` | Memberships, subscriptions | Test recurring billing |
+
+**Engine Files:**
+- `backend/src/engines/definitions/` — Engine type definitions
+- `backend/src/engines/registry.ts` — Engine factory
+- `backend/src/engines/state-machine.ts` — State transitions
+
+---
+
 ## Common Tasks
 
-### Running Tests
+### Running Tests (219 backend, 113 frontend, 90 E2E)
 
-```bash
+```powershell
 # Backend unit tests
 cd backend
-npm test
+npm run test:unit
 
 # Backend with coverage
 npm run test:coverage
 
 # Frontend tests
-cd frontend
+cd ..\frontend
 npm test
 
 # E2E tests (requires running servers)
-cd ../
-npx playwright test
+cd ..
+npx playwright test -c playwright.config.ts
 ```
 
-### Database Operations
+### Database Operations (160 Active Migrations)
 
-```bash
+```powershell
 # Create a new migration
 npx supabase migration new <migration_name>
 
@@ -206,12 +234,12 @@ npx supabase db reset  # Full reset
 npx supabase migration up  # Apply pending
 
 # Generate types from database
-npx supabase gen types typescript --local > ../shared/types/database.ts
+npx supabase gen types typescript --local > ..\shared\types\database.ts
 ```
 
 ### Code Quality
 
-```bash
+```powershell
 # Lint
 npm run lint
 
@@ -228,8 +256,8 @@ npm run type-check
 
 For full containerized development:
 
-```bash
-# Start all services
+```powershell
+# Start all services (Postgres 15 + Redis 7)
 docker-compose up -d
 
 # View logs
@@ -243,16 +271,23 @@ docker-compose down -v
 docker-compose up -d --build
 ```
 
+### Docker Services
+
+| Service | Image | Port | Purpose |
+|---------|-------|------|---------|
+| postgres | postgres:15-alpine | 5432 | Database |
+| redis | redis:7-alpine | 6379 | Cache/Sessions |
+
 ---
 
 ## Troubleshooting
 
 ### Port Already in Use
-```bash
-# Find process using port
-netstat -ano | findstr :3005
+```powershell
+# Find process using port (PowerShell)
+Get-NetTCPConnection -LocalPort 3005 | Select-Object LocalPort, OwningProcess
 # Kill process
-taskkill /PID <pid> /F
+Stop-Process -Id <pid> -Force
 ```
 
 ### Database Connection Issues
@@ -261,15 +296,20 @@ taskkill /PID <pid> /F
 3. Try resetting: `npx supabase db reset`
 
 ### Module Not Found Errors
-```bash
-# Clear node_modules and reinstall
-rm -rf node_modules package-lock.json
+```powershell
+# Clear node_modules and reinstall (PowerShell)
+Remove-Item -Recurse -Force node_modules, package-lock.json
 npm install
 ```
 
 ### Redis Connection Issues
-- Ensure Redis is running: `docker ps | grep redis`
+- Ensure Redis is running: `docker ps | Select-String redis`
 - Set `REDIS_ENABLED=false` to disable caching
+
+### Engine Framework Issues
+- Verify engine types: Check `backend/src/engines/types.ts`
+- Test engine resolution: Use `/api/v1/payments/intent` with different `referenceType`
+- Check state machine: Review `backend/src/engines/state-machine.ts`
 
 ---
 
@@ -282,6 +322,7 @@ npm install
 - TypeScript and JavaScript Language Features
 - Prisma (for database)
 - REST Client (for API testing)
+- Thunder Client (alternative to REST Client)
 
 ### Workspace Settings (.vscode/settings.json)
 ```json
@@ -300,15 +341,27 @@ npm install
 ## Next Steps
 
 After setup is complete:
-1. Run the seed script to populate test data: `npm run seed`
-2. Create a test user account at http://localhost:3000/register
-3. Access admin panel at http://localhost:3000/admin (requires admin role)
-4. Review API documentation at http://localhost:3005/api-docs
+1. Run the seed script: `npm run seed`
+2. Create test user: http://localhost:3000/register
+3. Access admin panel: http://localhost:3000/admin (requires admin role)
+4. Review API docs: http://localhost:3005/api-docs
+5. Test engine framework: Try creating transactions with different engine types
 
 ---
 
-## Which docker-compose file do I use?
+## Docker Compose Files
 
-- `docker-compose.yml`: local full-stack environment (Postgres, Redis, backend, frontend).
-- `docker-compose.supabase.yml`: run Supabase-related development workflows when Docker Desktop is unavailable.
-- `backend/docker-compose.test.yml`: isolated Postgres/Redis stack for backend integration tests.
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Local full-stack (Postgres 15, Redis 7, backend, frontend) |
+| `docker-compose.supabase.yml` | Supabase workflows without Docker Desktop |
+| `backend/docker-compose.test.yml` | Isolated Postgres/Redis for integration tests |
+
+---
+
+## Related Documentation
+
+- [Architecture Overview](../architecture/ARCHITECTURE.md) — Engine framework
+- [Testing Guide](./TESTING.md) — 7-stage CI pipeline
+- [API Reference](../api/API.md) — Engine-based endpoints
+- [Subsystem Registry](../meta/subsystem-registry.md) — 37 modules
