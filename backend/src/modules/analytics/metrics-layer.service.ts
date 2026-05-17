@@ -794,13 +794,139 @@ export class MetricsLayerService {
   }
 
   private async getMarginBridgeReport(propertyId: string, period: { start: Date; end: Date }): Promise<any> {
-    // Placeholder for margin bridge implementation
-    return { summary: {}, rows: [], footnotes: [], exportable: true };
+    // Get revenue and discounts/refunds breakdown by engine type
+    const { data: transactions } = await this.supabase
+      .from('transactions')
+      .select('engine_type, amount, discount_amount, refund_amount, tax_amount, service_charge, status')
+      .eq('property_id', propertyId)
+      .gte('created_at', period.start.toISOString())
+      .lte('created_at', period.end.toISOString());
+
+    const engineGroups: Record<string, { gross: number; discounts: number; refunds: number; tax: number; serviceCharge: number; net: number }> = {};
+
+    for (const t of (transactions || [])) {
+      const engine = t.engine_type || 'unknown';
+      if (!engineGroups[engine]) {
+        engineGroups[engine] = { gross: 0, discounts: 0, refunds: 0, tax: 0, serviceCharge: 0, net: 0 };
+      }
+      const g = engineGroups[engine];
+      if (t.status !== 'cancelled' && t.status !== 'void') {
+        g.gross += Number(t.amount || 0) + Number(t.discount_amount || 0);
+        g.discounts += Number(t.discount_amount || 0);
+        g.tax += Number(t.tax_amount || 0);
+        g.serviceCharge += Number(t.service_charge || 0);
+        if (t.status === 'refunded') {
+          g.refunds += Number(t.refund_amount || 0) || Number(t.amount || 0);
+        } else {
+          g.net += Number(t.amount || 0);
+        }
+      }
+    }
+
+    const rows = Object.entries(engineGroups).map(([engine, data]) => ({
+      engine_type: engine,
+      ...data,
+      margin_percent: data.gross > 0 ? ((data.net / data.gross) * 100).toFixed(1) : '0.0'
+    }));
+
+    const totals = rows.reduce((acc, r) => ({
+      gross: acc.gross + r.gross,
+      discounts: acc.discounts + r.discounts,
+      refunds: acc.refunds + r.refunds,
+      tax: acc.tax + r.tax,
+      serviceCharge: acc.serviceCharge + r.serviceCharge,
+      net: acc.net + r.net,
+    }), { gross: 0, discounts: 0, refunds: 0, tax: 0, serviceCharge: 0, net: 0 });
+
+    return {
+      summary: {
+        ...totals,
+        margin_percent: totals.gross > 0 ? ((totals.net / totals.gross) * 100).toFixed(1) : '0.0'
+      },
+      rows,
+      footnotes: [
+        'Gross = Amount + Discounts (before any deductions)',
+        'Net = Amount after discounts, excluding refunded transactions',
+        'Margin % = Net / Gross × 100',
+      ],
+      exportable: true
+    };
   }
 
   private async getBudgetVarianceReport(propertyId: string, period: { start: Date; end: Date }): Promise<any> {
-    // Placeholder for budget variance implementation
-    return { summary: {}, rows: [], footnotes: [], exportable: true };
+    // Compare actual revenue to prior period as a proxy for budget
+    const periodMs = period.end.getTime() - period.start.getTime();
+    const priorStart = new Date(period.start.getTime() - periodMs);
+    const priorEnd = new Date(period.end.getTime() - periodMs);
+
+    const [{ data: currentTx }, { data: priorTx }] = await Promise.all([
+      this.supabase
+        .from('transactions')
+        .select('engine_type, amount, status')
+        .eq('property_id', propertyId)
+        .gte('created_at', period.start.toISOString())
+        .lte('created_at', period.end.toISOString())
+        .not('status', 'in', '(cancelled,void)'),
+      this.supabase
+        .from('transactions')
+        .select('engine_type, amount, status')
+        .eq('property_id', propertyId)
+        .gte('created_at', priorStart.toISOString())
+        .lte('created_at', priorEnd.toISOString())
+        .not('status', 'in', '(cancelled,void)'),
+    ]);
+
+    // Aggregate by engine
+    const aggregate = (txs: any[]) => {
+      const map: Record<string, { revenue: number; count: number }> = {};
+      for (const t of txs) {
+        const engine = t.engine_type || 'unknown';
+        if (!map[engine]) map[engine] = { revenue: 0, count: 0 };
+        map[engine].revenue += Number(t.amount || 0);
+        map[engine].count += 1;
+      }
+      return map;
+    };
+
+    const currentMap = aggregate(currentTx || []);
+    const priorMap = aggregate(priorTx || []);
+    const allEngines = new Set([...Object.keys(currentMap), ...Object.keys(priorMap)]);
+
+    const rows = Array.from(allEngines).map(engine => {
+      const curr = currentMap[engine] || { revenue: 0, count: 0 };
+      const prior = priorMap[engine] || { revenue: 0, count: 0 };
+      const variance = curr.revenue - prior.revenue;
+      const variancePercent = prior.revenue > 0 ? ((variance / prior.revenue) * 100).toFixed(1) : 'N/A';
+      return {
+        engine_type: engine,
+        actual_revenue: curr.revenue,
+        actual_count: curr.count,
+        prior_revenue: prior.revenue,
+        prior_count: prior.count,
+        variance,
+        variance_percent: variancePercent,
+        status: variance >= 0 ? 'favorable' : 'unfavorable',
+      };
+    });
+
+    const totalActual = rows.reduce((s, r) => s + r.actual_revenue, 0);
+    const totalPrior = rows.reduce((s, r) => s + r.prior_revenue, 0);
+    const totalVariance = totalActual - totalPrior;
+
+    return {
+      summary: {
+        actual_revenue: totalActual,
+        prior_revenue: totalPrior,
+        variance: totalVariance,
+        variance_percent: totalPrior > 0 ? ((totalVariance / totalPrior) * 100).toFixed(1) : 'N/A',
+      },
+      rows,
+      footnotes: [
+        'Budget is approximated using the equivalent prior period revenue.',
+        'Variance % = (Actual - Prior) / Prior × 100',
+      ],
+      exportable: true
+    };
   }
 
   /**

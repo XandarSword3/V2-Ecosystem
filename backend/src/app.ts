@@ -117,6 +117,11 @@ app.use('/api/modules', getModules);
 
 // API Routes
 const apiRouter = express.Router();
+
+// GDPR: Log staff access to PII-containing routes
+import { gdprAccessLogger } from './middleware/gdpr-access-logger.js';
+apiRouter.use(gdprAccessLogger);
+
 // Add health check to API router
 apiRouter.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
@@ -222,6 +227,10 @@ apiRouter.use(getDynamicModulesRouter());
 // Economics Routes
 import { economicsRoutes } from './modules/economics/economics.routes.js';
 apiRouter.use('/economics', economicsRoutes);
+
+// Module Templates Routes
+import templateRoutes from './modules/templates/templates.routes.js';
+apiRouter.use('/templates', templateRoutes);
 
 // Channel Webhooks - FIXED
 app.use('/webhooks/channels', channelWebhookRoutes);

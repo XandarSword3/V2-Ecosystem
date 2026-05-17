@@ -218,43 +218,31 @@ export default function HomePage() {
           )}
         </AnimatePresence>
 
-        <motion.div
-          className="absolute inset-0 z-0"
-          style={{ y: heroY, opacity: heroOpacity }}
+        <div
+          className="absolute inset-0 z-0 pointer-events-none"
         >
-          {/* Cinematic floating orbs - always visible but adapt to background */}
-          {(true) && [
-            { size: 'w-64 sm:w-80 lg:w-96', x: '5%', y: '15%', delay: 0, blur: 'blur-3xl' },
-            { size: 'w-48 sm:w-64 lg:w-80', x: '75%', y: '25%', delay: 1.5, blur: 'blur-2xl' },
-            { size: 'w-32 sm:w-48 lg:w-64', x: '15%', y: '65%', delay: 0.8, blur: 'blur-2xl' },
-            { size: 'w-56 sm:w-72 lg:w-88', x: '65%', y: '70%', delay: 2.2, blur: 'blur-3xl' },
-            { size: 'w-24 sm:w-32 lg:w-48', x: '45%', y: '45%', delay: 3, blur: 'blur-xl' },
-          ].map((orb, i) => (
-            <motion.div
-              key={i}
-              className={`absolute rounded-full ${orb.size} ${orb.blur} pointer-events-none`}
-              style={{
-                left: orb.x,
-                top: orb.y,
-                background: currentSlide.imageUrl 
-                  ? 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)'
-                  : `radial-gradient(circle, var(--color-primary)15 0%, transparent 70%)`,
-              }}
-              animate={{
-                y: [0, -40, 0],
-                x: [0, 15, 0],
-                scale: [1, 1.15, 1],
-                opacity: [0.4, 0.7, 0.4],
-              }}
-              transition={{
-                duration: 8 + i * 2,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: orb.delay,
-              }}
-            />
-          ))}
-        </motion.div>
+          {/* Static decorative gradients — no animation, no blur filter overhead */}
+          <div
+            className="absolute w-96 h-96 rounded-full opacity-20"
+            style={{
+              left: '10%',
+              top: '20%',
+              background: currentSlide.imageUrl
+                ? 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)'
+                : 'radial-gradient(circle, var(--color-primary) 0%, transparent 70%)',
+            }}
+          />
+          <div
+            className="absolute w-80 h-80 rounded-full opacity-15"
+            style={{
+              right: '10%',
+              bottom: '20%',
+              background: currentSlide.imageUrl
+                ? 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)'
+                : 'radial-gradient(circle, var(--color-secondary) 0%, transparent 70%)',
+            }}
+          />
+        </div>
 
         {/* Weather Widget - Outside hero text container to prevent overlap */}
         <div className="hidden sm:block absolute top-4 right-4 z-30 pointer-events-none">

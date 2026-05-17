@@ -127,5 +127,11 @@ router.get('/promo-effectiveness', asyncHandler(async (req: Request, res: Respon
   res.json({ success: true, data });
 }));
 
+router.get('/cancellation-patterns', asyncHandler(async (req: Request, res: Response) => {
+  const params = parseParams(req);
+  const data = await economicsService.getCancellationPatterns(params);
+  res.json({ success: true, data });
+}));
+
 export const economicsRoutes = router;
 export default router;

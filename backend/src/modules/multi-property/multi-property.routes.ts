@@ -49,6 +49,9 @@ router.put('/groups/:groupId', authorize('super_admin'), multiPropertyController
 // Get group summary with metrics
 router.get('/groups/:groupId/summary', authorize('admin', 'super_admin'), multiPropertyController.getGroupSummary);
 
+// Get group consolidated P&L report
+router.get('/groups/:groupId/pnl', authorize('admin', 'super_admin'), multiPropertyController.getGroupProfitAndLoss);
+
 // Add property to group
 router.post('/groups/:groupId/properties', authorize('super_admin'), multiPropertyController.addPropertyToGroup);
 
@@ -77,5 +80,18 @@ router.post('/access/group/grant', authorize('super_admin'), multiPropertyContro
 // Revoke group access from user
 router.post('/access/group/revoke', authorize('super_admin'), multiPropertyController.revokeGroupAccess);
 
-export default router;
+// ==================== SETTINGS INHERITANCE ====================
 
+// Get effective settings for a property (resolved through cascade)
+router.get('/properties/:propertyId/settings', authorize('manage', 'admin', 'super_admin'), multiPropertyController.getPropertySettings);
+
+// Set a property-level setting override
+router.put('/properties/:propertyId/settings', authorize('admin', 'super_admin'), multiPropertyController.updatePropertySetting);
+
+// Delete a property-level setting override (falls back to group/system)
+router.delete('/properties/:propertyId/settings', authorize('admin', 'super_admin'), multiPropertyController.deletePropertySetting);
+
+// Set a group-level setting default
+router.put('/groups/:groupId/settings', authorize('super_admin'), multiPropertyController.updateGroupSetting);
+
+export default router;
