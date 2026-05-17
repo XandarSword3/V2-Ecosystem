@@ -13,7 +13,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Clock, Users, ShoppingCart, Plus, Minus, Calendar, Star, Check, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // Type definitions for menu and session data
 interface MenuItem {
@@ -65,25 +65,32 @@ interface RendererProps {
 }
 
 // Zod Schema for Run-time Validation
+// IMPORTANT: .passthrough() preserves position, label, background, sectionHeight, layers etc.
 const SafeBlockSchema: z.ZodType<any> = z.lazy(() => z.object({
   id: z.string(),
   type: z.string(),
   props: z.record(z.any()).optional(),
   style: z.record(z.any()).optional(),
   children: z.array(SafeBlockSchema).optional(),
-}));
+}).passthrough());
 
 // Helper to parse props - handles both JSON objects and PowerShell-style strings
 function parseProps(props: Record<string, unknown>): BlockProps {
   if (!props) return {};
 
-  // If props is already a proper object, return it
-  if (typeof props === 'object' && !Array.isArray(props)) {
-    // Check if any value looks like a PowerShell object string
-    const parsed: BlockProps = {};
-    for (const [key, value] of Object.entries(props)) {
-      if (typeof value === 'string' && value.startsWith('@{') && value.endsWith('}')) {
-        // Parse PowerShell-style string: @{key=value; key2=value2}
+  if (typeof props !== 'object' || Array.isArray(props)) {
+    return props as BlockProps;
+  }
+
+  const parsed: BlockProps = {};
+  
+  for (const [key, value] of Object.entries(props)) {
+    if (typeof value === 'string') {
+      const isPowerShell = value.startsWith('@{') && value.endsWith('}');
+      const isJsonArray = value.startsWith('[') && value.endsWith(']');
+      const isJsonObject = value.startsWith('{') && value.endsWith('}');
+      
+      if (isPowerShell) {
         const inner = value.slice(2, -1);
         const pairs = inner.split(';').map(p => p.trim()).filter(Boolean);
         for (const pair of pairs) {
@@ -94,17 +101,44 @@ function parseProps(props: Record<string, unknown>): BlockProps {
             parsed[k] = v;
           }
         }
-        return parsed;
+      } else if (isJsonArray || isJsonObject) {
+        try {
+          parsed[key] = JSON.parse(value);
+        } catch (e) {
+          parsed[key] = value;
+        }
+      } else {
+        parsed[key] = value;
       }
+    } else {
       parsed[key] = value;
     }
-    return parsed;
   }
 
-  return props as BlockProps;
+  return parsed;
+}
+
+// Hook to compute responsive scale factor for the 1920x1080 canvas
+function useCanvasScale() {
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const update = () => {
+      const vw = window.innerWidth;
+      // Scale the 1920px canvas to fit the viewport width
+      setScale(Math.min(vw / 1920, 1));
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  return scale;
 }
 
 export function DynamicModuleRenderer({ layout, module }: RendererProps) {
+  const scale = useCanvasScale();
+
   // Validate schema version
   const result = z.array(SafeBlockSchema).safeParse(layout);
   if (!result.success) {
@@ -118,52 +152,41 @@ export function DynamicModuleRenderer({ layout, module }: RendererProps) {
     return <div className="p-10 text-center">No layout defined for this module.</div>;
   }
 
-  // Detect if any block uses freeform positioning
-  const hasFreeformBlocks = safeLayout.some(b => b.position && (b.position.x !== undefined || b.position.y !== undefined));
-
-  if (hasFreeformBlocks) {
-    // Freeform canvas mode - blocks positioned absolutely like PowerPoint
-    return (
-      <div className="relative w-full min-h-screen bg-slate-50 dark:bg-slate-900" style={{ overflow: 'hidden' }}>
+  // Freeform canvas mode - blocks positioned absolutely like PowerPoint
+  // Scales down responsively on smaller viewports
+  return (
+    <div className="relative w-full bg-slate-50 dark:bg-slate-900 overflow-hidden" style={{ minHeight: `${1080 * scale}px` }}>
+      <div style={{
+        width: '1920px',
+        height: '1080px',
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left',
+        position: 'relative',
+      }}>
         {safeLayout.map((block) => {
           const pos = block.position;
-          if (pos && (pos.x !== undefined || pos.y !== undefined)) {
-            // Absolutely positioned block
-            return (
-              <div
-                key={block.id}
-                style={{
-                  position: 'absolute',
-                  left: pos.x !== undefined ? `${pos.x}px` : undefined,
-                  top: pos.y !== undefined ? `${pos.y}px` : undefined,
-                  zIndex: pos.z || 1,
-                  width: pos.width || undefined,
-                  height: pos.height || undefined,
-                  transform: pos.rotation ? `rotate(${pos.rotation}deg)` : pos.scale && pos.scale !== 1 ? `scale(${pos.scale})` : undefined,
-                  transformOrigin: 'center center',
-                }}
-              >
-                <BlockRenderer block={block} module={module} />
-              </div>
-            );
-          }
-          // Stack-positioned block in freeform canvas
+          const transforms: string[] = [];
+          if (pos?.rotation) transforms.push(`rotate(${pos.rotation}deg)`);
+          if (pos?.scale && pos.scale !== 1) transforms.push(`scale(${pos.scale})`);
           return (
-            <div key={block.id} style={{ position: 'relative', zIndex: pos?.z || 0 }}>
+            <div
+              key={block.id}
+              style={{
+                position: 'absolute',
+                left: pos?.x !== undefined ? `${pos.x}px` : '0px',
+                top: pos?.y !== undefined ? `${pos.y}px` : '0px',
+                zIndex: pos?.z || 1,
+                width: pos?.width || '100%',
+                height: pos?.height || 'auto',
+                transform: transforms.length > 0 ? transforms.join(' ') : undefined,
+                transformOrigin: 'center center',
+              }}
+            >
               <BlockRenderer block={block} module={module} />
             </div>
           );
         })}
       </div>
-    );
-  }
-
-  // Default stack mode - blocks flow vertically
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
-      {safeLayout.map((block) => (
-        <BlockRenderer key={block.id} block={block} module={module} />
-      ))}
     </div>
   );
 }
@@ -185,19 +208,19 @@ function SectionWrapper({ block, children }: SectionWrapperProps) {
 
     switch (sectionLayout) {
       case 'full-width':
-        return 'w-full';
+        return 'w-full h-full';
       case 'contained':
-        return 'container mx-auto';
+        return 'w-[90%] mx-auto h-full';
       case 'split-50-50':
-        return 'grid grid-cols-1 md:grid-cols-2 gap-0';
+        return 'grid grid-cols-1 md:grid-cols-2 gap-0 w-full h-full';
       case 'split-60-40':
-        return 'grid grid-cols-1 md:grid-cols-[60%_40%] gap-0';
+        return 'grid grid-cols-1 md:grid-cols-[60%_40%] gap-0 w-full h-full';
       case 'split-40-60':
-        return 'grid grid-cols-1 md:grid-cols-[40%_60%] gap-0';
+        return 'grid grid-cols-1 md:grid-cols-[40%_60%] gap-0 w-full h-full';
       case 'centered-narrow':
-        return 'max-w-4xl mx-auto';
+        return 'w-[60%] mx-auto h-full';
       default:
-        return '';
+        return 'w-full h-full';
     }
   };
 
@@ -388,7 +411,19 @@ function BlockErrorBoundary({ children, blockType }: { children: React.ReactNode
   }
 }
 
-function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
+// Safely coerce a prop value to an array — handles strings, arrays, and undefined
+function safeArray(val: unknown): any[] {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try { 
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }
+  return [];
+}
+
+export function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
   const { type, style } = block;
 
   // Validate Block Type - Added new glassmorphic components
@@ -429,7 +464,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
           {/* Overlay if image exists */}
           {props.backgroundImage && <div className="absolute inset-0 bg-black/40 z-0" />}
 
-          <div className="container relative z-10 px-4 py-20 text-center">
+          <div className="relative z-10 px-4 py-10 text-center w-full h-full flex flex-col items-center justify-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">{props.title || module.name}</h1>
             <p className="text-xl md:text-2xl opacity-90">{props.subtitle || module.description}</p>
           </div>
@@ -439,7 +474,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
 
     case 'container':
       content = (
-        <div style={inlineStyle} className="container mx-auto px-4 py-8">
+        <div style={inlineStyle} className="w-full h-full p-4">
           {block.children?.map(child => (
             <BlockRenderer key={child.id} block={child} module={module} />
           ))}
@@ -450,7 +485,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
     case 'grid':
       const gridCols = props.columns || 3;
       content = (
-        <div className={`grid grid-cols-1 md:grid-cols-${gridCols} gap-6 container mx-auto px-4 py-8`} style={inlineStyle}>
+        <div className={`grid grid-cols-1 md:grid-cols-${gridCols} gap-6 w-full h-full p-4`} style={inlineStyle}>
           {block.children && block.children.length > 0
             ? block.children.map(child => <BlockRenderer key={child.id} block={child} module={module} />)
             : <div className="col-span-full text-center p-8 bg-slate-100 dark:bg-slate-800 rounded text-slate-500">Grid - Add content in the builder</div>
@@ -461,7 +496,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
 
     case 'text_block':
       content = (
-        <div style={inlineStyle} className="prose dark:prose-invert max-w-none container mx-auto px-4 py-8">
+        <div style={inlineStyle} className="w-full h-full p-4 whitespace-pre-wrap">
           {props.content || 'Empty Text Block'}
         </div>
       );
@@ -469,11 +504,11 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
 
     case 'image':
       content = (
-        <div style={inlineStyle} className="w-full container mx-auto px-4 py-4">
+        <div style={inlineStyle} className="w-full h-full p-2 flex items-center justify-center">
           <img
             src={props.src || '/placeholder-image.jpg'}
             alt={props.alt || 'Module Image'}
-            className="w-full h-auto rounded-lg shadow-md"
+            className="max-w-full max-h-full object-contain rounded-lg shadow-md"
           />
         </div>
       );
@@ -656,9 +691,10 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
 
     case 'card_grid':
       const cardCols = props.columns || 3;
+      const safeCards = safeArray(props.cards);
       content = (
-        <div className={`grid grid-cols-1 md:grid-cols-${cardCols} gap-6 container mx-auto px-4 py-8`} style={inlineStyle}>
-          {props.cards?.map((card: any, index: number) => (
+        <div className={`grid grid-cols-1 md:grid-cols-${cardCols} gap-6 w-full h-full p-4`} style={inlineStyle}>
+          {safeCards.map((card: any, index: number) => (
             <motion.div
               key={index}
               whileHover={{ y: -8, scale: 1.02 }}
@@ -680,16 +716,17 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
                 <p className="text-slate-600 dark:text-slate-400">{card.description}</p>
               </div>
             </motion.div>
-          )) || <div className="col-span-full text-center p-8">Add cards in the builder</div>}
+          ))}
+          {safeCards.length === 0 && <div className="col-span-full text-center p-8">Add cards in the builder</div>}
         </div>
       );
       break;
 
     case 'stats':
       content = (
-        <div className="container mx-auto px-4 py-12" style={inlineStyle}>
+        <div className="w-full h-full px-4 py-12" style={inlineStyle}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {props.stats?.map((stat: any, index: number) => (
+            {safeArray(props.stats).map((stat: any, index: number) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
@@ -709,7 +746,8 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
                 </div>
                 <div className="text-slate-600 dark:text-slate-400 text-sm">{stat.label}</div>
               </motion.div>
-            )) || <div className="col-span-full text-center p-8">Add stats in the builder</div>}
+            ))}
+            {safeArray(props.stats).length === 0 && <div className="col-span-full text-center p-8">Add stats in the builder</div>}
           </div>
         </div>
       );
@@ -717,9 +755,9 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
 
     case 'features':
       content = (
-        <div className="container mx-auto px-4 py-12" style={inlineStyle}>
+        <div className="w-full h-full px-4 py-12" style={inlineStyle}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {props.features?.map((feature: any, index: number) => (
+            {safeArray(props.features).map((feature: any, index: number) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, x: -20 }}
@@ -743,7 +781,8 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
                   <p className="text-slate-600 dark:text-slate-400 text-sm">{feature.description}</p>
                 </div>
               </motion.div>
-            )) || <div className="col-span-full text-center p-8">Add features in the builder</div>}
+            ))}
+            {safeArray(props.features).length === 0 && <div className="col-span-full text-center p-8">Add features in the builder</div>}
           </div>
         </div>
       );
@@ -751,7 +790,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
 
     case 'cta':
       content = (
-        <div className="container mx-auto px-4 py-12" style={inlineStyle}>
+        <div className="w-full h-full px-4 py-12" style={inlineStyle}>
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -779,7 +818,7 @@ function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
 
     case 'divider':
       content = (
-        <div className="container mx-auto px-4 py-8" style={inlineStyle}>
+        <div className="w-full h-full p-4 flex items-center justify-center" style={inlineStyle}>
           <div 
             className="h-px w-full"
             style={{ 
@@ -891,7 +930,7 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="w-full h-full px-4 py-8">
       {/* Category Filter */}
       {categories.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-8 justify-center">
@@ -1029,7 +1068,7 @@ function SessionListComponent({ module, props }: { module: Module; props: BlockP
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="w-full h-full px-4 py-8">
       {/* Date Picker */}
       <div className="flex items-center justify-center gap-4 mb-8">
         <Calendar className="w-5 h-5 text-primary-600" />
@@ -1140,7 +1179,7 @@ function BookingCalendarComponent({ module, props }: { module: Module; props: Bl
   });
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="w-full h-full px-4 py-8">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 max-w-2xl mx-auto">
         <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 text-center">
           {props.title || 'Select Your Dates'}
@@ -1287,7 +1326,7 @@ function FormContainerComponent({ module, block, props }: { module: Module; bloc
   const fields = getDefaultFields();
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="w-full h-full px-4 py-8">
       <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 max-w-xl mx-auto space-y-4">
         {fields.map((field) => (
           <div key={field.name}>
@@ -1340,7 +1379,7 @@ function TestimonialsComponent({ props }: { props: BlockProps }) {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-12">
+    <div className="w-full h-full px-4 py-12">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {staticTestimonials.slice(0, props.count || 3).map((item, i) => (
           <motion.div
@@ -1412,7 +1451,7 @@ function PricingTableComponent({ module, props }: { module: Module; props: Block
   }
 
   return (
-    <div className="container mx-auto px-4 py-12">
+    <div className="w-full h-full px-4 py-12">
       {props.title && <h2 className="text-3xl font-bold text-center mb-12 dark:text-white">{props.title}</h2>}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
         {plans.map((plan: any, i: number) => (

@@ -44,8 +44,9 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
     // Get recent restaurant orders with error handling
     try {
       const { data: recentOrders } = await supabase
-        .from('transactions').eq('engine_type', 'instant_transaction')
+        .from('transactions')
         .select('id, order_number, status, created_at')
+        .eq('engine_type', 'instant_transaction')
         .gte('created_at', oneDayAgo.toISOString())
         .order('created_at', { ascending: false })
         .limit(5);
@@ -69,8 +70,9 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
     // Get recent chalet bookings with error handling
     try {
       const { data: recentBookings } = await supabase
-        .from('transactions').eq('engine_type', 'time_exclusive_reservation')
-        .select('id, chalet_id, check_in_date, status, created_at')
+        .from('transactions')
+        .select('id, status, created_at, metadata')
+        .eq('engine_type', 'time_exclusive_reservation')
         .gte('created_at', oneDayAgo.toISOString())
         .order('created_at', { ascending: false })
         .limit(5);
@@ -79,7 +81,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
         systemNotifications.push({
           id: `booking-${booking.id}`,
           title: 'Chalet Booking',
-          message: `New booking for ${booking.check_in_date}`,
+          message: `New booking — ${booking.status}`,
           type: 'info',
           target_type: 'staff',
           created_at: booking.created_at,

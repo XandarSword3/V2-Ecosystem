@@ -103,11 +103,14 @@ export function PropertyPanel() {
                             {/* Font Family */}
                             <div>
                                 <label className="mb-1 block text-sm">Font Family</label>
-                                <select
+                                <input
+                                    list="fontFamilyOptions"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
-                                    value={selectedBlock.style?.fontFamily || 'inherit'}
+                                    value={selectedBlock.style?.fontFamily || ''}
                                     onChange={(e) => handleStyleChange('fontFamily', e.target.value)}
-                                >
+                                    placeholder="inherit"
+                                />
+                                <datalist id="fontFamilyOptions">
                                     <option value="inherit">Default</option>
                                     <option value="Arial, sans-serif">Arial</option>
                                     <option value="Georgia, serif">Georgia</option>
@@ -117,7 +120,7 @@ export function PropertyPanel() {
                                     <option value="Courier New, monospace">Courier New</option>
                                     <option value="Impact, sans-serif">Impact</option>
                                     <option value="Comic Sans MS, cursive">Comic Sans MS</option>
-                                </select>
+                                </datalist>
                             </div>
 
                             {/* Font Size */}
@@ -127,15 +130,19 @@ export function PropertyPanel() {
                                     <input
                                         type="range"
                                         min="10"
-                                        max="72"
+                                        max="120"
                                         step="1"
                                         className="flex-1"
                                         value={parseInt(String(selectedBlock.style?.fontSize || '16').replace('px', '')) || 16}
                                         onChange={(e) => handleStyleChange('fontSize', e.target.value + 'px')}
                                     />
-                                    <span className="text-sm text-slate-500 w-12 text-right">
-                                        {parseInt(String(selectedBlock.style?.fontSize || '16').replace('px', '')) || 16}px
-                                    </span>
+                                    <input
+                                        type="text"
+                                        className="w-20 rounded-md border border-slate-300 px-2 py-1 text-sm text-right focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
+                                        value={selectedBlock.style?.fontSize || ''}
+                                        onChange={(e) => handleStyleChange('fontSize', e.target.value)}
+                                        placeholder="16px"
+                                    />
                                 </div>
                             </div>
 
@@ -243,32 +250,38 @@ export function PropertyPanel() {
                             {/* Line Height */}
                             <div>
                                 <label className="mb-1 block text-sm">Line Height</label>
-                                <select
+                                <input
+                                    list="lineHeightOptions"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
-                                    value={selectedBlock.style?.lineHeight || '1.5'}
+                                    value={selectedBlock.style?.lineHeight || ''}
                                     onChange={(e) => handleStyleChange('lineHeight', e.target.value)}
-                                >
+                                    placeholder="1.5"
+                                />
+                                <datalist id="lineHeightOptions">
                                     <option value="1">Single (1.0)</option>
                                     <option value="1.25">Tight (1.25)</option>
                                     <option value="1.5">Normal (1.5)</option>
                                     <option value="1.75">Relaxed (1.75)</option>
                                     <option value="2">Double (2.0)</option>
-                                </select>
+                                </datalist>
                             </div>
 
                             {/* Letter Spacing */}
                             <div>
                                 <label className="mb-1 block text-sm">Letter Spacing</label>
-                                <select
+                                <input
+                                    list="letterSpacingOptions"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
-                                    value={selectedBlock.style?.letterSpacing || 'normal'}
+                                    value={selectedBlock.style?.letterSpacing || ''}
                                     onChange={(e) => handleStyleChange('letterSpacing', e.target.value)}
-                                >
+                                    placeholder="normal"
+                                />
+                                <datalist id="letterSpacingOptions">
                                     <option value="-0.05em">Tight (-0.05em)</option>
                                     <option value="normal">Normal</option>
                                     <option value="0.05em">Wide (0.05em)</option>
                                     <option value="0.1em">Wider (0.1em)</option>
-                                </select>
+                                </datalist>
                             </div>
                         </div>
                     )}
@@ -283,27 +296,33 @@ export function PropertyPanel() {
                         <div className="space-y-3 pt-2">
                             <div>
                                 <label className="mb-1 block text-sm">Width</label>
-                                <select
+                                <input
+                                    list="widthOptions"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
-                                    value={selectedBlock.style?.width || '100%'}
+                                    value={selectedBlock.style?.width || ''}
                                     onChange={(e) => handleStyleChange('width', e.target.value)}
-                                >
+                                    placeholder="100%"
+                                />
+                                <datalist id="widthOptions">
                                     <option value="100%">Full Width (100%)</option>
                                     <option value="75%">3/4 Width (75%)</option>
                                     <option value="66%">2/3 Width (66%)</option>
                                     <option value="50%">1/2 Width (50%)</option>
                                     <option value="33%">1/3 Width (33%)</option>
                                     <option value="25%">1/4 Width (25%)</option>
-                                </select>
+                                </datalist>
                             </div>
 
                             <div>
                                 <label className="mb-1 block text-sm">Height</label>
-                                <select
+                                <input
+                                    list="heightOptions"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
-                                    value={selectedBlock.style?.height || 'auto'}
+                                    value={selectedBlock.style?.height || ''}
                                     onChange={(e) => handleStyleChange('height', e.target.value)}
-                                >
+                                    placeholder="auto"
+                                />
+                                <datalist id="heightOptions">
                                     <option value="auto">Auto</option>
                                     <option value="100px">Small (100px)</option>
                                     <option value="200px">Medium (200px)</option>
@@ -311,39 +330,45 @@ export function PropertyPanel() {
                                     <option value="400px">Extra Large (400px)</option>
                                     <option value="500px">XXL (500px)</option>
                                     <option value="100vh">Full Screen</option>
-                                </select>
+                                </datalist>
                             </div>
 
                             <div>
                                 <label className="mb-1 block text-sm">Padding</label>
-                                <select
+                                <input
+                                    list="paddingOptions"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
-                                    value={selectedBlock.style?.padding || '0'}
+                                    value={selectedBlock.style?.padding || ''}
                                     onChange={(e) => handleStyleChange('padding', e.target.value)}
-                                >
+                                    placeholder="0"
+                                />
+                                <datalist id="paddingOptions">
                                     <option value="0">None</option>
                                     <option value="8px">Small (8px)</option>
                                     <option value="16px">Medium (16px)</option>
                                     <option value="24px">Large (24px)</option>
                                     <option value="32px">Extra Large (32px)</option>
                                     <option value="48px">XXL (48px)</option>
-                                </select>
+                                </datalist>
                             </div>
 
                             <div>
                                 <label className="mb-1 block text-sm">Border Radius</label>
-                                <select
+                                <input
+                                    list="borderRadiusOptions"
                                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:bg-slate-900 dark:border-slate-700"
-                                    value={selectedBlock.style?.borderRadius || '0'}
+                                    value={selectedBlock.style?.borderRadius || ''}
                                     onChange={(e) => handleStyleChange('borderRadius', e.target.value)}
-                                >
+                                    placeholder="0"
+                                />
+                                <datalist id="borderRadiusOptions">
                                     <option value="0">None</option>
                                     <option value="4px">Small (4px)</option>
                                     <option value="8px">Medium (8px)</option>
                                     <option value="12px">Large (12px)</option>
                                     <option value="16px">Extra Large (16px)</option>
                                     <option value="9999px">Pill</option>
-                                </select>
+                                </datalist>
                             </div>
 
                             <div>
@@ -512,29 +537,26 @@ export function PropertyPanel() {
                                         className="text-xs px-2 py-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >↖ Top-Left</button>
                                     <button
-                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: 0, y: 0 } })}
+                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: 960 - (parseInt(String(selectedBlock.position?.width || '200')) / 2 || 100), y: 0 } })}
                                         className="text-xs px-2 py-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >↑ Top-Center</button>
                                     <button
-                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: 0, y: 0 } })}
+                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: 1920 - (parseInt(String(selectedBlock.position?.width || '200')) || 200), y: 0 } })}
                                         className="text-xs px-2 py-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >↗ Top-Right</button>
                                     <button
-                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: 0, y: 0 } })}
+                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: 0, y: 540 - (parseInt(String(selectedBlock.position?.height || '100')) / 2 || 50) } })}
                                         className="text-xs px-2 py-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >← Center-L</button>
                                     <button
-                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: 0, y: 0 } })}
+                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: 960 - (parseInt(String(selectedBlock.position?.width || '200')) / 2 || 100), y: 540 - (parseInt(String(selectedBlock.position?.height || '100')) / 2 || 50) } })}
                                         className="text-xs px-2 py-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >● Center</button>
                                     <button
-                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: 0, y: 0 } })}
+                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: 1920 - (parseInt(String(selectedBlock.position?.width || '200')) || 200), y: 540 - (parseInt(String(selectedBlock.position?.height || '100')) / 2 || 50) } })}
                                         className="text-xs px-2 py-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >→ Center-R</button>
-                                    <button
-                                        onClick={() => updateBlock(selectedBlock.id, { position: { ...selectedBlock.position, x: undefined, y: undefined } })}
-                                        className="text-xs px-2 py-1.5 col-span-3 bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-red-500"
-                                    >✕ Reset to Stack Flow</button>
+
                                 </div>
                             </div>
                         </div>

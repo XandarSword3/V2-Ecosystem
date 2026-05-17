@@ -98,7 +98,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
   canRedo: () => get()._futureStates.length > 0,
 
   addBlock: (type, parentId) => set((state) => {
-    const defaultProps: Record<string, string | number | boolean> = {};
+    const defaultProps: Record<string, any> = {};
 
     // Set default props based on type
     if (type === 'hero') {
@@ -139,11 +139,11 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
       defaultProps.align = 'center';
     } else if (type === 'features') {
       defaultProps.title = 'Our Features';
-      defaultProps.features = JSON.stringify([
+      defaultProps.features = [
         { icon: 'Star', title: 'Feature 1', description: 'Description here' },
         { icon: 'Heart', title: 'Feature 2', description: 'Description here' },
         { icon: 'Zap', title: 'Feature 3', description: 'Description here' }
-      ]);
+      ];
     } else if (type === 'cta') {
       defaultProps.title = 'Ready to get started?';
       defaultProps.buttonText = 'Get Started';
@@ -151,34 +151,34 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
     } else if (type === 'class_schedule') {
       defaultProps.title = 'Next Classes';
       defaultProps.subtitle = 'UPCOMING SESSIONS';
-      defaultProps.classes = JSON.stringify([
+      defaultProps.classes = [
         { id: '1', name: 'Class 1', time: '09:00 AM', trainer: 'Trainer', category: 'Category', icon: 'Dumbbell' },
         { id: '2', name: 'Class 2', time: '11:00 AM', trainer: 'Trainer', category: 'Category', icon: 'Heart' }
-      ]);
+      ];
     } else if (type === 'calendar') {
       defaultProps.title = 'Schedule';
     } else if (type === 'testimonials_carousel') {
       defaultProps.title = 'Testimonials';
       defaultProps.subtitle = 'WHAT PEOPLE SAY';
-      defaultProps.testimonials = JSON.stringify([
+      defaultProps.testimonials = [
         { id: '1', text: 'Great experience!', name: 'John D.', role: 'Member', rating: 5, avatar: 'JD' },
         { id: '2', text: 'Highly recommended!', name: 'Jane S.', role: 'Member', rating: 5, avatar: 'JS' },
         { id: '3', text: 'Amazing service!', name: 'Bob M.', role: 'Member', rating: 5, avatar: 'BM' }
-      ]);
+      ];
     } else if (type === 'stats') {
       defaultProps.title = 'Our Impact';
-      defaultProps.stats = JSON.stringify([
+      defaultProps.stats = [
         { value: '10K+', label: 'Happy Guests', icon: 'Users' },
         { value: '50+', label: 'Activities', icon: 'Zap' },
         { value: '99%', label: 'Satisfaction', icon: 'Heart' }
-      ]);
+      ];
     } else if (type === 'card_grid') {
       defaultProps.title = 'Our Services';
-      defaultProps.cards = JSON.stringify([
+      defaultProps.cards = [
         { title: 'Service 1', description: 'Description', icon: 'Star' },
         { title: 'Service 2', description: 'Description', icon: 'Heart' },
         { title: 'Service 3', description: 'Description', icon: 'Zap' }
-      ]);
+      ];
     } else if (type === 'divider') {
       defaultProps.accentColor = '#6366f1';
     } else if (type === 'spacer') {
@@ -191,6 +191,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
       label: `New ${type}`,
       props: defaultProps,
       style: { width: '100%' },
+      position: { x: 100, y: 100, width: '400px', height: 'auto', z: state.layout.length + 1 },
       children: type === 'container' || type === 'grid' || type === 'form_container' ? [] : undefined
     };
 

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as multiPropertyService from './multi-property.service.js';
+import * as settingsService from './settings-resolution.service.js';
 
 // ==================== PROPERTY GROUPS ====================
 
@@ -86,6 +87,30 @@ export async function getGroupSummary(req: Request, res: Response): Promise<void
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to get group summary';
+    res.status(500).json({ error: message });
+  }
+}
+
+export async function getGroupProfitAndLoss(req: Request, res: Response): Promise<void> {
+  try {
+    const { groupId } = req.params;
+    const { start_date, end_date } = req.query;
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const pnl = await multiPropertyService.getGroupProfitAndLoss(
+      groupId,
+      start_date ? String(start_date) : thirtyDaysAgo.toISOString(),
+      end_date ? String(end_date) : new Date().toISOString()
+    );
+
+    res.json({
+      success: true,
+      data: pnl,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get group P&L';
     res.status(500).json({ error: message });
   }
 }
@@ -425,6 +450,101 @@ export async function createProperty(req: Request, res: Response): Promise<void>
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create property';
+    res.status(400).json({ error: message });
+  }
+}
+
+// ==================== SETTINGS INHERITANCE ====================
+
+export async function getPropertySettings(req: Request, res: Response): Promise<void> {
+  try {
+    const { propertyId } = req.params;
+    const { category, keys } = req.query;
+
+    if (keys) {
+      // Resolve specific keys
+      const keyList = String(keys).split(',');
+      const resolved = await settingsService.resolveSettings(propertyId, keyList);
+      res.json({ success: true, data: resolved });
+    } else {
+      // Get all effective settings
+      const settings = await settingsService.getEffectiveSettings(
+        propertyId,
+        category ? String(category) : undefined
+      );
+      res.json({ success: true, data: settings });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get settings';
+    res.status(500).json({ error: message });
+  }
+}
+
+export async function updatePropertySetting(req: Request, res: Response): Promise<void> {
+  try {
+    const { propertyId } = req.params;
+    const { key, value, category } = req.body;
+
+    if (!key || value === undefined) {
+      res.status(400).json({ error: 'key and value are required' });
+      return;
+    }
+
+    await settingsService.setPropertySetting(
+      propertyId,
+      key,
+      value,
+      category || 'general',
+      req.user?.id
+    );
+
+    res.json({ success: true, message: `Setting '${key}' updated for property` });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update setting';
+    res.status(400).json({ error: message });
+  }
+}
+
+export async function deletePropertySetting(req: Request, res: Response): Promise<void> {
+  try {
+    const { propertyId } = req.params;
+    const { key } = req.query;
+
+    if (!key) {
+      res.status(400).json({ error: 'key query parameter is required' });
+      return;
+    }
+
+    await settingsService.deletePropertySetting(propertyId, String(key));
+
+    res.json({ success: true, message: `Setting override '${key}' removed, will fall back to group/system default` });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete setting';
+    res.status(400).json({ error: message });
+  }
+}
+
+export async function updateGroupSetting(req: Request, res: Response): Promise<void> {
+  try {
+    const { groupId } = req.params;
+    const { key, value, category } = req.body;
+
+    if (!key || value === undefined) {
+      res.status(400).json({ error: 'key and value are required' });
+      return;
+    }
+
+    await settingsService.setGroupSetting(
+      groupId,
+      key,
+      value,
+      category || 'general',
+      req.user?.id
+    );
+
+    res.json({ success: true, message: `Setting '${key}' updated for group` });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update group setting';
     res.status(400).json({ error: message });
   }
 }

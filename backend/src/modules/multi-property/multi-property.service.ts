@@ -482,44 +482,85 @@ export async function calculateAndStoreBenchmarks(
   const metrics = ['revenue', 'occupancy', 'adr', 'revpar'];
 
   for (const metric of metrics) {
-    // Calculate metric for each property (simplified - in production, pull from actual data)
     const propertyMetrics: { propertyId: string; value: number }[] = [];
 
     for (const property of properties) {
-      // Get aggregated data for the property
-      // This would typically come from reservations, revenue, etc.
       let value = 0;
 
       if (metric === 'revenue') {
-        const { data: revenue } = await client
-          .from('payments')
+        const { data: txs } = await client
+          .from('transactions')
           .select('amount')
           .eq('property_id', property.id)
-          .eq('status', 'completed')
+          .not('status', 'in', '(cancelled,void,refunded)')
           .gte('created_at', periodStart)
           .lte('created_at', periodEnd);
         
-        value = (revenue || []).reduce((sum, p) => sum + (p.amount || 0), 0);
-      } else if (metric === 'occupancy') {
-        // Calculate occupancy percentage
-        const { count: totalRooms } = await client
-          .from('rooms')
-          .select('*', { count: 'exact', head: true })
-          .eq('property_id', property.id);
+        value = (txs || []).reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        const { count: bookedNights } = await client
-          .from('reservations')
+      } else if (metric === 'occupancy') {
+        // Occupancy = booked reservation transactions / (available units × days in period)
+        const { count: totalUnits } = await client
+          .from('modules')
           .select('*', { count: 'exact', head: true })
           .eq('property_id', property.id)
-          .gte('check_in', periodStart)
-          .lte('check_out', periodEnd)
-          .in('status', ['confirmed', 'checked_in', 'checked_out']);
+          .eq('engine_type', 'time_exclusive_reservation')
+          .eq('is_active', true);
 
-        const days = Math.ceil(
+        const { count: bookedCount } = await client
+          .from('transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('property_id', property.id)
+          .eq('engine_type', 'time_exclusive_reservation')
+          .not('status', 'in', '(cancelled,void)')
+          .gte('created_at', periodStart)
+          .lte('created_at', periodEnd);
+
+        const days = Math.max(1, Math.ceil(
           (new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / (1000 * 60 * 60 * 24)
-        );
-        const totalRoomNights = (totalRooms || 1) * days;
-        value = totalRoomNights > 0 ? ((bookedNights || 0) / totalRoomNights) * 100 : 0;
+        ));
+        const totalCapacity = (totalUnits || 1) * days;
+        value = totalCapacity > 0 ? ((bookedCount || 0) / totalCapacity) * 100 : 0;
+
+      } else if (metric === 'adr') {
+        // Average Daily Rate = total reservation revenue / number of booked reservations
+        const { data: resTxs } = await client
+          .from('transactions')
+          .select('amount')
+          .eq('property_id', property.id)
+          .eq('engine_type', 'time_exclusive_reservation')
+          .not('status', 'in', '(cancelled,void)')
+          .gte('created_at', periodStart)
+          .lte('created_at', periodEnd);
+
+        const resRevenue = (resTxs || []).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        const bookingCount = (resTxs || []).length;
+        value = bookingCount > 0 ? resRevenue / bookingCount : 0;
+
+      } else if (metric === 'revpar') {
+        // RevPAR = total reservation revenue / (available units × days)
+        const { data: resTxs } = await client
+          .from('transactions')
+          .select('amount')
+          .eq('property_id', property.id)
+          .eq('engine_type', 'time_exclusive_reservation')
+          .not('status', 'in', '(cancelled,void)')
+          .gte('created_at', periodStart)
+          .lte('created_at', periodEnd);
+
+        const { count: totalUnits } = await client
+          .from('modules')
+          .select('*', { count: 'exact', head: true })
+          .eq('property_id', property.id)
+          .eq('engine_type', 'time_exclusive_reservation')
+          .eq('is_active', true);
+
+        const resRevenue = (resTxs || []).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        const days = Math.max(1, Math.ceil(
+          (new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / (1000 * 60 * 60 * 24)
+        ));
+        const totalCapacity = (totalUnits || 1) * days;
+        value = totalCapacity > 0 ? resRevenue / totalCapacity : 0;
       }
 
       propertyMetrics.push({ propertyId: property.id, value });
@@ -553,6 +594,88 @@ export async function calculateAndStoreBenchmarks(
   }
 }
 
+// ==================== GROUP P&L ====================
+
+export async function getGroupProfitAndLoss(groupId: string, periodStart: string, periodEnd: string) {
+  const client = supabase;
+  const properties = await getPropertiesInGroup(groupId);
+  const propertyIds = properties.map(p => p.id);
+
+  if (propertyIds.length === 0) {
+    return { properties: [], totals: { grossRevenue: 0, discounts: 0, refunds: 0, netRevenue: 0 } };
+  }
+
+  // Fetch all transactions for the group in the period
+  const { data: txs } = await client
+    .from('transactions')
+    .select('property_id, engine_type, status, amount, discount_amount, refund_amount')
+    .in('property_id', propertyIds)
+    .gte('created_at', periodStart)
+    .lte('created_at', periodEnd);
+
+  const rows = txs || [];
+
+  // Build per-property P&L
+  const propertyPL = new Map<string, {
+    propertyId: string;
+    propertyName: string;
+    grossRevenue: number;
+    discounts: number;
+    refunds: number;
+    netRevenue: number;
+    byEngine: Record<string, number>;
+    transactionCount: number;
+  }>();
+
+  for (const prop of properties) {
+    propertyPL.set(prop.id, {
+      propertyId: prop.id,
+      propertyName: prop.name,
+      grossRevenue: 0,
+      discounts: 0,
+      refunds: 0,
+      netRevenue: 0,
+      byEngine: {},
+      transactionCount: 0,
+    });
+  }
+
+  for (const tx of rows) {
+    const entry = propertyPL.get(tx.property_id);
+    if (!entry) continue;
+
+    const amount = Number(tx.amount || 0);
+    const discount = Number(tx.discount_amount || 0);
+    const refund = Number(tx.refund_amount || 0);
+
+    if (!['cancelled', 'void'].includes(tx.status)) {
+      entry.grossRevenue += amount;
+      entry.discounts += discount;
+      entry.refunds += refund;
+      entry.transactionCount++;
+
+      const engine = tx.engine_type || 'unknown';
+      entry.byEngine[engine] = (entry.byEngine[engine] || 0) + amount;
+    }
+  }
+
+  // Calculate net
+  for (const entry of propertyPL.values()) {
+    entry.netRevenue = entry.grossRevenue - entry.discounts - entry.refunds;
+  }
+
+  const propertyResults = Array.from(propertyPL.values()).sort((a, b) => b.netRevenue - a.netRevenue);
+
+  const totals = {
+    grossRevenue: propertyResults.reduce((s, p) => s + p.grossRevenue, 0),
+    discounts: propertyResults.reduce((s, p) => s + p.discounts, 0),
+    refunds: propertyResults.reduce((s, p) => s + p.refunds, 0),
+    netRevenue: propertyResults.reduce((s, p) => s + p.netRevenue, 0),
+  };
+
+  return { properties: propertyResults, totals };
+}
+
 // ==================== CONSOLIDATED REPORTING ====================
 
 export async function getGroupSummary(groupId: string): Promise<{
@@ -566,26 +689,46 @@ export async function getGroupSummary(groupId: string): Promise<{
   if (!group) throw new Error('Group not found');
 
   const properties = await getPropertiesInGroup(groupId);
+  const propertyIds = properties.map(p => p.id);
 
-  // Calculate summary metrics (simplified)
   const client = supabase;
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const { data: revenue } = await client
-    .from('payments')
+  // Revenue from unified transactions table
+  const { data: txs } = await client
+    .from('transactions')
     .select('amount')
-    .in('property_id', properties.map(p => p.id))
-    .eq('status', 'completed')
+    .in('property_id', propertyIds)
+    .not('status', 'in', '(cancelled,void,refunded)')
     .gte('created_at', thirtyDaysAgo.toISOString());
 
-  const totalRevenue = (revenue || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+  const totalRevenue = (txs || []).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  // Occupancy: count reservation engine transactions / (reservation modules × 30 days)
+  const { count: reservationModules } = await client
+    .from('modules')
+    .select('*', { count: 'exact', head: true })
+    .in('property_id', propertyIds)
+    .eq('engine_type', 'time_exclusive_reservation')
+    .eq('is_active', true);
+
+  const { count: bookedCount } = await client
+    .from('transactions')
+    .select('*', { count: 'exact', head: true })
+    .in('property_id', propertyIds)
+    .eq('engine_type', 'time_exclusive_reservation')
+    .not('status', 'in', '(cancelled,void)')
+    .gte('created_at', thirtyDaysAgo.toISOString());
+
+  const totalCapacity = (reservationModules || 1) * 30;
+  const averageOccupancy = totalCapacity > 0 ? ((bookedCount || 0) / totalCapacity) * 100 : 0;
 
   return {
     group,
     properties,
     totalRevenue,
-    averageOccupancy: 0, // Would calculate from actual data
+    averageOccupancy: Math.round(averageOccupancy * 10) / 10,
     propertyCount: properties.length
   };
 }

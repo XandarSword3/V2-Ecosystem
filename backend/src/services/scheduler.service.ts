@@ -8,6 +8,7 @@ import { reportingService } from '../modules/reporting/reporting.service.js';
 import { businessMetricsService } from './business-metrics.service.js';
 import { emitToRole } from '../socket/index.js';
 import { runMembershipRenewalJob } from '../jobs/membership-renewal.job.js';
+import { processApprovedDeletions } from '../modules/gdpr/gdpr.service.js';
 
 export class SchedulerService {
   /**
@@ -39,6 +40,9 @@ export class SchedulerService {
 
     // Daily KPI threshold alerts for managers/admins
     this.scheduleDailyKPIAlerts();
+
+    // GDPR: Process approved data deletion requests at 1:00 AM
+    this.scheduleGDPRDeletionProcessing();
     
     logger.info('Scheduler service initialized.');
   }
@@ -282,5 +286,23 @@ export class SchedulerService {
     });
 
     logger.info('Scheduled KPI alert job (30 8 * * *)');
+  }
+
+  /**
+   * GDPR: Process approved data deletion requests.
+   * Runs daily at 1:00 AM to ensure approved deletions are executed within compliance windows.
+   */
+  private static scheduleGDPRDeletionProcessing() {
+    cron.schedule('0 1 * * *', async () => {
+      logger.info('Starting scheduled GDPR deletion processing...');
+      try {
+        await processApprovedDeletions();
+        logger.info('GDPR deletion processing completed.');
+      } catch (error) {
+        logger.error('GDPR deletion processing failed:', error);
+      }
+    });
+
+    logger.info('Scheduled GDPR deletion processing job (0 1 * * *)');
   }
 }
