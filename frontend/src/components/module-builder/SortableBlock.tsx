@@ -4,9 +4,11 @@ import { useModuleBuilderStore } from '@/stores/module-builder-store';
 import { useEffect, useState } from 'react';
 import { api, modulesApi } from '@/lib/api';
 import { BlockRenderer } from './DynamicModuleRenderer';
+import { Module } from '@/lib/settings-context';
 
 interface SortableBlockProps {
   block: UIBlock;
+  module: Module;
 }
 
 const typeIcons: Record<string, any> = {
@@ -34,7 +36,7 @@ const typeIcons: Record<string, any> = {
   spacer: Minus,
 };
 
-export function SortableBlock({ block }: SortableBlockProps) {
+export function SortableBlock({ block, module }: SortableBlockProps) {
   const { selectBlock, selectedBlockId, removeBlock, duplicateBlock, activeModuleId } = useModuleBuilderStore();
   const [liveData, setLiveData] = useState<{ count?: number; subtitle?: string } | null>(null);
   const isSelected = selectedBlockId === block.id;
@@ -149,7 +151,7 @@ export function SortableBlock({ block }: SortableBlockProps) {
         
         {/* Real Component Rendering */}
         <div className="w-full h-full relative overflow-hidden">
-            <BlockRenderer block={block} module={{} as any} />
+            <BlockRenderer block={block} module={module} />
         </div>
       </div>
 

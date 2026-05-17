@@ -191,7 +191,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
       label: `New ${type}`,
       props: defaultProps,
       style: { width: '100%' },
-      position: { x: 100, y: 100, width: '400px', height: 'auto', z: state.layout.length + 1 },
+      position: { x: 100 + (state.layout.length % 10) * 30, y: 100 + (state.layout.length % 10) * 30, width: '400px', height: 'auto', z: state.layout.length + 1 },
       children: type === 'container' || type === 'grid' || type === 'form_container' ? [] : undefined
     };
 
