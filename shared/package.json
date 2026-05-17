@@ -4,7 +4,7 @@
   "private": true,
   "license": "PROPRIETARY",
   "scripts": {
-    "build": "node ../backend/node_modules/typescript/bin/tsc -p tsconfig.json"
+    "build": "npx tsc -p tsconfig.json"
   },
   "main": "types/index.ts",
   "types": "types/index.ts",

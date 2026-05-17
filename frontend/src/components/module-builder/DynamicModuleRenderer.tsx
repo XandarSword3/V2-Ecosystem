@@ -152,6 +152,21 @@ export function DynamicModuleRenderer({ layout, module }: RendererProps) {
     return <div className="p-10 text-center">No layout defined for this module.</div>;
   }
 
+  // Check if any block has position data. If none do, fall back to stack/flow layout
+  // to handle old layouts and newly added blocks before first drag.
+  const hasPositionData = safeLayout.some((b) => b.position?.x !== undefined || b.position?.y !== undefined);
+
+  // Stack fallback: render blocks in normal document flow
+  if (!hasPositionData) {
+    return (
+      <div className="relative w-full bg-slate-50 dark:bg-slate-900">
+        {safeLayout.map((block) => (
+          <BlockRenderer key={block.id} block={block} module={module} />
+        ))}
+      </div>
+    );
+  }
+
   // Freeform canvas mode - blocks positioned absolutely like PowerPoint
   // Scales down responsively on smaller viewports
   return (
