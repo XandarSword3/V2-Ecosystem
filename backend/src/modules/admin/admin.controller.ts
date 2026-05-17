@@ -1078,111 +1078,94 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
       start = dayjs().subtract(1, 'month').startOf('day').toISOString();
     }
 
-    // Query only required fields and keep each result set bounded.
-    // This prevents loading unbounded rows into Node memory.
+    // Query unified transactions table with correct PostgREST chaining
     const [
-      restaurantResult,
-      snackResult,
+      instantResult,
       chaletResult,
       poolResult,
       usersResult,
-      restItemsResult,
-      snackItemsResult
+      itemsResult
     ] = await Promise.all([
-      supabase.from('transactions').eq('engine_type', 'instant_transaction')
-        .select('id, status, total_amount, created_at')
+      supabase.from('transactions')
+        .select('id, status, amount, created_at')
+        .eq('engine_type', 'instant_transaction')
         .gte('created_at', start)
         .lte('created_at', end)
         .limit(1000),
-      supabase.from('transactions').eq('engine_type', 'instant_transaction')
-        .select('id, status, total_amount, created_at')
+      supabase.from('transactions')
+        .select('id, status, amount, created_at')
+        .eq('engine_type', 'time_exclusive_reservation')
         .gte('created_at', start)
         .lte('created_at', end)
         .limit(1000),
-      supabase.from('transactions').eq('engine_type', 'time_exclusive_reservation')
-        .select('id, payment_status, total_amount, created_at')
-        .gte('created_at', start)
-        .lte('created_at', end)
-        .limit(1000),
-      supabase.from('transactions').eq('engine_type', 'shared_capacity_access')
-        .select('id, payment_status, total_amount, created_at')
+      supabase.from('transactions')
+        .select('id, status, amount, created_at')
+        .eq('engine_type', 'shared_capacity_access')
         .gte('created_at', start)
         .lte('created_at', end)
         .limit(1000),
       supabase.from('users')
         .select('id', { count: 'exact', head: true }),
-      // Fetch completed orders for top items (items are in metadata.items)
+      // Fetch completed orders for top items (items stored in metadata.items)
       supabase.from('transactions')
-        .eq('engine_type', 'instant_transaction')
         .select('metadata, amount, status')
+        .eq('engine_type', 'instant_transaction')
         .eq('status', 'completed')
         .gte('created_at', start)
-        .lte('created_at', end),
-      // Placeholder — snack is also instant_transaction, covered above
-      Promise.resolve({ data: [], error: null })
+        .lte('created_at', end)
+        .limit(500),
     ]);
 
-    const allInstantList = restaurantResult.data || [];
-    const chaletBookingsList = chaletResult.data || [];
-    const poolTicketsList = poolResult.data || [];
+    const instantList = instantResult.data || [];
+    const chaletList = chaletResult.data || [];
+    const poolList = poolResult.data || [];
     const totalUsers = usersResult.count || 0;
 
     if (
-      allInstantList.length >= 1000 ||
-      
-      chaletBookingsList.length >= 1000 ||
-      poolTicketsList.length >= 1000
+      instantList.length >= 1000 ||
+      chaletList.length >= 1000 ||
+      poolList.length >= 1000
     ) {
       logger.warn('Admin overview report hit 1000-row safety limit for one or more datasets', {
-        instant: allInstantList.length,
-        
-        chalets: chaletBookingsList.length,
-        pool: poolTicketsList.length,
+        instant: instantList.length,
+        chalets: chaletList.length,
+        pool: poolList.length,
         start,
         end,
       });
     }
 
     // Calculate revenues
-    const ordersRevenue = allInstantList
-      .filter(o => o.status === 'completed')
+    const COMPLETED = ['completed', 'paid'];
+    const instantRevenue = instantList
+      .filter(o => COMPLETED.includes(o.status))
       .reduce((sum, o) => sum + parseFloat(o.amount || '0'), 0);
-    const // merged into ordersRevenue
-      .filter(o => o.status === 'completed')
-      .reduce((sum, o) => sum + parseFloat(o.amount || '0'), 0);
-    const chaletRevenue = chaletBookingsList
-      .filter(b => b.payment_status === 'paid')
+    const chaletRevenue = chaletList
+      .filter(b => COMPLETED.includes(b.status))
       .reduce((sum, b) => sum + parseFloat(b.amount || '0'), 0);
-    const poolRevenue = poolTicketsList
-      .filter(t => t.payment_status === 'paid')
+    const poolRevenue = poolList
+      .filter(t => COMPLETED.includes(t.status))
       .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
 
-    const totalRevenue = ordersRevenue + chaletRevenue + poolRevenue;
-    const totalOrders = allInstantList.length;
-    const totalBookings = chaletBookingsList.length + poolTicketsList.length;
+    const totalRevenue = instantRevenue + chaletRevenue + poolRevenue;
+    const totalOrders = instantList.length;
+    const totalBookings = chaletList.length + poolList.length;
 
-    // Process Top Items
+    // Process Top Items from metadata.items
     const topItemsMap = new Map<string, { name: string, quantity: number, revenue: number }>();
 
-    interface OrderItemWithJoins {
-      quantity?: number;
-      unit_price?: number;
-      menu_items?: { name: string } | null;
-      snack_items?: { name: string } | null;
+    for (const tx of (itemsResult.data || [])) {
+      const items = (tx.metadata as any)?.items;
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          const name = item.name || item.menu_item_name || 'Unknown Item';
+          const current = topItemsMap.get(name) || { name, quantity: 0, revenue: 0 };
+          current.quantity += (item.quantity || 1);
+          current.revenue += (item.quantity || 1) * (item.unit_price || item.price || 0);
+          topItemsMap.set(name, current);
+        }
+      }
     }
-
-    const processItems = (items: OrderItemWithJoins[]) => {
-      items.forEach(item => {
-        const name = item.menu_items?.name || item.snack_items?.name || 'Unknown Item';
-        const current = topItemsMap.get(name) || { name, quantity: 0, revenue: 0 };
-        current.quantity += (item.quantity || 0);
-        current.revenue += (item.quantity || 0) * (item.unit_price || 0);
-        topItemsMap.set(name, current);
-      });
-    };
-
-    processItems((restItemsResult.data || []) as unknown as OrderItemWithJoins[]);
-    processItems((snackItemsResult.data || []) as unknown as OrderItemWithJoins[]);
 
     const topItems = Array.from(topItemsMap.values())
       .sort((a, b) => b.revenue - a.revenue)
@@ -1191,21 +1174,13 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
     // Revenue By Month (or Period)
     const monthlyRevenueMap = new Map<string, number>();
     const addToMonth = (date: string, amount: number) => {
-      // Use simpler format if range is week/month to show trend more granuarly? 
-      // User requested "Revenue Trend" in UI, often implies monthly or daily.
-      // If range is year, 'MMM YYYY' is good.
-      // If range is month, 'DD MMM' might be better?
-      // But frontend expects "month" field. Let's stick to consistent buckets.
-      // Actually, if we use 'MMM YYYY', and range is 'month', we get 1 or 2 bars.
-      // Let's use 'MMM YYYY' for consistency with "revenueByMonth" name.
       const month = dayjs(date).format('MMM YYYY');
       monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + parseFloat(String(amount)));
     };
 
-    allInstantList.filter(o => o.status === 'completed').forEach(o => addToMonth(o.created_at, o.total_amount));
-    ([]).filter(o => o.status === 'completed').forEach(o => addToMonth(o.created_at, o.total_amount));
-    chaletBookingsList.filter(b => b.payment_status === 'paid').forEach(b => addToMonth(b.created_at, b.total_amount));
-    poolTicketsList.filter(t => t.payment_status === 'paid').forEach(t => addToMonth(t.created_at, t.total_amount));
+    instantList.filter(o => COMPLETED.includes(o.status)).forEach(o => addToMonth(o.created_at, o.amount));
+    chaletList.filter(b => COMPLETED.includes(b.status)).forEach(b => addToMonth(b.created_at, b.amount));
+    poolList.filter(t => COMPLETED.includes(t.status)).forEach(t => addToMonth(t.created_at, t.amount));
 
     const revenueByMonth = Array.from(monthlyRevenueMap.entries())
       .map(([month, revenue]) => ({ month, revenue }))
@@ -1223,8 +1198,7 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
           ordersChange: 0,
         },
         revenueByService: {
-          restaurant: restaurantRevenue,
-          snackBar: snackRevenue,
+          instant: instantRevenue,
           chalets: chaletRevenue,
           pool: poolRevenue,
         },
@@ -1260,8 +1234,9 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
     switch (type) {
       case 'restaurant': {
         const { data: orders, error } = await supabase
-          .from('transactions').eq('engine_type', 'instant_transaction')
-          .select('order_number, customer_name, order_type, status, subtotal, tax_amount, total_amount, payment_status, payment_method, created_at')
+          .from('transactions')
+          .select('order_number, status, amount, created_at, metadata')
+          .eq('engine_type', 'instant_transaction')
           .gte('created_at', start)
           .lte('created_at', end)
           .order('created_at', { ascending: false });
@@ -1269,14 +1244,8 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
         if (error) throw error;
         data = (orders || []).map(o => ({
           'Order Number': o.order_number,
-          'Customer': o.customer_name,
-          'Type': o.order_type,
           'Status': o.status,
-          'Subtotal': o.subtotal,
-          'Tax': o.tax_amount,
-          'Total': o.total_amount,
-          'Payment Status': o.payment_status,
-          'Payment Method': o.payment_method,
+          'Total': o.amount,
           'Date': dayjs(o.created_at).format('YYYY-MM-DD HH:mm'),
         }));
         filename = `restaurant-orders-${dayjs().format('YYYY-MM-DD')}`;
@@ -1285,8 +1254,9 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
 
       case 'chalets': {
         const { data: bookings, error } = await supabase
-          .from('transactions').eq('engine_type', 'time_exclusive_reservation')
-          .select('booking_number, customer_name, customer_email, check_in_date, check_out_date, number_of_guests, number_of_nights, base_amount, total_amount, status, payment_status, created_at')
+          .from('transactions')
+          .select('booking_number, status, amount, created_at, metadata')
+          .eq('engine_type', 'time_exclusive_reservation')
           .gte('created_at', start)
           .lte('created_at', end)
           .order('created_at', { ascending: false });
@@ -1294,16 +1264,8 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
         if (error) throw error;
         data = (bookings || []).map(b => ({
           'Booking Number': b.booking_number,
-          'Customer': b.customer_name,
-          'Email': b.customer_email,
-          'Check-in': dayjs(b.check_in_date).format('YYYY-MM-DD'),
-          'Check-out': dayjs(b.check_out_date).format('YYYY-MM-DD'),
-          'Guests': b.number_of_guests,
-          'Nights': b.number_of_nights,
-          'Base Amount': b.base_amount,
-          'Total': b.total_amount,
           'Status': b.status,
-          'Payment': b.payment_status,
+          'Total': b.amount,
           'Booked On': dayjs(b.created_at).format('YYYY-MM-DD HH:mm'),
         }));
         filename = `chalet-bookings-${dayjs().format('YYYY-MM-DD')}`;
@@ -1312,8 +1274,9 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
 
       case 'pool': {
         const { data: tickets, error } = await supabase
-          .from('transactions').eq('engine_type', 'shared_capacity_access')
-          .select('ticket_number, customer_name, ticket_date, number_of_guests, total_amount, status, payment_status, created_at')
+          .from('transactions')
+          .select('ticket_number, status, amount, created_at, metadata')
+          .eq('engine_type', 'shared_capacity_access')
           .gte('created_at', start)
           .lte('created_at', end)
           .order('created_at', { ascending: false });
@@ -1321,12 +1284,8 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
         if (error) throw error;
         data = (tickets || []).map(t => ({
           'Ticket Number': t.ticket_number,
-          'Customer': t.customer_name,
-          'Date': dayjs(t.ticket_date).format('YYYY-MM-DD'),
-          'Guests': t.number_of_guests,
-          'Total': t.total_amount,
           'Status': t.status,
-          'Payment': t.payment_status,
+          'Total': t.amount,
           'Purchased': dayjs(t.created_at).format('YYYY-MM-DD HH:mm'),
         }));
         filename = `pool-tickets-${dayjs().format('YYYY-MM-DD')}`;
@@ -1335,8 +1294,9 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
 
       case 'snack': {
         const { data: orders, error } = await supabase
-          .from('transactions').eq('engine_type', 'instant_transaction')
-          .select('order_number, customer_name, status, subtotal, total_amount, payment_status, created_at')
+          .from('transactions')
+          .select('order_number, status, amount, created_at')
+          .eq('engine_type', 'instant_transaction')
           .gte('created_at', start)
           .lte('created_at', end)
           .order('created_at', { ascending: false });
@@ -1344,11 +1304,8 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
         if (error) throw error;
         data = (orders || []).map(o => ({
           'Order Number': o.order_number,
-          'Customer': o.customer_name,
           'Status': o.status,
-          'Subtotal': o.subtotal,
-          'Total': o.total_amount,
-          'Payment': o.payment_status,
+          'Total': o.amount,
           'Date': dayjs(o.created_at).format('YYYY-MM-DD HH:mm'),
         }));
         filename = `snack-orders-${dayjs().format('YYYY-MM-DD')}`;
@@ -1420,8 +1377,9 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
 
     // Get recent restaurant orders
     const { data: recentOrders } = await supabase
-      .from('transactions').eq('engine_type', 'instant_transaction')
+      .from('transactions')
       .select('id, order_number, status, created_at')
+      .eq('engine_type', 'instant_transaction')
       .gte('created_at', oneDayAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(5);
@@ -1443,8 +1401,9 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
 
     // Get recent chalet bookings
     const { data: recentBookings } = await supabase
-      .from('transactions').eq('engine_type', 'time_exclusive_reservation')
-      .select('id, chalet_id, check_in_date, status, created_at')
+      .from('transactions')
+      .select('id, status, created_at, metadata')
+      .eq('engine_type', 'time_exclusive_reservation')
       .gte('created_at', oneDayAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(5);
@@ -1458,7 +1417,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
       notifications.push({
         id: `booking-${booking.id}`,
         title: 'Chalet Booking',
-        message: `New booking for ${booking.check_in_date}`,
+        message: `New booking — ${booking.status}`,
         time: timeAgo,
         read: booking.status !== 'pending',
       });
@@ -1517,31 +1476,33 @@ export const getOccupancyReport = asyncHandler(async (req: Request, res: Respons
     // 1. Chalet Occupancy
     const [chaletsResult, bookingsResult] = await Promise.all([
       supabase.from('chalets').select('id', { count: 'exact', head: true }).eq('is_active', true).is('deleted_at', null),
-      supabase.from('transactions').eq('engine_type', 'time_exclusive_reservation')
-        .select('number_of_nights, check_in_date, status')
-        .gte('check_in_date', start.toISOString())
-        .lte('check_in_date', end.toISOString())
+      supabase.from('transactions')
+        .select('status, amount, metadata')
+        .eq('engine_type', 'time_exclusive_reservation')
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString())
     ]);
 
     const totalChalets = chaletsResult.count || 0;
     const totalChaletCapacity = totalChalets * daysInRange;
     const activeBookings = (bookingsResult.data || []).filter(b => !['cancelled', 'no_show'].includes(b.status));
-    const bookedNights = activeBookings.reduce((sum, b) => sum + (b.number_of_nights || 0), 0);
+    const bookedNights = activeBookings.reduce((sum, b) => sum + ((b.metadata as any)?.number_of_nights || 1), 0);
     const chaletOccupancyRate = totalChaletCapacity > 0 ? (bookedNights / totalChaletCapacity) * 100 : 0;
 
     // 2. Pool Occupancy
     const [sessionsResult, ticketsResult] = await Promise.all([
       supabase.from('pool_sessions').select('max_capacity').eq('is_active', true),
-      supabase.from('transactions').eq('engine_type', 'shared_capacity_access')
-        .select('number_of_guests, status')
-        .gte('ticket_date', start.toISOString())
-        .lte('ticket_date', end.toISOString())
+      supabase.from('transactions')
+        .select('status, amount, metadata')
+        .eq('engine_type', 'shared_capacity_access')
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString())
     ]);
 
     const dailyPoolCapacity = (sessionsResult.data || []).reduce((sum, s) => sum + (s.max_capacity || 0), 0);
     const totalPoolCapacity = dailyPoolCapacity * daysInRange;
     const activeTickets = (ticketsResult.data || []).filter(t => !['cancelled', 'no_show'].includes(t.status));
-    const ticketsSold = activeTickets.reduce((sum, t) => sum + (t.number_of_guests || 0), 0);
+    const ticketsSold = activeTickets.reduce((sum, t) => sum + ((t.metadata as any)?.number_of_guests || 1), 0);
     const poolOccupancyRate = totalPoolCapacity > 0 ? (ticketsSold / totalPoolCapacity) * 100 : 0;
 
     res.json({
@@ -1578,14 +1539,21 @@ export const getCustomerAnalytics = asyncHandler(async (req: Request, res: Respo
       start = dayjs().subtract(1, 'month').startOf('day');
     }
 
-    // Fetch transactions from all units to identify top customers
-    // Since we don't have a single transactions table, we'll fetch from main tables
-    const [restOrders, snackOrders, chaletBookings, poolTickets] = await Promise.all([
-      supabase.from('transactions').eq('engine_type', 'instant_transaction').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('status', 'completed'),
-      supabase.from('transactions').eq('engine_type', 'instant_transaction').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('status', 'completed'),
-      supabase.from('transactions').eq('engine_type', 'time_exclusive_reservation').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('payment_status', 'paid'),
-      supabase.from('transactions').eq('engine_type', 'shared_capacity_access').select('customer_id, customer_name, total_amount, created_at').not('customer_id', 'is', null).eq('payment_status', 'paid')
+    // Fetch transactions — all are in the unified table now
+    const [allTxResult] = await Promise.all([
+      supabase.from('transactions')
+        .select('customer_id, amount, status, created_at, customer_name')
+        .not('customer_id', 'is', null)
+        .not('status', 'in', '(cancelled,void)')
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString())
+        .limit(2000)
     ]);
+
+    const restOrders = { data: allTxResult.data || [] };
+    const snackOrders = { data: [] as any[] };
+    const chaletBookings = { data: [] as any[] };
+    const poolTickets = { data: [] as any[] };
 
     const allTransactions = [
       ...(restOrders.data || []),

@@ -5,11 +5,11 @@ import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Legend, Cell
+  BarChart, Bar, Legend, Cell, PieChart, Pie, LineChart, Line
 } from 'recharts';
 import { 
   TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, 
-  DollarSign, Activity, Users, Clock, AlertCircle 
+  DollarSign, Activity, Users, Clock, AlertCircle, Download, XCircle, ChevronRight 
 } from 'lucide-react';
 import { startOfDay, endOfDay, subDays, format } from 'date-fns';
 import { useProperty } from '@/context/PropertyContext';
@@ -51,6 +51,10 @@ export default function EconomicsDashboard() {
   // Insights
   const [crossModule, setCrossModule] = useState<any>(null);
   const [slowPeriods, setSlowPeriods] = useState<any[]>([]);
+  const [cancelPatterns, setCancelPatterns] = useState<any>(null);
+  
+  // Drill-down
+  const [staffDrillDown, setStaffDrillDown] = useState<any>(null);
   const [promoEffect, setPromoEffect] = useState<any>(null);
 
   const fetchData = async () => {
@@ -61,7 +65,7 @@ export default function EconomicsDashboard() {
       
       const [
         resRevTime, resRevMod, resPeak, resStaff, resGross, resVol, resAvg,
-        resRet, resCross, resSlow, resPromo, resTop, resRep
+        resRet, resCross, resSlow, resPromo, resTop, resRep, resCancel
       ] = await Promise.all([
         api.get('/economics/revenue', { params: { ...p.params, interval: 'day' } }),
         api.get('/economics/by-module', p),
@@ -76,6 +80,7 @@ export default function EconomicsDashboard() {
         api.get('/economics/promo-effectiveness', p),
         api.get('/economics/top-customers', { params: { ...p.params, limit: 5 } }),
         api.get('/economics/repeat-vs-new', p),
+        api.get('/economics/cancellation-patterns', p).catch(() => ({ data: { data: null } })),
       ]);
 
       setRevenueTime(resRevTime.data.data);
@@ -93,6 +98,7 @@ export default function EconomicsDashboard() {
       setPromoEffect(resPromo.data.data);
       setTopCustomers(resTop.data.data);
       setRepeatNew(resRep.data.data);
+      setCancelPatterns(resCancel.data.data);
 
     } catch (err: any) {
       console.error(err);
@@ -107,6 +113,78 @@ export default function EconomicsDashboard() {
   }, [range, activePropertyId]);
 
   const formatCurrency = (val: number) => `$${(val || 0).toFixed(2)}`;
+
+  const exportToCSV = () => {
+    const sections: string[] = [];
+
+    // Revenue Overview
+    sections.push('=== Revenue Overview ===');
+    sections.push('Metric,Value');
+    sections.push(`Gross Revenue,${grossNet.gross}`);
+    sections.push(`Net Revenue,${grossNet.net}`);
+    sections.push(`Discounts,${grossNet.discounts}`);
+    sections.push(`Refunds,${grossNet.refunds}`);
+    sections.push(`Total Transactions,${volume.overall}`);
+    sections.push(`Average Transaction Value,${volume.overall > 0 ? (grossNet.net / volume.overall).toFixed(2) : 0}`);
+    sections.push('');
+
+    // Revenue By Module
+    if (revenueModule.length > 0) {
+      sections.push('=== Revenue By Module ===');
+      sections.push('Module,Transactions,Revenue,Average Value,Refund Rate %');
+      revenueModule.forEach(m => {
+        sections.push(`"${m.moduleName}",${m.count},${m.revenue},${m.averageValue.toFixed(2)},${m.refundRate.toFixed(1)}`);
+      });
+      sections.push('');
+    }
+
+    // Staff Performance
+    if (staffPerf.length > 0) {
+      sections.push('=== Staff Performance ===');
+      sections.push('Staff ID,Staff Name,Transactions,Revenue,Cancellation Rate %');
+      staffPerf.forEach(s => {
+        sections.push(`${s.staff_id},"${s.staff_name || ''}",${s.transactions},${s.revenue},${s.cancellationRate.toFixed(1)}`);
+      });
+      sections.push('');
+    }
+
+    // Top Customers
+    if (topCustomers.length > 0) {
+      sections.push('=== Top Customers ===');
+      sections.push('Customer Name,Transactions,Total Spend');
+      topCustomers.forEach(c => {
+        sections.push(`"${c.customer_name || 'Anonymous'}",${c.transactions},${c.spend}`);
+      });
+      sections.push('');
+    }
+
+    // Peak Hours
+    if (peakHours.length > 0) {
+      sections.push('=== Peak Hours ===');
+      sections.push('Hour,Average Revenue,Transaction Count');
+      peakHours.forEach(h => {
+        sections.push(`${h.hour}:00,${h.averageRevenue.toFixed(2)},${h.transactionCount}`);
+      });
+      sections.push('');
+    }
+
+    // Customer Retention
+    sections.push('=== Customer Metrics ===');
+    sections.push(`Repeat Customers,${repeatNew.repeat}`);
+    sections.push(`New Customers,${repeatNew.newCust}`);
+    sections.push(`Retention Rate,${retention.retentionRate?.toFixed(1) || 0}%`);
+
+    const csvContent = sections.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `economics_report_${range.label.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
 
   if (error) {
     return (
@@ -134,24 +212,35 @@ export default function EconomicsDashboard() {
           <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">{t('subtitle', { defaultValue: 'Real-time transaction and revenue analytics across all modules.' })}</p>
         </div>
         
-        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-          <Calendar className="h-4 w-4 text-slate-500 dark:text-slate-400 dark:text-slate-500 ms-2" />
-          <select 
-            className="border-0 bg-transparent text-sm font-medium focus:ring-0 cursor-pointer ps-1 pe-8 py-2"
-            value={range.label}
-            onChange={(e) => {
-              const selected = PRESETS.find(p => p.label === e.target.value);
-              if (selected) setRange(selected);
-            }}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
+            <Calendar className="h-4 w-4 text-slate-500 dark:text-slate-400 ms-2" />
+            <select 
+              className="border-0 bg-transparent text-sm font-medium focus:ring-0 cursor-pointer ps-1 pe-8 py-2"
+              value={range.label}
+              onChange={(e) => {
+                const selected = PRESETS.find(p => p.label === e.target.value);
+                if (selected) setRange(selected);
+              }}
+            >
+              {PRESETS.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
+            </select>
+          </div>
+
+          <button
+            onClick={exportToCSV}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
-            {PRESETS.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
-          </select>
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
         </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b border-slate-200 dark:border-slate-800-2 border-cyan-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b border-slate-200 dark:border-slate-800 border-cyan-600"></div>
         </div>
       ) : (
         <>
@@ -304,8 +393,11 @@ export default function EconomicsDashboard() {
                   </thead>
                   <tbody className="divide-y">
                     {staffPerf.length > 0 ? staffPerf.map((s) => (
-                      <tr key={s.staff_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/80 dark:bg-slate-800/50">
-                        <td className="p-4 font-mono text-xs">{s.staff_id.split('-')[0]}</td>
+                      <tr key={s.staff_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/80 dark:bg-slate-800/50 cursor-pointer group" onClick={() => setStaffDrillDown(s)}>
+                        <td className="p-4 font-mono text-xs flex items-center gap-2">
+                          {s.staff_name || s.staff_id.split('-')[0]}
+                          <ChevronRight className="h-3 w-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </td>
                         <td className="p-4 text-end">{s.transactions}</td>
                         <td className="p-4 text-end font-medium">{formatCurrency(s.revenue)}</td>
                         <td className="p-4 text-end">
@@ -378,7 +470,96 @@ export default function EconomicsDashboard() {
             </div>
           </section>
 
-          {/* Section 5: Insights Panel */}
+          {/* Staff Drill-Down Modal */}
+          {staffDrillDown && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setStaffDrillDown(null)}>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6 border border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">Staff Detail: {staffDrillDown.staff_name || 'Unknown'}</h3>
+                  <button onClick={() => setStaffDrillDown(null)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <XCircle className="h-5 w-5 text-slate-400" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Transactions</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{staffDrillDown.transactions}</p>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Revenue</p>
+                    <p className="text-2xl font-bold text-emerald-600">{formatCurrency(staffDrillDown.revenue)}</p>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Avg per Transaction</p>
+                    <p className="text-2xl font-bold text-cyan-600">{formatCurrency(staffDrillDown.transactions > 0 ? staffDrillDown.revenue / staffDrillDown.transactions : 0)}</p>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Cancellation Rate</p>
+                    <p className={`text-2xl font-bold ${staffDrillDown.cancellationRate > 10 ? 'text-red-500' : staffDrillDown.cancellationRate > 5 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                      {staffDrillDown.cancellationRate?.toFixed(1) || 0}%
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+                  <p className="text-sm text-slate-500">Staff ID: <span className="font-mono text-xs">{staffDrillDown.staff_id}</span></p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 5: Cancellation Patterns */}
+          {cancelPatterns && cancelPatterns.totalCancelled > 0 && (
+            <section>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <XCircle className="h-6 w-6 text-red-500" />
+                Cancellation Patterns
+              </h2>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Summary Cards */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                  <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Total Cancellations</p>
+                  <p className="text-3xl font-bold text-red-500">{cancelPatterns.totalCancelled}</p>
+                  <p className="text-sm text-slate-500 mt-2">Lost revenue: <span className="font-semibold text-slate-700 dark:text-slate-300">{formatCurrency(cancelPatterns.totalLostRevenue)}</span></p>
+                </div>
+
+                {/* By Reason Bar Chart */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm lg:col-span-2">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">By Reason</h3>
+                  {cancelPatterns.byReason.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={cancelPatterns.byReason.slice(0, 6)} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis type="number" tick={{ fontSize: 11 }} />
+                        <YAxis dataKey="reason" type="category" width={120} tick={{ fontSize: 11 }} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-48 flex items-center justify-center text-slate-400">No cancellation reasons recorded</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Cancellation Trend */}
+              {cancelPatterns.byDay.length > 1 && (
+                <div className="mt-4 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">Daily Cancellation Trend</h3>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={cancelPatterns.byDay}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="count" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Section 6: Insights Panel */}
           <section>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
               <Activity className="h-6 w-6 text-cyan-600" />

@@ -316,5 +316,76 @@ export const economicsService = {
       },
       valueDifferencePercentage: noPromoAvg > 0 ? ((withPromoAvg - noPromoAvg) / noPromoAvg) * 100 : 0
     };
+  },
+
+  // Cancellation Pattern Analysis — breakdown by reason, module, time
+  async getCancellationPatterns(params: DateRangeParams) {
+    const supabase = getSupabase();
+    let query = supabase
+      .from('transactions')
+      .select('engine_type, cancellation_reason, amount, created_at, module_id, staff_id')
+      .eq('status', 'cancelled')
+      .gte('created_at', params.from)
+      .lte('created_at', params.to);
+
+    if (params.propertyId) query = query.eq('property_id', params.propertyId);
+    if (params.engineType) query = query.eq('engine_type', params.engineType);
+    if (params.moduleId) query = query.eq('module_id', params.moduleId);
+
+    const { data, error } = await query;
+    if (error) throw toError(error);
+
+    const rows = data || [];
+    const totalCancelled = rows.length;
+    const totalLostRevenue = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
+
+    // Breakdown by reason
+    const byReason: Record<string, { count: number; lostRevenue: number }> = {};
+    rows.forEach(r => {
+      const reason = r.cancellation_reason || 'unspecified';
+      if (!byReason[reason]) byReason[reason] = { count: 0, lostRevenue: 0 };
+      byReason[reason].count++;
+      byReason[reason].lostRevenue += Number(r.amount || 0);
+    });
+
+    const reasonBreakdown = Object.entries(byReason)
+      .map(([reason, stats]) => ({
+        reason,
+        ...stats,
+        percentage: totalCancelled > 0 ? ((stats.count / totalCancelled) * 100) : 0
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Breakdown by engine type
+    const byEngine: Record<string, { count: number; lostRevenue: number }> = {};
+    rows.forEach(r => {
+      const engine = r.engine_type || 'unknown';
+      if (!byEngine[engine]) byEngine[engine] = { count: 0, lostRevenue: 0 };
+      byEngine[engine].count++;
+      byEngine[engine].lostRevenue += Number(r.amount || 0);
+    });
+
+    const engineBreakdown = Object.entries(byEngine)
+      .map(([engine_type, stats]) => ({ engine_type, ...stats }))
+      .sort((a, b) => b.count - a.count);
+
+    // Time breakdown (by day)
+    const byDay: Record<string, number> = {};
+    rows.forEach(r => {
+      const day = r.created_at?.split('T')[0] || 'unknown';
+      byDay[day] = (byDay[day] || 0) + 1;
+    });
+
+    const timeBreakdown = Object.entries(byDay)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return {
+      totalCancelled,
+      totalLostRevenue,
+      byReason: reasonBreakdown,
+      byEngine: engineBreakdown,
+      byDay: timeBreakdown,
+    };
   }
 };

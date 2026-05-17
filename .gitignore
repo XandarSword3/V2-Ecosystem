@@ -118,3 +118,4 @@ refactor_economics.js
 # Agent scratch space and schema dumps
 scratch/
 schema_dump.sql
+.aider*

@@ -46,13 +46,13 @@ export default function ModuleBuilderPage() {
     mutationFn: (newLayout: UIBlock[]) => {
         // We save the layout inside the 'settings' JSONb column
         // Merging with existing settings to prevent data loss
-        const currentSettings = data?.data?.settings || {};
+        const currentSettings = data?.data?.data?.settings || {};
         return modulesApi.update(id, {
             settings: {
                 ...currentSettings,
                 layout: newLayout
             },
-            settings_version: data?.data?.settings_version
+            settings_version: data?.data?.data?.settings_version
         });
     },
     onSuccess: () => {
@@ -63,11 +63,11 @@ export default function ModuleBuilderPage() {
   });
 
   useEffect(() => {
-    if (data?.data) {
+    if (data?.data?.data) {
       setActiveModuleId(id);
       // Load layout from settings if it exists, otherwise empty
       // Use skipHistory=true to not add initial load to undo stack
-      const savedLayout = data.data.settings?.layout || [];
+      const savedLayout = data.data.data.settings?.layout || [];
       console.log('[ModuleBuilder] Loading layout from API:', savedLayout);
       setLayout(savedLayout, true); // Skip history for initial load
     }
@@ -109,7 +109,7 @@ export default function ModuleBuilderPage() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 dark:text-white">{data?.data?.name || 'Module Builder'}</h1>
+            <h1 className="text-lg font-bold text-slate-900 dark:text-white">{data?.data?.data?.name || 'Module Builder'}</h1>
             <p className="text-xs text-slate-500">Visual Editor</p>
           </div>
         </div>
@@ -156,24 +156,6 @@ export default function ModuleBuilderPage() {
                 </button>
             </div>
 
-            {/* Canvas Mode Toggle */}
-            <div className="flex items-center border border-slate-300 rounded-lg dark:border-slate-600 overflow-hidden">
-                <button
-                    onClick={() => setCanvasMode('stack')}
-                    className={`p-2 ${canvasMode === 'stack' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                    title="Stack Mode (vertical flow)"
-                >
-                    <LayoutList className="h-4 w-4" />
-                </button>
-                <div className="w-px h-6 bg-slate-300 dark:bg-slate-600" />
-                <button
-                    onClick={() => setCanvasMode('freeform')}
-                    className={`p-2 ${canvasMode === 'freeform' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                    title="Freeform Canvas (PowerPoint-style)"
-                >
-                    <Layers className="h-4 w-4" />
-                </button>
-            </div>
 
             <button
                 onClick={togglePreview}
@@ -200,7 +182,7 @@ export default function ModuleBuilderPage() {
             {isPreview ? (
                  <div className="bg-white dark:bg-slate-900 min-h-full">
                     {/* Pass current layout state to renderer for live preview */}
-                    <DynamicModuleRenderer layout={layout} module={data?.data} />
+                    <DynamicModuleRenderer layout={layout} module={data?.data?.data} />
                  </div>
             ) : (
                 <div className="mx-auto max-w-5xl rounded-xl bg-white min-h-[600px] shadow-lg dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
