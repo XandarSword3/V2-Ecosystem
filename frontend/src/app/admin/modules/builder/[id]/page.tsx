@@ -186,7 +186,7 @@ export default function ModuleBuilderPage() {
                  </div>
             ) : (
                 <div className="mx-auto max-w-5xl rounded-xl bg-white min-h-[600px] shadow-lg dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                    <BuilderCanvas />
+                    <BuilderCanvas module={data?.data?.data} />
                 </div>
             )}
         </main>

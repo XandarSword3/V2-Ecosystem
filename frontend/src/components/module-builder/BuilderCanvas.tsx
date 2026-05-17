@@ -2,8 +2,13 @@ import { useModuleBuilderStore } from '@/stores/module-builder-store';
 import { SortableBlock } from './SortableBlock';
 import { Rnd } from 'react-rnd';
 import { UIBlock } from '@/types/module-builder';
+import { Module } from '@/lib/settings-context';
 
-export function BuilderCanvas() {
+interface BuilderCanvasProps {
+  module: Module;
+}
+
+export function BuilderCanvas({ module }: BuilderCanvasProps) {
   const { layout, updateBlock, zoom } = useModuleBuilderStore();
 
   const scaleStyle = {
@@ -76,7 +81,7 @@ export function BuilderCanvas() {
               style={{ zIndex: block.position?.z || 1 }}
               dragHandleClassName="drag-handle"
             >
-              <SortableBlock block={block} />
+              <SortableBlock block={block} module={module} />
             </Rnd>
           ))
         )}
