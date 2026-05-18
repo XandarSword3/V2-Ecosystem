@@ -98,16 +98,16 @@ class EmailService {
       const settings: Record<string, string> = {};
       (data || []).forEach((s: { key: string; value: Record<string, unknown> | null }) => {
         if (s.key === 'general' && s.value) {
-          settings.company_name = String(s.value.resortName || 'Iron Paradise Gym');
-          settings.companyName = String(s.value.resortName || 'Iron Paradise Gym');
+          settings.company_name = String(s.value.resortName || 'Your Resort');
+          settings.companyName = String(s.value.resortName || 'Your Resort');
         }
         if (s.key === 'contact' && s.value) {
           settings.contact_email = String(s.value.email || 'info@ironparadisegym.com');
           settings.contactEmail = String(s.value.email || 'info@ironparadisegym.com');
           settings.contact_phone = String(s.value.phone || 'Not configured');
           settings.contactPhone = String(s.value.phone || 'Not configured');
-          settings.contact_address = String(s.value.address || 'Iron Paradise Gym');
-          settings.companyAddress = String(s.value.address || 'Iron Paradise Gym');
+          settings.contact_address = String(s.value.address || 'Your Resort');
+          settings.companyAddress = String(s.value.address || 'Your Resort');
         }
         if (s.key === 'chalets' && s.value) {
           settings.chalet_check_in = String(s.value.checkIn || s.value.check_in_time || '3:00 PM');
@@ -122,14 +122,14 @@ class EmailService {
 
   private getDefaultSettings(): Record<string, string> {
     return {
-      company_name: 'Iron Paradise Gym',
+      company_name: 'Your Resort',
       contact_email: 'info@ironparadisegym.com',
       contact_phone: 'Not configured',
-      contact_address: 'Iron Paradise Gym',
-      companyName: 'Iron Paradise Gym',
+      contact_address: 'Your Resort',
+      companyName: 'Your Resort',
       contactEmail: 'info@ironparadisegym.com',
       contactPhone: 'Not configured',
-      companyAddress: 'Iron Paradise Gym',
+      companyAddress: 'Your Resort',
     };
   }
 
@@ -175,7 +175,7 @@ class EmailService {
     }
 
     const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@ironparadisegym.com';
-    const fromName = process.env.SMTP_FROM_NAME || 'Iron Paradise Gym';
+    const fromName = process.env.SMTP_FROM_NAME || 'Your Resort';
 
     try {
       const info = await this.transporter.sendMail({

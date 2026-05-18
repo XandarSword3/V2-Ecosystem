@@ -1,0 +1,79 @@
+name: Bug Report
+description: Report a reproducible bug or unexpected behaviour
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report. Please search existing issues before submitting.
+        **Do not report security vulnerabilities here** — see [SECURITY.md](../../SECURITY.md).
+
+  - type: dropdown
+    id: workspace
+    attributes:
+      label: Affected workspace
+      options:
+        - Backend (API / server)
+        - Frontend (web app)
+        - Mobile (Expo app)
+        - Database / migrations
+        - Multiple / unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+      placeholder: What went wrong?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the behaviour.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      placeholder: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Paste any relevant error output, stack traces, or screenshots.
+      render: shell
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      placeholder: "e.g. 20.14.0"
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "e.g. macOS 14, Ubuntu 22.04"
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser (for frontend issues)
+      placeholder: "e.g. Chrome 124, Safari 17"

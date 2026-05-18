@@ -75,7 +75,7 @@ export default function Footer() {
 
     // Build footer with translations - always use translated defaults
     const defaultFooterConfig = {
-        logo: { text: settings.resortName || 'Iron Paradise Gym', showIcon: true },
+        logo: { text: settings.resortName || 'Your Resort', showIcon: true },
         description: tFooter('description'),
         columns: [
             {

@@ -14,7 +14,7 @@ export function KioskIdleScreen({ deviceId, loading, onStartSession }: KioskIdle
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-teal-700 flex flex-col">
       {/* Header */}
       <header className="p-6 text-center">
-        <h1 className="text-4xl font-bold text-white">Welcome to Iron Paradise Gym</h1>
+        <h1 className="text-4xl font-bold text-white">Welcome to Your Resort</h1>
         <p className="text-xl text-blue-200 mt-2">Self-Service Kiosk</p>
       </header>
 

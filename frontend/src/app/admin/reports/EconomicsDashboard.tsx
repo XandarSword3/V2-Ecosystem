@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, 
-  DollarSign, Activity, Users, Clock, AlertCircle, Download, XCircle, ChevronRight 
+  DollarSign, Activity, Users, Clock, AlertCircle, Download, FileText, XCircle, ChevronRight 
 } from 'lucide-react';
 import { startOfDay, endOfDay, subDays, format } from 'date-fns';
 import { useProperty } from '@/context/PropertyContext';
@@ -186,6 +186,154 @@ export default function EconomicsDashboard() {
     URL.revokeObjectURL(url);
   };
 
+  const exportToPDF = () => {
+    const dateLabel = range.label.replace(/\s+/g, ' ');
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const netRevenue = (grossNet.net || 0).toFixed(2);
+    const grossRevenue = (grossNet.gross || 0).toFixed(2);
+    const discounts = (grossNet.discounts || 0).toFixed(2);
+    const refunds = (grossNet.refunds || 0).toFixed(2);
+    const avgTx = volume.overall > 0 ? (grossNet.net / volume.overall).toFixed(2) : '0.00';
+
+    const moduleRows = revenueModule.map(m =>
+      `<tr>
+        <td>${m.moduleName}</td>
+        <td>${m.count}</td>
+        <td>$${Number(m.revenue).toFixed(2)}</td>
+        <td>$${Number(m.averageValue).toFixed(2)}</td>
+        <td>${Number(m.refundRate).toFixed(1)}%</td>
+      </tr>`
+    ).join('');
+
+    const staffRows = staffPerf.map(s =>
+      `<tr>
+        <td>${s.staff_name || s.staff_id || '—'}</td>
+        <td>${s.transactions}</td>
+        <td>$${Number(s.revenue).toFixed(2)}</td>
+        <td>${Number(s.cancellationRate).toFixed(1)}%</td>
+      </tr>`
+    ).join('');
+
+    const customerRows = topCustomers.slice(0, 10).map(c =>
+      `<tr>
+        <td>${c.customer_name || 'Anonymous'}</td>
+        <td>${c.transactions}</td>
+        <td>$${Number(c.spend).toFixed(2)}</td>
+      </tr>`
+    ).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Economics Report — ${dateLabel}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; color: #1e293b; background: #fff; padding: 32px; }
+    .header { border-bottom: 2px solid #0891b2; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .header h1 { font-size: 22px; font-weight: 700; color: #0891b2; }
+    .header .meta { text-align: right; color: #64748b; font-size: 11px; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+    .kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; }
+    .kpi .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 4px; }
+    .kpi .value { font-size: 20px; font-weight: 700; color: #0f172a; }
+    .kpi .sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+    section { margin-bottom: 24px; }
+    section h2 { font-size: 13px; font-weight: 600; color: #0891b2; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f1f5f9; text-align: left; padding: 8px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; font-weight: 600; }
+    td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    tr:last-child td { border-bottom: none; }
+    .footer { margin-top: 32px; border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 10px; color: #94a3b8; text-align: center; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Economics Report</div>
+      <h1>Revenue &amp; Transaction Analytics</h1>
+    </div>
+    <div class="meta">
+      <div><strong>Period:</strong> ${dateLabel}</div>
+      <div><strong>Generated:</strong> ${today}</div>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="label">Net Revenue</div>
+      <div class="value">$${netRevenue}</div>
+      <div class="sub">After discounts &amp; refunds</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Gross Revenue</div>
+      <div class="value">$${grossRevenue}</div>
+      <div class="sub">Before adjustments</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Total Transactions</div>
+      <div class="value">${volume.overall || 0}</div>
+      <div class="sub">Avg $${avgTx} / tx</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Discounts &amp; Refunds</div>
+      <div class="value">$${(parseFloat(discounts) + parseFloat(refunds)).toFixed(2)}</div>
+      <div class="sub">$${discounts} disc · $${refunds} ref</div>
+    </div>
+  </div>
+
+  ${moduleRows ? `<section>
+    <h2>Revenue by Module</h2>
+    <table>
+      <thead><tr><th>Module</th><th>Transactions</th><th>Revenue</th><th>Avg Value</th><th>Refund Rate</th></tr></thead>
+      <tbody>${moduleRows}</tbody>
+    </table>
+  </section>` : ''}
+
+  ${staffRows ? `<section>
+    <h2>Staff Performance</h2>
+    <table>
+      <thead><tr><th>Staff Member</th><th>Transactions</th><th>Revenue</th><th>Cancellation Rate</th></tr></thead>
+      <tbody>${staffRows}</tbody>
+    </table>
+  </section>` : ''}
+
+  ${customerRows ? `<section>
+    <h2>Top Customers</h2>
+    <table>
+      <thead><tr><th>Customer</th><th>Transactions</th><th>Total Spend</th></tr></thead>
+      <tbody>${customerRows}</tbody>
+    </table>
+  </section>` : ''}
+
+  <section>
+    <h2>Customer Metrics</h2>
+    <table>
+      <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Repeat Customers</td><td>${repeatNew.repeat || 0}</td></tr>
+        <tr><td>New Customers</td><td>${repeatNew.newCust || 0}</td></tr>
+        <tr><td>Retention Rate</td><td>${retention.retentionRate?.toFixed(1) || 0}%</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="footer">Confidential — Generated by the Resort Management Platform · ${today}</div>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if (win) {
+      win.onload = () => {
+        win.print();
+        URL.revokeObjectURL(url);
+      };
+    }
+  };
+
   if (error) {
     return (
       <div className="p-8 text-center">
@@ -234,6 +382,14 @@ export default function EconomicsDashboard() {
           >
             <Download className="h-4 w-4" />
             Export CSV
+          </button>
+          <button
+            onClick={exportToPDF}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+          >
+            <FileText className="h-4 w-4" />
+            Export PDF
           </button>
         </div>
       </div>

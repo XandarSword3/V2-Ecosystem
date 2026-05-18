@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { JsonLd, generateBreadcrumbSchema } from '@/lib/structured-data';
 
 // Dynamic metadata generation based on slug
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const slug = params.slug;
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
   const title = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   
   return {
@@ -19,14 +19,14 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default function SlugModuleLayout({
+export default async function SlugModuleLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const slug = params.slug;
+  const { slug } = await params;
   const title = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
   const breadcrumbSchema = generateBreadcrumbSchema([

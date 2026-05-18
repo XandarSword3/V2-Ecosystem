@@ -79,7 +79,7 @@ export default function ContactPage() {
     {
       icon: MapPin,
       label: 'Address',
-      value: settings.address || 'Iron Paradise Gym, Lebanon',
+      value: settings.address || 'Your Resort, Lebanon',
       href: '#',
     },
     {

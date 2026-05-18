@@ -11,14 +11,13 @@ const nextConfig = {
   // Enable standalone output for Docker deployment
   output: 'standalone',
   
-  // Ignore ESLint warnings during builds (only fail on errors)
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  
   // Image optimization
   images: {
-    domains: ['localhost', 'v2resort.com', 'v2-resort-backend.onrender.com'],
+    remotePatterns: [
+      { protocol: 'http', hostname: 'localhost' },
+      { protocol: 'https', hostname: 'v2resort.com' },
+      { protocol: 'https', hostname: 'v2-resort-backend.onrender.com' },
+    ],
     unoptimized: process.env.NODE_ENV === 'development',
   },
   

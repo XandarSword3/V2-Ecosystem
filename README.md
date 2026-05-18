@@ -6,7 +6,7 @@
 
 [![CI Pipeline](https://img.shields.io/badge/CI-Passing-success)](https://github.com/XandarSword3/V2-Ecosystem)
 [![Coverage](https://img.shields.io/badge/Coverage-43.16%25-informational)](https://github.com/XandarSword3/V2-Ecosystem)
-[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
 
 A state-of-the-art, monorepo-based resort management ecosystem designed for luxury hospitality. Featuring a **4-engine transaction framework**, dynamic module architecture, real-time staff dashboards, and a visual module builder.
 

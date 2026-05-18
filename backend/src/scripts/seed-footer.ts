@@ -8,7 +8,7 @@ const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SE
 
 const footerConfig = {
     logo: {
-        text: "Iron Paradise Gym",
+        text: "Your Resort",
         showIcon: true
     },
     description: "Premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences in the heart of Lebanon.",
@@ -40,7 +40,7 @@ const footerConfig = {
         showPhone: true,
         showEmail: true
     },
-    copyright: "© {year} Iron Paradise Gym. All rights reserved."
+    copyright: "© {year} Your Resort. All rights reserved."
 };
 
 async function seed() {

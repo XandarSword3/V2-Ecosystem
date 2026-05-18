@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { SessionAccessDashboard } from '@/components/staff/SessionAccessDashboard';
@@ -18,8 +19,9 @@ interface ModuleData {
   is_active: boolean;
 }
 
-export default function ModulePage({ params }: { params: { slug: string } }) {
-  const slug = params.slug;
+export default function ModulePage() {
+  const params = useParams();
+  const slug = Array.isArray(params?.slug) ? params.slug[0] : (params?.slug ?? '');
   const [module, setModule] = useState<ModuleData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

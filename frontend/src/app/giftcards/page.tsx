@@ -206,7 +206,7 @@ export default function PublicGiftCardsPage() {
             Give the Gift of Experience
           </h1>
           <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-            Iron Paradise Gym gift cards are the perfect present for any occasion. 
+            Your Resort gift cards are the perfect present for any occasion. 
             Redeemable for pool access, chalets, dining, and more.
           </p>
           
@@ -402,7 +402,7 @@ export default function PublicGiftCardsPage() {
                           <textarea
                             className="w-full p-3 border rounded-lg dark:bg-slate-700 dark:border-slate-600 resize-none"
                             rows={3}
-                            placeholder="Happy Birthday! Hope you enjoy a relaxing day at Iron Paradise Gym..."
+                            placeholder="Happy Birthday! Hope you enjoy a relaxing day at Your Resort..."
                             value={giftDetails.message}
                             onChange={(e) => setGiftDetails(d => ({ ...d, message: e.target.value }))}
                           />
