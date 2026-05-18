@@ -331,6 +331,9 @@ export default function ManagerDashboard() {
     }
   };
 
+  useEffect(() => {
+    if (!socket) return;
+
     const requestBrowserPermission = async () => {
       if (typeof window === 'undefined' || !('Notification' in window)) return;
       if (Notification.permission === 'default') {
