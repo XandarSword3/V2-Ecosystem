@@ -37,6 +37,8 @@ import {
   ThumbsDown,
   Calendar,
   Shield,
+  Package,
+  XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -101,6 +103,10 @@ export default function ManagerDashboard() {
   const [moduleSummary, setModuleSummary] = useState<Array<{ module: string; todays_order_count: number; todays_revenue: number; active_orders_count: number; staff_on_shift: number }>>([]);
   const [todayShifts, setTodayShifts] = useState<any[]>([]);
   const [showShiftForm, setShowShiftForm] = useState(false);
+  const [inventoryAlerts, setInventoryAlerts] = useState<Array<{ id: string; item_name: string; current_stock: number; minimum_stock: number; unit: string; severity: string }>>([]);
+  const [inventoryStats, setInventoryStats] = useState<{ total: number; low: number; critical: number; out_of_stock: number; total_value: number } | null>(null);
+  const [pendingWastageApprovals, setPendingWastageApprovals] = useState<Array<{ id: string; item_name: string; quantity: number; unit: string; reason: string; notes: string; reported_by: string; created_at: string }>>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [editingShift, setEditingShift] = useState<any | null>(null);
   const [shiftForm, setShiftForm] = useState({
     staffId: '',
@@ -291,8 +297,39 @@ export default function ManagerDashboard() {
     }
   }, [activeProperty?.id]);
 
+  const fetchInventoryData = useCallback(async () => {
+    setInventoryLoading(true);
+    try {
+      const [alertsRes, statsRes, wastageRes] = await Promise.all([
+        api.get('/inventory/alerts?status=active&limit=20').catch(() => ({ data: { alerts: [] } })),
+        api.get('/inventory/stats').catch(() => ({ data: null })),
+        api.get('/inventory/wastage?status=pending&limit=20').catch(() => ({ data: { records: [] } })),
+      ]);
+      setInventoryAlerts(alertsRes.data?.alerts || []);
+      setInventoryStats(statsRes.data || null);
+      setPendingWastageApprovals(wastageRes.data?.records || []);
+    } catch {
+      // Non-critical fetch
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!socket) return;
+    if (activeTab === 'inventory') {
+      fetchInventoryData();
+    }
+  }, [activeTab, fetchInventoryData]);
+
+  const handleWastageApproval = async (id: string, approved: boolean) => {
+    try {
+      await api.patch(`/inventory/wastage/${id}`, { status: approved ? 'approved' : 'rejected' });
+      toast.success(`Wastage report ${approved ? 'approved' : 'rejected'}`);
+      setPendingWastageApprovals(prev => prev.filter(w => w.id !== id));
+    } catch {
+      toast.error('Failed to update wastage status');
+    }
+  };
 
     const requestBrowserPermission = async () => {
       if (typeof window === 'undefined' || !('Notification' in window)) return;
@@ -478,7 +515,7 @@ export default function ManagerDashboard() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-6 w-full max-w-2xl">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="approvals">
             Approvals
@@ -491,6 +528,15 @@ export default function ManagerDashboard() {
           <TabsTrigger value="staff">Staff</TabsTrigger>
           <TabsTrigger value="shifts">Shifts</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="inventory" className="flex items-center gap-1">
+            <Package className="w-3.5 h-3.5" />
+            Inventory
+            {inventoryAlerts.length > 0 && (
+              <span className="ml-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {inventoryAlerts.length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -852,6 +898,146 @@ export default function ManagerDashboard() {
                   </div>
                 </Button>
               </Link>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Inventory Tab */}
+        <TabsContent value="inventory" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Inventory Overview</h3>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={fetchInventoryData} disabled={inventoryLoading}>
+                <RefreshCw className={`w-3.5 h-3.5 mr-1 ${inventoryLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Link href="/admin/inventory">
+                <Button size="sm" variant="outline">
+                  <Eye className="w-3.5 h-3.5 mr-1" />
+                  Full Inventory
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Summary Stats */}
+          {inventoryStats && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Total Items', value: inventoryStats.total, color: 'text-slate-700 dark:text-slate-300' },
+                { label: 'Low Stock', value: inventoryStats.low, color: 'text-amber-600 dark:text-amber-400' },
+                { label: 'Critical', value: inventoryStats.critical, color: 'text-orange-600 dark:text-orange-400' },
+                { label: 'Out of Stock', value: inventoryStats.out_of_stock, color: 'text-red-600 dark:text-red-400' },
+              ].map(({ label, value, color }) => (
+                <Card key={label}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+                    <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Active Stock Alerts */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                Active Alerts
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {inventoryLoading ? (
+                <p className="text-sm text-slate-400 py-2">Loading alerts…</p>
+              ) : inventoryAlerts.length === 0 ? (
+                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 py-2">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="text-sm">All stock levels healthy</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {inventoryAlerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        alert.severity === 'out_of_stock'
+                          ? 'border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800'
+                          : alert.severity === 'critical'
+                          ? 'border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800'
+                          : 'border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800'
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{alert.item_name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {alert.severity === 'out_of_stock'
+                            ? 'Out of stock'
+                            : `${alert.current_stock} ${alert.unit} remaining (min: ${alert.minimum_stock} ${alert.unit})`}
+                        </p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        alert.severity === 'out_of_stock' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' :
+                        alert.severity === 'critical' ? 'bg-orange-100 text-orange-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {alert.severity === 'out_of_stock' ? 'OUT' : alert.severity.toUpperCase()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Pending Wastage Approvals */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ClipboardList className="w-4 h-4 text-slate-500" />
+                Pending Wastage Approvals
+                {pendingWastageApprovals.length > 0 && (
+                  <Badge variant="destructive" className="ml-1">{pendingWastageApprovals.length}</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pendingWastageApprovals.length === 0 ? (
+                <p className="text-sm text-slate-500 py-2">No pending wastage reports</p>
+              ) : (
+                <div className="space-y-3">
+                  {pendingWastageApprovals.map((w) => (
+                    <div key={w.id} className="p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                            {w.item_name} — {w.quantity} {w.unit}
+                          </p>
+                          <p className="text-xs text-slate-500 capitalize">Reason: {w.reason}</p>
+                          {w.notes && <p className="text-xs text-slate-400 italic mt-0.5">"{w.notes}"</p>}
+                          <p className="text-xs text-slate-400 mt-1">Reported by {w.reported_by}</p>
+                        </div>
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          <Button
+                            size="sm"
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs px-2"
+                            onClick={() => handleWastageApproval(w.id, true)}
+                          >
+                            <ThumbsUp className="w-3 h-3 mr-1" /> Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50 text-xs px-2"
+                            onClick={() => handleWastageApproval(w.id, false)}
+                          >
+                            <ThumbsDown className="w-3 h-3 mr-1" /> Reject
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

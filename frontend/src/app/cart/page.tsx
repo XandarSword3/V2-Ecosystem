@@ -146,8 +146,37 @@ export default function CartPage() {
                               {item.name}
                             </h3>
                             <p className="text-sm text-slate-500 dark:text-slate-400">
-                              {formatCurrency(item.price, currency)}
+                              {formatCurrency((item.price + (item.modifierTotal || 0)), currency)}
+                              {(item.modifierTotal || 0) !== 0 && (
+                                <span className="text-xs ml-1">
+                                  (base {formatCurrency(item.price, currency)}
+                                  {(item.modifierTotal || 0) > 0 ? ' + ' : ' '}
+                                  {(item.modifierTotal || 0) > 0 && formatCurrency(item.modifierTotal!, currency)})
+                                </span>
+                              )}
                             </p>
+                            {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {item.selectedModifiers.map((mod, i) => (
+                                  <span
+                                    key={i}
+                                    className={`inline-flex items-center text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                      mod.modifierType === 'remove'
+                                        ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
+                                        : mod.modifierType === 'swap'
+                                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                                        : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                                    }`}
+                                  >
+                                    {mod.modifierType === 'remove' ? '−' : mod.modifierType === 'swap' ? '⇄' : '+'}
+                                    {' '}{mod.optionName}
+                                    {mod.modifierType !== 'remove' && mod.priceAdjustment > 0 && (
+                                      <span className="ml-0.5 opacity-75">+{formatCurrency(mod.priceAdjustment, currency)}</span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             {item.specialInstructions && (
                               <p className="text-xs text-slate-500 mt-1 italic">
                                 "{item.specialInstructions}"

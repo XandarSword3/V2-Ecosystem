@@ -300,6 +300,19 @@ export function ModifierSelectionModal({
     }
   };
 
+  const getModifierTypeBadge = (type: string) => {
+    switch (type) {
+      case 'add':
+        return { label: 'Extra', bg: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400', icon: '+' };
+      case 'remove':
+        return { label: 'Remove', bg: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400', icon: '−' };
+      case 'swap':
+        return { label: 'Swap', bg: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400', icon: '⇄' };
+      default:
+        return { label: type, bg: 'bg-slate-100 text-slate-600', icon: '' };
+    }
+  };
+
   const totalPrice = menuItem.price + calculateModifierTotal();
 
   if (!isOpen) return null;
@@ -436,16 +449,23 @@ export function ModifierSelectionModal({
                                         </p>
                                       )}
                                     </div>
-                                    <span className={`text-xs px-1.5 py-0.5 rounded ${getModifierTypeColor(option.modifier_type)} bg-opacity-10`}>
-                                      {option.modifier_type}
-                                    </span>
+                                    {(() => {
+                                      const badge = getModifierTypeBadge(option.modifier_type);
+                                      return (
+                                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${badge.bg}`}>
+                                          {badge.icon} {badge.label}
+                                        </span>
+                                      );
+                                    })()}
                                   </div>
                                   <div className="flex items-center gap-3">
-                                    {option.price_adjustment !== 0 && (
+                                    {option.modifier_type === 'remove' ? (
+                                      <span className="text-xs text-slate-400 italic">no charge</span>
+                                    ) : option.price_adjustment !== 0 ? (
                                       <span className={`font-medium ${option.price_adjustment > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                         {option.price_adjustment > 0 ? '+' : ''}{formatCurrency(option.price_adjustment, currency)}
                                       </span>
-                                    )}
+                                    ) : null}
                                     {isSelected && group.allow_multiple_same && (
                                       <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                                         <button
