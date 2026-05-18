@@ -122,6 +122,7 @@ export default function DynamicMenuPage() {
   const [activeTab, setActiveTab] = useState('details');
   const [recipeItems, setRecipeItems] = useState<RecipeItem[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [groupSearch, setGroupSearch] = useState('');
 
   useEffect(() => {
     if (currentModule) {
@@ -807,11 +808,11 @@ export default function DynamicMenuPage() {
                 </TabsContent>
 
                 {/* Customizations Tab */}
-                <TabsContent value="customizations" className="p-6 space-y-6">
+                <TabsContent value="customizations" className="p-6 space-y-4">
                   <div>
                     <h4 className="font-medium text-slate-900 dark:text-white">Customization Groups</h4>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Select which customization options are available for this item
+                      Select which modifier groups apply to this item. Customers will see these options when ordering.
                     </p>
                   </div>
 
@@ -819,78 +820,115 @@ export default function DynamicMenuPage() {
                     <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
                       <Layers className="w-12 h-12 mx-auto mb-3 text-slate-400" />
                       <p className="text-slate-500 dark:text-slate-400">No customization groups available</p>
-                      <p className="text-sm text-slate-400 dark:text-slate-500">
-                        Create customization groups in Settings → Customizations
+                      <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+                        Create modifier groups first in{' '}
+                        <a href={`/${currentModule?.slug}/admin/settings/customizations`} className="text-orange-500 hover:underline">
+                          Settings → Customizations
+                        </a>
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {customizationGroups.map(group => (
-                        <div
-                          key={group.id}
-                          onClick={() => toggleCustomizationGroup(group.id)}
-                          className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                            selectedGroups.includes(group.id)
-                              ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
-                              : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <h5 className="font-medium text-slate-900 dark:text-white">
-                                  {group.name}
-                                </h5>
-                                {group.is_required && (
-                                  <span className="px-2 py-0.5 text-xs bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-full">
-                                    Required
-                                  </span>
-                                )}
-                              </div>
-                              {group.description && (
-                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                  {group.description}
-                                </p>
-                              )}
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {group.options.slice(0, 5).map(opt => (
-                                  <span
-                                    key={opt.id}
-                                    className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-700 rounded"
-                                  >
-                                    {opt.name}
-                                    {getCustomizationOptionPrice(opt) !== 0 && (
-                                      <span className="ml-1 text-orange-600">
-                                        {getCustomizationOptionPrice(opt) > 0 ? '+' : ''}{formatCurrency(getCustomizationOptionPrice(opt))}
-                                      </span>
+                    <>
+                      {/* Search bar for groups */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search groups…"
+                          value={groupSearch}
+                          onChange={e => setGroupSearch(e.target.value)}
+                          className="w-full px-3 py-2 pl-9 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-orange-500"
+                        />
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                      </div>
+
+                      <div className="space-y-3">
+                        {customizationGroups
+                          .filter(g => !groupSearch || g.name.toLowerCase().includes(groupSearch.toLowerCase()))
+                          .map(group => {
+                            const isSelected = selectedGroups.includes(group.id);
+                            return (
+                              <div
+                                key={group.id}
+                                onClick={() => toggleCustomizationGroup(group.id)}
+                                className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                                  isSelected
+                                    ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h5 className="font-medium text-slate-900 dark:text-white">
+                                        {group.name}
+                                      </h5>
+                                      {group.is_required && (
+                                        <span className="px-2 py-0.5 text-xs bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-full font-medium">
+                                          Required
+                                        </span>
+                                      )}
+                                      {(group.min_selections != null || group.max_selections != null) && (
+                                        <span className="text-xs text-slate-400">
+                                          {group.min_selections != null ? `min ${group.min_selections}` : ''}
+                                          {group.min_selections != null && group.max_selections != null ? ' · ' : ''}
+                                          {group.max_selections != null ? `max ${group.max_selections}` : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {group.description && (
+                                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate">
+                                        {group.description}
+                                      </p>
                                     )}
-                                  </span>
-                                ))}
-                                {group.options.length > 5 && (
-                                  <span className="px-2 py-1 text-xs text-slate-500">
-                                    +{group.options.length - 5} more
-                                  </span>
-                                )}
+                                    {/* Option tags with modifier type */}
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                      {group.options.slice(0, 6).map(opt => {
+                                        const type = (opt as any).modifier_type || (opt as any).type;
+                                        const price = getCustomizationOptionPrice(opt);
+                                        const typeStyle =
+                                          type === 'remove' ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' :
+                                          type === 'swap'   ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' :
+                                                             'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
+                                        return (
+                                          <span key={opt.id} className={`px-2 py-0.5 text-xs rounded-full font-medium ${typeStyle}`}>
+                                            {type === 'remove' ? '−' : type === 'swap' ? '⇄' : '+'}
+                                            {' '}{opt.name}
+                                            {price !== 0 && (
+                                              <span className="ml-1 opacity-75">
+                                                {price > 0 ? '+' : ''}{formatCurrency(price)}
+                                              </span>
+                                            )}
+                                          </span>
+                                        );
+                                      })}
+                                      {group.options.length > 6 && (
+                                        <span className="px-2 py-0.5 text-xs text-slate-400 dark:text-slate-500">
+                                          +{group.options.length - 6} more
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                                    isSelected
+                                      ? 'border-orange-500 bg-orange-500'
+                                      : 'border-slate-300 dark:border-slate-600'
+                                  }`}>
+                                    {isSelected && <Check className="w-4 h-4 text-white" />}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                              selectedGroups.includes(group.id)
-                                ? 'border-orange-500 bg-orange-500'
-                                : 'border-slate-300 dark:border-slate-600'
-                            }`}>
-                              {selectedGroups.includes(group.id) && (
-                                <Check className="w-4 h-4 text-white" />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                            );
+                          })}
+                        {customizationGroups.filter(g => !groupSearch || g.name.toLowerCase().includes(groupSearch.toLowerCase())).length === 0 && (
+                          <p className="text-center text-sm text-slate-400 py-4">No groups match "{groupSearch}"</p>
+                        )}
+                      </div>
+                    </>
                   )}
 
                   {selectedGroups.length > 0 && (
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {selectedGroups.length} customization group{selectedGroups.length !== 1 ? 's' : ''} selected
+                      ✓ {selectedGroups.length} group{selectedGroups.length !== 1 ? 's' : ''} assigned to this item
                     </p>
                   )}
                 </TabsContent>

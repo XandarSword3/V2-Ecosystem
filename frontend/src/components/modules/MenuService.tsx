@@ -44,6 +44,10 @@ interface MenuItemData {
   is_vegetarian?: boolean;
   is_vegan?: boolean;
   is_gluten_free?: boolean;
+  // Stock availability — populated by API when track_inventory is enabled
+  is_available?: boolean;
+  available_stock?: number | null;
+  track_inventory?: boolean;
 }
 
 export function MenuService({ module }: MenuServiceProps) {
@@ -263,7 +267,17 @@ export function MenuService({ module }: MenuServiceProps) {
     .filter((i) => i.moduleId === module.id)
     .reduce((sum, i) => sum + i.quantity, 0);
 
+  const isOutOfStock = (item: MenuItemData): boolean => {
+    if (item.is_available === false) return true;
+    if (item.track_inventory && item.available_stock !== null && item.available_stock !== undefined && item.available_stock <= 0) return true;
+    return false;
+  };
+
   const addToCart = (item: MenuItemData) => {
+    if (isOutOfStock(item)) {
+      toast.error(`${translateContent(item, 'name')} is currently unavailable`);
+      return;
+    }
     const cartItem = {
       id: item.id,
       name: item.name,
@@ -456,28 +470,47 @@ export function MenuService({ module }: MenuServiceProps) {
 
         {/* Items Grid - New glassmorphic cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredItems.map((item: MenuItemData) => (
+          {filteredItems.map((item: MenuItemData) => {
+            const outOfStock = isOutOfStock(item);
+            return (
             <GlassCard
               key={item.id}
               imageUrl={item.image_url}
               isFeatured={item.is_featured}
-              accentColor={accentColor}
-              onClick={() => handleItemClick(item)}
+              accentColor={outOfStock ? '#94a3b8' : accentColor}
+              onClick={() => !outOfStock && handleItemClick(item)}
             >
               <div className="flex justify-between items-start mb-2">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                  {translateContent(item, 'name')}
-                </h3>
-                <span className="text-lg font-bold" style={{ color: accentColor }}>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <h3 className={`text-xl font-bold truncate ${outOfStock ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`}>
+                    {translateContent(item, 'name')}
+                  </h3>
+                  {outOfStock && (
+                    <span className="flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                      Sold out
+                    </span>
+                  )}
+                </div>
+                <span className={`text-lg font-bold ml-2 flex-shrink-0 ${outOfStock ? 'text-slate-400 dark:text-slate-500 line-through' : ''}`} style={outOfStock ? {} : { color: accentColor }}>
                   {formatCurrency(item.price, currency)}
                 </span>
               </div>
-              <p className="text-slate-600 dark:text-slate-400 mb-4 line-clamp-2">
+              <p className={`mb-4 line-clamp-2 ${outOfStock ? 'text-slate-400 dark:text-slate-600' : 'text-slate-600 dark:text-slate-400'}`}>
                 {translateContent(item, 'description')}
               </p>
+              {!outOfStock && item.track_inventory && item.available_stock !== null && item.available_stock !== undefined && item.available_stock <= 5 && item.available_stock > 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-2">
+                  Only {item.available_stock} left
+                </p>
+              )}
               
               <div className="flex items-center justify-between mt-4">
-                {getItemQuantity(item.id) > 0 ? (
+                {outOfStock ? (
+                  <div className="w-full py-3 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 rounded-xl font-semibold flex items-center justify-center gap-2 cursor-not-allowed">
+                    <ShoppingCart className="w-5 h-5" />
+                    Unavailable
+                  </div>
+                ) : getItemQuantity(item.id) > 0 ? (
                   <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
                     <button 
                       onClick={() => removeFromCart(item.id)}
@@ -509,7 +542,8 @@ export function MenuService({ module }: MenuServiceProps) {
                 )}
               </div>
             </GlassCard>
-          ))}
+            );
+          })}
         </div>
       </main>
 
