@@ -41,7 +41,7 @@ export default function LiveChatWidget() {
     setIsSubmitting(true);
     
     try {
-      await api.post('/contact', formData);
+      await api.post('/support/contact', formData);
       setSubmitted(true);
       toast.success(t('messageSent'));
     } catch (error) {
