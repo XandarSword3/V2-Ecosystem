@@ -154,7 +154,7 @@ export default function ParityPage() {
   const { data: dashboard, isLoading: dashLoading, refetch: refetchDash } = useQuery({
     queryKey: ['parity-dashboard', activePropertyId],
     queryFn: async () => {
-      const res = await api.get(`/parity/properties/${activePropertyId}/dashboard`);
+      const res = await api.get(`/rate-parity/properties/${activePropertyId}/dashboard`);
       return res.data as ParityDashboard;
     },
     enabled: !!activePropertyId,
@@ -164,7 +164,7 @@ export default function ParityPage() {
   const { data: alerts = [], isLoading: alertsLoading, refetch: refetchAlerts } = useQuery({
     queryKey: ['parity-alerts', activePropertyId],
     queryFn: async () => {
-      const res = await api.get(`/parity/properties/${activePropertyId}/alerts`);
+      const res = await api.get(`/rate-parity/properties/${activePropertyId}/alerts`);
       return (res.data?.alerts || res.data || []) as ParityAlert[];
     },
     enabled: !!activePropertyId && activeTab === 'alerts',
@@ -173,7 +173,7 @@ export default function ParityPage() {
   const { data: history = [], isLoading: histLoading } = useQuery({
     queryKey: ['parity-history', activePropertyId, historyStart, historyEnd],
     queryFn: async () => {
-      const res = await api.get(`/parity/properties/${activePropertyId}/history?start=${historyStart}&end=${historyEnd}`);
+      const res = await api.get(`/rate-parity/properties/${activePropertyId}/history?start=${historyStart}&end=${historyEnd}`);
       return (res.data?.checks || res.data || []) as ParityCheck[];
     },
     enabled: !!activePropertyId && activeTab === 'history',
@@ -182,7 +182,7 @@ export default function ParityPage() {
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ['parity-config', activePropertyId],
     queryFn: async () => {
-      const res = await api.get(`/parity/properties/${activePropertyId}/config`);
+      const res = await api.get(`/rate-parity/properties/${activePropertyId}/config`);
       return res.data as ParityConfig;
     },
     enabled: !!activePropertyId && activeTab === 'config',
@@ -193,7 +193,7 @@ export default function ParityPage() {
 
   const runCheckMutation = useMutation({
     mutationFn: async () => {
-      await api.post(`/parity/properties/${activePropertyId}/check/full`, {});
+      await api.post(`/rate-parity/properties/${activePropertyId}/check/full`, {});
     },
     onSuccess: () => {
       toast.success('Parity check started — results will appear shortly');
@@ -204,7 +204,7 @@ export default function ParityPage() {
 
   const alertActionMutation = useMutation({
     mutationFn: async ({ alertId, action }: { alertId: string; action: 'acknowledge' | 'resolve' | 'ignore' }) => {
-      await api.post(`/parity/alerts/${alertId}/${action}`, {});
+      await api.post(`/rate-parity/alerts/${alertId}/${action}`, {});
     },
     onSuccess: () => {
       toast.success('Alert updated');
@@ -216,7 +216,7 @@ export default function ParityPage() {
 
   const saveConfigMutation = useMutation({
     mutationFn: async () => {
-      await api.put(`/parity/properties/${activePropertyId}/config`, configDraft);
+      await api.put(`/rate-parity/properties/${activePropertyId}/config`, configDraft);
     },
     onSuccess: () => {
       toast.success('Configuration saved');
