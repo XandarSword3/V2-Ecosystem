@@ -25,51 +25,38 @@ describe('GDPR Controller', () => {
   describe('exportUserData', () => {
     it('should export all user data', async () => {
       const mockUser = { id: 'user-1', email: 'test@test.com', full_name: 'Test User', created_at: '2024-01-01' };
-      const mockRestaurantOrders = [{ id: 'order-1', order_number: 'R001' }];
-      const mockSnackOrders = [{ id: 'snack-1', order_number: 'S001' }];
-      const mockChaletBookings = [{ id: 'booking-1', confirmation_number: 'C001' }];
-      const mockPoolTickets = [{ id: 'ticket-1', ticket_number: 'P001' }];
-      const mockReviews = [{ id: 'review-1', rating: 5 }];
-      const mockTickets = [{ id: 'ticket-1', subject: 'Help' }];
-      const mockLogs = [{ id: 'log-1', action: 'login' }];
+      const mockTransactions = [
+        { id: 'tx-1', engine_type: 'instant_transaction', amount: 50 },
+        { id: 'tx-2', engine_type: 'time_exclusive_reservation', amount: 200 },
+      ];
+
+      // Build a fully chainable thenable — every method returns the same object,
+      // and the object itself is awaitable (Promise.all resolves it via .then).
+      const makeOrderChain = (data: unknown[]) => {
+        const chain: Record<string, unknown> = {};
+        ['select', 'eq', 'neq', 'gte', 'lte', 'order', 'limit', 'filter', 'not', 'or', 'in', 'contains'].forEach(m => {
+          chain[m] = vi.fn().mockReturnValue(chain);
+        });
+        chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
+        chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+        // Make the chain itself awaitable
+        chain.then = (resolve: Function, reject?: Function) =>
+          Promise.resolve({ data, error: null }).then(resolve as any, reject as any);
+        return chain;
+      };
 
       const mockSupabase = {
         from: vi.fn().mockImplementation((table: string) => {
-          const baseChain = {
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            order: vi.fn().mockReturnThis(),
-            limit: vi.fn().mockReturnThis(),
-            single: vi.fn()
-          };
-
-          switch (table) {
-            case 'users':
-              baseChain.single = vi.fn().mockResolvedValue({ data: mockUser, error: null });
-              break;
-            case 'restaurant_orders':
-              baseChain.order = vi.fn().mockResolvedValue({ data: mockRestaurantOrders, error: null });
-              break;
-            case 'snack_orders':
-              baseChain.order = vi.fn().mockResolvedValue({ data: mockSnackOrders, error: null });
-              break;
-            case 'chalet_bookings':
-              baseChain.order = vi.fn().mockResolvedValue({ data: mockChaletBookings, error: null });
-              break;
-            case 'pool_tickets':
-              baseChain.order = vi.fn().mockResolvedValue({ data: mockPoolTickets, error: null });
-              break;
-            case 'reviews':
-              baseChain.order = vi.fn().mockResolvedValue({ data: mockReviews, error: null });
-              break;
-            case 'support_tickets':
-              baseChain.order = vi.fn().mockResolvedValue({ data: mockTickets, error: null });
-              break;
-            case 'audit_logs':
-              baseChain.limit = vi.fn().mockResolvedValue({ data: mockLogs, error: null });
-              break;
+          if (table === 'users') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({ data: mockUser, error: null }),
+            };
           }
-          return baseChain;
+          if (table === 'transactions') return makeOrderChain(mockTransactions);
+          // All other tables return empty arrays
+          return makeOrderChain([]);
         })
       };
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
@@ -85,7 +72,7 @@ describe('GDPR Controller', () => {
         data: expect.objectContaining({
           profile: mockUser,
           orders: expect.any(Object),
-          bookings: expect.any(Object)
+          reservations: expect.any(Object)
         }),
         exportedAt: expect.any(String)
       }));
@@ -94,12 +81,19 @@ describe('GDPR Controller', () => {
 
     it('should return 404 if user not found', async () => {
       const mockSupabase = {
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          order: vi.fn().mockReturnThis(),
-          limit: vi.fn().mockReturnThis(),
-          single: vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
+        from: vi.fn().mockImplementation((table: string) => {
+          const chain: Record<string, unknown> = {};
+          ['select', 'eq', 'neq', 'gte', 'lte', 'order', 'limit', 'filter', 'not', 'or', 'in', 'contains'].forEach(m => {
+            chain[m] = vi.fn().mockReturnValue(chain);
+          });
+          chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+          // users table: single() returns 404 error; all other tables: single() returns null,null
+          chain.single = table === 'users'
+            ? vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
+            : vi.fn().mockResolvedValue({ data: null, error: null });
+          chain.then = (resolve: Function, reject?: Function) =>
+            Promise.resolve({ data: [], error: null }).then(resolve as any, reject as any);
+          return chain;
         })
       };
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
@@ -213,17 +207,26 @@ describe('GDPR Controller', () => {
   });
 
   describe('getPortableData', () => {
+    const makePortableChain = (data: unknown[], singleData: unknown = null) => {
+      const chain: Record<string, unknown> = {};
+      ['select', 'eq', 'neq', 'gte', 'lte', 'order', 'limit', 'filter', 'not', 'or', 'in', 'contains'].forEach(m => {
+        chain[m] = vi.fn().mockReturnValue(chain);
+      });
+      chain.single = vi.fn().mockResolvedValue({ data: singleData, error: singleData ? null : { code: 'PGRST116' } });
+      chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+      chain.then = (resolve: Function, reject?: Function) =>
+        Promise.resolve({ data, error: null }).then(resolve as any, reject as any);
+      return chain;
+    };
+
     it('should return data in portable JSON format', async () => {
       const mockUser = { id: 'user-1', email: 'test@test.com', full_name: 'Test' };
 
       const mockSupabase = {
-        from: vi.fn().mockImplementation(() => ({
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          order: vi.fn().mockReturnThis(),
-          limit: vi.fn().mockReturnThis(),
-          single: vi.fn().mockResolvedValue({ data: mockUser, error: null })
-        }))
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'users') return makePortableChain([], mockUser);
+          return makePortableChain([]);
+        })
       };
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
 
@@ -241,13 +244,10 @@ describe('GDPR Controller', () => {
       const mockUser = { id: 'user-1', email: 'test@test.com', full_name: 'Test' };
 
       const mockSupabase = {
-        from: vi.fn().mockImplementation(() => ({
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          order: vi.fn().mockReturnThis(),
-          limit: vi.fn().mockReturnThis(),
-          single: vi.fn().mockResolvedValue({ data: mockUser, error: null })
-        }))
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'users') return makePortableChain([], mockUser);
+          return makePortableChain([]);
+        })
       };
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
 

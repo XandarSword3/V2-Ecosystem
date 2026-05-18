@@ -881,6 +881,9 @@ export default function AdminCustomizationsPage() {
           }
         }}
         isLoading={createOptionMutation.isPending || updateOptionMutation.isPending}
+        inventoryItems={inventoryItems}
+        inventorySearch={inventorySearch}
+        setInventorySearch={setInventorySearch}
       />
     </motion.div>
   );
@@ -1095,6 +1098,9 @@ function OptionDialog({
   option,
   onSubmit,
   isLoading,
+  inventoryItems,
+  inventorySearch,
+  setInventorySearch,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -1102,6 +1108,9 @@ function OptionDialog({
   option: CustomizationOption | null;
   onSubmit: (data: Partial<CustomizationOption>) => void;
   isLoading: boolean;
+  inventoryItems: { id: string; name: string; unit: string; current_stock: number }[];
+  inventorySearch: string;
+  setInventorySearch: (v: string) => void;
 }) {
   const [formData, setFormData] = useState<Partial<CustomizationOption>>({
     name: '',

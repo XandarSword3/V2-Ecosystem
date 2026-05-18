@@ -55,6 +55,7 @@ export interface Booking {
   payment_status: PaymentStatus;
   payment_method?: PaymentMethod;
   special_requests?: string;
+  metadata?: Record<string, unknown>;
   checked_in_at?: string;
   checked_in_by?: string;
   checked_out_at?: string;

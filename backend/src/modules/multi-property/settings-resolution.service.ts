@@ -6,7 +6,13 @@
 import { getSupabase } from '../../database/connection';
 import { logger } from '../../utils/logger';
 
-const supabase = getSupabase();
+// Lazy initialisation — avoids calling getSupabase() at import time,
+// which breaks unit tests that mock the connection module.
+let _supabase: ReturnType<typeof getSupabase> | null = null;
+function supabase() {
+  if (!_supabase) _supabase = getSupabase();
+  return _supabase;
+}
 
 export interface ResolvedSetting {
   key: string;
@@ -27,7 +33,7 @@ export async function resolveSetting(
   fallback: any = null
 ): Promise<ResolvedSetting> {
   // Level 1: Property override
-  const { data: propSetting } = await supabase
+  const { data: propSetting } = await supabase()
     .from('property_settings')
     .select('setting_value')
     .eq('property_id', propertyId)
@@ -39,7 +45,7 @@ export async function resolveSetting(
   }
 
   // Level 2: Group default — find the group this property belongs to
-  const { data: membership } = await supabase
+  const { data: membership } = await supabase()
     .from('property_group_members')
     .select('group_id')
     .eq('property_id', propertyId)
@@ -47,7 +53,7 @@ export async function resolveSetting(
     .single();
 
   if (membership?.group_id) {
-    const { data: groupSetting } = await supabase
+    const { data: groupSetting } = await supabase()
       .from('group_settings')
       .select('setting_value')
       .eq('group_id', membership.group_id)
@@ -60,7 +66,7 @@ export async function resolveSetting(
   }
 
   // Level 3: System default
-  const { data: sysSetting } = await supabase
+  const { data: sysSetting } = await supabase()
     .from('system_defaults')
     .select('setting_value')
     .eq('setting_key', key)
@@ -86,12 +92,12 @@ export async function resolveSettings(
 
   // Batch-fetch all three tiers
   const [propResult, memberResult] = await Promise.all([
-    supabase
+    supabase()
       .from('property_settings')
       .select('setting_key, setting_value')
       .eq('property_id', propertyId)
       .in('setting_key', keys),
-    supabase
+    supabase()
       .from('property_group_members')
       .select('group_id')
       .eq('property_id', propertyId)
@@ -106,7 +112,7 @@ export async function resolveSettings(
 
   let groupMap = new Map<string, any>();
   if (groupId) {
-    const { data: groupSettings } = await supabase
+    const { data: groupSettings } = await supabase()
       .from('group_settings')
       .select('setting_key, setting_value')
       .eq('group_id', groupId)
@@ -114,7 +120,7 @@ export async function resolveSettings(
     (groupSettings || []).forEach(r => groupMap.set(r.setting_key, r.setting_value));
   }
 
-  const { data: sysSettings } = await supabase
+  const { data: sysSettings } = await supabase()
     .from('system_defaults')
     .select('setting_key, setting_value')
     .in('setting_key', keys);
@@ -147,7 +153,7 @@ export async function setPropertySetting(
   category = 'general',
   userId?: string
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabase()
     .from('property_settings')
     .upsert({
       property_id: propertyId,
@@ -176,7 +182,7 @@ export async function setGroupSetting(
   category = 'general',
   userId?: string
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabase()
     .from('group_settings')
     .upsert({
       group_id: groupId,
@@ -202,7 +208,7 @@ export async function deletePropertySetting(
   propertyId: string,
   key: string
 ): Promise<void> {
-  await supabase
+  await supabase()
     .from('property_settings')
     .delete()
     .eq('property_id', propertyId)
@@ -217,7 +223,7 @@ export async function getEffectiveSettings(
   category?: string
 ): Promise<ResolvedSetting[]> {
   // Get all system defaults as baseline
-  let sysQuery = supabase.from('system_defaults').select('setting_key, setting_value, category');
+  let sysQuery = supabase().from('system_defaults').select('setting_key, setting_value, category');
   if (category) sysQuery = sysQuery.eq('category', category);
   const { data: sysDefaults } = await sysQuery;
 

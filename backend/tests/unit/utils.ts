@@ -5,8 +5,8 @@ import { Request, Response, NextFunction } from 'express';
 export function createChainableMock(returnData: any = null, error: any = null, count: number | null = null) {
   const methods = [
     'select', 'insert', 'update', 'delete', 'upsert',
-    'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'is', 'in', 'contains', 'or', 'not',
-    'order', 'limit', 'range', 'single', 'maybeSingle', 'rpc', 'csv', 'head'
+    'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'is', 'in', 'contains', 'or', 'not', 'filter',
+    'order', 'limit', 'range', 'single', 'maybeSingle', 'rpc', 'csv', 'head', 'throwOnError'
   ];
   const mock: any = {};
   

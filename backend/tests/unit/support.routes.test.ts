@@ -91,9 +91,12 @@ describe('Support Routes', () => {
 
     it('should send admin notification email', async () => {
       const mockInquiry = { id: 'inquiry-123' };
-      const queryMock = createChainableMock(mockInquiry);
+      const mockSiteSettings = { contact_email: 'admin@resort.com', site_name: 'V2 Resort' };
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(queryMock),
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'site_settings') return createChainableMock(mockSiteSettings);
+          return createChainableMock(mockInquiry);
+        }),
       } as any);
       vi.mocked(emailService.sendEmail).mockResolvedValue(undefined);
 
@@ -121,9 +124,12 @@ describe('Support Routes', () => {
 
     it('should send confirmation email to user', async () => {
       const mockInquiry = { id: 'inquiry-123' };
-      const queryMock = createChainableMock(mockInquiry);
+      const mockSiteSettings = { contact_email: 'admin@resort.com', site_name: 'V2 Resort' };
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(queryMock),
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'site_settings') return createChainableMock(mockSiteSettings);
+          return createChainableMock(mockInquiry);
+        }),
       } as any);
       vi.mocked(emailService.sendEmail).mockResolvedValue(undefined);
 
