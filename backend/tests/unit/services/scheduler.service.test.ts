@@ -72,8 +72,8 @@ describe('SchedulerService', () => {
     it('should initialize all cron jobs', () => {
       SchedulerService.init();
 
-      // Should schedule 7 cron jobs including membership renewal and KPI alerts.
-      expect(cron.schedule).toHaveBeenCalledTimes(7);
+      // Should schedule 8 cron jobs including membership renewal, KPI alerts, and GDPR deletion.
+      expect(cron.schedule).toHaveBeenCalledTimes(8);
       expect(logger.info).toHaveBeenCalledWith('Scheduler service initialized.');
     });
 

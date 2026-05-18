@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   TrendingUp,
@@ -186,8 +186,12 @@ export default function ParityPage() {
       return res.data as ParityConfig;
     },
     enabled: !!activePropertyId && activeTab === 'config',
-    onSuccess: (data) => { if (!configDraft) setConfigDraft(data); },
   });
+
+  // Seed draft when config first loads
+  useEffect(() => {
+    if (config && !configDraft) setConfigDraft(config);
+  }, [config]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
@@ -706,7 +710,7 @@ export default function ParityPage() {
                       <span key={ch} className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium">
                         {ch}
                         <button
-                          onClick={() => setConfigDraft(p => ({ ...p!, channels_to_monitor: p!.channels_to_monitor.filter(c => c !== ch) }))}
+                          onClick={() => setConfigDraft(p => ({ ...p!, channels_to_monitor: (p!.channels_to_monitor || []).filter(c => c !== ch) }))}
                           className="hover:text-red-500"
                         >
                           <X className="w-3 h-3" />
@@ -749,7 +753,7 @@ export default function ParityPage() {
                       <span key={email} className="flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs">
                         {email}
                         <button
-                          onClick={() => setConfigDraft(p => ({ ...p!, notification_emails: p!.notification_emails.filter(e => e !== email) }))}
+                          onClick={() => setConfigDraft(p => ({ ...p!, notification_emails: ( p!.notification_emails || []).filter(e => e !== email) }))}
                           className="hover:text-red-500"
                         >
                           <X className="w-3 h-3" />

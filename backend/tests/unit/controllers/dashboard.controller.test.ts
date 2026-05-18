@@ -25,47 +25,20 @@ describe('DashboardController', () => {
 
   describe('getDashboard', () => {
     it('should return dashboard statistics successfully', async () => {
-      const mockOrderData = [{ total_amount: '100.00' }, { total_amount: '50.00' }];
-      const mockRecentOrders = [
-        { id: 'order-1', order_number: 'R-001', customer_name: 'John', status: 'completed', total_amount: '100.00', created_at: '2026-01-15T10:00:00Z', items: [{ id: 'i-1' }] }
-      ];
-
-      const queryBuilder = createChainableMock([]);
-      // Override from to return different results for different tables
+      // Source queries 'transactions' table with eq('reference_table',...) or eq('engine_type',...)
       const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'restaurant_orders') {
-          // For count queries (head: true)
-          const mock = createChainableMock(null, null, 5);
-          mock.select = vi.fn().mockImplementation((_, opts) => {
-            if (opts?.head) return createChainableMock(null, null, 5);
-            if (_ && _.includes('items')) return createChainableMock(mockRecentOrders);
-            return createChainableMock(mockOrderData);
+        if (table === 'transactions') {
+          const chain = createChainableMock([], null, 5);
+          chain.eq = vi.fn().mockImplementation(() => {
+            const inner = createChainableMock([], null, 5);
+            inner.eq = vi.fn().mockReturnThis();
+            inner.gte = vi.fn().mockReturnThis();
+            inner.lte = vi.fn().mockReturnThis();
+            inner.order = vi.fn().mockReturnThis();
+            inner.limit = vi.fn().mockResolvedValue({ data: [], error: null });
+            return inner;
           });
-          return mock;
-        }
-        if (table === 'snack_orders') {
-          const mock = createChainableMock(null, null, 3);
-          mock.select = vi.fn().mockImplementation((_, opts) => {
-            if (opts?.head) return createChainableMock(null, null, 3);
-            return createChainableMock([{ total_amount: '30.00' }]);
-          });
-          return mock;
-        }
-        if (table === 'chalet_bookings') {
-          const mock = createChainableMock(null, null, 2);
-          mock.select = vi.fn().mockImplementation((_, opts) => {
-            if (opts?.head) return createChainableMock(null, null, 2);
-            return createChainableMock([{ total_amount: '200.00' }]);
-          });
-          return mock;
-        }
-        if (table === 'pool_tickets') {
-          const mock = createChainableMock(null, null, 10);
-          mock.select = vi.fn().mockImplementation((_, opts) => {
-            if (opts?.head) return createChainableMock(null, null, 10);
-            return createChainableMock([{ total_amount: '80.00' }]);
-          });
-          return mock;
+          return chain;
         }
         if (table === 'users') {
           return createChainableMock(null, null, 100);
@@ -164,20 +137,25 @@ describe('DashboardController', () => {
     });
 
     it('should aggregate revenue by service correctly', async () => {
-      const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'restaurant_orders') {
-          return createChainableMock([{ total_amount: '200.00', created_at: '2026-01-10T10:00:00Z' }]);
-        }
-        if (table === 'snack_orders') {
-          return createChainableMock([{ total_amount: '50.00', created_at: '2026-01-10T10:00:00Z' }]);
-        }
-        if (table === 'chalet_bookings') {
-          return createChainableMock([{ total_amount: '300.00', created_at: '2026-01-10T10:00:00Z' }]);
-        }
-        if (table === 'pool_tickets') {
-          return createChainableMock([{ total_amount: '100.00', created_at: '2026-01-10T10:00:00Z' }]);
-        }
-        return createChainableMock([]);
+      // The chain is: from('transactions').select().eq(ref).gte().lte().eq('status','completed')
+      // We use a thenable per from() call so the whole chain resolves via Promise.all
+      const datasets = [
+        [{ total_amount: '200.00', created_at: '2026-01-10T10:00:00Z' }], // restaurant_orders
+        [{ total_amount: '50.00',  created_at: '2026-01-10T10:00:00Z' }], // snack_orders
+        [{ total_amount: '300.00', created_at: '2026-01-10T10:00:00Z' }], // chalets (time_exclusive_reservation)
+        [{ total_amount: '100.00', created_at: '2026-01-10T10:00:00Z' }], // pool (shared_capacity_access)
+      ];
+      let callIdx = 0;
+
+      const fromMock = vi.fn().mockImplementation(() => {
+        const data = datasets[callIdx++ % datasets.length];
+        const thenable: Record<string, unknown> = {};
+        ['select', 'eq', 'gte', 'lte', 'filter', 'not', 'order', 'limit'].forEach(m => {
+          thenable[m] = vi.fn().mockReturnValue(thenable);
+        });
+        thenable.then = (resolve: Function, reject?: Function) =>
+          Promise.resolve({ data, error: null }).then(resolve as any, reject as any);
+        return thenable;
       });
 
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);

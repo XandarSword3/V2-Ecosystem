@@ -115,8 +115,8 @@ export abstract class BaseRepository<T extends Row> {
 
   /** Return the count of records matching optional equality filters. */
   async count(filters?: Record<string, unknown>): Promise<number> {
-    let query = this.getQuery()
-      .select('*', { count: 'exact', head: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = (this.getQuery() as any).select('*', { count: 'exact', head: true });
 
     if (filters) {
       for (const [key, value] of Object.entries(filters)) {
