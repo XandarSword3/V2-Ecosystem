@@ -32,6 +32,7 @@ import {
   Cog,
   Search,
   TrendingUp,
+  MessageSquare,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -195,6 +196,18 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
           href: '/admin/channels', 
           icon: Share2,
           translationKey: 'nav.channelManager'
+        },
+        {
+          name: 'Guest Messaging',
+          href: '/admin/messaging',
+          icon: MessageSquare,
+          translationKey: 'nav.guestMessaging',
+        },
+        {
+          name: 'Rate Parity',
+          href: '/admin/parity',
+          icon: TrendingUp,
+          translationKey: 'nav.rateParity',
         },
         { 
           name: 'Multi-Property', 
