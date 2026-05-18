@@ -34,6 +34,16 @@ import {
   Filter,
   Minus,
   Trash2,
+  Truck,
+  ShoppingBag,
+  ClipboardList,
+  FlaskConical,
+  Building2,
+  Send,
+  ChevronDown,
+  ChevronRight,
+  DollarSign,
+  Eye,
 } from 'lucide-react';
 
 interface InventoryItem {
@@ -123,6 +133,24 @@ export default function InventoryAdminPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+
+  // Advanced inventory state
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [varianceReport, setVarianceReport] = useState<any[]>([]);
+  const [recipeUsage, setRecipeUsage] = useState<any | null>(null);
+  const [recipeUsageItem, setRecipeUsageItem] = useState<InventoryItem | null>(null);
+  const [advancedLoading, setAdvancedLoading] = useState(false);
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [showPOForm, setShowPOForm] = useState(false);
+  const [showReceivePOModal, setShowReceivePOModal] = useState<string | null>(null);
+  const [showPhysicalCountForm, setShowPhysicalCountForm] = useState(false);
+  const [expandedPO, setExpandedPO] = useState<string | null>(null);
+
+  const [supplierForm, setSupplierForm] = useState({ name: '', contact_name: '', email: '', phone: '', address: '', notes: '' });
+  const [poForm, setPOForm] = useState({ supplierId: '', expectedDelivery: '', notes: '', items: [{ itemId: '', quantity: '', unitCost: '' }] });
+  const [receiveItems, setReceiveItems] = useState<{ itemId: string; quantityReceived: string; batchNumber: string; expiryDate: string }[]>([]);
+  const [physicalCountForm, setPhysicalCountForm] = useState({ itemId: '', actualQuantity: '', notes: '' });
   
   // Form states
   const [itemForm, setItemForm] = useState({
@@ -156,8 +184,116 @@ export default function InventoryAdminPage() {
       loadTransactions();
     } else if (activeTab === 'alerts') {
       loadAlerts();
+    } else if (activeTab === 'suppliers') {
+      loadSuppliers();
+    } else if (activeTab === 'purchase-orders') {
+      loadPurchaseOrders();
+    } else if (activeTab === 'operations') {
+      loadVarianceReport();
     }
   }, [activeTab]);
+
+  const loadSuppliers = async () => {
+    setAdvancedLoading(true);
+    try {
+      const res = await api.get('/inventory/suppliers');
+      setSuppliers(res.data?.data || res.data?.suppliers || []);
+    } catch { toast.error('Failed to load suppliers'); }
+    finally { setAdvancedLoading(false); }
+  };
+
+  const loadPurchaseOrders = async () => {
+    setAdvancedLoading(true);
+    try {
+      const res = await api.get('/inventory/purchase-orders');
+      setPurchaseOrders(res.data?.data || res.data?.orders || []);
+    } catch { toast.error('Failed to load purchase orders'); }
+    finally { setAdvancedLoading(false); }
+  };
+
+  const loadVarianceReport = async () => {
+    setAdvancedLoading(true);
+    try {
+      const res = await api.get('/inventory/variance-report');
+      setVarianceReport(res.data?.data || res.data?.variances || []);
+    } catch { toast.error('Failed to load variance report'); }
+    finally { setAdvancedLoading(false); }
+  };
+
+  const loadRecipeUsage = async (item: InventoryItem) => {
+    setRecipeUsageItem(item);
+    setRecipeUsage(null);
+    try {
+      const res = await api.get(`/inventory/menu-cost-analysis/${item.id}`);
+      setRecipeUsage(res.data?.data || res.data);
+    } catch { setRecipeUsage({ error: true }); }
+  };
+
+  const handleCreateSupplier = async () => {
+    try {
+      await api.post('/inventory/suppliers', supplierForm);
+      toast.success('Supplier created');
+      setShowSupplierForm(false);
+      setSupplierForm({ name: '', contact_name: '', email: '', phone: '', address: '', notes: '' });
+      loadSuppliers();
+    } catch { toast.error('Failed to create supplier'); }
+  };
+
+  const handleCreatePO = async () => {
+    if (!poForm.supplierId || poForm.items.some(i => !i.itemId || !i.quantity)) {
+      toast.error('Please fill in all required fields'); return;
+    }
+    try {
+      await api.post('/inventory/purchase-orders', {
+        supplierId: poForm.supplierId,
+        expectedDelivery: poForm.expectedDelivery || undefined,
+        notes: poForm.notes || undefined,
+        items: poForm.items.map(i => ({
+          itemId: i.itemId,
+          quantity: parseFloat(i.quantity),
+          unitCost: i.unitCost ? parseFloat(i.unitCost) : undefined,
+        })),
+      });
+      toast.success('Purchase order created');
+      setShowPOForm(false);
+      setPOForm({ supplierId: '', expectedDelivery: '', notes: '', items: [{ itemId: '', quantity: '', unitCost: '' }] });
+      loadPurchaseOrders();
+    } catch { toast.error('Failed to create purchase order'); }
+  };
+
+  const handleReceivePO = async (orderId: string) => {
+    try {
+      await api.post(`/inventory/purchase-orders/${orderId}/receive`, {
+        items: receiveItems.map(i => ({
+          itemId: i.itemId,
+          quantityReceived: parseFloat(i.quantityReceived),
+          batchNumber: i.batchNumber || undefined,
+          expiryDate: i.expiryDate || undefined,
+        })),
+      });
+      toast.success('Purchase order received — stock updated');
+      setShowReceivePOModal(null);
+      loadPurchaseOrders();
+      loadData();
+    } catch { toast.error('Failed to receive purchase order'); }
+  };
+
+  const handlePhysicalCount = async () => {
+    if (!physicalCountForm.itemId || physicalCountForm.actualQuantity === '') {
+      toast.error('Select an item and enter the actual quantity'); return;
+    }
+    try {
+      await api.post('/inventory/physical-count', {
+        itemId: physicalCountForm.itemId,
+        actualQuantity: parseFloat(physicalCountForm.actualQuantity),
+        notes: physicalCountForm.notes || undefined,
+      });
+      toast.success('Physical count recorded');
+      setPhysicalCountForm({ itemId: '', actualQuantity: '', notes: '' });
+      loadVarianceReport();
+      loadData();
+    } catch { toast.error('Failed to record physical count'); }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -513,7 +649,7 @@ export default function InventoryAdminPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 w-full max-w-lg">
+        <TabsList className="grid grid-cols-7 w-full">
           <TabsTrigger value="items">Items</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
@@ -524,6 +660,18 @@ export default function InventoryAdminPage() {
                 {stats?.unresolvedAlerts}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="suppliers" className="flex items-center gap-1">
+            <Building2 className="w-3.5 h-3.5" />
+            Suppliers
+          </TabsTrigger>
+          <TabsTrigger value="purchase-orders" className="flex items-center gap-1">
+            <ShoppingBag className="w-3.5 h-3.5" />
+            Orders
+          </TabsTrigger>
+          <TabsTrigger value="operations" className="flex items-center gap-1">
+            <ClipboardList className="w-3.5 h-3.5" />
+            Operations
           </TabsTrigger>
         </TabsList>
 
@@ -616,6 +764,14 @@ export default function InventoryAdminPage() {
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => loadRecipeUsage(item)}
+                              title="See which menu items use this"
+                            >
+                              <Eye className="w-4 h-4 text-blue-500" />
+                            </Button>
                             <Button 
                               variant="outline" 
                               size="sm"
@@ -822,6 +978,370 @@ export default function InventoryAdminPage() {
             </div>
           )}
         </TabsContent>
+
+        {/* ── Suppliers Tab ────────────────────────────────────── */}
+        <TabsContent value="suppliers" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Suppliers</h3>
+            <Button onClick={() => setShowSupplierForm(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Add Supplier
+            </Button>
+          </div>
+
+          {showSupplierForm && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">New Supplier</CardTitle></CardHeader>
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input placeholder="Company name *" value={supplierForm.name} onChange={e => setSupplierForm(f => ({ ...f, name: e.target.value }))} />
+                <Input placeholder="Contact name" value={supplierForm.contact_name} onChange={e => setSupplierForm(f => ({ ...f, contact_name: e.target.value }))} />
+                <Input placeholder="Email" type="email" value={supplierForm.email} onChange={e => setSupplierForm(f => ({ ...f, email: e.target.value }))} />
+                <Input placeholder="Phone" value={supplierForm.phone} onChange={e => setSupplierForm(f => ({ ...f, phone: e.target.value }))} />
+                <Input placeholder="Address" value={supplierForm.address} onChange={e => setSupplierForm(f => ({ ...f, address: e.target.value }))} className="sm:col-span-2" />
+                <Input placeholder="Notes" value={supplierForm.notes} onChange={e => setSupplierForm(f => ({ ...f, notes: e.target.value }))} className="sm:col-span-2" />
+                <div className="sm:col-span-2 flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => setShowSupplierForm(false)}>Cancel</Button>
+                  <Button onClick={handleCreateSupplier}>Create Supplier</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {advancedLoading ? (
+            <p className="text-slate-400 text-sm py-4">Loading suppliers…</p>
+          ) : suppliers.length === 0 ? (
+            <Card><CardContent className="py-10 text-center text-slate-400">No suppliers yet. Add your first one above.</CardContent></Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {suppliers.map((s: any) => (
+                <Card key={s.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                        <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900 dark:text-white truncate">{s.name}</p>
+                        {s.contact_name && <p className="text-sm text-slate-500">{s.contact_name}</p>}
+                        {s.email && <p className="text-xs text-slate-400 truncate">{s.email}</p>}
+                        {s.phone && <p className="text-xs text-slate-400">{s.phone}</p>}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── Purchase Orders Tab ──────────────────────────────── */}
+        <TabsContent value="purchase-orders" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Purchase Orders</h3>
+            <Button onClick={() => setShowPOForm(true)}>
+              <Plus className="w-4 h-4 mr-2" /> New Order
+            </Button>
+          </div>
+
+          {showPOForm && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Create Purchase Order</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 block">Supplier *</label>
+                    <select value={poForm.supplierId} onChange={e => setPOForm(f => ({ ...f, supplierId: e.target.value }))}
+                      className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                      <option value="">Select supplier…</option>
+                      {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 block">Expected Delivery</label>
+                    <Input type="date" value={poForm.expectedDelivery} onChange={e => setPOForm(f => ({ ...f, expectedDelivery: e.target.value }))} />
+                  </div>
+                  <Input placeholder="Notes" value={poForm.notes} onChange={e => setPOForm(f => ({ ...f, notes: e.target.value }))} className="sm:col-span-2" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Line Items</p>
+                  {poForm.items.map((line, idx) => (
+                    <div key={idx} className="grid grid-cols-3 gap-2 items-center">
+                      <select value={line.itemId} onChange={e => setPOForm(f => { const items = [...f.items]; items[idx] = { ...items[idx], itemId: e.target.value }; return { ...f, items }; })}
+                        className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                        <option value="">Select item…</option>
+                        {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+                      </select>
+                      <Input placeholder="Qty *" type="number" min="0" value={line.quantity} onChange={e => setPOForm(f => { const it = [...f.items]; it[idx] = { ...it[idx], quantity: e.target.value }; return { ...f, items: it }; })} />
+                      <Input placeholder="Unit cost" type="number" min="0" step="0.01" value={line.unitCost} onChange={e => setPOForm(f => { const it = [...f.items]; it[idx] = { ...it[idx], unitCost: e.target.value }; return { ...f, items: it }; })} />
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" onClick={() => setPOForm(f => ({ ...f, items: [...f.items, { itemId: '', quantity: '', unitCost: '' }] }))}>
+                    <Plus className="w-3 h-3 mr-1" /> Add Line
+                  </Button>
+                </div>
+                <div className="flex gap-2 justify-end pt-1">
+                  <Button variant="outline" onClick={() => setShowPOForm(false)}>Cancel</Button>
+                  <Button onClick={handleCreatePO}><Send className="w-4 h-4 mr-2" /> Submit Order</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {advancedLoading ? (
+            <p className="text-slate-400 text-sm py-4">Loading orders…</p>
+          ) : purchaseOrders.length === 0 ? (
+            <Card><CardContent className="py-10 text-center text-slate-400">No purchase orders yet.</CardContent></Card>
+          ) : (
+            <div className="space-y-3">
+              {purchaseOrders.map((order: any) => (
+                <Card key={order.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                          <Truck className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white">PO #{order.id?.slice(0, 8)}</p>
+                          <p className="text-sm text-slate-500">{order.supplier_name || 'Unknown supplier'}</p>
+                          {order.expected_delivery && <p className="text-xs text-slate-400">Expected: {formatDate(order.expected_delivery)}</p>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={order.status === 'received' ? 'default' : order.status === 'cancelled' ? 'destructive' : 'secondary'}>
+                          {order.status || 'pending'}
+                        </Badge>
+                        <button onClick={() => setExpandedPO(expandedPO === order.id ? null : order.id)} className="text-slate-400 hover:text-slate-600">
+                          {expandedPO === order.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    {expandedPO === order.id && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
+                        {(order.items || []).map((line: any, i: number) => (
+                          <div key={i} className="flex justify-between text-sm">
+                            <span className="text-slate-700 dark:text-slate-300">{line.item_name || line.itemId}</span>
+                            <span className="text-slate-500">{line.quantity} {line.unit} {line.unit_cost ? `@ ${formatCurrency(line.unit_cost)}` : ''}</span>
+                          </div>
+                        ))}
+                        {order.status === 'pending' && (
+                          <div className="pt-2">
+                            <Button size="sm" onClick={() => {
+                              setShowReceivePOModal(order.id);
+                              setReceiveItems((order.items || []).map((l: any) => ({
+                                itemId: l.item_id || l.itemId,
+                                quantityReceived: String(l.quantity),
+                                batchNumber: '',
+                                expiryDate: '',
+                              })));
+                            }}>
+                              <CheckCircle className="w-4 h-4 mr-1" /> Mark as Received
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Receive PO Modal */}
+          <AnimatePresence>
+            {showReceivePOModal && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+                onClick={e => { if (e.target === e.currentTarget) setShowReceivePOModal(null); }}>
+                <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+                  className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Receive Purchase Order</h3>
+                  <p className="text-sm text-slate-500">Confirm quantities actually received. Stock will be updated immediately.</p>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {receiveItems.map((ri, idx) => (
+                      <div key={idx} className="grid grid-cols-2 gap-2">
+                        <Input placeholder="Qty received" type="number" min="0" value={ri.quantityReceived}
+                          onChange={e => setReceiveItems(prev => { const n = [...prev]; n[idx] = { ...n[idx], quantityReceived: e.target.value }; return n; })} />
+                        <Input placeholder="Batch # (opt)" value={ri.batchNumber}
+                          onChange={e => setReceiveItems(prev => { const n = [...prev]; n[idx] = { ...n[idx], batchNumber: e.target.value }; return n; })} />
+                        <Input placeholder="Expiry date (opt)" type="date" value={ri.expiryDate} className="col-span-2"
+                          onChange={e => setReceiveItems(prev => { const n = [...prev]; n[idx] = { ...n[idx], expiryDate: e.target.value }; return n; })} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setShowReceivePOModal(null)}>Cancel</Button>
+                    <Button onClick={() => handleReceivePO(showReceivePOModal!)}><Truck className="w-4 h-4 mr-2" /> Confirm Receipt</Button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </TabsContent>
+
+        {/* ── Operations Tab ───────────────────────────────────── */}
+        <TabsContent value="operations" className="space-y-6">
+          {/* Physical Count */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FlaskConical className="w-4 h-4 text-violet-500" />
+                Physical Stock Count
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Record the actual measured quantity for an item. A variance entry will be created automatically if it differs from the system quantity.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 block">Item *</label>
+                  <select value={physicalCountForm.itemId} onChange={e => setPhysicalCountForm(f => ({ ...f, itemId: e.target.value }))}
+                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                    <option value="">Select item…</option>
+                    {items.map(i => <option key={i.id} value={i.id}>{i.name} (system: {i.current_stock} {i.unit})</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 block">Actual Quantity *</label>
+                  <Input type="number" min="0" step="0.01" placeholder="e.g. 14.5" value={physicalCountForm.actualQuantity}
+                    onChange={e => setPhysicalCountForm(f => ({ ...f, actualQuantity: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 block">Notes</label>
+                  <Input placeholder="Optional notes" value={physicalCountForm.notes} onChange={e => setPhysicalCountForm(f => ({ ...f, notes: e.target.value }))} />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={handlePhysicalCount}><ClipboardList className="w-4 h-4 mr-2" /> Submit Count</Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Variance Report */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <BarChart3 className="w-4 h-4 text-orange-500" />
+                  Variance Report
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={loadVarianceReport} disabled={advancedLoading}>
+                  <RefreshCw className={`w-3.5 h-3.5 mr-1 ${advancedLoading ? 'animate-spin' : ''}`} /> Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {advancedLoading ? (
+                <p className="text-sm text-slate-400">Loading variances…</p>
+              ) : varianceReport.length === 0 ? (
+                <p className="text-sm text-slate-400 py-4 text-center">No variances recorded. Run a physical count to generate variance data.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs uppercase">
+                        <th className="text-left p-3">Item</th>
+                        <th className="text-right p-3">System Qty</th>
+                        <th className="text-right p-3">Counted Qty</th>
+                        <th className="text-right p-3">Variance</th>
+                        <th className="text-right p-3">Value Impact</th>
+                        <th className="text-left p-3">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {varianceReport.map((v: any, i: number) => {
+                        const variance = (v.actual_quantity || 0) - (v.system_quantity || 0);
+                        return (
+                          <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                            <td className="p-3 font-medium text-slate-900 dark:text-white">{v.item_name}</td>
+                            <td className="p-3 text-right text-slate-500">{v.system_quantity} {v.unit}</td>
+                            <td className="p-3 text-right text-slate-500">{v.actual_quantity} {v.unit}</td>
+                            <td className={`p-3 text-right font-bold ${variance < 0 ? 'text-red-600 dark:text-red-400' : variance > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                              {variance > 0 ? '+' : ''}{variance} {v.unit}
+                            </td>
+                            <td className={`p-3 text-right ${variance < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                              {v.cost_per_unit ? formatCurrency(Math.abs(variance) * v.cost_per_unit) : '—'}
+                            </td>
+                            <td className="p-3 text-slate-400 text-xs">{v.counted_at ? formatDate(v.counted_at) : '—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Recipe Usage Slide-in Panel ──────────────────────── */}
+        <AnimatePresence>
+          {recipeUsageItem && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 z-50 flex justify-end"
+              onClick={e => { if (e.target === e.currentTarget) { setRecipeUsageItem(null); setRecipeUsage(null); } }}>
+              <motion.div initial={{ x: 400 }} animate={{ x: 0 }} exit={{ x: 400 }} transition={{ type: 'spring', damping: 28 }}
+                className="bg-white dark:bg-slate-900 w-full max-w-md h-full overflow-y-auto shadow-2xl p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">{recipeUsageItem.name}</h3>
+                    <p className="text-sm text-slate-500">Recipe usage — where this item is consumed</p>
+                  </div>
+                  <button onClick={() => { setRecipeUsageItem(null); setRecipeUsage(null); }} className="text-slate-400 hover:text-slate-600">
+                    <XCircle className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-1">
+                  <p className="text-xs text-slate-500">Current stock</p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{recipeUsageItem.current_stock} <span className="text-base font-normal text-slate-400">{recipeUsageItem.unit}</span></p>
+                  {recipeUsageItem.cost_per_unit && <p className="text-sm text-slate-500">Cost: {formatCurrency(recipeUsageItem.cost_per_unit)} / {recipeUsageItem.unit}</p>}
+                </div>
+                {!recipeUsage ? (
+                  <div className="flex items-center gap-2 text-slate-400 py-6">
+                    <RefreshCw className="w-4 h-4 animate-spin" /> Loading recipe data…
+                  </div>
+                ) : recipeUsage.error ? (
+                  <p className="text-sm text-slate-400 py-4">No recipe data available for this item.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {recipeUsage.usedIn && recipeUsage.usedIn.length > 0 ? (
+                      recipeUsage.usedIn.map((recipe: any, i: number) => (
+                        <Card key={i}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="font-semibold text-slate-900 dark:text-white">{recipe.menu_item_name}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">Uses <span className="font-medium">{recipe.quantity_required} {recipeUsageItem.unit}</span> per serving</p>
+                                {recipeUsageItem.cost_per_unit && (
+                                  <p className="text-xs text-slate-400">Ingredient cost: {formatCurrency(recipe.quantity_required * recipeUsageItem.cost_per_unit)}</p>
+                                )}
+                              </div>
+                              {recipe.sufficient !== undefined && (
+                                <Badge variant={recipe.sufficient ? 'default' : 'destructive'} className="flex-shrink-0">
+                                  {recipe.sufficient ? 'Stock OK' : 'Low'}
+                                </Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-400 text-center py-4">This item is not linked to any menu item recipes yet.</p>
+                    )}
+                    {recipeUsage.totalCost !== undefined && (
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-500">Total ingredient cost contribution</span>
+                          <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(recipeUsage.totalCost)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Tabs>
 
       {/* Create/Edit Item Modal */}
