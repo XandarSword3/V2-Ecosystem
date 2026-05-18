@@ -42,42 +42,55 @@ router.post('/contact', async (req: Request, res: Response, next: NextFunction) 
       throw error;
     }
 
-    // Send notification email to admin
+    // Pull white-label settings once for both emails
+    let adminEmail: string | null = process.env.ADMIN_EMAIL || null;
+    let siteName = 'Our Team';
     try {
-      await emailService.sendEmail({
-        to: process.env.ADMIN_EMAIL || 'admin@v2resort.com',
-        subject: `New Contact Form Submission: ${validated.subject}`,
-        html: `
-          <h2>New Contact Form Submission</h2>
-          <p><strong>From:</strong> ${validated.name} (${validated.email})</p>
-          <p><strong>Phone:</strong> ${validated.phone || 'Not provided'}</p>
-          <p><strong>Subject:</strong> ${validated.subject}</p>
-          <hr>
-          <p><strong>Message:</strong></p>
-          <p>${validated.message.replace(/\n/g, '<br>')}</p>
-        `,
-      });
+      const { data: siteSettings } = await supabase
+        .from('site_settings')
+        .select('contact_email, site_name')
+        .single();
+      if (!adminEmail) adminEmail = siteSettings?.contact_email || null;
+      if (siteSettings?.site_name) siteName = siteSettings.site_name;
+    } catch (_) { /* non-fatal */ }
+
+    // Send notification email to admin (only if we have an address)
+    try {
+      if (adminEmail) {
+        await emailService.sendEmail({
+          to: adminEmail,
+          subject: `New Contact Form Submission: ${validated.subject}`,
+          html: `
+            <h2>New Contact Form Submission</h2>
+            <p><strong>From:</strong> ${validated.name} (${validated.email})</p>
+            <p><strong>Phone:</strong> ${validated.phone || 'Not provided'}</p>
+            <p><strong>Subject:</strong> ${validated.subject}</p>
+            <hr>
+            <p><strong>Message:</strong></p>
+            <p>${validated.message.replace(/\n/g, '<br>')}</p>
+          `,
+        });
+      }
     } catch (emailError) {
       logger.warn('Failed to send admin notification email:', emailError);
-      // Don't fail the request if email fails
     }
 
     // Send confirmation email to user
     try {
       await emailService.sendEmail({
         to: validated.email,
-        subject: 'Thank you for contacting V2 Resort',
+        subject: `Thank you for contacting ${siteName}`,
         html: `
           <h2>Thank you for reaching out!</h2>
           <p>Dear ${validated.name},</p>
           <p>We have received your message and will get back to you as soon as possible.</p>
-          <p>Here's a copy of your inquiry:</p>
+          <p>Here is a copy of your inquiry:</p>
           <hr>
           <p><strong>Subject:</strong> ${validated.subject}</p>
           <p><strong>Message:</strong></p>
           <p>${validated.message.replace(/\n/g, '<br>')}</p>
           <hr>
-          <p>Best regards,<br>V2 Resort Team</p>
+          <p>Best regards,<br>${siteName}</p>
         `,
       });
     } catch (emailError) {
