@@ -1,0 +1,33 @@
+# CODEOWNERS
+# Each line is a file pattern followed by one or more owners.
+# Owners are automatically requested for review when someone opens a PR
+# that modifies matching files.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @XandarSword3
+
+# Backend
+/backend/ @XandarSword3
+
+# Frontend
+/frontend/ @XandarSword3
+
+# Mobile
+/mobile/ @XandarSword3
+
+# Database migrations — always require owner review
+/supabase/migrations/ @XandarSword3
+
+# Shared types — changes affect all workspaces
+/shared/ @XandarSword3
+
+# CI/CD and infrastructure
+/.github/ @XandarSword3
+/nginx/ @XandarSword3
+/infrastructure/ @XandarSword3
+
+# Security-sensitive files
+SECURITY.md @XandarSword3
+/backend/src/config/permissions.ts @XandarSword3
+/backend/src/middleware/ @XandarSword3

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "V2 Resort Management System - Unified platform for restaurant, snack bar, chalets, and pool",
-  "license": "PROPRIETARY",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",

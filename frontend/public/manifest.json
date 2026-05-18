@@ -1,6 +1,6 @@
 {
-  "name": "Iron Paradise Gym Management Platform",
-  "short_name": "Iron Paradise Gym",
+  "name": "Resort Management Platform",
+  "short_name": "Your Resort",
   "description": "Complete resort management system with hotel, restaurant, pool, and activity bookings",
   "start_url": "/",
   "display": "standalone",
@@ -52,14 +52,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Iron Paradise Gym Dashboard"
+      "label": "Resort Dashboard"
     },
     {
       "src": "/screenshots/mobile.png",
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Iron Paradise Gym Mobile"
+      "label": "Resort Mobile"
     }
   ],
   "shortcuts": [

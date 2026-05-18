@@ -17,7 +17,7 @@ const getBaseUrl = () => {
 };
 
 const fallbackSettings = {
-  resortName: 'Iron Paradise Gym',
+  resortName: 'Your Resort',
   description: 'Premier resort platform.'
 };
 
@@ -48,7 +48,7 @@ async function getSiteSettings() {
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings();
-  const title = settings.resortName || 'Iron Paradise Gym';
+  const title = settings.resortName || 'Your Resort';
   const description = settings.description || 'Experience the perfect blend of relaxation and entertainment.';
 
   return {
@@ -89,7 +89,7 @@ export default async function RootLayout({
   const settings = await getSiteSettings();
 
   const resortSchema = generateResortSchema({
-    name: settings.resortName || 'Iron Paradise Gym',
+    name: settings.resortName || 'Your Resort',
     description: settings.description || 'Premier resort experience.',
     url: 'https://v2-ecosystem.vercel.app',
     telephone: '+1 234 567 8900',

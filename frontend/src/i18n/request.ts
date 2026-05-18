@@ -36,7 +36,8 @@ export function getLocaleFromCookie(): Locale {
   return locales.includes(locale) ? locale : defaultLocale;
 }
 
-export default getRequestConfig(async ({locale}) => {
+export default getRequestConfig(async ({locale: rawLocale}) => {
+  const locale: string = rawLocale ?? defaultLocale;
   // 1. Load local file as baseline (guarantees UI doesn't break if DB is down)
   let messages;
   try {

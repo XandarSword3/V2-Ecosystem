@@ -49,7 +49,7 @@ function KioskContent() {
               <h1 className="text-2xl font-bold text-white">
                 {mode === 'checkin' ? 'Check In' : 'Check Out'}
               </h1>
-              <p className="text-slate-400 text-sm">Iron Paradise Gym Self-Service</p>
+              <p className="text-slate-400 text-sm">Resort Self-Service</p>
             </div>
           </div>
           <button
