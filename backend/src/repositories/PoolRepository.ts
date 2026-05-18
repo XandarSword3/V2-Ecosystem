@@ -131,9 +131,10 @@ export class PoolTicketRepository extends BaseRepository<PoolTicket> {
     const tickets = await this.findValidForSession(sessionId, date);
     // Note: number_of_guests is likely in metadata now if not explicit
     return tickets.reduce((sum, t) => {
-      const guests = typeof t.metadata?.number_of_guests === 'number' 
-        ? t.metadata.number_of_guests 
-        : (t.number_of_guests || 0);
+      const ticket = t as PoolTicket & { metadata?: { number_of_guests?: number } };
+      const guests = typeof ticket.metadata?.number_of_guests === 'number'
+        ? ticket.metadata.number_of_guests
+        : (ticket.number_of_guests || 0);
       return sum + Number(guests);
     }, 0);
   }

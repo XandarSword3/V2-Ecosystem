@@ -56,18 +56,22 @@ describe('NotificationsController', () => {
         { id: 'order-1', order_number: 'R-001', status: 'pending', created_at: '2026-01-15T10:00:00Z' }
       ];
       const mockBookings = [
-        { id: 'booking-1', chalet_id: 'chalet-1', check_in_date: '2026-01-20', status: 'pending', created_at: '2026-01-15T09:00:00Z' }
+        { id: 'booking-1', status: 'pending', created_at: '2026-01-15T09:00:00Z', metadata: {} }
       ];
       const mockReviews = [
         { id: 'review-1', rating: 5, created_at: '2026-01-15T08:00:00Z' }
       ];
 
       const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'restaurant_orders') {
-          return createChainableMock(mockOrders);
-        }
-        if (table === 'chalet_bookings') {
-          return createChainableMock(mockBookings);
+        if (table === 'transactions') {
+          // Source queries transactions with eq('engine_type', ...) to distinguish orders vs bookings
+          const chain = createChainableMock([]);
+          chain.eq = vi.fn().mockImplementation((_col: string, val: string) => {
+            if (val === 'instant_transaction') return createChainableMock(mockOrders);
+            if (val === 'time_exclusive_reservation') return createChainableMock(mockBookings);
+            return createChainableMock([]);
+          });
+          return chain;
         }
         if (table === 'reviews') {
           return createChainableMock(mockReviews);
@@ -109,7 +113,14 @@ describe('NotificationsController', () => {
       ];
 
       const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'restaurant_orders') return createChainableMock(mockOrders);
+        if (table === 'transactions') {
+          const chain = createChainableMock([]);
+          chain.eq = vi.fn().mockImplementation((_col: string, val: string) => {
+            if (val === 'instant_transaction') return createChainableMock(mockOrders);
+            return createChainableMock([]);
+          });
+          return chain;
+        }
         return createChainableMock([]);
       });
 
@@ -131,7 +142,14 @@ describe('NotificationsController', () => {
       }));
 
       const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'restaurant_orders') return createChainableMock(mockOrders);
+        if (table === 'transactions') {
+          const chain = createChainableMock([]);
+          chain.eq = vi.fn().mockImplementation((_col: string, val: string) => {
+            if (val === 'instant_transaction') return createChainableMock(mockOrders);
+            return createChainableMock([]);
+          });
+          return chain;
+        }
         return createChainableMock([]);
       });
 
@@ -150,7 +168,14 @@ describe('NotificationsController', () => {
       ];
 
       const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'restaurant_orders') return createChainableMock(mockOrders);
+        if (table === 'transactions') {
+          const chain = createChainableMock([]);
+          chain.eq = vi.fn().mockImplementation((_col: string, val: string) => {
+            if (val === 'instant_transaction') return createChainableMock(mockOrders);
+            return createChainableMock([]);
+          });
+          return chain;
+        }
         return createChainableMock([]);
       });
 
@@ -169,7 +194,14 @@ describe('NotificationsController', () => {
       ];
 
       const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'restaurant_orders') return createChainableMock(mockOrders);
+        if (table === 'transactions') {
+          const chain = createChainableMock([]);
+          chain.eq = vi.fn().mockImplementation((_col: string, val: string) => {
+            if (val === 'instant_transaction') return createChainableMock(mockOrders);
+            return createChainableMock([]);
+          });
+          return chain;
+        }
         return createChainableMock([]);
       });
 

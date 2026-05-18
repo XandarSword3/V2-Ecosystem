@@ -382,6 +382,11 @@ export interface ChaletBooking {
   add_ons_amount: string;
   deposit_amount: string;
   total_amount: string;
+  total_price?: number;   // alias used by legacy callers
+  net_amount?: number;
+  module_id?: string;
+  property_id?: string;
+  guests?: number;        // alias for number_of_guests
   status: 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled' | 'no_show';
   payment_status: 'pending' | 'deposit_paid' | 'paid' | 'refunded';
   payment_method?: 'cash' | 'card' | 'whish' | 'online';

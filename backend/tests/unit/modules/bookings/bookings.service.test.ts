@@ -24,7 +24,7 @@ let mockUsers: Array<Record<string, unknown>> = [];
 
 function createQueryMock(mockDataFn: () => unknown[]) {
   const mockObj: Record<string, unknown> = {};
-  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike'];
+  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike', 'filter'];
   chainMethods.forEach(method => {
     mockObj[method] = vi.fn().mockReturnValue(mockObj);
   });
@@ -89,6 +89,9 @@ function createQueryMock(mockDataFn: () => unknown[]) {
 const mockSupabase = {
   from: vi.fn((table: string) => {
     switch (table) {
+      case 'transactions':
+        // Service migrated from chalet_bookings to transactions table
+        return createQueryMock(() => mockBookings);
       case 'chalet_bookings':
         return createQueryMock(() => mockBookings);
       case 'chalets':
@@ -266,7 +269,7 @@ describe('BookingsService', () => {
 
       expect(result).toBeDefined();
       expect(mockSupabase.from).toHaveBeenCalledWith('chalets');
-      expect(mockSupabase.from).toHaveBeenCalledWith('chalet_bookings');
+      expect(mockSupabase.from).toHaveBeenCalledWith('transactions');
     });
 
     it('should throw error if chalet not found', async () => {
@@ -365,7 +368,7 @@ describe('BookingsService', () => {
 
       expect(result).toBeDefined();
       expect(result?.id).toBe('booking-1');
-      expect(mockSupabase.from).toHaveBeenCalledWith('chalet_bookings');
+      expect(mockSupabase.from).toHaveBeenCalledWith('transactions');
     });
 
     it('should return null when booking not found', async () => {
@@ -419,7 +422,7 @@ describe('BookingsService', () => {
       const result = await getBookings({ chaletId: 'chalet-1' });
 
       expect(result).toBeDefined();
-      expect(mockSupabase.from).toHaveBeenCalledWith('chalet_bookings');
+      expect(mockSupabase.from).toHaveBeenCalledWith('transactions');
     });
 
     it('should filter bookings by status', async () => {
@@ -460,7 +463,7 @@ describe('BookingsService', () => {
       const result = await getBookingsByCustomer('user-1');
 
       expect(result).toBeDefined();
-      expect(mockSupabase.from).toHaveBeenCalledWith('chalet_bookings');
+      expect(mockSupabase.from).toHaveBeenCalledWith('transactions');
     });
 
     it('should return empty array when customer has no bookings', async () => {
@@ -502,7 +505,7 @@ describe('BookingsService', () => {
       });
 
       expect(result).toBeDefined();
-      expect(mockSupabase.from).toHaveBeenCalledWith('chalet_bookings');
+      expect(mockSupabase.from).toHaveBeenCalledWith('transactions');
     });
 
     it('should throw error when booking not found', async () => {
@@ -651,12 +654,20 @@ describe('BookingsService', () => {
 
     it('should return false when dates overlap with existing booking', async () => {
       mockBookings = [
-        buildBooking({
-          chalet_id: 'chalet-1',
-          check_in_date: '2024-05-02',
-          check_out_date: '2024-05-05',
-          status: 'confirmed',
-        }),
+        {
+          ...buildBooking({
+            chalet_id: 'chalet-1',
+            check_in_date: '2024-05-02',
+            check_out_date: '2024-05-05',
+            status: 'confirmed',
+          }),
+          // Service reads dates from metadata when querying transactions table
+          metadata: {
+            chalet_id: 'chalet-1',
+            check_in_date: '2024-05-02',
+            check_out_date: '2024-05-05',
+          },
+        },
       ];
 
       const result = await checkAvailability(

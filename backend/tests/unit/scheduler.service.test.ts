@@ -43,6 +43,20 @@ vi.mock('../../src/database/connection.js', () => ({
   getSupabase: () => mockSupabaseClient,
 }));
 
+// Mock src/lib/supabase.ts which eagerly calls getSupabase() at module load
+vi.mock('../../src/lib/supabase.js', () => ({
+  supabase: { from: vi.fn().mockReturnThis() },
+  supabaseAdmin: { from: vi.fn().mockReturnThis() },
+}));
+
+// Mock business-metrics service (imports lib/supabase at module level)
+vi.mock('../../src/services/business-metrics.service.js', () => ({
+  BusinessMetricsService: {
+    calculateAndStoreKPIs: vi.fn().mockResolvedValue(undefined),
+    generateAlerts: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 // Mock logger
 vi.mock('../../src/utils/logger.js', () => ({
   logger: {
