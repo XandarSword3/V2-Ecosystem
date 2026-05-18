@@ -151,6 +151,14 @@ export default function AdminCustomizationsPage() {
   const [isOptionDialogOpen, setIsOptionDialogOpen] = useState(false);
   const [editingOption, setEditingOption] = useState<CustomizationOption | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [inventoryItems, setInventoryItems] = useState<{ id: string; name: string; unit: string; current_stock: number }[]>([]);
+  const [inventorySearch, setInventorySearch] = useState('');
+
+  useEffect(() => {
+    api.get('/inventory/items?limit=500&fields=id,name,unit,current_stock')
+      .then(res => setInventoryItems(res.data?.items || []))
+      .catch(() => {});
+  }, []);
 
   // Compute available entity types based on active modules
   const availableEntityTypes = useMemo(() => {
@@ -1220,13 +1228,49 @@ function OptionDialog({
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-foreground block mb-1">Inventory Item ID (optional)</label>
+            <label className="text-sm font-semibold text-foreground block mb-1">Linked Inventory Item (optional)</label>
+            {formData.inventoryItemId && (
+              <div className="flex items-center justify-between mb-1.5 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs text-emerald-700 dark:text-emerald-300">
+                <span>
+                  {inventoryItems.find(i => i.id === formData.inventoryItemId)?.name || formData.inventoryItemId}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, inventoryItemId: undefined })}
+                  className="ml-2 text-emerald-500 hover:text-red-500"
+                >✕</button>
+              </div>
+            )}
             <Input
-              value={formData.inventoryItemId || ''}
-              onChange={(e) => setFormData({ ...formData, inventoryItemId: e.target.value || undefined })}
-              placeholder="UUID of inventory item"
-              className="bg-card text-foreground border-border"
+              value={inventorySearch}
+              onChange={e => setInventorySearch(e.target.value)}
+              placeholder="Search inventory items…"
+              className="bg-card text-foreground border-border mb-1"
             />
+            {inventorySearch.length > 0 && (
+              <div className="max-h-36 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
+                {inventoryItems
+                  .filter(i => i.name.toLowerCase().includes(inventorySearch.toLowerCase()))
+                  .slice(0, 10)
+                  .map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, inventoryItemId: item.id });
+                        setInventorySearch('');
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between"
+                    >
+                      <span className="text-slate-800 dark:text-slate-200">{item.name}</span>
+                      <span className="text-xs text-slate-400">{item.current_stock} {item.unit}</span>
+                    </button>
+                  ))}
+                {inventoryItems.filter(i => i.name.toLowerCase().includes(inventorySearch.toLowerCase())).length === 0 && (
+                  <p className="px-3 py-2 text-sm text-slate-400">No items found</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-6 pt-2">

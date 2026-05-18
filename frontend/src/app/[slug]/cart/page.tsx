@@ -399,8 +399,40 @@ export default function ModuleCartPage() {
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-slate-900 dark:text-white text-lg truncate">{item.name}</h3>
                             <p className="text-orange-600 dark:text-orange-400 font-medium">
-                              {formatCurrency(item.price, currency)} each
+                              {formatCurrency(item.price + (item.modifierTotal || 0), currency)} each
+                              {(item.modifierTotal || 0) > 0 && (
+                                <span className="text-xs text-slate-400 ml-1 font-normal">
+                                  (base {formatCurrency(item.price, currency)} + {formatCurrency(item.modifierTotal!, currency)} extras)
+                                </span>
+                              )}
                             </p>
+                            {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {item.selectedModifiers.map((mod, i) => (
+                                  <span
+                                    key={i}
+                                    className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium ${
+                                      mod.modifierType === 'remove'
+                                        ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
+                                        : mod.modifierType === 'swap'
+                                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                                        : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                                    }`}
+                                  >
+                                    {mod.modifierType === 'remove' ? '−' : mod.modifierType === 'swap' ? '⇄' : '+'}
+                                    {' '}{mod.optionName}
+                                    {mod.modifierType !== 'remove' && mod.priceAdjustment > 0 && (
+                                      <span className="ml-0.5 opacity-75">+{formatCurrency(mod.priceAdjustment, currency)}</span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {item.specialInstructions && (
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 italic truncate">
+                                "{item.specialInstructions}"
+                              </p>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/50 rounded-full p-1">
@@ -718,17 +750,36 @@ export default function ModuleCartPage() {
                 <div className="p-6 space-y-6">
                   <div className="space-y-3 max-h-48 overflow-y-auto">
                     {moduleItems.map((item) => (
-                      <div key={item.id} className="flex justify-between items-start text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {item.quantity}
+                      <div key={item.id} className="text-sm">
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {item.quantity}
+                            </span>
+                            <span className="text-slate-700 dark:text-slate-300 line-clamp-1">{item.name}</span>
+                          </div>
+                          <span className="font-medium text-slate-900 dark:text-white flex-shrink-0 ml-2">
+                            {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, currency)}
                           </span>
-                          <span className="text-slate-700 dark:text-slate-300 line-clamp-1">{item.name}</span>
                         </div>
-                        <span className="font-medium text-slate-900 dark:text-white flex-shrink-0 ml-2">
-                          {/* FIX Iter-6: Include modifier costs in summary sidebar */}
-                          {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, currency)}
-                        </span>
+                        {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                          <div className="mt-1 ml-8 flex flex-wrap gap-1">
+                            {item.selectedModifiers.map((mod, i) => (
+                              <span
+                                key={i}
+                                className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                  mod.modifierType === 'remove'
+                                    ? 'bg-red-50 text-red-500 dark:bg-red-900/20 dark:text-red-400'
+                                    : mod.modifierType === 'swap'
+                                    ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400'
+                                    : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
+                                }`}
+                              >
+                                {mod.modifierType === 'remove' ? '−' : '+'} {mod.optionName}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
