@@ -58,7 +58,7 @@ interface FooterConfig {
 }
 
 const DEFAULT_CONFIG: FooterConfig = {
-  logo: { text: 'Iron Paradise Gym', showIcon: true },
+  logo: { text: 'Your Resort', showIcon: true },
   description: 'Premium resort experience in the heart of Lebanon.',
   columns: [
     {
@@ -88,7 +88,7 @@ const DEFAULT_CONFIG: FooterConfig = {
     showPhone: true,
     showEmail: true
   },
-  copyright: '© {year} Iron Paradise Gym. All rights reserved.'
+  copyright: '© {year} Your Resort. All rights reserved.'
 };
 
 export default function FooterSettingsPage() {
@@ -248,7 +248,7 @@ export default function FooterSettingsPage() {
                   <Input
                     value={config.logo.text}
                     onChange={(e) => setConfig({ ...config, logo: { ...config.logo, text: e.target.value } })}
-                    placeholder="Iron Paradise Gym"
+                    placeholder="Your Resort"
                   />
                   <Button
                     variant={config.logo.showIcon ? 'primary' : 'outline'}
@@ -351,7 +351,7 @@ export default function FooterSettingsPage() {
               <Input
                 value={config.copyright}
                 onChange={(e) => setConfig({ ...config, copyright: e.target.value })}
-                placeholder="© {year} Iron Paradise Gym. All rights reserved."
+                placeholder="© {year} Your Resort. All rights reserved."
               />
               <p className="text-xs text-slate-500 mt-2">Use {'{year}'} to insert the current year.</p>
             </CardContent>

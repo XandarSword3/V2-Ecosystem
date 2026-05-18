@@ -127,7 +127,7 @@ export default function AdminSettingsPage() {
               />
               {!formSettings.resortName && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Using default: Iron Paradise Gym
+                  Using default: Your Resort
                 </p>
               )}
             </div>

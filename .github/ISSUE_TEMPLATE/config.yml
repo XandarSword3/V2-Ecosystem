@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability
+    url: https://github.com/XandarSword3/V2-Ecosystem/blob/main/SECURITY.md
+    about: Please report security vulnerabilities privately via the process in SECURITY.md — do not open a public issue.
