@@ -82,8 +82,7 @@ const getTableIcon = (table: string) => {
     modules: Package,
     menu_categories: Utensils,
     menu_items: Utensils,
-    chalets: Home,
-    snack_items: Cookie,
+    accommodation_units: Home,
     chalet_add_ons: Home,
     pool_sessions: Waves,
   };

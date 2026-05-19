@@ -117,12 +117,15 @@ export async function splitModuleTable(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
     }
 
+    // Tabs are open instant_transactions with tab_state: 'open' in metadata
     const { data: sourceTab } = await supabase
-      .from('restaurant_tabs')
-      .select('id, table_id, status, customer_id, waiter_id, guest_count, notes')
-      .eq('table_id', tableId)
-      .eq('status', 'open')
-      .order('opened_at', { ascending: false })
+      .from('transactions')
+      .select('id, customer_id, metadata')
+      .eq('engine_type', 'instant_transaction')
+      .eq('status', 'pending')
+      .filter('metadata->>table_id', 'eq', tableId)
+      .filter('metadata->>tab_state', 'eq', 'open')
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -131,27 +134,35 @@ export async function splitModuleTable(req: Request, res: Response) {
     }
 
     const { data: existingTarget } = await supabase
-      .from('restaurant_tabs')
+      .from('transactions')
       .select('id')
-      .eq('table_id', newTableId)
-      .eq('status', 'open')
+      .eq('engine_type', 'instant_transaction')
+      .eq('status', 'pending')
+      .filter('metadata->>table_id', 'eq', newTableId)
+      .filter('metadata->>tab_state', 'eq', 'open')
       .maybeSingle();
 
     if (existingTarget) {
       return res.status(409).json({ success: false, error: 'Target table already has an open tab' });
     }
 
+    const sourceMeta = sourceTab.metadata as Record<string, any>;
     const { data: newTab, error: createError } = await supabase
-      .from('restaurant_tabs')
+      .from('transactions')
       .insert({
-        table_id: newTableId,
+        engine_type: 'instant_transaction',
+        status: 'pending',
         customer_id: sourceTab.customer_id,
-        waiter_id: sourceTab.waiter_id,
-        guest_count: sourceTab.guest_count,
-        notes: sourceTab.notes,
-        status: 'open',
+        module_id: module.id,
+        amount: 0,
+        metadata: {
+          ...sourceMeta,
+          table_id: newTableId,
+          tab_state: 'open',
+          split_from: sourceTab.id,
+        },
       })
-      .select('id, table_id, status')
+      .select('id, metadata')
       .single();
 
     if (createError) throw createError;
@@ -192,20 +203,24 @@ export async function mergeModuleTables(req: Request, res: Response) {
     }
 
     const { data: sourceTab } = await supabase
-      .from('restaurant_tabs')
-      .select('id, table_id')
-      .eq('table_id', tableId)
-      .eq('status', 'open')
-      .order('opened_at', { ascending: false })
+      .from('transactions')
+      .select('id, metadata')
+      .eq('engine_type', 'instant_transaction')
+      .eq('status', 'pending')
+      .filter('metadata->>table_id', 'eq', tableId)
+      .filter('metadata->>tab_state', 'eq', 'open')
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     const { data: targetTab } = await supabase
-      .from('restaurant_tabs')
-      .select('id, table_id')
-      .eq('table_id', targetTableId)
-      .eq('status', 'open')
-      .order('opened_at', { ascending: false })
+      .from('transactions')
+      .select('id, metadata')
+      .eq('engine_type', 'instant_transaction')
+      .eq('status', 'pending')
+      .filter('metadata->>table_id', 'eq', targetTableId)
+      .filter('metadata->>tab_state', 'eq', 'open')
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -228,8 +243,8 @@ export async function mergeModuleTables(req: Request, res: Response) {
     }
 
     await supabase
-      .from('restaurant_tabs')
-      .update({ status: 'merged', closed_at: new Date().toISOString() })
+      .from('transactions')
+      .update({ metadata: { ...(sourceTab.metadata as Record<string, any>), tab_state: 'merged', merged_into: targetTab.id, closed_at: new Date().toISOString() } })
       .eq('id', sourceTab.id);
 
     res.json({
