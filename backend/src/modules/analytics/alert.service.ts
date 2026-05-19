@@ -309,12 +309,13 @@ export class AlertService {
       case 'occupancy_rate': {
         const today = dayjs().format('YYYY-MM-DD');
         const { count: checkedIn } = await this.supabase
-          .from('bookings')
+          .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .eq('status', 'checked_in')
-          .lte('check_in', today)
-          .gt('check_out', today);
+          .filter('metadata->>check_in_date', 'lte', today)
+          .filter('metadata->>check_out_date', 'gt', today);
 
         const { data: rooms } = await this.supabase
           .from('rooms')
@@ -327,27 +328,29 @@ export class AlertService {
 
       case 'today_revenue': {
         const { data: bookings } = await this.supabase
-          .from('bookings')
-          .select('total_amount')
+          .from('transactions')
+          .select('amount')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .gte('created_at', dayjs().startOf('day').toISOString())
           .lte('created_at', dayjs().endOf('day').toISOString())
           .in('status', ['confirmed', 'checked_in', 'checked_out']);
 
-        return (bookings || []).reduce((sum, b) => sum + (b.total_amount || 0), 0);
+        return (bookings || []).reduce((sum, b: any) => sum + (b.amount || 0), 0);
       }
 
       case 'adr': {
         const { data: bookings } = await this.supabase
-          .from('bookings')
-          .select('room_rate, nights')
+          .from('transactions')
+          .select('amount, metadata')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .in('status', ['confirmed', 'checked_in', 'checked_out'])
-          .gte('check_in', dayjs().startOf('day').toISOString())
-          .lte('check_in', dayjs().endOf('day').toISOString());
+          .filter('metadata->>check_in_date', 'gte', dayjs().startOf('day').format('YYYY-MM-DD'))
+          .filter('metadata->>check_in_date', 'lte', dayjs().endOf('day').format('YYYY-MM-DD'));
 
-        const totalNights = (bookings || []).reduce((sum, b) => sum + (b.nights || 1), 0);
-        const totalRate = (bookings || []).reduce((sum, b) => sum + (b.room_rate || 0), 0);
+        const totalNights = (bookings || []).reduce((sum: number, b: any) => sum + (b.metadata?.nights || 1), 0);
+        const totalRate = (bookings || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
         return totalNights > 0 ? totalRate / totalNights : 0;
       }
 
@@ -359,27 +362,30 @@ export class AlertService {
           .eq('is_active', true);
 
         const { data: bookings } = await this.supabase
-          .from('bookings')
-          .select('room_rate')
+          .from('transactions')
+          .select('amount')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .in('status', ['confirmed', 'checked_in', 'checked_out'])
-          .gte('check_in', dayjs().startOf('day').toISOString())
-          .lte('check_in', dayjs().endOf('day').toISOString());
+          .filter('metadata->>check_in_date', 'gte', dayjs().startOf('day').format('YYYY-MM-DD'))
+          .filter('metadata->>check_in_date', 'lte', dayjs().endOf('day').format('YYYY-MM-DD'));
 
-        const totalRevenue = (bookings || []).reduce((sum, b) => sum + (b.room_rate || 0), 0);
+        const totalRevenue = (bookings || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
         return totalRevenue / (rooms?.length || 1);
       }
 
       case 'cancellation_rate': {
         const { count: total } = await this.supabase
-          .from('bookings')
+          .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .gte('created_at', dayjs().startOf('month').toISOString());
 
         const { count: cancelled } = await this.supabase
-          .from('bookings')
+          .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .eq('status', 'cancelled')
           .gte('created_at', dayjs().startOf('month').toISOString());
@@ -727,8 +733,9 @@ export class AlertService {
 
       case 'today_revenue': {
         const { data: revenueBySource } = await this.supabase
-          .from('bookings')
-          .select('source, total_amount')
+          .from('transactions')
+          .select('metadata, amount')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', definition.propertyId)
           .gte('created_at', dayjs().startOf('day').toISOString())
           .lte('created_at', dayjs().endOf('day').toISOString())
@@ -736,8 +743,9 @@ export class AlertService {
 
         const bySource: Record<string, number> = {};
         for (const b of revenueBySource || []) {
-          const source = b.source || 'direct';
-          bySource[source] = (bySource[source] || 0) + (b.total_amount || 0);
+          const meta = b.metadata as Record<string, unknown> | null;
+          const source = (meta?.source as string) || 'direct';
+          bySource[source] = (bySource[source] || 0) + (b.amount || 0);
         }
         context.revenueBySource = bySource;
         break;

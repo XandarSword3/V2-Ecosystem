@@ -93,8 +93,9 @@ export class MobileCheckinService {
   async createRegistration(bookingId: string): Promise<any> {
     // Get booking details
     const { data: booking } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('*, guests(email, first_name, last_name)')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('id', bookingId)
       .single();
 
@@ -115,7 +116,7 @@ export class MobileCheckinService {
 
     // Generate access token
     const accessToken = crypto.randomBytes(32).toString('hex');
-    const tokenExpires = dayjs(booking.check_in).add(1, 'day').toDate();
+    const tokenExpires = dayjs((booking.metadata as any)?.check_in_date).add(1, 'day').toDate();
 
     const guest = booking.guests as any;
     const { data: registration, error } = await this.supabase
@@ -525,8 +526,9 @@ export class MobileCheckinService {
     request: MobileKeyRequest
   ): Promise<any> {
     const { data: booking } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('*, rooms(room_number)')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('id', bookingId)
       .single();
 
@@ -554,9 +556,9 @@ export class MobileCheckinService {
     }
 
     // Set access times based on booking
-    const accessStarts = new Date(booking.check_in);
+    const accessStarts = new Date((booking.metadata as any)?.check_in_date);
     accessStarts.setHours(15, 0, 0, 0); // 3 PM check-in
-    const accessEnds = new Date(booking.check_out);
+    const accessEnds = new Date((booking.metadata as any)?.check_out_date);
     accessEnds.setHours(11, 0, 0, 0); // 11 AM check-out
 
     const keyId = uuidv4();
@@ -726,8 +728,9 @@ export class MobileCheckinService {
     deviceInfo?: any
   ): Promise<any> {
     const { data: booking } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('*')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('id', bookingId)
       .single();
 
@@ -828,13 +831,13 @@ export class MobileCheckinService {
 
     // Update booking
     await this.supabase
-      .from('bookings')
+      .from('transactions')
       .update({
         status: 'checked_in',
-        room_id: roomId,
-        actual_check_in: new Date().toISOString(),
+        metadata: { room_id: roomId, actual_check_in: new Date().toISOString() },
         updated_at: new Date().toISOString()
       })
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('id', session.booking_id);
 
     // Update registration if exists
@@ -928,8 +931,9 @@ export class MobileCheckinService {
 
   async sendCheckinReminder(bookingId: string): Promise<void> {
     const { data: booking } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('*, properties(name)')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('id', bookingId)
       .single();
 
@@ -952,8 +956,9 @@ export class MobileCheckinService {
 
   async sendRoomReadyNotification(bookingId: string, roomNumber: string): Promise<void> {
     const { data: booking } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('*, properties(name)')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('id', bookingId)
       .single();
 

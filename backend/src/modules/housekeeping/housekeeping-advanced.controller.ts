@@ -641,10 +641,11 @@ export class HousekeepingAdvancedController {
       // Check if next booking exists (to determine urgency)
       const today = new Date().toISOString().split('T')[0];
       const { data: nextBooking } = await supabase
-        .from('bookings')
+        .from('transactions')
         .select('id, check_in')
+        .eq('engine_type', 'time_exclusive_reservation')
         .eq('unit_id', chaletId)
-        .gte('check_in', today)
+        .filter('metadata->>check_in_date', 'gte',, today)
         .order('check_in', { ascending: true })
         .limit(1)
         .single();
@@ -908,10 +909,11 @@ export class HousekeepingAdvancedController {
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
       const { data: todayBookings } = await supabase
-        .from('bookings')
+        .from('transactions')
         .select('unit_id, check_in, check_out, status')
+        .eq('engine_type', 'time_exclusive_reservation')
         .or(`check_in.gte.${today},check_out.gte.${today}`)
-        .lte('check_in', tomorrow);
+        .filter('metadata->>check_in_date', 'lte',, tomorrow);
 
       // Get active tasks
       const { data: activeTasks } = await supabase
@@ -952,8 +954,8 @@ export class HousekeepingAdvancedController {
       // Map chalets with booking status
       const chaletStatus = (chalets || []).map(chalet => {
         const bookings = (todayBookings || []).filter(b => b.unit_id === chalet.id);
-        const checkingOut = bookings.find(b => b.check_out === today);
-        const checkingIn = bookings.find(b => b.check_in === today);
+        const checkingOut = bookings.find(b => (b.metadata as any)?.check_out_date === today);
+        const checkingIn = bookings.find(b => (b.metadata as any)?.check_in_date === today);
         const tasks = (activeTasks || []).filter(t => t.chalet_id === chalet.id);
 
         return {

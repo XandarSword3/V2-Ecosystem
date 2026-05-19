@@ -585,19 +585,21 @@ export class MetricsLayerService {
     switch (metricCode) {
       case 'revenue':
         const { data: revenue } = await this.supabase
-          .from('bookings')
-          .select('total_amount')
+          .from('transactions')
+          .eq('engine_type', 'time_exclusive_reservation')
+          .select('amount')
           .eq('property_id', propertyId)
           .gte('check_in', dateRange.start.toISOString())
           .lte('check_in', dateRange.end.toISOString())
           .in('status', ['confirmed', 'checked_in', 'checked_out']);
-        value = (revenue || []).reduce((sum, b) => sum + (b.total_amount || 0), 0);
+        value = (revenue || []).reduce((sum, b) => sum + (b.amount || 0), 0);
         break;
 
       case 'occupancy_rate':
         const today = dayjs().format('YYYY-MM-DD');
         const { count: occupied } = await this.supabase
-          .from('bookings')
+          .from('transactions')
+          .eq('engine_type', 'time_exclusive_reservation')
           .select('*', { count: 'exact', head: true })
           .eq('property_id', propertyId)
           .eq('status', 'checked_in')
@@ -613,7 +615,7 @@ export class MetricsLayerService {
 
       case 'active_guests':
         const { count: guests } = await this.supabase
-          .from('bookings')
+          .from('transactions')
           .select('*', { count: 'exact', head: true })
           .eq('property_id', propertyId)
           .eq('status', 'checked_in');
@@ -622,7 +624,8 @@ export class MetricsLayerService {
 
       case 'adr':
         const { data: adrBookings } = await this.supabase
-          .from('bookings')
+          .from('transactions')
+          .eq('engine_type', 'time_exclusive_reservation')
           .select('room_rate, nights')
           .eq('property_id', propertyId)
           .gte('check_in', dateRange.start.toISOString())
@@ -772,8 +775,9 @@ export class MetricsLayerService {
   ): Promise<any> {
     // Implementation for paginated revenue report
     const { data: bookings } = await this.supabase
-      .from('bookings')
-      .select('id, check_in, guest_name, room_number, total_amount, source, status')
+      .from('transactions')
+          .eq('engine_type', 'time_exclusive_reservation')
+      .select('id, check_in, guest_name, room_number, amount, source, status')
       .eq('property_id', propertyId)
       .gte('check_in', period.start.toISOString())
       .lte('check_in', period.end.toISOString())
@@ -781,10 +785,10 @@ export class MetricsLayerService {
 
     return {
       summary: {
-        total_revenue: (bookings || []).reduce((s, b) => s + (b.total_amount || 0), 0),
+        total_revenue: (bookings || []).reduce((s, b) => s + (b.amount || 0), 0),
         booking_count: bookings?.length || 0,
         average_value: bookings?.length 
-          ? (bookings || []).reduce((s, b) => s + (b.total_amount || 0), 0) / bookings.length 
+          ? (bookings || []).reduce((s, b) => s + (b.amount || 0), 0) / bookings.length 
           : 0
       },
       rows: bookings || [],
