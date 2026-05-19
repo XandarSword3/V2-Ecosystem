@@ -586,21 +586,21 @@ export class MetricsLayerService {
       case 'revenue':
         const { data: revenue } = await this.supabase
           .from('transactions')
-          .eq('engine_type', 'time_exclusive_reservation')
           .select('amount')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .gte('check_in', dateRange.start.toISOString())
           .lte('check_in', dateRange.end.toISOString())
           .in('status', ['confirmed', 'checked_in', 'checked_out']);
-        value = (revenue || []).reduce((sum, b) => sum + (b.amount || 0), 0);
+        value = (revenue || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
         break;
 
       case 'occupancy_rate':
         const today = dayjs().format('YYYY-MM-DD');
         const { count: occupied } = await this.supabase
           .from('transactions')
-          .eq('engine_type', 'time_exclusive_reservation')
           .select('*', { count: 'exact', head: true })
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .eq('status', 'checked_in')
           .lte('check_in', today)
@@ -625,14 +625,14 @@ export class MetricsLayerService {
       case 'adr':
         const { data: adrBookings } = await this.supabase
           .from('transactions')
-          .eq('engine_type', 'time_exclusive_reservation')
           .select('room_rate, nights')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .gte('check_in', dateRange.start.toISOString())
           .lte('check_in', dateRange.end.toISOString())
           .in('status', ['confirmed', 'checked_in', 'checked_out']);
-        const totalNights = (adrBookings || []).reduce((sum, b) => sum + (b.nights || 1), 0);
-        const totalRate = (adrBookings || []).reduce((sum, b) => sum + (b.room_rate || 0), 0);
+        const totalNights = (adrBookings || []).reduce((sum: number, b: any) => sum + (b.nights || 1), 0);
+        const totalRate = (adrBookings || []).reduce((sum: number, b: any) => sum + (b.room_rate || 0), 0);
         value = totalNights > 0 ? totalRate / totalNights : 0;
         break;
 
@@ -776,8 +776,8 @@ export class MetricsLayerService {
     // Implementation for paginated revenue report
     const { data: bookings } = await this.supabase
       .from('transactions')
-          .eq('engine_type', 'time_exclusive_reservation')
       .select('id, check_in, guest_name, room_number, amount, source, status')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .gte('check_in', period.start.toISOString())
       .lte('check_in', period.end.toISOString())
@@ -785,10 +785,10 @@ export class MetricsLayerService {
 
     return {
       summary: {
-        total_revenue: (bookings || []).reduce((s, b) => s + (b.amount || 0), 0),
+        total_revenue: (bookings || []).reduce((s: number, b: any) => s + (b.amount || 0), 0),
         booking_count: bookings?.length || 0,
         average_value: bookings?.length 
-          ? (bookings || []).reduce((s, b) => s + (b.amount || 0), 0) / bookings.length 
+          ? (bookings || []).reduce((s: number, b: any) => s + (b.amount || 0), 0) / bookings.length 
           : 0
       },
       rows: bookings || [],

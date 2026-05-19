@@ -28,6 +28,18 @@ vi.mock('../../../src/utils/logger', () => ({
 import { businessMetricsService } from '../../../src/services/business-metrics.service';
 import { supabase } from '../../../src/lib/supabase';
 
+function createQueryMock(mockData: any = [], count: number = 0) {
+  const mockObj: any = {};
+  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike', 'filter'];
+  chainMethods.forEach(method => {
+    mockObj[method] = vi.fn().mockImplementation(() => mockObj);
+  });
+  mockObj.then = (resolve: Function, reject?: Function) => {
+    return Promise.resolve({ data: mockData, count, error: null }).then(resolve as any, reject as any);
+  };
+  return mockObj;
+}
+
 describe('BusinessMetricsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,17 +48,13 @@ describe('BusinessMetricsService', () => {
   describe('getBookingMetrics', () => {
     it('should return booking metrics for default period', async () => {
       const mockBookings = [
-        { status: 'confirmed', total_amount: 100, room_type: 'suite', source: 'direct' },
-        { status: 'confirmed', total_amount: 150, room_type: 'standard', source: 'booking.com' },
-        { status: 'pending', total_amount: 80, room_type: 'suite', source: 'direct' },
-        { status: 'cancelled', total_amount: 120, room_type: 'deluxe', source: 'expedia' },
+        { status: 'confirmed', amount: 100, room_type: 'suite', source: 'direct' },
+        { status: 'confirmed', amount: 150, room_type: 'standard', source: 'booking.com' },
+        { status: 'pending', amount: 80, room_type: 'suite', source: 'direct' },
+        { status: 'cancelled', amount: 120, room_type: 'deluxe', source: 'expedia' },
       ];
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          gte: vi.fn().mockResolvedValue({ data: mockBookings, error: null }),
-        }),
-      } as any);
+      vi.mocked(supabase.from).mockReturnValue(createQueryMock(mockBookings));
 
       const result = await businessMetricsService.getBookingMetrics();
 
@@ -60,11 +68,7 @@ describe('BusinessMetricsService', () => {
     });
 
     it('should handle empty bookings', async () => {
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          gte: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      } as any);
+      vi.mocked(supabase.from).mockReturnValue(createQueryMock([]));
 
       const result = await businessMetricsService.getBookingMetrics();
 
@@ -73,27 +77,19 @@ describe('BusinessMetricsService', () => {
     });
 
     it('should calculate metrics for week period', async () => {
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          gte: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      } as any);
+      vi.mocked(supabase.from).mockReturnValue(createQueryMock([]));
 
       await businessMetricsService.getBookingMetrics('week');
 
-      expect(supabase.from).toHaveBeenCalledWith('bookings');
+      expect(supabase.from).toHaveBeenCalledWith('transactions');
     });
 
     it('should calculate metrics for day period', async () => {
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          gte: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      } as any);
+      vi.mocked(supabase.from).mockReturnValue(createQueryMock([]));
 
       await businessMetricsService.getBookingMetrics('day');
 
-      expect(supabase.from).toHaveBeenCalledWith('bookings');
+      expect(supabase.from).toHaveBeenCalledWith('transactions');
     });
   });
 
@@ -105,11 +101,7 @@ describe('BusinessMetricsService', () => {
         { amount: 50, engine_type: 'shared_capacity_access', created_at: '2024-01-15T12:00:00Z', status: 'completed' },
       ];
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          gte: vi.fn().mockResolvedValue({ data: mockTransactions, error: null }),
-        }),
-      } as any);
+      vi.mocked(supabase.from).mockReturnValue(createQueryMock(mockTransactions));
 
       const result = await businessMetricsService.getRevenueMetrics();
 
@@ -188,23 +180,18 @@ describe('BusinessMetricsService', () => {
   describe('getDashboardMetrics', () => {
     it('should return all dashboard metrics combined', async () => {
       // Mock all the supabase calls - return minimal data to pass
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockImplementation((_cols?: string, options?: any) => {
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        // Return exact count mock or standard query mock depending on options
+        const mockObj = createQueryMock([]);
+        mockObj.select = vi.fn().mockImplementation((_cols?: string, options?: any) => {
           if (options?.count === 'exact') {
-            return {
-              gte: vi.fn().mockResolvedValue({ data: null, count: 0, error: null }),
-              in: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({ data: null, count: 0, error: null }),
-              }),
-            };
+            const exactMock = createQueryMock(null, 0);
+            return exactMock;
           }
-          return {
-            gte: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          };
-        }),
-      } as any);
+          return mockObj;
+        });
+        return mockObj;
+      });
 
       const result = await businessMetricsService.getDashboardMetrics();
 

@@ -15,7 +15,7 @@ let mockPushNotifications: Array<Record<string, unknown>> = [];
 
 function createQueryMock(mockDataFn: () => unknown[]) {
   const mockObj: Record<string, unknown> = {};
-  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike'];
+  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike', 'filter'];
   chainMethods.forEach(method => {
     mockObj[method] = vi.fn().mockReturnValue(mockObj);
   });
@@ -80,6 +80,7 @@ function createQueryMock(mockDataFn: () => unknown[]) {
 const mockFrom = vi.fn().mockImplementation((table: string) => {
   switch (table) {
     case 'bookings':
+    case 'transactions':
       return createQueryMock(() => mockBookings);
     case 'pre_arrival_registrations':
       return createQueryMock(() => mockRegistrations);
@@ -174,7 +175,7 @@ describe('MobileCheckinService', () => {
       const result = await service.createRegistration('booking-1');
 
       expect(result).toBeDefined();
-      expect(mockFrom).toHaveBeenCalledWith('bookings');
+      expect(mockFrom).toHaveBeenCalledWith('transactions');
       expect(mockFrom).toHaveBeenCalledWith('pre_arrival_registrations');
     });
 
@@ -914,7 +915,7 @@ describe('MobileCheckinService', () => {
       await service.completeCheckin('session-1', 'room-101', 'mobile', 'key-1');
 
       expect(mockFrom).toHaveBeenCalledWith('checkin_sessions');
-      expect(mockFrom).toHaveBeenCalledWith('bookings');
+      expect(mockFrom).toHaveBeenCalledWith('transactions');
       expect(mockFrom).toHaveBeenCalledWith('pre_arrival_registrations');
     });
 
@@ -927,7 +928,7 @@ describe('MobileCheckinService', () => {
 
       await service.completeCheckin('session-1', 'room-102', 'physical', undefined, 'KEY-789');
 
-      expect(mockFrom).toHaveBeenCalledWith('bookings');
+      expect(mockFrom).toHaveBeenCalledWith('transactions');
     });
 
     it('should complete check-in with both key types', async () => {
@@ -1036,7 +1037,7 @@ describe('MobileCheckinService', () => {
 
       await service.sendCheckinReminder('booking-1');
 
-      expect(mockFrom).toHaveBeenCalledWith('bookings');
+      expect(mockFrom).toHaveBeenCalledWith('transactions');
       expect(mockFrom).toHaveBeenCalledWith('push_registrations');
     });
 
@@ -1063,7 +1064,7 @@ describe('MobileCheckinService', () => {
 
       await service.sendRoomReadyNotification('booking-1', '301');
 
-      expect(mockFrom).toHaveBeenCalledWith('bookings');
+      expect(mockFrom).toHaveBeenCalledWith('transactions');
     });
 
     it('should not send notification when booking not found', async () => {

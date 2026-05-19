@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock pattern for chainable Supabase queries
 function createQueryMock(mockDataFn: () => unknown[]) {
   const mockObj: Record<string, unknown> = {};
-  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike', 'range'];
+  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike', 'range', 'filter'];
   chainMethods.forEach(method => {
     mockObj[method] = vi.fn().mockReturnValue(mockObj);
   });

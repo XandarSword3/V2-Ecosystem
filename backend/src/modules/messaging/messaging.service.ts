@@ -967,16 +967,19 @@ export class MessagingService {
     if (conversation.bookingId) {
       const { data: booking } = await this.supabase
         .from('transactions')
-        .select('*, rooms(room_number, room_types(name)
-        .eq('engine_type', 'time_exclusive_reservation'))')
+        .select('*, accommodation_units(name)')
+        .eq('engine_type', 'time_exclusive_reservation')
         .eq('id', conversation.bookingId)
         .maybeSingle();
 
       if (booking) {
-        variables.room_number = (booking.rooms as any)?.room_number || '';
-        variables.room_type = (booking.rooms as any)?.room_types?.name || '';
-        variables.check_in_date = new Date(booking.check_in_date).toLocaleDateString();
-        variables.check_out_date = new Date(booking.check_out_date).toLocaleDateString();
+        variables.room_number = (booking.accommodation_units as any)?.name || '';
+        variables.room_type = 'Chalet';
+        const meta = booking.metadata as any;
+        const checkIn = meta?.check_in_date || booking.created_at;
+        const checkOut = meta?.check_out_date || booking.created_at;
+        variables.check_in_date = checkIn ? new Date(checkIn).toLocaleDateString() : '';
+        variables.check_out_date = checkOut ? new Date(checkOut).toLocaleDateString() : '';
       }
     }
 
