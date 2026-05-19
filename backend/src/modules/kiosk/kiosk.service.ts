@@ -899,8 +899,9 @@ class KioskService {
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
     const { data: bookings, error } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('*, guests(first_name, last_name)')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('confirmation_number', confirmationNumber)
       .eq('status', 'confirmed')
       .gte('check_in_date', oneDayAgo.toISOString().split('T')[0])
@@ -919,8 +920,8 @@ class KioskService {
 
     await this.updateSessionStep(session.id, 'booking_found', {
       guestName: `${booking.guests?.first_name} ${booking.guests?.last_name}`,
-      checkInDate: booking.check_in_date,
-      checkOutDate: booking.check_out_date
+      checkInDate: (booking.metadata as any)?.check_in_date_date,
+      checkOutDate: (booking.metadata as any)?.check_out_date_date
     });
 
     return (await this.getSession(session.id)) as KioskSession;
@@ -948,8 +949,9 @@ class KioskService {
 
     if (issueKey && device.capabilities.hasKeyEncoder) {
       const { data: bookings } = await this.supabase
-        .from('bookings')
+        .from('transactions')
         .select('*, guests(first_name, last_name)')
+        .eq('engine_type', 'time_exclusive_reservation')
         .eq('id', session.bookingId);
 
       if (bookings && bookings.length > 0) {
@@ -957,8 +959,8 @@ class KioskService {
         const keyResult = await this.encodeKey(sessionId, session.kioskId, {
           roomNumber,
           guestName: `${booking.guests?.first_name} ${booking.guests?.last_name}`,
-          checkInDate: new Date(booking.check_in_date),
-          checkOutDate: new Date(booking.check_out_date)
+          checkInDate: new Date((booking.metadata as any)?.check_in_date_date),
+          checkOutDate: new Date((booking.metadata as any)?.check_out_date_date)
         });
         keyNumber = keyResult.keyNumber;
       }
@@ -966,8 +968,9 @@ class KioskService {
 
     if (device.capabilities.hasReceiptPrinter) {
       const { data: bookings } = await this.supabase
-        .from('bookings')
+        .from('transactions')
         .select('*, guests(first_name, last_name), properties(name)')
+        .eq('engine_type', 'time_exclusive_reservation')
         .eq('id', session.bookingId);
 
       if (bookings && bookings.length > 0) {
@@ -977,19 +980,20 @@ class KioskService {
           guestName: `${booking.guests?.first_name} ${booking.guests?.last_name}`,
           confirmationNumber: booking.confirmation_number,
           roomNumber,
-          checkInDate: new Date(booking.check_in_date),
-          checkOutDate: new Date(booking.check_out_date)
+          checkInDate: new Date((booking.metadata as any)?.check_in_date_date),
+          checkOutDate: new Date((booking.metadata as any)?.check_out_date_date)
         });
         receiptPrinted = true;
       }
     }
 
     await this.supabase
-      .from('bookings')
+      .from('transactions')
       .update({
         status: 'checked_in',
-        actual_check_in: new Date().toISOString()
+        metadata: { actual_check_in: new Date().toISOString() }
       })
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('id', session.bookingId);
 
     await this.completeSession(sessionId, 'success', {
@@ -1015,8 +1019,9 @@ class KioskService {
     roomNumber: string
   ): Promise<KioskSession> {
     const { data: bookings, error } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('*, guests(first_name, last_name), rooms(room_number)')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('rooms.room_number', roomNumber)
       .eq('status', 'checked_in');
 
@@ -1081,8 +1086,9 @@ class KioskService {
 
     if (device.capabilities.hasReceiptPrinter) {
       const { data: bookings } = await this.supabase
-        .from('bookings')
+        .from('transactions')
         .select('*, guests(first_name, last_name)')
+        .eq('engine_type', 'time_exclusive_reservation')
         .eq('id', session.bookingId);
 
       if (bookings && bookings.length > 0) {
@@ -1098,11 +1104,12 @@ class KioskService {
     }
 
     await this.supabase
-      .from('bookings')
+      .from('transactions')
       .update({
         status: 'checked_out',
-        actual_check_out: new Date().toISOString()
+        metadata: { actual_check_out: new Date().toISOString() }
       })
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('id', session.bookingId);
 
     await this.completeSession(sessionId, 'success', {

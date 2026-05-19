@@ -177,12 +177,13 @@ export class RealtimeAnalyticsService {
 
     // Live occupancy - current checked-in guests
     const { count: checkedInCount } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('*', { count: 'exact', head: true })
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .eq('status', 'checked_in')
-      .lte('check_in', today)
-      .gt('check_out', today);
+      .lte('metadata->>check_in_date', today)
+      .gt('metadata->>check_out_date', today);
 
     const { data: rooms } = await this.supabase
       .from('rooms')
@@ -202,14 +203,15 @@ export class RealtimeAnalyticsService {
 
     // Today's revenue (accumulating)
     const { data: todaysRevenue } = await this.supabase
-      .from('bookings')
-      .select('total_amount')
+      .from('transactions')
+      .select('amount')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .gte('created_at', dayjs().startOf('day').toISOString())
       .lte('created_at', dayjs().endOf('day').toISOString())
       .in('status', ['confirmed', 'checked_in', 'checked_out']);
 
-    const revenue = (todaysRevenue || []).reduce((sum, b) => sum + (b.total_amount || 0), 0);
+    const revenue = (todaysRevenue || []).reduce((sum, b) => sum + (b.amount || 0), 0);
     
     metrics.push({
       metric: 'today_revenue',
@@ -220,8 +222,9 @@ export class RealtimeAnalyticsService {
 
     // Active restaurant orders
     const { count: activeOrders } = await this.supabase
-      .from('orders')
+      .from('transactions')
       .select('*', { count: 'exact', head: true })
+      .eq('engine_type', 'instant_transaction')
       .eq('property_id', propertyId)
       .in('status', ['pending', 'preparing', 'ready']);
 
@@ -273,16 +276,18 @@ export class RealtimeAnalyticsService {
 
     // Check-ins and check-outs today
     const { count: checkIns } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('*', { count: 'exact', head: true })
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
-      .eq('check_in', today);
+      .filter('metadata->>check_in_date', 'eq', today);
 
     const { count: checkOuts } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('*', { count: 'exact', head: true })
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
-      .eq('check_out', today);
+      .filter('metadata->>check_out_date', 'eq', today);
 
     metrics.push(
       { metric: 'todays_checkins', value: checkIns || 0, timestamp: new Date() },
@@ -314,23 +319,25 @@ export class RealtimeAnalyticsService {
 
     // Revenue comparison
     const { data: todayRevenue } = await this.supabase
-      .from('bookings')
-      .select('total_amount')
+      .from('transactions')
+      .select('amount')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .gte('created_at', today.startOf('day').toISOString())
       .lte('created_at', today.endOf('day').toISOString())
       .in('status', ['confirmed', 'checked_in', 'checked_out']);
 
     const { data: yesterdayRevenue } = await this.supabase
-      .from('bookings')
-      .select('total_amount')
+      .from('transactions')
+      .select('amount')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .gte('created_at', yesterday.startOf('day').toISOString())
       .lte('created_at', yesterday.endOf('day').toISOString())
       .in('status', ['confirmed', 'checked_in', 'checked_out']);
 
-    const todayTotal = (todayRevenue || []).reduce((sum, b) => sum + (b.total_amount || 0), 0);
-    const yesterdayTotal = (yesterdayRevenue || []).reduce((sum, b) => sum + (b.total_amount || 0), 0);
+    const todayTotal = (todayRevenue || []).reduce((sum, b) => sum + (b.amount || 0), 0);
+    const yesterdayTotal = (yesterdayRevenue || []).reduce((sum, b) => sum + (b.amount || 0), 0);
     const change = yesterdayTotal > 0 ? ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100 : 0;
 
     metrics.push({
@@ -344,15 +351,16 @@ export class RealtimeAnalyticsService {
 
     // ADR trend
     const { data: todayBookings } = await this.supabase
-      .from('bookings')
-      .select('room_rate, nights')
+      .from('transactions')
+      .select('amount, metadata')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
-      .gte('check_in', today.startOf('day').toISOString())
-      .lte('check_in', today.endOf('day').toISOString())
+      .filter('metadata->>check_in_date', 'gte', today.startOf('day').format('YYYY-MM-DD'))
+      .filter('metadata->>check_in_date', 'lte', today.endOf('day').format('YYYY-MM-DD'))
       .in('status', ['confirmed', 'checked_in']);
 
-    const totalNights = (todayBookings || []).reduce((sum, b) => sum + (b.nights || 1), 0);
-    const totalRate = (todayBookings || []).reduce((sum, b) => sum + (b.room_rate || 0), 0);
+    const totalNights = (todayBookings || []).reduce((sum: number, b: any) => sum + (b.metadata?.nights || 1), 0);
+    const totalRate = (todayBookings || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
     const adr = totalNights > 0 ? totalRate / totalNights : 0;
 
     metrics.push({

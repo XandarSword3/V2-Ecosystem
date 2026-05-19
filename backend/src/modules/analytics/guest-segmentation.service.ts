@@ -80,7 +80,8 @@ export class GuestSegmentationService {
   async calculateRFMScores(propertyId: string): Promise<GuestProfile[]> {
     // Get all guests with their booking history
     const { data: guestBookings, error } = await this.supabase
-      .from('bookings')
+      .from('transactions')
+      .eq('engine_type', 'time_exclusive_reservation')
       .select(`
         user_id,
         users:user_id(email, first_name, last_name, phone),
@@ -132,7 +133,7 @@ export class GuestSegmentationService {
       const frequency = validBookings.length;
 
       // Monetary: total spend
-      const monetary = validBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
+      const monetary = validBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
 
       // Calculate scores (1-5 quintiles)
       const rScore = this.calculateRScore(recencyDays);
@@ -340,8 +341,9 @@ export class GuestSegmentationService {
   async calculateCohortAnalysis(propertyId: string): Promise<CohortAnalysis[]> {
     // Get all bookings grouped by user and month
     const { data: bookings, error } = await this.supabase
-      .from('bookings')
-      .select('user_id, check_in, total_amount, created_at, status')
+      .from('transactions')
+      .eq('engine_type', 'time_exclusive_reservation')
+      .select('user_id, check_in, amount, created_at, status')
       .eq('property_id', propertyId)
       .not('user_id', 'is', null)
       .order('user_id')
@@ -410,7 +412,7 @@ export class GuestSegmentationService {
                 return checkIn.isAfter(monthStart.subtract(1, 'day')) && 
                        checkIn.isBefore(monthEnd.add(1, 'day'));
               })
-              .reduce((sum, b) => sum + (b.total_amount || 0), 0);
+              .reduce((sum, b) => sum + (b.amount || 0), 0);
           }
         }
 
@@ -424,7 +426,7 @@ export class GuestSegmentationService {
       for (const userId of userIds) {
         totalLtv += userBookings[userId]
           .filter(b => ['confirmed', 'checked_in', 'checked_out'].includes(b.status))
-          .reduce((sum, b) => sum + (b.total_amount || 0), 0);
+          .reduce((sum, b) => sum + (b.amount || 0), 0);
       }
 
       analysis.push({

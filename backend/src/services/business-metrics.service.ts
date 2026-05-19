@@ -97,8 +97,9 @@ class BusinessMetricsService {
 
     // Get booking counts
     const { data: bookings } = await supabase
-      .from('bookings')
-      .select('status, total_amount, room_type, source')
+      .from('transactions')
+      .select('status, amount, room_type, source')
+      .eq('engine_type', 'time_exclusive_reservation')
       .gte('created_at', periodStart);
 
     const metrics: BookingMetrics = {
@@ -106,7 +107,7 @@ class BusinessMetricsService {
       confirmed_bookings: bookings?.filter((b) => b.status === 'confirmed').length || 0,
       pending_bookings: bookings?.filter((b) => b.status === 'pending').length || 0,
       cancelled_bookings: bookings?.filter((b) => b.status === 'cancelled').length || 0,
-      total_revenue: bookings?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0,
+      total_revenue: bookings?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0,
       average_booking_value: 0,
       occupancy_rate: 0,
       bookings_by_room_type: {},

@@ -21,7 +21,7 @@ export function createOrderRepository(supabase: SupabaseClient): OrderRepository
 
     async createOrder(order: Omit<Order, 'id' | 'created_at' | 'updated_at'>): Promise<Order> {
       const { data, error } = await supabase
-        .from('orders')
+        .from('transactions')
         .insert(order)
         .select()
         .single();
@@ -32,8 +32,9 @@ export function createOrderRepository(supabase: SupabaseClient): OrderRepository
 
     async getOrderById(id: string): Promise<Order | null> {
       const { data, error } = await supabase
-        .from('orders')
+        .from('transactions')
         .select('*')
+        .eq('engine_type', 'instant_transaction')
         .eq('id', id)
         .single();
 
@@ -46,8 +47,9 @@ export function createOrderRepository(supabase: SupabaseClient): OrderRepository
 
     async getOrderByNumber(orderNumber: string): Promise<Order | null> {
       const { data, error } = await supabase
-        .from('orders')
+        .from('transactions')
         .select('*')
+        .eq('engine_type', 'instant_transaction')
         .eq('order_number', orderNumber)
         .single();
 
@@ -60,8 +62,9 @@ export function createOrderRepository(supabase: SupabaseClient): OrderRepository
 
     async getOrders(filters: { status?: string; date?: string; moduleId?: string }): Promise<Order[]> {
       let query = supabase
-        .from('orders')
+        .from('transactions')
         .select('*')
+        .eq('engine_type', 'instant_transaction')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
@@ -98,8 +101,9 @@ export function createOrderRepository(supabase: SupabaseClient): OrderRepository
       const activeStatuses = ['pending', 'confirmed', 'preparing', 'ready'];
 
       let query = supabase
-        .from('orders')
+        .from('transactions')
         .select('*')
+        .eq('engine_type', 'instant_transaction')
         .in('status', activeStatuses)
         .order('created_at', { ascending: true });
 
@@ -114,8 +118,9 @@ export function createOrderRepository(supabase: SupabaseClient): OrderRepository
 
     async getOrdersByCustomer(customerId: string): Promise<Order[]> {
       const { data, error } = await supabase
-        .from('orders')
+        .from('transactions')
         .select('*')
+        .eq('engine_type', 'instant_transaction')
         .eq('customer_id', customerId)
         .order('created_at', { ascending: false });
 
@@ -125,7 +130,7 @@ export function createOrderRepository(supabase: SupabaseClient): OrderRepository
 
     async updateOrder(id: string, updates: Partial<Order>): Promise<Order> {
       const { data, error } = await supabase
-        .from('orders')
+        .from('transactions')
         .update({
           ...updates,
           updated_at: new Date().toISOString(),

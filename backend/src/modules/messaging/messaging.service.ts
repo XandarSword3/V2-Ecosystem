@@ -966,8 +966,9 @@ export class MessagingService {
 
     if (conversation.bookingId) {
       const { data: booking } = await this.supabase
-        .from('bookings')
-        .select('*, rooms(room_number, room_types(name))')
+        .from('transactions')
+        .select('*, rooms(room_number, room_types(name)
+        .eq('engine_type', 'time_exclusive_reservation'))')
         .eq('id', conversation.bookingId)
         .maybeSingle();
 
@@ -1196,8 +1197,9 @@ export class MessagingService {
 
     // Try to find active booking
     const { data: bookings } = await this.supabase
-      .from('bookings')
+      .from('transactions')
       .select('id')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('guest_id', guestId)
       .eq('property_id', propertyId)
       .in('status', ['confirmed', 'checked_in'])

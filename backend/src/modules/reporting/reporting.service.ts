@@ -447,12 +447,13 @@ class ReportingService {
         const totalRoomNights = totalRooms * days;
 
         const { count } = await this.supabase
-          .from('bookings')
+          .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .in('status', ['confirmed', 'checked_in', 'checked_out'])
-          .gte('check_in', startStr)
-          .lte('check_out', endStr);
+          .filter('metadata->>check_in_date', 'gte', startStr)
+          .filter('metadata->>check_out_date', 'lte', endStr);
 
         const occupiedNights = count || 0;
         return totalRoomNights > 0 ? (occupiedNights / totalRoomNights) * 100 : 0;
@@ -460,16 +461,17 @@ class ReportingService {
 
       case 'adr': {
         const { data: bookings } = await this.supabase
-          .from('bookings')
-          .select('room_rate, nights')
+          .from('transactions')
+          .select('amount, metadata')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .in('status', ['confirmed', 'checked_in', 'checked_out'])
-          .gte('check_in', startStr)
-          .lte('check_out', endStr);
+          .filter('metadata->>check_in_date', 'gte', startStr)
+          .filter('metadata->>check_out_date', 'lte', endStr);
 
         if (!bookings || bookings.length === 0) return 0;
-        const totalRevenue = bookings.reduce((sum, b) => sum + (b.room_rate || 0), 0);
-        const totalNights = bookings.reduce((sum, b) => sum + (b.nights || 1), 0);
+        const totalRevenue = bookings.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+        const totalNights = bookings.reduce((sum: number, b: any) => sum + ((b.metadata as any)?.nights || 1), 0);
         return totalNights > 0 ? totalRevenue / totalNights : 0;
       }
 
@@ -485,33 +487,36 @@ class ReportingService {
         const totalRoomNights = totalRooms * days;
 
         const { data: bookings } = await this.supabase
-          .from('bookings')
-          .select('room_rate')
+          .from('transactions')
+          .select('amount')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .in('status', ['confirmed', 'checked_in', 'checked_out'])
-          .gte('check_in', startStr)
-          .lte('check_out', endStr);
+          .filter('metadata->>check_in_date', 'gte', startStr)
+          .filter('metadata->>check_out_date', 'lte', endStr);
 
-        const totalRevenue = (bookings || []).reduce((sum, b) => sum + (b.room_rate || 0), 0);
+        const totalRevenue = (bookings || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
         return totalRoomNights > 0 ? totalRevenue / totalRoomNights : 0;
       }
 
       case 'total_revenue': {
         const { data: bookings } = await this.supabase
-          .from('bookings')
-          .select('total_amount')
+          .from('transactions')
+          .select('amount')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .in('status', ['confirmed', 'checked_in', 'checked_out'])
           .gte('created_at', startStr)
           .lte('created_at', endStr);
 
-        return (bookings || []).reduce((sum, b) => sum + (b.total_amount || 0), 0);
+        return (bookings || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
       }
 
       case 'booking_count': {
         const { count } = await this.supabase
-          .from('bookings')
+          .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .gte('created_at', startStr)
           .lte('created_at', endStr);
@@ -521,15 +526,17 @@ class ReportingService {
 
       case 'cancellation_rate': {
         const { count: total } = await this.supabase
-          .from('bookings')
+          .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .gte('created_at', startStr)
           .lte('created_at', endStr);
 
         const { count: cancelled } = await this.supabase
-          .from('bookings')
+          .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .eq('status', 'cancelled')
           .gte('created_at', startStr)
@@ -540,15 +547,16 @@ class ReportingService {
 
       case 'average_stay': {
         const { data: bookings } = await this.supabase
-          .from('bookings')
-          .select('nights')
+          .from('transactions')
+          .select('metadata')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .in('status', ['confirmed', 'checked_in', 'checked_out'])
-          .gte('check_in', startStr)
-          .lte('check_out', endStr);
+          .filter('metadata->>check_in_date', 'gte', startStr)
+          .filter('metadata->>check_out_date', 'lte', endStr);
 
         if (!bookings || bookings.length === 0) return 0;
-        const totalNights = bookings.reduce((sum, b) => sum + (b.nights || 0), 0);
+        const totalNights = bookings.reduce((sum: number, b: any) => sum + ((b.metadata as any)?.nights || 0), 0);
         return totalNights / bookings.length;
       }
 
@@ -599,8 +607,9 @@ class ReportingService {
 
   async generateRevenueReport(propertyId: string, dateRange: DateRange, groupBy: 'day' | 'week' | 'month' = 'day'): Promise<any> {
     const { data: bookings, error } = await this.supabase
-      .from('bookings')
-      .select('*')
+      .from('transactions')
+      .select('amount, metadata, created_at')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .in('status', ['confirmed', 'checked_in', 'checked_out'])
       .gte('created_at', dateRange.start.toISOString())
@@ -608,8 +617,8 @@ class ReportingService {
 
     if (error) throw error;
 
-    const totalRevenue = (bookings || []).reduce((sum, b) => sum + (b.total_amount || 0), 0);
-    const roomRevenue = (bookings || []).reduce((sum, b) => sum + (b.room_rate || 0), 0);
+    const totalRevenue = (bookings || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+    const roomRevenue = totalRevenue; // amount IS the room revenue in unified model
     const bookingCount = bookings?.length || 0;
     const avgBookingValue = bookingCount > 0 ? totalRevenue / bookingCount : 0;
 
@@ -630,7 +639,7 @@ class ReportingService {
           periodKey = dayjs(bookingDate).format('YYYY-MM-DD');
       }
 
-      revenueByPeriod[periodKey] = (revenueByPeriod[periodKey] || 0) + (booking.total_amount || 0);
+      revenueByPeriod[periodKey] = (revenueByPeriod[periodKey] || 0) + ((booking as any).amount || 0);
     }
 
     return {
@@ -662,18 +671,20 @@ class ReportingService {
     const days = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
     const { data: bookings } = await this.supabase
-      .from('bookings')
-      .select('room_id, check_in, check_out')
+      .from('transactions')
+      .select('metadata')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .in('status', ['confirmed', 'checked_in', 'checked_out'])
-      .gte('check_in', dateRange.start.toISOString())
-      .lte('check_out', dateRange.end.toISOString());
+      .filter('metadata->>check_in_date', 'gte', dateRange.start.toISOString())
+      .filter('metadata->>check_out_date', 'lte', dateRange.end.toISOString());
 
     // FIX: Iteration 15 - Count actual room-nights, not booking records
     // A booking spanning 5 nights should count as 5 occupied nights, not 1
-    const occupiedNights = (bookings || []).reduce((sum, b) => {
-      const checkIn = new Date(b.check_in);
-      const checkOut = new Date(b.check_out);
+    const occupiedNights = (bookings || []).reduce((sum: number, b: any) => {
+      const meta = b.metadata as Record<string, unknown> | null;
+      const checkIn = new Date(String(meta?.check_in_date || ''));
+      const checkOut = new Date(String(meta?.check_out_date || ''));
       const nights = Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
       return sum + nights;
     }, 0);
@@ -684,13 +695,15 @@ class ReportingService {
     const occupancyByType: Record<string, { occupied: number; total: number }> = {};
     for (const rt of (roomTypes || [])) {
       const typeRooms = (rooms || []).filter(r => r.room_type_id === rt.id);
-      const typeBookings = (bookings || []).filter(b =>
-        typeRooms.some(r => r.id === b.room_id)
-      );
+      const typeBookings = (bookings || []).filter((b: any) => {
+        const meta = b.metadata as Record<string, unknown> | null;
+        return typeRooms.some(r => r.id === meta?.unit_id);
+      });
       // FIX: Iteration 15 - Same room-night calculation for per-type breakdown
-      const typeNights = typeBookings.reduce((sum, b) => {
-        const checkIn = new Date(b.check_in);
-        const checkOut = new Date(b.check_out);
+      const typeNights = typeBookings.reduce((sum: number, b: any) => {
+        const meta = b.metadata as Record<string, unknown> | null;
+        const checkIn = new Date(String(meta?.check_in_date || ''));
+        const checkOut = new Date(String(meta?.check_out_date || ''));
         return sum + Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
       }, 0);
       occupancyByType[rt.name] = {
@@ -715,8 +728,9 @@ class ReportingService {
 
   async generateChannelPerformanceReport(propertyId: string, dateRange: DateRange): Promise<any> {
     const { data: bookings, error } = await this.supabase
-      .from('bookings')
-      .select('source, total_amount')
+      .from('transactions')
+      .select('amount, metadata')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .in('status', ['confirmed', 'checked_in', 'checked_out'])
       .gte('created_at', dateRange.start.toISOString())
@@ -725,17 +739,18 @@ class ReportingService {
     if (error) throw error;
 
     const channelData: Record<string, { count: number; revenue: number }> = {};
-    for (const booking of (bookings || [])) {
-      const channel = booking.source || 'direct';
+    for (const booking of (bookings || []) as any[]) {
+      const meta = booking.metadata as Record<string, unknown> | null;
+      const channel = (meta?.source as string) || 'direct';
       if (!channelData[channel]) {
         channelData[channel] = { count: 0, revenue: 0 };
       }
       channelData[channel].count++;
-      channelData[channel].revenue += booking.total_amount || 0;
+      channelData[channel].revenue += (booking as any).amount || 0;
     }
 
     const totalBookings = bookings?.length || 0;
-    const totalRevenue = (bookings || []).reduce((sum, b) => sum + (b.total_amount || 0), 0);
+    const totalRevenue = (bookings || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
 
     return {
       summary: { totalBookings, totalRevenue },
@@ -1541,15 +1556,16 @@ class ReportingService {
     });
 
     const { data: bookings } = await this.supabase
-      .from('bookings')
-      .select('total_amount, status')
+      .from('transactions')
+      .select('amount, status')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .gte('created_at', `${snapshotDate}T00:00:00`)
       .lte('created_at', `${snapshotDate}T23:59:59`);
 
     const metrics = {
       total_bookings: bookings?.length || 0,
-      total_revenue: (bookings || []).reduce((sum, b) => sum + (b.total_amount || 0), 0),
+      total_revenue: (bookings || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0),
       check_ins: (bookings || []).filter(b => b.status === 'checked_in').length,
       check_outs: (bookings || []).filter(b => b.status === 'checked_out').length,
       cancellations: (bookings || []).filter(b => b.status === 'cancelled').length
