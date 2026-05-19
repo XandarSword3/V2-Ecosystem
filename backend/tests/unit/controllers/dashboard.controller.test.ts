@@ -139,22 +139,39 @@ describe('DashboardController', () => {
     it('should aggregate revenue by service correctly', async () => {
       // The chain is: from('transactions').select().eq(ref).gte().lte().eq('status','completed')
       // We use a thenable per from() call so the whole chain resolves via Promise.all
-      const datasets = [
-        [{ total_amount: '200.00', created_at: '2026-01-10T10:00:00Z' }], // restaurant_orders
-        [{ total_amount: '50.00',  created_at: '2026-01-10T10:00:00Z' }], // snack_orders
-        [{ total_amount: '300.00', created_at: '2026-01-10T10:00:00Z' }], // chalets (time_exclusive_reservation)
-        [{ total_amount: '100.00', created_at: '2026-01-10T10:00:00Z' }], // pool (shared_capacity_access)
-      ];
-      let callIdx = 0;
+      const fromMock = vi.fn().mockImplementation((table: string) => {
+        const thenable: Record<string, any> = {};
+        if (table === 'modules') {
+          thenable.select = vi.fn().mockReturnValue(thenable);
+          thenable.then = (resolve: Function) =>
+            Promise.resolve({ data: [{ id: 'res-id', slug: 'restaurant' }, { id: 'snack-id', slug: 'snack-bar' }], error: null }).then(resolve as any);
+          return thenable;
+        }
 
-      const fromMock = vi.fn().mockImplementation(() => {
-        const data = datasets[callIdx++ % datasets.length];
-        const thenable: Record<string, unknown> = {};
-        ['select', 'eq', 'gte', 'lte', 'filter', 'not', 'order', 'limit'].forEach(m => {
+        let typeVal: string | null = null;
+        thenable.select = vi.fn().mockReturnValue(thenable);
+        thenable.eq = vi.fn().mockImplementation((col: string, val: string) => {
+          if (col === 'module_id' || col === 'engine_type') {
+            typeVal = val;
+          }
+          return thenable;
+        });
+        ['gte', 'lte', 'filter', 'not', 'order', 'limit'].forEach(m => {
           thenable[m] = vi.fn().mockReturnValue(thenable);
         });
-        thenable.then = (resolve: Function, reject?: Function) =>
-          Promise.resolve({ data, error: null }).then(resolve as any, reject as any);
+        thenable.then = (resolve: Function, reject?: Function) => {
+          let data: any[] = [];
+          if (typeVal === 'res-id' || typeVal === 'restaurant') {
+            data = [{ total_amount: '200.00', created_at: '2026-01-10T10:00:00Z' }];
+          } else if (typeVal === 'snack-id' || typeVal === 'snack-bar') {
+            data = [{ total_amount: '50.00',  created_at: '2026-01-10T10:00:00Z' }];
+          } else if (typeVal === 'time_exclusive_reservation') {
+            data = [{ total_amount: '300.00', created_at: '2026-01-10T10:00:00Z' }];
+          } else if (typeVal === 'shared_capacity_access') {
+            data = [{ total_amount: '100.00', created_at: '2026-01-10T10:00:00Z' }];
+          }
+          return Promise.resolve({ data, error: null }).then(resolve as any, reject as any);
+        };
         return thenable;
       });
 

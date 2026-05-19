@@ -95,7 +95,7 @@ export class RevenueManagementService {
           .select('*')
           .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
-          .filter('metadata->>check_in_date', 'gte',, dayjs(currentDate).subtract(365, 'day').format('YYYY-MM-DD'))
+          .filter('metadata->>check_in_date', 'gte', dayjs(currentDate).subtract(365, 'day').format('YYYY-MM-DD'))
           .lte('check_in', dayjs(currentDate).subtract(335, 'day').format('YYYY-MM-DD'));
 
         const avgDemand = historicalData?.length || 5;
@@ -1020,7 +1020,7 @@ export class RevenueManagementService {
       .select('amount, room_rate, nights')
       .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
-      .filter('metadata->>check_in_date', 'gte',, dayjs(startDate).format('YYYY-MM-DD'))
+      .filter('metadata->>check_in_date', 'gte', dayjs(startDate).format('YYYY-MM-DD'))
       .lte('check_in', dayjs(endDate).format('YYYY-MM-DD'))
       .not('status', 'in', '("cancelled","no_show")');
 
@@ -1091,7 +1091,7 @@ export class RevenueManagementService {
         .select('amount, room_rate, nights')
         .eq('engine_type', 'time_exclusive_reservation')
         .in('room_id', roomIdList)
-        .filter('metadata->>check_in_date', 'gte',, dayjs(startDate).format('YYYY-MM-DD'))
+        .filter('metadata->>check_in_date', 'gte', dayjs(startDate).format('YYYY-MM-DD'))
         .lte('check_in', dayjs(endDate).format('YYYY-MM-DD'))
         .not('status', 'in', '("cancelled","no_show")');
 

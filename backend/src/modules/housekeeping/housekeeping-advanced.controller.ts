@@ -645,7 +645,7 @@ export class HousekeepingAdvancedController {
         .select('id, check_in')
         .eq('engine_type', 'time_exclusive_reservation')
         .eq('unit_id', chaletId)
-        .filter('metadata->>check_in_date', 'gte',, today)
+        .filter('metadata->>check_in_date', 'gte', today)
         .order('check_in', { ascending: true })
         .limit(1)
         .single();
@@ -910,10 +910,10 @@ export class HousekeepingAdvancedController {
 
       const { data: todayBookings } = await supabase
         .from('transactions')
-        .select('unit_id, check_in, check_out, status')
+        .select('unit_id, check_in, check_out, status, metadata')
         .eq('engine_type', 'time_exclusive_reservation')
         .or(`check_in.gte.${today},check_out.gte.${today}`)
-        .filter('metadata->>check_in_date', 'lte',, tomorrow);
+        .filter('metadata->>check_in_date', 'lte', tomorrow);
 
       // Get active tasks
       const { data: activeTasks } = await supabase

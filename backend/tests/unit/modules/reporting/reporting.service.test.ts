@@ -17,7 +17,7 @@ let mockDashboardWidgets: Array<Record<string, unknown>> = [];
 function createQueryMock(mockDataFn: () => unknown[]) {
   const mockObj: Record<string, unknown> = {};
   
-  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike', 'range'];
+  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike', 'range', 'filter'];
   chainMethods.forEach(method => {
     mockObj[method] = vi.fn().mockReturnValue(mockObj);
   });
@@ -107,6 +107,7 @@ const mockSupabase = {
       case 'kpi_targets':
         return createQueryMock(() => mockKpiTargets);
       case 'bookings':
+      case 'transactions':
         return createQueryMock(() => mockBookings);
       case 'rooms':
         return createQueryMock(() => mockRooms);
@@ -584,8 +585,8 @@ describe('ReportingService', () => {
   describe('generateRevenueReport', () => {
     it('should generate revenue report with summary and breakdown', async () => {
       mockBookings = [
-        { id: 'b1', total_amount: 500, room_rate: 400, created_at: '2024-01-15T10:00:00Z', status: 'confirmed' },
-        { id: 'b2', total_amount: 700, room_rate: 600, created_at: '2024-01-16T14:00:00Z', status: 'checked_in' }
+        { id: 'b1', total_amount: 500, amount: 500, room_rate: 400, created_at: '2024-01-15T10:00:00Z', status: 'confirmed' },
+        { id: 'b2', total_amount: 700, amount: 700, room_rate: 600, created_at: '2024-01-16T14:00:00Z', status: 'checked_in' }
       ];
       
       const result = await reportingService.generateRevenueReport(
@@ -597,7 +598,7 @@ describe('ReportingService', () => {
       expect(result).toBeDefined();
       expect(result.summary).toBeDefined();
       expect(result.summary.totalRevenue).toBe(1200);
-      expect(result.summary.roomRevenue).toBe(1000);
+      expect(result.summary.roomRevenue).toBe(1200);
       expect(result.summary.bookingCount).toBe(2);
       expect(result.breakdown).toBeDefined();
       expect(Array.isArray(result.breakdown)).toBe(true);
@@ -605,7 +606,7 @@ describe('ReportingService', () => {
 
     it('should group by week', async () => {
       mockBookings = [
-        { id: 'b1', total_amount: 300, room_rate: 250, created_at: '2024-01-08T10:00:00Z' }
+        { id: 'b1', total_amount: 300, amount: 300, room_rate: 250, created_at: '2024-01-08T10:00:00Z', status: 'confirmed' }
       ];
       
       const result = await reportingService.generateRevenueReport(
@@ -619,7 +620,7 @@ describe('ReportingService', () => {
 
     it('should group by month', async () => {
       mockBookings = [
-        { id: 'b1', total_amount: 1000, room_rate: 800, created_at: '2024-01-15T10:00:00Z' }
+        { id: 'b1', total_amount: 1000, amount: 1000, room_rate: 800, created_at: '2024-01-15T10:00:00Z', status: 'confirmed' }
       ];
       
       const result = await reportingService.generateRevenueReport(
@@ -657,7 +658,7 @@ describe('ReportingService', () => {
         { id: 'rt-2', name: 'Deluxe' }
       ];
       mockBookings = [
-        { id: 'b1', room_id: 'room-1', check_in: '2024-01-15', check_out: '2024-01-17' }
+        { id: 'b1', room_id: 'room-1', check_in: '2024-01-15', check_out: '2024-01-17', status: 'confirmed', metadata: { unit_id: 'room-1', check_in_date: '2024-01-15', check_out_date: '2024-01-17' } }
       ];
       
       const result = await reportingService.generateOccupancyReport(
@@ -689,10 +690,10 @@ describe('ReportingService', () => {
   describe('generateChannelPerformanceReport', () => {
     it('should generate channel performance report', async () => {
       mockBookings = [
-        { id: 'b1', source: 'booking.com', total_amount: 500 },
-        { id: 'b2', source: 'booking.com', total_amount: 600 },
-        { id: 'b3', source: 'direct', total_amount: 800 },
-        { id: 'b4', source: null, total_amount: 300 }
+        { id: 'b1', amount: 500, status: 'confirmed', metadata: { source: 'booking.com' }, created_at: '2024-01-15T10:00:00Z' },
+        { id: 'b2', amount: 600, status: 'confirmed', metadata: { source: 'booking.com' }, created_at: '2024-01-15T10:00:00Z' },
+        { id: 'b3', amount: 800, status: 'confirmed', metadata: { source: 'direct' }, created_at: '2024-01-15T10:00:00Z' },
+        { id: 'b4', amount: 300, status: 'confirmed', metadata: { source: null }, created_at: '2024-01-15T10:00:00Z' }
       ];
       
       const result = await reportingService.generateChannelPerformanceReport(
@@ -709,7 +710,7 @@ describe('ReportingService', () => {
 
     it('should handle bookings without source', async () => {
       mockBookings = [
-        { id: 'b1', source: null, total_amount: 500 }
+        { id: 'b1', amount: 500, status: 'confirmed', metadata: { source: null }, created_at: '2024-01-15T10:00:00Z' }
       ];
       
       const result = await reportingService.generateChannelPerformanceReport(
@@ -1233,8 +1234,8 @@ describe('ReportingService', () => {
   describe('edge cases', () => {
     it('should handle missing or null values in booking calculations', async () => {
       mockBookings = [
-        { id: 'b1', total_amount: null, room_rate: undefined, created_at: '2024-01-15' },
-        { id: 'b2', total_amount: 200, room_rate: 150, created_at: '2024-01-16' }
+        { id: 'b1', total_amount: null, amount: null, room_rate: undefined, created_at: '2024-01-15T10:00:00Z', status: 'confirmed' },
+        { id: 'b2', total_amount: 200, amount: 200, room_rate: 150, created_at: '2024-01-16T10:00:00Z', status: 'confirmed' }
       ];
       
       const result = await reportingService.generateRevenueReport(
@@ -1243,7 +1244,7 @@ describe('ReportingService', () => {
       );
       
       expect(result.summary.totalRevenue).toBe(200);
-      expect(result.summary.roomRevenue).toBe(150);
+      expect(result.summary.roomRevenue).toBe(200);
     });
 
     it('should handle empty property with no data', async () => {

@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 function createQueryMock(mockDataFn: () => unknown[]) {
   const mockObj: Record<string, unknown> = {};
-  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike'];
+  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'limit', 'neq', 'not', 'in', 'contains', 'ilike', 'filter'];
   chainMethods.forEach(method => {
     mockObj[method] = vi.fn().mockReturnValue(mockObj);
   });
@@ -171,6 +171,9 @@ const mockAnalyticsRow = {
 let currentMockData: Record<string, unknown[]> = {};
 
 const mockFrom = vi.fn().mockImplementation((table: string) => {
+  if (table === 'transactions' || table === 'bookings') {
+    return createQueryMock(() => currentMockData['transactions'] || currentMockData['bookings'] || []);
+  }
   return createQueryMock(() => currentMockData[table] || []);
 });
 
@@ -914,7 +917,7 @@ describe('KioskService', () => {
 
       const result = await kioskService.performKioskCheckin('kiosk-1', 'CONF123');
 
-      expect(mockFrom).toHaveBeenCalledWith('bookings');
+      expect(mockFrom).toHaveBeenCalledWith('transactions');
       expect(result.sessionType).toBe('checkin');
     });
 

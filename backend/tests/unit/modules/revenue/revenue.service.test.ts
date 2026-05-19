@@ -15,7 +15,7 @@ function createQueryMock(mockDataFn: () => unknown[]) {
   const mockObj: Record<string, unknown> = {};
   
   // All chainable methods return the same object
-  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'range', 'limit', 'neq', 'not', 'in', 'contains', 'ilike', 'like'];
+  const chainMethods = ['select', 'eq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt', 'range', 'limit', 'neq', 'not', 'in', 'contains', 'ilike', 'like', 'filter'];
   chainMethods.forEach(method => {
     mockObj[method] = vi.fn().mockReturnValue(mockObj);
   });

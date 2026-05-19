@@ -24,12 +24,13 @@ interface AmountRecord {
 
 interface RecentOrderQuery {
   id: string;
-  order_number: string;
+  order_number?: string;
   customer_name?: string | null;
   status: string;
   total_amount: string;
   created_at: string;
   items?: Array<{ id: string }>;
+  metadata?: any;
 }
 
 /**
@@ -38,6 +39,13 @@ interface RecentOrderQuery {
  */
 export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
+    
+    // Fetch active modules first to map slugs to IDs
+    const { data: modulesList } = await supabase.from('modules').select('id, slug');
+    const modulesMap = new Map((modulesList || []).map(m => [m.slug, m.id]));
+    const restaurantModuleId = modulesMap.get('restaurant') || '00000000-0000-0000-0000-000000000000';
+    const snackModuleId = modulesMap.get('snack-bar') || '00000000-0000-0000-0000-000000000000';
+
     const today = dayjs().startOf('day').toISOString();
     const endOfDay = dayjs().endOf('day').toISOString();
     const yesterday = dayjs().subtract(1, 'day').startOf('day').toISOString();
@@ -45,7 +53,6 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
     const lastWeekStart = dayjs().subtract(7, 'day').startOf('day').toISOString();
     const lastWeekEnd = dayjs().subtract(7, 'day').endOf('day').toISOString();
 
-    // Today's stats - run queries in parallel
     // Today's stats - run queries in parallel
     const [
       restaurantOrdersResult,
@@ -66,26 +73,26 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
       // Restaurant orders count
       supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .eq('reference_table', 'restaurant_orders')
+        .eq('module_id', restaurantModuleId)
         .gte('created_at', today)
         .lte('created_at', endOfDay),
       // Restaurant revenue
       supabase.from('transactions')
         .select('total_amount:amount')
-        .eq('reference_table', 'restaurant_orders')
+        .eq('module_id', restaurantModuleId)
         .gte('created_at', today)
         .lte('created_at', endOfDay)
         .eq('status', 'completed'),
       // Snack orders count
       supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .eq('reference_table', 'snack_orders')
+        .eq('module_id', snackModuleId)
         .gte('created_at', today)
         .lte('created_at', endOfDay),
       // Snack revenue
       supabase.from('transactions')
         .select('total_amount:amount')
-        .eq('reference_table', 'snack_orders')
+        .eq('module_id', snackModuleId)
         .gte('created_at', today)
         .lte('created_at', endOfDay)
         .eq('status', 'completed'),
@@ -120,19 +127,19 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
         .select('id', { count: 'exact', head: true }),
       // Recent orders (from transactions)
       supabase.from('transactions')
-        .select('id, order_number, status, total_amount:amount, created_at, metadata')
+        .select('id, status, total_amount:amount, created_at, metadata')
         .order('created_at', { ascending: false })
         .limit(5),
       // Yesterday orders
       supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
-        .eq('reference_table', 'restaurant_orders')
+        .eq('module_id', restaurantModuleId)
         .gte('created_at', yesterday)
         .lte('created_at', endOfYesterday),
       // Yesterday revenue
       supabase.from('transactions')
         .select('total_amount:amount')
-        .eq('reference_table', 'restaurant_orders')
+        .eq('module_id', restaurantModuleId)
         .gte('created_at', yesterday)
         .lte('created_at', endOfYesterday)
         .eq('status', 'completed'),
@@ -172,15 +179,19 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
     const ticketsTrend = calculateTrend(poolTicketsResult.count || 0, yesterdayTickets);
 
     // Transform recent orders to camelCase
-    const recentOrders: RecentOrderSummary[] = ((recentOrdersResult.data || []) as RecentOrderQuery[]).map((order) => ({
-      id: order.id,
-      orderNumber: order.order_number,
-      customerName: order.customer_name || 'Guest',
-      status: order.status,
-      totalAmount: order.total_amount,
-      itemCount: order.items?.length || 0,
-      createdAt: order.created_at,
-    }));
+    const recentOrders: RecentOrderSummary[] = ((recentOrdersResult.data || []) as RecentOrderQuery[]).map((order) => {
+      const meta = order.metadata as any;
+      const orderNumber = meta?.order_number || meta?.booking_number || meta?.ticket_number || '';
+      return {
+        id: order.id,
+        orderNumber: orderNumber,
+        customerName: order.customer_name || 'Guest',
+        status: order.status,
+        totalAmount: order.total_amount,
+        itemCount: meta?.items?.length || 0,
+        createdAt: order.created_at,
+      };
+    });
 
     res.json({
       success: true,
@@ -220,6 +231,12 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
 export const getRevenueStats = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { startDate, endDate } = req.query;
+
+    // Fetch active modules first to map slugs to IDs
+    const { data: modulesList } = await supabase.from('modules').select('id, slug');
+    const modulesMap = new Map((modulesList || []).map(m => [m.slug, m.id]));
+    const restaurantModuleId = modulesMap.get('restaurant') || '00000000-0000-0000-0000-000000000000';
+    const snackModuleId = modulesMap.get('snack-bar') || '00000000-0000-0000-0000-000000000000';
     
     const start = startDate ? dayjs(startDate as string).toISOString() : dayjs().subtract(30, 'day').toISOString();
     const end = endDate ? dayjs(endDate as string).toISOString() : dayjs().toISOString();
@@ -232,13 +249,13 @@ export const getRevenueStats = asyncHandler(async (req: Request, res: Response) 
     ] = await Promise.all([
       supabase.from('transactions')
         .select('total_amount:amount, created_at')
-        .eq('reference_table', 'restaurant_orders')
+        .eq('module_id', restaurantModuleId)
         .gte('created_at', start)
         .lte('created_at', end)
         .eq('status', 'completed'),
       supabase.from('transactions')
         .select('total_amount:amount, created_at')
-        .eq('reference_table', 'snack_orders')
+        .eq('module_id', snackModuleId)
         .gte('created_at', start)
         .lte('created_at', end)
         .eq('status', 'completed'),
