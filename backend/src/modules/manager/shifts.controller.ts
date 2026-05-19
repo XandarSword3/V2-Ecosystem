@@ -472,12 +472,16 @@ export class ShiftsController {
       const startIso = todayStart.toISOString();
       const endIso = todayEnd.toISOString();
 
-      const [transactionsResult, activeShifts] = await Promise.all([
-        supabase.from('transactions').select('id, amount, status, created_at, engine_type, reference_table'),
+      const [transactionsResult, activeShifts, modulesList] = await Promise.all([
+        supabase.from('transactions').select('id, amount, status, created_at, engine_type, module_id'),
         supabase.from('staff_shifts').select('id, status, department').eq('status', 'active'),
+        supabase.from('modules').select('id, slug'),
       ]);
 
       const transactions = transactionsResult.data || [];
+      const modulesMap = new Map((modulesList.data || []).map(m => [m.slug, m.id]));
+      const restaurantModuleId = modulesMap.get('restaurant');
+      const snackModuleId = modulesMap.get('snack-bar');
 
       const withinToday = (createdAt?: string | null) => {
         if (!createdAt) return false;
@@ -488,8 +492,8 @@ export class ShiftsController {
       const activeStatuses = new Set(['pending', 'confirmed', 'preparing', 'ready', 'checked_in', 'valid', 'active']);
 
       const modules = [
-        { name: 'restaurant', rows: transactions.filter(t => t.engine_type === 'instant_transaction' && t.reference_table !== 'snack_orders') },
-        { name: 'snack', rows: transactions.filter(t => t.engine_type === 'instant_transaction' && t.reference_table === 'snack_orders') },
+        { name: 'restaurant', rows: transactions.filter(t => t.module_id === restaurantModuleId) },
+        { name: 'snack', rows: transactions.filter(t => t.module_id === snackModuleId) },
         { name: 'chalets', rows: transactions.filter(t => t.engine_type === 'time_exclusive_reservation') },
         { name: 'pool', rows: transactions.filter(t => t.engine_type === 'shared_capacity_access') },
       ].map((module) => {

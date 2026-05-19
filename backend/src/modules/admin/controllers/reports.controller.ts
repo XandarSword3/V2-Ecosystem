@@ -62,7 +62,7 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
 
     const [currentRestaurant, currentChalets, currentPool, currentSnack, previousRestaurant, previousChalets, previousPool, previousSnack, monthlyRevenueRows, topItemsResult, usersResult] = await Promise.all([
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE reference_table = \'restaurant_orders\' AND created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(t.amount), 0) AS revenue FROM transactions t JOIN modules m ON t.module_id = m.id WHERE m.slug = \'restaurant\' AND t.created_at BETWEEN $1 AND $2',
         [startISO, endISO]
       ),
       pool.query<PeriodAggregateRow>(
@@ -74,11 +74,11 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
         [startISO, endISO]
       ),
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE reference_table = \'snack_orders\' AND created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(t.amount), 0) AS revenue FROM transactions t JOIN modules m ON t.module_id = m.id WHERE m.slug = \'snack-bar\' AND t.created_at BETWEEN $1 AND $2',
         [startISO, endISO]
       ),
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE reference_table = \'restaurant_orders\' AND created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(t.amount), 0) AS revenue FROM transactions t JOIN modules m ON t.module_id = m.id WHERE m.slug = \'restaurant\' AND t.created_at BETWEEN $1 AND $2',
         [prevStartISO, prevEndISO]
       ),
       pool.query<PeriodAggregateRow>(
@@ -90,7 +90,7 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
         [prevStartISO, prevEndISO]
       ),
       pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE reference_table = \'snack_orders\' AND created_at BETWEEN $1 AND $2',
+        'SELECT COUNT(*)::int AS count, COALESCE(SUM(t.amount), 0) AS revenue FROM transactions t JOIN modules m ON t.module_id = m.id WHERE m.slug = \'snack-bar\' AND t.created_at BETWEEN $1 AND $2',
         [prevStartISO, prevEndISO]
       ),
       pool.query<{ month_key: string; revenue: string }>(`
@@ -185,21 +185,27 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
     // Fall back to the existing Supabase client path when a direct pool is unavailable.
   }
 
+  // Fetch active modules first to map slugs to IDs
+  const { data: modulesList } = await supabase.from('modules').select('id, slug');
+  const modulesMap = new Map((modulesList || []).map(m => [m.slug, m.id]));
+  const restaurantModuleId = modulesMap.get('restaurant') || '00000000-0000-0000-0000-000000000000';
+  const snackModuleId = modulesMap.get('snack-bar') || '00000000-0000-0000-0000-000000000000';
+
   // Current period queries
   const [ordersRes, chaletBookingsRes, poolTicketsRes, snackOrdersRes, usersRes] = await Promise.all([
-    supabase.from('transactions').select('id, amount, created_at').eq('reference_table', 'restaurant_orders').gte('created_at', startISO).lte('created_at', endISO),
+    supabase.from('transactions').select('id, amount, created_at').eq('module_id', restaurantModuleId).gte('created_at', startISO).lte('created_at', endISO),
     supabase.from('transactions').select('id, amount, created_at').eq('engine_type', 'time_exclusive_reservation').gte('created_at', startISO).lte('created_at', endISO),
     supabase.from('transactions').select('id, amount, created_at').eq('engine_type', 'shared_capacity_access').gte('created_at', startISO).lte('created_at', endISO),
-    supabase.from('transactions').select('id, amount, created_at').eq('reference_table', 'snack_orders').gte('created_at', startISO).lte('created_at', endISO),
+    supabase.from('transactions').select('id, amount, created_at').eq('module_id', snackModuleId).gte('created_at', startISO).lte('created_at', endISO),
     supabase.from('users').select('id', { count: 'exact' }),
   ]);
 
   // Previous period for change calculation
   const [prevOrdersRes, prevChaletRes, prevPoolRes, prevSnackRes] = await Promise.all([
-    supabase.from('transactions').select('id, amount').eq('reference_table', 'restaurant_orders').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+    supabase.from('transactions').select('id, amount').eq('module_id', restaurantModuleId).gte('created_at', prevStartISO).lte('created_at', prevEndISO),
     supabase.from('transactions').select('id, amount').eq('engine_type', 'time_exclusive_reservation').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
     supabase.from('transactions').select('id, amount').eq('engine_type', 'shared_capacity_access').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
-    supabase.from('transactions').select('id, amount').eq('reference_table', 'snack_orders').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
+    supabase.from('transactions').select('id, amount').eq('module_id', snackModuleId).gte('created_at', prevStartISO).lte('created_at', prevEndISO),
   ]);
 
   const orders = ordersRes.data || [];
@@ -403,13 +409,19 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
   const startISO = start.toISOString();
   const endISO = end.toISOString();
 
+  // Fetch active modules first to map slugs to IDs
+  const { data: modulesList } = await supabase.from('modules').select('id, slug');
+  const modulesMap = new Map((modulesList || []).map(m => [m.slug, m.id]));
+  const restaurantModuleId = modulesMap.get('restaurant') || '00000000-0000-0000-0000-000000000000';
+  const snackModuleId = modulesMap.get('snack-bar') || '00000000-0000-0000-0000-000000000000';
+
   let csvData = '';
   const filename = `${type}-report.csv`;
 
   switch (type) {
     case 'restaurant': {
-      const { data } = await supabase.from('transactions').select('id, order_number, amount, status, created_at').eq('reference_table', 'restaurant_orders').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
-      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.order_number || ''},${o.amount},${o.status},${o.created_at}`).join('\n');
+      const { data } = await supabase.from('transactions').select('id, metadata, amount, status, created_at').eq('module_id', restaurantModuleId).gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
+      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.metadata?.order_number || ''},${o.amount},${o.status},${o.created_at}`).join('\n');
       break;
     }
     case 'chalets': {
@@ -418,13 +430,13 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
       break;
     }
     case 'pool': {
-      const { data } = await supabase.from('transactions').select('id, ticket_number, amount, status, metadata, created_at').eq('engine_type', 'shared_capacity_access').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
-      csvData = 'ID,Ticket,Total,Status,Guests,Date\n' + (data || []).map((t: any) => `${t.id},${t.ticket_number || ''},${t.amount},${t.status},${t.metadata?.number_of_guests || 0},${t.created_at}`).join('\n');
+      const { data } = await supabase.from('transactions').select('id, amount, status, metadata, created_at').eq('engine_type', 'shared_capacity_access').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
+      csvData = 'ID,Ticket,Total,Status,Guests,Date\n' + (data || []).map((t: any) => `${t.id},${t.metadata?.ticket_number || ''},${t.amount},${t.status},${t.metadata?.number_of_guests || 0},${t.created_at}`).join('\n');
       break;
     }
     case 'snack': {
-      const { data } = await supabase.from('transactions').select('id, order_number, amount, status, created_at').eq('reference_table', 'snack_orders').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
-      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.order_number || ''},${o.amount},${o.status},${o.created_at}`).join('\n');
+      const { data } = await supabase.from('transactions').select('id, metadata, amount, status, created_at').eq('module_id', snackModuleId).gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
+      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.metadata?.order_number || ''},${o.amount},${o.status},${o.created_at}`).join('\n');
       break;
     }
     case 'users': {

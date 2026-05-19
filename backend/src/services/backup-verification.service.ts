@@ -45,14 +45,10 @@ interface DataIntegrityReport {
 // Critical tables that must be backed up
 const CRITICAL_TABLES = [
   'users',
-  'chalets',
-  'chalet_bookings',
-  'pool_tickets',
+  'accommodation_units',
+  'transactions',
   'pool_memberships',
   'payments',
-  'restaurant_tables',
-  'table_reservations',
-  'kitchen_orders',
   'menu_items',
   'seasonal_pricing_rules',
   'system_settings',
@@ -61,16 +57,10 @@ const CRITICAL_TABLES = [
 
 // Expected foreign key relationships
 const EXPECTED_RELATIONSHIPS = [
-  { table: 'chalet_bookings', column: 'user_id', references: 'users.id' },
-  { table: 'chalet_bookings', column: 'chalet_id', references: 'chalets.id' },
-  { table: 'pool_tickets', column: 'user_id', references: 'users.id' },
   { table: 'pool_memberships', column: 'user_id', references: 'users.id' },
-  { table: 'payments', column: 'user_id', references: 'users.id' },
-  { table: 'table_reservations', column: 'user_id', references: 'users.id' },
-  { table: 'table_reservations', column: 'table_id', references: 'restaurant_tables.id' },
-  { table: 'kitchen_orders', column: 'table_id', references: 'restaurant_tables.id' },
-  { table: 'kitchen_order_items', column: 'order_id', references: 'kitchen_orders.id' },
-  { table: 'kitchen_order_items', column: 'menu_item_id', references: 'menu_items.id' },
+  { table: 'payments', column: 'processed_by', references: 'users.id' },
+  { table: 'transactions', column: 'customer_id', references: 'users.id' },
+  { table: 'transactions', column: 'module_id', references: 'modules.id' },
 ];
 
 export class BackupVerificationService {
@@ -219,7 +209,7 @@ export class BackupVerificationService {
       counts[table] = count || 0;
 
       // Check for unexpectedly empty tables that should have data
-      if (count === 0 && ['system_settings', 'chalets', 'menu_items'].includes(table)) {
+      if (count === 0 && ['system_settings', 'accommodation_units', 'menu_items'].includes(table)) {
         issues.push(`Table ${table} is unexpectedly empty`);
       }
     }
@@ -298,13 +288,13 @@ export class BackupVerificationService {
       issues.push('Unable to verify system settings');
     }
 
-    // Check chalets exist
+    // Check accommodation units exist
     const { count: chaletCount } = await supabase
-      .from('chalets')
+      .from('accommodation_units')
       .select('*', { count: 'exact', head: true });
 
     if (!chaletCount || chaletCount === 0) {
-      issues.push('No chalets configured');
+      issues.push('No accommodation units configured');
     }
 
     if (issues.length > 0) {
@@ -367,7 +357,7 @@ export class BackupVerificationService {
       issues.push(...duplicateIssues);
 
       // Check for invalid date ranges
-      if (['chalet_bookings', 'pool_memberships', 'seasonal_pricing_rules'].includes(table)) {
+      if (['pool_memberships', 'seasonal_pricing_rules'].includes(table)) {
         const dateIssues = await this.checkDateRanges(table);
         issues.push(...dateIssues);
       }
@@ -407,9 +397,8 @@ export class BackupVerificationService {
     // Define required fields per table
     const requiredFields: Record<string, string[]> = {
       users: ['email', 'created_at'],
-      chalet_bookings: ['user_id', 'chalet_id', 'check_in', 'check_out', 'total_price'],
-      payments: ['user_id', 'amount', 'status'],
-      pool_tickets: ['user_id', 'ticket_date', 'slot'],
+      payments: ['processed_by', 'amount', 'status'],
+      transactions: ['module_id', 'status', 'amount'],
     };
 
     const fields = requiredFields[table];
@@ -457,16 +446,16 @@ export class BackupVerificationService {
     const issues: DataIntegrityReport['issues'] = [];
 
     // Check for end date before start date
-    if (table === 'chalet_bookings') {
+    if (table === 'pool_memberships' || table === 'seasonal_pricing_rules') {
       const { count, error } = await supabase
         .from(table)
         .select('*', { count: 'exact', head: true })
-        .filter('check_out', 'lt', 'check_in');
+        .filter('end_date', 'lt', 'start_date');
 
       if (!error && count && count > 0) {
         issues.push({
           table,
-          issue: `${count} bookings with check_out before check_in`,
+          issue: `${count} records with end_date before start_date`,
           severity: 'high',
           affectedRows: count,
         });
@@ -479,11 +468,11 @@ export class BackupVerificationService {
   private async checkPaymentIntegrity(): Promise<DataIntegrityReport['issues']> {
     const issues: DataIntegrityReport['issues'] = [];
 
-    // Check for payments without associated bookings
+    // Check for payments without associated bookings/transactions
     const { count, error } = await supabase
       .from('payments')
       .select('*', { count: 'exact', head: true })
-      .not('booking_id', 'is', null)
+      .not('reference_id', 'is', null)
       .eq('status', 'succeeded');
 
     // More checks would go here in production
