@@ -34,19 +34,11 @@ const TRANSLATABLE_TABLES = [
     labelField: 'name',
   },
   {
-    table: 'chalets',
+    table: 'accommodation_units',
     fields: [
       { field: 'name', ar: 'name_ar', fr: 'name_fr' }
     ],
-    displayName: 'Chalets',
-    labelField: 'name',
-  },
-  {
-    table: 'snack_items',
-    fields: [
-      { field: 'name', ar: 'name_ar', fr: 'name_fr' }
-    ],
-    displayName: 'Snack Items',
+    displayName: 'Accommodation Units',
     labelField: 'name',
   },
   {

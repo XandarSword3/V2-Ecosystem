@@ -106,7 +106,6 @@ export interface RestaurantOrderRow {
   created_at: string;
   updated_at?: string | null;
   items?: OrderItemRow[];
-  restaurant_order_items?: { id: string }[];
 }
 
 export interface SnackOrderRow {

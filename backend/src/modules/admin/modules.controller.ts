@@ -435,7 +435,6 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
       const directModuleTables = [
         'menu_items',
         'menu_categories',
-        'snack_items',
         'pool_sessions',
         'accommodation_units',
         'reviews',

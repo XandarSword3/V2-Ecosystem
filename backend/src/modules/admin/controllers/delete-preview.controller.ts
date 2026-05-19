@@ -9,7 +9,7 @@ import { logger } from '../../../utils/logger.js';
  * Shows all affected/related data that would be impacted
  */
 
-type EntityType = 'user' | 'booking' | 'staff' | 'chalet' | 'menu_item' | 'table' | 'module';
+type EntityType = 'user' | 'booking' | 'staff' | 'chalet' | 'menu_item' | 'module';
 
 interface RelatedEntity {
   table: string;
@@ -44,7 +44,7 @@ export const getDeletePreview = asyncHandler(async (req: Request, res: Response)
     const supabase = getSupabase();
 
     // Validate entity type
-    const validTypes: EntityType[] = ['user', 'booking', 'staff', 'chalet', 'menu_item', 'table', 'module'];
+    const validTypes: EntityType[] = ['user', 'booking', 'staff', 'chalet', 'menu_item', 'module'];
     if (!validTypes.includes(entityType as EntityType)) {
       res.status(400).json({
         success: false,
@@ -70,9 +70,6 @@ export const getDeletePreview = asyncHandler(async (req: Request, res: Response)
         break;
       case 'menu_item':
         result = await getMenuItemDeletePreview(supabase, entityId);
-        break;
-      case 'table':
-        result = await getTableDeletePreview(supabase, entityId);
         break;
       case 'module':
         result = await getModuleDeletePreview(supabase, entityId);
@@ -431,65 +428,7 @@ async function getMenuItemDeletePreview(supabase: any, itemId: string): Promise<
   };
 }
 
-/**
- * Table delete preview
- */
-async function getTableDeletePreview(supabase: any, tableId: string): Promise<DeletePreviewResult> {
-  const { data: table, error } = await supabase
-    .from('restaurant_tables')
-    .select('id, table_number, created_at')
-    .eq('id', tableId)
-    .single();
 
-  if (error || !table) {
-    throw new Error('Table not found');
-  }
-
-  const [ordersResult, reservationsResult] = await Promise.all([
-    supabase.from('transactions').select('id', { count: 'exact' }).filter('metadata->table_id', 'eq', tableId),
-    supabase.from('table_reservations').select('id', { count: 'exact' }).eq('table_id', tableId),
-  ]);
-
-  const relatedEntities: RelatedEntity[] = [
-    { table: 'orders', count: ordersResult.count || 0 },
-    { table: 'table_reservations', count: reservationsResult.count || 0 },
-  ].filter(e => e.count > 0);
-
-  const warnings: string[] = [];
-  const recommendations: string[] = [];
-  let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
-
-  // Check for active orders
-  const { count: activeOrders } = await supabase
-    .from('transactions')
-    .select('id', { count: 'exact' })
-    .filter('metadata->table_id', 'eq', tableId)
-    .in('status', ['pending', 'preparing', 'ready']);
-
-  if (activeOrders && activeOrders > 0) {
-    severity = 'critical';
-    warnings.push(`Table has ${activeOrders} active order(s)`);
-    recommendations.push('Complete all active orders before deleting');
-  }
-
-  return {
-    entity: {
-      type: 'table',
-      id: tableId,
-      identifier: `Table ${table.table_number}`,
-      created_at: table.created_at,
-    },
-    impact: {
-      severity,
-      message: `Table has ${ordersResult.count || 0} historical orders`,
-      warnings,
-    },
-    relatedEntities,
-    recommendations,
-    canDelete: !activeOrders || activeOrders === 0,
-    requiresForce: (ordersResult.count || 0) > 50,
-  };
-}
 
 /**
  * Module delete preview
@@ -534,15 +473,13 @@ async function getModuleDeletePreview(supabase: any, moduleId: string): Promise<
       canDelete = false;
     }
   } else if (module.type === 'restaurant') {
-    const [ordersResult, tablesResult, menuResult] = await Promise.all([
+    const [ordersResult, menuResult] = await Promise.all([
       supabase.from('transactions').select('id', { count: 'exact' }).eq('module_id', moduleId),
-      supabase.from('restaurant_tables').select('id', { count: 'exact' }).eq('module_id', moduleId),
       supabase.from('menu_items').select('id', { count: 'exact' }).eq('module_id', moduleId),
     ]);
 
     relatedEntities = [
       { table: 'orders', count: ordersResult.count || 0 },
-      { table: 'tables', count: tablesResult.count || 0 },
       { table: 'menu_items', count: menuResult.count || 0 },
     ].filter(e => e.count > 0);
 
