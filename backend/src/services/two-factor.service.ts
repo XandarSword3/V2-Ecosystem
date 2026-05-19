@@ -307,15 +307,17 @@ class TwoFactorService {
     if (!key) {
       throw new Error('JWT_SECRET environment variable is required for 2FA encryption');
     }
-    const iv = crypto.randomBytes(16);
+    // SECURITY: AES-256-GCM provides authenticated encryption (integrity + confidentiality)
+    const iv = crypto.randomBytes(12); // GCM standard: 12-byte IV
     const cipher = crypto.createCipheriv(
-      'aes-256-cbc',
+      'aes-256-gcm',
       crypto.createHash('sha256').update(key).digest(),
       iv
     );
     let encrypted = cipher.update(secret, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return iv.toString('hex') + ':' + encrypted;
+    const authTag = cipher.getAuthTag().toString('hex');
+    return iv.toString('hex') + ':' + encrypted + ':' + authTag;
   }
 
   /**
@@ -326,13 +328,29 @@ class TwoFactorService {
     if (!key) {
       throw new Error('JWT_SECRET environment variable is required for 2FA decryption');
     }
-    const [ivHex, encryptedData] = encrypted.split(':');
+    const parts = encrypted.split(':');
+    // Support legacy CBC format (2 parts: iv:data) for backwards compatibility during migration
+    if (parts.length === 2) {
+      const [ivHex, encryptedData] = parts;
+      const iv = Buffer.from(ivHex, 'hex');
+      const decipher = crypto.createDecipheriv(
+        'aes-256-cbc',
+        crypto.createHash('sha256').update(key).digest(),
+        iv
+      );
+      let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    }
+    // GCM format (3 parts: iv:data:authTag)
+    const [ivHex, encryptedData, authTagHex] = parts;
     const iv = Buffer.from(ivHex, 'hex');
     const decipher = crypto.createDecipheriv(
-      'aes-256-cbc',
+      'aes-256-gcm',
       crypto.createHash('sha256').update(key).digest(),
       iv
     );
+    decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
     let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;

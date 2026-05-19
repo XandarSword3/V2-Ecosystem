@@ -793,6 +793,14 @@ export const updateFrontendTranslation = asyncHandler(async (req: Request, res: 
         error: 'Language, key, and value are required',
       });
     }
+
+    // SECURITY: Validate language code to prevent path traversal
+    if (!/^[a-z]{2}(-[A-Z]{2})?$/.test(language)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid language code format',
+      });
+    }
     
     const fs = await import('fs').then(m => m.promises);
     const path = await import('path');
