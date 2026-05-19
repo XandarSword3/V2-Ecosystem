@@ -45,11 +45,21 @@ const propertiesSeed = [
 ];
 
 vi.mock('@/lib/api', () => ({
-  __esModule: true,
-  default: {
+  api: {
     get: apiGetMock,
     post: apiPostMock,
   },
+}));
+
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Azure Bay Resort' },
+    setActiveProperty: vi.fn(),
+    properties: [],
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
 }));
 
 vi.mock('sonner', () => ({
@@ -85,13 +95,15 @@ describe('Admin properties route coverage', () => {
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
 
-    apiGetMock.mockResolvedValue({ data: { properties: propertiesSeed } });
-
-    apiPostMock.mockImplementation((url: string, payload: Record<string, unknown>) => {
-      if (url === '/multi-property/switch-property') {
-        return Promise.resolve({ data: { success: true, propertyId: payload.property_id } });
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/multi-property/my-properties') {
+        return Promise.resolve({ data: { properties: propertiesSeed } });
       }
+      // Economics and module queries — return empty so PropertyCard renders '—' safely
+      return Promise.resolve({ data: { data: null } });
+    });
 
+    apiPostMock.mockImplementation((url: string) => {
       if (url === '/multi-property/properties') {
         return Promise.resolve({ data: { success: true } });
       }
@@ -100,43 +112,37 @@ describe('Admin properties route coverage', () => {
     });
   });
 
-  it('loads properties, switches property context, and creates a new property', async () => {
+  it('loads properties and creates a new property', async () => {
     const user = userEvent.setup();
 
     renderPage();
 
-    expect(await screen.findByText('Multi-Property Management')).toBeInTheDocument();
+    expect(await screen.findByText('Property Management')).toBeInTheDocument();
     expect(await screen.findByText('Azure Bay Resort')).toBeInTheDocument();
-
-    await user.click(screen.getAllByRole('button', { name: /Switch to Property/i })[0]);
-
-    await waitFor(() => {
-      expect(apiPostMock).toHaveBeenCalledWith('/multi-property/switch-property', { property_id: 'prop-1' });
-    });
-
-    expect(toastSuccessMock).toHaveBeenCalledWith('Switched to Azure Bay Resort');
 
     await user.click(screen.getByRole('button', { name: /Add Property/i }));
 
-    const nameInput = await screen.findByPlaceholderText('e.g., Iron Paradise Gym Downtown');
+    const nameInput = await screen.findByPlaceholderText('V2 Resort & Spa');
     await user.type(nameInput, 'Sunset Cliff Villas');
 
-    const codeInput = screen.getByPlaceholderText('e.g., V2-DTN');
-    await user.type(codeInput, 'SCV-003');
+    const cityInput = screen.getByPlaceholderText('Beirut');
+    await user.type(cityInput, 'Naples');
 
-    await user.click(screen.getAllByRole('button', { name: /Add Property/i })[1]);
+    const countryInput = screen.getByPlaceholderText('Lebanon');
+    await user.type(countryInput, 'Italy');
+
+    await user.click(screen.getByRole('button', { name: /Deploy Property/i }));
 
     await waitFor(() => {
       expect(apiPostMock).toHaveBeenCalledWith(
         '/multi-property/properties',
         expect.objectContaining({
           name: 'Sunset Cliff Villas',
-          property_code: 'SCV-003',
         })
       );
     });
 
-    expect(toastSuccessMock).toHaveBeenCalledWith('Property created');
+    expect(toastSuccessMock).toHaveBeenCalledWith('Property created successfully');
   });
 
   it('shows a validation error when creating a property without a name', async () => {
@@ -144,11 +150,14 @@ describe('Admin properties route coverage', () => {
 
     renderPage();
 
-    await screen.findByText('Multi-Property Management');
+    await screen.findByText('Property Management');
 
     await user.click(screen.getByRole('button', { name: /Add Property/i }));
-    await user.click(screen.getAllByRole('button', { name: /Add Property/i })[1]);
+    await screen.findByText('Deploy New Property');
+    await user.click(screen.getByRole('button', { name: /Deploy Property/i }));
 
-    expect(toastErrorMock).toHaveBeenCalledWith('Property name is required');
+    // HTML5 required validation prevents submission — form stays open
+    expect(await screen.findByText('Deploy New Property')).toBeInTheDocument();
+    expect(apiPostMock).not.toHaveBeenCalled();
   });
 });
