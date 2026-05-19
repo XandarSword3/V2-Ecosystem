@@ -4,7 +4,7 @@
   "private": true,
   "license": "PROPRIETARY",
   "scripts": {
-    "build": "node ../node_modules/typescript/bin/tsc -p tsconfig.json"
+    "build": "echo 'Shared package exports raw TypeScript — compiled by consumer (Next.js). No separate build step required.'"
   },
   "main": "types/index.ts",
   "types": "types/index.ts",
