@@ -116,7 +116,7 @@ describe('Admin module modifiers route coverage', () => {
     toastErrorMock.mockReset();
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/restaurant/modifiers') {
+      if (url === '/customization/groups') {
         return Promise.resolve({ data: { data: groupsSeed } });
       }
       return Promise.resolve({ data: { data: [] } });
@@ -134,8 +134,8 @@ describe('Admin module modifiers route coverage', () => {
 
     render(<DynamicModifiersPage />);
 
-    expect(await screen.findByText('Restaurant Modifiers')).toBeInTheDocument();
-    expect(await screen.findByText('Toppings')).toBeInTheDocument();
+    await screen.findByText('Restaurant Modifiers');
+    await screen.findByText('Toppings');
 
     await user.click(screen.getByText('Toppings'));
     await user.click(screen.getByRole('button', { name: /Add Option/i }));
@@ -146,7 +146,7 @@ describe('Admin module modifiers route coverage', () => {
 
     await waitFor(() => {
       expect(apiPostMock).toHaveBeenCalledWith(
-        '/restaurant/modifiers/group-1/options',
+        '/customization/options',
         expect.objectContaining({
           name: expect.any(String),
           modifierType: 'add',

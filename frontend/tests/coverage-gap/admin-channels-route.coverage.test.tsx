@@ -51,6 +51,17 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: propertyId,
+    activeProperty: { id: propertyId, name: 'Test Property' },
+    setActiveProperty: vi.fn(),
+    properties: [],
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
+}));
+
 import ChannelManagerPage from '../../src/app/admin/channels/page';
 
 function renderPage() {
