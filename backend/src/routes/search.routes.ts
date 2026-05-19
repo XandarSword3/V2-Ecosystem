@@ -16,25 +16,30 @@ router.get('/orders', authenticate, authorize('staff', 'manager', 'admin', 'supe
       return nextQuery;
     };
 
-    let ordersQ = applyFilters(supabase.from('orders').select('id, customer_id, customer_name, total_amount, status, created_at, module_id, order_number'));
-    let bookingsQ = applyFilters(supabase.from('bookings').select('id, customer_id, customer_name, total_amount, status, created_at, unit_id, booking_number'));
-    let ticketsQ = applyFilters(supabase.from('tickets').select('id, customer_id, customer_name, total_amount, status, created_at, session_id, ticket_number'));
+    // All transaction types unified in the transactions table per Architecture Law
+    const ENGINE_TYPE_MAP: Record<string, string> = {
+      order: 'instant_transaction',
+      booking: 'time_exclusive_reservation',
+      ticket: 'shared_capacity_access',
+    };
 
-    if (customer_id) {
-      ordersQ = ordersQ.eq('customer_id', customer_id);
-      bookingsQ = bookingsQ.eq('customer_id', customer_id);
-      ticketsQ = ticketsQ.eq('customer_id', customer_id);
-    }
-    if (q) {
-      ordersQ = ordersQ.ilike('customer_name', `%${q}%`);
-      bookingsQ = bookingsQ.ilike('customer_name', `%${q}%`);
-      ticketsQ = ticketsQ.ilike('customer_name', `%${q}%`);
-    }
-    if (module) {
-      ordersQ = ordersQ.eq('module_id', module);
-    }
+    const buildQuery = (engineType: string) => {
+      let q2 = applyFilters(
+        supabase
+          .from('transactions')
+          .select('id, customer_id, status, amount, created_at, module_id, metadata, engine_type')
+          .eq('engine_type', engineType)
+      );
+      if (customer_id) q2 = q2.eq('customer_id', customer_id);
+      if (module) q2 = q2.eq('module_id', module);
+      return q2;
+    };
 
-    const [ordersRes, bookingsRes, ticketsRes] = await Promise.all([ordersQ, bookingsQ, ticketsQ]);
+    const [ordersRes, bookingsRes, ticketsRes] = await Promise.all([
+      buildQuery('instant_transaction'),
+      buildQuery('time_exclusive_reservation'),
+      buildQuery('shared_capacity_access'),
+    ]);
 
     const combined = [
       ...(ordersRes.data || []).map((row: any) => ({ ...row, type: 'order' })),

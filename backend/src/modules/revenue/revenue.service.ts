@@ -91,10 +91,11 @@ export class RevenueManagementService {
       for (const rt of (roomTypes || [])) {
         // Simple forecast based on historical data
         const { data: historicalData } = await this.supabase
-          .from('bookings')
+          .from('transactions')
           .select('*')
+          .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
-          .gte('check_in', dayjs(currentDate).subtract(365, 'day').format('YYYY-MM-DD'))
+          .filter('metadata->>check_in_date', 'gte',, dayjs(currentDate).subtract(365, 'day').format('YYYY-MM-DD'))
           .lte('check_in', dayjs(currentDate).subtract(335, 'day').format('YYYY-MM-DD'));
 
         const avgDemand = historicalData?.length || 5;
@@ -167,8 +168,9 @@ export class RevenueManagementService {
   async updateForecastActuals(propertyId: string, date: Date): Promise<void> {
     // Get actual booking data for the date
     const { data: bookings } = await this.supabase
-      .from('bookings')
-      .select('room_id, room_rate, total_amount')
+      .from('transactions')
+      .select('room_id, room_rate, amount')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .lte('check_in', dayjs(date).format('YYYY-MM-DD'))
       .gt('check_out', dayjs(date).format('YYYY-MM-DD'))
@@ -186,7 +188,7 @@ export class RevenueManagementService {
     const adr = roomsSold > 0
       ? bookings!.reduce((sum, b) => sum + (b.room_rate || 0), 0) / roomsSold
       : 0;
-    const revenue = bookings?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
+    const revenue = bookings?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0;
 
     // Update all forecasts for this date
     await this.supabase
@@ -1014,14 +1016,15 @@ export class RevenueManagementService {
     endDate: Date
   ): Promise<any> {
     const { data: bookings } = await this.supabase
-      .from('bookings')
-      .select('total_amount, room_rate, nights')
+      .from('transactions')
+      .select('amount, room_rate, nights')
+      .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
-      .gte('check_in', dayjs(startDate).format('YYYY-MM-DD'))
+      .filter('metadata->>check_in_date', 'gte',, dayjs(startDate).format('YYYY-MM-DD'))
       .lte('check_in', dayjs(endDate).format('YYYY-MM-DD'))
       .not('status', 'in', '("cancelled","no_show")');
 
-    const totalRevenue = bookings?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
+    const totalRevenue = bookings?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0;
     const totalBookings = bookings?.length || 0;
     const roomNightsSold = bookings?.reduce((sum, b) => sum + (b.nights || 0), 0) || 0;
     const adr = roomNightsSold > 0
@@ -1084,14 +1087,15 @@ export class RevenueManagementService {
       }
 
       const { data: bookings } = await this.supabase
-        .from('bookings')
-        .select('total_amount, room_rate, nights')
+        .from('transactions')
+        .select('amount, room_rate, nights')
+        .eq('engine_type', 'time_exclusive_reservation')
         .in('room_id', roomIdList)
-        .gte('check_in', dayjs(startDate).format('YYYY-MM-DD'))
+        .filter('metadata->>check_in_date', 'gte',, dayjs(startDate).format('YYYY-MM-DD'))
         .lte('check_in', dayjs(endDate).format('YYYY-MM-DD'))
         .not('status', 'in', '("cancelled","no_show")');
 
-      const revenue = bookings?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
+      const revenue = bookings?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0;
       const bookingCount = bookings?.length || 0;
       const roomNights = bookings?.reduce((sum, b) => sum + (b.nights || 0), 0) || 0;
       const avgRate = bookingCount > 0
