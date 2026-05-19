@@ -11,7 +11,10 @@ import { activityLogger } from "../utils/activityLogger.js";
 
 const router = Router();
 
-const UNSUBSCRIBE_SECRET = process.env.UNSUBSCRIBE_SECRET || process.env.JWT_SECRET || 'unsubscribe-secret';
+const UNSUBSCRIBE_SECRET = process.env.UNSUBSCRIBE_SECRET || process.env.JWT_SECRET;
+if (!UNSUBSCRIBE_SECRET) {
+  throw new Error('UNSUBSCRIBE_SECRET or JWT_SECRET environment variable is required');
+}
 const TOKEN_EXPIRY = '30d'; // Unsubscribe tokens valid for 30 days
 
 export interface UnsubscribeToken {

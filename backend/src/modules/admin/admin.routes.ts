@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate, authorize } from "../../middleware/auth.middleware";
-import { rateLimits } from "../../middleware/userRateLimit.middleware.js";
+import { rateLimits, userRateLimit } from "../../middleware/userRateLimit.middleware.js";
 import * as modulesController from "./modules.controller";
 import * as backupsController from "./backups.controller";
 import * as translationsController from "./translations.controller";
@@ -142,8 +142,10 @@ router.put('/translations/languages/:code', authorize('super_admin'), translatio
 router.delete('/translations/languages/:code', authorize('super_admin'), translationsController.deleteLanguage);
 
 // Frontend Translation Files Comparison - SUPER ADMIN
-router.get('/translations/frontend/compare', authorize('super_admin'), translationsController.compareFrontendTranslations);
-router.post('/translations/frontend/update', authorize('super_admin'), translationsController.updateFrontendTranslation);
+// SECURITY: Rate-limited — these endpoints perform file system operations
+const frontendTranslationRateLimit = userRateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'translation-fs:', message: 'Too many translation file requests. Please wait.' });
+router.get('/translations/frontend/compare', authorize('super_admin'), frontendTranslationRateLimit, translationsController.compareFrontendTranslations);
+router.post('/translations/frontend/update', authorize('super_admin'), frontendTranslationRateLimit, translationsController.updateFrontendTranslation);
 
 // UI Translations (Database Backed) - Phase 2
 router.get('/translations/ui', authorizeManager, translationsController.getUiTranslations);
