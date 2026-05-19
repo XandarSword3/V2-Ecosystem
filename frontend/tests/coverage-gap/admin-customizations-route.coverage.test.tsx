@@ -187,8 +187,8 @@ describe('Admin customizations route coverage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('Customization Manager')).toBeInTheDocument();
-    expect(await screen.findByText('Sizes')).toBeInTheDocument();
+    await screen.findByText('Customization Manager');
+    await screen.findByText('Sizes');
 
     await user.click(screen.getByRole('button', { name: /Performance Metrics/i }));
     expect(await screen.findByText('Validation Latency')).toBeInTheDocument();

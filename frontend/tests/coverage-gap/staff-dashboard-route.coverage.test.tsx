@@ -89,6 +89,17 @@ vi.mock('@/lib/socket', () => {
   };
 });
 
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property' },
+    setActiveProperty: vi.fn(),
+    properties: [],
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     info: toastInfoMock,
@@ -120,32 +131,18 @@ describe('Staff dashboard route coverage', () => {
     ];
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/restaurant/staff/orders/live') {
+      if (url === '/transactions/live') {
         return Promise.resolve({
           data: {
             data: [
               {
                 id: 'ord-1',
+                engine_type: 'instant_transaction',
                 order_number: 'R100',
                 status: 'pending',
+                metadata: { order_number: 'R100' },
                 updated_at: '2025-01-03T10:00:00.000Z',
                 created_at: '2025-01-03T09:50:00.000Z',
-              },
-            ],
-          },
-        });
-      }
-
-      if (url === '/snack/staff/orders/live') {
-        return Promise.resolve({
-          data: {
-            data: [
-              {
-                id: 'ord-2',
-                order_number: 'S200',
-                status: 'completed',
-                updated_at: new Date().toISOString(),
-                created_at: '2025-01-03T09:00:00.000Z',
               },
             ],
           },
@@ -160,24 +157,25 @@ describe('Staff dashboard route coverage', () => {
     render(<StaffDashboard />);
 
     await waitFor(() => {
-      expect(apiGetMock).toHaveBeenCalledTimes(2);
+      expect(apiGetMock).toHaveBeenCalledWith('/transactions/live', expect.any(Object));
     });
 
     await screen.findByText('Spa Services');
     await screen.findByText(/Order #R100 - pending/i);
 
     act(() => {
-      socketHandlers.get('order:new')?.({
+      socketHandlers.get('transaction:new')?.(({
         id: 'ord-3',
-        order_number: 'R300',
+        engine_type: 'instant_transaction',
+        metadata: { order_number: 'R300' },
         status: 'pending',
-      });
+      }) as unknown);
     });
 
-    expect(toastInfoMock).toHaveBeenCalledWith('newOrderReceived');
+    expect(toastInfoMock).toHaveBeenCalledWith('newTransactionReceived');
 
     act(() => {
-      socketHandlers.get('order:statusChanged')?.({ orderId: 'ord-3', status: 'completed' });
+      socketHandlers.get('transaction:statusChanged')?.((({ transactionId: 'ord-3', status: 'completed', engine_type: 'instant_transaction' }) as unknown));
     });
 
     await screen.findByText(/Order #ord-3 completed/i);
