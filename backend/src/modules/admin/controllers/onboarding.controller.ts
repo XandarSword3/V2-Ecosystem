@@ -5,6 +5,7 @@ import { logger } from '../../../utils/logger.js';
 import { logActivity } from '../../../utils/activityLogger.js';
 import Stripe from 'stripe';
 import nodemailer from 'nodemailer';
+import { secretsManager } from '../../../config/secrets.config.js';
 
 /**
  * Onboarding Controller
@@ -333,14 +334,29 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       faviconUrl: themeData.faviconUrl || null,
     };
 
+    // Pass the secret keys directly to the secrets manager / environment variables (New Bug #1)
+    if (stripeSecret) {
+      await secretsManager.rotate('STRIPE_SECRET_KEY', stripeSecret);
+      process.env.STRIPE_SECRET_KEY = stripeSecret;
+    }
+    if (smtpPass) {
+      process.env.SMTP_PASS = smtpPass;
+    }
+    if (smtpApiKey) {
+      await secretsManager.rotate('SENDGRID_API_KEY', smtpApiKey);
+      process.env.SENDGRID_API_KEY = smtpApiKey;
+    }
+
     const finalGatewaySettings = {
-      ...gatewayData,
-      secretKey: stripeSecret
+      publicKey: gatewayData.publicKey ? `${gatewayData.publicKey.substring(0, 8)}...` : '',
+      configured: !!stripeSecret,
     };
     const finalSmtpSettings = {
-      ...smtpData,
-      apiKey: smtpApiKey,
-      pass: smtpPass
+      host: smtpData.host || '',
+      port: smtpData.port || '',
+      user: smtpData.user || '',
+      fromEmail: smtpData.fromEmail || '',
+      configured: !!(smtpPass || smtpApiKey || smtpData.host),
     };
 
     const settingsToInsert = [
