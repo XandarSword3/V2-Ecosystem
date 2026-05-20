@@ -208,7 +208,7 @@ describe('OnboardingController', () => {
       const mockState = {
         completed: false,
         steps: {
-          brand_identity: { data: { resortName: 'Alpine Chalet', slug: 'alpine-chalet', address: '123 Peak St', phone: '123', email: 'alpine@test.com' } },
+          resort_details: { data: { name: 'Alpine Chalet', slug: 'alpine-chalet', address: '123 Peak St', phone: '123', email: 'alpine@test.com' } },
           visual_design: { data: { themeColor: '#123456', accentColor: '#abcdef' } },
           modules: { data: { modules: ['restaurant', 'accommodation'] } },
           staff_invitations: { data: { invitations: [{ email: 'staff1@test.com', name: 'John Doe', role: 'staff' }] } }
@@ -241,7 +241,19 @@ describe('OnboardingController', () => {
         return createChainableMock({});
       });
 
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+      const inviteUserByEmailMock = vi.fn().mockResolvedValue({
+        data: { user: { id: 'invited-staff-123', email: 'staff1@test.com' } },
+        error: null
+      });
+
+      vi.mocked(getSupabase).mockReturnValue({
+        from: fromMock,
+        auth: {
+          admin: {
+            inviteUserByEmail: inviteUserByEmailMock
+          }
+        }
+      } as any);
 
       const { req, res, next } = createMockReqRes({
         user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
