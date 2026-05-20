@@ -56,6 +56,7 @@ export function createInMemoryNotificationRepository(): NotificationRepository &
       if (filters?.isRead !== undefined) result = result.filter(n => n.is_read === filters.isRead);
       if (filters?.channel) result = result.filter(n => n.channel === filters.channel);
       if (filters?.priority) result = result.filter(n => n.priority === filters.priority);
+      if (filters?.propertyId) result = result.filter(n => n.property_id === filters.propertyId);
       return result;
     },
     async getAll(filters, pagination) {
@@ -67,6 +68,7 @@ export function createInMemoryNotificationRepository(): NotificationRepository &
       if (filters?.channel) result = result.filter(n => n.channel === filters.channel);
       if (filters?.scheduled) result = result.filter(n => !!n.scheduled_for);
       if (filters?.sent !== undefined) result = result.filter(n => filters.sent ? !!n.sent_at : !n.sent_at);
+      if (filters?.propertyId) result = result.filter(n => n.property_id === filters.propertyId);
       const total = result.length;
       if (pagination) {
         result = result.slice(pagination.offset, pagination.offset + pagination.limit);
@@ -118,9 +120,10 @@ export function createInMemoryNotificationRepository(): NotificationRepository &
       broadcasts.set(id, broadcast);
       return broadcast;
     },
-    async getBroadcasts(targetType) {
+    async getBroadcasts(targetType, propertyId) {
       let result = [...broadcasts.values()];
       if (targetType) result = result.filter(b => b.target_type === targetType);
+      if (propertyId) result = result.filter(b => b.property_id === propertyId);
       return result;
     },
     async getBroadcastById(id) {
@@ -148,9 +151,10 @@ export function createInMemoryNotificationRepository(): NotificationRepository &
       templates.set(id, template);
       return template;
     },
-    async getTemplates(activeOnly) {
+    async getTemplates(activeOnly, propertyId) {
       let result = [...templates.values()];
       if (activeOnly) result = result.filter(t => t.is_active);
+      if (propertyId) result = result.filter(t => t.property_id === propertyId);
       return result;
     },
     async getTemplateById(id) {

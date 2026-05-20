@@ -22,6 +22,7 @@ export function createSupabaseNotificationRepository(): NotificationRepository {
         .from('notifications')
         .insert({
           user_id: data.user_id,
+          property_id: data.property_id,
           title: data.title,
           message: data.message,
           type: data.type,
@@ -73,6 +74,9 @@ export function createSupabaseNotificationRepository(): NotificationRepository {
         if (filters.channel) {
           query = query.eq('channel', filters.channel);
         }
+        if (filters.propertyId) {
+          query = query.eq('property_id', filters.propertyId);
+        }
       }
 
       const { data, error } = await query;
@@ -104,6 +108,9 @@ export function createSupabaseNotificationRepository(): NotificationRepository {
         }
         if (filters.channel) {
           query = query.eq('channel', filters.channel);
+        }
+        if (filters.propertyId) {
+          query = query.eq('property_id', filters.propertyId);
         }
       }
 
@@ -181,6 +188,7 @@ export function createSupabaseNotificationRepository(): NotificationRepository {
       const { data: broadcast, error } = await supabase
         .from('notification_broadcasts')
         .insert({
+          property_id: data.property_id,
           title: data.title,
           message: data.message,
           type: data.type,
@@ -201,7 +209,7 @@ export function createSupabaseNotificationRepository(): NotificationRepository {
       return broadcast;
     },
 
-    async getBroadcasts(targetType?: NotificationTargetType): Promise<BroadcastNotification[]> {
+    async getBroadcasts(targetType?: NotificationTargetType, propertyId?: string): Promise<BroadcastNotification[]> {
       let query = supabase
         .from('notification_broadcasts')
         .select('*')
@@ -209,6 +217,9 @@ export function createSupabaseNotificationRepository(): NotificationRepository {
 
       if (targetType) {
         query = query.or(`target_type.eq.${targetType},target_type.eq.all`);
+      }
+      if (propertyId) {
+        query = query.eq('property_id', propertyId);
       }
 
       const { data, error } = await query;
@@ -268,6 +279,7 @@ export function createSupabaseNotificationRepository(): NotificationRepository {
       const { data: template, error } = await supabase
         .from('notification_templates')
         .insert({
+          property_id: data.property_id,
           name: data.name,
           title: data.title,
           message: data.message,
@@ -285,7 +297,7 @@ export function createSupabaseNotificationRepository(): NotificationRepository {
       return template;
     },
 
-    async getTemplates(activeOnly = true): Promise<NotificationTemplate[]> {
+    async getTemplates(activeOnly = true, propertyId?: string): Promise<NotificationTemplate[]> {
       let query = supabase
         .from('notification_templates')
         .select('*')
@@ -293,6 +305,9 @@ export function createSupabaseNotificationRepository(): NotificationRepository {
 
       if (activeOnly) {
         query = query.eq('is_active', true);
+      }
+      if (propertyId) {
+        query = query.eq('property_id', propertyId);
       }
 
       const { data, error } = await query;

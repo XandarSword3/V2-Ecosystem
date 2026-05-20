@@ -30,6 +30,7 @@ export interface NotificationServiceDependencies {
 
 export interface CreateNotificationInput {
   userId?: string;
+  propertyId?: string;
   title: string;
   message: string;
   type?: NotificationType;
@@ -52,6 +53,7 @@ export interface BroadcastInput {
   actions?: NotificationAction[];
   scheduledFor?: string;
   createdBy: string;
+  propertyId?: string;
 }
 
 export interface CreateTemplateInput {
@@ -64,6 +66,7 @@ export interface CreateTemplateInput {
   actions?: NotificationAction[];
   variables?: string[];
   isActive?: boolean;
+  propertyId?: string;
 }
 
 // Valid types for validation
@@ -260,6 +263,7 @@ export function createNotificationService(deps: NotificationServiceDependencies)
       
       const notification = await notificationRepository.create({
         user_id: input.userId ?? null,
+        property_id: input.propertyId ?? null,
         title: input.title.trim(),
         message: input.message.trim(),
         type,
@@ -301,6 +305,7 @@ export function createNotificationService(deps: NotificationServiceDependencies)
       unreadOnly?: boolean;
       type?: NotificationType;
       limit?: number;
+      propertyId?: string;
     }): Promise<Notification[]> {
       validateUserId(userId);
       if (!userId) {
@@ -317,6 +322,9 @@ export function createNotificationService(deps: NotificationServiceDependencies)
       }
       if (options?.type) {
         filters.type = options.type;
+      }
+      if (options?.propertyId) {
+        filters.propertyId = options.propertyId;
       }
       
       const notifications = await notificationRepository.getByUserId(userId, filters);
@@ -475,6 +483,7 @@ export function createNotificationService(deps: NotificationServiceDependencies)
       const isScheduled = !!input.scheduledFor;
       
       const broadcast = await notificationRepository.createBroadcast({
+        property_id: input.propertyId ?? null,
         title: input.title.trim(),
         message: input.message.trim(),
         type,
@@ -509,12 +518,12 @@ export function createNotificationService(deps: NotificationServiceDependencies)
     /**
      * Get broadcast notifications
      */
-    async getBroadcasts(targetType?: NotificationTargetType): Promise<BroadcastNotification[]> {
+    async getBroadcasts(targetType?: NotificationTargetType, propertyId?: string): Promise<BroadcastNotification[]> {
       if (targetType) {
         validateTargetType(targetType);
       }
       
-      return notificationRepository.getBroadcasts(targetType);
+      return notificationRepository.getBroadcasts(targetType, propertyId);
     },
 
     /**
@@ -572,6 +581,7 @@ export function createNotificationService(deps: NotificationServiceDependencies)
       ].filter((v, i, arr) => arr.indexOf(v) === i);
       
       return notificationRepository.createTemplate({
+        property_id: input.propertyId ?? null,
         name: input.name.trim(),
         title: input.title.trim(),
         message: input.message.trim(),
@@ -587,8 +597,8 @@ export function createNotificationService(deps: NotificationServiceDependencies)
     /**
      * Get all templates
      */
-    async getTemplates(activeOnly = true): Promise<NotificationTemplate[]> {
-      return notificationRepository.getTemplates(activeOnly);
+    async getTemplates(activeOnly = true, propertyId?: string): Promise<NotificationTemplate[]> {
+      return notificationRepository.getTemplates(activeOnly, propertyId);
     },
 
     /**
@@ -623,8 +633,9 @@ export function createNotificationService(deps: NotificationServiceDependencies)
       
       return notificationRepository.updateTemplate(id, {
         ...data,
-        target_type: data.targetType
-      });
+        target_type: data.targetType,
+        property_id: data.propertyId
+      } as any);
     },
 
     /**

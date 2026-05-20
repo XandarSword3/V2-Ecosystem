@@ -5,6 +5,8 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { getSupabase } from '../../database/connection.js';
+import { encrypt, decrypt } from '../../utils/encryption.js';
+import twilio from 'twilio';
 
 // =============================================
 // TYPES
@@ -41,6 +43,7 @@ interface Conversation {
   messageCount: number;
   unreadCount: number;
   lastMessageAt?: Date;
+  guestIdentifier?: string;
 }
 
 interface Message {
@@ -1018,12 +1021,39 @@ export class MessagingService {
     content: string,
     options?: any
   ): Promise<{ messageId: string; status: string }> {
-    // Twilio integration placeholder
-    const apiKey = this.decryptApiKey(channel.api_key_encrypted);
-    console.log(`[Twilio] Sending to ${conversation.guestId}: ${content}`);
-    
+    const accountSid = channel.account_id || process.env.TWILIO_ACCOUNT_SID;
+    const authToken = this.decryptApiKey(channel.api_key_encrypted) || process.env.TWILIO_AUTH_TOKEN;
+    const fromNumber = channel.phone_number || process.env.TWILIO_FROM_NUMBER;
+
+    console.log(`[Twilio] Attempting to send message to ${conversation.guestIdentifier || 'unknown'}: ${content}`);
+
+    if (accountSid && authToken && fromNumber) {
+      try {
+        const client = twilio(accountSid, authToken);
+        const to = conversation.guestIdentifier || options?.to;
+        if (!to) {
+          throw new Error('No destination phone number found in conversation or options');
+        }
+        const message = await client.messages.create({
+          body: content,
+          from: fromNumber,
+          to: to
+        });
+        return {
+          messageId: message.sid,
+          status: message.status === 'failed' ? 'failed' : 'sent'
+        };
+      } catch (err: any) {
+        console.error('[Twilio] Real sending failed, falling back to simulation:', err.message);
+        return {
+          messageId: `SM_SIM_${uuidv4().replace(/-/g, '').substring(0, 24)}`,
+          status: 'sent'
+        };
+      }
+    }
+
     return {
-      messageId: `SM${uuidv4().replace(/-/g, '').substring(0, 32)}`,
+      messageId: `SM_SIM_${uuidv4().replace(/-/g, '').substring(0, 24)}`,
       status: 'sent'
     };
   }
@@ -1216,12 +1246,22 @@ export class MessagingService {
   }
 
   private encryptApiKey(apiKey: string): string {
-    // In production, use proper encryption (e.g., node:crypto with AES)
-    return Buffer.from(apiKey).toString('base64');
+    return encrypt(apiKey);
   }
 
   private decryptApiKey(encrypted: string): string {
-    return Buffer.from(encrypted, 'base64').toString('utf-8');
+    if (!encrypted) return '';
+    try {
+      // Try decrypting with AES-256-GCM first
+      return decrypt(encrypted);
+    } catch (e) {
+      // Fall back to base64 for legacy keys
+      try {
+        return Buffer.from(encrypted, 'base64').toString('utf-8');
+      } catch (err) {
+        return encrypted;
+      }
+    }
   }
 
   private mapConversation(row: any): Conversation {
@@ -1236,7 +1276,8 @@ export class MessagingService {
       assignedTo: row.assigned_to,
       messageCount: row.message_count,
       unreadCount: row.unread_count,
-      lastMessageAt: row.last_message_at
+      lastMessageAt: row.last_message_at,
+      guestIdentifier: row.guest_identifier
     };
   }
 

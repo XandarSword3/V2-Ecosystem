@@ -19,6 +19,9 @@ import * as deletePreviewController from "./controllers/delete-preview.controlle
 import pricingRoutes from "./pricing.controller";
 import * as softDeleteController from "./controllers/soft-delete.controller";
 import * as reportsController from "./controllers/reports.controller";
+import { validatePropertyAccess } from "../../middleware/propertyAccess.middleware.js";
+import * as onboardingController from "./controllers/onboarding.controller.js";
+import * as importController from "./controllers/import.controller.js";
 
 const router = Router();
 
@@ -35,6 +38,7 @@ const authorizeManager = authorize(...MANAGEMENT_ROLES);
 
 // Base authentication required for all routes
 router.use(authenticate);
+router.use(validatePropertyAccess);
 
 // --- SUPER ADMIN ONLY ROUTES ---
 
@@ -94,11 +98,11 @@ router.get('/audit-logs/:resource', authorize('admin', 'super_admin'), auditCont
 router.get('/audit-logs/:resource/:resourceId', authorize('admin', 'super_admin'), auditController.getAuditLogsByResource);
 
 // Backups (rate limited - expensive operations) - SUPER ADMIN ONLY
-router.get('/backups', authorize('admin', 'super_admin'), backupsController.getBackups);
-router.post('/backups', authorize('admin', 'super_admin'), rateLimits.expensive, backupsController.createBackup);
-router.get('/backups/:id/download', authorize('admin', 'super_admin'), backupsController.getDownloadUrl);
+router.get('/backups', authorize('super_admin'), backupsController.getBackups);
+router.post('/backups', authorize('super_admin'), rateLimits.expensive, backupsController.createBackup);
+router.get('/backups/:id/download', authorize('super_admin'), backupsController.getDownloadUrl);
 router.post('/backups/restore', authorize('super_admin'), rateLimits.expensive, backupsController.restoreBackup);
-router.delete('/backups/:id', authorize('admin', 'super_admin'), backupsController.deleteBackup);
+router.delete('/backups/:id', authorize('super_admin'), backupsController.deleteBackup);
 
 // Legacy Reports and Scheduled Reports endpoints removed in favor of Unified Reporting Module
 
@@ -163,5 +167,18 @@ router.get('/deleted/:entityType', authorizeManager, softDeleteController.getDel
 router.post('/deleted/:entityType/:entityId/restore', authorizeManager, softDeleteController.restoreRecord);
 router.delete('/deleted/:entityType/:entityId/permanent', authorize('super_admin'), softDeleteController.permanentDelete);
 router.post('/soft-delete/:entityType/:entityId', authorizeManager, softDeleteController.softDelete);
+
+// Onboarding Wizard Setup
+router.get('/onboarding', onboardingController.getOnboardingState);
+router.put('/onboarding', onboardingController.updateOnboardingState);
+router.post('/onboarding/verify-stripe', onboardingController.verifyStripe);
+router.post('/onboarding/test-email', onboardingController.testEmail);
+router.post('/onboarding/finalize', onboardingController.finalizeOnboarding);
+router.get('/onboarding/manual', onboardingController.getOperationsManual);
+
+// CSV Bulk Imports
+router.post('/import/menu', authorizeManager, importController.importMenuItems);
+router.post('/import/accommodations', authorizeManager, importController.importAccommodations);
+router.post('/import/inventory', authorizeManager, importController.importInventory);
 
 export default router;

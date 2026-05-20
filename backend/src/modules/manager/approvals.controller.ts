@@ -28,6 +28,7 @@ export class ApprovalsController {
    */
   async getPendingApprovals(req: Request, res: Response) {
     try {
+      const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
       const supabase = getSupabase();
       const { page = '1', limit = '20', type } = req.query;
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
@@ -37,6 +38,10 @@ export class ApprovalsController {
         .select('*', { count: 'exact' })
         .eq('status', 'pending')
         .gt('expires_at', new Date().toISOString());
+
+      if (propertyId) {
+        query = query.eq('property_id', propertyId);
+      }
 
       if (type) {
         query = query.eq('type', type as string);
@@ -90,6 +95,7 @@ export class ApprovalsController {
    */
   async getApprovals(req: Request, res: Response) {
     try {
+      const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
       const supabase = getSupabase();
       const { page = '1', limit = '20', status, type, requestedBy, startDate, endDate } = req.query;
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
@@ -98,6 +104,9 @@ export class ApprovalsController {
         .from('manager_approvals')
         .select('*', { count: 'exact' });
 
+      if (propertyId) {
+        query = query.eq('property_id', propertyId);
+      }
       if (status) query = query.eq('status', status as string);
       if (type) query = query.eq('type', type as string);
       if (requestedBy) query = query.eq('requested_by', requestedBy as string);
@@ -154,6 +163,7 @@ export class ApprovalsController {
    */
   async createApproval(req: Request, res: Response) {
     try {
+      const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
       const validation = createApprovalSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({
@@ -179,6 +189,7 @@ export class ApprovalsController {
           reference_type: data.referenceType,
           reference_id: data.referenceId,
           requested_by: userId,
+          property_id: propertyId,
         })
         .select()
         .single();
@@ -229,6 +240,7 @@ export class ApprovalsController {
   async reviewApproval(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
       const validation = reviewApprovalSchema.safeParse(req.body);
       
       if (!validation.success) {
@@ -261,6 +273,13 @@ export class ApprovalsController {
         return res.status(400).json({
           success: false,
           error: 'Approval has already been reviewed',
+        });
+      }
+
+      if (propertyId && existing.property_id && existing.property_id !== propertyId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied: Approval request belongs to a different property context',
         });
       }
 
@@ -339,6 +358,7 @@ export class ApprovalsController {
                 approval_id: approval.id,
                 reason: 'No completed payment record found for reference',
               },
+              property_id: approval.property_id,
             });
             break;
           }
@@ -368,7 +388,7 @@ export class ApprovalsController {
         case 'discount':
         case 'price_adjustment':
           if (approval.reference_id) {
-            await supabase.from('activity_logs').insert({ // Changed from audit_logs to activity_logs
+            await supabase.from('audit_logs').insert({
               user_id: approval.reviewed_by,
               action: `${approval.type}_applied`,
               resource: approval.reference_type,
@@ -379,6 +399,7 @@ export class ApprovalsController {
                 original_amount: approval.original_amount,
                 approval_id: approval.id,
               },
+              property_id: approval.property_id,
             });
           }
           break;
@@ -408,6 +429,7 @@ export class ApprovalsController {
    */
   async getApprovalStats(req: Request, res: Response) {
     try {
+      const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
       const supabase = getSupabase();
       const { startDate, endDate } = req.query;
 
@@ -415,19 +437,32 @@ export class ApprovalsController {
       const end = endDate ? new Date(endDate as string) : new Date();
 
       // Get counts by status
-      const { data: statusCounts } = await supabase
+      let queryStatus = supabase
         .from('manager_approvals')
         .select('status')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString());
 
       // Get counts by type
-      const { data: typeCounts } = await supabase
+      let queryType = supabase
         .from('manager_approvals')
         .select('type, amount')
         .eq('status', 'approved')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString());
+
+      if (propertyId) {
+        queryStatus = queryStatus.eq('property_id', propertyId);
+        queryType = queryType.eq('property_id', propertyId);
+      }
+
+      const [statusCountsRes, typeCountsRes] = await Promise.all([
+        queryStatus,
+        queryType
+      ]);
+
+      const statusCounts = statusCountsRes.data;
+      const typeCounts = typeCountsRes.data;
 
       const summary = {
         total: statusCounts?.length || 0,
@@ -442,7 +477,7 @@ export class ApprovalsController {
           summary.byType[t.type] = { count: 0, totalAmount: 0 };
         }
         summary.byType[t.type].count++;
-        summary.byType[t.type].totalAmount += t.amount || 0;
+        summary.byType[t.type].totalAmount += Number(t.amount || 0);
       });
 
       res.json({

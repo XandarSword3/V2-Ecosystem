@@ -229,29 +229,33 @@ export default function EconomicsDashboard() {
   <title>Economics Report — ${dateLabel}</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; color: #1e293b; background: #fff; padding: 32px; }
-    .header { border-bottom: 2px solid #0891b2; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
-    .header h1 { font-size: 22px; font-weight: 700; color: #0891b2; }
-    .header .meta { text-align: right; color: #64748b; font-size: 11px; }
-    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
-    .kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; }
-    .kpi .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 4px; }
-    .kpi .value { font-size: 20px; font-weight: 700; color: #0f172a; }
-    .kpi .sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
-    section { margin-bottom: 24px; }
-    section h2 { font-size: 13px; font-weight: 600; color: #0891b2; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
-    table { width: 100%; border-collapse: collapse; }
-    th { background: #f1f5f9; text-align: left; padding: 8px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; font-weight: 600; }
-    td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; color: #0f172a; background: #fff; padding: 40px; }
+    .header { border-bottom: 2px solid #4f46e5; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .header h1 { font-size: 24px; font-weight: 800; color: #4f46e5; letter-spacing: -0.02em; }
+    .header .meta { text-align: right; color: #64748b; font-size: 10px; line-height: 1.5; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px; }
+    .kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
+    .kpi .label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 6px; }
+    .kpi .value { font-size: 22px; font-weight: 800; color: #0f172a; }
+    .kpi .sub { font-size: 9px; color: #94a3b8; margin-top: 4px; }
+    section { margin-bottom: 30px; page-break-inside: avoid; }
+    section h2 { font-size: 12px; font-weight: 700; color: #4f46e5; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.05em; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+    th { background: #f8fafc; text-align: left; padding: 10px 12px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; font-weight: 700; border-bottom: 1px solid #e2e8f0; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    tr:nth-child(even) td { background-color: #fcfdfe; }
     tr:last-child td { border-bottom: none; }
-    .footer { margin-top: 32px; border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 10px; color: #94a3b8; text-align: center; }
-    @media print { body { padding: 20px; } }
+    .footer { margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 9px; color: #94a3b8; text-align: center; }
+    @media print { 
+      body { padding: 20px 0; }
+      @page { margin: 1.5cm; }
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <div>
-      <div style="font-size:11px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Economics Report</div>
+      <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Economics Core Report</div>
       <h1>Revenue &amp; Transaction Analytics</h1>
     </div>
     <div class="meta">
@@ -323,14 +327,14 @@ export default function EconomicsDashboard() {
 </body>
 </html>`;
 
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, '_blank');
+    const win = window.open('', '_blank');
     if (win) {
-      win.onload = () => {
+      win.document.write(html);
+      win.document.close();
+      // Brief timeout to ensure stylesheet rendering finishes
+      win.setTimeout(() => {
         win.print();
-        URL.revokeObjectURL(url);
-      };
+      }, 500);
     }
   };
 

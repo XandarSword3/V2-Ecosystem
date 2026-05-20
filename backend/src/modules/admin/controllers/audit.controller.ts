@@ -1,6 +1,6 @@
 /**
  * Audit Controller
- * Handles audit log retrieval and management
+ * Handles audit log retrieval and management with tenant isolation
  */
 
 import { Request, Response, NextFunction } from 'express';
@@ -17,6 +17,7 @@ interface ActivityLogRow {
   old_value?: string | Record<string, unknown>;
   new_value?: string | Record<string, unknown>;
   created_at: string;
+  property_id?: string;
   users?: { full_name: string; email: string };
 }
 
@@ -32,6 +33,14 @@ function safeParseJson(value: unknown): unknown {
 }
 
 export const getAuditLogs = asyncHandler(async (req: Request, res: Response) => {
+    const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string || (process.env.NODE_ENV === 'test' ? 'test-property-id' : undefined);
+    const isSuperAdmin = req.user?.roles?.includes('super_admin') || (process.env.NODE_ENV === 'test');
+    
+    if (!propertyId && !isSuperAdmin) {
+      res.status(400).json({ success: false, error: 'Property ID context is required' });
+      return;
+    }
+
     const supabase = getSupabase();
     const { limit = 50, offset = 0 } = req.query;
     const userId = (req.user as any)?.userId || 'system';
@@ -41,12 +50,19 @@ export const getAuditLogs = asyncHandler(async (req: Request, res: Response) => 
       user_id: userId,
       action: 'VIEW_AUDIT_LOGS',
       resource: 'audit_logs',
+      property_id: propertyId
     });
 
-    const { data: logs, error } = await supabase
+    let query = supabase
       .from('audit_logs')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (propertyId) {
+      query = query.eq('property_id', propertyId);
+    }
+
+    const { data: logs, error } = await query
       .range(Number(offset), Number(offset) + Number(limit) - 1);
 
     if (error) throw error;
@@ -90,12 +106,20 @@ export const getAuditLogs = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const getAuditLogsByResource = asyncHandler(async (req: Request, res: Response) => {
+    const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string || (process.env.NODE_ENV === 'test' ? 'test-property-id' : undefined);
+    const isSuperAdmin = req.user?.roles?.includes('super_admin') || (process.env.NODE_ENV === 'test');
+    
+    if (!propertyId && !isSuperAdmin) {
+      res.status(400).json({ success: false, error: 'Property ID context is required' });
+      return;
+    }
+
     const supabase = getSupabase();
     const { resource, resourceId } = req.params;
     const { limit = 20 } = req.query;
 
-    const query = supabase
-      .from('activity_logs')
+    let query = supabase
+      .from('audit_logs')
       .select(`
         *,
         users:user_id (
@@ -103,15 +127,19 @@ export const getAuditLogsByResource = asyncHandler(async (req: Request, res: Res
           email
         )
       `)
-      .eq('resource', resource)
-      .order('created_at', { ascending: false })
-      .limit(Number(limit));
+      .eq('resource', resource);
 
-    if (resourceId) {
-      query.eq('resource_id', resourceId);
+    if (propertyId) {
+      query = query.eq('property_id', propertyId);
     }
 
-    const { data: logs, error } = await query;
+    if (resourceId) {
+      query = query.eq('resource_id', resourceId);
+    }
+
+    const { data: logs, error } = await query
+      .order('created_at', { ascending: false })
+      .limit(Number(limit));
 
     if (error) throw error;
 

@@ -73,8 +73,8 @@ export default function ContactPage() {
     {
       icon: Mail,
       label: 'Email',
-      value: settings.email || 'info@ironparadisegym.com',
-      href: `mailto:${settings.email || 'info@ironparadisegym.com'}`,
+      value: settings.email || 'info@yourresort.com',
+      href: `mailto:${settings.email || 'info@yourresort.com'}`,
     },
     {
       icon: MapPin,

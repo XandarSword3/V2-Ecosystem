@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 import { exportUserData, deleteUserData, getPortableData } from './gdpr.controller.js';
+import { validatePropertyAccess } from '../../middleware/propertyAccess.middleware.js';
 import { 
   getProfile, 
   updateProfile, 
@@ -14,6 +15,7 @@ const router = Router();
 
 // All user routes require authentication
 router.use(authenticate);
+router.use(validatePropertyAccess);
 
 // =====================================
 // GDPR Compliance Endpoints

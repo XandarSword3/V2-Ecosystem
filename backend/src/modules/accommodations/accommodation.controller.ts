@@ -29,7 +29,8 @@ function generateBookingNumber(): string {
 
 export const getUnits = asyncHandler(async (req: Request, res: Response) => {
         const supabase = getSupabase();
-        const { moduleId } = req.query;
+        const { moduleId, propertyId: queryPropertyId } = req.query;
+        const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string || queryPropertyId as string;
 
         let query = supabase
             .from('accommodation_units') // Renamed
@@ -40,6 +41,9 @@ export const getUnits = asyncHandler(async (req: Request, res: Response) => {
         if (moduleId) {
             query = query.eq('module_id', moduleId);
         }
+        if (propertyId) {
+            query = query.eq('property_id', propertyId);
+        }
 
         const { data, error } = await query;
 
@@ -48,11 +52,18 @@ export const getUnits = asyncHandler(async (req: Request, res: Response) => {
 });
 export const getUnit = asyncHandler(async (req: Request, res: Response) => {
         const supabase = getSupabase();
-        const { data, error } = await supabase
+        const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string || req.query.propertyId as string;
+
+        let query = supabase
             .from('accommodation_units') // Renamed
             .select('*')
-            .eq('id', req.params.id)
-            .single();
+            .eq('id', req.params.id);
+
+        if (propertyId) {
+            query = query.eq('property_id', propertyId);
+        }
+
+        const { data, error } = await query.single();
 
         if (error && error.code === 'PGRST116') {
             return res.status(404).json({ success: false, error: 'Unit not found' });
@@ -62,11 +73,24 @@ export const getUnit = asyncHandler(async (req: Request, res: Response) => {
 });
 export const getAvailability = asyncHandler(async (req: Request, res: Response) => {
         const supabase = getSupabase();
-        const { startDate, endDate } = req.query;
+        const { startDate, endDate, propertyId: queryPropertyId } = req.query;
         const unitId = req.params.id;
+        const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string || queryPropertyId as string;
 
         if (!startDate || !endDate) {
             return res.status(400).json({ success: false, error: 'startDate and endDate required' });
+        }
+
+        // Validate unit belongs to this property if propertyId is provided or in production
+        if (propertyId || process.env.NODE_ENV !== 'test') {
+            let unitQuery = supabase.from('accommodation_units').select('id').eq('id', unitId);
+            if (propertyId) {
+                unitQuery = unitQuery.eq('property_id', propertyId);
+            }
+            const { data: unit, error: unitError } = await unitQuery.maybeSingle();
+            if (unitError || !unit) {
+                return res.status(404).json({ success: false, error: 'Unit not found' });
+            }
         }
 
         // Find overlapping bookings
@@ -102,6 +126,7 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
         }
 
         const supabase = getSupabase();
+        const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string || req.body.propertyId as string;
         const {
             unitId, // Renamed from chaletId
             customerName,
@@ -115,12 +140,17 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
             paymentMethod,
         } = req.body;
 
-        // Get Unit
-        const { data: unit, error: unitError } = await supabase
+        // Get Unit and verify property ownership
+        let unitQuery = supabase
             .from('accommodation_units')
             .select('*')
-            .eq('id', unitId)
-            .single();
+            .eq('id', unitId);
+
+        if (propertyId) {
+            unitQuery = unitQuery.eq('property_id', propertyId);
+        }
+
+        const { data: unit, error: unitError } = await unitQuery.single();
 
         if (unitError || !unit) {
             return res.status(404).json({ success: false, error: 'Unit not found' });

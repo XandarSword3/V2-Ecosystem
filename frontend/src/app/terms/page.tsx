@@ -6,10 +6,16 @@ import { FileText, CheckCircle, Briefcase, Calendar, Users, AlertTriangle, Refre
 import Link from 'next/link';
 import { useSiteSettings } from '@/lib/settings-context';
 import { Container } from '@/components/layout/Container';
+import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
 
 export default function TermsPage() {
   const t = useTranslations('legal.terms');
-  const { settings } = useSiteSettings();
+  const { settings, modules } = useSiteSettings();
+
+  const termsModule = modules.find(m => m.slug === 'terms-of-service');
+  if (termsModule?.settings?.layout && Array.isArray(termsModule.settings.layout) && termsModule.settings.layout.length > 0) {
+    return <DynamicModuleRenderer layout={termsModule.settings.layout} module={termsModule} />;
+  }
 
   const sections = [
     { key: 'acceptance', icon: CheckCircle },

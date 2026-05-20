@@ -1,6 +1,6 @@
 /**
  * File Upload Controller
- * Handles logo, favicon, and image uploads to Supabase Storage
+ * Handles logo, favicon, and image uploads to Supabase Storage with tenant isolation
  */
 
 import { Request, Response, NextFunction } from 'express';
@@ -67,6 +67,7 @@ async function ensureBucket() {
 export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = req.user?.userId;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     
     // Check if we have file data in body (from middleware)
     const { file, type = 'image', filename } = req.body;
@@ -135,7 +136,11 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     const ext = mimeType.split('/')[1]?.replace('svg+xml', 'svg').replace('x-icon', 'ico').replace('vnd.microsoft.icon', 'ico') || 'png';
     const timestamp = Date.now();
     const safeName = (filename || 'file').replace(/[^a-zA-Z0-9.-]/g, '_').substring(0, 50);
-    const storagePath = `${uploadType}/${timestamp}-${safeName}.${ext}`;
+    
+    // Prefix storage path by property ID to ensure isolation
+    const storagePath = propertyId 
+      ? `properties/${propertyId}/${uploadType}/${timestamp}-${safeName}.${ext}`
+      : `${uploadType}/${timestamp}-${safeName}.${ext}`;
     
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
@@ -161,29 +166,44 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     if (uploadType === 'logo' || uploadType === 'favicon') {
       const settingKey = uploadType === 'logo' ? 'logoUrl' : 'faviconUrl';
       
-      // Get existing branding settings
-      const { data: existing } = await supabase
-        .from('site_settings')
-        .select('value')
-        .eq('key', 'branding')
-        .single();
+      let brandingSettings: Record<string, unknown> = {};
       
-      const brandingSettings = (existing?.value as Record<string, unknown>) || {};
-      brandingSettings[settingKey] = publicUrl;
-      
-      // Update settings
-      const { error: updateError } = await supabase
-        .from('site_settings')
-        .upsert({
-          key: 'branding',
-          value: brandingSettings,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'key',
-        });
-      
-      if (updateError) {
-        logger.error('Failed to update branding settings', { error: updateError.message });
+      if (propertyId) {
+        try {
+          const { resolveSetting, setPropertySetting } = await import('../../multi-property/settings-resolution.service.js');
+          const resolved = await resolveSetting(propertyId, 'branding', {});
+          brandingSettings = (resolved?.value as Record<string, unknown>) || {};
+          brandingSettings[settingKey] = publicUrl;
+          
+          await setPropertySetting(propertyId, 'branding', brandingSettings, 'appearance', userId);
+        } catch (err) {
+          logger.error('Failed to update multi-property branding setting', { error: err });
+        }
+      } else {
+        // Get existing branding settings
+        const { data: existing } = await supabase
+          .from('site_settings')
+          .select('value')
+          .eq('key', 'branding')
+          .single();
+        
+        brandingSettings = (existing?.value as Record<string, unknown>) || {};
+        brandingSettings[settingKey] = publicUrl;
+        
+        // Update settings
+        const { error: updateError } = await supabase
+          .from('site_settings')
+          .upsert({
+            key: 'branding',
+            value: brandingSettings,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'key',
+          });
+        
+        if (updateError) {
+          logger.error('Failed to update branding settings', { error: updateError.message });
+        }
       }
       
       // Emit real-time update
@@ -217,12 +237,21 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
 export const deleteFile = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = req.user?.userId;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     const { path } = req.params;
     
     if (!path) {
       return res.status(400).json({
         success: false,
         error: 'File path required',
+      });
+    }
+
+    // Verify tenant isolation - do not allow deleting other tenant's files
+    if (propertyId && !path.startsWith(`properties/${propertyId}/`)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have access to delete this file',
       });
     }
     
@@ -257,13 +286,19 @@ export const deleteFile = asyncHandler(async (req: Request, res: Response) => {
  */
 export const listFiles = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     const { type } = req.query;
     
     const folder = (type as string) || '';
     
+    // Restrict folder view to current property if scoped
+    const folderPath = propertyId 
+      ? `properties/${propertyId}/${folder}`.replace(/\/$/, '') 
+      : folder;
+    
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
-      .list(folder, {
+      .list(folderPath, {
         limit: 100,
         sortBy: { column: 'created_at', order: 'desc' },
       });
@@ -274,7 +309,7 @@ export const listFiles = asyncHandler(async (req: Request, res: Response) => {
     
     // Get public URLs for all files
     const files = (data || []).map(file => {
-      const path = folder ? `${folder}/${file.name}` : file.name;
+      const path = folderPath ? `${folderPath}/${file.name}` : file.name;
       const { data: urlData } = supabase.storage
         .from(BUCKET_NAME)
         .getPublicUrl(path);
@@ -299,21 +334,34 @@ export const listFiles = asyncHandler(async (req: Request, res: Response) => {
  */
 export const getBranding = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     
-    const { data, error } = await supabase
-      .from('site_settings')
-      .select('value')
-      .eq('key', 'branding')
-      .single();
-    
-    if (error && error.code !== 'PGRST116') { // Not found is OK
-      throw error;
-    }
-    
-    const branding = (data?.value as Record<string, unknown>) || {
+    let branding = {
       logoUrl: null,
       faviconUrl: null,
     };
+    
+    if (propertyId) {
+      try {
+        const { resolveSetting } = await import('../../multi-property/settings-resolution.service.js');
+        const resolved = await resolveSetting(propertyId, 'branding', {});
+        branding = (resolved?.value as any) || branding;
+      } catch (err) {
+        logger.error('Failed to resolve branding setting', { error: err });
+      }
+    } else {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'branding')
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // Not found is OK
+        throw error;
+      }
+      
+      branding = (data?.value as any) || branding;
+    }
     
     res.json({
       success: true,

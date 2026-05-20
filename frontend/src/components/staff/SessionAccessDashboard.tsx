@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { isOnline } from '@/lib/offline/offline-storage';
+import { createOfflineMaintenanceLog } from '@/lib/offline/offline-sync';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import {
@@ -251,12 +253,21 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
 
   const handleMaintenanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const logData = {
+      type: maintenanceType,
+      notes: maintenanceNotes,
+      readings: maintenanceType === 'chemical_check' ? maintenanceReadings : {},
+    };
     try {
-      await api.post(`/staff/modules/${slug}/maintenance`, {
-        type: maintenanceType,
-        notes: maintenanceNotes,
-        readings: maintenanceType === 'chemical_check' ? maintenanceReadings : {},
-      });
+      if (!isOnline()) {
+        await createOfflineMaintenanceLog(logData);
+        toast.info('Log saved offline', { icon: '⏳' });
+        setShowAddMaintenanceForm(false);
+        setMaintenanceNotes('');
+        setMaintenanceReadings({ ph: '', chlorine: '', temperature: '' });
+        return;
+      }
+      await api.post(`/staff/modules/${slug}/maintenance`, logData);
       toast.success('Maintenance log saved');
       setShowAddMaintenanceForm(false);
       setMaintenanceNotes('');

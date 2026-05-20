@@ -26,6 +26,7 @@ vi.mock('../../src/database/connection.js', () => ({
 // 2. Mock Modules
 vi.mock('../../src/socket/index.js', () => ({
   emitToAll: vi.fn(),
+  getOnlineUsers: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('../../src/utils/logger.js', () => ({
@@ -86,7 +87,7 @@ describe('Admin Controller', () => {
                     return createChainableMock(mockUsers, null, 1);
                 }
                 if (table === 'user_roles') {
-                    return createChainableMock([{ roles: { name: 'customer' } }]);
+                    return createChainableMock([{ user_id: 'u-1', roles: { name: 'customer' } }]);
                 }
                 return createChainableMock([]);
             })
@@ -99,13 +100,16 @@ describe('Admin Controller', () => {
 
         await getUsers(req, res, next);
 
-        expect(res.json).toHaveBeenCalledWith({
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             success: true,
-            data: [{
-                ...mockUsers[0],
-                roles: ['customer'] 
-            }]
-        });
+            data: expect.arrayContaining([
+                expect.objectContaining({
+                    id: 'u-1',
+                    full_name: 'User 1',
+                    roles: ['customer'] 
+                })
+            ])
+        }));
     });
   });
 
@@ -182,10 +186,10 @@ describe('Admin Controller', () => {
 
           await updateSettings(req, res, next);
 
-          expect(res.json).toHaveBeenCalledWith({
+          expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
               success: true,
               message: expect.any(String)
-          });
+          }));
       });
   });
   
