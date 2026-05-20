@@ -10,6 +10,13 @@ CREATE TABLE IF NOT EXISTS site_settings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure the missing updated_by column exists on site_settings (Bug #6)
+ALTER TABLE site_settings 
+ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES users(id) ON DELETE SET NULL;
+
+COMMENT ON COLUMN site_settings.updated_by IS 'User who last updated this setting';
+
+
 -- Insert default onboarding state if it doesn't exist
 INSERT INTO site_settings (key, value, description)
 VALUES (

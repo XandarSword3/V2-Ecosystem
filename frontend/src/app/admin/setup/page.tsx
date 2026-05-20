@@ -298,7 +298,8 @@ export default function SetupWizardPage() {
     } else if (id === 'modules') {
       await saveStepProgress(id, { modules: selectedModules });
     } else if (id === 'payment_gateway') {
-      await saveStepProgress(id, stripeConfig);
+      const { secretKey, verifySuccess, verifyMsg, ...scrubbedStripe } = stripeConfig;
+      await saveStepProgress(id, scrubbedStripe);
     } else if (id === 'taxes') {
       await saveStepProgress(id, taxConfig);
     } else if (id === 'staff_invitations') {
@@ -306,7 +307,8 @@ export default function SetupWizardPage() {
     } else if (id === 'landing_cms') {
       await saveStepProgress(id, cmsConfig);
     } else if (id === 'transactional_emails') {
-      await saveStepProgress(id, smtpConfig);
+      const { pass, apiKey, verifySuccess, verifyMsg, ...scrubbedSmtp } = smtpConfig;
+      await saveStepProgress(id, scrubbedSmtp);
     }
   };
 
@@ -476,7 +478,12 @@ export default function SetupWizardPage() {
     try {
       const res = await fetch('/api/v1/admin/onboarding/finalize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stripeSecretKey: stripeConfig.secretKey,
+          smtpPass: smtpConfig.pass,
+          smtpApiKey: smtpConfig.apiKey
+        })
       });
       const data = await res.json();
       if (data.success) {
