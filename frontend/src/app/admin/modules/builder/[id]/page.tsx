@@ -25,6 +25,8 @@ export default function ModuleBuilderPage() {
     setActiveModuleId, 
     isPreview,
     togglePreview,
+    previewDevice,
+    setPreviewDevice,
     canvasMode,
     setCanvasMode,
     undo,
@@ -157,6 +159,33 @@ export default function ModuleBuilderPage() {
             </div>
 
 
+            {isPreview && (
+              <div className="flex items-center border border-slate-300 rounded-lg dark:border-slate-600 overflow-hidden mr-2">
+                <button
+                  onClick={() => setPreviewDevice('desktop')}
+                  className={`px-3 py-2 text-xs font-semibold transition-colors ${
+                    previewDevice === 'desktop'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}
+                  title="Desktop Preview"
+                >
+                  Desktop
+                </button>
+                <button
+                  onClick={() => setPreviewDevice('mobile')}
+                  className={`px-3 py-2 text-xs font-semibold transition-colors ${
+                    previewDevice === 'mobile'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}
+                  title="Mobile Preview"
+                >
+                  Mobile
+                </button>
+              </div>
+            )}
+
             <button
                 onClick={togglePreview}
                 className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700"
@@ -180,10 +209,25 @@ export default function ModuleBuilderPage() {
         {/* Render Canvas */}
          <main className={`flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-950/50 ${isPreview ? 'p-0' : 'p-8'}`}>
             {isPreview ? (
-                 <div className="bg-white dark:bg-slate-900 min-h-full">
-                    {/* Pass current layout state to renderer for live preview */}
-                    <DynamicModuleRenderer layout={layout} module={data?.data?.data} />
-                 </div>
+                 previewDevice === 'mobile' ? (
+                   <div className="flex items-center justify-center min-h-full py-8 bg-slate-100 dark:bg-slate-950/50">
+                     <div className="relative mx-auto border-[14px] border-slate-900 dark:border-slate-800 rounded-[2.5rem] h-[812px] w-[375px] shadow-2xl bg-white dark:bg-slate-900 overflow-hidden">
+                       {/* Phone Notch/Island */}
+                       <div className="absolute top-0 inset-x-0 h-6 flex justify-center z-50">
+                         <div className="bg-slate-900 dark:bg-slate-800 h-4 w-32 rounded-b-xl" />
+                       </div>
+                       {/* Phone Screen Scrollable Area */}
+                       <div className="h-full w-full overflow-y-auto pt-6 bg-white dark:bg-slate-900">
+                         <DynamicModuleRenderer layout={layout} module={data?.data?.data} />
+                       </div>
+                     </div>
+                   </div>
+                 ) : (
+                   <div className="bg-white dark:bg-slate-900 min-h-full">
+                      {/* Pass current layout state to renderer for live preview */}
+                      <DynamicModuleRenderer layout={layout} module={data?.data?.data} />
+                   </div>
+                 )
             ) : (
                 <div className="mx-auto max-w-5xl rounded-xl bg-white min-h-[600px] shadow-lg dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                     <BuilderCanvas module={data?.data?.data} />

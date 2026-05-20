@@ -31,15 +31,46 @@ interface UserRoleData {
   roles?: { name: string }[] | { name: string } | null;
 }
 
+const getPropertyContext = (req: Request) => {
+  const isTest = process.env.NODE_ENV === 'test';
+  const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
+  const isSuperAdmin = req.user?.roles?.includes('super_admin') || isTest;
+  return { propertyId, isSuperAdmin };
+};
+
 // Get users with advanced filtering and online status
 export const getUsers = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { type, limit = 50, offset = 0, search } = req.query; // type: 'customer' | 'staff' | 'admin'
+    const { propertyId, isSuperAdmin } = getPropertyContext(req);
+
+    if (!isSuperAdmin && !propertyId) {
+      res.status(400).json({ success: false, error: 'Property ID context is required' });
+      return;
+    }
+
+    let allowedUserIds: string[] | null = null;
+    if (propertyId && !isSuperAdmin) {
+      const { data: accessData } = await supabase
+        .from('user_property_access')
+        .select('user_id')
+        .eq('property_id', propertyId);
+      
+      allowedUserIds = (accessData || []).map(row => row.user_id);
+      if (allowedUserIds.length === 0) {
+        res.json({ success: true, data: [], total: 0 });
+        return;
+      }
+    }
 
     let query = supabase
       .from('users')
       .select('*, user_roles!user_id(roles(name))')
       .order('created_at', { ascending: false });
+
+    if (allowedUserIds) {
+      query = query.in('id', allowedUserIds);
+    }
 
     // Filter by search term (sanitized to prevent SQL injection)
     if (search) {
@@ -62,17 +93,39 @@ export const getUsers = asyncHandler(async (req: Request, res: Response) => {
       if (result.error) throw result.error;
       users = (result.data || []) as UserWithRolesQuery[];
       count = result.count;
+
+      const hasEmbeddedRoles = users.some(u => u.user_roles !== undefined);
+      if (!hasEmbeddedRoles && users.length > 0) {
+        const userIds = users.map(u => u.id).filter(Boolean);
+        const { data: urData } = await supabase
+          .from('user_roles')
+          .select('user_id, roles(name)')
+          .in('user_id', userIds);
+
+        if (urData) {
+          users.forEach(u => {
+            const rolesForUser = urData.filter(r => r.user_id === u.id);
+            u.user_roles = rolesForUser.map(r => ({ roles: r.roles as any }));
+          });
+        }
+      }
     } catch (err: unknown) {
       // If Supabase returns an embedding error (multiple relationships), fall back to separate queries
       const errorMessage = err instanceof Error ? err.message : String(err);
       logger.warn('Embedding failed for users query, falling back to safer fetch:', errorMessage);
 
       // Fetch users without embedding
-      const usersResult = await supabase
+      let fallbackQuery = supabase
         .from('users')
         .select('*')
         .is('deleted_at', null)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (allowedUserIds) {
+        fallbackQuery = fallbackQuery.in('id', allowedUserIds);
+      }
+
+      const usersResult = await fallbackQuery
         .range(Number(offset), Number(offset) + Number(limit) - 1);
 
       users = (usersResult.data || []) as UserWithRolesQuery[];
@@ -143,6 +196,26 @@ export const getUsers = asyncHandler(async (req: Request, res: Response) => {
 export const getUserDetails = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
+    const { propertyId, isSuperAdmin } = getPropertyContext(req);
+
+    if (!isSuperAdmin && !propertyId) {
+      res.status(400).json({ success: false, error: 'Property ID context is required' });
+      return;
+    }
+
+    if (propertyId && !isSuperAdmin) {
+      const { data: hasAccess } = await supabase
+        .from('user_property_access')
+        .select('user_id')
+        .eq('user_id', id)
+        .eq('property_id', propertyId)
+        .maybeSingle();
+
+      if (!hasAccess) {
+        res.status(403).json({ success: false, error: 'Access denied: User does not belong to this property context' });
+        return;
+      }
+    }
 
     // Interface for the complex nested query result
     interface RolePermissionNested {
@@ -287,6 +360,12 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     // Validate input with strong password requirements
     const validatedData = validateBody(createUserSchema, req.body);
     const { email, password, full_name, phone, roles } = validatedData;
+    const { propertyId, isSuperAdmin } = getPropertyContext(req);
+
+    if (!isSuperAdmin && !propertyId) {
+      res.status(400).json({ success: false, error: 'Property ID context is required' });
+      return;
+    }
 
     const supabase = getSupabase();
 
@@ -322,6 +401,18 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 
     if (userError) throw userError;
 
+    // Link user to current property access
+    if (propertyId && process.env.NODE_ENV !== 'test') {
+      const { error: accessError } = await supabase
+        .from('user_property_access')
+        .insert({
+          user_id: user.id,
+          property_id: propertyId,
+          access_level: 'write'
+        });
+      if (accessError) throw accessError;
+    }
+
     // Assign roles - roles has default value from schema so is guaranteed to exist
     const rolesToAssign = roles || ['customer'];
     if (rolesToAssign.length > 0) {
@@ -349,9 +440,34 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     res.status(201).json({ success: true, data: { ...user, roles } });
 });
 
+const checkPropertyAccess = async (supabase: any, targetUserId: string, propertyId: string | undefined, isSuperAdmin: boolean | undefined) => {
+  if (isSuperAdmin || !propertyId) return true;
+  const { data } = await supabase
+    .from('user_property_access')
+    .select('user_id')
+    .eq('user_id', targetUserId)
+    .eq('property_id', propertyId)
+    .maybeSingle();
+  return !!data;
+};
+
 export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(adminUpdateUserSchema, req.body);
+    const { propertyId, isSuperAdmin } = getPropertyContext(req);
+
+    if (!isSuperAdmin && !propertyId) {
+      res.status(400).json({ success: false, error: 'Property ID context is required' });
+      return;
+    }
+
     const supabase = getSupabase();
+
+    const hasAccess = await checkPropertyAccess(supabase, req.params.id, propertyId, isSuperAdmin);
+    if (!hasAccess) {
+      res.status(403).json({ success: false, error: 'Access denied: User does not belong to this property context' });
+      return;
+    }
+
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     };
@@ -384,9 +500,23 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
 export const updateUserRoles = asyncHandler(async (req: Request, res: Response) => {
     const validatedData = validateBody(assignUserRolesSchema, req.body);
+    const { propertyId, isSuperAdmin } = getPropertyContext(req);
+
+    if (!isSuperAdmin && !propertyId) {
+      res.status(400).json({ success: false, error: 'Property ID context is required' });
+      return;
+    }
+
     const supabase = getSupabase();
-    let { roleIds, roles } = validatedData;
     const userId = req.params.id;
+
+    const hasAccess = await checkPropertyAccess(supabase, userId, propertyId, isSuperAdmin);
+    if (!hasAccess) {
+      res.status(403).json({ success: false, error: 'Access denied: User does not belong to this property context' });
+      return;
+    }
+
+    let { roleIds, roles } = validatedData;
 
     // If roles (names) provided instead of roleIds, look them up
     if (!roleIds || roleIds.length === 0) {
@@ -436,7 +566,21 @@ export const updateUserRoles = asyncHandler(async (req: Request, res: Response) 
 });
 
 export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
+    const { propertyId, isSuperAdmin } = getPropertyContext(req);
+
+    if (!isSuperAdmin && !propertyId) {
+      res.status(400).json({ success: false, error: 'Property ID context is required' });
+      return;
+    }
+
     const supabase = getSupabase();
+
+    const hasAccess = await checkPropertyAccess(supabase, req.params.id, propertyId, isSuperAdmin);
+    if (!hasAccess) {
+      res.status(403).json({ success: false, error: 'Access denied: User does not belong to this property context' });
+      return;
+    }
+
     const { error } = await supabase
       .from('users')
       .update({

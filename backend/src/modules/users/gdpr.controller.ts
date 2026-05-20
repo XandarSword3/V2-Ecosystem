@@ -46,6 +46,7 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
       return;
     }
 
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     const supabase = getSupabase();
 
     // Fetch all user data in parallel
@@ -67,39 +68,66 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
         .single(),
       
       // All user transactions (unified)
-      supabase.from('transactions')
-        .select('id, engine_type, order_number, ticket_number, booking_number, status, amount, payment_status, customer_name, customer_phone, created_at, reference_id, reference_table')
-        .eq('customer_id', userId)
-        .order('created_at', { ascending: false }),
+      (() => {
+        let q = supabase.from('transactions')
+          .select('id, engine_type, order_number, ticket_number, booking_number, status, amount, payment_status, customer_name, customer_phone, created_at, reference_id, reference_table')
+          .eq('customer_id', userId);
+        if (propertyId) q = q.eq('property_id', propertyId);
+        return q.order('created_at', { ascending: false });
+      })(),
       
       // GDPR Consents
-      supabase.from('gdpr_consents').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+      (() => {
+        let q = supabase.from('gdpr_consents').select('*').eq('user_id', userId);
+        if (propertyId) q = q.eq('property_id', propertyId);
+        return q.order('created_at', { ascending: false });
+      })(),
       
       // Reviews
-      supabase.from('reviews')
-        .select('id, rating, text, service_type, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false }),
+      (() => {
+        let q = supabase.from('reviews')
+          .select('id, rating, text, service_type, created_at')
+          .eq('user_id', userId);
+        if (propertyId) q = q.eq('property_id', propertyId);
+        return q.order('created_at', { ascending: false });
+      })(),
       
       // Support tickets
-      supabase.from('support_tickets')
-        .select('id, subject, status, priority, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false }),
+      (() => {
+        let q = supabase.from('support_tickets')
+          .select('id, subject, status, priority, created_at')
+          .eq('user_id', userId);
+        if (propertyId) q = q.eq('property_id', propertyId);
+        return q.order('created_at', { ascending: false });
+      })(),
       
       // Activity logs (last 1000)
-      supabase.from('audit_logs')
-        .select('id, action, resource, resource_id, old_value, new_value, ip_address, user_agent, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(1000),
+      (() => {
+        let q = supabase.from('audit_logs')
+          .select('id, action, resource, resource_id, old_value, new_value, ip_address, user_agent, created_at')
+          .eq('user_id', userId);
+        if (propertyId) q = q.eq('property_id', propertyId);
+        return q.order('created_at', { ascending: false }).limit(1000);
+      })(),
         
       // Loyalty Data
-      supabase.from('loyalty_accounts').select('*').eq('user_id', userId).maybeSingle(),
-      supabase.from('loyalty_transactions').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+      (() => {
+        let q = supabase.from('loyalty_accounts').select('*').eq('user_id', userId);
+        if (propertyId) q = q.eq('property_id', propertyId);
+        return q.maybeSingle();
+      })(),
+      (() => {
+        let q = supabase.from('loyalty_transactions').select('*').eq('user_id', userId);
+        if (propertyId) q = q.eq('property_id', propertyId);
+        return q.order('created_at', { ascending: false });
+      })(),
       
       // Gift Cards
-      supabase.from('gift_cards').select('*').eq('purchaser_id', userId).order('created_at', { ascending: false })
+      (() => {
+        let q = supabase.from('gift_cards').select('*').eq('purchaser_id', userId);
+        if (propertyId) q = q.eq('property_id', propertyId);
+        return q.order('created_at', { ascending: false });
+      })()
     ]);
 
     if (userResult.error || !userResult.data) {

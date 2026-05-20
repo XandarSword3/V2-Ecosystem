@@ -9,6 +9,7 @@ import {
 import Link from 'next/link';
 import { useSiteSettings } from '@/lib/settings-context';
 import { Container } from '@/components/layout/Container';
+import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
 
 /**
  * /privacy — Privacy Policy page
@@ -19,7 +20,12 @@ import { Container } from '@/components/layout/Container';
  */
 export default function PrivacyPage() {
   const t = useTranslations('legal.privacy');
-  const { settings } = useSiteSettings();
+  const { settings, modules } = useSiteSettings();
+
+  const privacyModule = modules.find(m => m.slug === 'privacy-policy');
+  if (privacyModule?.settings?.layout && Array.isArray(privacyModule.settings.layout) && privacyModule.settings.layout.length > 0) {
+    return <DynamicModuleRenderer layout={privacyModule.settings.layout} module={privacyModule} />;
+  }
 
   return (
     <div className="min-h-screen bg-background">

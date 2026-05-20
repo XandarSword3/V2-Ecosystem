@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/Button';
 import dynamic from 'next/dynamic';
 import { useSiteSettings } from '@/lib/settings-context';
 import { getModuleIcon, getMainPageModules, getModuleDefaultDescription, getModuleStatLabel, getModuleStatPlaceholder, type Module } from '@/lib/module-utils';
+import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
 
 // Premium effects
 import { AuroraBackground, AuroraSection } from '@/components/effects/AuroraBackground';
@@ -49,6 +50,9 @@ export default function HomePage() {
   const tCommon = useTranslations('common');
   const tFooter = useTranslations('footer');
   const { settings, modules } = useSiteSettings();
+
+  const homePageModule = modules.find(m => m.slug === 'home-page');
+
   const heroRef = useRef<HTMLDivElement>(null);
 
   // Hero slide carousel state
@@ -171,6 +175,10 @@ export default function HomePage() {
     { title: tHome('features.modernAmenities.title'), description: tHome('features.modernAmenities.description'), icon: <Sparkles className="w-5 h-5" /> },
     { title: tHome('features.familyFriendly.title'), description: tHome('features.familyFriendly.description'), icon: <Users className="w-5 h-5" /> },
   ];
+
+  if (homePageModule?.settings?.layout && Array.isArray(homePageModule.settings.layout) && homePageModule.settings.layout.length > 0) {
+    return <DynamicModuleRenderer layout={homePageModule.settings.layout} module={homePageModule} />;
+  }
 
   return (
     <AuroraBackground className="min-h-screen" intensity="medium">

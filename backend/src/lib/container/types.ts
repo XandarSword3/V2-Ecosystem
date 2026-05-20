@@ -820,6 +820,7 @@ export interface NotificationAction {
 export interface Notification {
   id: string;
   user_id?: string | null;
+  property_id?: string | null;
   title: string;
   message: string;
   type: NotificationType;
@@ -838,6 +839,7 @@ export interface Notification {
 
 export interface NotificationTemplate {
   id: string;
+  property_id?: string | null;
   name: string;
   title: string;
   message: string;
@@ -853,6 +855,7 @@ export interface NotificationTemplate {
 
 export interface BroadcastNotification {
   id: string;
+  property_id?: string | null;
   title: string;
   message: string;
   type: NotificationType;
@@ -877,6 +880,7 @@ export interface NotificationFilters {
   priority?: NotificationPriority;
   scheduled?: boolean;
   sent?: boolean;
+  propertyId?: string;
 }
 
 export interface NotificationRepository {
@@ -890,14 +894,14 @@ export interface NotificationRepository {
   deleteExpired(): Promise<number>;
   deleteMultiple(ids: string[]): Promise<number>;
   createBroadcast(data: Omit<BroadcastNotification, 'id' | 'created_at'>): Promise<BroadcastNotification>;
-  getBroadcasts(targetType?: NotificationTargetType): Promise<BroadcastNotification[]>;
+  getBroadcasts(targetType?: NotificationTargetType, propertyId?: string): Promise<BroadcastNotification[]>;
   getBroadcastById(id: string): Promise<BroadcastNotification | null>;
   updateBroadcast(id: string, data: Partial<BroadcastNotification>): Promise<BroadcastNotification>;
   getScheduledNotifications(): Promise<Notification[]>;
   getScheduledBroadcasts(): Promise<BroadcastNotification[]>;
   // Templates
   createTemplate(data: Omit<NotificationTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<NotificationTemplate>;
-  getTemplates(activeOnly?: boolean): Promise<NotificationTemplate[]>;
+  getTemplates(activeOnly?: boolean, propertyId?: string): Promise<NotificationTemplate[]>;
   getTemplateById(id: string): Promise<NotificationTemplate | null>;
   updateTemplate(id: string, data: Partial<NotificationTemplate>): Promise<NotificationTemplate>;
   deleteTemplate(id: string): Promise<void>;

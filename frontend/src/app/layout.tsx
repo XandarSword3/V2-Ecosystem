@@ -93,7 +93,7 @@ export default async function RootLayout({
     description: settings.description || 'Premier resort experience.',
     url: 'https://v2-ecosystem.vercel.app',
     telephone: '+1 234 567 8900',
-    email: 'bookings@ironparadisegym.com',
+    email: settings.email || 'bookings@yourresort.com',
     address: {
       street: '123 Resort Boulevard',
       city: 'Global City',

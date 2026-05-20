@@ -1,6 +1,6 @@
 /**
  * Settings Controller
- * Handles site settings and configuration
+ * Handles site settings and configuration with multi-property tenant isolation support
  */
 
 import { Request, Response, NextFunction } from 'express';
@@ -12,20 +12,34 @@ import { logger } from '../../../utils/logger.js';
 
 export const getSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-
-    // Get all settings from database (existing schema uses 'key' and 'value' columns)
-    const { data: settings, error } = await supabase
-      .from('site_settings')
-      .select('key, value');
-
-    if (error) throw error;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
 
     // Combine all settings into a flat object
     const combinedSettings: Record<string, unknown> = {};
-    (settings || []).forEach((s: { key: string; value: unknown }) => {
-      // Store keyed setting
-      combinedSettings[s.key] = s.value;
-    });
+
+    if (propertyId) {
+      // Multi-property settings resolution (property -> group -> system defaults cascade)
+      try {
+        const { getEffectiveSettings } = await import('../../multi-property/settings-resolution.service.js');
+        const resolvedSettings = await getEffectiveSettings(propertyId);
+        resolvedSettings.forEach(s => {
+          combinedSettings[s.key] = s.value;
+        });
+      } catch (err) {
+        logger.error('Failed to fetch effective multi-property settings:', err);
+      }
+    } else {
+      // Legacy global site settings
+      const { data: settings, error } = await supabase
+        .from('site_settings')
+        .select('key, value');
+
+      if (error) throw error;
+
+      (settings || []).forEach((s: { key: string; value: unknown }) => {
+        combinedSettings[s.key] = s.value;
+      });
+    }
 
     // Flatten nested settings keys into root to match default response structure
     // This supports frontend expecting flat properties (e.g. resortName at root)
@@ -93,6 +107,7 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
     const supabase = getSupabase();
     const settings = req.body;
     const userId = req.user?.userId;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
 
     // Helper to check if an object has any non-undefined values
     const hasValidData = (obj: Record<string, unknown>) => 
@@ -109,6 +124,15 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       updates.push({ key: settings.key, value: settings.value });
     }
 
+    // Fetch resolution/override helpers if in property context
+    let resolveSettingHelper: any;
+    let setPropertySettingHelper: any;
+    if (propertyId) {
+      const resolutionService = await import('../../multi-property/settings-resolution.service.js');
+      resolveSettingHelper = resolutionService.resolveSetting;
+      setPropertySettingHelper = resolutionService.setPropertySetting;
+    }
+
     // Appearance settings (theme, weather, animations)
     const appearanceData = {
       theme: settings.theme,
@@ -121,14 +145,21 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       weatherEffect: settings.weatherEffect,
     };
     if (hasValidData(appearanceData)) {
-      const { data: existingAppearance } = await supabase
-        .from('site_settings')
-        .select('value')
-        .eq('key', 'appearance')
-        .single();
+      let existingAppearanceValue = {};
+      if (propertyId) {
+        const resolved = await resolveSettingHelper(propertyId, 'appearance', {});
+        existingAppearanceValue = resolved?.value || {};
+      } else {
+        const { data: existingAppearance } = await supabase
+          .from('site_settings')
+          .select('value')
+          .eq('key', 'appearance')
+          .single();
+        existingAppearanceValue = existingAppearance?.value || {};
+      }
       
       const mergedAppearance = {
-        ...(existingAppearance?.value || {}),
+        ...existingAppearanceValue,
         ...filterUndefined(appearanceData)
       };
       updates.push({ key: 'appearance', value: mergedAppearance });
@@ -141,8 +172,15 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       description: settings.description,
     };
     if (hasValidData(generalData)) {
-      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'general').single();
-      updates.push({ key: 'general', value: { ...(existing?.value || {}), ...filterUndefined(generalData) } });
+      let existingGeneralValue = {};
+      if (propertyId) {
+        const resolved = await resolveSettingHelper(propertyId, 'general', {});
+        existingGeneralValue = resolved?.value || {};
+      } else {
+        const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'general').single();
+        existingGeneralValue = existing?.value || {};
+      }
+      updates.push({ key: 'general', value: { ...existingGeneralValue, ...filterUndefined(generalData) } });
     }
 
     // Contact settings
@@ -152,8 +190,15 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       address: settings.address,
     };
     if (hasValidData(contactData)) {
-      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'contact').single();
-      updates.push({ key: 'contact', value: { ...(existing?.value || {}), ...filterUndefined(contactData) } });
+      let existingContactValue = {};
+      if (propertyId) {
+        const resolved = await resolveSettingHelper(propertyId, 'contact', {});
+        existingContactValue = resolved?.value || {};
+      } else {
+        const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'contact').single();
+        existingContactValue = existing?.value || {};
+      }
+      updates.push({ key: 'contact', value: { ...existingContactValue, ...filterUndefined(contactData) } });
     }
 
     // Hours settings
@@ -163,8 +208,15 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       receptionHours: settings.receptionHours,
     };
     if (hasValidData(hoursData)) {
-      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'hours').single();
-      updates.push({ key: 'hours', value: { ...(existing?.value || {}), ...filterUndefined(hoursData) } });
+      let existingHoursValue = {};
+      if (propertyId) {
+        const resolved = await resolveSettingHelper(propertyId, 'hours', {});
+        existingHoursValue = resolved?.value || {};
+      } else {
+        const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'hours').single();
+        existingHoursValue = existing?.value || {};
+      }
+      updates.push({ key: 'hours', value: { ...existingHoursValue, ...filterUndefined(hoursData) } });
     }
 
     // Chalet settings
@@ -175,8 +227,15 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       cancellationPolicy: settings.cancellationPolicy,
     };
     if (hasValidData(chaletData)) {
-      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'chalets').single();
-      updates.push({ key: 'chalets', value: { ...(existing?.value || {}), ...filterUndefined(chaletData) } });
+      let existingChaletValue = {};
+      if (propertyId) {
+        const resolved = await resolveSettingHelper(propertyId, 'chalets', {});
+        existingChaletValue = resolved?.value || {};
+      } else {
+        const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'chalets').single();
+        existingChaletValue = existing?.value || {};
+      }
+      updates.push({ key: 'chalets', value: { ...existingChaletValue, ...filterUndefined(chaletData) } });
     }
 
     // Pool settings
@@ -187,8 +246,15 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       capacity: settings.poolCapacity,
     };
     if (hasValidData(poolData)) {
-      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'pool').single();
-      updates.push({ key: 'pool', value: { ...(existing?.value || {}), ...filterUndefined(poolData) } });
+      let existingPoolValue = {};
+      if (propertyId) {
+        const resolved = await resolveSettingHelper(propertyId, 'pool', {});
+        existingPoolValue = resolved?.value || {};
+      } else {
+        const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'pool').single();
+        existingPoolValue = existing?.value || {};
+      }
+      updates.push({ key: 'pool', value: { ...existingPoolValue, ...filterUndefined(poolData) } });
     }
 
     // Legal settings
@@ -198,8 +264,15 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       refundPolicy: settings.refundPolicy,
     };
     if (hasValidData(legalData)) {
-      const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'legal').single();
-      updates.push({ key: 'legal', value: { ...(existing?.value || {}), ...filterUndefined(legalData) } });
+      let existingLegalValue = {};
+      if (propertyId) {
+        const resolved = await resolveSettingHelper(propertyId, 'legal', {});
+        existingLegalValue = resolved?.value || {};
+      } else {
+        const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'legal').single();
+        existingLegalValue = existing?.value || {};
+      }
+      updates.push({ key: 'legal', value: { ...existingLegalValue, ...filterUndefined(legalData) } });
     }
 
     // CMS settings - homepage, footer, navbar (these come as complete objects)
@@ -216,16 +289,27 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
     // Perform all updates
     for (const update of updates) {
       const timestamp = new Date().toISOString();
-      const { error } = await supabase
-        .from('site_settings')
-        .upsert(
-          {
-            key: update.key,
-            value: update.value,
-            updated_at: timestamp,
-          },
-          { onConflict: 'key' }
-        );
+      let error;
+
+      if (propertyId) {
+        try {
+          await setPropertySettingHelper(propertyId, update.key, update.value, 'general', userId);
+        } catch (err: any) {
+          error = err;
+        }
+      } else {
+        const res = await supabase
+          .from('site_settings')
+          .upsert(
+            {
+              key: update.key,
+              value: update.value,
+              updated_at: timestamp,
+            },
+            { onConflict: 'key' }
+          );
+        error = res.error;
+      }
 
       if (error) {
         logger.error(`Failed to update ${update.key}:`, error);
@@ -257,9 +341,22 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       updatedCategories,
     });
 });
-// FIX: Iteration 26 - Dedicated homepage settings endpoints (frontend calls /admin/settings/homepage)
+
+// Dedicated homepage settings endpoints
 export const getHomepageSettings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
+  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+
+  if (propertyId) {
+    try {
+      const { resolveSetting } = await import('../../multi-property/settings-resolution.service.js');
+      const resolved = await resolveSetting(propertyId, 'homepage', {});
+      return res.json({ success: true, data: resolved.value });
+    } catch (err) {
+      logger.error('Failed to resolve homepage settings for property:', err);
+    }
+  }
+
   const { data, error } = await supabase
     .from('site_settings')
     .select('value')
@@ -277,6 +374,28 @@ export const getHomepageSettings = asyncHandler(async (req: Request, res: Respon
 export const updateHomepageSettings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
   const homepageData = req.body;
+  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+
+  if (propertyId) {
+    try {
+      const { setPropertySetting } = await import('../../multi-property/settings-resolution.service.js');
+      await setPropertySetting(propertyId, 'homepage', homepageData, 'cms', (req.user as any)?.userId);
+      
+      emitToAll('settings.updated', { homepage: homepageData });
+
+      await logActivity({
+        user_id: (req.user as any)?.userId || 'system',
+        action: 'UPDATE_SETTINGS',
+        resource: 'settings:homepage',
+        new_value: homepageData,
+      });
+
+      return res.json({ success: true, message: 'Homepage settings saved successfully' });
+    } catch (err: any) {
+      logger.error('Failed to update homepage settings for property:', err);
+      return res.status(500).json({ success: false, error: err.message || 'Failed to save homepage settings' });
+    }
+  }
 
   const { error } = await supabase
     .from('site_settings')
@@ -306,6 +425,18 @@ export const updateHomepageSettings = asyncHandler(async (req: Request, res: Res
 // Tax settings endpoints
 export const getTaxSettings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
+  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+
+  if (propertyId) {
+    try {
+      const { resolveSetting } = await import('../../multi-property/settings-resolution.service.js');
+      const resolved = await resolveSetting(propertyId, 'tax_configuration', null);
+      return res.json({ success: true, data: resolved.value });
+    } catch (err) {
+      logger.error('Failed to resolve tax settings for property:', err);
+    }
+  }
+
   const { data, error } = await supabase
     .from('site_settings')
     .select('value')
@@ -323,6 +454,28 @@ export const getTaxSettings = asyncHandler(async (req: Request, res: Response) =
 export const updateTaxSettings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
   const taxData = req.body;
+  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+
+  if (propertyId) {
+    try {
+      const { setPropertySetting } = await import('../../multi-property/settings-resolution.service.js');
+      await setPropertySetting(propertyId, 'tax_configuration', taxData, 'finance', (req.user as any)?.userId);
+
+      emitToAll('settings.updated', { tax: taxData });
+
+      await logActivity({
+        user_id: (req.user as any)?.userId || 'system',
+        action: 'UPDATE_SETTINGS',
+        resource: 'settings:tax',
+        new_value: taxData,
+      });
+
+      return res.json({ success: true, message: 'Tax settings saved successfully' });
+    } catch (err: any) {
+      logger.error('Failed to update tax settings for property:', err);
+      return res.status(500).json({ success: false, error: err.message || 'Failed to save tax settings' });
+    }
+  }
 
   const { error } = await supabase
     .from('site_settings')

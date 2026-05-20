@@ -262,7 +262,7 @@ export default function AdminSettingsPage() {
                 />
                 {!formSettings.email && (
                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                    Using default: support@ironparadisegym.com
+                    Using default: support@yourresort.com
                   </p>
                 )}
               </div>

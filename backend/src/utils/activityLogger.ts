@@ -13,6 +13,7 @@ interface AuditLogEntry {
   new_value?: unknown;
   ip_address?: string;
   user_agent?: string;
+  property_id?: string;
 }
 
 export async function logActivity(entry: AuditLogEntry) {
@@ -21,9 +22,15 @@ export async function logActivity(entry: AuditLogEntry) {
 
     // Convert objects to strings if needed
     const safePayload = {
-      ...entry,
+      user_id: entry.user_id,
+      action: entry.action,
+      resource: entry.resource,
+      resource_id: entry.resource_id || entry.entity_id,
       old_value: entry.old_value ? (typeof entry.old_value === 'string' ? entry.old_value : JSON.stringify(entry.old_value)) : null,
       new_value: entry.new_value ? (typeof entry.new_value === 'string' ? entry.new_value : JSON.stringify(entry.new_value)) : null,
+      ip_address: entry.ip_address,
+      user_agent: entry.user_agent,
+      property_id: entry.property_id
     };
 
     const { error } = await supabase
@@ -62,4 +69,3 @@ export const activityLogger = {
     return logActivity(entry);
   }
 };
-

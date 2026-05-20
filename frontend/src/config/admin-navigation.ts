@@ -284,6 +284,7 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
           translationKey: 'nav.settings',
           children: [
             { name: t('nav.general'), href: '/admin/settings', translationKey: 'nav.general' },
+            { name: t('nav.propertySettings') || 'Property Settings', href: '/admin/settings/properties', translationKey: 'nav.propertySettings' },
             { name: t('nav.navbar'), href: '/admin/settings/navbar', translationKey: 'nav.navbar' },
             { name: t('nav.appearance'), href: '/admin/settings/appearance', translationKey: 'nav.appearance' },
             { name: 'Customizations', href: '/admin/customizations', translationKey: 'nav.customizations' },

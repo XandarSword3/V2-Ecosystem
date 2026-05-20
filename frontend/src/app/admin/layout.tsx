@@ -457,7 +457,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   {user?.fullName || 'Admin'}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {user?.email || 'admin@ironparadisegym.com'}
+                  {user?.email || 'admin@yourresort.com'}
                 </p>
               </div>
             </div>

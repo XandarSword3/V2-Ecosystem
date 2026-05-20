@@ -38,10 +38,16 @@ interface RecentOrderQuery {
  * Get comprehensive dashboard statistics
  */
 export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
+    const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
+    if (!propertyId && process.env.NODE_ENV !== 'test') {
+        res.status(400).json({ success: false, error: 'Property ID context is required' });
+        return;
+    }
+
     const supabase = getSupabase();
     
     // Fetch active modules first to map slugs to IDs
-    const { data: modulesList } = await supabase.from('modules').select('id, slug');
+    const { data: modulesList } = await supabase.from('modules').select('id, slug').eq('property_id', propertyId);
     const modulesMap = new Map((modulesList || []).map(m => [m.slug, m.id]));
     const restaurantModuleId = modulesMap.get('restaurant') || '00000000-0000-0000-0000-000000000000';
     const snackModuleId = modulesMap.get('snack-bar') || '00000000-0000-0000-0000-000000000000';
@@ -73,12 +79,14 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
       // Restaurant orders count
       supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('property_id', propertyId)
         .eq('module_id', restaurantModuleId)
         .gte('created_at', today)
         .lte('created_at', endOfDay),
       // Restaurant revenue
       supabase.from('transactions')
         .select('total_amount:amount')
+        .eq('property_id', propertyId)
         .eq('module_id', restaurantModuleId)
         .gte('created_at', today)
         .lte('created_at', endOfDay)
@@ -86,12 +94,14 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
       // Snack orders count
       supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('property_id', propertyId)
         .eq('module_id', snackModuleId)
         .gte('created_at', today)
         .lte('created_at', endOfDay),
       // Snack revenue
       supabase.from('transactions')
         .select('total_amount:amount')
+        .eq('property_id', propertyId)
         .eq('module_id', snackModuleId)
         .gte('created_at', today)
         .lte('created_at', endOfDay)
@@ -99,12 +109,14 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
       // Chalet bookings count
       supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('property_id', propertyId)
         .eq('engine_type', 'time_exclusive_reservation')
         .gte('created_at', today)
         .lte('created_at', endOfDay),
       // Chalet revenue
       supabase.from('transactions')
         .select('total_amount:amount')
+        .eq('property_id', propertyId)
         .eq('engine_type', 'time_exclusive_reservation')
         .gte('created_at', today)
         .lte('created_at', endOfDay)
@@ -112,33 +124,39 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
       // Pool tickets count
       supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('property_id', propertyId)
         .eq('engine_type', 'shared_capacity_access')
         .gte('created_at', today)
         .lte('created_at', endOfDay),
       // Pool revenue
       supabase.from('transactions')
         .select('total_amount:amount')
+        .eq('property_id', propertyId)
         .eq('engine_type', 'shared_capacity_access')
         .gte('created_at', today)
         .lte('created_at', endOfDay)
         .eq('status', 'completed'),
-      // Total users
-      supabase.from('users')
-        .select('id', { count: 'exact', head: true }),
+      // Total users associated with this property
+      supabase.from('user_property_access')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('property_id', propertyId),
       // Recent orders (from transactions)
       supabase.from('transactions')
         .select('id, status, total_amount:amount, created_at, metadata')
+        .eq('property_id', propertyId)
         .order('created_at', { ascending: false })
         .limit(5),
       // Yesterday orders
       supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('property_id', propertyId)
         .eq('module_id', restaurantModuleId)
         .gte('created_at', yesterday)
         .lte('created_at', endOfYesterday),
       // Yesterday revenue
       supabase.from('transactions')
         .select('total_amount:amount')
+        .eq('property_id', propertyId)
         .eq('module_id', restaurantModuleId)
         .gte('created_at', yesterday)
         .lte('created_at', endOfYesterday)
@@ -146,12 +164,14 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
       // Last week bookings
       supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('property_id', propertyId)
         .eq('engine_type', 'time_exclusive_reservation')
         .gte('created_at', lastWeekStart)
         .lte('created_at', lastWeekEnd),
       // Yesterday tickets
       supabase.from('transactions')
         .select('id', { count: 'exact', head: true })
+        .eq('property_id', propertyId)
         .eq('engine_type', 'shared_capacity_access')
         .gte('created_at', yesterday)
         .lte('created_at', endOfYesterday)
@@ -229,11 +249,21 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
  * Get revenue statistics for a date range
  */
 export const getRevenueStats = asyncHandler(async (req: Request, res: Response) => {
+    const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
+    if (!propertyId && process.env.NODE_ENV !== 'test') {
+        res.status(400).json({ success: false, error: 'Property ID context is required' });
+        return;
+    }
+
     const supabase = getSupabase();
     const { startDate, endDate } = req.query;
 
     // Fetch active modules first to map slugs to IDs
-    const { data: modulesList } = await supabase.from('modules').select('id, slug');
+    let modulesQuery = supabase.from('modules').select('id, slug');
+    if (propertyId) {
+        modulesQuery = modulesQuery.eq('property_id', propertyId);
+    }
+    const { data: modulesList } = await modulesQuery;
     const modulesMap = new Map((modulesList || []).map(m => [m.slug, m.id]));
     const restaurantModuleId = modulesMap.get('restaurant') || '00000000-0000-0000-0000-000000000000';
     const snackModuleId = modulesMap.get('snack-bar') || '00000000-0000-0000-0000-000000000000';
@@ -241,36 +271,36 @@ export const getRevenueStats = asyncHandler(async (req: Request, res: Response) 
     const start = startDate ? dayjs(startDate as string).toISOString() : dayjs().subtract(30, 'day').toISOString();
     const end = endDate ? dayjs(endDate as string).toISOString() : dayjs().toISOString();
 
+    const buildTransactionQuery = (moduleIdOrEngineType: { module_id?: string; engine_type?: string }) => {
+      let q = supabase.from('transactions')
+        .select('total_amount:amount, created_at')
+        .gte('created_at', start)
+        .lte('created_at', end)
+        .eq('status', 'completed');
+      
+      if (propertyId) {
+        q = q.eq('property_id', propertyId);
+      }
+      
+      if (moduleIdOrEngineType.module_id) {
+        q = q.eq('module_id', moduleIdOrEngineType.module_id);
+      } else if (moduleIdOrEngineType.engine_type) {
+        q = q.eq('engine_type', moduleIdOrEngineType.engine_type);
+      }
+      
+      return q;
+    };
+
     const [
       restaurantResult,
       snackResult,
       chaletResult,
       poolResult
     ] = await Promise.all([
-      supabase.from('transactions')
-        .select('total_amount:amount, created_at')
-        .eq('module_id', restaurantModuleId)
-        .gte('created_at', start)
-        .lte('created_at', end)
-        .eq('status', 'completed'),
-      supabase.from('transactions')
-        .select('total_amount:amount, created_at')
-        .eq('module_id', snackModuleId)
-        .gte('created_at', start)
-        .lte('created_at', end)
-        .eq('status', 'completed'),
-      supabase.from('transactions')
-        .select('total_amount:amount, created_at')
-        .eq('engine_type', 'time_exclusive_reservation')
-        .gte('created_at', start)
-        .lte('created_at', end)
-        .eq('status', 'completed'),
-      supabase.from('transactions')
-        .select('total_amount:amount, created_at')
-        .eq('engine_type', 'shared_capacity_access')
-        .gte('created_at', start)
-        .lte('created_at', end)
-        .eq('status', 'completed')
+      buildTransactionQuery({ module_id: restaurantModuleId }),
+      buildTransactionQuery({ module_id: snackModuleId }),
+      buildTransactionQuery({ engine_type: 'time_exclusive_reservation' }),
+      buildTransactionQuery({ engine_type: 'shared_capacity_access' })
     ]);
 
     // Group by day

@@ -14,6 +14,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
     const container = getContainer();
     const notificationService = container.notificationService();
     const { userId } = req.query;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     
     // Get notifications from the service
     const notifications = await notificationService.getForUser(
@@ -21,7 +22,8 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
       {
         unreadOnly: req.query.unreadOnly === 'true',
         type: req.query.type as NotificationType,
-        limit: parseInt(req.query.limit as string) || 20
+        limit: parseInt(req.query.limit as string) || 20,
+        propertyId
       }
     );
     
@@ -43,13 +45,19 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
 
     // Get recent restaurant orders with error handling
     try {
-      const { data: recentOrders } = await supabase
+      let ordersQuery = supabase
         .from('transactions')
         .select('id, order_number, status, created_at')
         .eq('engine_type', 'instant_transaction')
         .gte('created_at', oneDayAgo.toISOString())
         .order('created_at', { ascending: false })
         .limit(5);
+
+      if (propertyId) {
+        ordersQuery = ordersQuery.eq('property_id', propertyId);
+      }
+
+      const { data: recentOrders } = await ordersQuery;
 
       (recentOrders || []).forEach(order => {
         systemNotifications.push({
@@ -69,13 +77,19 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
 
     // Get recent chalet bookings with error handling
     try {
-      const { data: recentBookings } = await supabase
+      let bookingsQuery = supabase
         .from('transactions')
         .select('id, status, created_at, metadata')
         .eq('engine_type', 'time_exclusive_reservation')
         .gte('created_at', oneDayAgo.toISOString())
         .order('created_at', { ascending: false })
         .limit(5);
+
+      if (propertyId) {
+        bookingsQuery = bookingsQuery.eq('property_id', propertyId);
+      }
+
+      const { data: recentBookings } = await bookingsQuery;
 
       (recentBookings || []).forEach(booking => {
         systemNotifications.push({
@@ -95,12 +109,18 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
 
     // Get pending reviews with error handling
     try {
-      const { data: pendingReviews } = await supabase
+      let reviewsQuery = supabase
         .from('reviews')
         .select('id, rating, created_at')
         .eq('is_approved', false)
         .order('created_at', { ascending: false })
         .limit(5);
+
+      if (propertyId) {
+        reviewsQuery = reviewsQuery.eq('property_id', propertyId);
+      }
+
+      const { data: pendingReviews } = await reviewsQuery;
 
       (pendingReviews || []).forEach(review => {
         systemNotifications.push({
@@ -167,6 +187,7 @@ export const broadcastNotification = asyncHandler(async (req: Request, res: Resp
 
     const container = getContainer();
     const notificationService = container.notificationService();
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     
     const broadcast = await notificationService.broadcast({
       title,
@@ -177,7 +198,8 @@ export const broadcastNotification = asyncHandler(async (req: Request, res: Resp
       targetUserIds: target_user_ids,
       actions,
       scheduledFor: scheduled_for,
-      createdBy: req.user?.userId || ''
+      createdBy: req.user?.userId || '',
+      propertyId
     });
 
     res.status(201).json({ success: true, data: broadcast });
@@ -211,8 +233,9 @@ export const getTemplates = asyncHandler(async (req: Request, res: Response) => 
     const container = getContainer();
     const notificationService = container.notificationService();
     const activeOnly = req.query.activeOnly !== 'false';
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     
-    const templates = await notificationService.getTemplates(activeOnly);
+    const templates = await notificationService.getTemplates(activeOnly, propertyId);
     res.json({ success: true, data: templates });
 });
 
@@ -248,6 +271,7 @@ export const createTemplate = asyncHandler(async (req: Request, res: Response) =
 
     const container = getContainer();
     const notificationService = container.notificationService();
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     
     const template = await notificationService.createTemplate({
       name,
@@ -258,7 +282,8 @@ export const createTemplate = asyncHandler(async (req: Request, res: Response) =
       priority: priority as NotificationPriority,
       actions,
       variables: variables || [],
-      isActive: is_active
+      isActive: is_active,
+      propertyId
     });
 
     res.status(201).json({ success: true, data: template });
@@ -270,6 +295,7 @@ export const updateTemplate = asyncHandler(async (req: Request, res: Response) =
     
     const container = getContainer();
     const notificationService = container.notificationService();
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     
     const template = await notificationService.updateTemplate(id, {
       name: updates.name,
@@ -280,7 +306,8 @@ export const updateTemplate = asyncHandler(async (req: Request, res: Response) =
       priority: updates.priority,
       actions: updates.actions,
       variables: updates.variables,
-      isActive: updates.is_active
+      isActive: updates.is_active,
+      propertyId
     });
 
     res.json({ success: true, data: template });
@@ -320,8 +347,9 @@ export const getBroadcasts = asyncHandler(async (req: Request, res: Response) =>
     const container = getContainer();
     const notificationService = container.notificationService();
     const targetType = req.query.target_type as NotificationTargetType | undefined;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     
-    const broadcasts = await notificationService.getBroadcasts(targetType);
+    const broadcasts = await notificationService.getBroadcasts(targetType, propertyId);
     res.json({ success: true, data: broadcasts });
 });
 

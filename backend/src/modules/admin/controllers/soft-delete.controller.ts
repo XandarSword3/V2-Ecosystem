@@ -25,6 +25,7 @@ interface SoftDeletedRecord {
 export const getDeletedRecords = asyncHandler(async (req: Request, res: Response) => {
     const { entityType } = req.params;
     const { limit = 50, offset = 0 } = req.query;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     const supabase = getSupabase();
 
     // Validate entity type
@@ -51,9 +52,23 @@ export const getDeletedRecords = asyncHandler(async (req: Request, res: Response
         break;
     }
 
-    const { data, error, count } = await supabase
-      .from(entityType)
-      .select(selectFields, { count: 'exact' })
+    let query = supabase.from(entityType).select(selectFields, { count: 'exact' });
+
+    if (propertyId) {
+      if (entityType === 'users') {
+        const { data: userAccess } = await supabase
+          .from('user_property_access')
+          .select('user_id')
+          .eq('property_id', propertyId);
+        
+        const userIds = (userAccess || []).map((ua: any) => ua.user_id);
+        query = query.in('id', userIds);
+      } else {
+        query = query.eq('property_id', propertyId);
+      }
+    }
+
+    const { data, error, count } = await query
       .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false })
       .range(Number(offset), Number(offset) + Number(limit) - 1);
@@ -97,6 +112,7 @@ export const restoreRecord = asyncHandler(async (req: Request, res: Response) =>
     const { entityType, entityId } = req.params;
     const userId = req.user?.userId;
     if (!userId) throw new Error('Authentication required');
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     const supabase = getSupabase();
 
     // Validate entity type
@@ -109,10 +125,28 @@ export const restoreRecord = asyncHandler(async (req: Request, res: Response) =>
       return;
     }
 
-    // Verify record exists and is deleted
-    const { data: existing, error: fetchError } = await supabase
-      .from(entityType)
-      .select('id, deleted_at')
+    // Verify record exists and belongs to property
+    let fetchQuery = supabase.from(entityType).select('id, deleted_at');
+    
+    if (propertyId) {
+      if (entityType === 'users') {
+        const { data: access } = await supabase
+          .from('user_property_access')
+          .select('id')
+          .eq('user_id', entityId)
+          .eq('property_id', propertyId)
+          .limit(1);
+        
+        if (!access || access.length === 0) {
+          res.status(404).json({ success: false, error: 'Record not found in this property context' });
+          return;
+        }
+      } else {
+        fetchQuery = fetchQuery.eq('property_id', propertyId);
+      }
+    }
+
+    const { data: existing, error: fetchError } = await fetchQuery
       .eq('id', entityId)
       .single();
 
@@ -127,14 +161,20 @@ export const restoreRecord = asyncHandler(async (req: Request, res: Response) =>
     }
 
     // Restore the record
-    const { data, error } = await supabase
+    let updateQuery = supabase
       .from(entityType)
       .update({
         deleted_at: null,
         deleted_by: null,
         is_active: true, // Also reactivate if applicable
       })
-      .eq('id', entityId)
+      .eq('id', entityId);
+
+    if (propertyId && entityType !== 'users') {
+      updateQuery = updateQuery.eq('property_id', propertyId);
+    }
+
+    const { data, error } = await updateQuery
       .select()
       .single();
 
@@ -166,6 +206,7 @@ export const permanentDelete = asyncHandler(async (req: Request, res: Response) 
     const { force } = req.query;
     const userId = req.user?.userId;
     if (!userId) throw new Error('Authentication required');
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     const supabase = getSupabase();
 
     if (force !== 'true') {
@@ -186,10 +227,28 @@ export const permanentDelete = asyncHandler(async (req: Request, res: Response) 
       return;
     }
 
-    // Verify record is already soft-deleted
-    const { data: existing, error: fetchError } = await supabase
-      .from(entityType)
-      .select('id, deleted_at')
+    // Verify record is already soft-deleted and belongs to property
+    let fetchQuery = supabase.from(entityType).select('id, deleted_at');
+    
+    if (propertyId) {
+      if (entityType === 'users') {
+        const { data: access } = await supabase
+          .from('user_property_access')
+          .select('id')
+          .eq('user_id', entityId)
+          .eq('property_id', propertyId)
+          .limit(1);
+        
+        if (!access || access.length === 0) {
+          res.status(404).json({ success: false, error: 'Record not found in this property context' });
+          return;
+        }
+      } else {
+        fetchQuery = fetchQuery.eq('property_id', propertyId);
+      }
+    }
+
+    const { data: existing, error: fetchError } = await fetchQuery
       .eq('id', entityId)
       .single();
 
@@ -207,10 +266,16 @@ export const permanentDelete = asyncHandler(async (req: Request, res: Response) 
     }
 
     // Permanently delete the record
-    const { error } = await supabase
+    let deleteQuery = supabase
       .from(entityType)
       .delete()
       .eq('id', entityId);
+
+    if (propertyId && entityType !== 'users') {
+      deleteQuery = deleteQuery.eq('property_id', propertyId);
+    }
+
+    const { error } = await deleteQuery;
 
     if (error) throw error;
 
@@ -238,6 +303,7 @@ export const softDelete = asyncHandler(async (req: Request, res: Response) => {
     const { entityType, entityId } = req.params;
     const userId = req.user?.userId;
     if (!userId) throw new Error('Authentication required');
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     const supabase = getSupabase();
 
     // Validate entity type
@@ -250,10 +316,28 @@ export const softDelete = asyncHandler(async (req: Request, res: Response) => {
       return;
     }
 
-    // Verify record exists and is not already deleted
-    const { data: existing, error: fetchError } = await supabase
-      .from(entityType)
-      .select('id, deleted_at')
+    // Verify record exists, belongs to property, and is not already deleted
+    let fetchQuery = supabase.from(entityType).select('id, deleted_at');
+    
+    if (propertyId) {
+      if (entityType === 'users') {
+        const { data: access } = await supabase
+          .from('user_property_access')
+          .select('id')
+          .eq('user_id', entityId)
+          .eq('property_id', propertyId)
+          .limit(1);
+        
+        if (!access || access.length === 0) {
+          res.status(404).json({ success: false, error: 'Record not found in this property context' });
+          return;
+        }
+      } else {
+        fetchQuery = fetchQuery.eq('property_id', propertyId);
+      }
+    }
+
+    const { data: existing, error: fetchError } = await fetchQuery
       .eq('id', entityId)
       .single();
 
@@ -268,14 +352,20 @@ export const softDelete = asyncHandler(async (req: Request, res: Response) => {
     }
 
     // Soft delete the record
-    const { data, error } = await supabase
+    let updateQuery = supabase
       .from(entityType)
       .update({
         deleted_at: new Date().toISOString(),
         deleted_by: userId,
         is_active: false,
       })
-      .eq('id', entityId)
+      .eq('id', entityId);
+
+    if (propertyId && entityType !== 'users') {
+      updateQuery = updateQuery.eq('property_id', propertyId);
+    }
+
+    const { data, error } = await updateQuery
       .select()
       .single();
 
