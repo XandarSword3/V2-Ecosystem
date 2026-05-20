@@ -2,6 +2,7 @@ import app from './app.js';
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { initializeDatabase, closeDatabase } from './database/connection.js';
+import { seedSystemModules } from './database/system-modules.seeder.js';
 import { initializeSocketServer, closeSocketServer } from './socket/index.js';
 import { initSentry } from './utils/sentry.js';
 import { SchedulerService } from './services/scheduler.service.js';
@@ -32,6 +33,7 @@ async function main() {
       .then(async () => {
         logger.info('Database connected successfully');
         await permissionCache.initialize();
+        await seedSystemModules();
       })
       .catch(async (error) => {
         logger.error('Database connection failed:', error);

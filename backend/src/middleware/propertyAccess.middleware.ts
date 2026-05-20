@@ -14,7 +14,8 @@ import { logger } from '../utils/logger.js';
  * property assignments. Super admins bypass the check.
  */
 export async function validatePropertyAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const propertyId = req.headers['x-property-id'] as string;
+  try {
+    const propertyId = req.headers['x-property-id'] as string;
 
   // If no property header, allow (some endpoints don't require it)
   if (!propertyId) {
@@ -38,17 +39,9 @@ export async function validatePropertyAccess(req: Request, res: Response, next: 
     return;
   }
 
-  // Check user's property access in the database
-  const supabase = getSupabase();
-  try {
-    const { data, error } = await supabase
-      .from('user_properties')
-      .select('property_id')
-      .eq('user_id', req.user.userId)
-      .eq('property_id', propertyId)
-      .single();
+    const allowed = await userHasAccessToProperty(req.user.userId, propertyId);
 
-    if (error || !data) {
+    if (!allowed) {
       logger.warn('Property access denied', {
         userId: req.user?.userId,
         propertyId,

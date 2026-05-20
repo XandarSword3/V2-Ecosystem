@@ -162,6 +162,7 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
  * List all users with pagination
  */
 export const listUsers = asyncHandler(async (req: Request, res: Response) => {
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     const supabase = getSupabase();
     
     const page = parseInt(req.query.page as string) || 1;
@@ -174,6 +175,22 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
       .select(`
         id, email, full_name, phone, profile_image_url, is_active, created_at, updated_at
       `, { count: 'exact' });
+
+    if (propertyId) {
+      const { data: accessList, error: accessError } = await supabase
+        .from('user_property_access')
+        .select('user_id')
+        .eq('property_id', propertyId);
+      
+      if (accessError) {
+        logger.error('Error fetching user property access:', accessError);
+        res.status(500).json({ success: false, error: 'Failed to filter users by property context' });
+        return;
+      }
+      
+      const userIds = (accessList || []).map(entry => entry.user_id).filter(Boolean);
+      query = query.in('id', userIds);
+    }
 
     if (search) {
       // Sanitize search input to prevent SQL injection
@@ -225,6 +242,7 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
  */
 export const getUserById = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     
     // Validate UUID
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -234,6 +252,20 @@ export const getUserById = asyncHandler(async (req: Request, res: Response) => {
     }
 
     const supabase = getSupabase();
+
+    if (propertyId) {
+      const { data: accessRecord, error: accessError } = await supabase
+        .from('user_property_access')
+        .select('id')
+        .eq('property_id', propertyId)
+        .eq('user_id', id)
+        .maybeSingle();
+
+      if (accessError || !accessRecord) {
+        res.status(403).json({ success: false, error: 'Access denied: User does not belong to this property context' });
+        return;
+      }
+    }
     
     // Fetch user data
     const { data: user, error } = await supabase
@@ -384,6 +416,7 @@ export const updateUserRoles = asyncHandler(async (req: Request, res: Response) 
 
 export const getMyStatement = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     if (!userId) {
       res.status(401).json({ success: false, error: 'Authentication required' });
       return;
@@ -402,12 +435,18 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
       return q;
     };
 
+    let txsQuery = supabase
+      .from('transactions')
+      .select('id,engine_type,amount,status,created_at,order_number,ticket_number,booking_number,reference_id,reference_table,customer_name,customer_phone,table_id,session_id,chalet_id,staff_id')
+      .eq('customer_id', userId)
+      .in('engine_type', ['instant_transaction', 'shared_capacity_access', 'time_exclusive_reservation']);
+
+    if (propertyId) {
+      txsQuery = txsQuery.eq('property_id', propertyId);
+    }
+
     const [transactions, loyalty, giftcards] = await Promise.all([
-      applyDateFilters(supabase
-        .from('transactions')
-        .select('id,engine_type,amount,status,created_at,order_number,ticket_number,booking_number,reference_id,reference_table,customer_name,customer_phone,table_id,session_id,chalet_id,staff_id')
-        .eq('customer_id', userId)
-        .in('engine_type', ['instant_transaction', 'shared_capacity_access', 'time_exclusive_reservation'])),
+      applyDateFilters(txsQuery),
       applyDateFilters(supabase.from('loyalty_transactions').select('id,points,type,created_at,reference_id,reference_type').eq('user_id', userId)),
       applyDateFilters(supabase.from('gift_card_transactions').select('id,amount,created_at').eq('user_id', userId)),
     ]);

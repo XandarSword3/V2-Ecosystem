@@ -41,6 +41,7 @@ interface DeletePreviewResult {
  */
 export const getDeletePreview = asyncHandler(async (req: Request, res: Response) => {
     const { entityType, entityId } = req.params;
+    const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
     const supabase = getSupabase();
 
     // Validate entity type
@@ -57,29 +58,29 @@ export const getDeletePreview = asyncHandler(async (req: Request, res: Response)
 
     switch (entityType as EntityType) {
       case 'user':
-        result = await getUserDeletePreview(supabase, entityId);
+        result = await getUserDeletePreview(supabase, entityId, propertyId);
         break;
       case 'booking':
-        result = await getBookingDeletePreview(supabase, entityId);
+        result = await getBookingDeletePreview(supabase, entityId, propertyId);
         break;
       case 'staff':
-        result = await getStaffDeletePreview(supabase, entityId);
+        result = await getStaffDeletePreview(supabase, entityId, propertyId);
         break;
       case 'chalet':
-        result = await getChaletDeletePreview(supabase, entityId);
+        result = await getChaletDeletePreview(supabase, entityId, propertyId);
         break;
       case 'menu_item':
-        result = await getMenuItemDeletePreview(supabase, entityId);
+        result = await getMenuItemDeletePreview(supabase, entityId, propertyId);
         break;
       case 'module':
-        result = await getModuleDeletePreview(supabase, entityId);
+        result = await getModuleDeletePreview(supabase, entityId, propertyId);
         break;
       default:
         res.status(400).json({ success: false, error: 'Unsupported entity type' });
         return;
     }
 
-    logger.info(`Delete preview requested for ${entityType}:${entityId}`, {
+    logger.info(`Delete preview requested for ${entityType}:${entityId} on property:${propertyId}`, {
       severity: result.impact.severity,
       canDelete: result.canDelete,
     });
@@ -90,7 +91,7 @@ export const getDeletePreview = asyncHandler(async (req: Request, res: Response)
 /**
  * User delete preview
  */
-async function getUserDeletePreview(supabase: any, userId: string): Promise<DeletePreviewResult> {
+async function getUserDeletePreview(supabase: any, userId: string, propertyId?: string): Promise<DeletePreviewResult> {
   // Get user info
   const { data: user, error: userError } = await supabase
     .from('users')
@@ -102,7 +103,39 @@ async function getUserDeletePreview(supabase: any, userId: string): Promise<Dele
     throw new Error('User not found');
   }
 
+  // If in property context, check membership or transaction presence
+  if (propertyId) {
+    const { data: access } = await supabase
+      .from('user_property_access')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('property_id', propertyId)
+      .limit(1);
+
+    const { count: bookingsCount } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('customer_id', userId)
+      .eq('property_id', propertyId);
+
+    if ((!access || access.length === 0) && (!bookingsCount || bookingsCount === 0)) {
+      throw new Error('User not found in this property context');
+    }
+  }
+
   // Count related data
+  let bookingsQuery = supabase.from('transactions').select('id, booking_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'time_exclusive_reservation').limit(5);
+  let ordersQuery = supabase.from('transactions').select('id, order_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'instant_transaction').limit(5);
+  let poolTicketsQuery = supabase.from('transactions').select('id, ticket_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'shared_capacity_access').limit(5);
+  let reviewsQuery = supabase.from('reviews').select('id, rating', { count: 'exact' }).eq('user_id', userId).limit(5);
+
+  if (propertyId) {
+    bookingsQuery = bookingsQuery.eq('property_id', propertyId);
+    ordersQuery = ordersQuery.eq('property_id', propertyId);
+    poolTicketsQuery = poolTicketsQuery.eq('property_id', propertyId);
+    reviewsQuery = reviewsQuery.eq('property_id', propertyId);
+  }
+
   const [
     bookingsResult,
     ordersResult,
@@ -111,10 +144,10 @@ async function getUserDeletePreview(supabase: any, userId: string): Promise<Dele
     sessionsResult,
     rolesResult,
   ] = await Promise.all([
-    supabase.from('transactions').select('id, booking_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'time_exclusive_reservation').limit(5),
-    supabase.from('transactions').select('id, order_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'instant_transaction').limit(5),
-    supabase.from('transactions').select('id, ticket_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'shared_capacity_access').limit(5),
-    supabase.from('reviews').select('id, rating', { count: 'exact' }).eq('user_id', userId).limit(5),
+    bookingsQuery,
+    ordersQuery,
+    poolTicketsQuery,
+    reviewsQuery,
     supabase.from('user_sessions').select('id', { count: 'exact' }).eq('user_id', userId),
     supabase.from('user_roles').select('role_id', { count: 'exact' }).eq('user_id', userId),
   ]);
@@ -173,22 +206,31 @@ async function getUserDeletePreview(supabase: any, userId: string): Promise<Dele
 /**
  * Booking delete preview
  */
-async function getBookingDeletePreview(supabase: any, bookingId: string): Promise<DeletePreviewResult> {
-  const { data: booking, error } = await supabase
+async function getBookingDeletePreview(supabase: any, bookingId: string, propertyId?: string): Promise<DeletePreviewResult> {
+  let query = supabase
     .from('transactions')
-    .select('id, booking_number, status, amount, customer_id, created_at')
+    .select('id, booking_number, status, amount, customer_id, created_at, property_id')
     .eq('id', bookingId)
-    .eq('engine_type', 'time_exclusive_reservation')
-    .single();
+    .eq('engine_type', 'time_exclusive_reservation');
+
+  if (propertyId) {
+    query = query.eq('property_id', propertyId);
+  }
+
+  const { data: booking, error } = await query.single();
 
   if (error || !booking) {
     throw new Error('Booking not found');
   }
 
+  let paymentsQuery = supabase.from('payments').select('id, amount', { count: 'exact' }).eq('reference_id', bookingId).eq('reference_table', 'transactions');
+  if (propertyId) {
+    paymentsQuery = paymentsQuery.eq('property_id', propertyId);
+  }
+
   const [paymentsResult, addOnsResult] = await Promise.all([
-    supabase.from('payments').select('id, amount', { count: 'exact' }).eq('reference_id', bookingId).eq('reference_table', 'transactions'),
-    // Addons are now in metadata or a separate table if they were not unified.
-    // Assuming they are in metadata for now.
+    paymentsQuery,
+    // Addons assumed in metadata
     Promise.resolve({ count: 0, data: [] })
   ]);
 
@@ -236,7 +278,7 @@ async function getBookingDeletePreview(supabase: any, bookingId: string): Promis
 /**
  * Staff delete preview
  */
-async function getStaffDeletePreview(supabase: any, staffId: string): Promise<DeletePreviewResult> {
+async function getStaffDeletePreview(supabase: any, staffId: string, propertyId?: string): Promise<DeletePreviewResult> {
   const { data: staff, error } = await supabase
     .from('users')
     .select('id, email, full_name, created_at')
@@ -247,16 +289,41 @@ async function getStaffDeletePreview(supabase: any, staffId: string): Promise<De
     throw new Error('Staff member not found');
   }
 
+  if (propertyId) {
+    const { data: access, error: accessError } = await supabase
+      .from('user_property_access')
+      .select('id')
+      .eq('user_id', staffId)
+      .eq('property_id', propertyId)
+      .limit(1);
+
+    if (accessError || !access || access.length === 0) {
+      throw new Error('Staff member not found in this property context');
+    }
+  }
+
+  let shiftsQuery = supabase.from('staff_shifts').select('id', { count: 'exact' }).eq('staff_id', staffId);
+  let assignmentsQuery = supabase.from('staff_assignments').select('id', { count: 'exact' }).eq('staff_id', staffId);
+  let housekeepingQuery = supabase.from('housekeeping_tasks').select('id', { count: 'exact' }).eq('assigned_to', staffId);
+  let ordersAssignedQuery = supabase.from('transactions').select('id', { count: 'exact' }).eq('staff_id', staffId);
+
+  if (propertyId) {
+    shiftsQuery = shiftsQuery.eq('property_id', propertyId);
+    assignmentsQuery = assignmentsQuery.eq('property_id', propertyId);
+    housekeepingQuery = housekeepingQuery.eq('property_id', propertyId);
+    ordersAssignedQuery = ordersAssignedQuery.eq('property_id', propertyId);
+  }
+
   const [
     shiftsResult,
     assignmentsResult,
     housekeepingResult,
     ordersAssignedResult,
   ] = await Promise.all([
-    supabase.from('staff_shifts').select('id', { count: 'exact' }).eq('staff_id', staffId),
-    supabase.from('staff_assignments').select('id', { count: 'exact' }).eq('staff_id', staffId),
-    supabase.from('housekeeping_tasks').select('id', { count: 'exact' }).eq('assigned_to', staffId),
-    supabase.from('transactions').select('id', { count: 'exact' }).eq('staff_id', staffId),
+    shiftsQuery,
+    assignmentsQuery,
+    housekeepingQuery,
+    ordersAssignedQuery,
   ]);
 
   const relatedEntities: RelatedEntity[] = [
@@ -272,11 +339,17 @@ async function getStaffDeletePreview(supabase: any, staffId: string): Promise<De
   let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
 
   // Check for upcoming shifts
-  const { count: upcomingShifts } = await supabase
+  let upcomingShiftsQuery = supabase
     .from('staff_shifts')
     .select('id', { count: 'exact' })
     .eq('staff_id', staffId)
     .gte('start_time', new Date().toISOString());
+
+  if (propertyId) {
+    upcomingShiftsQuery = upcomingShiftsQuery.eq('property_id', propertyId);
+  }
+
+  const { count: upcomingShifts } = await upcomingShiftsQuery;
 
   if (upcomingShifts && upcomingShifts > 0) {
     severity = 'high';
@@ -314,20 +387,32 @@ async function getStaffDeletePreview(supabase: any, staffId: string): Promise<De
 /**
  * Chalet delete preview
  */
-async function getChaletDeletePreview(supabase: any, chaletId: string): Promise<DeletePreviewResult> {
-  const { data: chalet, error } = await supabase
+async function getChaletDeletePreview(supabase: any, chaletId: string, propertyId?: string): Promise<DeletePreviewResult> {
+  let query = supabase
     .from('accommodation_units')
-    .select('id, name, created_at')
-    .eq('id', chaletId)
-    .single();
+    .select('id, name, created_at, property_id')
+    .eq('id', chaletId);
+
+  if (propertyId) {
+    query = query.eq('property_id', propertyId);
+  }
+
+  const { data: chalet, error } = await query.single();
 
   if (error || !chalet) {
     throw new Error('Chalet not found');
   }
 
+  let bookingsQuery = supabase.from('transactions').select('id, booking_number, status', { count: 'exact' }).eq('reference_id', chaletId).eq('reference_table', 'accommodation_units').limit(10);
+  let imagesQuery = supabase.from('accommodation_unit_images').select('id', { count: 'exact' }).eq('unit_id', chaletId);
+
+  if (propertyId) {
+    bookingsQuery = bookingsQuery.eq('property_id', propertyId);
+  }
+
   const [bookingsResult, imagesResult] = await Promise.all([
-    supabase.from('transactions').select('id, booking_number, status', { count: 'exact' }).eq('reference_id', chaletId).eq('reference_table', 'accommodation_units').limit(10),
-    supabase.from('accommodation_unit_images').select('id', { count: 'exact' }).eq('unit_id', chaletId),
+    bookingsQuery,
+    imagesQuery,
   ]);
 
   const activeBookings = bookingsResult.data?.filter((b: any) => 
@@ -375,10 +460,10 @@ async function getChaletDeletePreview(supabase: any, chaletId: string): Promise<
 /**
  * Menu item delete preview
  */
-async function getMenuItemDeletePreview(supabase: any, itemId: string): Promise<DeletePreviewResult> {
+async function getMenuItemDeletePreview(supabase: any, itemId: string, propertyId?: string): Promise<DeletePreviewResult> {
   const { data: item, error } = await supabase
     .from('menu_items')
-    .select('id, name, created_at')
+    .select('id, name, created_at, category_id')
     .eq('id', itemId)
     .single();
 
@@ -386,10 +471,40 @@ async function getMenuItemDeletePreview(supabase: any, itemId: string): Promise<
     throw new Error('Menu item not found');
   }
 
+  if (propertyId) {
+    const { data: category } = await supabase
+      .from('menu_categories')
+      .select('property_id, module_id')
+      .eq('id', item.category_id)
+      .single();
+
+    if (category) {
+      if (category.property_id && category.property_id !== propertyId) {
+        throw new Error('Menu item not found in this property context');
+      } else if (category.module_id) {
+        const { data: mod } = await supabase
+          .from('modules')
+          .select('property_id')
+          .eq('id', category.module_id)
+          .single();
+        if (mod && mod.property_id !== propertyId) {
+          throw new Error('Menu item not found in this property context');
+        }
+      }
+    }
+  }
+
+  let orderItemsQuery = supabase.from('transactions').select('id', { count: 'exact' }).filter('metadata->items', 'cs', `[{"menu_item_id": "${itemId}"}]`);
+  let inventoryQuery = supabase.from('inventory_recipes').select('id', { count: 'exact' }).eq('menu_item_id', itemId);
+
+  if (propertyId) {
+    orderItemsQuery = orderItemsQuery.eq('property_id', propertyId);
+    inventoryQuery = inventoryQuery.eq('property_id', propertyId);
+  }
+
   const [orderItemsResult, inventoryResult] = await Promise.all([
-    // Check if item appears in any transaction metadata
-    supabase.from('transactions').select('id', { count: 'exact' }).filter('metadata->items', 'cs', `[{"menu_item_id": "${itemId}"}]`),
-    supabase.from('inventory_recipes').select('id', { count: 'exact' }).eq('menu_item_id', itemId),
+    orderItemsQuery,
+    inventoryQuery,
   ]);
 
   const relatedEntities: RelatedEntity[] = [
@@ -428,17 +543,20 @@ async function getMenuItemDeletePreview(supabase: any, itemId: string): Promise<
   };
 }
 
-
-
 /**
  * Module delete preview
  */
-async function getModuleDeletePreview(supabase: any, moduleId: string): Promise<DeletePreviewResult> {
-  const { data: module, error } = await supabase
+async function getModuleDeletePreview(supabase: any, moduleId: string, propertyId?: string): Promise<DeletePreviewResult> {
+  let moduleQuery = supabase
     .from('modules')
-    .select('id, name, type, created_at')
-    .eq('id', moduleId)
-    .single();
+    .select('id, name, type, created_at, property_id')
+    .eq('id', moduleId);
+
+  if (propertyId) {
+    moduleQuery = moduleQuery.eq('property_id', propertyId);
+  }
+
+  const { data: module, error } = await moduleQuery.single();
 
   if (error || !module) {
     throw new Error('Module not found');
@@ -452,15 +570,28 @@ async function getModuleDeletePreview(supabase: any, moduleId: string): Promise<
   let canDelete = true;
 
   if (module.type === 'multi_day') {
-    const { count: bookingsCount } = await supabase
+    let bookingsQuery = supabase
       .from('transactions')
       .select('id', { count: 'exact' })
       .eq('module_id', moduleId);
     
-    const { count: unitsCount } = await supabase
+    let unitsQuery = supabase
       .from('accommodation_units')
       .select('id', { count: 'exact' })
       .eq('module_id', moduleId);
+
+    if (propertyId) {
+      bookingsQuery = bookingsQuery.eq('property_id', propertyId);
+      unitsQuery = unitsQuery.eq('property_id', propertyId);
+    }
+
+    const [bookingsResult, unitsResult] = await Promise.all([
+      bookingsQuery,
+      unitsQuery,
+    ]);
+
+    const bookingsCount = bookingsResult.count;
+    const unitsCount = unitsResult.count;
 
     relatedEntities = [
       { table: 'units', count: unitsCount || 0 },
@@ -473,9 +604,16 @@ async function getModuleDeletePreview(supabase: any, moduleId: string): Promise<
       canDelete = false;
     }
   } else if (module.type === 'restaurant') {
+    let ordersQuery = supabase.from('transactions').select('id', { count: 'exact' }).eq('module_id', moduleId);
+    let menuQuery = supabase.from('menu_items').select('id', { count: 'exact' }).eq('module_id', moduleId);
+
+    if (propertyId) {
+      ordersQuery = ordersQuery.eq('property_id', propertyId);
+    }
+
     const [ordersResult, menuResult] = await Promise.all([
-      supabase.from('transactions').select('id', { count: 'exact' }).eq('module_id', moduleId),
-      supabase.from('menu_items').select('id', { count: 'exact' }).eq('module_id', moduleId),
+      ordersQuery,
+      menuQuery,
     ]);
 
     relatedEntities = [

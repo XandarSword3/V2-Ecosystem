@@ -2,11 +2,13 @@ import { Router } from 'express';
 import { approvalsController } from './approvals.controller.js';
 import { shiftsController } from './shifts.controller.js';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { validatePropertyAccess } from '../../middleware/propertyAccess.middleware.js';
 
 const router = Router();
 
-// All routes require authentication
+// All routes require authentication and property validation
 router.use(authenticate);
+router.use(validatePropertyAccess);
 
 // ============== APPROVALS ==============
 // Staff can create approval requests

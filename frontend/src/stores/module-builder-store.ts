@@ -6,6 +6,7 @@ interface ModuleBuilderStore {
   layout: UIBlock[];
   selectedBlockId: string | null;
   isPreview: boolean;
+  previewDevice: 'desktop' | 'mobile';
   zoom: number;
   canvasMode: CanvasMode;
   history: UIBlock[][];
@@ -17,6 +18,7 @@ interface ModuleBuilderStore {
   setLayout: (layout: UIBlock[], skipHistory?: boolean) => void;
   selectBlock: (id: string | null) => void;
   togglePreview: () => void;
+  setPreviewDevice: (device: 'desktop' | 'mobile') => void;
   setZoom: (zoom: number) => void;
   setCanvasMode: (mode: CanvasMode) => void;
   undo: () => void;
@@ -53,6 +55,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
   layout: [],
   selectedBlockId: null,
   isPreview: false,
+  previewDevice: 'desktop',
   zoom: 100,
   canvasMode: 'stack',
   history: [], // past states
@@ -67,6 +70,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
   }),
   selectBlock: (id) => set({ selectedBlockId: id }),
   togglePreview: () => set((state) => ({ isPreview: !state.isPreview, selectedBlockId: null })),
+  setPreviewDevice: (previewDevice) => set({ previewDevice }),
   setZoom: (zoom) => set({ zoom: Math.max(50, Math.min(150, zoom)) }),
   setCanvasMode: (mode) => set({ canvasMode: mode }),
 

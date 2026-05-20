@@ -18,6 +18,8 @@ export interface ResolvedSetting {
   key: string;
   value: any;
   source: 'property' | 'group' | 'system' | 'default';
+  category?: string;
+  description?: string;
 }
 
 /**
@@ -223,7 +225,7 @@ export async function getEffectiveSettings(
   category?: string
 ): Promise<ResolvedSetting[]> {
   // Get all system defaults as baseline
-  let sysQuery = supabase().from('system_defaults').select('setting_key, setting_value, category');
+  let sysQuery = supabase().from('system_defaults').select('setting_key, setting_value, category, description');
   if (category) sysQuery = sysQuery.eq('category', category);
   const { data: sysDefaults } = await sysQuery;
 
@@ -231,5 +233,15 @@ export async function getEffectiveSettings(
 
   if (allKeys.length === 0) return [];
 
-  return Object.values(await resolveSettings(propertyId, allKeys));
+  const resolved = await resolveSettings(propertyId, allKeys);
+
+  // Attach category and description from sysDefaults
+  sysDefaults?.forEach(sys => {
+    if (resolved[sys.setting_key]) {
+      resolved[sys.setting_key].category = sys.category;
+      resolved[sys.setting_key].description = sys.description;
+    }
+  });
+
+  return Object.values(resolved);
 }

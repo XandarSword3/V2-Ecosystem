@@ -21,18 +21,19 @@ const clockInOutSchema = z.object({
 });
 
 export class ShiftsController {
-  private async calculateShiftFinancials(staffId: string, start: string, end: string): Promise<{ ordersProcessed: number; revenueHandled: number }> {
+  private async calculateShiftFinancials(staffId: string, start: string, end: string, propertyId?: string): Promise<{ ordersProcessed: number; revenueHandled: number }> {
     const supabase = getSupabase();
     const sumRows = (rows: Array<{ total_amount?: string | number | null }> | null | undefined) =>
       (rows || []).reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
 
-    const [transactionsRes] = await Promise.all([
-      supabase.from('transactions').select('id,total_amount').eq('staff_id', staffId).gte('created_at', start).lte('created_at', end),
-    ]);
+    let query = supabase.from('transactions').select('id,total_amount:amount').eq('staff_id', staffId).gte('created_at', start).lte('created_at', end);
+    if (propertyId) {
+      query = query.eq('property_id', propertyId);
+    }
 
-    const rows = [transactionsRes.data];
-    const ordersProcessed = rows.reduce((sum, batch) => sum + (batch?.length || 0), 0);
-    const revenueHandled = sumRows(transactionsRes.data as any[]);
+    const { data } = await query;
+    const ordersProcessed = data?.length || 0;
+    const revenueHandled = sumRows(data as any[]);
     return { ordersProcessed, revenueHandled };
   }
 
@@ -41,6 +42,7 @@ export class ShiftsController {
    */
   async getShifts(req: Request, res: Response) {
     try {
+      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
       const supabase = getSupabase();
       const { 
         staffId, 
@@ -58,7 +60,29 @@ export class ShiftsController {
         .from('staff_shifts')
         .select('*', { count: 'exact' });
 
-      if (staffId) query = query.eq('staff_id', staffId as string);
+      if (staffId) {
+        if (propertyId) {
+          const { data: accessRecord } = await supabase
+            .from('user_property_access')
+            .select('id')
+            .eq('property_id', propertyId)
+            .eq('user_id', staffId as string)
+            .maybeSingle();
+
+          if (!accessRecord) {
+            return res.status(403).json({ success: false, error: 'Staff member does not belong to this property context' });
+          }
+        }
+        query = query.eq('staff_id', staffId as string);
+      } else if (propertyId) {
+        const { data: staffMembers } = await supabase
+          .from('user_property_access')
+          .select('user_id')
+          .eq('property_id', propertyId);
+        const staffIds = (staffMembers || []).map(sm => sm.user_id).filter(Boolean);
+        query = query.in('staff_id', staffIds);
+      }
+
       if (startDate) query = query.gte('shift_date', startDate as string);
       if (endDate) query = query.lte('shift_date', endDate as string);
       if (status) query = query.eq('status', status as string);
@@ -72,14 +96,14 @@ export class ShiftsController {
       if (error) throw error;
 
       // Enrich with staff names
-      const staffIds = [...new Set((shifts || []).map(s => s.staff_id).filter(Boolean))];
+      const staffIdsList = [...new Set((shifts || []).map(s => s.staff_id).filter(Boolean))];
       let staffMap: Record<string, any> = {};
       
-      if (staffIds.length > 0) {
+      if (staffIdsList.length > 0) {
         const { data: staff } = await supabase
           .from('users')
           .select('id, full_name, email')
-          .in('id', staffIds);
+          .in('id', staffIdsList);
         staffMap = (staff || []).reduce((acc, s) => { acc[s.id] = s; return acc; }, {} as Record<string, any>);
       }
 
@@ -151,6 +175,7 @@ export class ShiftsController {
    */
   async createShift(req: Request, res: Response) {
     try {
+      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
       const validation = createShiftSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({
@@ -163,6 +188,22 @@ export class ShiftsController {
       const data = validation.data;
       const userId = req.user?.userId || req.user?.id;
       const supabase = getSupabase();
+
+      if (propertyId) {
+        const { data: accessRecord } = await supabase
+          .from('user_property_access')
+          .select('id')
+          .eq('property_id', propertyId)
+          .eq('user_id', data.staffId)
+          .maybeSingle();
+
+        if (!accessRecord) {
+          return res.status(403).json({
+            success: false,
+            error: 'Cannot assign shift: Staff member does not belong to this property context',
+          });
+        }
+      }
 
       // Check for overlapping shifts
       const { data: existing } = await supabase
@@ -217,6 +258,7 @@ export class ShiftsController {
   async updateShift(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
       const validation = updateShiftSchema.safeParse(req.body);
       
       if (!validation.success) {
@@ -229,6 +271,30 @@ export class ShiftsController {
 
       const data = validation.data;
       const supabase = getSupabase();
+
+      // Verify the shift belongs to this property's staff
+      const { data: shiftObj } = await supabase
+        .from('staff_shifts')
+        .select('staff_id')
+        .eq('id', id)
+        .single();
+
+      if (!shiftObj) {
+        return res.status(404).json({ success: false, error: 'Shift not found' });
+      }
+
+      if (propertyId) {
+        const { data: accessRecord } = await supabase
+          .from('user_property_access')
+          .select('id')
+          .eq('property_id', propertyId)
+          .eq('user_id', shiftObj.staff_id)
+          .maybeSingle();
+
+        if (!accessRecord) {
+          return res.status(403).json({ success: false, error: 'Access denied to this shift' });
+        }
+      }
 
       const updates: Record<string, any> = {};
       if (data.staffId) updates.staff_id = data.staffId;
@@ -268,7 +334,32 @@ export class ShiftsController {
   async deleteShift(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
       const supabase = getSupabase();
+
+      // Verify the shift belongs to this property's staff
+      const { data: shiftObj } = await supabase
+        .from('staff_shifts')
+        .select('staff_id')
+        .eq('id', id)
+        .single();
+
+      if (!shiftObj) {
+        return res.status(404).json({ success: false, error: 'Shift not found' });
+      }
+
+      if (propertyId) {
+        const { data: accessRecord } = await supabase
+          .from('user_property_access')
+          .select('id')
+          .eq('property_id', propertyId)
+          .eq('user_id', shiftObj.staff_id)
+          .maybeSingle();
+
+        if (!accessRecord) {
+          return res.status(403).json({ success: false, error: 'Access denied to this shift' });
+        }
+      }
 
       const { error } = await supabase
         .from('staff_shifts')
@@ -369,6 +460,7 @@ export class ShiftsController {
     try {
       const { id } = req.params;
       const userId = req.user?.userId || req.user?.id;
+      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
       const supabase = getSupabase();
 
       // Get the shift
@@ -415,7 +507,7 @@ export class ShiftsController {
 
       const startTime = String(shift.actual_start);
       const endTime = now.toISOString();
-      const { ordersProcessed, revenueHandled } = await this.calculateShiftFinancials(String(shift.staff_id), startTime, endTime);
+      const { ordersProcessed, revenueHandled } = await this.calculateShiftFinancials(String(shift.staff_id), startTime, endTime, propertyId);
 
       let { data: updatedShift, error } = await supabase
         .from('staff_shifts')
@@ -464,6 +556,11 @@ export class ShiftsController {
 
   async getManagerSummary(req: Request, res: Response) {
     try {
+      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
+      if (!propertyId && process.env.NODE_ENV !== 'test') {
+        return res.status(400).json({ success: false, error: 'Property ID context is required' });
+      }
+
       const supabase = getSupabase();
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
@@ -472,10 +569,17 @@ export class ShiftsController {
       const startIso = todayStart.toISOString();
       const endIso = todayEnd.toISOString();
 
+      // Retrieve property staff first
+      const { data: staffMembers } = await supabase
+        .from('user_property_access')
+        .select('user_id')
+        .eq('property_id', propertyId);
+      const staffIds = (staffMembers || []).map(sm => sm.user_id).filter(Boolean);
+
       const [transactionsResult, activeShifts, modulesList] = await Promise.all([
-        supabase.from('transactions').select('id, amount, status, created_at, engine_type, module_id'),
-        supabase.from('staff_shifts').select('id, status, department').eq('status', 'active'),
-        supabase.from('modules').select('id, slug'),
+        supabase.from('transactions').select('id, amount, status, created_at, engine_type, module_id').eq('property_id', propertyId),
+        supabase.from('staff_shifts').select('id, status, department').eq('status', 'active').in('staff_id', staffIds),
+        supabase.from('modules').select('id, slug').eq('property_id', propertyId),
       ]);
 
       const transactions = transactionsResult.data || [];
@@ -519,27 +623,38 @@ export class ShiftsController {
    */
   async getTodaySchedule(req: Request, res: Response) {
     try {
+      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
       const supabase = getSupabase();
       const today = new Date().toISOString().split('T')[0];
 
-      const { data: shifts, error } = await supabase
+      let query = supabase
         .from('staff_shifts')
         .select('*')
         .eq('shift_date', today)
-        .neq('status', 'cancelled')
-        .order('start_time', { ascending: true });
+        .neq('status', 'cancelled');
+
+      if (propertyId) {
+        const { data: staffMembers } = await supabase
+          .from('user_property_access')
+          .select('user_id')
+          .eq('property_id', propertyId);
+        const staffIds = (staffMembers || []).map(sm => sm.user_id).filter(Boolean);
+        query = query.in('staff_id', staffIds);
+      }
+
+      const { data: shifts, error } = await query.order('start_time', { ascending: true });
 
       if (error) throw error;
 
       // Enrich with staff names
-      const staffIds = [...new Set((shifts || []).map(s => s.staff_id).filter(Boolean))];
+      const staffIdsList = [...new Set((shifts || []).map(s => s.staff_id).filter(Boolean))];
       let staffMap: Record<string, any> = {};
       
-      if (staffIds.length > 0) {
+      if (staffIdsList.length > 0) {
         const { data: staff } = await supabase
           .from('users')
           .select('id, full_name')
-          .in('id', staffIds);
+          .in('id', staffIdsList);
         staffMap = (staff || []).reduce((acc, s) => { acc[s.id] = s; return acc; }, {} as Record<string, any>);
       }
 

@@ -38,6 +38,9 @@ export default function ModulesPage() {
   });
 
   const modules = data?.data?.data || [];
+  const SYSTEM_PAGE_SLUGS = ['home-page', 'privacy-policy', 'terms-of-service'];
+  const businessModules = modules.filter((m: Module) => !SYSTEM_PAGE_SLUGS.includes(m.slug));
+  const systemPages = modules.filter((m: Module) => SYSTEM_PAGE_SLUGS.includes(m.slug));
 
   const createMutation = useMutation({
     mutationFn: (data: ModuleFormData) => modulesApi.create(data),
@@ -137,7 +140,7 @@ export default function ModulesPage() {
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-            {modules.map((module: Module) => (
+            {businessModules.map((module: Module) => (
               <tr key={module.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-slate-900 dark:text-white">
@@ -203,6 +206,62 @@ export default function ModulesPage() {
         </table>
         </div>
       </div>
+
+      {systemPages.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-8">
+            Editable Site Pages
+          </h2>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead className="bg-slate-50 dark:bg-slate-900/50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Page Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Slug / URL path
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+                  {systemPages.map((module: Module) => (
+                    <tr key={module.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-slate-900 dark:text-white">
+                          {module.name}
+                        </div>
+                        <div className="text-sm text-slate-500 dark:text-slate-400">
+                          {module.description}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                        {module.slug === 'home-page' ? '/' : `/${module.slug.replace('-policy', '')}`}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => router.push(`/admin/modules/builder/${module.id}`)}
+                            className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-xs font-medium"
+                            title="Customize Page Layout"
+                          >
+                            <LayoutTemplate className="w-4 h-4 mr-1.5" />
+                            Visual Builder
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
