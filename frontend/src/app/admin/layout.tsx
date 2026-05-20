@@ -59,6 +59,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [authChecked, setAuthChecked] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
   
   // Notifications state
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -194,13 +196,42 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [isAuthenticated, isLoading, router, user, t]);
 
+  // Check onboarding status
+  useEffect(() => {
+    async function checkOnboarding() {
+      try {
+        const res = await api.get('/admin/onboarding');
+        if (res.data?.success && res.data?.data) {
+          const completed = !!res.data.data.completed;
+          setOnboardingCompleted(completed);
+          setOnboardingChecked(true);
+          
+          if (!completed && pathname !== '/admin/setup') {
+            router.push('/admin/setup');
+          }
+        } else {
+          setOnboardingChecked(true);
+        }
+      } catch (err) {
+        console.error('Failed to check onboarding state:', err);
+        setOnboardingChecked(true);
+      }
+    }
+
+    if (!isLoading && isAuthenticated && user?.roles.some(role => ['admin', 'super_admin'].includes(role))) {
+      checkOnboarding();
+    } else if (!isLoading) {
+      setOnboardingChecked(true);
+    }
+  }, [isAuthenticated, isLoading, user, pathname, router]);
+
   const handleLogout = async () => {
     await logout();
     toast.success(t('messages.loggedOutSuccessfully'));
     router.push('/');
   };
 
-  if (isLoading || !authChecked || !isAuthenticated) {
+  if (isLoading || !authChecked || !isAuthenticated || (!onboardingChecked && pathname !== '/admin/setup')) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <motion.div
@@ -209,6 +240,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           className="w-10 h-10 border-3 rounded-full border-primary-600 border-t-transparent"
         />
       </div>
+    );
+  }
+
+  // Bypass Layout wrapper for onboarding setup page
+  if (pathname === '/admin/setup') {
+    return (
+      <PropertyProvider>
+        {children}
+      </PropertyProvider>
     );
   }
 

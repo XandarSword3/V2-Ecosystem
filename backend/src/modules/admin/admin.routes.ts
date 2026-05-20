@@ -169,12 +169,12 @@ router.delete('/deleted/:entityType/:entityId/permanent', authorize('super_admin
 router.post('/soft-delete/:entityType/:entityId', authorizeManager, softDeleteController.softDelete);
 
 // Onboarding Wizard Setup
-router.get('/onboarding', onboardingController.getOnboardingState);
-router.put('/onboarding', onboardingController.updateOnboardingState);
-router.post('/onboarding/verify-stripe', onboardingController.verifyStripe);
-router.post('/onboarding/test-email', onboardingController.testEmail);
-router.post('/onboarding/finalize', onboardingController.finalizeOnboarding);
-router.get('/onboarding/manual', onboardingController.getOperationsManual);
+router.get('/onboarding', authorize('admin'), onboardingController.getOnboardingState);
+router.put('/onboarding', authorize('admin'), onboardingController.updateOnboardingState);
+router.post('/onboarding/verify-stripe', authorize('admin'), onboardingController.verifyStripe);
+router.post('/onboarding/test-email', authorize('admin'), onboardingController.testEmail);
+router.post('/onboarding/finalize', authorize('super_admin'), onboardingController.finalizeOnboarding);
+router.get('/onboarding/manual', authorize('admin'), onboardingController.getOperationsManual);
 
 // CSV Bulk Imports
 router.post('/import/menu', authorizeManager, importController.importMenuItems);

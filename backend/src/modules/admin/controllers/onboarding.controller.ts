@@ -236,203 +236,285 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
     return;
   }
 
+  // Atomically mark onboarding_state completed to prevent race conditions (Bug #8)
+  const { data: updateResult, error: updateErr } = await supabase
+    .from('site_settings')
+    .update({
+      value: { ...state, completed: true }
+    })
+    .eq('key', 'onboarding_state')
+    .eq('value->>completed', 'false')
+    .select();
+
+  if (updateErr || !updateResult || updateResult.length === 0) {
+    res.status(400).json({ success: false, error: 'Onboarding is already completed or currently processing' });
+    return;
+  }
+
   // Extract data from completed steps
   const steps = state.steps || {};
-  const brandData = steps['brand_identity']?.data || {};
+  const brandData = steps['resort_details']?.data || {};
   const themeData = steps['visual_design']?.data || {};
-  const hoursData = steps['hours']?.data || {};
+  const hoursData = {
+    timezone: 'UTC',
+    poolHours: '08:00 - 20:00',
+    restaurantHours: '07:00 - 23:00',
+    receptionHours: '24/7'
+  };
   const modulesData = steps['modules']?.data || { modules: [] };
   const gatewayData = steps['payment_gateway']?.data || {};
   const smtpData = steps['transactional_emails']?.data || {};
   const staffData = steps['staff_invitations']?.data || { invitations: [] };
 
-  const propertyName = brandData.resortName || 'My Resort';
-  const propertySlug = brandData.slug || 'my-resort';
+  const propertyName = brandData.name || 'My Resort';
 
-  // 2. Start provisioning within a transaction context
-  // First, create the default property group if not exists
-  let groupId: string | null = null;
-  const { data: existingGroup } = await supabase
-    .from('property_groups')
-    .select('id')
-    .limit(1);
+  // Read credentials from request body with database state fallback (Bug #4)
+  const stripeSecret = req.body.stripeSecretKey || gatewayData.secretKey;
+  const smtpApiKey = req.body.smtpApiKey || smtpData.apiKey;
+  const smtpPass = req.body.smtpPass || smtpData.pass;
 
-  if (existingGroup && existingGroup.length > 0) {
-    groupId = existingGroup[0].id;
-  } else {
-    const { data: newGroup, error: groupErr } = await supabase
+  try {
+    // 2. Start provisioning within a transaction context
+    // First, create the default property group if not exists
+    let groupId: string | null = null;
+    const { data: existingGroup } = await supabase
       .from('property_groups')
+      .select('id')
+      .limit(1);
+
+    if (existingGroup && existingGroup.length > 0) {
+      groupId = existingGroup[0].id;
+    } else {
+      const { data: newGroup, error: groupErr } = await supabase
+        .from('property_groups')
+        .insert({
+          name: 'Default Group',
+          description: 'Primary property group',
+        })
+        .select()
+        .single();
+
+      if (groupErr) throw groupErr;
+      groupId = newGroup.id;
+    }
+
+    // 3. Create the property (Bug #5: remove slug, map address to address_line1)
+    const { data: newProperty, error: propErr } = await supabase
+      .from('properties')
       .insert({
-        name: 'Default Group',
-        description: 'Primary property group',
+        name: propertyName,
+        address_line1: brandData.address || '',
+        phone: brandData.phone || '',
+        email: brandData.email || '',
+        group_id: groupId,
       })
       .select()
       .single();
 
-    if (groupErr) throw groupErr;
-    groupId = newGroup.id;
-  }
+    if (propErr) throw propErr;
+    const propertyId = newProperty.id;
 
-  // 3. Create the property
-  const { data: newProperty, error: propErr } = await supabase
-    .from('properties')
-    .insert({
-      name: propertyName,
-      slug: propertySlug,
-      address: brandData.address || '',
-      phone: brandData.phone || '',
-      email: brandData.email || '',
-      group_id: groupId,
-    })
-    .select()
-    .single();
+    // 4. Associate the creator with the property as admin
+    const { error: accessErr } = await supabase
+      .from('user_property_access')
+      .insert({
+        user_id: userId,
+        property_id: propertyId,
+        access_level: 'admin',
+      });
 
-  if (propErr) throw propErr;
-  const propertyId = newProperty.id;
+    if (accessErr) throw accessErr;
 
-  // 4. Associate the creator with the property as admin
-  const { error: accessErr } = await supabase
-    .from('user_property_access')
-    .insert({
-      user_id: userId,
-      property_id: propertyId,
-      access_level: 'admin',
+    // 5. Seed Property Settings (Inheritance)
+    const brandingSettings = {
+      themeColor: themeData.themeColor || '#6366f1',
+      accentColor: themeData.accentColor || '#4f46e5',
+      logoUrl: themeData.logoUrl || null,
+      faviconUrl: themeData.faviconUrl || null,
+    };
+
+    const finalGatewaySettings = {
+      ...gatewayData,
+      secretKey: stripeSecret
+    };
+    const finalSmtpSettings = {
+      ...smtpData,
+      apiKey: smtpApiKey,
+      pass: smtpPass
+    };
+
+    const settingsToInsert = [
+      { property_id: propertyId, setting_key: 'branding', setting_value: brandingSettings, category: 'appearance' },
+      { property_id: propertyId, setting_key: 'operational_hours', setting_value: hoursData, category: 'general' },
+      { property_id: propertyId, setting_key: 'payment_gateway', setting_value: finalGatewaySettings, category: 'finance' },
+      { property_id: propertyId, setting_key: 'smtp_config', setting_value: finalSmtpSettings, category: 'system' },
+    ];
+
+    const { error: settingsErr } = await supabase
+      .from('property_settings')
+      .insert(settingsToInsert);
+
+    if (settingsErr) throw settingsErr;
+
+    // 6. Provision Modules
+    const selectedModules: string[] = modulesData.modules || [];
+    const modulesToInsert = selectedModules.map((modSlug) => {
+      let engineType = 'instant_transaction';
+      if (modSlug === 'hotel' || modSlug === 'chalet') engineType = 'time_exclusive_reservation';
+      else if (modSlug === 'pool' || modSlug === 'beach') engineType = 'shared_capacity_access';
+      else if (modSlug === 'membership') engineType = 'ongoing_entitlement';
+
+      return {
+        property_id: propertyId,
+        name: modSlug.charAt(0).toUpperCase() + modSlug.slice(1),
+        slug: modSlug,
+        type: engineType,
+        is_active: true,
+      };
     });
 
-  if (accessErr) throw accessErr;
+    if (modulesToInsert.length > 0) {
+      const { error: modErr } = await supabase
+        .from('modules')
+        .insert(modulesToInsert);
+      if (modErr) throw modErr;
+    }
 
-  // 5. Seed Property Settings (Inheritance)
-  const brandingSettings = {
-    themeColor: themeData.themeColor || '#6366f1',
-    accentColor: themeData.accentColor || '#4f46e5',
-    logoUrl: themeData.logoUrl || null,
-    faviconUrl: themeData.faviconUrl || null,
-  };
+    // 7. Invite Staff Members
+    const staffInvitations = staffData.invitations || [];
+    for (const staff of staffInvitations) {
+      if (staff.email) {
+        let userAuthId: string | null = null;
+        
+        // Invite user via Supabase Auth admin client
+        const { data: inviteData, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(
+          staff.email,
+          {
+            data: {
+              full_name: staff.name || staff.email.split('@')[0],
+            }
+          }
+        );
 
-  const settingsToInsert = [
-    { property_id: propertyId, setting_key: 'branding', setting_value: brandingSettings, category: 'appearance' },
-    { property_id: propertyId, setting_key: 'operational_hours', setting_value: hoursData, category: 'general' },
-    { property_id: propertyId, setting_key: 'payment_gateway', setting_value: gatewayData, category: 'finance' },
-    { property_id: propertyId, setting_key: 'smtp_config', setting_value: smtpData, category: 'system' },
-  ];
-
-  const { error: settingsErr } = await supabase
-    .from('property_settings')
-    .insert(settingsToInsert);
-
-  if (settingsErr) throw settingsErr;
-
-  // 6. Provision Modules
-  const selectedModules: string[] = modulesData.modules || [];
-  const modulesToInsert = selectedModules.map((modSlug) => {
-    let engineType = 'instant_transaction';
-    if (modSlug === 'hotel' || modSlug === 'chalet') engineType = 'time_exclusive_reservation';
-    else if (modSlug === 'pool' || modSlug === 'beach') engineType = 'shared_capacity_access';
-    else if (modSlug === 'membership') engineType = 'ongoing_entitlement';
-
-    return {
-      property_id: propertyId,
-      name: modSlug.charAt(0).toUpperCase() + modSlug.slice(1),
-      slug: modSlug,
-      type: engineType,
-      is_active: true,
-    };
-  });
-
-  if (modulesToInsert.length > 0) {
-    const { error: modErr } = await supabase
-      .from('modules')
-      .insert(modulesToInsert);
-    if (modErr) throw modErr;
-  }
-
-  // 7. Invite Staff Members
-  const staffInvitations = staffData.invitations || [];
-  for (const staff of staffInvitations) {
-    // Create users if they do not exist, or send invite link
-    // For local onboarding simplicity, we create user profiles directly
-    if (staff.email) {
-      const { data: newUser, error: uErr } = await supabase
-        .from('users')
-        .insert({
-          email: staff.email,
-          full_name: staff.name || staff.email.split('@')[0],
-          role: staff.role || 'staff',
-          is_active: true,
-        })
-        .select()
-        .single();
-      
-      if (!uErr && newUser) {
-        // Grant property access
-        await supabase
-          .from('user_property_access')
-          .insert({
-            user_id: newUser.id,
-            property_id: propertyId,
-            access_level: staff.role === 'admin' ? 'admin' : 'write',
+        if (inviteErr) {
+          logger.warn('Failed to invite staff user via auth, checking if profile exists', {
+            email: staff.email,
+            error: inviteErr.message,
           });
+          // If user already exists in Auth, retrieve their ID from the public users table
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', staff.email)
+            .maybeSingle();
+          
+          if (existingUser) {
+            userAuthId = existingUser.id;
+          }
+        } else if (inviteData?.user) {
+          userAuthId = inviteData.user.id;
+        }
+
+        if (userAuthId) {
+          // Upsert user profile in public users table using the auth user's ID
+          const { data: newUser, error: uErr } = await supabase
+            .from('users')
+            .upsert({
+              id: userAuthId,
+              email: staff.email,
+              full_name: staff.name || staff.email.split('@')[0],
+              role: staff.role || 'staff',
+              is_active: true,
+            })
+            .select()
+            .single();
+          
+          if (!uErr && newUser) {
+            // Grant property access
+            await supabase
+              .from('user_property_access')
+              .upsert({
+                user_id: userAuthId,
+                property_id: propertyId,
+                access_level: staff.role === 'admin' ? 'admin' : 'write',
+              });
+          }
+        }
       }
     }
+
+    // 8. Generate Printable Operations Manual (Bug #9: XSS Escape user inputs)
+    const manualHtml = generateOperationsManual({
+      resortName: propertyName,
+      address: brandData.address || 'N/A',
+      phone: brandData.phone || 'N/A',
+      email: brandData.email || 'N/A',
+      modules: selectedModules,
+      themeColor: brandingSettings.themeColor,
+      stripeEnabled: !!stripeSecret,
+      smtpEnabled: !!smtpApiKey || !!smtpData.host,
+    });
+
+    // Save Operations Manual to site_settings under 'operations_manual' for download
+    await supabase
+      .from('site_settings')
+      .upsert({
+        key: `operations_manual_${propertyId}`,
+        value: { html: manualHtml, generated_at: new Date().toISOString() },
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      });
+
+    // 9. Complete Onboarding
+    const finalState: OnboardingState = {
+      ...state,
+      completed: true,
+      completed_at: new Date().toISOString(),
+      current_step: 'completed',
+    };
+
+    await supabase
+      .from('site_settings')
+      .upsert({
+        key: 'onboarding_state',
+        value: finalState,
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      });
+
+    // Log final activity
+    await logActivity({
+      user_id: userId,
+      action: 'COMPLETE_ONBOARDING',
+      resource: 'site_settings',
+      resource_id: 'onboarding_state',
+      property_id: propertyId,
+    });
+
+    res.json({
+      success: true,
+      message: 'Onboarding setup finalized successfully!',
+      data: {
+        propertyId,
+        propertyName,
+        manualUrl: `/api/v1/admin/onboarding/manual?property_id=${propertyId}`,
+      },
+    });
+  } catch (err: any) {
+    logger.error('Onboarding finalization failed, reverting completed status', { error: err.message });
+    // Revert completed status to allow retries
+    await supabase
+      .from('site_settings')
+      .update({
+        value: { ...state, completed: false }
+      })
+      .eq('key', 'onboarding_state');
+
+    res.status(500).json({
+      success: false,
+      error: err.message || 'Onboarding finalization failed',
+    });
   }
-
-  // 8. Generate Printable Operations Manual
-  const manualHtml = generateOperationsManual({
-    resortName: propertyName,
-    address: brandData.address || 'N/A',
-    phone: brandData.phone || 'N/A',
-    email: brandData.email || 'N/A',
-    modules: selectedModules,
-    themeColor: brandingSettings.themeColor,
-    stripeEnabled: !!gatewayData.secretKey,
-    smtpEnabled: !!smtpData.apiKey || !!smtpData.host,
-  });
-
-  // Save Operations Manual to site_settings under 'operations_manual' for download
-  await supabase
-    .from('site_settings')
-    .upsert({
-      key: `operations_manual_${propertyId}`,
-      value: { html: manualHtml, generated_at: new Date().toISOString() },
-      updated_by: userId,
-      updated_at: new Date().toISOString(),
-    });
-
-  // 9. Complete Onboarding
-  const finalState: OnboardingState = {
-    ...state,
-    completed: true,
-    completed_at: new Date().toISOString(),
-    current_step: 'completed',
-  };
-
-  await supabase
-    .from('site_settings')
-    .upsert({
-      key: 'onboarding_state',
-      value: finalState,
-      updated_by: userId,
-      updated_at: new Date().toISOString(),
-    });
-
-  // Log final activity
-  await logActivity({
-    user_id: userId,
-    action: 'COMPLETE_ONBOARDING',
-    resource: 'site_settings',
-    resource_id: 'onboarding_state',
-    property_id: propertyId,
-  });
-
-  res.json({
-    success: true,
-    message: 'Onboarding setup finalized successfully!',
-    data: {
-      propertyId,
-      propertyName,
-      manualUrl: `/api/v1/admin/onboarding/manual?property_id=${propertyId}`,
-    },
-  });
 });
 
 /**
@@ -465,34 +547,62 @@ export const getOperationsManual = asyncHandler(async (req: Request, res: Respon
 });
 
 /**
+ * HTML Escaper and Color Sanitizer helpers to prevent XSS and CSS injection (Bug #9)
+ */
+const esc = (s: any): string => {
+  if (s == null) return '';
+  const str = String(s);
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+};
+
+const sanitizeColor = (color: any): string => {
+  if (typeof color !== 'string') return '#6366f1';
+  // Limit color inputs to valid CSS colors and hex values, preventing CSS injection escape
+  const safeColor = color.replace(/[^a-zA-Z0-9#(),.%-]/g, '');
+  return safeColor || '#6366f1';
+};
+
+/**
  * Helper to generate a beautiful printable operations manual HTML
  */
 function generateOperationsManual(details: any): string {
+  const resortName = esc(details.resortName);
+  const email = esc(details.email);
+  const phone = esc(details.phone);
+  const address = esc(details.address);
+  const themeColor = sanitizeColor(details.themeColor);
+
   return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <title>${details.resortName} - Operations Manual</title>
+      <title>${resortName} - Operations Manual</title>
       <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 40px; }
-        .header { text-align: center; border-bottom: 2px solid ${details.themeColor}; padding-bottom: 20px; margin-bottom: 30px; }
-        .title { color: ${details.themeColor}; font-size: 32px; font-weight: bold; margin: 0; }
+        .header { text-align: center; border-bottom: 2px solid ${themeColor}; padding-bottom: 20px; margin-bottom: 30px; }
+        .title { color: ${themeColor}; font-size: 32px; font-weight: bold; margin: 0; }
         .subtitle { color: #666; font-size: 18px; margin-top: 5px; }
-        .section { margin-bottom: 30px; background: #fafafa; padding: 20px; border-radius: 8px; border-left: 4px solid ${details.themeColor}; }
-        .section-title { font-size: 20px; font-weight: bold; color: ${details.themeColor}; margin-top: 0; margin-bottom: 15px; }
+        .section { margin-bottom: 30px; background: #fafafa; padding: 20px; border-radius: 8px; border-left: 4px solid ${themeColor}; }
+        .section-title { font-size: 20px; font-weight: bold; color: ${themeColor}; margin-top: 0; margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { text-align: left; padding: 10px; border-bottom: 1px solid #ddd; }
         th { background: #eee; }
         .badge { display: inline-block; padding: 4px 8px; font-size: 12px; border-radius: 4px; color: white; background: #10b981; }
         .badge.inactive { background: #ef4444; }
-        .print-btn { display: block; width: 200px; padding: 12px; background: ${details.themeColor}; color: white; text-align: center; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 40px auto; }
+        .print-btn { display: block; width: 200px; padding: 12px; background: ${themeColor}; color: white; text-align: center; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 40px auto; }
         @media print { .print-btn { display: none; } }
       </style>
     </head>
     <body>
       <div class="header">
-        <h1 class="title">${details.resortName}</h1>
+        <h1 class="title">${resortName}</h1>
         <div class="subtitle">Official Resort Operations & Setup Manual</div>
         <p>Generated on ${new Date().toLocaleDateString()}</p>
       </div>
@@ -501,10 +611,10 @@ function generateOperationsManual(details: any): string {
         <h2 class="section-title">1. Directory & Contact Information</h2>
         <table>
           <tr><th>Attribute</th><th>Detail</th></tr>
-          <tr><td>Resort Name</td><td>${details.resortName}</td></tr>
-          <tr><td>Contact Email</td><td>${details.email}</td></tr>
-          <tr><td>Contact Phone</td><td>${details.phone}</td></tr>
-          <tr><td>Address</td><td>${details.address}</td></tr>
+          <tr><td>Resort Name</td><td>${resortName}</td></tr>
+          <tr><td>Contact Email</td><td>${email}</td></tr>
+          <tr><td>Contact Phone</td><td>${phone}</td></tr>
+          <tr><td>Address</td><td>${address}</td></tr>
         </table>
       </div>
 
@@ -513,7 +623,7 @@ function generateOperationsManual(details: any): string {
         <ul>
           ${details.modules.map((m: string) => `
             <li>
-              <strong>${m.toUpperCase()} Module</strong> - Active and configured.
+              <strong>${esc(m.toUpperCase())} Module</strong> - Active and configured.
             </li>
           `).join('')}
         </ul>
