@@ -6,6 +6,12 @@ vi.mock('../../../src/database/connection', () => ({
   getSupabase: vi.fn()
 }));
 
+vi.mock('../../../src/config/secrets.config.js', () => ({
+  secretsManager: {
+    rotate: vi.fn().mockResolvedValue(undefined)
+  }
+}));
+
 vi.mock('../../../src/utils/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -55,6 +61,7 @@ import {
   finalizeOnboarding,
   getOperationsManual
 } from '../../../src/modules/admin/controllers/onboarding.controller';
+import { secretsManager } from '../../../src/config/secrets.config.js';
 
 describe('OnboardingController', () => {
   beforeEach(() => {
@@ -269,6 +276,163 @@ describe('OnboardingController', () => {
           propertyName: 'Alpine Chalet'
         })
       });
+    });
+
+    it('should return 400 if onboarding is already completed or currently processing (double-finalize protection)', async () => {
+      const mockState = {
+        completed: false,
+        steps: {}
+      };
+
+      const fromMock = vi.fn().mockImplementation((table: string) => {
+        if (table === 'site_settings') {
+          return createChainableMock([]);
+        }
+        return createChainableMock({});
+      });
+
+      vi.mocked(getSupabase).mockReturnValue({
+        from: fromMock
+      } as any);
+
+      const { req, res, next } = createMockReqRes({
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+      });
+
+      await finalizeOnboarding(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Onboarding is already completed or currently processing'
+      });
+    });
+
+    it('should rollback completed flag to false and return 500 if provisioning fails', async () => {
+      const mockState = {
+        completed: false,
+        steps: {}
+      };
+
+      const updateSpy = vi.fn().mockReturnThis();
+
+      const fromMock = vi.fn().mockImplementation((table: string) => {
+        if (table === 'site_settings') {
+          return {
+            ...createChainableMock([{ key: 'onboarding_state' }]),
+            update: updateSpy
+          };
+        }
+        if (table === 'property_groups') {
+          return createChainableMock([{ id: 'group-1' }]);
+        }
+        if (table === 'properties') {
+          return createChainableMock(null, new Error('DB insert failed'));
+        }
+        return createChainableMock({});
+      });
+
+      vi.mocked(getSupabase).mockReturnValue({
+        from: fromMock
+      } as any);
+
+      const { req, res, next } = createMockReqRes({
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+      });
+
+      await finalizeOnboarding(req, res, next);
+
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({
+        value: expect.objectContaining({
+          completed: false,
+          completed_at: null
+        })
+      }));
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: 'DB insert failed'
+      }));
+    });
+
+    it('should mask sensitive credentials, store in secrets manager, and escape XSS inputs in Operations Manual', async () => {
+      const mockState = {
+        completed: false,
+        steps: {
+          resort_details: { data: { name: "<script>alert('xss')</script> Resort", address: "Address \" onload=\"alert(1)" } },
+          visual_design: { data: { themeColor: "blue; background: url(javascript:alert(1))" } },
+          modules: { data: { modules: ['restaurant'] } }
+        }
+      };
+
+      const settingsInsertSpy = vi.fn().mockResolvedValue({ error: null });
+      const siteSettingsUpsertSpy = vi.fn().mockResolvedValue({ error: null });
+
+      const fromMock = vi.fn().mockImplementation((table: string) => {
+        if (table === 'site_settings') {
+          return {
+            ...createChainableMock({ value: mockState }),
+            upsert: siteSettingsUpsertSpy
+          };
+        }
+        if (table === 'property_groups') {
+          return createChainableMock([{ id: 'group-1' }]);
+        }
+        if (table === 'properties') {
+          return createChainableMock({ id: 'prop-123', name: 'Resort' });
+        }
+        if (table === 'property_settings') {
+          return {
+            ...createChainableMock({}),
+            insert: settingsInsertSpy
+          };
+        }
+        return createChainableMock({});
+      });
+
+      vi.mocked(getSupabase).mockReturnValue({
+        from: fromMock,
+        auth: { admin: { inviteUserByEmail: vi.fn() } }
+      } as any);
+
+      delete process.env.STRIPE_SECRET_KEY;
+      delete process.env.SMTP_PASS;
+      delete process.env.SENDGRID_API_KEY;
+
+      const { req, res, next } = createMockReqRes({
+        body: {
+          stripeSecretKey: 'sk_test_secret123',
+          smtpApiKey: 'SG.api_key123',
+          smtpPass: 'smtp_password123'
+        },
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+      });
+
+      await finalizeOnboarding(req, res, next);
+
+      expect(secretsManager.rotate).toHaveBeenCalledWith('STRIPE_SECRET_KEY', 'sk_test_secret123');
+      expect(secretsManager.rotate).toHaveBeenCalledWith('SENDGRID_API_KEY', 'SG.api_key123');
+
+      expect(process.env.STRIPE_SECRET_KEY).toBe('sk_test_secret123');
+      expect(process.env.SMTP_PASS).toBe('smtp_password123');
+      expect(process.env.SENDGRID_API_KEY).toBe('SG.api_key123');
+
+      expect(settingsInsertSpy).toHaveBeenCalled();
+      const insertedSettings = settingsInsertSpy.mock.calls[0][0];
+      const gatewaySettings = insertedSettings.find((s: any) => s.setting_key === 'payment_gateway').setting_value;
+      const smtpSettings = insertedSettings.find((s: any) => s.setting_key === 'smtp_config').setting_value;
+
+      expect(gatewaySettings.configured).toBe(true);
+      expect(gatewaySettings.secretKey).toBeUndefined();
+      expect(smtpSettings.configured).toBe(true);
+      expect(smtpSettings.pass).toBeUndefined();
+      expect(smtpSettings.apiKey).toBeUndefined();
+
+      expect(siteSettingsUpsertSpy).toHaveBeenCalled();
+      const upsertedManual = siteSettingsUpsertSpy.mock.calls.find(call => call[0].key.startsWith('operations_manual_'))[0];
+      expect(upsertedManual.value.html).toContain('&lt;script&gt;alert(&#x27;xss&#x27;)&lt;&#x2F;script&gt; Resort');
+      expect(upsertedManual.value.html).toContain('Address &quot; onload=&quot;alert(1)');
+      expect(upsertedManual.value.html).toContain('bluebackgroundurl(javascriptalert(1))');
     });
   });
 
