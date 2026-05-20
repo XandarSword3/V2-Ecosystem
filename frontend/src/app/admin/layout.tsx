@@ -60,7 +60,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [authChecked, setAuthChecked] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
-  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
   
   // Notifications state
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -198,12 +197,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   // Check onboarding status
   useEffect(() => {
+    if (onboardingChecked) return;
+
     async function checkOnboarding() {
       try {
         const res = await api.get('/admin/onboarding');
         if (res.data?.success && res.data?.data) {
           const completed = !!res.data.data.completed;
-          setOnboardingCompleted(completed);
           setOnboardingChecked(true);
           
           if (!completed && pathname !== '/admin/setup') {
@@ -223,7 +223,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     } else if (!isLoading) {
       setOnboardingChecked(true);
     }
-  }, [isAuthenticated, isLoading, user, pathname, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isLoading, user, onboardingChecked]);
 
   const handleLogout = async () => {
     await logout();
