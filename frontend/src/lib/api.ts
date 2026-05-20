@@ -229,6 +229,12 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
 
+      // Add x-property-id header if present in localStorage
+      const activePropertyId = localStorage.getItem('activePropertyId');
+      if (activePropertyId) {
+        config.headers['x-property-id'] = activePropertyId;
+      }
+
       // Add CSRF token for non-GET requests (Double Submit Cookie pattern)
       const method = config.method?.toUpperCase();
       if (method && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {

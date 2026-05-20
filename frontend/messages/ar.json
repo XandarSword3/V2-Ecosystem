@@ -589,7 +589,9 @@
       "actionQueued": "تم وضع الإجراء في قائمة الانتظار. سيتم المزامنة تلقائياً عند الاتصال.",
       "syncing": "مزامنة الإجراءات المعلقة...",
       "syncSuccess": "تمت مزامنة الإجراءات بنجاح.",
-      "syncError": "فشل في مزامنة بعض الإجراءات."
+      "syncError": "فشل في مزامنة بعض الإجراءات.",
+      "lastUpdated": "آخر تحديث",
+      "actionsPending": "العمليات المعلقة"
     },
     "loading": "جاري التحميل...",
     "saving": "جاري الحفظ...",
@@ -1328,6 +1330,7 @@
       "reports": "التقارير",
       "settings": "الإعدادات",
       "general": "General",
+      "propertySettings": "إعدادات المنشأة",
       "appearance": "Appearance",
       "payments": "Payments",
       "notifications": "Notifications",
