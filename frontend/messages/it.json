@@ -665,6 +665,15 @@
     }
   },
   "adminCommon": {
+    "offline": {
+      "showingCached": "Lavorando offline. Visualizzazione dei dati memorizzati nella cache.",
+      "actionQueued": "Azione in coda. Verrà sincronizzata automaticamente quando tornerai online.",
+      "syncing": "Sincronizzazione delle azioni in attesa...",
+      "syncSuccess": "Azioni offline sincronizzate con successo.",
+      "syncError": "Sincronizzazione di alcune azioni fallita.",
+      "lastUpdated": "Ultimo aggiornamento",
+      "actionsPending": "Azioni in attesa"
+    },
     "loading": "Caricamento...",
     "saving": "Salvataggio...",
     "saved": "Salvato!",
@@ -1392,6 +1401,7 @@
       "reports": "Report",
       "settings": "Impostazioni",
       "general": "Generale",
+      "propertySettings": "Impostazioni della proprietà",
       "appearance": "Aspetto",
       "payments": "Pagamenti",
       "notifications": "Notifiche",

@@ -671,7 +671,9 @@
       "actionQueued": "Action queued. It will sync automatically when back online.",
       "syncing": "Syncing pending actions...",
       "syncSuccess": "Successfully synced offline actions.",
-      "syncError": "Failed to sync some actions."
+      "syncError": "Failed to sync some actions.",
+      "lastUpdated": "Last Updated",
+      "actionsPending": "Actions Pending"
     },
     "loading": "Loading...",
     "saving": "Saving...",
@@ -1520,6 +1522,7 @@
       "reports": "Reports",
       "settings": "Settings",
       "general": "General",
+      "propertySettings": "Property Settings",
       "appearance": "Appearance",
       "payments": "Payments",
       "notifications": "Notifications",

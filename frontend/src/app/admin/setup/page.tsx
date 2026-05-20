@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 import {
   Check,
   ChevronRight,
@@ -133,8 +134,8 @@ export default function SetupWizardPage() {
     async function loadState() {
       try {
         setLoading(true);
-        const res = await fetch('/api/v1/admin/onboarding');
-        const json = await res.json();
+        const res = await api.get('/admin/onboarding');
+        const json = res.data;
         if (json.success && json.data) {
           const s = json.data;
           // Prepopulate states from steps if present
@@ -166,8 +167,8 @@ export default function SetupWizardPage() {
   // Save current step data to DB on navigate
   const saveStepProgress = async (stepId: string, data: any) => {
     try {
-      const res = await fetch('/api/v1/admin/onboarding');
-      const json = await res.json();
+      const res = await api.get('/admin/onboarding');
+      const json = res.data;
       const currentDbState = json.success ? json.data : { steps: {} };
       
       const updatedSteps = {
@@ -179,13 +180,9 @@ export default function SetupWizardPage() {
         }
       };
 
-      await fetch('/api/v1/admin/onboarding', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          current_step: stepId,
-          steps: updatedSteps
-        })
+      await api.put('/admin/onboarding', {
+        current_step: stepId,
+        steps: updatedSteps
       });
     } catch (err) {
       console.error('Failed to save progress:', err);
@@ -317,12 +314,10 @@ export default function SetupWizardPage() {
     setSubmitting(true);
     setStripeConfig(prev => ({ ...prev, verifySuccess: false, verifyMsg: '' }));
     try {
-      const res = await fetch('/api/v1/admin/onboarding/verify-stripe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secretKey: stripeConfig.secretKey })
+      const res = await api.post('/admin/onboarding/verify-stripe', {
+        secretKey: stripeConfig.secretKey
       });
-      const data = await res.json();
+      const data = res.data;
       if (data.success) {
         setStripeConfig(prev => ({
           ...prev,
@@ -347,22 +342,18 @@ export default function SetupWizardPage() {
     setSubmitting(true);
     setSmtpConfig(prev => ({ ...prev, verifySuccess: false, verifyMsg: '' }));
     try {
-      const res = await fetch('/api/v1/admin/onboarding/test-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: smtpConfig.provider,
-          host: smtpConfig.host,
-          port: smtpConfig.port,
-          secure: smtpConfig.secure,
-          user: smtpConfig.user,
-          pass: smtpConfig.pass,
-          apiKey: smtpConfig.apiKey,
-          fromEmail: smtpConfig.fromEmail,
-          toEmail: smtpConfig.testRecipient
-        })
+      const res = await api.post('/admin/onboarding/test-email', {
+        provider: smtpConfig.provider,
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.secure,
+        user: smtpConfig.user,
+        pass: smtpConfig.pass,
+        apiKey: smtpConfig.apiKey,
+        fromEmail: smtpConfig.fromEmail,
+        toEmail: smtpConfig.testRecipient
       });
-      const data = await res.json();
+      const data = res.data;
       if (data.success) {
         setSmtpConfig(prev => ({
           ...prev,
@@ -399,12 +390,8 @@ export default function SetupWizardPage() {
         return item;
       });
 
-      const res = await fetch('/api/v1/admin/import/menu', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items })
-      });
-      const data = await res.json();
+      const res = await api.post('/admin/import/menu', { items });
+      const data = res.data;
       alert(data.message || 'Import completed!');
       nextStep();
     } catch (err: any) {
@@ -428,12 +415,8 @@ export default function SetupWizardPage() {
         return item;
       });
 
-      const res = await fetch('/api/v1/admin/import/accommodations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items })
-      });
-      const data = await res.json();
+      const res = await api.post('/admin/import/accommodations', { items });
+      const data = res.data;
       alert(data.message || 'Import completed!');
       nextStep();
     } catch (err: any) {
@@ -457,12 +440,8 @@ export default function SetupWizardPage() {
         return item;
       });
 
-      const res = await fetch('/api/v1/admin/import/inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items })
-      });
-      const data = await res.json();
+      const res = await api.post('/admin/import/inventory', { items });
+      const data = res.data;
       alert(data.message || 'Import completed!');
       nextStep();
     } catch (err: any) {
@@ -476,16 +455,12 @@ export default function SetupWizardPage() {
   const handleGoLive = async () => {
     setSubmitting(true);
     try {
-      const res = await fetch('/api/v1/admin/onboarding/finalize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          stripeSecretKey: stripeConfig.secretKey,
-          smtpPass: smtpConfig.pass,
-          smtpApiKey: smtpConfig.apiKey
-        })
+      const res = await api.post('/admin/onboarding/finalize', {
+        stripeSecretKey: stripeConfig.secretKey,
+        smtpPass: smtpConfig.pass,
+        smtpApiKey: smtpConfig.apiKey
       });
-      const data = await res.json();
+      const data = res.data;
       if (data.success) {
         setFinalManualUrl(data.data.manualUrl);
         // confetty trigger

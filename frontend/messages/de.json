@@ -665,6 +665,15 @@
     }
   },
   "adminCommon": {
+    "offline": {
+      "showingCached": "Arbeiten offline. Zwischengespeicherte Daten werden angezeigt.",
+      "actionQueued": "Aktion in Warteschlange. Sie wird automatisch synchronisiert, wenn Sie wieder online sind.",
+      "syncing": "Synchronisierung ausstehender Aktionen...",
+      "syncSuccess": "Ausstehende Aktionen erfolgreich synchronisiert.",
+      "syncError": "Synchronisierung einiger Aktionen fehlgeschlagen.",
+      "lastUpdated": "Zuletzt aktualisiert",
+      "actionsPending": "Ausstehende Aktionen"
+    },
     "loading": "Laden...",
     "saving": "Speichern...",
     "saved": "Gespeichert!",
@@ -1392,6 +1401,7 @@
       "reports": "Berichte",
       "settings": "Einstellungen",
       "general": "Allgemein",
+      "propertySettings": "Unterkunftseinstellungen",
       "appearance": "Erscheinungsbild",
       "payments": "Zahlungen",
       "notifications": "Benachrichtigungen",
