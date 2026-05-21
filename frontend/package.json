@@ -92,8 +92,9 @@
   "overrides": {
     "ws": ">=8.20.1",
     "rollup": ">=4.22.4",
-    "minimatch": ">=9.0.5",
-    "next>postcss": ">=8.5.15"
+    "next": {
+      "postcss": ">=8.5.15"
+    }
   },
   "resolutions": {
     "ws": ">=8.20.1"
