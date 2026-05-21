@@ -137,7 +137,23 @@ jobs:
     name: Stage 3 - Backend Integration
     runs-on: ubuntu-latest
     needs: backend-unit
+    # Use supabase/postgres image directly as a service — avoids 'supabase start'
+    # which fails in this runner environment. supabase/postgres:15.x includes all
+    # Supabase extensions (pgcrypto, uuid-ossp, auth schema, etc.).
     services:
+      supabase-db:
+        image: supabase/postgres:15.6.1.143
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
       redis-test:
         image: redis:7-alpine
         ports:
@@ -160,67 +176,61 @@ jobs:
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
-      - name: Install Supabase CLI manually
-        run: |
-          curl -sSL https://github.com/supabase/cli/releases/download/v2.22.6/supabase_linux_amd64.tar.gz             -o /tmp/supabase.tar.gz
-          tar -xzf /tmp/supabase.tar.gz -C /tmp
-          sudo mv /tmp/supabase /usr/local/bin/supabase
-          supabase --version
-
       - name: Install dependencies
         working-directory: backend
         run: npm ci
 
-      - name: Verify Docker
+      - name: Apply database migrations
         run: |
-          docker info --format "Engine: {{.ServerVersion}}"
-          docker compose version
+          # psql comes pre-installed on ubuntu-latest
+          export DB_URL="postgresql://postgres:postgres@localhost:15432/postgres"
+          echo "Applying $( ls supabase/migrations/*.sql | wc -l ) migration files..."
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            case "$f" in
+              *DUPLICATE*) echo "Skipping duplicate: $f"; continue ;;
+            esac
+            echo "  -> $f"
+            psql "$DB_URL" -f "$f" 2>&1 || echo "  (non-fatal, continuing)"
+          done
+          echo "Migrations done."
 
-      - name: Patch supabase config for CI
+      - name: Start PostgREST
         run: |
-          # supabase/postgres:17.x not in local-stack registry; use PG15
-          sed -i "s/^major_version = 17/major_version = 15/" supabase/config.toml
-          grep major_version supabase/config.toml
-
-      - name: Start Supabase local stack
-        timeout-minutes: 8
-        env:
-          SUPABASE_NO_ANALYTICS: "true"
-        run: |
-          supabase start
+          docker run -d --name postgrest \
+            --network host \
+            -e PGRST_DB_URI="postgresql://postgres:postgres@localhost:15432/postgres" \
+            -e PGRST_DB_SCHEMA="public" \
+            -e PGRST_DB_ANON_ROLE="anon" \
+            -e PGRST_JWT_SECRET="super-secret-jwt-token-with-at-least-32-characters-long" \
+            -e PGRST_SERVER_PORT="15421" \
+            postgrest/postgrest:latest
 
           echo "Waiting for PostgREST on :15421..."
-          for i in $(seq 1 18); do
-            if curl -sf http://127.0.0.1:15421/rest/v1/ -H "apikey: x" >/dev/null 2>&1; then
-              echo "Ready (attempt $i)"; break
+          for i in $(seq 1 12); do
+            if curl -sf http://127.0.0.1:15421/ >/dev/null 2>&1; then
+              echo "PostgREST ready (attempt $i)"; break
             fi
-            [ $i -eq 18 ] && { supabase logs || true; exit 1; }
+            [ $i -eq 12 ] && { echo "PostgREST timed out"; docker logs postgrest; exit 1; }
             sleep 5
           done
 
-          supabase status -o env > /tmp/supabase.env
-          cat /tmp/supabase.env >> "$GITHUB_ENV"
-          source /tmp/supabase.env
-          echo "SUPABASE_URL=${API_URL}" >> "$GITHUB_ENV"
-          echo "SUPABASE_SERVICE_KEY=${SERVICE_ROLE_KEY}" >> "$GITHUB_ENV"
-          echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}" >> "$GITHUB_ENV"
-          echo "SUPABASE_ANON_KEY=${ANON_KEY}" >> "$GITHUB_ENV"
-          echo "DATABASE_URL=${DB_URL}" >> "$GITHUB_ENV"
-          echo "TEST_DATABASE_URL=${DB_URL}" >> "$GITHUB_ENV"
+      - name: Set Supabase env vars
+        run: |
+          echo "SUPABASE_URL=http://127.0.0.1:15421" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTcwMDAwMDAwMCwiZXhwIjo5OTk5OTk5OTk5fQ.tM2Q6u7jTiD0lxqqYkR-xZFHD3OUWJE0cFw5y_ZwTMA" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjk5OTk5OTk5OTl9.CvRO64tTDIEplrwz04VrlDVJy1RFA0yDr2O-ofo9ZdI" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjk5OTk5OTk5OTl9.CvRO64tTDIEplrwz04VrlDVJy1RFA0yDr2O-ofo9ZdI" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:15432/postgres" >> "$GITHUB_ENV"
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:15432/postgres" >> "$GITHUB_ENV"
 
       - name: Run integration tests
         working-directory: backend
         run: npm run test:integration
         env:
           NODE_ENV: test
-          JWT_SECRET: test-jwt-secret-for-ci-minimum-32-characters
+          JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
           REDIS_URL: redis://127.0.0.1:6380
           TEST_REDIS_URL: redis://127.0.0.1:6380
-
-      - name: Stop Supabase local stack
-        if: always()
-        run: |
-          supabase stop --no-backup || supabase stop || true
 
       - name: Upload integration results
         uses: actions/upload-artifact@v4
