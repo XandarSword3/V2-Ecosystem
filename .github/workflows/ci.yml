@@ -171,13 +171,26 @@ jobs:
 
       - name: Start Supabase local stack
         timeout-minutes: 8
+        env:
+          SUPABASE_NO_ANALYTICS: "true"
+          SUPABASE_INTERNAL_ENVIRONMENT: github-ci
         run: |
-          # supabase/postgres:17.x image is not yet in the local-stack registry.
-          # Patch config to PG15 (supabase/postgres:15.x is the stable local image) for CI.
+          # Downgrade to PG15 — supabase/postgres:17.x is not in the local-stack registry
           sed -i 's/^major_version = 17/major_version = 15/' supabase/config.toml
-          cat supabase/config.toml | grep major_version
+          grep major_version supabase/config.toml
 
-          supabase start --ignore-health-check
+          # Pre-flight: verify tooling
+          supabase --version
+          docker info --format "Docker version: {{.ServerVersion}}"
+          docker compose version
+
+          # Start the stack; capture output so it appears in the step log
+          supabase start 2>&1 || {
+            echo "--- supabase start failed; dumping status ---"
+            supabase status 2>&1 || true
+            supabase logs 2>&1 || true
+            exit 1
+          }
 
           echo "Waiting for Supabase API on port 15421..."
           for i in $(seq 1 18); do
