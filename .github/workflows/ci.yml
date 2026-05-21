@@ -163,17 +163,33 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.22.6
 
       - name: Install dependencies
         working-directory: backend
         run: npm ci
 
       - name: Start Supabase local stack
+        timeout-minutes: 8
         run: |
-          supabase start
-          supabase status
+          supabase start --ignore-health-check
 
+          echo "Waiting for Supabase API on port 15421..."
+          for i in $(seq 1 18); do
+            if curl -sf http://127.0.0.1:15421/rest/v1/ -H "apikey: placeholder" >/dev/null 2>&1 ||                curl -sf http://127.0.0.1:15421/ >/dev/null 2>&1; then
+              echo "API is up (attempt $i)"
+              break
+            fi
+            if [ $i -eq 18 ]; then
+              echo "Supabase API did not become ready in time"
+              supabase logs || true
+              supabase status || true
+              exit 1
+            fi
+            sleep 5
+          done
+
+          supabase status
           supabase status -o env > /tmp/supabase.env
           cat /tmp/supabase.env >> "$GITHUB_ENV"
 
