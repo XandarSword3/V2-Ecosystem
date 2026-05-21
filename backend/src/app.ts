@@ -111,6 +111,11 @@ app.get('/health/ready', async (req, res) => {
   }
 });
 
+// Install Routes (public — must come before authenticated routes)
+// Handles first-boot machine-ID check and super_admin provisioning.
+import installRoutes from './modules/install/install.routes.js';
+app.use('/api/install', installRoutes);
+
 // Public API Routes
 app.use('/api', publicRoutes);
 app.use('/api/modules', getModules);
