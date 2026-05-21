@@ -45,11 +45,12 @@
   "author": "V2 Ecosystem Team",
   "license": "PROPRIETARY",
   "overrides": {
-    "minimatch": ">=9.0.5",
+    "postcss": ">=8.5.10",
+    "vite": ">=6.4.2",
+    "minimatch": ">=9.0.7",
+    "rollup": ">=4.59.0",
+    "esbuild": ">=0.25.0",
     "brace-expansion": ">=2.0.1",
-    "vitest": {
-      "minimatch": ">=9.0.5",
-      "brace-expansion": ">=2.0.1"
-    }
+    "ws": ">=8.20.1"
   }
 }
