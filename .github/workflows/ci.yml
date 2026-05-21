@@ -160,57 +160,46 @@ jobs:
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.22.6
+      - name: Install Supabase CLI manually
+        run: |
+          curl -sSL https://github.com/supabase/cli/releases/download/v2.22.6/supabase_linux_amd64.tar.gz             -o /tmp/supabase.tar.gz
+          tar -xzf /tmp/supabase.tar.gz -C /tmp
+          sudo mv /tmp/supabase /usr/local/bin/supabase
+          supabase --version
 
       - name: Install dependencies
         working-directory: backend
         run: npm ci
 
+      - name: Verify Docker
+        run: |
+          docker info --format "Engine: {{.ServerVersion}}"
+          docker compose version
+
+      - name: Patch supabase config for CI
+        run: |
+          # supabase/postgres:17.x not in local-stack registry; use PG15
+          sed -i "s/^major_version = 17/major_version = 15/" supabase/config.toml
+          grep major_version supabase/config.toml
+
       - name: Start Supabase local stack
         timeout-minutes: 8
         env:
           SUPABASE_NO_ANALYTICS: "true"
-          SUPABASE_INTERNAL_ENVIRONMENT: github-ci
         run: |
-          # Downgrade to PG15 — supabase/postgres:17.x is not in the local-stack registry
-          sed -i 's/^major_version = 17/major_version = 15/' supabase/config.toml
-          grep major_version supabase/config.toml
+          supabase start
 
-          # Pre-flight: verify tooling
-          supabase --version
-          docker info --format "Docker version: {{.ServerVersion}}"
-          docker compose version
-
-          # Start the stack; capture output so it appears in the step log
-          supabase start 2>&1 || {
-            echo "--- supabase start failed; dumping status ---"
-            supabase status 2>&1 || true
-            supabase logs 2>&1 || true
-            exit 1
-          }
-
-          echo "Waiting for Supabase API on port 15421..."
+          echo "Waiting for PostgREST on :15421..."
           for i in $(seq 1 18); do
-            if curl -sf http://127.0.0.1:15421/rest/v1/ -H "apikey: placeholder" >/dev/null 2>&1 ||                curl -sf http://127.0.0.1:15421/ >/dev/null 2>&1; then
-              echo "API is up (attempt $i)"
-              break
+            if curl -sf http://127.0.0.1:15421/rest/v1/ -H "apikey: x" >/dev/null 2>&1; then
+              echo "Ready (attempt $i)"; break
             fi
-            if [ $i -eq 18 ]; then
-              echo "Supabase API did not become ready in time"
-              supabase logs || true
-              supabase status || true
-              exit 1
-            fi
+            [ $i -eq 18 ] && { supabase logs || true; exit 1; }
             sleep 5
           done
 
-          supabase status
           supabase status -o env > /tmp/supabase.env
           cat /tmp/supabase.env >> "$GITHUB_ENV"
-
           source /tmp/supabase.env
           echo "SUPABASE_URL=${API_URL}" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_KEY=${SERVICE_ROLE_KEY}" >> "$GITHUB_ENV"
