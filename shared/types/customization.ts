@@ -1,5 +1,5 @@
 // ============================================
-// V2 Resort - Unified Customization System Types
+// V2 Ecosystem - Unified Customization System Types
 // Module-agnostic customization for all present and future modules
 // ============================================
 

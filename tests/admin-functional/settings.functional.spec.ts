@@ -11,7 +11,7 @@ test.describe('Admin functional - Settings', () => {
 
     const before = await apiJson(page.request, { method: 'GET', path: '/admin/settings', token });
     expect(before.status).toBe(200);
-    const prevName = String(before.body?.data?.resortName || 'V2 Resort');
+    const prevName = String(before.body?.data?.resortName || 'V2 Ecosystem');
     const nextName = `${prevName} E2E`;
 
     const put = await apiJson(page.request, {

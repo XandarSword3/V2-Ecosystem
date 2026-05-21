@@ -1,5 +1,5 @@
 /**
- * V2 Resort Service Worker
+ * V2 Ecosystem Service Worker
  * Powered by Workbox
  */
 
@@ -15,7 +15,7 @@ if (workbox) {
   const { BackgroundSyncPlugin } = workbox.backgroundSync;
 
   // Precache basic assets
-  const PRECACHE_NAME = 'v2-resort-precache-v1';
+  const PRECACHE_NAME = 'v2-ecosystem-precache-v1';
   const OFFLINE_URL = '/offline';
 
   self.addEventListener('install', (event) => {
@@ -103,13 +103,13 @@ if (workbox) {
     if (!event.data) return;
     const data = event.data.json();
     const options = {
-      body: data.body || 'V2 Resort Update',
+      body: data.body || 'V2 Ecosystem Update',
       icon: '/icons/icon-192x192.png',
       badge: '/icons/icon-72x72.png',
       vibrate: [100, 50, 100],
       data: { url: data.url || '/' },
     };
-    event.waitUntil(self.registration.showNotification(data.title || 'V2 Resort', options));
+    event.waitUntil(self.registration.showNotification(data.title || 'V2 Ecosystem', options));
   });
 
   self.addEventListener('notificationclick', (event) => {

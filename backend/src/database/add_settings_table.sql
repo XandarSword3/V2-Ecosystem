@@ -1,5 +1,5 @@
 -- ============================================
--- V2 Resort - Add Settings Table
+-- V2 Ecosystem - Add Settings Table
 -- Run this in Supabase SQL Editor
 -- ============================================
 
@@ -18,7 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_site_settings_key ON site_settings(key);
 -- Insert default settings
 INSERT INTO site_settings (key, value) VALUES
   ('general', '{
-    "resortName": "V2 Resort",
+    "resortName": "V2 Ecosystem",
     "tagline": "Lebanon''s Premier Resort Experience",
     "description": "Your premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences in the heart of Lebanon.",
     "currency": "USD",
@@ -27,8 +27,8 @@ INSERT INTO site_settings (key, value) VALUES
   }'::jsonb),
   ('contact', '{
     "phone": "+961 XX XXX XXX",
-    "email": "info@v2resort.com",
-    "address": "V2 Resort, Lebanon"
+    "email": "info@v2ecosystem.com",
+    "address": "V2 Ecosystem, Lebanon"
   }'::jsonb),
   ('hours', '{
     "poolHours": "9:00 AM - 7:00 PM",

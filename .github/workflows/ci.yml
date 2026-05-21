@@ -279,7 +279,7 @@ jobs:
       - name: Start backend and frontend
         working-directory: .
         run: |
-          npm run dev > /tmp/v2-resort-dev.log 2>&1 &
+          npm run dev > /tmp/v2-ecosystem-dev.log 2>&1 &
           echo "Started app services"
 
       - name: Wait for services
@@ -292,7 +292,7 @@ jobs:
             sleep 5
           done
           echo "Services did not become ready in time"
-          cat /tmp/v2-resort-dev.log || true
+          cat /tmp/v2-ecosystem-dev.log || true
           exit 1
 
       - name: Run smoke Playwright tests
@@ -302,7 +302,7 @@ jobs:
           CI: true
           E2E_CUSTOMER_EMAIL: e2e.customer@test.com
           E2E_CUSTOMER_PASSWORD: TestPass123!
-          E2E_ADMIN_EMAIL: admin@v2resort.com
+          E2E_ADMIN_EMAIL: admin@v2ecosystem.com
           E2E_ADMIN_PASSWORD: admin123
       
       - name: Upload test results
@@ -354,7 +354,7 @@ jobs:
       - name: Start backend and frontend
         working-directory: .
         run: |
-          npm run dev > /tmp/v2-resort-dev.log 2>&1 &
+          npm run dev > /tmp/v2-ecosystem-dev.log 2>&1 &
           echo "Started app services"
 
       - name: Wait for services
@@ -367,7 +367,7 @@ jobs:
             sleep 5
           done
           echo "Services did not become ready in time"
-          cat /tmp/v2-resort-dev.log || true
+          cat /tmp/v2-ecosystem-dev.log || true
           exit 1
 
       - name: Run Phase 3 critical-path specs (PR)
@@ -441,7 +441,7 @@ jobs:
       - name: Start backend and frontend
         working-directory: .
         run: |
-          npm run dev > /tmp/v2-resort-dev.log 2>&1 &
+          npm run dev > /tmp/v2-ecosystem-dev.log 2>&1 &
           echo "Started app services"
 
       - name: Wait for services
@@ -454,7 +454,7 @@ jobs:
             sleep 5
           done
           echo "Services did not become ready in time"
-          cat /tmp/v2-resort-dev.log || true
+          cat /tmp/v2-ecosystem-dev.log || true
           exit 1
 
       - name: Run full Playwright suite
@@ -557,7 +557,7 @@ jobs:
         env:
           CI: true
           PRODUCTION_FRONTEND_URL: https://v2-ecosystem.vercel.app
-          PRODUCTION_API_URL: https://v2-resort-backend.onrender.com
+          PRODUCTION_API_URL: https://v2-ecosystem-backend.onrender.com
 
       - name: Upload production smoke artifacts
         uses: actions/upload-artifact@v4

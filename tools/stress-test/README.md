@@ -1,6 +1,6 @@
 ﻿# Stress Test Framework
 
-Custom load testing tool that simulates concurrent users interacting with the V2 Resort API.
+Custom load testing tool that simulates concurrent users interacting with the V2 Ecosystem API.
 
 ## Contents (38 files)
 
@@ -13,7 +13,7 @@ Configuration, user simulators, and test scenarios for:
 ## Commands
 
 ```bash
-# From v2-resort root:
+# From v2-ecosystem root:
 npm run stress-test              # Full test
 npm run stress-test:quick        # 5 customers, 60s
 npm run stress-test:medium       # 25 customers, 300s

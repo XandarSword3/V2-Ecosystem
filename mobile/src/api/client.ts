@@ -1,5 +1,5 @@
 /**
- * API Client for V2 Resort Mobile App
+ * API Client for V2 Ecosystem Mobile App
  * 
  * Features:
  * - Automatic token refresh

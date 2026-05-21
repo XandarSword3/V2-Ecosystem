@@ -161,7 +161,7 @@ export default function RootLayout() {
           <StripeProvider
             publishableKey={STRIPE_PUBLISHABLE_KEY}
             merchantIdentifier={STRIPE_MERCHANT_ID}
-            urlScheme="v2resort"
+            urlScheme="v2ecosystem"
           >
             {AppContent}
           </StripeProvider>

@@ -13,9 +13,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Development/test credentials (only used in non-production)
 const DEV_CREDENTIALS = {
-  ADMIN_EMAIL: 'admin@v2resort.com',
+  ADMIN_EMAIL: 'admin@v2ecosystem.com',
   ADMIN_PASSWORD: 'admin123',
-  STAFF_EMAIL: 'staff@v2resort.com',
+  STAFF_EMAIL: 'staff@v2ecosystem.com',
   STAFF_PASSWORD: 'staff123',
 };
 
@@ -64,11 +64,11 @@ export const testCredentials = {
 // For E2E tests that need credentials
 export const e2eCredentials = {
   admin: {
-    email: process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com',
+    email: process.env.E2E_ADMIN_EMAIL || 'admin@v2ecosystem.com',
     password: process.env.E2E_ADMIN_PASSWORD || 'Admin123!',
   },
   staff: {
-    email: process.env.E2E_STAFF_EMAIL || 'staff@v2resort.com',
+    email: process.env.E2E_STAFF_EMAIL || 'staff@v2ecosystem.com',
     password: process.env.E2E_STAFF_PASSWORD || 'staff123',
   },
   customer: {

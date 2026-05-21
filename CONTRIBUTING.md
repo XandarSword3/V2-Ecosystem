@@ -1,4 +1,4 @@
-# Contributing to V2 Resort Management Platform
+# Contributing to V2 Ecosystem
 
 Thank you for your interest in contributing. This document outlines the process for reporting issues, proposing features, and submitting pull requests.
 

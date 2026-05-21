@@ -5,7 +5,7 @@
  * They are skipped by default in CI environments.
  * To run these tests locally, ensure:
  * 1. Database is running with test data
- * 2. Admin user exists (admin@v2resort.com / Admin123!)
+ * 2. Admin user exists (admin@v2ecosystem.com / Admin123!)
  * 3. Set RUN_INTEGRATION_TESTS=true in environment
  */
 

@@ -1,7 +1,7 @@
 {
-  "name": "@v2-resort/simulation",
+  "name": "@v2-ecosystem/simulation",
   "version": "1.0.0",
-  "description": "Multi-Actor Real-Time Simulation System for V2 Resort",
+  "description": "Multi-Actor Real-Time Simulation System for V2 Ecosystem",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -43,6 +43,6 @@
     "bots",
     "actors"
   ],
-  "author": "V2 Resort Team",
+  "author": "V2 Ecosystem Team",
   "license": "PROPRIETARY"
 }

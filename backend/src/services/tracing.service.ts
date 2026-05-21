@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Distributed Tracing Service
+ * V2 Ecosystem - Distributed Tracing Service
  * OpenTelemetry-based distributed tracing for request flow visibility
  */
 
@@ -25,7 +25,7 @@ import {
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 
 // Configuration
-const SERVICE_NAME = process.env.SERVICE_NAME || 'v2resort-backend';
+const SERVICE_NAME = process.env.SERVICE_NAME || 'v2ecosystem-backend';
 const SERVICE_VERSION = process.env.SERVICE_VERSION || '1.0.0';
 const OTEL_EXPORTER_URL = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces';
 const ENVIRONMENT = process.env.NODE_ENV || 'development';

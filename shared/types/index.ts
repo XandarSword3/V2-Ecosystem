@@ -1,5 +1,5 @@
 // ============================================
-// V2 Resort - Shared TypeScript Types
+// V2 Ecosystem - Shared TypeScript Types
 // ============================================
 
 // ----- Base Types -----

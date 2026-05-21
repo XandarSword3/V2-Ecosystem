@@ -18,7 +18,7 @@ import { test, expect, Page } from '../fixtures/auth.fixture';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 const STAFF_CREDENTIALS = {
-  email: process.env.E2E_STAFF_EMAIL || 'staff@v2resort.com',
+  email: process.env.E2E_STAFF_EMAIL || 'staff@v2ecosystem.com',
   password: process.env.E2E_STAFF_PASSWORD || 'staff123',
 };
 

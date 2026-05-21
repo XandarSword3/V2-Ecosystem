@@ -38,11 +38,11 @@ const ROLE_CREDENTIALS: Record<Exclude<AuthRole, 'guest'>, RoleCredentials> = {
     password: process.env.E2E_CUSTOMER_PASSWORD || 'TestPass123!',
   },
   admin: {
-    email: process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com',
+    email: process.env.E2E_ADMIN_EMAIL || 'admin@v2ecosystem.com',
     password: process.env.E2E_ADMIN_PASSWORD || 'admin123',
   },
   staff: {
-    email: process.env.E2E_STAFF_EMAIL || 'restaurant.staff@v2resort.com',
+    email: process.env.E2E_STAFF_EMAIL || 'restaurant.staff@v2ecosystem.com',
     password: process.env.E2E_STAFF_PASSWORD || 'staff123',
   },
 };
@@ -53,10 +53,10 @@ const ROLE_CREDENTIAL_FALLBACKS: Record<Exclude<AuthRole, 'guest'>, RoleCredenti
     { email: 'customer@example.com', password: 'password123' },
   ],
   admin: [
-    { email: 'admin@v2resort.com', password: 'Admin123!' },
+    { email: 'admin@v2ecosystem.com', password: 'Admin123!' },
   ],
   staff: [
-    { email: 'staff@v2resort.com', password: 'staff123' },
+    { email: 'staff@v2ecosystem.com', password: 'staff123' },
   ],
 };
 

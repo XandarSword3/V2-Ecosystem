@@ -1,6 +1,6 @@
 # Stress Test Bots
 
-Automated testing bots that simulate real user behavior across the V2 Resort platform.
+Automated testing bots that simulate real user behavior across the V2 Ecosystem platform.
 
 ## Overview
 
@@ -130,7 +130,7 @@ export const config = {
   testDurationMs: 60000, // Total test duration
   
   // Credentials
-  adminEmail: 'admin@v2resort.com',
+  adminEmail: 'admin@v2ecosystem.com',
   adminPassword: process.env.SEED_ADMIN_PASSWORD || 'admin123',
 };
 ```

@@ -403,7 +403,7 @@ export function createAuthService(deps: AuthServiceDependencies): AuthService {
 
       await emailService.sendEmail({
         to: user.email,
-        subject: 'Reset Your Password - V2 Resort',
+        subject: 'Reset Your Password - V2 Ecosystem',
         html: `
           <h1>Password Reset Request</h1>
           <p>Hi ${user.full_name},</p>
@@ -411,7 +411,7 @@ export function createAuthService(deps: AuthServiceDependencies): AuthService {
           <p><a href="${resetUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Reset Password</a></p>
           <p>This link will expire in 1 hour.</p>
           <p>If you didn't request this, you can safely ignore this email.</p>
-          <p>Thanks,<br>V2 Resort Team</p>
+          <p>Thanks,<br>V2 Ecosystem Team</p>
         `,
       });
 

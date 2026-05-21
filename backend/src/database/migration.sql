@@ -1,5 +1,5 @@
 -- ============================================
--- V2 Resort Database Schema
+-- V2 Ecosystem Database Schema
 -- Run this in Supabase SQL Editor
 -- https://supabase.com/dashboard/project/dfneswicpdprhneeqlsn/sql/new
 -- ============================================

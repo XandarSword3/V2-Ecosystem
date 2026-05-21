@@ -11,7 +11,7 @@ import { View, Text } from 'react-native';
 const MockRegisterScreen = ({ onRegister, isLoading, error }: any) => (
   <View testID="register-screen">
     <Text>Create Account</Text>
-    <Text>Join V2 Resort</Text>
+    <Text>Join V2 Ecosystem</Text>
     <View testID="first-name-input" />
     <View testID="last-name-input" />
     <View testID="email-input" />
@@ -45,7 +45,7 @@ describe('RegisterScreen', () => {
 
     it('should render subtitle text', () => {
       const { getByText } = render(<MockRegisterScreen />);
-      expect(getByText(/Join V2 Resort/i)).toBeTruthy();
+      expect(getByText(/Join V2 Ecosystem/i)).toBeTruthy();
     });
 
     it('should render login link', () => {

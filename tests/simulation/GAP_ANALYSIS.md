@@ -208,7 +208,7 @@ GDPR:
 
 ## Conclusion
 
-**All major V2 Resort backend modules now have comprehensive bot coverage** for:
+**All major V2 Ecosystem backend modules now have comprehensive bot coverage** for:
 - Customer-facing actions (GuestBot)
 - Operational staff tasks (StaffBot)
 - Administrative management (AdminBot)

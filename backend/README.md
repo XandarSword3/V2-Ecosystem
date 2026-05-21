@@ -1,4 +1,4 @@
-﻿# V2 Resort — Backend
+﻿# V2 Ecosystem — Backend
 
 Express.js + TypeScript REST API backed by Supabase (PostgreSQL).
 

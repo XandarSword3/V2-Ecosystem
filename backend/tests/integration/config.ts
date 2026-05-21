@@ -10,9 +10,9 @@ export const TEST_CONFIG = {
   database: {
     host: process.env.TEST_DB_HOST || 'localhost',
     port: parseInt(process.env.TEST_DB_PORT || '5433', 10),
-    user: process.env.TEST_DB_USER || 'v2resort_test',
-    password: process.env.TEST_DB_PASSWORD || 'v2resort_test_secret',
-    database: process.env.TEST_DB_NAME || 'v2resort_test',
+    user: process.env.TEST_DB_USER || 'v2ecosystem_test',
+    password: process.env.TEST_DB_PASSWORD || 'v2ecosystem_test_secret',
+    database: process.env.TEST_DB_NAME || 'v2ecosystem_test',
   },
 
   // Redis configuration
@@ -31,17 +31,17 @@ export const TEST_CONFIG = {
   // Test users (must exist in database - use real credentials for live testing)
   users: {
     admin: {
-      email: process.env.TEST_ADMIN_EMAIL || 'admin@v2resort.com',
+      email: process.env.TEST_ADMIN_EMAIL || 'admin@v2ecosystem.com',
       password: process.env.TEST_ADMIN_PASSWORD || 'admin123',
       fullName: 'Administrator',
     },
     staff: {
-      email: process.env.TEST_STAFF_EMAIL || 'restaurant.staff@v2resort.com',
+      email: process.env.TEST_STAFF_EMAIL || 'restaurant.staff@v2ecosystem.com',
       password: process.env.TEST_STAFF_PASSWORD || 'staff123',
       fullName: 'Restaurant Staff',
     },
     customer: {
-      email: process.env.TEST_CUSTOMER_EMAIL || 'customer.test@v2resort.local',
+      email: process.env.TEST_CUSTOMER_EMAIL || 'customer.test@v2ecosystem.local',
       password: process.env.TEST_CUSTOMER_PASSWORD || 'TestCustomer123!',
       fullName: 'Test Customer',
     },

@@ -1,5 +1,5 @@
 -- ============================================
--- V2 Resort - Missing Tables Migration
+-- V2 Ecosystem - Missing Tables Migration
 -- Run this AFTER the main migration.sql
 -- ============================================
 

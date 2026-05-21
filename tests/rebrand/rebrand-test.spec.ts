@@ -1,7 +1,7 @@
 /**
  * COMPREHENSIVE REBRANDING TEST
  * 
- * Rebrands the V2 Resort 5 times via the frontend admin UI,
+ * Rebrands the V2 Ecosystem 5 times via the frontend admin UI,
  * then verifies each rebrand as Customer, Admin, and Staff.
  * 
  * Rebrand Themes:
@@ -26,8 +26,8 @@ test.skip(!RUN_EXPLORATORY_E2E, 'Full multi-theme rebrand validation is explorat
 const API_BASE = 'http://localhost:3005';
 const FRONTEND = 'http://localhost:3000';
 
-const ADMIN_CREDS = { email: 'admin@v2resort.com', password: 'admin123' };
-const STAFF_CREDS = { email: 'restaurant.staff@v2resort.com', password: 'staff123' };
+const ADMIN_CREDS = { email: 'admin@v2ecosystem.com', password: 'admin123' };
+const STAFF_CREDS = { email: 'restaurant.staff@v2ecosystem.com', password: 'staff123' };
 
 interface BrandConfig {
   name: string;
@@ -307,10 +307,10 @@ async function ssFull(page: Page, name: string) {
 async function cleanGoto(page: Page, url: string, waitUntil: 'domcontentloaded' | 'networkidle' = 'domcontentloaded') {
   try {
     await page.evaluate(() => {
-      localStorage.removeItem('v2-resort-settings');
-      localStorage.removeItem('v2-resort-theme');
+      localStorage.removeItem('v2-ecosystem-settings');
+      localStorage.removeItem('v2-ecosystem-theme');
       localStorage.removeItem('theme');
-      sessionStorage.removeItem('v2resort_visited');
+      sessionStorage.removeItem('v2ecosystem_visited');
     });
   } catch { /* no page context yet */ }
   await page.goto(url, { waitUntil });

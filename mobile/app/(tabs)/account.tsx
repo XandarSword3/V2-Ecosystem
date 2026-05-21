@@ -137,7 +137,7 @@ export default function AccountScreen() {
         </View>
 
         <Text className="text-center text-muted-foreground text-xs mt-8">
-          V2 Resort v1.0.0
+          V2 Ecosystem v1.0.0
         </Text>
       </ScrollView>
     </View>

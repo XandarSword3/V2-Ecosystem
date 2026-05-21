@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Secrets Management
+ * V2 Ecosystem - Secrets Management
  * Secure secrets loading and rotation
  */
 

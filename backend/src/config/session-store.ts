@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Horizontal Scaling Session Store Configuration
+ * V2 Ecosystem - Horizontal Scaling Session Store Configuration
  * Enables stateless backend instances with Redis-backed sessions
  */
 
@@ -86,7 +86,7 @@ export const createSessionStore = () => {
   if (REDIS_ENABLED && redisClient) {
     return new RedisStore({
       client: redisClient,
-      prefix: 'v2resort:session:',
+      prefix: 'v2ecosystem:session:',
       ttl: 86400, // 24 hours default
     });
   }
@@ -97,7 +97,7 @@ export const createSessionStore = () => {
 export const sessionConfig = {
   store: createSessionStore(),
   secret: FINAL_SESSION_SECRET,
-  name: 'v2resort.sid',
+  name: 'v2ecosystem.sid',
   resave: false,
   saveUninitialized: false,
   rolling: true, // Reset expiration on activity
@@ -107,7 +107,7 @@ export const sessionConfig = {
     httpOnly: true,
     sameSite: 'lax' as const,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    domain: NODE_ENV === 'production' ? '.v2resort.com' : undefined,
+    domain: NODE_ENV === 'production' ? '.v2ecosystem.com' : undefined,
   },
 };
 
@@ -121,7 +121,7 @@ export const sessionUtils = {
    */
   async getSession(sessionId: string): Promise<any | null> {
     if (!REDIS_ENABLED || !redisClient) return null;
-    const data = await redisClient.get(`v2resort:session:${sessionId}`);
+    const data = await redisClient.get(`v2ecosystem:session:${sessionId}`);
     return data ? JSON.parse(data) : null;
   },
 
@@ -130,7 +130,7 @@ export const sessionUtils = {
    */
   async destroySession(sessionId: string): Promise<boolean> {
     if (!REDIS_ENABLED || !redisClient) return false;
-    const result = await redisClient.del(`v2resort:session:${sessionId}`);
+    const result = await redisClient.del(`v2ecosystem:session:${sessionId}`);
     return result > 0;
   },
 
@@ -139,7 +139,7 @@ export const sessionUtils = {
    */
   async destroyUserSessions(userId: string): Promise<number> {
     if (!REDIS_ENABLED || !redisClient) return 0;
-    const pattern = 'v2resort:session:*';
+    const pattern = 'v2ecosystem:session:*';
     let cursor = '0';
     let count = 0;
 
@@ -167,7 +167,7 @@ export const sessionUtils = {
    */
   async getUserSessionCount(userId: string): Promise<number> {
     if (!REDIS_ENABLED || !redisClient) return 0;
-    const pattern = 'v2resort:session:*';
+    const pattern = 'v2ecosystem:session:*';
     let cursor = '0';
     let count = 0;
 
@@ -194,7 +194,7 @@ export const sessionUtils = {
    */
   async extendSession(sessionId: string, ttlSeconds: number): Promise<boolean> {
     if (!REDIS_ENABLED || !redisClient) return false;
-    const result = await redisClient.expire(`v2resort:session:${sessionId}`, ttlSeconds);
+    const result = await redisClient.expire(`v2ecosystem:session:${sessionId}`, ttlSeconds);
     return result === 1;
   },
 
@@ -203,7 +203,7 @@ export const sessionUtils = {
    */
   async getTotalSessionCount(): Promise<number> {
     if (!REDIS_ENABLED || !redisClient) return 0;
-    const pattern = 'v2resort:session:*';
+    const pattern = 'v2ecosystem:session:*';
     let cursor = '0';
     let count = 0;
 

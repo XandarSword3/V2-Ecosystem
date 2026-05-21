@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT_DIR = path.resolve(__dirname, '../..'); // v2-resort/
+const ROOT_DIR = path.resolve(__dirname, '../..'); // v2-ecosystem/
 const FRONTEND_APP_ROOT = path.join(ROOT_DIR, 'frontend', 'src', 'app');
 const ADMIN_APP_ROOT = path.join(FRONTEND_APP_ROOT, 'admin');
 const ADMIN_NAVIGATION_PATH = path.join(

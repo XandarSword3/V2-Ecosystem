@@ -253,7 +253,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                    placeholder="admin@v2resort.com"
+                    placeholder="admin@v2ecosystem.com"
                     required
                     autoComplete="email" // FIX Iter-5: Add autocomplete attribute for email
                   />
@@ -378,9 +378,9 @@ export default function LoginPage() {
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold uppercase tracking-wider">{t('demoCredentials')}</p>
             <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2">
               {/* FIX Iter-13: Changed clickable div to button for keyboard accessibility */}
-              <button type="button" className="flex w-full justify-between items-center group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 p-1 rounded" onClick={() => { setEmail('admin@v2resort.com'); setPassword('admin123'); }}>
+              <button type="button" className="flex w-full justify-between items-center group cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 p-1 rounded" onClick={() => { setEmail('admin@v2ecosystem.com'); setPassword('admin123'); }}>
                 <span className="font-medium text-primary-600">{t('superAdmin')}:</span>
-                <span className="font-mono">admin@v2resort.com / admin123</span>
+                <span className="font-mono">admin@v2ecosystem.com / admin123</span>
               </button>
             </div>
           </div>

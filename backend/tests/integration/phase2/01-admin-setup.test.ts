@@ -28,8 +28,8 @@ describe('Part 1: Admin Setup Sequence', () => {
       admin = new Phase2Client();
       const loginCandidates: Array<{ email: string; password: string }> = [
         { email: TEST_CONFIG.users.admin.email, password: TEST_CONFIG.users.admin.password },
-        { email: 'admin@v2resort.com', password: 'admin123' },
-        { email: 'admin@v2resort.com', password: 'Admin123!' },
+        { email: 'admin@v2ecosystem.com', password: 'admin123' },
+        { email: 'admin@v2ecosystem.com', password: 'Admin123!' },
       ];
 
       let res = await admin.login(loginCandidates[0].email, loginCandidates[0].password);
@@ -77,7 +77,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     it('should set contact details', async () => {
       const res = await admin.updateSettings('contact', {
         phone: '+1-555-TEST',
-        email: 'test@v2resort.com',
+        email: 'test@v2ecosystem.com',
         address: '1 Test Boulevard, Verification City',
       });
       expect(res.status).toBeLessThan(300);
@@ -773,7 +773,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     const staffRoles = [
       {
         name: 'Kitchen Staff',
-        email: 'kitchen1@v2resort.com',
+        email: 'kitchen1@v2ecosystem.com',
         password: 'Staff123!',
         role: 'restaurant_staff',
         idKey: 'kitchenStaffId' as const,
@@ -781,7 +781,7 @@ describe('Part 1: Admin Setup Sequence', () => {
       },
       {
         name: 'Pool Staff',
-        email: 'pool1@v2resort.com',
+        email: 'pool1@v2ecosystem.com',
         password: 'Staff123!',
         role: 'pool_staff',
         idKey: 'poolStaffId' as const,
@@ -789,7 +789,7 @@ describe('Part 1: Admin Setup Sequence', () => {
       },
       {
         name: 'Chalet Staff',
-        email: 'chalet1@v2resort.com',
+        email: 'chalet1@v2ecosystem.com',
         password: 'Staff123!',
         role: 'chalet_staff',
         idKey: 'chaletStaffId' as const,
@@ -797,7 +797,7 @@ describe('Part 1: Admin Setup Sequence', () => {
       },
       {
         name: 'Housekeeping Staff',
-        email: 'hk1@v2resort.com',
+        email: 'hk1@v2ecosystem.com',
         password: 'Staff123!',
         role: 'chalet_staff',
         idKey: 'hkStaffId' as const,
@@ -805,7 +805,7 @@ describe('Part 1: Admin Setup Sequence', () => {
       },
       {
         name: 'Resort Manager',
-        email: 'manager@v2resort.com',
+        email: 'manager@v2ecosystem.com',
         password: 'Manager123!',
         role: 'admin',
         idKey: 'managerId' as const,

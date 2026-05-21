@@ -1,4 +1,4 @@
-// Framer Motion Animation Presets for V2 Resort
+// Framer Motion Animation Presets for V2 Ecosystem
 // Different animation styles: playful for customers, professional for staff/admin
 
 import { Variants, Transition } from 'framer-motion';

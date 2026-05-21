@@ -1,5 +1,5 @@
 // ============================================
-// V2 Resort – Drizzle ORM Schema (barrel export)
+// V2 Ecosystem – Drizzle ORM Schema (barrel export)
 // Re-exports every table and enum from domain-specific files
 // ============================================
 

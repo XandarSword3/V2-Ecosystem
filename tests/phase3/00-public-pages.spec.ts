@@ -78,7 +78,7 @@ test.describe('Public Pages — No Auth Required', () => {
       await waitForPageLoad(page);
 
       const body = (await page.textContent('body')) || '';
-      const hasDemo = body.includes('admin@v2resort.com') || body.includes('admin123');
+      const hasDemo = body.includes('admin@v2ecosystem.com') || body.includes('admin123');
       expect(hasDemo).toBeTruthy();
     });
 
@@ -106,7 +106,7 @@ test.describe('Public Pages — No Auth Required', () => {
       await page.goto('/login', { waitUntil: 'domcontentloaded' });
       await waitForPageLoad(page);
 
-      await page.locator('input[type="email"]').fill('admin@v2resort.com');
+      await page.locator('input[type="email"]').fill('admin@v2ecosystem.com');
       await page.locator('input[type="password"]').first().fill('admin123');
       const submitBtn = page.locator('button[type="submit"]').first();
       await submitBtn.scrollIntoViewIfNeeded();

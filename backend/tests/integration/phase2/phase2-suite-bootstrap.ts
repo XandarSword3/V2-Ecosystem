@@ -36,7 +36,7 @@ interface UserSeed {
 const staffSeeds: UserSeed[] = [
   {
     name: 'Kitchen Staff',
-    email: 'kitchen1@v2resort.com',
+    email: 'kitchen1@v2ecosystem.com',
     password: 'Staff123!',
     role: 'restaurant_staff',
     tokenKey: 'kitchenStaffToken',
@@ -44,7 +44,7 @@ const staffSeeds: UserSeed[] = [
   },
   {
     name: 'Pool Staff',
-    email: 'pool1@v2resort.com',
+    email: 'pool1@v2ecosystem.com',
     password: 'Staff123!',
     role: 'pool_staff',
     tokenKey: 'poolStaffToken',
@@ -52,7 +52,7 @@ const staffSeeds: UserSeed[] = [
   },
   {
     name: 'Chalet Staff',
-    email: 'chalet1@v2resort.com',
+    email: 'chalet1@v2ecosystem.com',
     password: 'Staff123!',
     role: 'chalet_staff',
     tokenKey: 'chaletStaffToken',
@@ -60,7 +60,7 @@ const staffSeeds: UserSeed[] = [
   },
   {
     name: 'Housekeeping Staff',
-    email: 'hk1@v2resort.com',
+    email: 'hk1@v2ecosystem.com',
     password: 'Staff123!',
     role: 'housekeeping_staff',
     tokenKey: 'hkStaffToken',
@@ -68,7 +68,7 @@ const staffSeeds: UserSeed[] = [
   },
   {
     name: 'Resort Manager',
-    email: 'manager@v2resort.com',
+    email: 'manager@v2ecosystem.com',
     password: 'Manager123!',
     role: 'admin',
     tokenKey: 'managerToken',

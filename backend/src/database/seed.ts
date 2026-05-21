@@ -39,7 +39,7 @@ async function seed() {
     const adminPassword = await bcrypt.hash(adminPasswordPlain, 12);
     const adminResult = await pool.query(`
       INSERT INTO users (email, password_hash, full_name, email_verified, is_active)
-      VALUES ('admin@v2resort.com', $1, 'System Administrator', true, true)
+      VALUES ('admin@v2ecosystem.com', $1, 'System Administrator', true, true)
       ON CONFLICT (email) DO UPDATE SET password_hash = $1
       RETURNING id;
     `, [adminPassword]);
@@ -100,7 +100,7 @@ async function seed() {
     logger.info('Seeding completed successfully');
     logger.info('');
     logger.info('Admin credentials:');
-    logger.info('  Email: admin@v2resort.com');
+    logger.info('  Email: admin@v2ecosystem.com');
     logger.info('  Password: [from SEED_ADMIN_PASSWORD env var or default in dev]');
     logger.info('');
     

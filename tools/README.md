@@ -19,7 +19,7 @@ Located in `stress-test/`, this is a custom load testing framework that simulate
 ### Running Stress Tests
 
 ```bash
-# From v2-resort root:
+# From v2-ecosystem root:
 npm run stress-test              # Full stress test
 npm run stress-test:quick        # Quick run (5 customers, 60s)
 npm run stress-test:medium       # Medium run (25 customers, 300s)

@@ -38,7 +38,7 @@ async function runMigration() {
     // Print the full migration SQL
     const migrationSQL = `
 -- ============================================
--- V2 Resort Database Schema
+-- V2 Ecosystem Database Schema
 -- Run this in Supabase SQL Editor
 -- ============================================
 

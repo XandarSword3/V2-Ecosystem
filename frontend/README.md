@@ -2,7 +2,7 @@
 
 ## Technical Implementation & Core Behaviors
 
-The V2 Resort frontend is a massive Next.js App Router application leveraging complex client-side interactions and real-time data. Rather than simple pages, the application acts as a dynamic Platform-as-a-Service interface.
+The V2 Ecosystem frontend is a massive Next.js App Router application leveraging complex client-side interactions and real-time data. Rather than simple pages, the application acts as a dynamic Platform-as-a-Service interface.
 
 ### 1. The Admin Dashboard (`/admin`)
 - **Real-Time Presence**: Connects to the backend Socket.IO (`/stats:online_users`) constantly to display live resort guest traffic.

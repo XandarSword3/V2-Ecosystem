@@ -151,7 +151,7 @@ describe('Biometric Controller', () => {
           options: expect.objectContaining({
             challenge: expect.any(String),
             rp: expect.objectContaining({
-              name: 'V2 Resort',
+              name: 'V2 Ecosystem',
             }),
             user: expect.objectContaining({
               name: 'test@example.com',

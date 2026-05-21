@@ -34,8 +34,8 @@ describe('SettingsController', () => {
   describe('getSettings', () => {
     it('should return all settings successfully', async () => {
       const mockSettings = [
-        { key: 'general', value: { resortName: 'V2 Resort', tagline: 'Paradise Awaits' } },
-        { key: 'contact', value: { phone: '+1234567890', email: 'info@v2resort.com' } },
+        { key: 'general', value: { resortName: 'V2 Ecosystem', tagline: 'Paradise Awaits' } },
+        { key: 'contact', value: { phone: '+1234567890', email: 'info@v2ecosystem.com' } },
         { key: 'appearance', value: { theme: 'light', animationsEnabled: true } }
       ];
 
@@ -48,10 +48,10 @@ describe('SettingsController', () => {
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
         data: expect.objectContaining({
-          resortName: 'V2 Resort',
+          resortName: 'V2 Ecosystem',
           tagline: 'Paradise Awaits',
           phone: '+1234567890',
-          email: 'info@v2resort.com',
+          email: 'info@v2ecosystem.com',
           theme: 'light',
           animationsEnabled: true
         })
@@ -68,11 +68,11 @@ describe('SettingsController', () => {
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
         data: expect.objectContaining({
-          resortName: 'V2 Resort',
+          resortName: 'V2 Ecosystem',
           currency: 'USD',
           general: expect.objectContaining({
-            resortName: 'V2 Resort',
-            businessName: 'V2 Resort',
+            resortName: 'V2 Ecosystem',
+            businessName: 'V2 Ecosystem',
             currency: 'USD',
           }),
           payments: expect.objectContaining({

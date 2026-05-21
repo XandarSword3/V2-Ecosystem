@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: v2-resort-backend
+    name: v2-ecosystem-backend
     runtime: node
     region: frankfurt
     plan: free

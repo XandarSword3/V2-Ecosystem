@@ -71,7 +71,7 @@ export default function RegisterScreen() {
       >
         <View style={styles.content}>
           <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join V2 Resort</Text>
+          <Text style={styles.subtitle}>Join V2 Ecosystem</Text>
 
           <View style={styles.form}>
             <View style={styles.row}>

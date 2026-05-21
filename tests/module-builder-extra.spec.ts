@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures/auth.fixture';
 
 // Constants
-const ADMIN_EMAIL = 'admin@v2resort.com';
+const ADMIN_EMAIL = 'admin@v2ecosystem.com';
 const ADMIN_PASSWORD = 'admin123';
 const API_URL = 'http://localhost:3005';
 const BASE_URL = 'http://localhost:3000';
@@ -42,7 +42,7 @@ test.describe('Module Builder New Features', () => {
   test('should support Button, Form components and Undo/Redo', async ({ page }) => {
     // 1. Login
     await page.goto(`${BASE_URL}/login`);
-    await page.getByPlaceholder('admin@v2resort.com').fill(ADMIN_EMAIL);
+    await page.getByPlaceholder('admin@v2ecosystem.com').fill(ADMIN_EMAIL);
     await page.getByPlaceholder('••••••••').fill(ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL('**/admin**');

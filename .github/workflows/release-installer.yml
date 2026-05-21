@@ -1,0 +1,140 @@
+name: Release Installer
+
+# Triggers on any tag that looks like a version: v1.0.0, v2.3.1, etc.
+# To cut a release:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+# GitHub Actions does the rest — builds the .exe and attaches it to the release.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version label for manual build (e.g. v1.0.0-beta)'
+        required: false
+        default: 'v0.0.0-dev'
+
+env:
+  NODE_VERSION: '20.x'
+
+jobs:
+  build-installer:
+    name: Build Windows Installer (.exe)
+    # Must run on Windows — electron-builder needs the native NSIS toolchain
+    # to produce a real Windows installer.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: wizard1/package-lock.json
+
+      - name: Install wizard dependencies
+        working-directory: wizard1
+        run: npm ci
+
+      # Sync the version in package.json to match the git tag
+      # so the .exe filename and About screen show the right version.
+      - name: Stamp version from tag
+        working-directory: wizard1
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          # Strip the leading 'v' for npm version (v1.2.3 -> 1.2.3)
+          VERSION="${TAG#v}"
+          # Fall back to the manual input if this was triggered by workflow_dispatch
+          if [ -z "$VERSION" ] || [ "$VERSION" = "*.*.*-dev" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            VERSION="${VERSION#v}"
+          fi
+          echo "Building version: $VERSION"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Build .exe installer
+        working-directory: wizard1
+        run: npm run build
+        env:
+          # Suppress electron-builder telemetry
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: 'true'
+
+      # Locate the produced .exe — electron-builder names it after productName + version
+      - name: Locate installer artifact
+        id: find_exe
+        shell: bash
+        working-directory: wizard1
+        run: |
+          EXE=$(find dist -name "*.exe" | head -1)
+          echo "Found: $EXE"
+          echo "path=$EXE" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename $EXE)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload .exe as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-installer-exe
+          path: wizard1/${{ steps.find_exe.outputs.path }}
+          retention-days: 30
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-installer
+    # Only publish a real release on tag pushes — not on manual workflow_dispatch
+    if: startsWith(github.ref, 'refs/tags/')
+
+    permissions:
+      contents: write   # Required to create releases and upload assets
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: v2-installer-exe
+          path: release-assets/
+
+      - name: Find downloaded .exe
+        id: find_asset
+        run: |
+          EXE=$(find release-assets -name "*.exe" | head -1)
+          echo "path=$EXE" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename $EXE)" >> "$GITHUB_OUTPUT"
+
+      # Extract release notes from CHANGELOG.md if it exists,
+      # otherwise fall back to a sensible default.
+      - name: Extract release notes
+        id: release_notes
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -f CHANGELOG.md ]; then
+            # Pull the section between this tag and the previous one
+            NOTES=$(awk "/^## \[$TAG\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          fi
+          if [ -z "$NOTES" ]; then
+            NOTES="Download **${{ steps.find_asset.outputs.name }}**, double-click it, and follow the setup wizard."
+          fi
+          # Write to file to avoid shell escaping issues
+          echo "$NOTES" > release_notes.txt
+
+      - name: Create GitHub Release and upload .exe
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: V2 Ecosystem ${{ github.ref_name }}
+          body_path: release_notes.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}  # v1.0.0-beta → prerelease
+          files: ${{ steps.find_asset.outputs.path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -22,12 +22,12 @@ const CUSTOMER_CREDENTIALS = {
 };
 
 const STAFF_CREDENTIALS = {
-  email: process.env.E2E_STAFF_EMAIL || 'staff@v2resort.com',
+  email: process.env.E2E_STAFF_EMAIL || 'staff@v2ecosystem.com',
   password: process.env.E2E_STAFF_PASSWORD || 'staff123',
 };
 
 const ADMIN_CREDENTIALS = {
-  email: process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com',
+  email: process.env.E2E_ADMIN_EMAIL || 'admin@v2ecosystem.com',
   password: process.env.E2E_ADMIN_PASSWORD || 'admin123',
 };
 

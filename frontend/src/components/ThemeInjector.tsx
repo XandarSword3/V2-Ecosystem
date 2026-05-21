@@ -223,7 +223,7 @@ export function ThemeInjector() {
     // Persist theme to localStorage for the inline script on next page load
     // This prevents theme flash on subsequent visits
     try {
-      localStorage.setItem('v2-resort-theme', settings.theme || 'beach');
+      localStorage.setItem('v2-ecosystem-theme', settings.theme || 'beach');
     } catch (e) {
       // localStorage not available (e.g., private browsing)
     }

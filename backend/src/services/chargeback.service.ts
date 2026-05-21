@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Chargeback Handling Service
+ * V2 Ecosystem - Chargeback Handling Service
  * Manages Stripe disputes and chargeback workflows
  */
 
@@ -437,7 +437,7 @@ class ChargebackService {
     );
 
     await emailService.sendEmail({
-      to: process.env.ADMIN_EMAIL || 'admin@v2resort.com',
+      to: process.env.ADMIN_EMAIL || 'admin@v2ecosystem.com',
       subject: `[URGENT] New Chargeback Dispute - ${chargeback.amount} ${chargeback.currency}`,
       template: 'admin-chargeback-alert',
       data: {
@@ -463,7 +463,7 @@ class ChargebackService {
       : `[Resolved - LOST] Chargeback ${chargeback.id}`;
 
     await emailService.sendEmail({
-      to: process.env.ADMIN_EMAIL || 'admin@v2resort.com',
+      to: process.env.ADMIN_EMAIL || 'admin@v2ecosystem.com',
       subject,
       template: 'admin-chargeback-outcome',
       data: {

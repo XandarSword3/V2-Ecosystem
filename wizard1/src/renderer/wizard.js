@@ -1,5 +1,5 @@
 // ============================================================
-// V2 Resort — Wizard 1: Installation Wizard (Renderer)
+// V2 Ecosystem — Wizard 1: Installation Wizard (Renderer)
 // All 8 steps: Welcome → Docker → Supabase → Security →
 //   Stripe → SMTP → Domain/DNS → Review → Deploy → Done
 // ============================================================
@@ -223,8 +223,8 @@ function mask(s) {
 function renderWelcome() {
   const p = panel();
   p.innerHTML = `
-    ${header('Step 1 of 8', 'Welcome to V2 Resort Installer',
-      'This wizard will get V2 Resort Management Platform running on your Windows server with Docker, SSL, and automatic database setup. The whole process takes about 10 minutes.'
+    ${header('Step 1 of 8', 'Welcome to V2 Ecosystem Installer',
+      'This wizard will get V2 Ecosystem running on your Windows server with Docker, SSL, and automatic database setup. The whole process takes about 10 minutes.'
     )}
 
     <ul class="what-list">
@@ -377,7 +377,7 @@ function renderSupabase() {
     ${callout('info', '🔥', 'How to get your Supabase keys',
       `<ol style="margin:6px 0 0 16px; line-height:1.9">
         <li>Go to <strong>supabase.com</strong> → click <em>New Project</em></li>
-        <li>Choose a name (e.g. <code>v2-resort</code>) and a strong database password — <strong>save this password</strong></li>
+        <li>Choose a name (e.g. <code>v2-ecosystem</code>) and a strong database password — <strong>save this password</strong></li>
         <li>Wait ~2 min for the project to provision</li>
         <li>Go to <strong>Project Settings → API</strong> — copy the three keys below</li>
         <li>Go to <strong>Project Settings → Database</strong> → copy the Connection String (URI format)</li>
@@ -547,8 +547,8 @@ function renderSMTP() {
       })}
       ${field({
         id: 'emailFrom', label: 'From Address', badge: 'optional', value: state.config.emailFrom,
-        hint: 'How V2 signs outgoing emails. Examples: <code>V2 Resort &lt;noreply@v2resort.com&gt;</code>',
-        placeholder: 'V2 Resort <noreply@your-domain.com>',
+        hint: 'How V2 signs outgoing emails. Examples: <code>V2 Ecosystem &lt;noreply@v2ecosystem.com&gt;</code>',
+        placeholder: 'V2 Ecosystem <noreply@your-domain.com>',
       })}
     </div>
 
@@ -710,7 +710,7 @@ function renderReview() {
       </div>
       <div class="nav-right">
         <button class="btn btn-primary" id="btn-install" onclick="startInstall()">
-          🚀 Install V2 Resort
+          🚀 Install V2 Ecosystem
         </button>
       </div>
     </div>
@@ -801,7 +801,7 @@ function renderSuccess() {
     <div class="step-panel active" style="align-items:center;justify-content:center;">
       <div class="success-hero">
         <div class="success-badge">✅</div>
-        <div class="success-title">V2 Resort is live!</div>
+        <div class="success-title">V2 Ecosystem is live!</div>
         <div class="success-sub">
           Docker containers are running, the database is migrated, and your stack is ready.
           The next step is <strong>Wizard 2</strong> — opening the install page in your browser to create your owner account and configure your resort.

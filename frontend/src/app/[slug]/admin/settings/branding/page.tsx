@@ -287,7 +287,7 @@ export default function AdminBrandingPage() {
         <div>
           <h1 className="text-3xl font-bold">Branding & White Label</h1>
           <p className="text-muted-foreground mt-1">
-            Customize the look and feel of your resort management system
+            Customize the look and feel of your platform management system
           </p>
         </div>
         <div className="flex items-center gap-2">

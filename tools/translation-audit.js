@@ -23,7 +23,7 @@ const SUPPORTED_LANGUAGES = ['en', 'ar', 'fr'];
 const IGNORE_WORDS = [
   'React', 'Next', 'TypeScript', 'JavaScript', 'CSS', 'HTML',
   'API', 'JSON', 'URL', 'HTTP', 'HTTPS', 'GET', 'POST',
-  'V2', 'Resort', 'V2 Resort',
+  'V2', 'Resort', 'V2 Ecosystem',
   // Technical terms
   'onClick', 'onChange', 'className', 'useState', 'useEffect',
   'motion', 'div', 'span', 'button', 'Link', 'href',

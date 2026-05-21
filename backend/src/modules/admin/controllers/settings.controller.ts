@@ -85,7 +85,7 @@ export const getSettings = asyncHandler(async (req: Request, res: Response) => {
     const resolvedResortName = (combinedSettings as Record<string, unknown>).resortName
       || general.resortName
       || general.businessName
-      || 'V2 Resort';
+      || 'V2 Ecosystem';
 
     combinedSettings.general = {
       businessName: resolvedResortName,

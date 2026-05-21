@@ -24,7 +24,7 @@ require('ts-node').register({
   compilerOptions: { module: 'commonjs' },
 });
 
-const ROOT_DIR = path.resolve(__dirname, '../..'); // v2-resort/
+const ROOT_DIR = path.resolve(__dirname, '../..'); // v2-ecosystem/
 const WIRING_MAP_PATH = path.join(ROOT_DIR, 'docs', 'admin', 'admin-wiring-map.json');
 const OPENAPI_SPEC_PATH = path.join(ROOT_DIR, 'backend', 'src', 'docs', 'openapi-spec.ts');
 const OUTPUT_JSON = path.join(ROOT_DIR, 'docs', 'admin', 'admin-wiring-validation.json');

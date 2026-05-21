@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Email Rate Limiter
+ * V2 Ecosystem - Email Rate Limiter
  * Prevents email flooding and ensures deliverability
  */
 

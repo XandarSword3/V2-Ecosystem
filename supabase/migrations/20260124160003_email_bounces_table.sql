@@ -1,4 +1,4 @@
--- V2 Resort: Email Bounces and Suppression Table Migration
+-- V2 Ecosystem: Email Bounces and Suppression Table Migration
 -- Stores email bounce records and suppression list
 -- Production Hardening Phase 1.4
 

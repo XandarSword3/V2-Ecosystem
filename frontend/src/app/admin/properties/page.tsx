@@ -512,7 +512,7 @@ function AddPropertyModal({ isOpen, onClose, onAdd, isSubmitting }: any) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2 col-span-2">
               <Label htmlFor="name">Property Name</Label>
-              <Input id="name" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="V2 Resort & Spa" className="rounded-xl border-border/40" />
+              <Input id="name" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="V2 Ecosystem & Spa" className="rounded-xl border-border/40" />
             </div>
             
             <div className="space-y-2">

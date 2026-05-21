@@ -1,4 +1,4 @@
-# V2 Resort Backend - Complete API Endpoints Audit
+# V2 Ecosystem Backend - Complete API Endpoints Audit
 
 **Generated:** February 3, 2026  
 **Base URL:** `/api/v1`

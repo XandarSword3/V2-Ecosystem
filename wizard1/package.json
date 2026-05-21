@@ -1,7 +1,7 @@
 {
   "name": "v2-install-wizard",
   "version": "1.0.0",
-  "description": "V2 Resort Management Platform — Installation Wizard",
+  "description": "V2 Ecosystem — Installation Wizard",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -10,9 +10,9 @@
     "pack": "electron-builder --win --x64 --publish never"
   },
   "build": {
-    "appId": "com.v2resort.installer",
-    "productName": "V2 Resort Installer",
-    "copyright": "Copyright © 2026 V2 Resort",
+    "appId": "com.v2ecosystem.installer",
+    "productName": "V2 Ecosystem Installer",
+    "copyright": "Copyright © 2026 V2 Ecosystem",
     "win": {
       "target": [
         { "target": "nsis", "arch": ["x64"] }
@@ -28,7 +28,7 @@
       "installerHeaderIcon": "assets/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "V2 Resort Installer",
+      "shortcutName": "V2 Ecosystem Installer",
       "runAfterFinish": true
     },
     "files": [

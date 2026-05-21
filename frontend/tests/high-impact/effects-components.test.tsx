@@ -31,7 +31,7 @@ vi.mock('framer-motion', () => {
 vi.mock('@/lib/settings-context', () => ({
   useSiteSettings: () => ({
     settings: {
-      resortName: 'V2 Resort',
+      resortName: 'V2 Ecosystem',
       tagline: 'Luxury and comfort',
       weatherEffect: 'rain',
       showWeatherWidget: true,

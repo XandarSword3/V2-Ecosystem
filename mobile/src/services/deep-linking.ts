@@ -2,8 +2,8 @@
  * Deep Linking Service
  * 
  * Handles:
- * - URL scheme (v2resort://)
- * - Universal links (https://v2resort.com/app/*)
+ * - URL scheme (v2ecosystem://)
+ * - Universal links (https://v2ecosystem.com/app/*)
  * - Navigation from external links
  */
 
@@ -11,10 +11,10 @@ import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 
 // URL scheme
-export const URL_SCHEME = 'v2resort';
+export const URL_SCHEME = 'v2ecosystem';
 
 // Universal link domain
-export const UNIVERSAL_LINK_DOMAIN = 'v2resort.com';
+export const UNIVERSAL_LINK_DOMAIN = 'v2ecosystem.com';
 
 /**
  * Linking configuration for expo-router

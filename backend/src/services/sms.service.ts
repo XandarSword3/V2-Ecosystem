@@ -1,5 +1,5 @@
 /**
- * V2 Resort - SMS Notification Service
+ * V2 Ecosystem - SMS Notification Service
  * Twilio integration for SMS notifications
  */
 
@@ -48,31 +48,31 @@ export type SMSStatus =
 // SMS templates
 const SMS_TEMPLATES: Record<string, (data: Record<string, any>) => string> = {
   'booking-confirmation': (data) =>
-    `V2 Resort: Your booking #${data.booking_id} is confirmed for ${data.check_in_date}. Check-in: ${data.check_in_time}. Questions? Call ${data.resort_phone}`,
+    `V2 Ecosystem: Your booking #${data.booking_id} is confirmed for ${data.check_in_date}. Check-in: ${data.check_in_time}. Questions? Call ${data.resort_phone}`,
 
   'booking-reminder': (data) =>
-    `V2 Resort: Reminder - Your stay begins ${data.check_in_date}. Looking forward to hosting you! Check-in from ${data.check_in_time}.`,
+    `V2 Ecosystem: Reminder - Your stay begins ${data.check_in_date}. Looking forward to hosting you! Check-in from ${data.check_in_time}.`,
 
   'pool-ticket': (data) =>
-    `V2 Resort Pool: Your ticket for ${data.session_date} ${data.session_time} is ready. Show this SMS or your QR code at entry. Ticket #${data.ticket_id}`,
+    `V2 Ecosystem Pool: Your ticket for ${data.session_date} ${data.session_time} is ready. Show this SMS or your QR code at entry. Ticket #${data.ticket_id}`,
 
   'order-ready': (data) =>
-    `V2 Resort Kitchen: Your order #${data.order_id} is ready for pickup${data.location ? ` at ${data.location}` : ''}!`,
+    `V2 Ecosystem Kitchen: Your order #${data.order_id} is ready for pickup${data.location ? ` at ${data.location}` : ''}!`,
 
   'payment-confirmation': (data) =>
-    `V2 Resort: Payment of ${data.amount} received. Transaction #${data.transaction_id}. Thank you!`,
+    `V2 Ecosystem: Payment of ${data.amount} received. Transaction #${data.transaction_id}. Thank you!`,
 
   'password-reset': (data) =>
-    `V2 Resort: Your password reset code is ${data.code}. Valid for 10 minutes. Don't share this code.`,
+    `V2 Ecosystem: Your password reset code is ${data.code}. Valid for 10 minutes. Don't share this code.`,
 
   '2fa-code': (data) =>
-    `V2 Resort: Your verification code is ${data.code}. Valid for 5 minutes.`,
+    `V2 Ecosystem: Your verification code is ${data.code}. Valid for 5 minutes.`,
 
   'cancellation': (data) =>
-    `V2 Resort: Your booking #${data.booking_id} has been cancelled. ${data.refund_amount ? `Refund of ${data.refund_amount} will be processed.` : ''}`,
+    `V2 Ecosystem: Your booking #${data.booking_id} has been cancelled. ${data.refund_amount ? `Refund of ${data.refund_amount} will be processed.` : ''}`,
 
   'alert': (data) =>
-    `V2 Resort Alert: ${data.message}`,
+    `V2 Ecosystem Alert: ${data.message}`,
 };
 
 class SMSService {

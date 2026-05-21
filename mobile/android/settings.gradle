@@ -31,7 +31,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
 }
 expoAutolinking.useExpoModules()
 
-rootProject.name = 'V2 Resort'
+rootProject.name = 'V2 Ecosystem'
 
 expoAutolinking.useExpoVersionCatalog()
 

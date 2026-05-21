@@ -187,9 +187,9 @@ describe('Stripe Platform Service', () => {
     it('should include Apple Pay config for iOS', async () => {
       const iosResult = {
         applePayConfig: {
-          merchantId: 'merchant.com.v2resort',
+          merchantId: 'merchant.com.v2ecosystem',
           merchantCountryCode: 'CY',
-          merchantName: 'V2 Resort',
+          merchantName: 'V2 Ecosystem',
         },
       };
       
@@ -201,7 +201,7 @@ describe('Stripe Platform Service', () => {
       const androidResult = {
         googlePayConfig: {
           merchantId: 'google_merchant_id',
-          merchantName: 'V2 Resort',
+          merchantName: 'V2 Ecosystem',
           gatewayMerchantId: 'stripe',
           testMode: true,
         },

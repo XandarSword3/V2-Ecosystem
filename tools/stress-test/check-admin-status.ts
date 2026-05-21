@@ -44,7 +44,7 @@ async function checkAdmin() {
     try {
         // 1. Check Admin Status
         console.log('Checking Admin Status...');
-        const userRes = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.admin@v2resort.com&select=*`, { headers: HEADERS });
+        const userRes = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.admin@v2ecosystem.com&select=*`, { headers: HEADERS });
         if (!userRes.ok) {
             console.error('Error fetching admin:', await userRes.text());
         } else {

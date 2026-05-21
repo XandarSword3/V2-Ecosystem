@@ -1,5 +1,5 @@
 -- =====================================================
--- V2 Resort Production Seed Script
+-- V2 Ecosystem Production Seed Script
 -- Run this in Supabase SQL Editor
 -- =====================================================
 

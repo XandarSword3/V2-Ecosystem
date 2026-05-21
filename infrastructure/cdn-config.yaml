@@ -1,13 +1,13 @@
-# V2 Resort CDN Configuration
+# V2 Ecosystem CDN Configuration
 # Cloudflare Configuration for Production
 
 # Domain Configuration
 domain:
-  name: "v2resort.com"
+  name: "v2ecosystem.com"
   aliases:
-    - "www.v2resort.com"
-    - "api.v2resort.com"
-    - "cdn.v2resort.com"
+    - "www.v2ecosystem.com"
+    - "api.v2ecosystem.com"
+    - "cdn.v2ecosystem.com"
 
 # SSL/TLS Settings
 ssl:
@@ -83,17 +83,17 @@ cache:
 
 # Page Rules
 page_rules:
-  - pattern: "*.v2resort.com/api/*"
+  - pattern: "*.v2ecosystem.com/api/*"
     settings:
       cache_level: "bypass"
       ssl: "full_strict"
       
-  - pattern: "*.v2resort.com/admin/*"
+  - pattern: "*.v2ecosystem.com/admin/*"
     settings:
       cache_level: "bypass"
       security_level: "high"
       
-  - pattern: "cdn.v2resort.com/*"
+  - pattern: "cdn.v2ecosystem.com/*"
     settings:
       cache_level: "cache_everything"
       edge_cache_ttl: 2678400  # 31 days
@@ -160,13 +160,13 @@ performance:
 origin:
   # Frontend (Vercel)
   frontend:
-    address: "v2-resort-frontend.vercel.app"
+    address: "v2-ecosystem-frontend.vercel.app"
     port: 443
     protocol: "https"
     
   # Backend API (Render)
   backend:
-    address: "v2-resort-api.onrender.com"
+    address: "v2-ecosystem-api.onrender.com"
     port: 443
     protocol: "https"
     
@@ -180,10 +180,10 @@ origin:
 # Worker Routes (Edge Functions)
 workers:
   routes:
-    - pattern: "*.v2resort.com/api/v1/public/*"
+    - pattern: "*.v2ecosystem.com/api/v1/public/*"
       script: "cache-api-response"
       
-    - pattern: "*.v2resort.com/images/*"
+    - pattern: "*.v2ecosystem.com/images/*"
       script: "optimize-image"
 
 # Analytics
@@ -194,9 +194,9 @@ analytics:
 # Notifications
 notifications:
   email:
-    - admin@v2resort.com
+    - admin@v2ecosystem.com
   webhook:
-    url: "https://api.v2resort.com/webhooks/cloudflare"
+    url: "https://api.v2ecosystem.com/webhooks/cloudflare"
     events:
       - "ssl_certificate_expiring"
       - "ddos_attack_detected"

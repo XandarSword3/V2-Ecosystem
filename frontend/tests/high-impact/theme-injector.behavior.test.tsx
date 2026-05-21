@@ -122,7 +122,7 @@ describe('ThemeInjector behavior', () => {
       expect(root.getAttribute('data-color-mode')).toBe('light');
     });
 
-    expect(setItemSpy).toHaveBeenCalledWith('v2-resort-theme', 'beach');
+    expect(setItemSpy).toHaveBeenCalledWith('v2-ecosystem-theme', 'beach');
   });
 
   it('uses dark-mode preset colors and dark gradients when custom colors are absent', async () => {

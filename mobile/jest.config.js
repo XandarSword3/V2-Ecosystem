@@ -1,5 +1,5 @@
 /**
- * Jest Configuration for V2 Resort Mobile App
+ * Jest Configuration for V2 Ecosystem Mobile App
  * 
  * Enforces 70% minimum coverage threshold across all metrics.
  * Configured for React Native with Expo and TypeScript support.
@@ -98,7 +98,7 @@ module.exports = {
     [
       'jest-html-reporter',
       {
-        pageTitle: 'V2 Resort Mobile Test Report',
+        pageTitle: 'V2 Ecosystem Mobile Test Report',
         outputPath: './coverage/test-report.html',
         includeFailureMsg: true,
         includeConsoleLog: true,

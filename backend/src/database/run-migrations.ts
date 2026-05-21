@@ -1,5 +1,5 @@
 /**
- * V2 Resort Database Migration Runner
+ * V2 Ecosystem Database Migration Runner
  * 
  * This script executes database migrations in the correct sequential order.
  * It tracks which migrations have been applied and only runs new ones.

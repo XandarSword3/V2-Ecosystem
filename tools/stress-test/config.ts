@@ -34,7 +34,7 @@ export const CONFIG = {
   TEST_DURATION_MS: 5 * 60 * 1000, // 5 minutes default
 
   // Admin Credentials (for creating users)
-  ADMIN_EMAIL: process.env.STRESS_TEST_ADMIN_EMAIL || 'admin@v2resort.com',
+  ADMIN_EMAIL: process.env.STRESS_TEST_ADMIN_EMAIL || 'admin@v2ecosystem.com',
   ADMIN_PASSWORD: process.env.STRESS_TEST_ADMIN_PASS || 'admin123',
 
   // Probability Weights (must sum to 100 for each bot type)
@@ -190,17 +190,17 @@ export function generateCustomerData(index: number) {
 // Staff order is important: stress test uses first N staff bots (default 7)
 // Include snack staff early so snack orders can be processed
 const SEEDED_STAFF = [
-  'restaurant.staff@v2resort.com',   // 1: restaurant_staff
-  'snack.staff@v2resort.com',        // 2: snack_bar_staff - moved up!
-  'restaurant.admin@v2resort.com',   // 3: restaurant_admin
-  'snack.admin@v2resort.com',        // 4: snack_bar_admin - moved up!
-  'pool.staff@v2resort.com',         // 5: pool_staff
-  'kitchen.staff@v2resort.com',      // 6: kitchen (restaurant_staff)
-  'chalet.staff@v2resort.com',       // 7: chalet_staff
-  'restaurant.manager@v2resort.com', // 8: moved down
-  'pool.admin@v2resort.com',         // 9: moved down
-  'chalet.manager@v2resort.com',     // 10: moved down
-  'chalet.admin@v2resort.com'        // 11: moved down
+  'restaurant.staff@v2ecosystem.com',   // 1: restaurant_staff
+  'snack.staff@v2ecosystem.com',        // 2: snack_bar_staff - moved up!
+  'restaurant.admin@v2ecosystem.com',   // 3: restaurant_admin
+  'snack.admin@v2ecosystem.com',        // 4: snack_bar_admin - moved up!
+  'pool.staff@v2ecosystem.com',         // 5: pool_staff
+  'kitchen.staff@v2ecosystem.com',      // 6: kitchen (restaurant_staff)
+  'chalet.staff@v2ecosystem.com',       // 7: chalet_staff
+  'restaurant.manager@v2ecosystem.com', // 8: moved down
+  'pool.admin@v2ecosystem.com',         // 9: moved down
+  'chalet.manager@v2ecosystem.com',     // 10: moved down
+  'chalet.admin@v2ecosystem.com'        // 11: moved down
 ];
 
 export function generateStaffData(index: number, isTrainee = false) {
@@ -223,7 +223,7 @@ export function generateStaffData(index: number, isTrainee = false) {
   const roleList = ['restaurant_staff', 'snack_bar_staff', 'pool_staff', 'chalet_staff'];
 
   return {
-    email: `${prefix}${index}@v2resort.com`,
+    email: `${prefix}${index}@v2ecosystem.com`,
     password: 'StaffPass123!',
     full_name: `${isTrainee ? 'Trainee' : 'Stress Test Staff'} ${indexToLetters(index)}`,
     phone: `+961${String(71000000 + index).padStart(8, '0')}`,
