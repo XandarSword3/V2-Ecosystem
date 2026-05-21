@@ -111,6 +111,10 @@
   },
   "overrides": {
     "magicast": "^0.5.1",
-    "fast-xml-builder": "^1.1.7"
+    "fast-xml-builder": "^1.1.7",
+    "ws": ">=8.20.1"
+  },
+  "resolutions": {
+    "ws": ">=8.20.1"
   }
 }
