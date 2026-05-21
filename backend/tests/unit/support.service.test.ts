@@ -318,7 +318,7 @@ describe('SupportService', () => {
       expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'john@example.com',
-          subject: 'Thank you for contacting V2 Resort',
+          subject: 'Thank you for contacting V2 Ecosystem',
         })
       );
     });
@@ -335,7 +335,7 @@ describe('SupportService', () => {
 
       expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'admin@v2resort.com',
+          to: 'admin@v2ecosystem.com',
         })
       );
     });

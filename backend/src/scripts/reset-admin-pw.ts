@@ -18,7 +18,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function resetAdmin() {
     console.log('Resetting admin password...');
-    const email = 'admin@v2resort.com';
+    const email = 'admin@v2ecosystem.com';
     const newPassword = 'admin123';
     
     try {

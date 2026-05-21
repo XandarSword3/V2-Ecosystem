@@ -15,16 +15,16 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'http', hostname: 'localhost' },
-      { protocol: 'https', hostname: 'v2resort.com' },
-      { protocol: 'https', hostname: 'v2-resort-backend.onrender.com' },
+      { protocol: 'https', hostname: 'v2ecosystem.com' },
+      { protocol: 'https', hostname: 'v2-ecosystem-backend.onrender.com' },
     ],
     unoptimized: process.env.NODE_ENV === 'development',
   },
   
   // Environment variables - DO NOT add /api here, api.ts adds it
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-resort-backend.onrender.com' : 'http://localhost:3005'),
-    NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-resort-backend.onrender.com' : 'http://localhost:3005'),
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-ecosystem-backend.onrender.com' : 'http://localhost:3005'),
+    NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'production' ? 'https://v2-ecosystem-backend.onrender.com' : 'http://localhost:3005'),
   },
 
   // URL redirects for deprecated routes (point old hardcoded paths to dynamic routes)

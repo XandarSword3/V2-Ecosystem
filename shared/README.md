@@ -4,7 +4,7 @@ Shared TypeScript type definitions used by both the backend and frontend.
 
 ## Structure
 
-- `package.json` — Package metadata (name: `@v2-resort/shared`)
+- `package.json` — Package metadata (name: `@v2-ecosystem/shared`)
 - `types/` — 87 type definition files covering all domain entities
 
 ## Purpose

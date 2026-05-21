@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Multi-Currency Support Service
+ * V2 Ecosystem - Multi-Currency Support Service
  * Handles currency conversion and management
  */
 

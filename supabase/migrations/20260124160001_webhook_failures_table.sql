@@ -1,4 +1,4 @@
--- V2 Resort: Webhook Failures Table Migration
+-- V2 Ecosystem: Webhook Failures Table Migration
 -- Stores failed webhook events for retry processing
 -- Production Hardening Phase 1.2
 

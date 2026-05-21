@@ -91,7 +91,7 @@ describe('Support Routes', () => {
 
     it('should send admin notification email', async () => {
       const mockInquiry = { id: 'inquiry-123' };
-      const mockSiteSettings = { contact_email: 'admin@resort.com', site_name: 'V2 Resort' };
+      const mockSiteSettings = { contact_email: 'admin@resort.com', site_name: 'V2 Ecosystem' };
       vi.mocked(getSupabase).mockReturnValue({
         from: vi.fn().mockImplementation((table: string) => {
           if (table === 'site_settings') return createChainableMock(mockSiteSettings);
@@ -124,7 +124,7 @@ describe('Support Routes', () => {
 
     it('should send confirmation email to user', async () => {
       const mockInquiry = { id: 'inquiry-123' };
-      const mockSiteSettings = { contact_email: 'admin@resort.com', site_name: 'V2 Resort' };
+      const mockSiteSettings = { contact_email: 'admin@resort.com', site_name: 'V2 Ecosystem' };
       vi.mocked(getSupabase).mockReturnValue({
         from: vi.fn().mockImplementation((table: string) => {
           if (table === 'site_settings') return createChainableMock(mockSiteSettings);
@@ -151,7 +151,7 @@ describe('Support Routes', () => {
       expect(emailService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'jane@example.com',
-          subject: 'Thank you for contacting V2 Resort',
+          subject: 'Thank you for contacting V2 Ecosystem',
         })
       );
     });

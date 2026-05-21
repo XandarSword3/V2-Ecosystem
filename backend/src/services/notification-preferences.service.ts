@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Notification Preferences Service
+ * V2 Ecosystem - Notification Preferences Service
  * Manages user notification preferences across all channels
  */
 

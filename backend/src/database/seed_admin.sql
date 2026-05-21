@@ -24,11 +24,11 @@ INSERT INTO roles (name, display_name, description, business_unit) VALUES
   ('pool_staff', 'Pool Staff', 'Pool operations', 'pool')
 ON CONFLICT (name) DO NOTHING;
 
--- Step 3: Create/Update Super Admin User (admin@v2resort.com / admin123)
+-- Step 3: Create/Update Super Admin User (admin@v2ecosystem.com / admin123)
 -- Password 'admin123' hashed with bcrypt (12 rounds)
 INSERT INTO users (email, password_hash, full_name, email_verified, is_active)
 VALUES (
-  'admin@v2resort.com', 
+  'admin@v2ecosystem.com', 
   '$2a$12$IBfoxad7JE8i3DNQrQ2VJuxCNhqUPYmCFiferKoJBewbHBp7XbCsG', 
   'System Administrator', 
   true, 
@@ -43,5 +43,5 @@ ON CONFLICT (email) DO UPDATE SET
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id 
 FROM users u, roles r 
-WHERE u.email = 'admin@v2resort.com' AND r.name = 'super_admin'
+WHERE u.email = 'admin@v2ecosystem.com' AND r.name = 'super_admin'
 ON CONFLICT (user_id, role_id) DO NOTHING;

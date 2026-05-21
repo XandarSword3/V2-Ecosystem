@@ -1,8 +1,8 @@
-# V2 Resort API Documentation
+# V2 Ecosystem API Documentation
 
 ## Overview
 
-The V2 Resort Management Platform API provides a comprehensive REST API for managing resort operations including hotel reservations, restaurant orders, pool tickets, chalet bookings, and more.
+The V2 Ecosystem API provides a comprehensive REST API for managing resort operations including hotel reservations, restaurant orders, pool tickets, chalet bookings, and more.
 
 **Base URL:** `https://your-domain.com/api`
 

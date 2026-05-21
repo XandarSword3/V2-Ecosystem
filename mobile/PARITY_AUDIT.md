@@ -1,4 +1,4 @@
-# V2 Resort Mobile App - Feature Parity Audit
+# V2 Ecosystem Mobile App - Feature Parity Audit
 
 > **Audit Date:** January 20, 2026  
 > **Branch:** `fix/mobile-run-stable`  

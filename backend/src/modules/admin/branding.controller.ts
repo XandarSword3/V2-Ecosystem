@@ -72,7 +72,7 @@ router.get(
 
     // Return defaults if not set
     const defaultBranding: BrandingSettings = {
-      businessName: 'V2 Resort',
+      businessName: 'V2 Ecosystem',
       tagline: '',
       description: '',
       email: '',
@@ -255,7 +255,7 @@ router.get(
     res.json({
       success: true,
       data: {
-        businessName: branding.businessName || 'V2 Resort',
+        businessName: branding.businessName || 'V2 Ecosystem',
         tagline: branding.tagline || '',
         logoUrl: branding.logoUrl || '',
         faviconUrl: branding.faviconUrl || '',

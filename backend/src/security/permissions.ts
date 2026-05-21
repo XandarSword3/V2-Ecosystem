@@ -1,5 +1,5 @@
 /**
- * Permission and Role Definitions for V2 Resort
+ * Permission and Role Definitions for V2 Ecosystem
  * 
  * This is the single source of truth for authorization.
  * ALL authorization checks MUST happen on the backend.

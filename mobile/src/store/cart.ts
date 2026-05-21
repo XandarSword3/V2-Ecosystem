@@ -355,7 +355,7 @@ export const useCartStore = create<CartState>()(
       clearSnackCart: () => get().clearModuleCart('snack-bar'),
     }),
     {
-      name: 'v2-resort-cart',
+      name: 'v2-ecosystem-cart',
       storage: createJSONStorage(() => AsyncStorage),
       // Only persist cart items and discounts
       partialize: (state) => ({

@@ -20,7 +20,7 @@ Integration tests validate API behavior with real dependency wiring.
 
 By default, integration setup expects:
 
-1. PostgreSQL at port 5433 (v2resort_test database profile)
+1. PostgreSQL at port 5433 (v2ecosystem_test database profile)
 2. Redis at port 6380
 3. Reachable test API URL (defaults to `http://localhost:3006/api/v1`)
 

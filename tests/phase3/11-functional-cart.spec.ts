@@ -19,7 +19,7 @@ test.skip(!RUN_EXPLORATORY_E2E, 'Deep cart localStorage behavior assertions are 
 /** Helper: inject a cart state directly into localStorage */
 async function setCart(page: any, items: any[]) {
   await page.evaluate((cartItems: any[]) => {
-    localStorage.setItem('v2-resort-cart', JSON.stringify({
+    localStorage.setItem('v2-ecosystem-cart', JSON.stringify({
       state: { items: cartItems },
       version: 0,
     }));
@@ -28,7 +28,7 @@ async function setCart(page: any, items: any[]) {
 
 /** Helper: read cart state from localStorage */
 async function getCart(page: any): Promise<any[]> {
-  const raw = await page.evaluate(() => localStorage.getItem('v2-resort-cart'));
+  const raw = await page.evaluate(() => localStorage.getItem('v2-ecosystem-cart'));
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -57,7 +57,7 @@ test.describe('Cart — Proves Real Functionality', () => {
   test.beforeEach(async ({ page }) => {
     // Always start at app root so localStorage is available
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.evaluate(() => localStorage.removeItem('v2-resort-cart'));
+    await page.evaluate(() => localStorage.removeItem('v2-ecosystem-cart'));
   });
 
   test('adding an item stores it with name, price, and quantity', async ({ page }) => {
@@ -115,11 +115,11 @@ test.describe('Cart — Proves Real Functionality', () => {
 
     // Remove the middle item
     await page.evaluate(() => {
-      const raw = localStorage.getItem('v2-resort-cart');
+      const raw = localStorage.getItem('v2-ecosystem-cart');
       if (!raw) return;
       const cart = JSON.parse(raw);
       cart.state.items = cart.state.items.filter((i: any) => i.id !== 'fries-1');
-      localStorage.setItem('v2-resort-cart', JSON.stringify(cart));
+      localStorage.setItem('v2-ecosystem-cart', JSON.stringify(cart));
     });
 
     const stored = await getCart(page);
@@ -146,11 +146,11 @@ test.describe('Cart — Proves Real Functionality', () => {
 
     // Clear cart
     await page.evaluate(() => {
-      const raw = localStorage.getItem('v2-resort-cart');
+      const raw = localStorage.getItem('v2-ecosystem-cart');
       if (!raw) return;
       const cart = JSON.parse(raw);
       cart.state.items = [];
-      localStorage.setItem('v2-resort-cart', JSON.stringify(cart));
+      localStorage.setItem('v2-ecosystem-cart', JSON.stringify(cart));
     });
 
     // PROVE: Cart is now empty

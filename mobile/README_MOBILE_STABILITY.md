@@ -1,7 +1,7 @@
 ﻿# MOBILE STABILITY README
 
 ## Scope
-This README documents the directory: ..\\v2-resort\\mobile.
+This README documents the directory: ..\\v2-ecosystem\\mobile.
 
 ## Verification
 - Last refreshed: 2026-03-19

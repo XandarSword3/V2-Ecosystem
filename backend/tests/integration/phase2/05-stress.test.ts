@@ -125,7 +125,7 @@ describe('S-02: 20 Concurrent $100 Redemptions from $1000 Gift Card', () => {
       amount: 1000,
       balance: 1000,
       purchaser_name: 'Stress Admin',
-      purchaser_email: 'admin@v2resort.com',
+      purchaser_email: 'admin@v2ecosystem.com',
       status: 'active',
     });
 

@@ -1,4 +1,4 @@
-package com.v2resort.app
+package com.v2ecosystem.app
 
 import android.app.Application
 import android.content.res.Configuration

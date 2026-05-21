@@ -1,7 +1,7 @@
 /**
  * Complete Feature Coverage E2E Tests
  * 
- * Comprehensive tests covering all major features across the V2 Resort application.
+ * Comprehensive tests covering all major features across the V2 Ecosystem application.
  * These tests "let the bots loose" to systematically test every feature.
  */
 

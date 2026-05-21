@@ -188,7 +188,7 @@ export const useCartStore = create<CartState>()(
         .reduce((sum, i) => sum + (i.price + (i.modifierTotal || 0)) * i.quantity, 0),
     }),
     {
-      name: 'v2-resort-cart',
+      name: 'v2-ecosystem-cart',
     }
   )
 );

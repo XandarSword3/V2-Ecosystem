@@ -1,4 +1,4 @@
--- V2 Resort: Currencies Table Migration
+-- V2 Ecosystem: Currencies Table Migration
 -- Stores supported currencies and exchange rates
 -- Production Hardening Phase 1.3
 

@@ -1,7 +1,7 @@
 /**
  * Unified Customization Module
  * 
- * This module provides a centralized customization system for ALL modules in the V2 Resort platform.
+ * This module provides a centralized customization system for ALL modules in the V2 Ecosystem platform.
  * It supports:
  * - Restaurant menu items
  * - Snack bar items

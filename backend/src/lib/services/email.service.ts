@@ -127,14 +127,14 @@ export interface EmailServiceDependencies {
 export function createEmailService(deps: EmailServiceDependencies): EmailService {
   const { transporter, templateRepository, logger, fromAddress, fromName } = deps;
 
-  const defaultFromAddress = fromAddress || 'noreply@v2resort.com';
-  const defaultFromName = fromName || 'V2 Resort';
+  const defaultFromAddress = fromAddress || 'noreply@v2ecosystem.com';
+  const defaultFromName = fromName || 'V2 Ecosystem';
 
   const defaultSettings: SiteSettings = {
-    companyName: 'V2 Resort',
-    contactEmail: 'info@v2resort.com',
+    companyName: 'V2 Ecosystem',
+    contactEmail: 'info@v2ecosystem.com',
     contactPhone: '+1-555-123-4567',
-    companyAddress: 'V2 Resort, Lebanon',
+    companyAddress: 'V2 Ecosystem, Lebanon',
     chaletCheckIn: '3:00 PM',
     chaletCheckOut: '12:00 PM',
   };

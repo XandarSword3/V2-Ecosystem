@@ -43,7 +43,7 @@ const HEADERS = {
 };
 
 async function enableAdmin() {
-    const email = 'admin@v2resort.com';
+    const email = 'admin@v2ecosystem.com';
     console.log(`Enabling account for ${email} via REST API...`);
     console.log(`Supabase URL: ${SUPABASE_URL}`);
 

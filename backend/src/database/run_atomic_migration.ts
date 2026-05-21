@@ -12,7 +12,7 @@ function getErrorMessage(error: unknown): string {
 
 const potentialUrls = [
     process.env.DATABASE_URL,
-    'postgresql://v2resort_test:v2resort_test_secret@localhost:5433/v2resort_test',
+    'postgresql://v2ecosystem_test:v2ecosystem_test_secret@localhost:5433/v2ecosystem_test',
     'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
     'postgresql://postgres:postgres@localhost:5432/postgres'
 ].filter((value): value is string => Boolean(value));

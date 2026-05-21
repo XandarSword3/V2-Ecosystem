@@ -1,6 +1,6 @@
-# Wizard 1 — V2 Resort `.exe` Installation Wizard
+# Wizard 1 — V2 Ecosystem `.exe` Installation Wizard
 
-> **Electron-based Windows installer** that gets V2 Resort running on your server with one guided session.
+> **Electron-based Windows installer** that gets V2 Ecosystem running on your server with one guided session.
 
 ## What it does
 
@@ -35,11 +35,11 @@ npm start
 
 # 3. Build the installer .exe
 npm run build
-# Output → wizard1/dist/V2 Resort Installer Setup 1.0.0.exe
+# Output → wizard1/dist/V2 Ecosystem Installer Setup 1.0.0.exe
 ```
 
 ### Output
-`dist/V2 Resort Installer Setup 1.0.0.exe` — a standalone NSIS installer that:
+`dist/V2 Ecosystem Installer Setup 1.0.0.exe` — a standalone NSIS installer that:
 - Requires administrator privileges (set in manifest)
 - Bundles all Node.js runtime via Electron
 - Copies V2 source files as extra resources

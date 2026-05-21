@@ -1,5 +1,5 @@
 -- ============================================
--- V2 Resort - Appearance & Theme Settings Migration
+-- V2 Ecosystem - Appearance & Theme Settings Migration
 -- Run this in Supabase SQL Editor to enable all theme/appearance features
 -- ============================================
 

@@ -31,7 +31,7 @@ async function seed() {
         const { data: user, error: userError } = await supabase
             .from('users')
             .upsert({
-                email: 'admin@v2resort.com',
+                email: 'admin@v2ecosystem.com',
                 password_hash: adminPassword,
                 full_name: 'System Administrator',
                 email_verified: true,
@@ -54,7 +54,7 @@ async function seed() {
         }
 
         logger.info('Seeding completed via HTTP.');
-        logger.info('Admin: admin@v2resort.com / ' + adminPasswordPlain);
+        logger.info('Admin: admin@v2ecosystem.com / ' + adminPasswordPlain);
         process.exit(0);
     } catch (error) {
         logger.error('Seeding failed:', error);

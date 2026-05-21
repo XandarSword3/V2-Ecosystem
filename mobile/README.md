@@ -1,6 +1,6 @@
 ﻿# Mobile App
 
-React Native mobile application for the V2 Resort platform.
+React Native mobile application for the V2 Ecosystem platform.
 
 ## Status
 

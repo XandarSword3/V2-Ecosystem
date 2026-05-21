@@ -1,4 +1,4 @@
-// ESLint configuration for V2 Resort Mobile App
+// ESLint configuration for V2 Ecosystem Mobile App
 // Production-grade linting with strict TypeScript rules
 
 module.exports = {

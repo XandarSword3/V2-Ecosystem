@@ -109,7 +109,7 @@ export default async function RootLayout({
   // GDPR: Theme detection script — classified as STRICTLY NECESSARY
   //
   // This inline script reads two localStorage keys before React hydrates:
-  //   - 'v2-resort-theme' — the colour theme (beach, mountain, etc.)
+  //   - 'v2-ecosystem-theme' — the colour theme (beach, mountain, etc.)
   //   - 'theme' — light/dark mode
   //
   // Justification for strictly-necessary classification:
@@ -134,7 +134,7 @@ export default async function RootLayout({
 (function() {
   try {
     // Get theme and mode from localStorage (set by previous visits)
-    var theme = localStorage.getItem('v2-resort-theme') || 'beach';
+    var theme = localStorage.getItem('v2-ecosystem-theme') || 'beach';
     var mode = localStorage.getItem('theme') || 'light';
     
     // Theme color mappings (must match theme-config.ts)

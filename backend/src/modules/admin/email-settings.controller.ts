@@ -184,10 +184,10 @@ router.post(
       // Send test email
       await emailService.sendEmail({
         to: recipient,
-        subject: 'V2 Resort - Email Configuration Test',
+        subject: 'V2 Ecosystem - Email Configuration Test',
         html: `
           <h2>Email Configuration Test</h2>
-          <p>This is a test email from your V2 Resort system.</p>
+          <p>This is a test email from your V2 Ecosystem system.</p>
           <p>If you received this email, your email configuration is working correctly!</p>
           <hr>
           <p style="color: #666; font-size: 12px;">

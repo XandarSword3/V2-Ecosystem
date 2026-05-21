@@ -1,5 +1,5 @@
 -- ============================================
--- V2 Resort - Add Navbar Settings
+-- V2 Ecosystem - Add Navbar Settings
 -- ============================================
 
 INSERT INTO site_settings (key, value) VALUES

@@ -1,5 +1,5 @@
 // ============================================================
-// V2 Resort — Wizard 1: .exe Installation Wizard
+// V2 Ecosystem — Wizard 1: .exe Installation Wizard
 // Electron Main Process
 // ============================================================
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
@@ -143,12 +143,12 @@ ipcMain.handle('files:writeEnvFiles', async (event, { config, installDir }) => {
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: config.stripePublishableKey || '',
       NEXT_PUBLIC_API_URL: backendUrl,
       NEXT_PUBLIC_SOCKET_URL: backendUrl,
-      NEXT_PUBLIC_APP_NAME: 'V2 Resort',
+      NEXT_PUBLIC_APP_NAME: 'V2 Ecosystem',
       SMTP_HOST: config.smtpHost || '',
       SMTP_PORT: config.smtpPort || '587',
       SMTP_USER: config.smtpUser || '',
       SMTP_PASS: config.smtpPass || '',
-      EMAIL_FROM: config.emailFrom || `V2 Resort <noreply@${domain}>`,
+      EMAIL_FROM: config.emailFrom || `V2 Ecosystem <noreply@${domain}>`,
     });
 
     // Backend .env
@@ -177,7 +177,7 @@ ipcMain.handle('files:writeEnvFiles', async (event, { config, installDir }) => {
       RATE_LIMIT_WINDOW_MS: '900000',
       RATE_LIMIT_MAX_REQUESTS: '100',
       WEBAUTHBN_RP_ID: domain,
-      WEBAUTHN_RP_NAME: 'V2 Resort',
+      WEBAUTHN_RP_NAME: 'V2 Ecosystem',
       WEBAUTHN_ORIGIN: frontendUrl,
     });
 
@@ -248,7 +248,7 @@ ipcMain.handle('deploy:runMigrations', async (event, { installDir }) => {
 
     // Wait a few seconds for backend to be ready, then hit migration endpoint
     setTimeout(() => {
-      const proc = spawn('docker', ['exec', 'v2-resort-backend', 'node', 'scripts/run-migration.js'], {
+      const proc = spawn('docker', ['exec', 'v2-ecosystem-backend', 'node', 'scripts/run-migration.js'], {
         cwd: installDir,
         shell: true,
         stdio: 'pipe',
@@ -431,25 +431,25 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: v2-resort-db
+    container_name: v2-ecosystem-db
     environment:
-      POSTGRES_USER: v2resort
-      POSTGRES_PASSWORD: \${DB_PASSWORD:-v2resort_secret}
-      POSTGRES_DB: v2resort
+      POSTGRES_USER: v2ecosystem
+      POSTGRES_PASSWORD: \${DB_PASSWORD:-v2ecosystem_secret}
+      POSTGRES_DB: v2ecosystem
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
       - v2-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U v2resort"]
+      test: ["CMD-SHELL", "pg_isready -U v2ecosystem"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: v2-resort-redis
+    container_name: v2-ecosystem-redis
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -465,7 +465,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: v2-resort-backend
+    container_name: v2-ecosystem-backend
     env_file: ./backend/.env
     environment:
       NODE_ENV: production
@@ -484,7 +484,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: v2-resort-frontend
+    container_name: v2-ecosystem-frontend
     environment:
       NEXT_PUBLIC_API_URL: ${protocol}://${domain || 'localhost:3001'}/api
       NEXT_PUBLIC_SOCKET_URL: ${protocol}://${domain || 'localhost:3001'}
@@ -497,7 +497,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: v2-resort-nginx
+    container_name: v2-ecosystem-nginx
     ports:
       - "80:80"
       - "443:443"

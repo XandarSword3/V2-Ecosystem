@@ -49,7 +49,7 @@ export const COOKIE_CATEGORIES: CookieCategoryMeta[] = [
       { name: 'user', purpose: 'Cached user profile (localStorage)', duration: 'Session' },
       // GDPR: theme localStorage is classified as strictly necessary to prevent
       // a flash of wrong theme colours. See layout.tsx inline script.
-      { name: 'v2-resort-theme', purpose: 'Prevents flash of wrong theme on page load', duration: 'Persistent' },
+      { name: 'v2-ecosystem-theme', purpose: 'Prevents flash of wrong theme on page load', duration: 'Persistent' },
       { name: 'theme', purpose: 'Light/dark mode preference to prevent flicker', duration: 'Persistent' },
     ],
   },

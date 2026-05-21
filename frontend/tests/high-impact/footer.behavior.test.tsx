@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const pathnameState = vi.hoisted(() => ({ pathname: '/' }));
 const siteState = vi.hoisted(() => ({
   settings: {
-    resortName: 'V2 Resort',
+    resortName: 'V2 Ecosystem',
     footer: undefined as
       | undefined
       | {
@@ -72,7 +72,7 @@ describe('Footer behavior', () => {
   beforeEach(() => {
     pathnameState.pathname = '/';
     siteState.settings = {
-      resortName: 'V2 Resort',
+      resortName: 'V2 Ecosystem',
       footer: undefined,
     };
     siteState.modules = [

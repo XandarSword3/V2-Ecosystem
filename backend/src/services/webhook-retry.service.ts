@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Webhook Retry Service
+ * V2 Ecosystem - Webhook Retry Service
  * Handles failed webhook processing with exponential backoff
  */
 
@@ -311,7 +311,7 @@ class WebhookRetryService {
     const { emailService } = await import('./email.service.js');
 
     await emailService.sendEmail({
-      to: process.env.ADMIN_EMAIL || 'admin@v2resort.com',
+      to: process.env.ADMIN_EMAIL || 'admin@v2ecosystem.com',
       subject: `[Alert] Webhook Failed After ${failure.max_retries} Retries`,
       template: 'admin-webhook-failure',
       data: {

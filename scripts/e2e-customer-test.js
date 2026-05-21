@@ -1,5 +1,5 @@
 /**
- * V2 Resort — Phase 2: Comprehensive E2E Customer API Testing (v2)
+ * V2 Ecosystem — Phase 2: Comprehensive E2E Customer API Testing (v2)
  * Tests ALL customer-facing endpoints systematically
  * Run: node scripts/e2e-customer-test.js
  */
@@ -80,7 +80,7 @@ async function setup() {
     test('Login as test customer', login.status, true);
   } else {
     console.log('  ⚠️  Customer login failed, fallback to admin...');
-    const admin = await request('POST', '/api/v1/auth/login', { email: 'admin@v2resort.com', password: 'admin123' });
+    const admin = await request('POST', '/api/v1/auth/login', { email: 'admin@v2ecosystem.com', password: 'admin123' });
     jwt = admin.data.data?.tokens?.accessToken;
     userId = admin.data.data?.user?.id;
     test('Login fallback (admin)', admin.status, admin.status === 200);

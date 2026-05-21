@@ -329,7 +329,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
     }),
     {
-      name: 'v2-resort-settings',
+      name: 'v2-ecosystem-settings',
       storage: createJSONStorage(() => AsyncStorage),
       // Persist all settings
       partialize: (state) => ({

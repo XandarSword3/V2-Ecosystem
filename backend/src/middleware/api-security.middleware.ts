@@ -1,5 +1,5 @@
 /**
- * V2 Resort - API Security Hardening Middleware
+ * V2 Ecosystem - API Security Hardening Middleware
  * Comprehensive security middleware for API protection
  */
 

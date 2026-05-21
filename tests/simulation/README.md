@@ -13,7 +13,7 @@ These tests focus on:
 ## Running
 
 ```bash
-# From v2-resort root
+# From v2-ecosystem root
 npx playwright test tests/simulation --config playwright.all.config.ts --project=chromium
 ```
 

@@ -6,7 +6,7 @@ test.describe('V2 Ecosystem Critical Flows', () => {
     // Check for footer content to verify hook fix
     await expect(page.locator('footer')).toBeVisible();
     // Use first() to handle multiple matches in footer
-    await expect(page.getByRole('contentinfo').getByText('V2 Resort').first()).toBeVisible();
+    await expect(page.getByRole('contentinfo').getByText('V2 Ecosystem').first()).toBeVisible();
   });
 
   test('Admin Login and Dashboard Access', async ({ page }) => {
@@ -17,7 +17,7 @@ test.describe('V2 Ecosystem Critical Flows', () => {
     const passwordInput = page.locator('input[type="password"]').first();
     
     await emailInput.clear();
-    await emailInput.fill('admin@v2resort.com');
+    await emailInput.fill('admin@v2ecosystem.com');
     await passwordInput.fill('admin123');
     await page.getByRole('button', { name: 'Login' }).click();
     

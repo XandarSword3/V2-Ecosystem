@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Business Metrics Service
+ * V2 Ecosystem - Business Metrics Service
  * Tracks and exposes business-level KPIs and metrics
  */
 
@@ -402,33 +402,33 @@ class BusinessMetricsService {
     ]);
 
     const lines: string[] = [
-      '# HELP v2resort_bookings_total Total number of bookings',
-      '# TYPE v2resort_bookings_total gauge',
-      `v2resort_bookings_total ${bookings.total_bookings}`,
+      '# HELP v2ecosystem_bookings_total Total number of bookings',
+      '# TYPE v2ecosystem_bookings_total gauge',
+      `v2ecosystem_bookings_total ${bookings.total_bookings}`,
       '',
-      '# HELP v2resort_revenue_total Total revenue in cents',
-      '# TYPE v2resort_revenue_total gauge',
-      `v2resort_revenue_total ${Math.round(revenue.total_revenue * 100)}`,
+      '# HELP v2ecosystem_revenue_total Total revenue in cents',
+      '# TYPE v2ecosystem_revenue_total gauge',
+      `v2ecosystem_revenue_total ${Math.round(revenue.total_revenue * 100)}`,
       '',
-      '# HELP v2resort_users_total Total number of users',
-      '# TYPE v2resort_users_total gauge',
-      `v2resort_users_total ${users.total_users}`,
+      '# HELP v2ecosystem_users_total Total number of users',
+      '# TYPE v2ecosystem_users_total gauge',
+      `v2ecosystem_users_total ${users.total_users}`,
       '',
-      '# HELP v2resort_users_active_24h Active users in last 24 hours',
-      '# TYPE v2resort_users_active_24h gauge',
-      `v2resort_users_active_24h ${users.active_users_24h}`,
+      '# HELP v2ecosystem_users_active_24h Active users in last 24 hours',
+      '# TYPE v2ecosystem_users_active_24h gauge',
+      `v2ecosystem_users_active_24h ${users.active_users_24h}`,
       '',
-      '# HELP v2resort_transactions_today Transactions placed today',
-      '# TYPE v2resort_transactions_today gauge',
-      `v2resort_transactions_today ${operational.transactions_today}`,
+      '# HELP v2ecosystem_transactions_today Transactions placed today',
+      '# TYPE v2ecosystem_transactions_today gauge',
+      `v2ecosystem_transactions_today ${operational.transactions_today}`,
       '',
-      '# HELP v2resort_transactions_pending Pending transactions',
-      '# TYPE v2resort_transactions_pending gauge',
-      `v2resort_transactions_pending ${operational.transactions_pending}`,
+      '# HELP v2ecosystem_transactions_pending Pending transactions',
+      '# TYPE v2ecosystem_transactions_pending gauge',
+      `v2ecosystem_transactions_pending ${operational.transactions_pending}`,
       '',
-      '# HELP v2resort_staff_online Staff members currently online',
-      '# TYPE v2resort_staff_online gauge',
-      `v2resort_staff_online ${operational.staff_online}`,
+      '# HELP v2ecosystem_staff_online Staff members currently online',
+      '# TYPE v2ecosystem_staff_online gauge',
+      `v2ecosystem_staff_online ${operational.staff_online}`,
     ];
 
     return lines.join('\n');

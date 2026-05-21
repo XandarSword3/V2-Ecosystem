@@ -18,17 +18,17 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Staff accounts to create
 const STAFF_ACCOUNTS = [
-  { email: 'restaurant.staff@v2resort.com', name: 'Restaurant Staff', role: 'restaurant_staff' },
-  { email: 'restaurant.manager@v2resort.com', name: 'Restaurant Manager', role: 'restaurant_manager' },
-  { email: 'restaurant.admin@v2resort.com', name: 'Restaurant Admin', role: 'restaurant_admin' },
-  { email: 'kitchen.staff@v2resort.com', name: 'Kitchen Staff', role: 'kitchen_staff' },
-  { email: 'pool.staff@v2resort.com', name: 'Pool Staff', role: 'pool_staff' },
-  { email: 'pool.admin@v2resort.com', name: 'Pool Admin', role: 'pool_admin' },
-  { email: 'chalet.staff@v2resort.com', name: 'Chalet Staff', role: 'chalet_staff' },
-  { email: 'chalet.manager@v2resort.com', name: 'Chalet Manager', role: 'chalet_manager' },
-  { email: 'chalet.admin@v2resort.com', name: 'Chalet Admin', role: 'chalet_admin' },
-  { email: 'snack.staff@v2resort.com', name: 'Snack Bar Staff', role: 'snack_bar_staff' },
-  { email: 'snack.admin@v2resort.com', name: 'Snack Bar Admin', role: 'snack_bar_admin' },
+  { email: 'restaurant.staff@v2ecosystem.com', name: 'Restaurant Staff', role: 'restaurant_staff' },
+  { email: 'restaurant.manager@v2ecosystem.com', name: 'Restaurant Manager', role: 'restaurant_manager' },
+  { email: 'restaurant.admin@v2ecosystem.com', name: 'Restaurant Admin', role: 'restaurant_admin' },
+  { email: 'kitchen.staff@v2ecosystem.com', name: 'Kitchen Staff', role: 'kitchen_staff' },
+  { email: 'pool.staff@v2ecosystem.com', name: 'Pool Staff', role: 'pool_staff' },
+  { email: 'pool.admin@v2ecosystem.com', name: 'Pool Admin', role: 'pool_admin' },
+  { email: 'chalet.staff@v2ecosystem.com', name: 'Chalet Staff', role: 'chalet_staff' },
+  { email: 'chalet.manager@v2ecosystem.com', name: 'Chalet Manager', role: 'chalet_manager' },
+  { email: 'chalet.admin@v2ecosystem.com', name: 'Chalet Admin', role: 'chalet_admin' },
+  { email: 'snack.staff@v2ecosystem.com', name: 'Snack Bar Staff', role: 'snack_bar_staff' },
+  { email: 'snack.admin@v2ecosystem.com', name: 'Snack Bar Admin', role: 'snack_bar_admin' },
 ];
 
 // Get password from environment or use default only in development

@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Circuit Breaker Pattern Implementation
+ * V2 Ecosystem - Circuit Breaker Pattern Implementation
  * Prevents cascading failures when external services are unavailable
  */
 

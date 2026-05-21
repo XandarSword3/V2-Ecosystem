@@ -65,7 +65,7 @@ describe('Atomic Functions Verification', () => {
     await initializeDatabase();
 
     // 1. Create a User
-    const email = `atomic-${Date.now()}@test.v2resort.local`;
+    const email = `atomic-${Date.now()}@test.v2ecosystem.local`;
     
     const { data: user, error: signUpError } = await supabase.auth.signUp({
       email,

@@ -1,4 +1,4 @@
-# Proposed GitHub Issues for V2 Resort Management Platform
+# Proposed GitHub Issues for V2 Ecosystem
 
 These issues have been identified during the cleanup and audit of the repository. They represent critical paths for stabilizing the platform and reaching feature parity across all interfaces.
 

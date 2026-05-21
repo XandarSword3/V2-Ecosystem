@@ -1,5 +1,5 @@
 /**
- * V2 Resort Engine Framework
+ * V2 Ecosystem Engine Framework
  * 
  * The engine framework replaces ad-hoc, per-module business logic with
  * four formal business engines that all modules configure against.

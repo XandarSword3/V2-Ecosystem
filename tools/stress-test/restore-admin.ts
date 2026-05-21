@@ -22,7 +22,7 @@ async function restoreAdmin() {
         'Content-Type': 'application/json'
     };
 
-    const email = 'admin@v2resort.com';
+    const email = 'admin@v2ecosystem.com';
     console.log(`Restoring ${email}...`);
 
     const res = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${email}`, { headers: HEADERS });

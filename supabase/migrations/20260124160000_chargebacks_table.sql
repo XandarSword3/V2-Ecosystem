@@ -1,4 +1,4 @@
--- V2 Resort: Chargebacks Table Migration
+-- V2 Ecosystem: Chargebacks Table Migration
 -- Stores Stripe dispute and chargeback records
 -- Production Hardening Phase 1.1
 

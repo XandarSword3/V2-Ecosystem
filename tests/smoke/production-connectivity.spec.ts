@@ -8,7 +8,7 @@ const FRONTEND_URL =
 const API_URL =
   process.env.PRODUCTION_API_URL ||
   process.env.API_URL ||
-  'https://v2-resort-backend.onrender.com';
+  'https://v2-ecosystem-backend.onrender.com';
 
 const CRITICAL_ENDPOINTS = [
   '/api/settings',

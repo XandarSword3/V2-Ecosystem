@@ -12,14 +12,14 @@ async function fixAllUserRoles() {
   console.log('🔧 Fixing all user role assignments...\n');
 
   const usersToFix = [
-    { email: 'admin@v2resort.com', role: 'super_admin' },
-    { email: 'restaurant.staff@v2resort.com', role: 'restaurant_staff' },
-    { email: 'restaurant.admin@v2resort.com', role: 'restaurant_admin' },
-    { email: 'snack.staff@v2resort.com', role: 'snack_bar_staff' },
-    { email: 'chalet.staff@v2resort.com', role: 'chalet_staff' },
-    { email: 'chalet.admin@v2resort.com', role: 'chalet_admin' },
-    { email: 'pool.staff@v2resort.com', role: 'pool_staff' },
-    { email: 'pool.admin@v2resort.com', role: 'pool_admin' },
+    { email: 'admin@v2ecosystem.com', role: 'super_admin' },
+    { email: 'restaurant.staff@v2ecosystem.com', role: 'restaurant_staff' },
+    { email: 'restaurant.admin@v2ecosystem.com', role: 'restaurant_admin' },
+    { email: 'snack.staff@v2ecosystem.com', role: 'snack_bar_staff' },
+    { email: 'chalet.staff@v2ecosystem.com', role: 'chalet_staff' },
+    { email: 'chalet.admin@v2ecosystem.com', role: 'chalet_admin' },
+    { email: 'pool.staff@v2ecosystem.com', role: 'pool_staff' },
+    { email: 'pool.admin@v2ecosystem.com', role: 'pool_admin' },
   ];
 
   for (const userInfo of usersToFix) {

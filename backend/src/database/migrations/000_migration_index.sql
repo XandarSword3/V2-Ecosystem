@@ -1,5 +1,5 @@
 -- ============================================
--- V2 Resort Database Migration Index
+-- V2 Ecosystem Database Migration Index
 -- ============================================
 -- 
 -- This file documents the migration execution order.

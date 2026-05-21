@@ -45,7 +45,7 @@ export default function LoginScreen() {
               <Text className="text-white text-4xl font-black">V2</Text>
             </View>
             <Text className="text-white text-3xl font-bold tracking-tight text-center">
-              V2 Resort
+              V2 Ecosystem
             </Text>
             <Text className="text-slate-300 text-base text-center">
               Welcome back to paradise

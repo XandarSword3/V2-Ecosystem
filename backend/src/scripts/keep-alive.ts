@@ -1,7 +1,7 @@
 
 import axios from 'axios';
 
-const BACKEND_URL = 'https://v2-resort-backend.onrender.com';
+const BACKEND_URL = 'https://v2-ecosystem-backend.onrender.com';
 
 async function ping() {
   try {

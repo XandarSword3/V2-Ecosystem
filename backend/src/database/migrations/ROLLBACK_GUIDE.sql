@@ -1,5 +1,5 @@
 -- ============================================
--- V2 Resort Database Migration Rollback Guide
+-- V2 Ecosystem Database Migration Rollback Guide
 -- ============================================
 --
 -- IMPORTANT: This file documents rollback procedures for database migrations.

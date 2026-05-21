@@ -105,7 +105,7 @@ export const config = {
 
   storage: {
     endpoint: process.env.STORAGE_ENDPOINT || '',
-    bucket: process.env.STORAGE_BUCKET || 'v2-resort-files',
+    bucket: process.env.STORAGE_BUCKET || 'v2-ecosystem-files',
     accessKey: process.env.STORAGE_ACCESS_KEY || '',
     secretKey: process.env.STORAGE_SECRET_KEY || '',
   },
@@ -128,7 +128,7 @@ export const config = {
       callbackUrl: process.env.FACEBOOK_CALLBACK_URL || `http://localhost:${process.env.PORT || 3005}/api/auth/facebook/callback`,
     },
     apple: {
-      clientId: process.env.APPLE_CLIENT_ID || '', // Service ID (e.g., com.v2resort.web)
+      clientId: process.env.APPLE_CLIENT_ID || '', // Service ID (e.g., com.v2ecosystem.web)
       teamId: process.env.APPLE_TEAM_ID || '',
       keyId: process.env.APPLE_KEY_ID || '',
       privateKey: process.env.APPLE_PRIVATE_KEY || '', // Contents of .p8 file (with \n replaced)
@@ -147,13 +147,13 @@ export const config = {
   // Mobile App Configuration
   mobile: {
     bundleId: {
-      ios: process.env.IOS_BUNDLE_ID || 'com.v2resort.app',
-      android: process.env.ANDROID_BUNDLE_ID || 'com.v2resort.app',
+      ios: process.env.IOS_BUNDLE_ID || 'com.v2ecosystem.app',
+      android: process.env.ANDROID_BUNDLE_ID || 'com.v2ecosystem.app',
     },
     // Apple Developer Team ID for Apple Sign In
     appleTeamId: process.env.APPLE_TEAM_ID || '',
     // Deep linking scheme
-    deepLinkScheme: process.env.DEEP_LINK_SCHEME || 'v2resort',
+    deepLinkScheme: process.env.DEEP_LINK_SCHEME || 'v2ecosystem',
   },
 } as const;
 

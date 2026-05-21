@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Email Analytics Service
+ * V2 Ecosystem - Email Analytics Service
  * Tracks email metrics and provides insights
  */
 

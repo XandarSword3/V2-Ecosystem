@@ -1,5 +1,5 @@
 /**
- * Structured Error Classes for V2 Resort Backend
+ * Structured Error Classes for V2 Ecosystem Backend
  * 
  * Provides a hierarchy of typed errors that the global error handler
  * can distinguish between operational errors (expected, safe to expose)
