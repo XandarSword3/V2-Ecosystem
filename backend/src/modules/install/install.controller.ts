@@ -19,7 +19,7 @@
 import { Request, Response, NextFunction } from 'express';
 import os from 'os';
 import crypto from 'crypto';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { getSupabase } from '../../database/connection.js';
 import { generateTokens } from '../../modules/auth/auth.utils.js';
@@ -343,7 +343,9 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
     // Compensating cleanup: remove the user row if it was created before the
     // failure so a retry doesn't hit "email already exists".
     if (createdUserId) {
-      await supabase.from('users').delete().eq('id', createdUserId).catch(() => {});
+      try {
+        await supabase.from('users').delete().eq('id', createdUserId);
+      } catch (_) { /* best-effort cleanup */ }
     }
 
     logger.error('Install failed', { error: err.message });
