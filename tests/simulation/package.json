@@ -45,9 +45,11 @@
   "author": "V2 Ecosystem Team",
   "license": "PROPRIETARY",
   "overrides": {
-    "vitest>minimatch": ">=9.0.5",
     "minimatch": ">=9.0.5",
     "brace-expansion": ">=2.0.1",
-    "vitest>brace-expansion": ">=2.0.1"
+    "vitest": {
+      "minimatch": ">=9.0.5",
+      "brace-expansion": ">=2.0.1"
+    }
   }
 }

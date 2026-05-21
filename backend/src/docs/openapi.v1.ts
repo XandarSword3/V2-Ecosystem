@@ -11,7 +11,7 @@
 export const openApiV1Spec = {
   openapi: '3.0.3',
   info: {
-    title: 'V2 Resort Management API',
+    title: 'V2 Ecosystem Management API',
     version: '1.0.0',
     description: `
 # Iron Paradise Gym Management System API - Version 1
