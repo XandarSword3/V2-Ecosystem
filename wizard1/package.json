@@ -1,0 +1,75 @@
+{
+  "name": "v2-install-wizard",
+  "version": "1.0.0",
+  "description": "V2 Resort Management Platform — Installation Wizard",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "build:dir": "electron-builder --win --x64 --dir",
+    "pack": "electron-builder --win --x64 --publish never"
+  },
+  "build": {
+    "appId": "com.v2resort.installer",
+    "productName": "V2 Resort Installer",
+    "copyright": "Copyright © 2026 V2 Resort",
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": false,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "V2 Resort Installer",
+      "runAfterFinish": true
+    },
+    "files": [
+      "src/**/*",
+      "installer/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../docker-compose.yml",
+        "to": "v2/docker-compose.yml"
+      },
+      {
+        "from": "../docker-compose.supabase.yml",
+        "to": "v2/docker-compose.supabase.yml"
+      },
+      {
+        "from": "../nginx",
+        "to": "v2/nginx",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../backend/.env.example",
+        "to": "v2/backend/.env.example"
+      },
+      {
+        "from": "../.env.example",
+        "to": "v2/.env.example"
+      }
+    ]
+  },
+  "dependencies": {
+    "crypto": "builtin",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

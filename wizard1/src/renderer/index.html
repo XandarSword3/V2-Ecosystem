@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>V2 Resort — Installation Wizard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Custom titlebar -->
+  <div class="titlebar">
+    <div class="titlebar-drag">
+      <span class="titlebar-logo">⬡</span>
+      <span class="titlebar-title">V2 Resort — Installation Wizard</span>
+    </div>
+    <div class="titlebar-controls">
+      <button class="tb-btn tb-min" onclick="window.api.minimize()" title="Minimize">─</button>
+      <button class="tb-btn tb-close" onclick="window.api.close()" title="Close">✕</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="v2-badge">V2</div>
+        <div class="sidebar-subtitle">Install Wizard</div>
+      </div>
+      <ol class="step-list" id="stepList"></ol>
+      <div class="sidebar-footer">
+        <div class="sf-label">Version 1.0.0</div>
+        <div class="sf-label">© 2026 V2 Resort</div>
+      </div>
+    </nav>
+
+    <!-- Content -->
+    <main class="content" id="content">
+      <!-- Steps rendered here by wizard.js -->
+    </main>
+  </div>
+
+  <script src="wizard.js"></script>
+</body>
+</html>
