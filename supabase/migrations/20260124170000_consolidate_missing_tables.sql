@@ -1,5 +1,5 @@
 -- ============================================
--- V2 Resort - Consolidated Missing Tables Migration
+-- V2 Ecosystem - Consolidated Missing Tables Migration
 -- Includes content from add_missing_tables.sql and create_backups_table.sql
 -- ============================================
 

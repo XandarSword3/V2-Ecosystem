@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Email Bounce Handling Service
+ * V2 Ecosystem - Email Bounce Handling Service
  * Manages email bounces, complaints, and suppression list
  */
 

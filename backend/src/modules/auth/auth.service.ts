@@ -608,7 +608,7 @@ export async function sendPasswordResetEmail(email: string) {
 
   await emailService.sendEmail({
     to: user.email,
-    subject: 'Reset Your Password - V2 Resort',
+    subject: 'Reset Your Password - V2 Ecosystem',
     html: `
       <h1>Password Reset Request</h1>
       <p>Hi ${user.full_name},</p>
@@ -616,7 +616,7 @@ export async function sendPasswordResetEmail(email: string) {
       <p><a href="${resetUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Reset Password</a></p>
       <p>This link will expire in 1 hour.</p>
       <p>If you didn't request this, you can safely ignore this email.</p>
-      <p>Thanks,<br>V2 Resort Team</p>
+      <p>Thanks,<br>V2 Ecosystem Team</p>
     `,
   });
 }
@@ -728,15 +728,15 @@ export async function sendVerificationEmail(userId: string, email: string, fullN
 
   await emailService.sendEmail({
     to: email,
-    subject: 'Verify Your Email - V2 Resort',
+    subject: 'Verify Your Email - V2 Ecosystem',
     html: `
-      <h1>Welcome to V2 Resort!</h1>
+      <h1>Welcome to V2 Ecosystem!</h1>
       <p>Hi ${fullName},</p>
       <p>Thanks for registering. Please verify your email by clicking the button below:</p>
       <p><a href="${verifyUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Verify Email</a></p>
       <p>This link will expire in 24 hours.</p>
       <p>If you didn't create an account, you can safely ignore this email.</p>
-      <p>Thanks,<br>V2 Resort Team</p>
+      <p>Thanks,<br>V2 Ecosystem Team</p>
     `,
   });
 

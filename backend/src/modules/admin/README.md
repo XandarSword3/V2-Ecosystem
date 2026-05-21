@@ -5,7 +5,7 @@ The Admin module handles multi-tenant, Role-Based Access Control (RBAC) platform
 
 ## Dynamic Modules Architecture (`modules.controller.ts`)
 
-The V2 Resort is composed of togglable "Modules" defined in the `modules` database table. The Admin API regulates them.
+The V2 Ecosystem is composed of togglable "Modules" defined in the `modules` database table. The Admin API regulates them.
 
 ### `GET /api/v1/admin/modules`
 - **Features**: Supports filtering via `?activeOnly=true` and `?showInMain=true`.
@@ -18,7 +18,7 @@ The V2 Resort is composed of togglable "Modules" defined in the `modules` databa
   - **Dynamic Permission Injection**: Automatically generates CRUD action permissions (`module:{slug}:read`, `module:{slug}:manage`) and upserts them into `app_permissions`.
   - Links permissions to `super_admin` in `app_role_permissions`.
   - **Navbar Integration**: Scans `site_settings` and auto-embeds standard icons (`UtensilsCrossed`, `Waves`, or `Home`) to the CMS navigation array.
-  - **Staff Generation**: Auto-provisions generic staff roles (`{slug}_admin` and `{slug}_staff`) and creates a dummy Staff user accounts (`staff.{slug}@v2resort.com`).
+  - **Staff Generation**: Auto-provisions generic staff roles (`{slug}_admin` and `{slug}_staff`) and creates a dummy Staff user accounts (`staff.{slug}@v2ecosystem.com`).
 
 ### `PUT /api/v1/admin/modules/:id`
 - **Request**: `{ ...updates, settings_version (optional) }`

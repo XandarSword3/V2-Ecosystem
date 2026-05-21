@@ -18,7 +18,7 @@ async function main() {
 
   // Show available scenarios if none specified
   if (!scenarioArg || scenarioArg === '--help' || scenarioArg === '-h') {
-    console.log('\n🎭 V2 Resort Multi-Actor Simulation System\n');
+    console.log('\n🎭 V2 Ecosystem Multi-Actor Simulation System\n');
     console.log('Usage: npx ts-node scripts/run-scenario.ts <scenario>\n');
     console.log('Available scenarios:');
     for (const scenario of getAllScenarios()) {

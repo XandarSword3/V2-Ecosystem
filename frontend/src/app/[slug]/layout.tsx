@@ -7,12 +7,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const title = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   
   return {
-    title: `${title} | V2 Resort`,
-    description: `Explore ${title} at V2 Resort. Browse offerings, make reservations, and enjoy a premium experience.`,
-    keywords: [slug, 'V2 Resort', title, 'booking', 'resort experience'],
+    title: `${title} | V2 Ecosystem`,
+    description: `Explore ${title} at V2 Ecosystem. Browse offerings, make reservations, and enjoy a premium experience.`,
+    keywords: [slug, 'V2 Ecosystem', title, 'booking', 'resort experience'],
     openGraph: {
-      title: `${title} | V2 Resort`,
-      description: `Explore ${title} at V2 Resort. Book now for an unforgettable experience.`,
+      title: `${title} | V2 Ecosystem`,
+      description: `Explore ${title} at V2 Ecosystem. Book now for an unforgettable experience.`,
       type: 'website',
       url: `https://v2-ecosystem.vercel.app/${slug}`,
     },

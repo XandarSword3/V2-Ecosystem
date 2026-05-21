@@ -25,7 +25,7 @@ const describeIf = runIntegration ? describe : describe.skip;
 
 describeIf('Authentication Flow Integration', () => {
   let client: TestApiClient;
-  const testEmail = `integration.test.${Date.now()}@v2resort.local`;
+  const testEmail = `integration.test.${Date.now()}@v2ecosystem.local`;
   const testPassword = 'IntegrationTest123!';
   const testFullName = 'Integration Test User';
   let servicesAvailable = false;
@@ -93,7 +93,7 @@ describeIf('Authentication Flow Integration', () => {
     it('should reject weak password', async () => {
       const newClient = createGuestClient();
       const response = await newClient.register(
-        `weak.password.${Date.now()}@v2resort.local`,
+        `weak.password.${Date.now()}@v2ecosystem.local`,
         '123',
         'Weak Password User'
       );
@@ -136,7 +136,7 @@ describeIf('Authentication Flow Integration', () => {
 
     it('should reject login for non-existent user', async () => {
       const wrongClient = createGuestClient();
-      const response = await wrongClient.login('nonexistent@v2resort.local', testPassword);
+      const response = await wrongClient.login('nonexistent@v2ecosystem.local', testPassword);
 
       assertFailure(response);
       expect([400, 401, 404]).toContain(response.status);

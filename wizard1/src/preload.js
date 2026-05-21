@@ -1,5 +1,5 @@
 // ============================================================
-// V2 Resort — Wizard 1 Preload Script
+// V2 Ecosystem — Wizard 1 Preload Script
 // Exposes safe IPC bridge to renderer process
 // ============================================================
 const { contextBridge, ipcRenderer } = require('electron');

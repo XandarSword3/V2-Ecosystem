@@ -273,7 +273,7 @@ export class MaliciousBot extends CustomerBot {
         this.logger.action('Attempting USER ENUMERATION...');
 
         // Try common admin emails to see if the error messages leak existence info
-        const emails = ['admin@v2resort.com', 'test@test.com', 'nonexistent@fake.com'];
+        const emails = ['admin@v2ecosystem.com', 'test@test.com', 'nonexistent@fake.com'];
 
         for (const email of emails) {
             const res = await this.api.request('/auth/login', 'POST', {

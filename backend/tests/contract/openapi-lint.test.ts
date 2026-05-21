@@ -87,7 +87,7 @@ describe('OpenAPI Contract Validation', () => {
 
     it('should have info section with required fields', () => {
       expect(openApiV1Spec.info).toBeDefined();
-      expect(openApiV1Spec.info.title).toBe('V2 Resort Management API');
+      expect(openApiV1Spec.info.title).toBe('V2 Ecosystem Management API');
       expect(openApiV1Spec.info.version).toBeDefined();
       expect(openApiV1Spec.info.description).toBeDefined();
     });

@@ -4,7 +4,7 @@
  */
 import { chromium } from 'playwright';
 
-const ADMIN_EMAIL = 'admin@v2resort.com';
+const ADMIN_EMAIL = 'admin@v2ecosystem.com';
 const ADMIN_PASSWORD = 'admin123';
 const API_URL = 'http://localhost:3005';
 const BASE_URL = 'http://localhost:3000';  // Frontend dev server port

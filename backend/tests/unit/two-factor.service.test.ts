@@ -107,7 +107,7 @@ describe('Two-Factor Authentication Service', () => {
       expect(vi.mocked(generateURI)).toHaveBeenCalledWith(
         expect.objectContaining({
           secret: expect.any(String),
-          issuer: 'V2 Resort',
+          issuer: 'V2 Ecosystem',
           label: 'test@example.com',
         })
       );

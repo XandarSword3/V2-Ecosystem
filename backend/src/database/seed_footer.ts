@@ -40,9 +40,9 @@ const footerSettings = {
         }
     ],
     socials: [
-        { platform: "facebook", url: "https://facebook.com/v2resort" },
-        { platform: "instagram", url: "https://instagram.com/v2resort" },
-        { platform: "twitter", url: "https://twitter.com/v2resort" }
+        { platform: "facebook", url: "https://facebook.com/v2ecosystem" },
+        { platform: "instagram", url: "https://instagram.com/v2ecosystem" },
+        { platform: "twitter", url: "https://twitter.com/v2ecosystem" }
     ],
     contact: {
         showAddress: true,

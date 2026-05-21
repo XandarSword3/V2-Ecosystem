@@ -1,6 +1,6 @@
 -- ============================================
 -- Migration 001: Initial Schema
--- V2 Resort Database Core Schema
+-- V2 Ecosystem Database Core Schema
 -- ============================================
 
 -- Create enums
@@ -617,7 +617,7 @@ ON CONFLICT (slug) DO NOTHING;
 
 -- Insert default settings
 INSERT INTO site_settings (key, value) VALUES
-  ('general', '{"siteName": "V2 Resort", "tagline": "Your Perfect Getaway", "currency": "USD", "timezone": "UTC", "defaultLanguage": "en"}'),
+  ('general', '{"siteName": "V2 Ecosystem", "tagline": "Your Perfect Getaway", "currency": "USD", "timezone": "UTC", "defaultLanguage": "en"}'),
   ('appearance', '{"primaryColor": "#2563eb", "secondaryColor": "#7c3aed", "darkMode": true}'),
   ('chalets', '{"depositType": "percentage", "depositPercentage": 30, "minStay": 1, "maxStay": 30}'),
   ('pool', '{"allowOverbooking": false, "gracePeriodMinutes": 15}'),

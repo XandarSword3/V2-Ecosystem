@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Email Unsubscribe Handler
+ * V2 Ecosystem - Email Unsubscribe Handler
  * Manages email unsubscribe links and one-click unsubscribe
  */
 
@@ -55,10 +55,10 @@ export function generateUnsubscribeHeaders(
   'List-Unsubscribe-Post': string;
 } {
   const token = generateUnsubscribeToken(userId, email, type);
-  const baseUrl = process.env.BACKEND_URL || 'https://api.v2resort.com';
+  const baseUrl = process.env.BACKEND_URL || 'https://api.v2ecosystem.com';
 
   return {
-    'List-Unsubscribe': `<${baseUrl}/unsubscribe?token=${token}>, <mailto:unsubscribe@v2resort.com?subject=Unsubscribe-${token}>`,
+    'List-Unsubscribe': `<${baseUrl}/unsubscribe?token=${token}>, <mailto:unsubscribe@v2ecosystem.com?subject=Unsubscribe-${token}>`,
     'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
   };
 }
@@ -174,17 +174,17 @@ router.get('/preferences', async (req: Request, res: Response) => {
   const { token } = req.query;
 
   if (!token || typeof token !== 'string') {
-    return res.redirect(`${process.env.FRONTEND_URL || 'https://v2resort.com'}/settings/notifications`);
+    return res.redirect(`${process.env.FRONTEND_URL || 'https://v2ecosystem.com'}/settings/notifications`);
   }
 
   const decoded = verifyUnsubscribeToken(token);
   if (!decoded) {
-    return res.redirect(`${process.env.FRONTEND_URL || 'https://v2resort.com'}/settings/notifications`);
+    return res.redirect(`${process.env.FRONTEND_URL || 'https://v2ecosystem.com'}/settings/notifications`);
   }
 
   // Generate a temporary auth token for the preferences page
   // In production, this would go through proper auth flow
-  res.redirect(`${process.env.FRONTEND_URL || 'https://v2resort.com'}/settings/notifications?email=${encodeURIComponent(decoded.email)}`);
+  res.redirect(`${process.env.FRONTEND_URL || 'https://v2ecosystem.com'}/settings/notifications?email=${encodeURIComponent(decoded.email)}`);
 });
 
 function getTypeDescription(type: string): string {
@@ -204,7 +204,7 @@ function renderUnsubscribePage(decoded: UnsubscribeToken, token: string): string
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unsubscribe - V2 Resort</title>
+    <title>Unsubscribe - V2 Ecosystem</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -334,7 +334,7 @@ function renderUnsubscribePage(decoded: UnsubscribeToken, token: string): string
             </svg>
         </div>
         <h1>Manage Your Emails</h1>
-        <p class="subtitle">Choose your email preferences for V2 Resort</p>
+        <p class="subtitle">Choose your email preferences for V2 Ecosystem</p>
         
         <div class="email-preview">
             <strong>${decoded.email}</strong>
@@ -380,8 +380,8 @@ function renderUnsubscribePage(decoded: UnsubscribeToken, token: string): string
         </a>
         
         <div class="footer">
-            <p>&copy; ${new Date().getFullYear()} V2 Resort. All rights reserved.</p>
-            <p><a href="${process.env.FRONTEND_URL || 'https://v2resort.com'}/privacy">Privacy Policy</a></p>
+            <p>&copy; ${new Date().getFullYear()} V2 Ecosystem. All rights reserved.</p>
+            <p><a href="${process.env.FRONTEND_URL || 'https://v2ecosystem.com'}/privacy">Privacy Policy</a></p>
         </div>
     </div>
     
@@ -404,7 +404,7 @@ function renderPage(title: string, message: string, isError: boolean): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title} - V2 Resort</title>
+    <title>${title} - V2 Ecosystem</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -468,7 +468,7 @@ function renderPage(title: string, message: string, isError: boolean): string {
         </div>
         <h1>${title}</h1>
         <p>${message}</p>
-        <a href="${process.env.FRONTEND_URL || 'https://v2resort.com'}" class="btn">Return to V2 Resort</a>
+        <a href="${process.env.FRONTEND_URL || 'https://v2ecosystem.com'}" class="btn">Return to V2 Ecosystem</a>
     </div>
 </body>
 </html>

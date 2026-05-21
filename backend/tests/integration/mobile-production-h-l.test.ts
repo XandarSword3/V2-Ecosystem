@@ -15,30 +15,30 @@ import { getSupabase } from '../../src/database/connection.js';
 describe('Phase H: Deep Linking', () => {
   describe('Universal Link Patterns', () => {
     it('should define order deep link pattern', async () => {
-      const orderLink = 'v2resort://order/12345';
-      expect(orderLink).toMatch(/^v2resort:\/\/order\/\d+$/);
+      const orderLink = 'v2ecosystem://order/12345';
+      expect(orderLink).toMatch(/^v2ecosystem:\/\/order\/\d+$/);
     });
 
     it('should define booking deep link pattern', async () => {
-      const bookingLink = 'v2resort://booking/abc-123';
-      expect(bookingLink).toMatch(/^v2resort:\/\/booking\/.+$/);
+      const bookingLink = 'v2ecosystem://booking/abc-123';
+      expect(bookingLink).toMatch(/^v2ecosystem:\/\/booking\/.+$/);
     });
 
     it('should define pool ticket deep link pattern', async () => {
-      const ticketLink = 'v2resort://pool/ticket/xyz';
-      expect(ticketLink).toMatch(/^v2resort:\/\/pool\/ticket\/.+$/);
+      const ticketLink = 'v2ecosystem://pool/ticket/xyz';
+      expect(ticketLink).toMatch(/^v2ecosystem:\/\/pool\/ticket\/.+$/);
     });
 
     it('should define promotion deep link pattern', async () => {
-      const promoLink = 'v2resort://promo/SUMMER2025';
-      expect(promoLink).toMatch(/^v2resort:\/\/promo\/.+$/);
+      const promoLink = 'v2ecosystem://promo/SUMMER2025';
+      expect(promoLink).toMatch(/^v2ecosystem:\/\/promo\/.+$/);
     });
   });
 
   describe('Web Fallback', () => {
     it('should have web fallback for deep links', async () => {
       // Pattern: Universal links fall back to web if app not installed
-      const webFallback = 'https://v2resort.com/order/12345';
+      const webFallback = 'https://v2ecosystem.com/order/12345';
       expect(webFallback).toMatch(/^https:\/\//);
     });
   });
@@ -50,7 +50,7 @@ describe('Phase H: Deep Linking', () => {
         applinks: {
           apps: [],
           details: [{
-            appID: 'TEAMID.com.v2resort.app',
+            appID: 'TEAMID.com.v2ecosystem.app',
             paths: ['/order/*', '/booking/*', '/pool/*', '/promo/*'],
           }],
         },
@@ -64,11 +64,11 @@ describe('Phase H: Deep Linking', () => {
         relation: ['delegate_permission/common.handle_all_urls'],
         target: {
           namespace: 'android_app',
-          package_name: 'com.v2resort.app',
+          package_name: 'com.v2ecosystem.app',
           sha256_cert_fingerprints: ['AA:BB:CC:...'],
         },
       }];
-      expect(assetlinks[0].target.package_name).toBe('com.v2resort.app');
+      expect(assetlinks[0].target.package_name).toBe('com.v2ecosystem.app');
     });
   });
 });

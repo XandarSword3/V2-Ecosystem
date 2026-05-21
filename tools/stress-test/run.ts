@@ -35,7 +35,7 @@ const args = process.argv.slice(2);
 
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`
-V2 Resort Stress Test Runner
+V2 Ecosystem Stress Test Runner
 
 Usage: npx ts-node tools/stress-test/run.ts [options]
 
@@ -119,7 +119,7 @@ async function main() {
 
   if (hellModeScenario) {
     console.log(`
-🔥 V2 Resort HELL MODE Starting...
+🔥 V2 Ecosystem HELL MODE Starting...
    Scenario: ${hellModeScenario}
 `);
     const hellOrchestrator = new HellModeOrchestrator();
@@ -139,7 +139,7 @@ async function main() {
   }
 
   console.log(`
-🚀 V2 Resort Stress Test Starting...
+🚀 V2 Ecosystem Stress Test Starting...
 
 Configuration:
   - Base URL: ${CONFIG.BASE_URL}

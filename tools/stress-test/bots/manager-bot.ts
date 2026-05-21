@@ -9,8 +9,8 @@ import {
 
 // Manager accounts pre-seeded in the system
 const MANAGER_ACCOUNTS = [
-    { email: 'restaurant.manager@v2resort.com', password: 'staff123', department: 'restaurant' },
-    { email: 'chalet.manager@v2resort.com', password: 'staff123', department: 'chalets' },
+    { email: 'restaurant.manager@v2ecosystem.com', password: 'staff123', department: 'restaurant' },
+    { email: 'chalet.manager@v2ecosystem.com', password: 'staff123', department: 'chalets' },
 ];
 
 export class ManagerBot {

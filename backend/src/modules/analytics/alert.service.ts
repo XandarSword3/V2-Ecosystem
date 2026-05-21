@@ -564,7 +564,7 @@ export class AlertService {
     `;
 
     await this.emailTransporter.sendMail({
-      from: process.env.SMTP_FROM || 'alerts@v2resort.com',
+      from: process.env.SMTP_FROM || 'alerts@v2ecosystem.com',
       to: email,
       subject,
       html

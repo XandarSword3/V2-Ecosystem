@@ -40,10 +40,10 @@ const STRIPE_CONFIG: Record<StripeEnvironment, {
 
 // Merchant info for Apple Pay / Google Pay
 const MERCHANT_INFO = {
-  merchantName: process.env.MERCHANT_NAME || 'V2 Resort',
+  merchantName: process.env.MERCHANT_NAME || 'V2 Ecosystem',
   merchantCountryCode: process.env.MERCHANT_COUNTRY || 'CY',
   merchantCurrency: process.env.MERCHANT_CURRENCY || 'EUR',
-  appleMerchantId: process.env.APPLE_MERCHANT_ID || 'merchant.com.v2resort',
+  appleMerchantId: process.env.APPLE_MERCHANT_ID || 'merchant.com.v2ecosystem',
   googleMerchantId: process.env.GOOGLE_MERCHANT_ID || '',
 };
 
@@ -72,7 +72,7 @@ function getStripeInstance(env?: StripeEnvironment): Stripe {
     apiVersion: '2023-10-16',
     typescript: true,
     appInfo: {
-      name: 'V2 Resort',
+      name: 'V2 Ecosystem',
       version: '1.0.0',
     },
   });
@@ -257,7 +257,7 @@ export class StripePlatformService {
         allow_redirects: 'never', // Mobile apps can't handle redirects
       },
       metadata: {
-        // V2 Resort metadata
+        // V2 Ecosystem metadata
         userId,
         referenceType,
         referenceId,

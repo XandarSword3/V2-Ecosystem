@@ -9,7 +9,7 @@
 //
 // Alternatively, drop a 256x256 icon.ico directly into ./assets/
 //
-// The icon should represent V2 Resort branding.
+// The icon should represent V2 Ecosystem branding.
 // Recommended: a hexagon shape matching the ⬡ in the titlebar.
 //
 // Free ICO creation tools:

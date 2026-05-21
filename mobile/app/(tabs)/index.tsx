@@ -137,7 +137,7 @@ export default function HomeScreen() {
             <View className="flex-row justify-between items-center">
               <View className="bg-background/20 rounded-full px-4 py-1">
                 <Text className="text-white font-medium text-xs tracking-wider uppercase">
-                  V2 Resort & Spa
+                  V2 Ecosystem & Spa
                 </Text>
               </View>
               <TouchableOpacity
@@ -294,7 +294,7 @@ export default function HomeScreen() {
 
           {/* Footer */}
           <Text className="text-center text-muted-foreground text-xs mb-8 mt-4">
-            V2 Resort Mobile
+            V2 Ecosystem Mobile
           </Text>
         </View>
       </ScrollView>

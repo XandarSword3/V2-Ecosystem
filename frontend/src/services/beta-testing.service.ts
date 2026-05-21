@@ -1,4 +1,4 @@
-// Beta Testing Framework for V2 Resort
+// Beta Testing Framework for V2 Ecosystem
 // Sprint 15: UAT & Polish
 
 import { createClient } from '@supabase/supabase-js';

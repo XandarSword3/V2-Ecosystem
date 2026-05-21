@@ -1,6 +1,6 @@
 # INVENTORY A: FAILURE PATHS & ERROR HANDLING
 
-> **Scope**: `v2-resort/backend/src/` — every failure path, error handler, race condition, and transaction boundary.  
+> **Scope**: `v2-ecosystem/backend/src/` — every failure path, error handler, race condition, and transaction boundary.  
 > **Generated from**: Actual source code reads, not speculation.
 
 ---

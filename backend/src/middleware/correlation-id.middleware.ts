@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Request Correlation ID Tracking Middleware
+ * V2 Ecosystem - Request Correlation ID Tracking Middleware
  * Enables distributed tracing across services
  */
 

@@ -16,7 +16,7 @@ describe('SettingsService', () => {
   const mockSetting: Setting = {
     id: 'setting-1',
     key: 'site_name',
-    value: 'V2 Resort',
+    value: 'V2 Ecosystem',
     category: 'general',
     description: 'The name of the site',
     created_at: '2024-01-01T00:00:00Z',
@@ -54,7 +54,7 @@ describe('SettingsService', () => {
       const result = await service.getAllSettings();
       
       expect(result).toEqual({
-        site_name: 'V2 Resort',
+        site_name: 'V2 Ecosystem',
         site_description: 'A beautiful resort'
       });
     });
@@ -128,7 +128,7 @@ describe('SettingsService', () => {
 
       const result = await service.getSetting('site_name');
       
-      expect(result).toBe('V2 Resort');
+      expect(result).toBe('V2 Ecosystem');
     });
 
     it('should return null for non-existent key', async () => {
@@ -161,7 +161,7 @@ describe('SettingsService', () => {
       
       expect(result).toMatchObject({
         key: 'site_name',
-        value: 'V2 Resort',
+        value: 'V2 Ecosystem',
         category: 'general',
         description: 'The name of the site'
       });

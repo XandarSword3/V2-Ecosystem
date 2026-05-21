@@ -18,7 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT_DIR = path.resolve(__dirname, '../..'); // v2-resort/
+const ROOT_DIR = path.resolve(__dirname, '../..'); // v2-ecosystem/
 const WIRING_MAP_PATH = path.join(ROOT_DIR, 'docs', 'admin', 'admin-wiring-map.json');
 const APP_TS_PATH = path.join(ROOT_DIR, 'backend', 'src', 'app.ts');
 const OUTPUT_JSON = path.join(ROOT_DIR, 'docs', 'admin', 'admin-wiring-validation-backend-routes.json');

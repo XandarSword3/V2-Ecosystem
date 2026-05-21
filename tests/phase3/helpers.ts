@@ -12,11 +12,11 @@ export const URLS = {
 
 export const CREDS = {
   admin: {
-    email: process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com',
+    email: process.env.E2E_ADMIN_EMAIL || 'admin@v2ecosystem.com',
     password: process.env.E2E_ADMIN_PASSWORD || 'admin123',
   },
   staff: {
-    email: process.env.E2E_STAFF_EMAIL || 'restaurant.staff@v2resort.com',
+    email: process.env.E2E_STAFF_EMAIL || 'restaurant.staff@v2ecosystem.com',
     password: process.env.E2E_STAFF_PASSWORD || 'staff123',
   },
   customer: {
@@ -242,7 +242,7 @@ export async function countElements(page: Page, selector: string): Promise<numbe
  */
 export async function setupApiProxy(page: Page, options?: { user?: any }): Promise<void> {
   await page.route(
-    (url) => url.toString().includes('v2-resort-backend.onrender.com'),
+    (url) => url.toString().includes('v2-ecosystem-backend.onrender.com'),
     async (route) => {
       const requestUrl = new URL(route.request().url());
       let localPath = requestUrl.pathname;

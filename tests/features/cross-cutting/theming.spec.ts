@@ -33,7 +33,7 @@ test.describe('Theming Features [SYS-THEME-001 → 003]', () => {
 
   test('admin panel has theming applied', async ({ page }) => {
     await page.goto(`${BASE}/login`);
-    await page.getByLabel(/email/i).fill('admin@v2resort.com');
+    await page.getByLabel(/email/i).fill('admin@v2ecosystem.com');
     await page.getByLabel(/password/i).fill('admin123');
     await page.getByRole('button', { name: /sign in|log in|login/i }).click();
     await page.waitForURL(/\/admin/, { timeout: 10000 });

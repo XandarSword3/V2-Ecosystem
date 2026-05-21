@@ -2,7 +2,7 @@
 // Engine Type System - First Principles
 // ============================================
 //
-// The V2 Resort platform reduces ALL hospitality commerce
+// The V2 Ecosystem platform reduces ALL hospitality commerce
 // to four economic patterns (engines):
 //
 //   A. Instant Transaction   — Order → Prepare → Deliver → Done

@@ -1,5 +1,5 @@
 /**
- * V2 Resort — Phase 3: Staff & Admin E2E Testing
+ * V2 Ecosystem — Phase 3: Staff & Admin E2E Testing
  * Tests ALL staff and admin endpoints systematically
  */
 const http = require('http');
@@ -653,7 +653,7 @@ async function main() {
   console.log('╚══════════════════════════════════════════════════╝\n');
   console.log('🔧 SETUP: Login as Super Admin\n');
 
-  const ok = await login('admin@v2resort.com', 'admin123', 'Super Admin');
+  const ok = await login('admin@v2ecosystem.com', 'admin123', 'Super Admin');
   if (!ok) { console.log('FATAL: Cannot login'); process.exit(1); }
 
   await testAdminRestaurant();

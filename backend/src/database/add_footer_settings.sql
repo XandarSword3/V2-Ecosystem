@@ -1,11 +1,11 @@
 -- ============================================
--- V2 Resort - Add Footer Settings
+-- V2 Ecosystem - Add Footer Settings
 -- ============================================
 
 INSERT INTO site_settings (key, value) VALUES
   ('footer', '{
     "logo": {
-      "text": "V2 Resort",
+      "text": "V2 Ecosystem",
       "showIcon": true
     },
     "description": "Premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences in the heart of Lebanon.",
@@ -38,6 +38,6 @@ INSERT INTO site_settings (key, value) VALUES
       "showPhone": true,
       "showEmail": true
     },
-    "copyright": "© {year} V2 Resort. All rights reserved."
+    "copyright": "© {year} V2 Ecosystem. All rights reserved."
   }'::jsonb)
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;

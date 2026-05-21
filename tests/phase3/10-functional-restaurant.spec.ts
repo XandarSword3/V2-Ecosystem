@@ -251,7 +251,7 @@ test.describe('Restaurant — Proves Real Functionality', () => {
 
       // Clear cart first
       await page.goto('/restaurant', { waitUntil: 'domcontentloaded' });
-      await page.evaluate(() => localStorage.removeItem('v2-resort-cart'));
+      await page.evaluate(() => localStorage.removeItem('v2-ecosystem-cart'));
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForLoadState('networkidle');
 
@@ -303,7 +303,7 @@ test.describe('Restaurant — Proves Real Functionality', () => {
 
       // PROVE: Cart in localStorage has an item with name, price, quantity
       const cartState = await page.evaluate(() => {
-        const raw = localStorage.getItem('v2-resort-cart');
+        const raw = localStorage.getItem('v2-ecosystem-cart');
         return raw ? JSON.parse(raw) : null;
       });
 
@@ -361,7 +361,7 @@ test.describe('Restaurant — Proves Real Functionality', () => {
           },
           version: 0,
         };
-        localStorage.setItem('v2-resort-cart', JSON.stringify(cartData));
+        localStorage.setItem('v2-ecosystem-cart', JSON.stringify(cartData));
       });
 
       // Navigate to cart page

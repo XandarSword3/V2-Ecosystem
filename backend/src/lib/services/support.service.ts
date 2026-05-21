@@ -170,7 +170,7 @@ export function createSupportService(deps: SupportServiceDeps): SupportService {
 
     // Send admin notification (async, don't await)
     if (emailService) {
-      const notifyEmail = adminEmail || 'admin@v2resort.com';
+      const notifyEmail = adminEmail || 'admin@v2ecosystem.com';
       emailService.sendEmail({
         to: notifyEmail,
         subject: `New Contact Form: ${input.subject}`,
@@ -190,13 +190,13 @@ export function createSupportService(deps: SupportServiceDeps): SupportService {
       // Send confirmation to user
       emailService.sendEmail({
         to: input.email,
-        subject: 'Thank you for contacting V2 Resort',
+        subject: 'Thank you for contacting V2 Ecosystem',
         html: `
           <h2>Thank you for reaching out!</h2>
           <p>Dear ${input.name},</p>
           <p>We have received your message and will get back to you as soon as possible.</p>
           <p><strong>Subject:</strong> ${input.subject}</p>
-          <p>Best regards,<br>V2 Resort Team</p>
+          <p>Best regards,<br>V2 Ecosystem Team</p>
         `,
       }).catch(err => {
         logger.warn('Failed to send confirmation email:', err);

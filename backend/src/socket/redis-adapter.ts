@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Socket.io Redis Adapter for Horizontal Scaling
+ * V2 Ecosystem - Socket.io Redis Adapter for Horizontal Scaling
  * Enables WebSocket communication across multiple backend instances
  */
 

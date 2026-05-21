@@ -122,7 +122,7 @@ describeIf('Booking Cycle Integration', () => {
         checkInDate: formatDate(checkInDate),
         checkOutDate: formatDate(checkOutDate),
         customerName: 'Integration Test Guest',
-        customerEmail: `integration.booking.${Date.now()}@v2resort.local`,
+        customerEmail: `integration.booking.${Date.now()}@v2ecosystem.local`,
         customerPhone: '+1234567890',
         numberOfGuests: 2,
         paymentMethod: 'cash',
@@ -174,7 +174,7 @@ describeIf('Booking Cycle Integration', () => {
         checkInDate: formatDate(checkInDate),
         checkOutDate: formatDate(checkOutDate),
         customerName: 'Conflict Test Guest',
-        customerEmail: `conflict.${Date.now()}@v2resort.local`,
+        customerEmail: `conflict.${Date.now()}@v2ecosystem.local`,
         customerPhone: '+9876543210',
         numberOfGuests: 2,
         paymentMethod: 'cash',
@@ -241,7 +241,7 @@ describeIf('Booking Cycle Integration', () => {
         checkInDate: '2026-01-15',
         checkOutDate: '2026-01-10', // End before start
         customerName: 'Invalid Date Guest',
-        customerEmail: 'invalid@v2resort.local',
+        customerEmail: 'invalid@v2ecosystem.local',
         customerPhone: '+1234567890',
         numberOfGuests: 2,
       };
@@ -257,7 +257,7 @@ describeIf('Booking Cycle Integration', () => {
         checkInDate: '2020-01-01',
         checkOutDate: '2020-01-05',
         customerName: 'Past Date Guest',
-        customerEmail: 'past@v2resort.local',
+        customerEmail: 'past@v2ecosystem.local',
         customerPhone: '+1234567890',
         numberOfGuests: 2,
       };
@@ -273,7 +273,7 @@ describeIf('Booking Cycle Integration', () => {
         checkInDate: formatDate(checkInDate),
         checkOutDate: formatDate(checkOutDate),
         customerName: 'Non-existent Chalet Guest',
-        customerEmail: 'fake@v2resort.local',
+        customerEmail: 'fake@v2ecosystem.local',
         customerPhone: '+1234567890',
         numberOfGuests: 2,
       };

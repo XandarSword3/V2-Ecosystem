@@ -16,7 +16,7 @@ import { test, expect, Page } from './fixtures/auth.fixture';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com';
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@v2ecosystem.com';
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'admin123';
 
 // ============================================
@@ -75,7 +75,7 @@ test('Hero slide title change reflects on public homepage', async ({ page, reque
     
     if (hasHeroSlides) {
       const heroSlides = currentSettings.data?.heroSlides || currentSettings.heroSlides;
-      const originalTitle = heroSlides?.[0]?.title || 'Welcome to V2 Resort';
+      const originalTitle = heroSlides?.[0]?.title || 'Welcome to V2 Ecosystem';
       
       // 2. Update hero slide title
       const testTitle = `E2E Test Hero - ${Date.now()}`;
@@ -854,7 +854,7 @@ test('Resort name change reflects in header/title', async ({ page, request }) =>
       headers: { Authorization: `Bearer ${token}` }
     });
     const settingsData = await settingsRes.json();
-    const originalName = settingsData.data?.resortName || 'V2 Resort';
+    const originalName = settingsData.data?.resortName || 'V2 Ecosystem';
     
     // Update resort name
     const testName = `E2E Test Resort - ${Date.now()}`;

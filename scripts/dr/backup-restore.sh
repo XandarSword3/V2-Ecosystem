@@ -1,12 +1,12 @@
 #!/bin/bash
-# V2 Resort - Database Backup and Restore Script
+# V2 Ecosystem - Database Backup and Restore Script
 # For disaster recovery operations
 
 set -euo pipefail
 
 # Configuration
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/v2resort}"
-S3_BUCKET="${S3_BUCKET:-v2resort-backups}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/v2ecosystem}"
+S3_BUCKET="${S3_BUCKET:-v2ecosystem-backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
@@ -39,7 +39,7 @@ ensure_backup_dir() {
 # Create a database backup
 backup_database() {
     local backup_type="${1:-daily}"
-    local backup_file="$BACKUP_DIR/$backup_type/v2resort_${backup_type}_${TIMESTAMP}.sql.gz"
+    local backup_file="$BACKUP_DIR/$backup_type/v2ecosystem_${backup_type}_${TIMESTAMP}.sql.gz"
     
     log_info "Starting $backup_type database backup..."
     
@@ -277,7 +277,7 @@ backup_schema() {
 # Show help
 show_help() {
     cat << EOF
-V2 Resort Database Backup/Restore Script
+V2 Ecosystem Database Backup/Restore Script
 
 Usage: $0 <command> [options]
 
@@ -303,13 +303,13 @@ Commands:
 
 Environment Variables:
   DATABASE_URL        PostgreSQL connection string (required)
-  BACKUP_DIR          Local backup directory (default: /var/backups/v2resort)
+  BACKUP_DIR          Local backup directory (default: /var/backups/v2ecosystem)
   S3_BUCKET           S3 bucket for remote backups
   RETENTION_DAYS      Days to keep daily backups (default: 30)
 
 Examples:
   $0 backup daily
-  $0 restore /var/backups/v2resort/daily/v2resort_daily_20240115.sql.gz
+  $0 restore /var/backups/v2ecosystem/daily/v2ecosystem_daily_20240115.sql.gz
   $0 pitr "2024-01-15T10:30:00Z"
   $0 list s3
   $0 verify /path/to/backup.sql.gz

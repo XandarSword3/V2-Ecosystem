@@ -1,8 +1,8 @@
 {
-  "name": "v2-resort",
+  "name": "v2-ecosystem",
   "version": "1.0.0",
   "private": true,
-  "description": "V2 Resort Management System - Unified platform for restaurant, snack bar, chalets, and pool",
+  "description": "V2 Ecosystem - Unified platform for restaurant, snack bar, chalets, and pool",
   "license": "UNLICENSED",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",

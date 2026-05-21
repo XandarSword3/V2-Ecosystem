@@ -1,5 +1,5 @@
 /**
- * V2 Resort Backend - Testable Architecture Library
+ * V2 Ecosystem Backend - Testable Architecture Library
  * 
  * This library provides a dependency injection-based architecture
  * that enables easy unit testing without database mocking.

@@ -24,7 +24,7 @@ This folder contains Playwright suites that validate cross-system behavior acros
 ## Execution
 
 ```bash
-# From v2-resort root
+# From v2-ecosystem root
 
 # Broad root suite
 npx playwright test -c playwright.all.config.ts --project=chromium

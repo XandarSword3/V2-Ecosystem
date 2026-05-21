@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 
 // Mock expo-linking
 jest.mock('expo-linking', () => ({
-  createURL: jest.fn((path) => `v2resort://${path}`),
+  createURL: jest.fn((path) => `v2ecosystem://${path}`),
   parse: jest.fn(),
   getInitialURL: jest.fn(),
   addEventListener: jest.fn(() => ({ remove: jest.fn() })),
@@ -31,18 +31,18 @@ describe('Deep Linking Service', () => {
 
   describe('constants', () => {
     it('should have correct URL scheme', () => {
-      expect(URL_SCHEME).toBe('v2resort');
+      expect(URL_SCHEME).toBe('v2ecosystem');
     });
 
     it('should have correct universal link domain', () => {
-      expect(UNIVERSAL_LINK_DOMAIN).toBe('v2resort.com');
+      expect(UNIVERSAL_LINK_DOMAIN).toBe('v2ecosystem.com');
     });
   });
 
   describe('linkingConfig', () => {
     it('should have correct prefixes', () => {
-      expect(linkingConfig.prefixes).toContain('v2resort://');
-      expect(linkingConfig.prefixes.some(p => p.includes('v2resort.com'))).toBe(true);
+      expect(linkingConfig.prefixes).toContain('v2ecosystem://');
+      expect(linkingConfig.prefixes.some(p => p.includes('v2ecosystem.com'))).toBe(true);
     });
   });
 
@@ -52,10 +52,10 @@ describe('Deep Linking Service', () => {
         path: null,
         queryParams: {},
         hostname: null,
-        scheme: 'v2resort',
+        scheme: 'v2ecosystem',
       });
 
-      const result = parseDeepLink('v2resort://');
+      const result = parseDeepLink('v2ecosystem://');
 
       expect(result).toBeNull();
     });
@@ -65,10 +65,10 @@ describe('Deep Linking Service', () => {
         path: '',
         queryParams: {},
         hostname: null,
-        scheme: 'v2resort',
+        scheme: 'v2ecosystem',
       });
 
-      const result = parseDeepLink('v2resort://');
+      const result = parseDeepLink('v2ecosystem://');
 
       expect(result).toBeDefined();
     });
@@ -78,10 +78,10 @@ describe('Deep Linking Service', () => {
         path: 'login',
         queryParams: {},
         hostname: null,
-        scheme: 'v2resort',
+        scheme: 'v2ecosystem',
       });
 
-      const result = parseDeepLink('v2resort://login');
+      const result = parseDeepLink('v2ecosystem://login');
 
       expect(result?.route).toBeDefined();
     });
@@ -91,10 +91,10 @@ describe('Deep Linking Service', () => {
         path: 'restaurant',
         queryParams: {},
         hostname: null,
-        scheme: 'v2resort',
+        scheme: 'v2ecosystem',
       });
 
-      const result = parseDeepLink('v2resort://restaurant');
+      const result = parseDeepLink('v2ecosystem://restaurant');
 
       expect(result?.route).toBeDefined();
     });
@@ -104,10 +104,10 @@ describe('Deep Linking Service', () => {
         path: 'order',
         queryParams: { id: '123' },
         hostname: null,
-        scheme: 'v2resort',
+        scheme: 'v2ecosystem',
       });
 
-      const result = parseDeepLink('v2resort://order?id=123');
+      const result = parseDeepLink('v2ecosystem://order?id=123');
 
       expect(result?.params.id).toBe('123');
     });
@@ -129,10 +129,10 @@ describe('Deep Linking Service', () => {
         path: 'restaurant',
         queryParams: {},
         hostname: null,
-        scheme: 'v2resort',
+        scheme: 'v2ecosystem',
       });
 
-      await handleDeepLink('v2resort://restaurant');
+      await handleDeepLink('v2ecosystem://restaurant');
 
       expect(mockRouter.push).toHaveBeenCalled();
     });
@@ -142,10 +142,10 @@ describe('Deep Linking Service', () => {
         path: null,
         queryParams: {},
         hostname: null,
-        scheme: 'v2resort',
+        scheme: 'v2ecosystem',
       });
 
-      await handleDeepLink('v2resort://');
+      await handleDeepLink('v2ecosystem://');
 
       // Should not crash
       expect(mockRouter.push).not.toHaveBeenCalled();

@@ -12,7 +12,7 @@ They use:
 Run locally (example):
 
 ```bash
-cd v2-resort
+cd v2-ecosystem
 npx playwright test -c playwright.all.config.ts tests/admin-functional --project=chromium
 ```
 

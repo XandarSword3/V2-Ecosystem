@@ -25,10 +25,10 @@
         },
         {
           "name": "user",
-          "value": "{\"id\":\"a47c3408-42b8-451b-9099-7c95a4ccdcbc\",\"email\":\"admin@v2resort.com\",\"fullName\":\"System Administrator\",\"profileImageUrl\":null,\"preferredLanguage\":\"en\",\"roles\":[\"super_admin\"]}"
+          "value": "{\"id\":\"a47c3408-42b8-451b-9099-7c95a4ccdcbc\",\"email\":\"admin@v2ecosystem.com\",\"fullName\":\"System Administrator\",\"profileImageUrl\":null,\"preferredLanguage\":\"en\",\"roles\":[\"super_admin\"]}"
         },
         {
-          "name": "v2-resort-theme",
+          "name": "v2-ecosystem-theme",
           "value": "luxury"
         }
       ]

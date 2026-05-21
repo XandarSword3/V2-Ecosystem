@@ -1348,7 +1348,7 @@ class ReportingService {
           : `Your scheduled report "${scheduled.name}" is ready.\n\nDownload: ${exportUrl}`;
 
         await this.emailTransporter.sendMail({
-          from: process.env.SMTP_FROM || 'reports@v2resort.com',
+          from: process.env.SMTP_FROM || 'reports@v2ecosystem.com',
           to: recipientAddress,
           subject,
           text: body,

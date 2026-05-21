@@ -1,6 +1,6 @@
 <!-- Last updated: 2026-05-10 -->
 
-# V2 Resort Management Platform
+# V2 Ecosystem
 
 > **Modules:** 37 | **Engines:** 4 | **Commits:** 257 | **Tests:** 422 | **API Endpoints:** 711 | **Frontend Pages:** 108
 
@@ -8,7 +8,7 @@
 [![Coverage](https://img.shields.io/badge/Coverage-43.16%25-informational)](https://github.com/XandarSword3/V2-Ecosystem)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
 
-A state-of-the-art, monorepo-based resort management ecosystem designed for luxury hospitality. Featuring a **4-engine transaction framework**, dynamic module architecture, real-time staff dashboards, and a visual module builder.
+A state-of-the-art, monorepo-based platform management ecosystem designed for luxury hospitality. Featuring a **4-engine transaction framework**, dynamic module architecture, real-time staff dashboards, and a visual module builder.
 
 ## ✨ Core Pillars
 
@@ -23,7 +23,7 @@ A state-of-the-art, monorepo-based resort management ecosystem designed for luxu
 
 ### 4-Engine Transaction Framework
 
-The V2 Resort platform is built on a revolutionary **4-engine transaction framework** that provides unified transaction handling across all resort operations:
+The V2 Ecosystem platform is built on a revolutionary **4-engine transaction framework** that provides unified transaction handling across all resort operations:
 
 #### Engine Types (Confirmed from `backend/src/engines/`)
 
@@ -270,8 +270,8 @@ frontend/src/
 
 ```bash
 # Clone the repository
-git clone https://github.com/XandarSword3/V2-Ecosystem.git v2-resort
-cd v2-resort
+git clone https://github.com/XandarSword3/V2-Ecosystem.git v2-ecosystem
+cd v2-ecosystem
 
 # Install workspace dependencies (37 modules + shared dependencies)
 npm install
@@ -341,7 +341,7 @@ NEXT_PUBLIC_SENTRY_DSN="https://...@sentry.io/..."
 
 # Application Settings
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
-NEXT_PUBLIC_APP_NAME="V2 Resort Management"
+NEXT_PUBLIC_APP_NAME="V2 Ecosystem Management"
 ```
 
 ### 3. Database Setup
@@ -541,7 +541,7 @@ npm run health:production
 
 ### Testing Overview
 
-The V2 Resort platform employs a comprehensive multi-layer testing strategy:
+The V2 Ecosystem platform employs a comprehensive multi-layer testing strategy:
 
 ```bash
 # Run all unit tests (219 backend + 113 frontend = 332 total)
@@ -664,7 +664,7 @@ npm run test:e2e:smoke     # Smoke tests
 
 ### Documentation Overview
 
-The V2 Resort platform includes comprehensive documentation organized by domain and purpose:
+The V2 Ecosystem platform includes comprehensive documentation organized by domain and purpose:
 
 #### Primary Documentation Areas
 

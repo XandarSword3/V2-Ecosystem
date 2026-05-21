@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# V2 Resort - Blue-Green Deployment Script
+# V2 Ecosystem - Blue-Green Deployment Script
 # Zero-downtime deployment with automatic rollback capability
 
 set -e  # Exit on error
 
 # Configuration
-BLUE_CONTAINER="v2-resort-blue"
-GREEN_CONTAINER="v2-resort-green"
-NGINX_CONTAINER="v2-resort-nginx"
+BLUE_CONTAINER="v2-ecosystem-blue"
+GREEN_CONTAINER="v2-ecosystem-green"
+NGINX_CONTAINER="v2-ecosystem-nginx"
 HEALTH_CHECK_URL="http://localhost:3001/health"
 HEALTH_CHECK_RETRIES=30
 HEALTH_CHECK_INTERVAL=2
@@ -85,7 +85,7 @@ health_check() {
 # Deploy new version to inactive environment
 deploy_to_environment() {
     local env=$1
-    local container_name="v2-resort-$env"
+    local container_name="v2-ecosystem-$env"
     local port
     
     if [ "$env" = "blue" ]; then
@@ -105,20 +105,20 @@ deploy_to_environment() {
     
     # Pull latest image
     log_info "Pulling latest Docker image..."
-    docker pull v2resort/backend:latest
+    docker pull v2ecosystem/backend:latest
     
     # Start new container
     log_info "Starting new $env container on port $port..."
     docker run -d \
         --name $container_name \
-        --network v2-resort-network \
+        --network v2-ecosystem-network \
         -p $port:3000 \
         -e NODE_ENV=production \
         -e DATABASE_URL="$DATABASE_URL" \
         -e REDIS_URL="$REDIS_URL" \
         -e JWT_SECRET="$JWT_SECRET" \
         --restart unless-stopped \
-        v2resort/backend:latest
+        v2ecosystem/backend:latest
     
     # Wait for container to be ready
     sleep 5
@@ -146,8 +146,8 @@ shift_traffic() {
     # Generate new upstream config
     cat > /tmp/upstream.conf << EOF
 upstream backend {
-    server v2-resort-blue:3000 weight=$blue_weight;
-    server v2-resort-green:3000 weight=$green_weight;
+    server v2-ecosystem-blue:3000 weight=$blue_weight;
+    server v2-ecosystem-green:3000 weight=$green_weight;
 }
 EOF
     
@@ -253,7 +253,7 @@ deploy() {
     local target_env=$(get_inactive_environment)
     
     log_info "=========================================="
-    log_info "V2 Resort Blue-Green Deployment"
+    log_info "V2 Ecosystem Blue-Green Deployment"
     log_info "=========================================="
     log_info "Active environment: $active_env"
     log_info "Target environment: $target_env"
@@ -282,7 +282,7 @@ deploy() {
     # Step 4: Cleanup old environment (optional)
     if [ "$CLEANUP_OLD" = "true" ]; then
         log_info "Stopping old $active_env environment..."
-        docker stop "v2-resort-$active_env" || true
+        docker stop "v2-ecosystem-$active_env" || true
     fi
     
     log_info "=========================================="
@@ -321,12 +321,12 @@ status() {
     local active_env=$(get_active_environment)
     
     echo ""
-    echo "V2 Resort Deployment Status"
+    echo "V2 Ecosystem Deployment Status"
     echo "==========================="
     echo "Active Environment: $active_env"
     echo ""
     echo "Container Status:"
-    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "(NAME|v2-resort)"
+    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "(NAME|v2-ecosystem)"
     echo ""
 }
 

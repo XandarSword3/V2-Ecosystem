@@ -122,7 +122,7 @@ describe('Admin properties route coverage', () => {
 
     await user.click(screen.getByRole('button', { name: /Add Property/i }));
 
-    const nameInput = await screen.findByPlaceholderText('V2 Resort & Spa');
+    const nameInput = await screen.findByPlaceholderText('V2 Ecosystem & Spa');
     await user.type(nameInput, 'Sunset Cliff Villas');
 
     const cityInput = screen.getByPlaceholderText('Beirut');

@@ -194,14 +194,14 @@ export const testEmail = asyncHandler(async (req: Request, res: Response) => {
 
     // Send verification email
     await transporter.sendMail({
-      from: fromEmail || 'noreply@v2resort.com',
+      from: fromEmail || 'noreply@v2ecosystem.com',
       to: toEmail,
       subject: 'V2 Ecosystem Onboarding - Email Verification',
       text: 'Congratulations! Your transactional email configuration is correct.',
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; max-width: 600px; margin: auto;">
           <h2 style="color: #6366f1;">Email System Working!</h2>
-          <p>This is a test email sent from the V2 Resort Ecosystem onboarding setup wizard.</p>
+          <p>This is a test email sent from the V2 Ecosystem Ecosystem onboarding setup wizard.</p>
           <p>Your mail server settings are fully valid and operational.</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
           <small style="color: #999;">Sent at: ${new Date().toISOString()}</small>

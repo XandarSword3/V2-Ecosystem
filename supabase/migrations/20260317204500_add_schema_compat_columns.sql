@@ -269,7 +269,7 @@ INSERT INTO users (
 )
 VALUES
   (
-    'admin@v2resort.com',
+    'admin@v2ecosystem.com',
     extensions.crypt('admin123', extensions.gen_salt('bf')),
     'System Administrator',
     'super_admin',
@@ -278,7 +278,7 @@ VALUES
     true
   ),
   (
-    'restaurant.staff@v2resort.com',
+    'restaurant.staff@v2ecosystem.com',
     extensions.crypt('staff123', extensions.gen_salt('bf')),
     'Restaurant Staff',
     'restaurant_staff',
@@ -309,14 +309,14 @@ INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id
 FROM users u
 JOIN roles r ON r.name = 'super_admin'
-WHERE u.email = 'admin@v2resort.com'
+WHERE u.email = 'admin@v2ecosystem.com'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id
 FROM users u
 JOIN roles r ON r.name = 'restaurant_staff'
-WHERE u.email = 'restaurant.staff@v2resort.com'
+WHERE u.email = 'restaurant.staff@v2ecosystem.com'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id)

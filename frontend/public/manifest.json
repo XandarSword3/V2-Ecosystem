@@ -1,7 +1,7 @@
 {
-  "name": "Resort Management Platform",
+  "name": "Platform Management Platform",
   "short_name": "Your Resort",
-  "description": "Complete resort management system with hotel, restaurant, pool, and activity bookings",
+  "description": "Complete platform management system with hotel, restaurant, pool, and activity bookings",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
@@ -52,14 +52,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Resort Dashboard"
+      "label": "Platform Dashboard"
     },
     {
       "src": "/screenshots/mobile.png",
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Resort Mobile"
+      "label": "Platform Mobile"
     }
   ],
   "shortcuts": [

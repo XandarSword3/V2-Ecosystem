@@ -14,6 +14,6 @@ export const API_BASE_URL = `http://${DEV_HOST}:3001`;
 export const SOCKET_URL = `http://${DEV_HOST}:3001`;
 
 export const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_KEY || '';
-export const STRIPE_MERCHANT_ID = process.env.EXPO_PUBLIC_STRIPE_MERCHANT_ID || 'merchant.com.v2resort';
+export const STRIPE_MERCHANT_ID = process.env.EXPO_PUBLIC_STRIPE_MERCHANT_ID || 'merchant.com.v2ecosystem';
 
 export const IS_DEV = true;

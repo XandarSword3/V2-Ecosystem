@@ -164,11 +164,11 @@ test.describe('Admin Settings Tests', () => {
       const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
         headers: { Authorization: `Bearer ${token}` },
         data: {
-          resortName: 'V2 Resort Test',
+          resortName: 'V2 Ecosystem Test',
           tagline: 'Test Tagline',
           description: 'Test Description',
           phone: '+1 234 567 8900',
-          email: 'test@v2resort.com',
+          email: 'test@v2ecosystem.com',
           address: 'Test Address, Global City'
         }
       });

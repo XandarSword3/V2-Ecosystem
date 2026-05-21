@@ -6,7 +6,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: v2-resort-backend
+    container_name: v2-ecosystem-backend
     env_file:
       - ./backend/.env
     environment:
@@ -27,7 +27,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: v2-resort-frontend
+    container_name: v2-ecosystem-frontend
     env_file:
       - ./frontend/.env.local
     environment:

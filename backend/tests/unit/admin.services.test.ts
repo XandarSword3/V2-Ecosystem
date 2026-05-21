@@ -24,8 +24,8 @@ describe('SettingsService', () => {
   describe('getAllSettings', () => {
     it('should return all settings as a map', async () => {
       const mockSettings = [
-        { key: 'site_name', value: 'V2 Resort' },
-        { key: 'contact_email', value: 'info@v2resort.com' }
+        { key: 'site_name', value: 'V2 Ecosystem' },
+        { key: 'contact_email', value: 'info@v2ecosystem.com' }
       ];
       
       vi.mocked(getSupabase).mockReturnValue({
@@ -38,8 +38,8 @@ describe('SettingsService', () => {
       const result = await service.getAllSettings();
       
       expect(result).toEqual({
-        site_name: 'V2 Resort',
-        contact_email: 'info@v2resort.com'
+        site_name: 'V2 Ecosystem',
+        contact_email: 'info@v2ecosystem.com'
       });
     });
 

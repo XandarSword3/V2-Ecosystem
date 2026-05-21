@@ -3,7 +3,7 @@ import { test, expect } from '../../fixtures/auth.fixture';
 test.describe('Manager Dashboard [MGR]', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:3000/login');
-    await page.fill('input[type="email"]', 'admin@v2resort.com');
+    await page.fill('input[type="email"]', 'admin@v2ecosystem.com');
     await page.fill('input[type="password"]', 'admin123');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(admin|staff|dashboard)/);

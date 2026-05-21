@@ -117,7 +117,7 @@ export default function SetupWizardPage() {
     user: 'apikey',
     pass: '',
     apiKey: '',
-    fromEmail: 'noreply@v2resort.com',
+    fromEmail: 'noreply@v2ecosystem.com',
     testRecipient: '',
     verifySuccess: false,
     verifyMsg: ''

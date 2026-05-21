@@ -17,7 +17,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
 
 const ADMIN_CREDENTIALS = {
-  email: process.env.E2E_ADMIN_EMAIL || 'admin@v2resort.com',
+  email: process.env.E2E_ADMIN_EMAIL || 'admin@v2ecosystem.com',
   password: process.env.E2E_ADMIN_PASSWORD || 'admin123',
 };
 
@@ -135,7 +135,7 @@ let adminPage: Page;
     // Fill subject
     const subjectInput = adminPage.locator('input[placeholder*="Subject" i]').first();
     if (await subjectInput.isVisible()) {
-      await subjectInput.fill('Welcome to V2 Resort, {{name}}!');
+      await subjectInput.fill('Welcome to V2 Ecosystem, {{name}}!');
     }
     
     // Fill body with variables

@@ -35,7 +35,7 @@ const format = winston.format.combine(
 // 2. ./logs relative to project root (if writable)
 // 3. OS temp directory (always writable in most environments)
 const preferred = process.env.LOG_DIR;
-const defaultTmp = path.join(os.tmpdir(), 'v2-resort-logs');
+const defaultTmp = path.join(os.tmpdir(), 'v2-ecosystem-logs');
 let logDir: string | null = null;
 
 try {

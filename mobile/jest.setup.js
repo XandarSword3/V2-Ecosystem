@@ -1,5 +1,5 @@
 /**
- * Jest Setup File for V2 Resort Mobile App
+ * Jest Setup File for V2 Ecosystem Mobile App
  * 
  * Configures test environment with all necessary mocks for:
  * - React Native modules
@@ -126,8 +126,8 @@ jest.mock('expo-constants', () => ({
 jest.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',
   nativeBuildVersion: '1',
-  applicationName: 'V2 Resort',
-  applicationId: 'com.v2resort.mobile',
+  applicationName: 'V2 Ecosystem',
+  applicationId: 'com.v2ecosystem.mobile',
 }));
 
 // Mock expo-device
@@ -196,7 +196,7 @@ jest.mock('expo-notifications', () => ({
 
 // Mock expo-linking
 jest.mock('expo-linking', () => ({
-  createURL: jest.fn((path) => `v2resort://${path}`),
+  createURL: jest.fn((path) => `v2ecosystem://${path}`),
   parse: jest.fn((url) => ({ path: url, queryParams: {} })),
   addEventListener: jest.fn(() => ({ remove: jest.fn() })),
   getInitialURL: jest.fn(async () => null),

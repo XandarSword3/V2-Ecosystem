@@ -52,7 +52,7 @@ async function seed() {
     const { data: adminUser, error: adminError } = await supabase
       .from('users')
       .upsert({
-        email: 'admin@v2resort.com',
+        email: 'admin@v2ecosystem.com',
         password_hash: adminPassword,
         full_name: 'System Administrator',
         email_verified: true,
@@ -97,13 +97,13 @@ async function seed() {
     const staffPassword = await bcrypt.hash(staffPasswordPlain, 12);
     
     const staffUsers = [
-      { email: 'restaurant.staff@v2resort.com', full_name: 'Restaurant Staff', role: 'restaurant_staff' },
-      { email: 'restaurant.admin@v2resort.com', full_name: 'Restaurant Admin', role: 'restaurant_admin' },
-      { email: 'snack.staff@v2resort.com', full_name: 'Snack Bar Staff', role: 'snack_bar_staff' },
-      { email: 'chalet.staff@v2resort.com', full_name: 'Chalet Staff', role: 'chalet_staff' },
-      { email: 'chalet.admin@v2resort.com', full_name: 'Chalet Admin', role: 'chalet_admin' },
-      { email: 'pool.staff@v2resort.com', full_name: 'Pool Staff', role: 'pool_staff' },
-      { email: 'pool.admin@v2resort.com', full_name: 'Pool Admin', role: 'pool_admin' },
+      { email: 'restaurant.staff@v2ecosystem.com', full_name: 'Restaurant Staff', role: 'restaurant_staff' },
+      { email: 'restaurant.admin@v2ecosystem.com', full_name: 'Restaurant Admin', role: 'restaurant_admin' },
+      { email: 'snack.staff@v2ecosystem.com', full_name: 'Snack Bar Staff', role: 'snack_bar_staff' },
+      { email: 'chalet.staff@v2ecosystem.com', full_name: 'Chalet Staff', role: 'chalet_staff' },
+      { email: 'chalet.admin@v2ecosystem.com', full_name: 'Chalet Admin', role: 'chalet_admin' },
+      { email: 'pool.staff@v2ecosystem.com', full_name: 'Pool Staff', role: 'pool_staff' },
+      { email: 'pool.admin@v2ecosystem.com', full_name: 'Pool Admin', role: 'pool_admin' },
     ];
 
     for (const staff of staffUsers) {
@@ -352,17 +352,17 @@ async function seed() {
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('');
     console.log('📧 Admin credentials:');
-    console.log('   Email: admin@v2resort.com');
+    console.log('   Email: admin@v2ecosystem.com');
     console.log('   Password: admin123');
     console.log('');
     console.log('👥 Staff credentials (all use password: staff123):');
-    console.log('   - restaurant.staff@v2resort.com');
-    console.log('   - restaurant.admin@v2resort.com');
-    console.log('   - chalet.staff@v2resort.com');
-    console.log('   - chalet.admin@v2resort.com');
-    console.log('   - pool.staff@v2resort.com');
-    console.log('   - pool.admin@v2resort.com');
-    console.log('   - snack.staff@v2resort.com');
+    console.log('   - restaurant.staff@v2ecosystem.com');
+    console.log('   - restaurant.admin@v2ecosystem.com');
+    console.log('   - chalet.staff@v2ecosystem.com');
+    console.log('   - chalet.admin@v2ecosystem.com');
+    console.log('   - pool.staff@v2ecosystem.com');
+    console.log('   - pool.admin@v2ecosystem.com');
+    console.log('   - snack.staff@v2ecosystem.com');
     console.log('═══════════════════════════════════════════════════════════════');
 
   } catch (error) {

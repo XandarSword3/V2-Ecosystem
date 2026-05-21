@@ -1,6 +1,6 @@
 # INVENTORY B: AUTOMATED PROCESSES & SCHEDULED TASKS
 
-> **Scope**: `v2-resort/backend/src/` — every cron job, background timer, script, webhook handler, and startup initialization.  
+> **Scope**: `v2-ecosystem/backend/src/` — every cron job, background timer, script, webhook handler, and startup initialization.  
 > **Generated from**: Actual source code reads, not speculation.
 
 ---

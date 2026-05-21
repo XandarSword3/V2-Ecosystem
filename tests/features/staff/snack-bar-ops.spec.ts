@@ -3,7 +3,7 @@ import { test, expect } from '../../fixtures/auth.fixture';
 test.describe('Snack Bar Operations [STF-SNCK]', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:3000/login');
-    await page.fill('input[type="email"]', 'staff@v2resort.com');
+    await page.fill('input[type="email"]', 'staff@v2ecosystem.com');
     await page.fill('input[type="password"]', 'staff123');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(staff|dashboard)/);

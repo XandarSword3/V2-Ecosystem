@@ -80,7 +80,7 @@ export const useSettingsStore = create<SettingsState>()(
       setEnableLoadingAnimation: (enabled) => set({ enableLoadingAnimation: enabled }),
     }),
     {
-      name: 'v2-resort-settings',
+      name: 'v2-ecosystem-settings',
     }
   )
 );

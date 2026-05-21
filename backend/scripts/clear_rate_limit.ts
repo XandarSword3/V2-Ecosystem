@@ -11,7 +11,7 @@ async function clearRateLimit() {
         const { error } = await supabase
             .from('login_attempts')
             .delete()
-            .eq('email', 'admin@v2resort.com');
+            .eq('email', 'admin@v2ecosystem.com');
 
         if (error) {
             logger.warn('Could not clear login_attempts:', error.message);
@@ -28,7 +28,7 @@ async function clearRateLimit() {
         const { error } = await supabase
             .from('rate_limits')
             .delete()
-            .ilike('key', '%admin@v2resort.com%');
+            .ilike('key', '%admin@v2ecosystem.com%');
 
         if (!error) {
             logger.info('✅ rate_limits cleared!');

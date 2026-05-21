@@ -131,7 +131,7 @@ export default function ChaletBookingScreen() {
             } else {
                 const init = await initPaymentSheet({
                     paymentIntentClientSecret: paymentIntent.data.clientSecret,
-                    merchantDisplayName: 'V2 Resort',
+                    merchantDisplayName: 'V2 Ecosystem',
                     allowsDelayedPaymentMethods: true,
                 });
                 if (init.error) throw new Error(init.error.message);

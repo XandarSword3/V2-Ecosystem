@@ -29,7 +29,7 @@ interface TwoFactorStatus {
 }
 
 class TwoFactorService {
-  private readonly APP_NAME = 'V2 Resort';
+  private readonly APP_NAME = 'V2 Ecosystem';
   
   /**
    * Generate a new 2FA secret and QR code for setup

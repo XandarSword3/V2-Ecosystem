@@ -1,5 +1,5 @@
 /**
- * V2 Resort - Accessibility Utilities
+ * V2 Ecosystem - Accessibility Utilities
  * Helpers for ensuring WCAG 2.1 AA compliance
  */
 

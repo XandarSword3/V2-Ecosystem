@@ -1,6 +1,6 @@
 /**
  * Simulation System - Main Entry Point
- * Multi-Actor Real-Time Simulation for V2 Resort
+ * Multi-Actor Real-Time Simulation for V2 Ecosystem
  */
 
 // Core exports

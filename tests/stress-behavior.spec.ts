@@ -1,7 +1,7 @@
 import { test, expect, Page, APIRequestContext } from './fixtures/auth.fixture';
 
 /**
- * Stress Testing Utilities for V2 Resort Ecosystem
+ * Stress Testing Utilities for V2 Ecosystem Ecosystem
  * 
  * Tests for:
  * - Concurrency simulation

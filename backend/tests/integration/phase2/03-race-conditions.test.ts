@@ -66,7 +66,7 @@ describe('R-01: Gift Card Over-Redemption — Concurrent Race', () => {
       amount: 100,
       balance: 100,
       purchaser_name: 'Admin',
-      purchaser_email: 'admin@v2resort.com',
+      purchaser_email: 'admin@v2ecosystem.com',
       status: 'active',
     });
 

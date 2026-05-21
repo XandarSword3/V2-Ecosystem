@@ -2,7 +2,7 @@
  * Unified Customization Components
  * 
  * This module provides reusable customization components for ALL modules
- * in the V2 Resort platform.
+ * in the V2 Ecosystem platform.
  * 
  * Usage:
  * 

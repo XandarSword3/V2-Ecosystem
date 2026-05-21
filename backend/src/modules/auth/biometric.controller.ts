@@ -75,7 +75,7 @@ export async function registerBegin(req: Request, res: Response) {
     const options = {
       challenge,
       rp: {
-        name: 'V2 Resort',
+        name: 'V2 Ecosystem',
         id: process.env.WEBAUTHN_RP_ID || 'localhost',
       },
       user: {
