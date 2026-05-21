@@ -221,6 +221,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     if (!isLoading && isAuthenticated && user?.roles.some(role => ['admin', 'super_admin'].includes(role))) {
       checkOnboarding();
     } else if (!isLoading) {
+      // Not admin, or not authenticated — no onboarding check needed.
+      // Middleware handles the install gate; layout handles the auth gate.
       setOnboardingChecked(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
