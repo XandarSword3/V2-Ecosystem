@@ -173,7 +173,7 @@ router.get('/onboarding', authorize('admin'), onboardingController.getOnboarding
 router.put('/onboarding', authorize('admin'), onboardingController.updateOnboardingState);
 router.post('/onboarding/verify-stripe', authorize('admin'), onboardingController.verifyStripe);
 router.post('/onboarding/test-email', authorize('admin'), onboardingController.testEmail);
-router.post('/onboarding/finalize', authorize('super_admin'), onboardingController.finalizeOnboarding);
+router.post('/onboarding/finalize', authorize('admin'), onboardingController.finalizeOnboarding); // super_admin is created by install; admin is the minimum valid role
 router.get('/onboarding/manual', authorize('admin'), onboardingController.getOperationsManual);
 
 // CSV Bulk Imports

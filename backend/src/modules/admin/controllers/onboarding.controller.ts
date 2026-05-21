@@ -78,9 +78,17 @@ export const updateOnboardingState = asyncHandler(async (req: Request, res: Resp
   
   const oldState = (existing.data?.value as unknown as OnboardingState) || DEFAULT_STATE;
   
+  // Deep-merge steps so a partial PUT (e.g. saving one step) never wipes
+  // progress from other steps that were already saved.
+  const mergedSteps = {
+    ...(oldState.steps ?? {}),
+    ...(newState.steps ?? {}),
+  };
+
   const updatedState = {
     ...oldState,
     ...newState,
+    steps:      mergedSteps,
     started_at: oldState.started_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -266,6 +274,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
   const gatewayData = steps['payment_gateway']?.data || {};
   const smtpData = steps['transactional_emails']?.data || {};
   const staffData = steps['staff_invitations']?.data || { invitations: [] };
+  const taxData   = steps['taxes']?.data || {};
 
   const propertyName = brandData.name || 'My Resort';
 
@@ -359,11 +368,17 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       configured: !!(smtpPass || smtpApiKey || smtpData.host),
     };
 
+    const taxSettings = {
+      taxRate:       parseFloat(taxData.taxRate ?? '0') || 0,
+      serviceCharge: parseFloat(taxData.serviceCharge ?? '0') || 0,
+    };
+
     const settingsToInsert = [
-      { property_id: propertyId, setting_key: 'branding', setting_value: brandingSettings, category: 'appearance' },
-      { property_id: propertyId, setting_key: 'operational_hours', setting_value: hoursData, category: 'general' },
-      { property_id: propertyId, setting_key: 'payment_gateway', setting_value: finalGatewaySettings, category: 'finance' },
-      { property_id: propertyId, setting_key: 'smtp_config', setting_value: finalSmtpSettings, category: 'system' },
+      { property_id: propertyId, setting_key: 'branding',          setting_value: brandingSettings,    category: 'appearance' },
+      { property_id: propertyId, setting_key: 'operational_hours', setting_value: hoursData,           category: 'general' },
+      { property_id: propertyId, setting_key: 'payment_gateway',   setting_value: finalGatewaySettings, category: 'finance' },
+      { property_id: propertyId, setting_key: 'smtp_config',       setting_value: finalSmtpSettings,   category: 'system' },
+      { property_id: propertyId, setting_key: 'tax_config',        setting_value: taxSettings,         category: 'finance' },
     ];
 
     const { error: settingsErr } = await supabase

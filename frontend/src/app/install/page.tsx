@@ -1,0 +1,410 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Server, User, Mail, Lock, Building2,
+  Eye, EyeOff, Loader2, CheckCircle2, AlertCircle,
+  ShieldCheck, Cpu,
+} from 'lucide-react';
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3005/api/v1';
+const BASE = API.replace('/api/v1', '');
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function getCsrfToken(): Promise<string> {
+  const res = await fetch(`${BASE}/api/csrf-token`, { credentials: 'include' });
+  const data = await res.json();
+  return data.csrfToken ?? '';
+}
+
+async function checkStatus(): Promise<{ initialized: boolean; reason: string }> {
+  const res = await fetch(`${BASE}/api/install/status`, { credentials: 'include' });
+  const data = await res.json();
+  return data.data ?? { initialized: false, reason: 'first_boot' };
+}
+
+// ---------------------------------------------------------------------------
+// Password strength indicator
+// ---------------------------------------------------------------------------
+
+function strengthScore(pw: string): number {
+  let score = 0;
+  if (pw.length >= 8)              score++;
+  if (/[A-Z]/.test(pw))           score++;
+  if (/[a-z]/.test(pw))           score++;
+  if (/[0-9]/.test(pw))           score++;
+  if (/[^A-Za-z0-9]/.test(pw))    score++;
+  return score; // 0-5
+}
+
+const STRENGTH_LABELS = ['', 'Very weak', 'Weak', 'Fair', 'Strong', 'Very strong'];
+const STRENGTH_COLORS = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a'];
+
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
+
+export default function InstallPage() {
+  const router = useRouter();
+
+  const [checking, setChecking]   = useState(true);
+  const [reason, setReason]       = useState<string>('first_boot');
+  const [step, setStep]           = useState<'form' | 'installing' | 'done'>('form');
+  const [showPw, setShowPw]       = useState(false);
+  const [error, setError]         = useState('');
+
+  const [form, setForm] = useState({
+    businessName:  '',
+    adminFullName: '',
+    adminEmail:    '',
+    adminPassword: '',
+    confirmPw:     '',
+  });
+
+  // On mount: verify this page should be shown
+  useEffect(() => {
+    checkStatus().then((status) => {
+      if (status.initialized) {
+        // Already installed — bounce to login
+        router.replace('/login');
+      } else {
+        setReason(status.reason);
+        setChecking(false);
+      }
+    }).catch(() => {
+      // Can't reach backend — still show the form; install will fail with a
+      // clear error message rather than silently blocking the user.
+      setChecking(false);
+    });
+  }, [router]);
+
+  const pwScore = strengthScore(form.adminPassword);
+
+  const handleChange = (field: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleSubmit = async () => {
+    setError('');
+
+    // Client-side guard
+    if (form.adminPassword !== form.confirmPw) {
+      setError('Passwords do not match.');
+      return;
+    }
+    if (pwScore < 3) {
+      setError('Please choose a stronger password.');
+      return;
+    }
+
+    setStep('installing');
+
+    try {
+      const csrf = await getCsrfToken();
+
+      const res = await fetch(`${BASE}/api/install`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrf,
+        },
+        body: JSON.stringify({
+          businessName:  form.businessName,
+          adminEmail:    form.adminEmail,
+          adminPassword: form.adminPassword,
+          adminFullName: form.adminFullName,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error ?? 'Installation failed. Check server logs.');
+      }
+
+      // Persist JWT so the wizard's API calls are authenticated
+      const { accessToken, refreshToken } = data.data.tokens;
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+
+      setStep('done');
+
+      // Brief pause so the user sees the success screen, then enter wizard
+      setTimeout(() => router.replace('/admin/setup'), 2200);
+
+    } catch (err: any) {
+      setError(err.message ?? 'Unexpected error during installation.');
+      setStep('form');
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Render: loading check
+  // ---------------------------------------------------------------------------
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render: success
+  // ---------------------------------------------------------------------------
+
+  if (step === 'done') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center"
+        >
+          <CheckCircle2 className="w-20 h-20 text-emerald-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Installation complete</h2>
+          <p className="text-slate-400">Opening setup wizard…</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render: installing spinner
+  // ---------------------------------------------------------------------------
+
+  if (step === 'installing') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center space-y-4"
+        >
+          <Loader2 className="w-12 h-12 text-blue-400 animate-spin mx-auto" />
+          <p className="text-white text-lg font-medium">Setting up your system…</p>
+          <p className="text-slate-500 text-sm">Seeding roles · Creating your account · Recording machine identity</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render: install form
+  // ---------------------------------------------------------------------------
+
+  const isMigration = reason === 'machine_mismatch';
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="w-full max-w-lg"
+      >
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600/20 border border-blue-500/30 mb-4">
+            <Server className="w-8 h-8 text-blue-400" />
+          </div>
+          <h1 className="text-3xl font-bold text-white">
+            {isMigration ? 'Server migration detected' : 'Welcome to V2'}
+          </h1>
+          <p className="text-slate-400 mt-2 text-sm leading-relaxed">
+            {isMigration
+              ? 'This machine does not match the stored installation. Re-run setup to confirm ownership and re-bind the system to this server.'
+              : 'This appears to be a first-run on a new machine. Create your owner account to get started.'}
+          </p>
+        </div>
+
+        {/* Machine ID badge */}
+        <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-lg bg-slate-800/60 border border-slate-700/50 text-xs text-slate-400">
+          <Cpu className="w-4 h-4 shrink-0 text-slate-500" />
+          <span>
+            Machine identity will be recorded on this server during installation.
+            This check prevents duplicate setups.
+          </span>
+        </div>
+
+        {/* Card */}
+        <div className="bg-slate-900 border border-slate-700/60 rounded-2xl p-8 shadow-2xl space-y-5">
+
+          {/* Error banner */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex items-start gap-3 p-4 rounded-lg bg-red-950/40 border border-red-800/60"
+              >
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <span className="text-red-300 text-sm">{error}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Business name */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              Business name
+            </label>
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                value={form.businessName}
+                onChange={handleChange('businessName')}
+                placeholder="Seaside Resort & Spa"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-slate-700" />
+            <span className="text-slate-500 text-xs flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Owner account
+            </span>
+            <div className="flex-1 h-px bg-slate-700" />
+          </div>
+
+          {/* Full name */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              Your full name
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                value={form.adminFullName}
+                onChange={handleChange('adminFullName')}
+                placeholder="Alex Daher"
+                autoComplete="name"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              Email address
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="email"
+                value={form.adminEmail}
+                onChange={handleChange('adminEmail')}
+                placeholder="owner@yourbusiness.com"
+                autoComplete="email"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type={showPw ? 'text' : 'password'}
+                value={form.adminPassword}
+                onChange={handleChange('adminPassword')}
+                placeholder="Min. 8 chars, upper, number, symbol"
+                autoComplete="new-password"
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {/* Strength bar */}
+            {form.adminPassword.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className="h-1 flex-1 rounded-full transition-colors duration-200"
+                      style={{ backgroundColor: i <= pwScore ? STRENGTH_COLORS[pwScore] : '#334155' }}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs" style={{ color: STRENGTH_COLORS[pwScore] || '#64748b' }}>
+                  {STRENGTH_LABELS[pwScore]}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Confirm password */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              Confirm password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type={showPw ? 'text' : 'password'}
+                value={form.confirmPw}
+                onChange={handleChange('confirmPw')}
+                placeholder="Repeat password"
+                autoComplete="new-password"
+                className={`w-full pl-10 pr-4 py-2.5 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent text-sm ${
+                  form.confirmPw && form.confirmPw !== form.adminPassword
+                    ? 'border-red-600 focus:ring-red-500/50'
+                    : 'border-slate-600 focus:ring-blue-500/50 focus:border-blue-500'
+                }`}
+              />
+            </div>
+            {form.confirmPw && form.confirmPw !== form.adminPassword && (
+              <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
+            )}
+          </div>
+
+          {/* Submit */}
+          <button
+            onClick={handleSubmit}
+            disabled={
+              !form.businessName ||
+              !form.adminFullName ||
+              !form.adminEmail ||
+              !form.adminPassword ||
+              form.adminPassword !== form.confirmPw ||
+              pwScore < 3
+            }
+            className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-150 text-sm"
+          >
+            Install V2 &amp; create owner account
+          </button>
+        </div>
+
+        <p className="text-center text-slate-600 text-xs mt-6">
+          This page is only reachable when no installation is detected on this machine.
+        </p>
+      </motion.div>
+    </div>
+  );
+}

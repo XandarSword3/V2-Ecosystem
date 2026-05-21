@@ -165,24 +165,19 @@ export default function SetupWizardPage() {
   }, []);
 
   // Save current step data to DB on navigate
+  // The backend deep-merges `steps`, so we can PUT just the single step that
+  // changed — no need to GET the full state first on every navigation.
   const saveStepProgress = async (stepId: string, data: any) => {
     try {
-      const res = await api.get('/admin/onboarding');
-      const json = res.data;
-      const currentDbState = json.success ? json.data : { steps: {} };
-      
-      const updatedSteps = {
-        ...currentDbState.steps,
-        [stepId]: {
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          data
-        }
-      };
-
       await api.put('/admin/onboarding', {
         current_step: stepId,
-        steps: updatedSteps
+        steps: {
+          [stepId]: {
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            data,
+          },
+        },
       });
     } catch (err) {
       console.error('Failed to save progress:', err);
@@ -476,6 +471,21 @@ export default function SetupWizardPage() {
   };
 
   // Simple Canvas-based Confettiburst
+  const confettiRafRef = useRef<number | null>(null);
+  const confettiCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Clean up confetti on unmount
+  useEffect(() => {
+    return () => {
+      if (confettiRafRef.current !== null) {
+        cancelAnimationFrame(confettiRafRef.current);
+      }
+      if (confettiCanvasRef.current && document.body.contains(confettiCanvasRef.current)) {
+        document.body.removeChild(confettiCanvasRef.current);
+      }
+    };
+  }, []);
+
   const triggerConfetti = () => {
     const canvas = document.createElement('canvas');
     canvas.style.position = 'fixed';
@@ -486,6 +496,7 @@ export default function SetupWizardPage() {
     canvas.style.pointerEvents = 'none';
     canvas.style.zIndex = '99999';
     document.body.appendChild(canvas);
+    confettiCanvasRef.current = canvas;
 
     const ctx = canvas.getContext('2d')!;
     canvas.width = window.innerWidth;
@@ -522,12 +533,14 @@ export default function SetupWizardPage() {
       });
 
       if (alive) {
-        requestAnimationFrame(frame);
+        confettiRafRef.current = requestAnimationFrame(frame);
       } else {
-        document.body.removeChild(canvas);
+        confettiRafRef.current = null;
+        confettiCanvasRef.current = null;
+        if (document.body.contains(canvas)) document.body.removeChild(canvas);
       }
     }
-    frame();
+    confettiRafRef.current = requestAnimationFrame(frame);
   };
 
   if (loading) {
@@ -605,7 +618,7 @@ export default function SetupWizardPage() {
                       return (
                         <button
                           key={st.id}
-                          onClick={() => setCurrentStepIndex(stepIdx)}
+                          onClick={async () => { await saveCurrentStepState(); setCurrentStepIndex(stepIdx); }}
                           className={`block text-left text-xs transition-colors duration-150 w-full py-1 ${
                             isStepActive 
                               ? 'text-indigo-300 font-medium' 
