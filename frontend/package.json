@@ -78,18 +78,25 @@
     "@vitest/coverage-istanbul": "^4.0.17",
     "@vitest/coverage-v8": "^4.0.17",
     "autoprefixer": "^10.4.19",
-    "esbuild": "^0.27.3",
+    "esbuild": "^0.28.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.9",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^24.0.0",
-    "postcss": ">=8.5.10",
+    "postcss": ">=8.5.15",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.4.3",
     "vitest": "^4.0.17"
   },
   "overrides": {
-    "postcss": ">=8.5.10"
+    "postcss": ">=8.4.31",
+    "ws": ">=8.20.1",
+    "rollup": ">=4.22.4",
+    "minimatch": ">=9.0.5",
+    "esbuild": ">=0.25.0"
+  },
+  "resolutions": {
+    "ws": ">=8.20.1"
   }
 }

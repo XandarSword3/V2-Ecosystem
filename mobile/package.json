@@ -88,6 +88,10 @@
     "postcss": ">=8.5.10",
     "@tootallnate/once": ">=3.0.1",
     "jsdom": ">=20.0.0",
-    "http-proxy-agent": ">=7.0.0"
+    "http-proxy-agent": ">=7.0.0",
+    "ws": ">=8.20.1"
+  },
+  "resolutions": {
+    "ws": ">=8.20.1"
   }
 }
