@@ -69,14 +69,23 @@
     ]
   },
   "dependencies": {
-    "crypto": "builtin",
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "electron": "^39.8.5",
-    "electron-builder": "^24.0.0"
+    "electron-builder": "^26.8.1"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "overrides": {
+    "tar": ">=6.2.1",
+    "node-tar": ">=6.2.1",
+    "minimatch": ">=9.0.5",
+    "brace-expansion": ">=2.0.1",
+    "electron-builder>tar": ">=6.2.1",
+    "app-builder-lib>tar": ">=6.2.1",
+    "builder-util>tar": ">=6.2.1",
+    "http-proxy-agent": ">=7.0.0"
   }
 }
