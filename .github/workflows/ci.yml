@@ -172,6 +172,11 @@ jobs:
       - name: Start Supabase local stack
         timeout-minutes: 8
         run: |
+          # supabase/postgres:17.x image is not yet in the local-stack registry.
+          # Patch config to PG15 (supabase/postgres:15.x is the stable local image) for CI.
+          sed -i 's/^major_version = 17/major_version = 15/' supabase/config.toml
+          cat supabase/config.toml | grep major_version
+
           supabase start --ignore-health-check
 
           echo "Waiting for Supabase API on port 15421..."
