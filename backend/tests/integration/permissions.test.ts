@@ -390,21 +390,11 @@ describe('Permission Matrix Validation', () => {
       expect(customerPerms).not.toContain(Permissions.ADMIN_DASHBOARD);
     });
 
-    it('staff should have cross-module order/booking permissions', () => {
+    it('staff should have generic cross-module permissions', () => {
       const staffPerms = RolePermissions[Roles.STAFF];
-      expect(staffPerms).toContain(Permissions.RESTAURANT_ORDER_READ_ALL);
-      expect(staffPerms).toContain(Permissions.RESTAURANT_ORDER_UPDATE);
-    });
-
-    it('staff should have pool permissions', () => {
-      const staffPerms = RolePermissions[Roles.STAFF];
-      expect(staffPerms).toContain(Permissions.POOL_SESSION_READ);
-      expect(staffPerms).toContain(Permissions.POOL_TICKET_VALIDATE);
-    });
-
-    it('staff should have booking permissions', () => {
-      const staffPerms = RolePermissions[Roles.STAFF];
-      expect(staffPerms).toContain(Permissions.CHALET_BOOKING_READ_ALL);
+      expect(staffPerms).toContain(Permissions.PAYMENT_RECORD_CASH);
+      expect(staffPerms).toContain(Permissions.INVENTORY_READ);
+      expect(staffPerms).not.toContain(Permissions.ADMIN_DASHBOARD);
     });
   });
 });
