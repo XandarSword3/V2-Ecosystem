@@ -183,9 +183,14 @@ export function clearTrackedResources(): void {
 export async function isDatabaseAvailable(): Promise<boolean> {
   try {
     const { Pool } = await import('pg');
+    const connectionString = getTestDatabaseUrl();
+    const isLocalConnection = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
     const pool = new Pool({
-      connectionString: getTestDatabaseUrl(),
+      connectionString,
       connectionTimeoutMillis: 5000,
+      ssl: isLocalConnection ? false : {
+        rejectUnauthorized: false,
+      },
     });
 
     const client = await pool.connect();
@@ -193,7 +198,8 @@ export async function isDatabaseAvailable(): Promise<boolean> {
     client.release();
     await pool.end();
     return true;
-  } catch {
+  } catch (error) {
+    console.error('Database connection test failed:', error);
     return false;
   }
 }
@@ -267,7 +273,14 @@ export async function seedTestDatabase(): Promise<void> {
   const bcrypt = await import('bcryptjs');
   const { migrate } = await import('../../src/database/migrate');
 
-  const pool = new Pool({ connectionString: getTestDatabaseUrl() });
+  const connectionString = getTestDatabaseUrl();
+  const isLocalConnection = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+  const pool = new Pool({
+    connectionString,
+    ssl: isLocalConnection ? false : {
+      rejectUnauthorized: false,
+    },
+  });
 
   const forceMigrate = process.env.TEST_FORCE_MIGRATE === 'true';
   const hasUsersResult = await pool.query<{ table_name: string | null }>(
@@ -396,7 +409,14 @@ export async function cleanupTestDatabase(): Promise<void> {
   }
 
   const { Pool } = await import('pg');
-  const pool = new Pool({ connectionString: getTestDatabaseUrl() });
+  const connectionString = getTestDatabaseUrl();
+  const isLocalConnection = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+  const pool = new Pool({
+    connectionString,
+    ssl: isLocalConnection ? false : {
+      rejectUnauthorized: false,
+    },
+  });
 
   try {
     // Cleanup resources tracked during tests

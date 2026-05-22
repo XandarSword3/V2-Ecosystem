@@ -126,6 +126,11 @@ export async function migrate() {
       );
     `);
 
+    // Add name column to sessions (used by dynamic module session_access queries)
+    await pool.query(`
+      ALTER TABLE sessions ADD COLUMN IF NOT EXISTS name TEXT;
+    `);
+
     // Compatibility shim: older bootstrap schemas created permissions without slug.
     // Later SQL migrations and module logic rely on this column and a unique index.
     await pool.query(`
@@ -193,57 +198,9 @@ export async function migrate() {
         updated_at TIMESTAMP DEFAULT NOW() NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS restaurant_orders (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        order_number VARCHAR(20) NOT NULL UNIQUE,
-        customer_id UUID REFERENCES users(id),
-        customer_name VARCHAR(255) NOT NULL,
-        customer_phone VARCHAR(20),
-        table_id UUID REFERENCES restaurant_tables(id),
-        order_type order_type NOT NULL,
-        status order_status DEFAULT 'pending' NOT NULL,
-        subtotal DECIMAL(10,2) NOT NULL,
-        tax_amount DECIMAL(10,2) NOT NULL,
-        service_charge DECIMAL(10,2),
-        delivery_fee DECIMAL(10,2),
-        discount_amount DECIMAL(10,2) DEFAULT 0,
-        total_amount DECIMAL(10,2) NOT NULL,
-        special_instructions TEXT,
-        estimated_ready_time TIMESTAMP,
-        actual_ready_time TIMESTAMP,
-        payment_status payment_status DEFAULT 'pending' NOT NULL,
-        payment_method payment_method,
-        assigned_to_staff UUID REFERENCES users(id),
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        completed_at TIMESTAMP,
-        cancelled_at TIMESTAMP,
-        cancellation_reason TEXT,
-        deleted_at TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS restaurant_order_items (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        order_id UUID REFERENCES restaurant_orders(id) NOT NULL,
-        menu_item_id UUID REFERENCES menu_items(id) NOT NULL,
-        quantity INTEGER NOT NULL,
-        unit_price DECIMAL(10,2) NOT NULL,
-        subtotal DECIMAL(10,2) NOT NULL,
-        special_instructions TEXT,
-        status order_status,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS restaurant_order_status_history (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        order_id UUID REFERENCES restaurant_orders(id) NOT NULL,
-        from_status order_status,
-        to_status order_status NOT NULL,
-        changed_by UUID REFERENCES users(id),
-        notes TEXT,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
+      -- Legacy tables removed per ARCHITECTURE_LAW.md
+      -- restaurant_orders, restaurant_order_items, restaurant_order_status_history
+      -- All records now use the unified 'transactions' table
     `);
 
     // Snack Bar tables
@@ -264,35 +221,8 @@ export async function migrate() {
         deleted_at TIMESTAMP
       );
 
-      CREATE TABLE IF NOT EXISTS snack_orders (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        order_number VARCHAR(20) NOT NULL UNIQUE,
-        customer_id UUID REFERENCES users(id),
-        customer_name VARCHAR(255),
-        customer_phone VARCHAR(20),
-        status order_status DEFAULT 'pending' NOT NULL,
-        total_amount DECIMAL(10,2) NOT NULL,
-        subtotal DECIMAL(10,2),
-        tax_amount DECIMAL(10,2) DEFAULT 0,
-        payment_status payment_status DEFAULT 'pending' NOT NULL,
-        payment_method payment_method,
-        special_instructions TEXT,
-        estimated_ready_time TIMESTAMP,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        completed_at TIMESTAMP,
-        deleted_at TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS snack_order_items (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        order_id UUID REFERENCES snack_orders(id) NOT NULL,
-        snack_item_id UUID REFERENCES snack_items(id) NOT NULL,
-        quantity INTEGER NOT NULL,
-        unit_price DECIMAL(10,2) NOT NULL,
-        subtotal DECIMAL(10,2) NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
+      -- Legacy tables removed per ARCHITECTURE_LAW.md
+      -- snack_orders, snack_order_items
     `);
 
     // Chalets tables
@@ -344,47 +274,8 @@ export async function migrate() {
         updated_at TIMESTAMP DEFAULT NOW() NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS chalet_bookings (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        booking_number VARCHAR(20) NOT NULL UNIQUE,
-        chalet_id UUID REFERENCES chalets(id) NOT NULL,
-        customer_id UUID REFERENCES users(id),
-        customer_name VARCHAR(255) NOT NULL,
-        customer_email VARCHAR(255) NOT NULL,
-        customer_phone VARCHAR(20) NOT NULL,
-        check_in_date TIMESTAMP NOT NULL,
-        check_out_date TIMESTAMP NOT NULL,
-        number_of_guests INTEGER NOT NULL,
-        number_of_nights INTEGER NOT NULL,
-        base_amount DECIMAL(10,2) NOT NULL,
-        add_ons_amount DECIMAL(10,2) DEFAULT 0,
-        discount_amount DECIMAL(10,2) DEFAULT 0,
-        deposit_amount DECIMAL(10,2) DEFAULT 0,
-        total_amount DECIMAL(10,2) NOT NULL,
-        status booking_status DEFAULT 'pending' NOT NULL,
-        payment_status payment_status DEFAULT 'pending' NOT NULL,
-        payment_method payment_method,
-        special_requests TEXT,
-        checked_in_at TIMESTAMP,
-        checked_out_at TIMESTAMP,
-        checked_in_by UUID REFERENCES users(id),
-        checked_out_by UUID REFERENCES users(id),
-        cancelled_at TIMESTAMP,
-        cancellation_reason TEXT,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        deleted_at TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS chalet_booking_add_ons (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        booking_id UUID REFERENCES chalet_bookings(id) NOT NULL,
-        add_on_id UUID REFERENCES chalet_add_ons(id) NOT NULL,
-        quantity INTEGER NOT NULL,
-        unit_price DECIMAL(10,2) NOT NULL,
-        subtotal DECIMAL(10,2) NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
+      -- Legacy tables removed per ARCHITECTURE_LAW.md
+      -- chalet_bookings, chalet_booking_add_ons
     `);
 
     // Pool tables
@@ -401,26 +292,8 @@ export async function migrate() {
         updated_at TIMESTAMP DEFAULT NOW() NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS pool_tickets (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        ticket_number VARCHAR(20) NOT NULL UNIQUE,
-        session_id UUID REFERENCES pool_sessions(id) NOT NULL,
-        customer_id UUID REFERENCES users(id),
-        customer_name VARCHAR(255) NOT NULL,
-        customer_phone VARCHAR(20),
-        ticket_date TIMESTAMP NOT NULL,
-        number_of_guests INTEGER NOT NULL,
-        total_amount DECIMAL(10,2) NOT NULL,
-        status ticket_status DEFAULT 'valid' NOT NULL,
-        payment_status payment_status DEFAULT 'pending' NOT NULL,
-        payment_method payment_method,
-        qr_code TEXT NOT NULL,
-        validated_at TIMESTAMP,
-        validated_by UUID REFERENCES users(id),
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        deleted_at TIMESTAMP
-      );
+      -- Legacy tables removed per ARCHITECTURE_LAW.md
+      -- pool_tickets
     `);
 
     // Payments & Notifications tables
@@ -522,6 +395,40 @@ export async function migrate() {
         ('session_access', 'Pool', 'pool', 'Pool access and session management', 3, true),
         ('menu_service', 'Snack Bar', 'snack-bar', 'Quick service snack bar', 4, true)
       ON CONFLICT (slug) DO NOTHING;
+    `);
+
+    // Create transactions table (engine-refit unified table)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        module_id UUID REFERENCES modules(id) ON DELETE SET NULL,
+        engine_type VARCHAR(50) NOT NULL,
+        property_id UUID,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        service_charge DECIMAL(12,2) NOT NULL DEFAULT 0,
+        discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        net_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+        customer_id UUID,
+        reference_id UUID,
+        reference_table VARCHAR(50),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        completed_at TIMESTAMPTZ,
+        metadata JSONB DEFAULT '{}'
+      );
+
+      ALTER TABLE transactions ALTER COLUMN property_id DROP NOT NULL;
+      ALTER TABLE transactions ALTER COLUMN reference_id DROP NOT NULL;
+      ALTER TABLE transactions ALTER COLUMN reference_table DROP NOT NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_transactions_engine_type ON transactions(engine_type);
+      CREATE INDEX IF NOT EXISTS idx_transactions_module_id ON transactions(module_id);
+      CREATE INDEX IF NOT EXISTS idx_transactions_customer_id ON transactions(customer_id);
+      CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
+      CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
 
       -- Support inquiries table
       CREATE TABLE IF NOT EXISTS support_inquiries (
@@ -663,29 +570,10 @@ export async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
-      CREATE INDEX IF NOT EXISTS idx_restaurant_orders_customer_id ON restaurant_orders(customer_id);
-      CREATE INDEX IF NOT EXISTS idx_restaurant_orders_created_at ON restaurant_orders(created_at);
-      CREATE INDEX IF NOT EXISTS idx_chalet_bookings_chalet_id ON chalet_bookings(chalet_id);
-      CREATE INDEX IF NOT EXISTS idx_chalet_bookings_check_in_date ON chalet_bookings(check_in_date);
-      CREATE INDEX IF NOT EXISTS idx_pool_tickets_session_id ON pool_tickets(session_id);
-      CREATE INDEX IF NOT EXISTS idx_pool_tickets_ticket_date ON pool_tickets(ticket_date);
       CREATE INDEX IF NOT EXISTS idx_payments_reference ON payments(reference_type, reference_id);
     `);
 
-    // Add module_id to restaurant_orders
-    await pool.query(`
-      ALTER TABLE restaurant_orders ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);
-      
-      DO $$
-      DECLARE
-        restaurant_id UUID;
-      BEGIN
-        SELECT id INTO restaurant_id FROM modules WHERE slug = 'restaurant';
-        IF restaurant_id IS NOT NULL THEN
-          UPDATE restaurant_orders SET module_id = restaurant_id WHERE module_id IS NULL;
-        END IF;
-      END $$;
-    `);
+    // Legacy restaurant_orders module_id backfill removed per ARCHITECTURE_LAW.md
 
     let shouldReplaySqlMigrations = true;
     const supabaseMigrationTableResult = await pool.query<{ table_name: string | null }>(
