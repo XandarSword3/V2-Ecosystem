@@ -1,14 +1,17 @@
 /**
  * Integration Test API Client
  *
- * HTTP client wrapper for integration tests with auth handling.
- * Adapted from stress test api-client for test assertions.
+ * HTTP client for integration tests. All module commerce is engine-based:
+ * records are stored in `transactions` (see ARCHITECTURE_LAW.md).
+ * Module slugs (`/restaurant`, `/chalets`, `/pool`, `/snack-bar`) expose REST
+ * surfaces; staff operations use `/staff/modules/:slug/*`.
  */
 
 import { TEST_CONFIG } from './config';
-import { testContext, trackResource } from './setup';
+import { testContext, trackResource, trackTransaction } from './setup';
+import { ModuleSlug } from './engine-refit-helpers';
 
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   status: number;
   data?: T;
@@ -33,16 +36,10 @@ export class TestApiClient {
     this.baseUrl = baseUrl;
   }
 
-  /**
-   * Set auth token directly (for reusing tokens across tests)
-   */
   setToken(token: string | null): void {
     this.accessToken = token;
   }
 
-  /**
-   * Get current auth token
-   */
   getToken(): string | null {
     return this.accessToken;
   }
@@ -51,24 +48,21 @@ export class TestApiClient {
     return this.accessToken !== null;
   }
 
-  /**
-   * Make HTTP request with full response details for assertions
-   */
-  async request<T = any>(
+  async request<T = unknown>(
     endpoint: string,
     method: string,
-    body?: any,
-    options: { requiresAuth?: boolean; timeout?: number } = {}
+    body?: unknown,
+    options: { requiresAuth?: boolean; timeout?: number } = {},
   ): Promise<ApiResponse<T>> {
     const { requiresAuth = true, timeout = TEST_CONFIG.api.timeout } = options;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-Integration-Test': 'true', // Bypass rate limiting for integration tests
+      'X-Integration-Test': 'true',
     };
 
     if (requiresAuth && this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
+      headers.Authorization = `Bearer ${this.accessToken}`;
     }
 
     const controller = new AbortController();
@@ -84,7 +78,7 @@ export class TestApiClient {
 
       clearTimeout(timeoutId);
 
-      let data: any;
+      let data: unknown;
       const contentType = response.headers.get('content-type');
       if (contentType?.includes('application/json')) {
         data = await response.json();
@@ -92,34 +86,36 @@ export class TestApiClient {
         data = await response.text();
       }
 
+      const payload = data as { data?: T; error?: string };
       return {
         success: response.ok,
         status: response.status,
-        data: data.data ?? data,
-        error: data.error,
+        data: payload.data ?? (data as T),
+        error: payload.error,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearTimeout(timeoutId);
-
-      if (error.name === 'AbortError') {
+      const err = error as { name?: string; message?: string };
+      if (err.name === 'AbortError') {
         return { success: false, status: 0, error: 'Request timeout' };
       }
-      return { success: false, status: 0, error: error.message };
+      return { success: false, status: 0, error: err.message ?? 'Request failed' };
     }
   }
 
   // ============ AUTH ============
+
   async register(
     email: string,
     password: string,
     fullName: string,
-    phone?: string
+    phone?: string,
   ): Promise<ApiResponse<AuthResponse>> {
     const result = await this.request<AuthResponse>(
       '/auth/register',
       'POST',
       { email, password, fullName, phone },
-      { requiresAuth: false }
+      { requiresAuth: false },
     );
 
     if (result.success && result.data) {
@@ -127,7 +123,6 @@ export class TestApiClient {
       this.refreshToken = result.data.refreshToken || result.data.tokens?.refreshToken || null;
       this.userId = result.data.user?.id || null;
       this.userRoles = result.data.user?.roles || [];
-
       if (this.userId) {
         trackResource('users', this.userId);
       }
@@ -140,7 +135,7 @@ export class TestApiClient {
       '/auth/login',
       'POST',
       { email, password },
-      { requiresAuth: false }
+      { requiresAuth: false },
     );
 
     if (result.success && result.data) {
@@ -172,12 +167,13 @@ export class TestApiClient {
       '/auth/refresh',
       'POST',
       { refreshToken: this.refreshToken },
-      { requiresAuth: false }
+      { requiresAuth: false },
     );
 
     if (result.success && result.data) {
       this.accessToken = result.data.accessToken || result.data.tokens?.accessToken || null;
-      this.refreshToken = result.data.refreshToken || result.data.tokens?.refreshToken || this.refreshToken;
+      this.refreshToken =
+        result.data.refreshToken || result.data.tokens?.refreshToken || this.refreshToken;
     }
     return result;
   }
@@ -190,16 +186,14 @@ export class TestApiClient {
     return this.request('/auth/change-password', 'POST', { currentPassword, newPassword });
   }
 
-  // ============ RESTAURANT ============
+  // ============ RESTAURANT (menu_service → instant_transaction) ============
+
   async getRestaurantMenu(): Promise<ApiResponse> {
-    return this.request('/restaurant/menu', 'GET', null, { requiresAuth: false });
+    return this.request(`/${ModuleSlug.RESTAURANT}/items`, 'GET');
   }
 
-  async getRestaurantCategories(): Promise<ApiResponse> {
-    return this.request('/restaurant/categories', 'GET', null, { requiresAuth: false });
-  }
-
-  async createRestaurantOrder(order: {
+  /** Creates an `instant_transaction` row via the restaurant module API. */
+  async createRestaurantTransaction(order: {
     customerName: string;
     customerPhone: string;
     orderType: 'dine_in' | 'takeaway' | 'delivery';
@@ -207,123 +201,162 @@ export class TestApiClient {
     tableNumber?: string;
     notes?: string;
   }): Promise<ApiResponse> {
-    const result = await this.request('/restaurant/orders', 'POST', order, { requiresAuth: false });
-    if (result.success && result.data?.id) {
-      trackResource('restaurant_orders', result.data.id);
+    const items = order.items.map((item) => ({
+      menu_item_id: item.menuItemId,
+      quantity: item.quantity,
+    }));
+    const result = await this.request(`/${ModuleSlug.RESTAURANT}/orders`, 'POST', {
+      items,
+      notes: order.notes,
+      metadata: {
+        customer_name: order.customerName,
+        customer_phone: order.customerPhone,
+        order_type: order.orderType,
+        table_number: order.tableNumber,
+      },
+    });
+    if (result.success && result.data && typeof result.data === 'object' && 'id' in result.data) {
+      trackTransaction(String((result.data as { id: string }).id));
     }
     return result;
   }
 
-  async getRestaurantOrder(id: string): Promise<ApiResponse> {
-    return this.request(`/restaurant/orders/${id}`, 'GET', null, { requiresAuth: false });
+  async getRestaurantTransaction(id: string): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.RESTAURANT}/orders/${id}`, 'GET');
   }
 
-  async updateOrderStatus(id: string, status: string): Promise<ApiResponse> {
-    return this.request(`/restaurant/staff/orders/${id}/status`, 'PATCH', { status });
+  async updateRestaurantTransactionStatus(id: string, status: string): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.RESTAURANT}/orders/${id}/status`, 'PATCH', { status });
   }
 
-  // ============ CHALETS ============
-  async getChalets(): Promise<ApiResponse> {
-    return this.request('/chalets', 'GET', null, { requiresAuth: false });
+  // ============ CHALETS (multi_day_booking → time_exclusive_reservation) ============
+
+  async getChaletUnits(): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.CHALETS}/availability`, 'GET');
   }
 
-  async getChalet(id: string): Promise<ApiResponse> {
-    return this.request(`/chalets/${id}`, 'GET', null, { requiresAuth: false });
-  }
-
-  async getChaletAvailability(chaletId: string, startDate: string, endDate: string): Promise<ApiResponse> {
+  async getChaletAvailability(startDate: string, endDate: string): Promise<ApiResponse> {
     return this.request(
-      `/chalets/${chaletId}/availability?startDate=${startDate}&endDate=${endDate}`,
+      `/${ModuleSlug.CHALETS}/availability?start=${startDate}&end=${endDate}`,
       'GET',
-      null,
-      { requiresAuth: false }
     );
   }
 
-  async createBooking(booking: {
-    chaletId: string;
+  async createChaletReservation(reservation: {
+    unitId: string;
     checkInDate: string;
     checkOutDate: string;
     customerName: string;
     customerEmail: string;
     customerPhone: string;
     numberOfGuests: number;
+    totalAmount?: number;
     paymentMethod?: string;
   }): Promise<ApiResponse> {
-    const result = await this.request('/chalets/bookings', 'POST', booking, { requiresAuth: false });
-    if (result.success && result.data?.id) {
-      trackResource('chalet_bookings', result.data.id);
+    const result = await this.request(`/${ModuleSlug.CHALETS}/bookings`, 'POST', {
+      unit_id: reservation.unitId,
+      check_in_date: reservation.checkInDate,
+      check_out_date: reservation.checkOutDate,
+      total_amount: reservation.totalAmount ?? 0,
+      metadata: {
+        customer_name: reservation.customerName,
+        customer_email: reservation.customerEmail,
+        customer_phone: reservation.customerPhone,
+        number_of_guests: reservation.numberOfGuests,
+        payment_method: reservation.paymentMethod,
+      },
+    });
+    if (result.success && result.data && typeof result.data === 'object' && 'id' in result.data) {
+      trackTransaction(String((result.data as { id: string }).id));
     }
     return result;
   }
 
-  async getBooking(id: string): Promise<ApiResponse> {
-    return this.request(`/chalets/bookings/${id}`, 'GET');
+  async getChaletReservation(id: string): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.CHALETS}/bookings/${id}`, 'GET');
   }
 
-  async checkIn(bookingId: string): Promise<ApiResponse> {
-    return this.request(`/chalets/bookings/${bookingId}/check-in`, 'POST');
+  async updateChaletReservationStatus(
+    reservationId: string,
+    status: string,
+  ): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.CHALETS}/bookings/${reservationId}/status`, 'PATCH', {
+      status,
+    });
   }
 
-  async checkOut(bookingId: string): Promise<ApiResponse> {
-    return this.request(`/chalets/bookings/${bookingId}/check-out`, 'POST');
+  // ============ POOL (session_access → shared_capacity_access) ============
+
+  async getPoolSessions(): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.POOL}/sessions`, 'GET');
   }
 
-  // ============ POOL ============
-  async getPoolStatus(): Promise<ApiResponse> {
-    return this.request('/pool/status', 'GET', null, { requiresAuth: false });
-  }
-
-  async getPoolTicketTypes(): Promise<ApiResponse> {
-    return this.request('/pool/ticket-types', 'GET', null, { requiresAuth: false });
-  }
-
-  async purchasePoolTicket(ticket: {
-    ticketTypeId: string;
-    customerName: string;
-    customerPhone: string;
-    visitDate: string;
+  async purchasePoolAccess(ticket: {
+    sessionId: string;
     quantity?: number;
-    paymentMethod?: string;
+    unitPrice?: number;
   }): Promise<ApiResponse> {
-    const result = await this.request('/pool/tickets', 'POST', ticket, { requiresAuth: false });
-    if (result.success && result.data?.id) {
-      trackResource('pool_tickets', result.data.id);
+    const result = await this.request(`/${ModuleSlug.POOL}/tickets`, 'POST', {
+      session_id: ticket.sessionId,
+      quantity: ticket.quantity ?? 1,
+      unit_price: ticket.unitPrice ?? 0,
+    });
+    if (result.success && result.data && typeof result.data === 'object' && 'id' in result.data) {
+      trackTransaction(String((result.data as { id: string }).id));
     }
     return result;
   }
 
-  async getPoolTicket(id: string): Promise<ApiResponse> {
-    return this.request(`/pool/tickets/${id}`, 'GET', null, { requiresAuth: false });
+  async getPoolTransaction(id: string): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.POOL}/tickets/${id}`, 'GET');
   }
 
-  async validatePoolTicket(ticketId: string): Promise<ApiResponse> {
-    return this.request(`/pool/tickets/${ticketId}/validate`, 'POST');
+  async validatePoolTransaction(transactionId: string): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.POOL}/tickets/${transactionId}/validate`, 'PATCH');
   }
 
-  // ============ SNACK BAR ============
-  async getSnackCategories(): Promise<ApiResponse> {
-    return this.request('/snack/categories', 'GET', null, { requiresAuth: false });
+  async recordPoolEntry(transactionId: string): Promise<ApiResponse> {
+    return this.request(`/staff/modules/${ModuleSlug.POOL}/entry`, 'POST', {
+      ticketId: transactionId,
+    });
   }
 
-  async getSnackItems(): Promise<ApiResponse> {
-    return this.request('/snack/items', 'GET', null, { requiresAuth: false });
+  async recordPoolExit(transactionId: string): Promise<ApiResponse> {
+    return this.request(`/staff/modules/${ModuleSlug.POOL}/exit`, 'POST', {
+      ticketId: transactionId,
+    });
   }
 
-  async createSnackOrder(order: {
-    customerName: string;
-    customerPhone: string;
-    items: { itemId: string; quantity: number }[];
-    tableNumber?: string;
+  async getPoolCapacity(): Promise<ApiResponse> {
+    return this.request(`/staff/modules/${ModuleSlug.POOL}/capacity`, 'GET');
+  }
+
+  // ============ SNACK BAR (menu_service → instant_transaction) ============
+
+  async getSnackMenu(): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.SNACK_BAR}/items`, 'GET');
+  }
+
+  async createSnackTransaction(order: {
+    items: { menuItemId: string; quantity: number }[];
+    metadata?: Record<string, unknown>;
   }): Promise<ApiResponse> {
-    const result = await this.request('/snack/orders', 'POST', order, { requiresAuth: false });
-    if (result.success && result.data?.id) {
-      trackResource('snack_orders', result.data.id);
+    const items = order.items.map((item) => ({
+      menu_item_id: item.menuItemId,
+      quantity: item.quantity,
+    }));
+    const result = await this.request(`/${ModuleSlug.SNACK_BAR}/orders`, 'POST', {
+      items,
+      metadata: order.metadata,
+    });
+    if (result.success && result.data && typeof result.data === 'object' && 'id' in result.data) {
+      trackTransaction(String((result.data as { id: string }).id));
     }
     return result;
   }
 
   // ============ PAYMENTS ============
+
   async createPaymentIntent(payment: {
     amount: number;
     currency: string;
@@ -338,6 +371,7 @@ export class TestApiClient {
   }
 
   // ============ ADMIN ============
+
   async getAdminDashboard(): Promise<ApiResponse> {
     return this.request('/admin/dashboard', 'GET');
   }
@@ -352,14 +386,105 @@ export class TestApiClient {
   }
 
   // ============ HEALTH ============
+
   async healthCheck(): Promise<ApiResponse> {
     return this.request('/health', 'GET', null, { requiresAuth: false });
   }
+
+  // ── Aliases for older scenario tests (engine-refit implementations only) ──
+
+  async createRestaurantOrder(
+    order: Parameters<TestApiClient['createRestaurantTransaction']>[0],
+  ) {
+    return this.createRestaurantTransaction(order);
+  }
+
+  async getRestaurantOrder(id: string) {
+    return this.getRestaurantTransaction(id);
+  }
+
+  async updateOrderStatus(id: string, status: string) {
+    return this.updateRestaurantTransactionStatus(id, status);
+  }
+
+  async createBooking(booking: {
+    chaletId: string;
+    checkInDate: string;
+    checkOutDate: string;
+    customerName: string;
+    customerEmail: string;
+    customerPhone: string;
+    numberOfGuests: number;
+    paymentMethod?: string;
+    totalAmount?: number;
+  }) {
+    return this.createChaletReservation({
+      unitId: booking.chaletId,
+      checkInDate: booking.checkInDate,
+      checkOutDate: booking.checkOutDate,
+      customerName: booking.customerName,
+      customerEmail: booking.customerEmail,
+      customerPhone: booking.customerPhone,
+      numberOfGuests: booking.numberOfGuests,
+      paymentMethod: booking.paymentMethod,
+      totalAmount: booking.totalAmount,
+    });
+  }
+
+  async getBooking(id: string) {
+    return this.getChaletReservation(id);
+  }
+
+  async checkIn(reservationId: string) {
+    return this.updateChaletReservationStatus(reservationId, 'active');
+  }
+
+  async checkOut(reservationId: string) {
+    return this.updateChaletReservationStatus(reservationId, 'used');
+  }
+
+  async getChalet(id: string) {
+    return this.getChaletReservation(id);
+  }
+
+  async purchasePoolTicket(ticket: {
+    sessionId: string;
+    customerName?: string;
+    customerPhone?: string;
+    numberOfGuests?: number;
+    ticketDate?: string;
+    visitDate?: string;
+    paymentMethod?: string;
+    ticketTypeId?: string;
+    quantity?: number;
+    unitPrice?: number;
+  }) {
+    return this.purchasePoolAccess({
+      sessionId: ticket.sessionId,
+      quantity: ticket.numberOfGuests ?? ticket.quantity ?? 1,
+      unitPrice: ticket.unitPrice ?? 0,
+    });
+  }
+
+  async getPoolTicket(id: string) {
+    return this.getPoolTransaction(id);
+  }
+
+  async validatePoolTicket(transactionId: string) {
+    return this.validatePoolTransaction(transactionId);
+  }
+
+  async getPoolStatus() {
+    return this.getPoolSessions();
+  }
+
+  async createSnackOrder(
+    order: Parameters<TestApiClient['createSnackTransaction']>[0],
+  ) {
+    return this.createSnackTransaction(order);
+  }
 }
 
-/**
- * Create client pre-authenticated as admin
- */
 export async function createAdminClient(): Promise<TestApiClient> {
   const client = new TestApiClient();
 
@@ -368,7 +493,7 @@ export async function createAdminClient(): Promise<TestApiClient> {
   } else {
     const result = await client.login(
       TEST_CONFIG.users.admin.email,
-      TEST_CONFIG.users.admin.password
+      TEST_CONFIG.users.admin.password,
     );
     if (result.success) {
       testContext.adminToken = client.getToken();
@@ -378,9 +503,6 @@ export async function createAdminClient(): Promise<TestApiClient> {
   return client;
 }
 
-/**
- * Create client pre-authenticated as staff
- */
 export async function createStaffClient(): Promise<TestApiClient> {
   const client = new TestApiClient();
 
@@ -389,7 +511,7 @@ export async function createStaffClient(): Promise<TestApiClient> {
   } else {
     const result = await client.login(
       TEST_CONFIG.users.staff.email,
-      TEST_CONFIG.users.staff.password
+      TEST_CONFIG.users.staff.password,
     );
     if (result.success) {
       testContext.staffToken = client.getToken();
@@ -399,9 +521,6 @@ export async function createStaffClient(): Promise<TestApiClient> {
   return client;
 }
 
-/**
- * Create client pre-authenticated as customer
- */
 export async function createCustomerClient(): Promise<TestApiClient> {
   const client = new TestApiClient();
 
@@ -410,7 +529,7 @@ export async function createCustomerClient(): Promise<TestApiClient> {
   } else {
     const result = await client.login(
       TEST_CONFIG.users.customer.email,
-      TEST_CONFIG.users.customer.password
+      TEST_CONFIG.users.customer.password,
     );
     if (result.success) {
       testContext.customerToken = client.getToken();
@@ -420,9 +539,6 @@ export async function createCustomerClient(): Promise<TestApiClient> {
   return client;
 }
 
-/**
- * Create unauthenticated client
- */
 export function createGuestClient(): TestApiClient {
   return new TestApiClient();
 }
