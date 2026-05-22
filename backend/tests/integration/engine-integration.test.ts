@@ -83,7 +83,7 @@ describe('Engine Integration Tests', () => {
       expect(result.moduleId).toBe('mod-1');
       expect(result.subtotal).toBe(20);
       expect(result.totalDiscount).toBe(10); // from mock coupon
-      expect(result.totalAmount).toBe(12); // subtotal 20, coupon 10, tax 1 → total 12
+      expect(result.totalAmount).toBe(11); // subtotal 20, coupon 10 pre-tax, taxable=10, tax=1 → total 11
     });
 
     it('should handle state transitions', async () => {
