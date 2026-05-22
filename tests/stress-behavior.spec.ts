@@ -106,7 +106,7 @@ test.describe('Concurrency Stress Tests', () => {
     
     const bookingPromises = Array(concurrentBookings).fill(null).map(async (_, i) => {
       try {
-        const response = await request.post(`${baseUrl}/api/v1/chalets/bookings`, {
+        const response = await request.post(`${baseUrl}/api/v1/units/bookings`, {
           data: {
             chaletId,
             checkInDate: checkIn,

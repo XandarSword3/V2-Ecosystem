@@ -103,12 +103,9 @@ describe.skip('Data Integrity', () => {
         
         // Get an order with items - actual table is restaurant_orders
         const { data: orders, error } = await supabase
-          .from('restaurant_orders')
-          .select(`
-            id,
-            order_number,
-            status
-          `)
+          .from('transactions')
+          .select('id, status, metadata, amount')
+          .eq('engine_type', 'instant_transaction')
           .limit(5);
         
         expect(error).toBeNull();
@@ -131,8 +128,9 @@ describe.skip('Data Integrity', () => {
       
       // Find a chalet with bookings
       const { data: bookings, error: fetchError } = await supabase
-        .from('chalet_bookings')
-        .select('chalet_id')
+        .from('transactions')
+        .select('metadata')
+        .eq('engine_type', 'time_exclusive_reservation')
         .eq('status', 'confirmed')
         .limit(1);
       
@@ -141,13 +139,16 @@ describe.skip('Data Integrity', () => {
         return;
       }
       
-      const chaletId = bookings[0].chalet_id;
+      const unitId = (bookings[0].metadata as { unit_id?: string } | null)?.unit_id;
+      if (!unitId) {
+        console.log('Booking has no unit_id in metadata');
+        return;
+      }
       
-      // Attempting hard delete should fail due to foreign key
       const { error: deleteError } = await supabase
-        .from('chalets')
+        .from('bookable_units')
         .delete()
-        .eq('id', chaletId);
+        .eq('id', unitId);
       
       // Should get foreign key constraint error or be prevented
       if (deleteError) {
@@ -161,8 +162,9 @@ describe.skip('Data Integrity', () => {
       
       // Find a user with orders
       const { data: orders, error: fetchError } = await supabase
-        .from('restaurant_orders')
+        .from('transactions')
         .select('customer_id')
+        .eq('engine_type', 'instant_transaction')
         .not('customer_id', 'is', null)
         .limit(1);
       
@@ -192,7 +194,8 @@ describe.skip('Data Integrity', () => {
       
       // Check that all orders reference valid modules
       const { data: orders, error } = await supabase
-        .from('restaurant_orders')
+        .from('transactions')
+          .eq('engine_type', 'instant_transaction')
         .select(`
           id,
           module_id
@@ -217,7 +220,8 @@ describe.skip('Data Integrity', () => {
       const supabase = getSupabase();
       
       const { data: orders, error } = await supabase
-        .from('restaurant_orders')
+        .from('transactions')
+          .eq('engine_type', 'instant_transaction')
         .select('id, status')
         .limit(50);
       
@@ -236,7 +240,8 @@ describe.skip('Data Integrity', () => {
       const supabase = getSupabase();
       
       const { data: orders, error } = await supabase
-        .from('restaurant_orders')
+        .from('transactions')
+          .eq('engine_type', 'instant_transaction')
         .select('id, payment_status')
         .limit(50);
       
@@ -430,7 +435,8 @@ describe.skip('Delete Preview', () => {
         
         // Check for related orders
         const { data: orders, error: ordersError } = await supabase
-          .from('restaurant_orders')
+          .from('transactions')
+          .eq('engine_type', 'instant_transaction')
           .select('id')
           .eq('module_id', moduleId);
         
@@ -478,7 +484,8 @@ describe('Transaction Safety', () => {
       
       // Check that paid orders have payment records
       const { data: paidOrders, error } = await supabase
-        .from('restaurant_orders')
+        .from('transactions')
+          .eq('engine_type', 'instant_transaction')
         .select(`
           id,
           payment_status

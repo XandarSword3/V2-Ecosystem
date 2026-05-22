@@ -71,7 +71,7 @@ describeIntegration('Authentication (Integration)', () => {
 
 describeIntegration('Double Booking Prevention (Integration)', () => {
   it('should prevent double booking for the same chalet and dates', async () => {
-    const chaletsRes = await request(app).get('/api/v1/chalets');
+    const chaletsRes = await request(app).get('/api/v1/units');
     expect(chaletsRes.status).toBeLessThan(500);
 
     const chalets = Array.isArray(chaletsRes.body?.data)
@@ -110,18 +110,14 @@ describeIntegration('Double Booking Prevention (Integration)', () => {
       checkOut.setUTCDate(checkOut.getUTCDate() + 2);
 
       const candidatePayload = {
-        chaletId: chalet.id,
-        checkInDate: toIsoDate(checkIn),
-        checkOutDate: toIsoDate(checkOut),
-        customerName: 'Test User',
-        customerEmail: 'test@example.com',
-        customerPhone: '+1234567890',
-        numberOfGuests: 2,
-        paymentMethod: 'cash',
+        unit_id: chalet.id,
+        check_in_date: toIsoDate(checkIn),
+        check_out_date: toIsoDate(checkOut),
+        number_of_guests: 2,
       };
 
       const candidate = await request(app)
-        .post('/api/v1/chalets/bookings')
+        .post('/api/v1/units/bookings')
         .send(candidatePayload);
 
       if ([200, 201].includes(candidate.status)) {
@@ -143,7 +139,7 @@ describeIntegration('Double Booking Prevention (Integration)', () => {
 
     // Second booking for same dates should fail
     const res2 = await request(app)
-      .post('/api/v1/chalets/bookings')
+      .post('/api/v1/units/bookings')
       .send(bookingPayload);
 
     expect([200, 201]).not.toContain(res2.status);

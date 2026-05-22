@@ -34,12 +34,12 @@ describe('AI Agent Interaction Tests', () => {
         // expect(Array.isArray(response.body.data)).toBe(true);
     });
 
-    it('should handle legacy routes correctly for agents using old paths', async () => {
-        // Path /api/v1/chalets should redirect or be handled as /api/v1/units
+    it('should reject legacy chalet API paths with 410 Gone', async () => {
         const response = await request(app)
             .get(`${API_V1}/chalets`)
-            .expect(200); // Middleware handles it
+            .expect(410);
 
-        expect(response.body.success).toBe(true);
+        expect(response.body.success).toBe(false);
+        expect(response.body.migration).toBe('/api/v1/units');
     });
 });

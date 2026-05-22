@@ -23,7 +23,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
     
     async getChalets(filters = {}) {
       let query = supabase
-        .from('chalets')
+        .from('bookable_units')
         .select('*')
         .is('deleted_at', null);
 
@@ -41,7 +41,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
 
     async getChaletById(id: string) {
       const { data, error } = await supabase
-        .from('chalets')
+        .from('bookable_units')
         .select('*')
         .eq('id', id)
         .single();
@@ -53,7 +53,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
 
     async createChalet(chalet) {
       const { data, error } = await supabase
-        .from('chalets')
+        .from('bookable_units')
         .insert(chalet)
         .select()
         .single();
@@ -64,7 +64,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
 
     async updateChalet(id: string, updates) {
       const { data, error } = await supabase
-        .from('chalets')
+        .from('bookable_units')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
@@ -76,7 +76,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
 
     async deleteChalet(id: string) {
       const { error } = await supabase
-        .from('chalets')
+        .from('bookable_units')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', id);
 
@@ -300,7 +300,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
     // ============================================
 
     async getAddOns(activeOnly = true) {
-      let query = supabase.from('chalet_add_ons').select('*');
+      let query = supabase.from('accommodation_add_ons').select('*');
       if (activeOnly) query = query.eq('is_active', true);
 
       const { data, error } = await query;
@@ -310,7 +310,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
 
     async getAddOnById(id: string) {
       const { data, error } = await supabase
-        .from('chalet_add_ons')
+        .from('accommodation_add_ons')
         .select('*')
         .eq('id', id)
         .single();
@@ -324,7 +324,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
       if (ids.length === 0) return [];
 
       const { data, error } = await supabase
-        .from('chalet_add_ons')
+        .from('accommodation_add_ons')
         .select('*')
         .in('id', ids);
 
@@ -334,7 +334,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
 
     async createAddOn(addOn) {
       const { data, error } = await supabase
-        .from('chalet_add_ons')
+        .from('accommodation_add_ons')
         .insert(addOn)
         .select()
         .single();
@@ -345,7 +345,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
 
     async updateAddOn(id: string, updates) {
       const { data, error } = await supabase
-        .from('chalet_add_ons')
+        .from('accommodation_add_ons')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
@@ -357,7 +357,7 @@ export function createSupabaseChaletRepository(supabase: SupabaseClient): Chalet
 
     async deleteAddOn(id: string) {
       const { error } = await supabase
-        .from('chalet_add_ons')
+        .from('accommodation_add_ons')
         .update({ is_active: false })
         .eq('id', id);
 

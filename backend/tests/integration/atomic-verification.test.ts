@@ -105,27 +105,31 @@ describe('Atomic Functions Verification', () => {
     }
 
     // 2. Get/Create Chalet
-    const { data: chalet, error: selErr } = await supabase
-      .from('chalets')
+    const { data: unit } = await supabase
+      .from('bookable_units')
       .select('id')
+      .eq('is_active', true)
       .limit(1)
-      .single();
+      .maybeSingle();
       
-    if (chalet) {
-        testChaletId = chalet.id;
-        console.log('Using existing chalet:', testChaletId);
-        // Clean up any existing future bookings for this chalet to prevent 400 errors on re-runs
-        await supabase.from('chalet_bookings').delete().eq('chalet_id', testChaletId);
+    if (unit) {
+        testChaletId = unit.id;
+        console.log('Using existing bookable unit:', testChaletId);
+        await supabase
+          .from('transactions')
+          .delete()
+          .eq('engine_type', 'time_exclusive_reservation')
+          .filter('metadata->>unit_id', 'eq', testChaletId);
     } else {
-        const { data: newChalet, error: insErr } = await supabase.from('chalets').insert({
-            name: 'Atomic Test Chalet',
-            price: 100,
+        const { data: newUnit, error: insErr } = await supabase.from('bookable_units').insert({
+            name: 'Atomic Test Unit',
             base_price: 100,
             weekend_price: 120,
-            capacity: 4
+            capacity: 4,
+            is_active: true,
         }).select().single();
-        console.log('Inserted chalet:', newChalet, 'Error:', insErr);
-        testChaletId = newChalet?.id;
+        console.log('Inserted bookable unit:', newUnit, 'Error:', insErr);
+        testChaletId = newUnit?.id;
     }
     console.log('Final testChaletId:', testChaletId);
   });
@@ -147,16 +151,13 @@ describe('Atomic Functions Verification', () => {
     checkOut.setDate(checkOut.getDate() + 2);
 
     const res = await request(app)
-      .post('/api/v1/chalets/bookings') // Verify route path later if fails
+      .post('/api/v1/units/bookings')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
-        chaletId: testChaletId,
-        customerName: 'Atomic Tester',
-        customerEmail: 'atomic@test.com',
-        customerPhone: '1234567890',
-        checkInDate: checkIn.toISOString(),
-        checkOutDate: checkOut.toISOString(),
-        numberOfGuests: 2,
+        unit_id: testChaletId,
+        check_in_date: checkIn.toISOString().split('T')[0],
+        check_out_date: checkOut.toISOString().split('T')[0],
+        number_of_guests: 2,
         addOns: [],
         paymentMethod: 'card'
       });

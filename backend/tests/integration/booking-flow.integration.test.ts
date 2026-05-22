@@ -62,20 +62,24 @@ describeIf('Booking Flow Integration', () => {
     }
 
     // Get first available chalet
-    const { data: chalet } = await supabase
-      .from('chalets')
+    const { data: unit } = await supabase
+      .from('bookable_units')
       .select('id')
       .eq('is_active', true)
       .limit(1)
-      .single();
+      .maybeSingle();
     
-    testChaletId = chalet?.id || 'test-chalet-id';
+    testChaletId = unit?.id || '00000000-0000-0000-0000-000000000001';
   });
 
   afterAll(async () => {
     // Cleanup test data
     if (testBookingId) {
-      await supabase.from('chalet_bookings').delete().eq('id', testBookingId);
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', testBookingId)
+        .eq('engine_type', 'time_exclusive_reservation');
     }
     if (testUserId) {
       await supabase.auth.admin.deleteUser(testUserId);
@@ -91,7 +95,7 @@ describeIf('Booking Flow Integration', () => {
       checkOut.setDate(checkOut.getDate() + 3);
 
       const response = await request(app)
-        .get(`/api/v1/chalets/${testChaletId}/availability`)
+        .get(`/api/v1/units/${testChaletId}/availability`)
         .query({
           startDate: tomorrow.toISOString().split('T')[0],
           endDate: checkOut.toISOString().split('T')[0],
@@ -105,7 +109,7 @@ describeIf('Booking Flow Integration', () => {
 
     it('should exclude already booked chalets', async () => {
       const response = await request(app)
-        .get(`/api/v1/chalets/${testChaletId}/availability`)
+        .get(`/api/v1/units/${testChaletId}/availability`)
         .query({
           startDate: '2025-07-01',
           endDate: '2025-07-05',
@@ -118,7 +122,7 @@ describeIf('Booking Flow Integration', () => {
 
     it('should filter by capacity', async () => {
       const response = await request(app)
-        .get('/api/v1/chalets');
+        .get('/api/v1/units');
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -135,18 +139,13 @@ describeIf('Booking Flow Integration', () => {
       checkOut.setDate(checkOut.getDate() + 2);
 
       const response = await request(app)
-        .post('/api/v1/chalets/bookings')
+        .post('/api/v1/units/bookings')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          chaletId: testChaletId,
-          customerName: 'Test User',
-          customerEmail: 'test@example.com',
-          customerPhone: '+1234567890',
-          checkInDate: tomorrow.toISOString().split('T')[0],
-          checkOutDate: checkOut.toISOString().split('T')[0],
-          numberOfGuests: 4,
-          specialRequests: 'Early check-in if possible',
-          paymentMethod: 'card',
+          unit_id: testChaletId,
+          check_in_date: tomorrow.toISOString().split('T')[0],
+          check_out_date: checkOut.toISOString().split('T')[0],
+          number_of_guests: 4,
         });
 
       if (response.status === 201) {
@@ -158,17 +157,13 @@ describeIf('Booking Flow Integration', () => {
 
     it('should reject booking for unavailable dates', async () => {
       const response = await request(app)
-        .post('/api/v1/chalets/bookings')
+        .post('/api/v1/units/bookings')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          chaletId: testChaletId,
-          customerName: 'Test User',
-          customerEmail: 'test@example.com',
-          customerPhone: '+1234567890',
-          checkInDate: '2025-01-01',
-          checkOutDate: '2025-01-03',
-          numberOfGuests: 4,
-          paymentMethod: 'card',
+          unit_id: testChaletId,
+          check_in_date: '2025-01-01',
+          check_out_date: '2025-01-03',
+          number_of_guests: 4,
         });
 
       expect([201, 400, 404]).toContain(response.status);
@@ -176,12 +171,12 @@ describeIf('Booking Flow Integration', () => {
 
     it('should reject booking without authentication', async () => {
       const response = await request(app)
-        .post('/api/v1/chalets/bookings')
+        .post('/api/v1/units/bookings')
         .send({
-          chaletId: testChaletId,
-          checkInDate: '2025-08-01',
-          checkOutDate: '2025-08-03',
-          numberOfGuests: 4,
+          unit_id: testChaletId,
+          check_in_date: '2025-08-01',
+          check_out_date: '2025-08-03',
+          number_of_guests: 4,
         });
 
       expect([400, 401]).toContain(response.status);
@@ -213,9 +208,10 @@ describeIf('Booking Flow Integration', () => {
       if (!testBookingId) return;
 
       const { data: booking } = await supabase
-        .from('chalet_bookings')
-        .select('*')
+        .from('transactions')
+        .select('id, status, amount, metadata')
         .eq('id', testBookingId)
+        .eq('engine_type', 'time_exclusive_reservation')
         .single();
 
       if (booking) {

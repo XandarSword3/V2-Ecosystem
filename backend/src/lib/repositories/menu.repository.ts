@@ -96,7 +96,16 @@ export function createSupabaseMenuRepository(supabase: SupabaseClient): MenuRepo
         .order('display_order', { ascending: true });
 
       if (filters.categoryId) query = query.eq('category_id', filters.categoryId);
-      if (filters.moduleId) query = query.eq('module_id', filters.moduleId);
+      if (filters.moduleId) {
+        const { data: categories, error: catError } = await supabase
+          .from('menu_categories')
+          .select('id')
+          .eq('module_id', filters.moduleId);
+        if (catError) throw catError;
+        const categoryIds = (categories ?? []).map((c) => c.id);
+        if (categoryIds.length === 0) return [];
+        query = query.in('category_id', categoryIds);
+      }
       if (filters.availableOnly) query = query.eq('is_available', true);
       if (filters.featuredOnly) query = query.eq('is_featured', true);
       if (filters.isVegetarian === true) query = query.eq('is_vegetarian', true);
@@ -148,7 +157,14 @@ export function createSupabaseMenuRepository(supabase: SupabaseClient): MenuRepo
         .order('display_order', { ascending: true });
 
       if (moduleId) {
-        query = query.eq('module_id', moduleId);
+        const { data: categories, error: catError } = await supabase
+          .from('menu_categories')
+          .select('id')
+          .eq('module_id', moduleId);
+        if (catError) throw catError;
+        const categoryIds = (categories ?? []).map((c) => c.id);
+        if (categoryIds.length === 0) return [];
+        query = query.in('category_id', categoryIds);
       }
 
       const { data, error } = await query;

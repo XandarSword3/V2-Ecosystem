@@ -1541,7 +1541,7 @@ export class ChaletStaff extends StaffBot {
   private async processChaletCheckIn(): Promise<{ success: boolean; action: string; data?: any; error?: string; cascades?: string[] }> {
     const result = await this.apiCall<{ bookingId: string; chaletId: string }>(
       'POST',
-      '/api/v1/chalets/bookings/check-in',
+      '/api/v1/units/bookings/check-in',
       {
         staffId: this.id,
       }
@@ -1568,7 +1568,7 @@ export class ChaletStaff extends StaffBot {
   private async processChaletCheckOut(): Promise<{ success: boolean; action: string; data?: any; error?: string; cascades?: string[] }> {
     const result = await this.apiCall<{ bookingId: string; chaletId: string; damageCharges?: number }>(
       'POST',
-      '/api/v1/chalets/bookings/check-out',
+      '/api/v1/units/bookings/check-out',
       {
         staffId: this.id,
       }
@@ -1596,7 +1596,7 @@ export class ChaletStaff extends StaffBot {
   private async prepareChalet(): Promise<{ success: boolean; action: string; data?: any }> {
     const result = await this.apiCall<{ chaletId: string; prepared: boolean }>(
       'POST',
-      '/api/v1/chalets/prepare',
+      '/api/v1/units/prepare',
       {
         preparedBy: this.id,
         checklist: ['clean', 'linens', 'amenities', 'bbq_check', 'inventory'],
@@ -1613,7 +1613,7 @@ export class ChaletStaff extends StaffBot {
   private async inspectChalet(): Promise<{ success: boolean; action: string; data?: any }> {
     const result = await this.apiCall<{ chaletId: string; issues: any[]; passed: boolean }>(
       'POST',
-      '/api/v1/chalets/inspect',
+      '/api/v1/units/inspect',
       {
         inspectedBy: this.id,
         areas: ['interior', 'exterior', 'kitchen', 'bathroom', 'deck'],
@@ -1639,7 +1639,7 @@ export class ChaletStaff extends StaffBot {
   private async deliverChaletAddOn(): Promise<{ success: boolean; action: string; data?: any; cascades?: string[] }> {
     const result = await this.apiCall<{ deliveryId: string; addOnType: string; chaletId: string }>(
       'POST',
-      '/api/v1/chalets/add-ons/deliver',
+      '/api/v1/units/add-ons/deliver',
       {
         deliveredBy: this.id,
       }
@@ -1667,7 +1667,7 @@ export class ChaletStaff extends StaffBot {
   private async handleChaletMaintenance(): Promise<{ success: boolean; action: string; data?: any }> {
     const result = await this.apiCall<{ maintenanceId: string; chaletId: string; issue: string; resolved: boolean }>(
       'POST',
-      '/api/v1/chalets/maintenance/handle',
+      '/api/v1/units/maintenance/handle',
       {
         handledBy: this.id,
       }

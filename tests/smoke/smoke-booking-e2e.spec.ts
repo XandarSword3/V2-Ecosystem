@@ -32,7 +32,7 @@ async function findBookableChalet(
   checkInDate: string,
   checkOutDate: string,
 ): Promise<ChaletSummary | null> {
-  const chaletsResponse = await request.get(`${API_BASE_URL}/api/v1/chalets`);
+  const chaletsResponse = await request.get(`${API_BASE_URL}/api/v1/units`);
   expect(chaletsResponse.status()).toBe(200);
 
   const chaletsBody = await chaletsResponse.json();
@@ -48,7 +48,7 @@ async function findBookableChalet(
     }
 
     const availabilityResponse = await request.get(
-      `${API_BASE_URL}/api/v1/chalets/${chalet.id}/availability`,
+      `${API_BASE_URL}/api/v1/units/${chalet.id}/availability`,
       {
         params: { startDate: startDay, endDate: endDay },
       },
@@ -104,7 +104,7 @@ test.describe('Smoke 02 - Core Booking Flow', () => {
     const maxGuests = Number(chalet.max_guests ?? chalet.maxGuests ?? 2);
     const numberOfGuests = Math.max(1, Math.min(2, Number.isFinite(maxGuests) ? maxGuests : 2));
 
-    const createResponse = await request.post(`${API_BASE_URL}/api/v1/chalets/bookings`, {
+    const createResponse = await request.post(`${API_BASE_URL}/api/v1/units/bookings`, {
       headers: {
         Authorization: `Bearer ${customerToken}`,
         'x-csrf-token': csrfToken,
@@ -128,7 +128,7 @@ test.describe('Smoke 02 - Core Booking Flow', () => {
     const bookingId = createdBody?.data?.id as string | undefined;
     expect(bookingId).toBeTruthy();
 
-    const fetchResponse = await request.get(`${API_BASE_URL}/api/v1/chalets/bookings/${bookingId}`, {
+    const fetchResponse = await request.get(`${API_BASE_URL}/api/v1/units/bookings/${bookingId}`, {
       headers: { Authorization: `Bearer ${customerToken}` },
     });
     expect(fetchResponse.status()).toBe(200);
@@ -138,7 +138,7 @@ test.describe('Smoke 02 - Core Booking Flow', () => {
     expect(fetchedBody?.data?.id).toBe(bookingId);
     expect(fetchedBody?.data?.chalet_id).toBe(chalet.id);
 
-    const myBookingsResponse = await request.get(`${API_BASE_URL}/api/v1/chalets/my-bookings`, {
+    const myBookingsResponse = await request.get(`${API_BASE_URL}/api/v1/units/my-bookings`, {
       headers: { Authorization: `Bearer ${customerToken}` },
     });
     expect(myBookingsResponse.status()).toBe(200);
