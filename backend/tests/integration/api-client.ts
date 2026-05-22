@@ -235,9 +235,19 @@ export class TestApiClient {
     return this.request(`/${ModuleSlug.CHALETS}/availability`, 'GET');
   }
 
-  async getChaletAvailability(startDate: string, endDate: string): Promise<ApiResponse> {
+  async getChaletAvailability(chaletIdOrStartDate: string, startDateOrEndDate: string, endDate?: string): Promise<ApiResponse> {
+    if (endDate) {
+      // Called as getChaletAvailability(chaletId, startDate, endDate)
+      return this.request(
+        `/units/${chaletIdOrStartDate}/availability?startDate=${startDateOrEndDate}&endDate=${endDate}`,
+        'GET',
+        null,
+        { requiresAuth: false },
+      );
+    }
+    // Called as getChaletAvailability(startDate, endDate)
     return this.request(
-      `/${ModuleSlug.CHALETS}/availability?start=${startDate}&end=${endDate}`,
+      `/${ModuleSlug.CHALETS}/availability?start=${chaletIdOrStartDate}&end=${startDateOrEndDate}`,
       'GET',
     );
   }
@@ -329,6 +339,10 @@ export class TestApiClient {
 
   async getPoolCapacity(): Promise<ApiResponse> {
     return this.request(`/staff/modules/${ModuleSlug.POOL}/capacity`, 'GET');
+  }
+
+  async getPoolTicketTypes(): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.POOL}/sessions`, 'GET');
   }
 
   // ============ SNACK BAR (menu_service → instant_transaction) ============
@@ -444,8 +458,13 @@ export class TestApiClient {
   }
 
   async getChalet(id: string) {
-    return this.getChaletReservation(id);
+    return this.request(`/units/${id}`, 'GET', null, { requiresAuth: false });
   }
+
+  async getChalets() {
+    return this.request('/units', 'GET', null, { requiresAuth: false });
+  }
+
 
   async purchasePoolTicket(ticket: {
     sessionId: string;
