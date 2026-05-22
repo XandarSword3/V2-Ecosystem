@@ -46,17 +46,15 @@ export default defineConfig({
     testTimeout: 30000, // 30 seconds per test
     hookTimeout: 60000, // 60 seconds for setup/teardown
 
-    // Run tests sequentially to avoid database conflicts
+    // Run tests sequentially to avoid database conflicts.
+    // poolOptions was removed in Vitest 4; maxWorkers/minWorkers replace singleFork.
     fileParallelism: false,
+    maxWorkers: 1,
+    minWorkers: 1,
     sequence: {
       shuffle: false,
     },
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true, // Run all tests in single process
-      },
-    },
 
     // Reporter configuration
     reporters: ['verbose', 'json'],
