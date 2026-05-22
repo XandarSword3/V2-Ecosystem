@@ -10,23 +10,20 @@ import { OrderConfigService } from '../../src/services/order-config.service.js';
 
 vi.mock('../../src/services/tax.service.js', () => {
   return {
-    TaxService: vi.fn().mockImplementation(() => ({
-      calculateTaxes: vi.fn((subtotal) => [
-        { name: 'VAT', rate: 0.1, amount: subtotal * 0.1 }
-      ]),
-      getTotalTax: vi.fn((subtotal) => subtotal * 0.1)
-    }))
+    TaxService: class MockTaxService {
+      getTaxRate = vi.fn().mockResolvedValue(0.1);
+    },
   };
 });
 
 vi.mock('../../src/services/order-config.service.js', () => {
   return {
-    OrderConfigService: vi.fn().mockImplementation(() => ({
-      getConfig: vi.fn().mockResolvedValue({
-        serviceChargeAmount: 5,
-        deliveryFeeAmount: 3
-      })
-    }))
+    OrderConfigService: class MockOrderConfigService {
+      getOrderConfig = vi.fn().mockResolvedValue({
+        serviceChargeRate: 0.1,
+        deliveryFee: 3,
+      });
+    },
   };
 });
 
@@ -79,7 +76,7 @@ describe('Engine Integration Tests', () => {
       expect(result.moduleId).toBe('mod-1');
       expect(result.subtotal).toBe(20);
       expect(result.totalDiscount).toBe(10); // from mock coupon
-      expect(result.totalAmount).toBe(12); // 20 - 10 = 10 subtotal, + 2 tax = 12. (wait, tax service returns %0.1 of what?)
+      expect(result.totalAmount).toBe(12); // subtotal 20, coupon 10, tax 1 → total 12
     });
 
     it('should handle state transitions', async () => {
@@ -90,8 +87,8 @@ describe('Engine Integration Tests', () => {
         'staff',
       );
 
-      expect(result.success).toBe(true);
-      expect(result.newState).toBe('confirmed');
+      expect(result.allowed).toBe(true);
+      expect(result.targetState).toBe('confirmed');
     });
   });
 
@@ -138,8 +135,8 @@ describe('Engine Integration Tests', () => {
         'staff',
       );
 
-      expect(result.success).toBe(true);
-      expect(result.newState).toBe('checked_in');
+      expect(result.allowed).toBe(true);
+      expect(result.targetState).toBe('checked_in');
     });
   });
 
@@ -179,8 +176,8 @@ describe('Engine Integration Tests', () => {
         'staff'
       );
 
-      expect(result.success).toBe(true);
-      expect(result.newState).toBe('active');
+      expect(result.allowed).toBe(true);
+      expect(result.targetState).toBe('active');
     });
   });
 

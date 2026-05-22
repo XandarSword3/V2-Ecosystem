@@ -30,8 +30,13 @@ export const importMenuItems = asyncHandler(async (req: Request, res: Response) 
 
   const supabase = getSupabase();
 
-  // Find or create category maps
-  const categoriesSet = new Set<string>(items.map(item => item.category || 'General').filter(Boolean));
+  // Find or create category maps (skip items that already provide category_id)
+  const categoriesSet = new Set<string>(
+    items
+      .filter((item) => !item.category_id)
+      .map((item) => item.category || 'General')
+      .filter(Boolean),
+  );
   const categoryMap: Record<string, string> = {};
 
   // Resolve categories
@@ -73,14 +78,16 @@ export const importMenuItems = asyncHandler(async (req: Request, res: Response) 
   }
 
   // Bulk insert menu items
-  const menuItemsToInsert = items.map(item => ({
-    name: item.name,
-    description: item.description || '',
-    price: Number(item.price) || 0,
-    category_id: categoryMap[item.category || 'General'],
-    is_available: item.is_available !== false,
-    image_url: item.imageUrl || null,
-  })).filter(item => item.category_id);
+  const menuItemsToInsert = items
+    .map((item) => ({
+      name: item.name,
+      description: item.description || '',
+      price: Number(item.price) || 0,
+      category_id: item.category_id || categoryMap[item.category || 'General'],
+      is_available: item.is_available !== false,
+      image_url: item.imageUrl || null,
+    }))
+    .filter((item) => item.category_id);
 
   if (menuItemsToInsert.length === 0) {
     res.status(400).json({ success: false, error: 'Failed to map any items to valid categories' });

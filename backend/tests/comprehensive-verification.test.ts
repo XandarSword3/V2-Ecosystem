@@ -62,6 +62,30 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
     beforeAll(async () => {
         // Create a test role
         await supabase.from('roles').insert({ name: testRoleName, description: 'Test Role' });
+
+        // Seed users referenced by generated JWTs
+        await supabase.from('users').upsert([
+            {
+                id: superAdminId,
+                email: 'superadmin@test.com',
+                full_name: 'Super Admin',
+                password_hash: 'test-hash',
+                is_active: true,
+                email_verified: true,
+                token_version: 0,
+                roles: ['super_admin'],
+            },
+            {
+                id: testUserId,
+                email: 'testuser@test.com',
+                full_name: 'Test User',
+                password_hash: 'test-hash',
+                is_active: true,
+                email_verified: true,
+                token_version: 0,
+                roles: [testRoleName],
+            },
+        ], { onConflict: 'id' });
     });
 
     afterAll(async () => {
@@ -70,6 +94,7 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
         await supabase.from('roles').delete().eq('name', testRoleName);
         await supabase.from('app_permissions').delete().like('slug', `module:${moduleSlug}%`);
         await supabase.from('payment_ledger').delete().like('webhook_id', `test_webhook_${testId}%`);
+        await supabase.from('users').delete().in('id', [superAdminId, testUserId]);
     });
 
     // 1. Module Creation & Permission Generation

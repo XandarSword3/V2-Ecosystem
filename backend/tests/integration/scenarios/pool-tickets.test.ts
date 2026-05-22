@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   TestApiClient,
   createStaffClient,
-  createGuestClient,
+  createCustomerClient,
 } from '../api-client';
 import {
   assertSuccess,
@@ -39,8 +39,8 @@ describeIf('Pool Ticket Lifecycle Integration', () => {
 
   beforeAll(async () => {
     // Always create clients
-    guestClient = createGuestClient();
-    staffClient = createGuestClient(); // Will be replaced if services available
+    guestClient = await createCustomerClient();
+    staffClient = await createCustomerClient(); // Will be replaced if services available
     
     const services = await waitForServices(5, 1000);
     if (!services.api) {

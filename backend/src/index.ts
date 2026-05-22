@@ -1,4 +1,4 @@
-import app from './app.js';
+import app, { loadDynamicModules } from './app.js';
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { initializeDatabase, closeDatabase } from './database/connection.js';
@@ -34,6 +34,7 @@ async function main() {
         logger.info('Database connected successfully');
         await permissionCache.initialize();
         await seedSystemModules();
+        await loadDynamicModules();
       })
       .catch(async (error) => {
         logger.error('Database connection failed:', error);
