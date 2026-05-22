@@ -290,16 +290,7 @@ export async function seedTestDatabase(): Promise<void> {
         ('admin', 'Administrator', 'Administrative access', 'admin'),
         ('manager', 'Manager', 'Manager access', 'admin'),
         ('customer', 'Customer', 'Registered customer', NULL),
-        ('staff', 'Staff', 'Generic staff role', NULL),
-        ('restaurant_staff', 'Restaurant Staff', 'Restaurant operations', 'restaurant'),
-        ('restaurant_admin', 'Restaurant Admin', 'Restaurant management', 'restaurant'),
-        ('pool_staff', 'Pool Staff', 'Pool operations', 'pool'),
-        ('pool_admin', 'Pool Admin', 'Pool management', 'pool'),
-        ('chalet_staff', 'Chalet Staff', 'Chalet operations', 'chalets'),
-        ('chalet_admin', 'Chalet Admin', 'Chalet management', 'chalets'),
-        ('housekeeping_staff', 'Housekeeping Staff', 'Housekeeping operations', 'chalets'),
-        ('snack_bar_staff', 'Snack Bar Staff', 'Snack bar operations', 'snack_bar'),
-        ('snack_bar_admin', 'Snack Bar Admin', 'Snack bar management', 'snack_bar')
+        ('staff', 'Staff', 'Generic staff role', NULL)
       ON CONFLICT (name) DO UPDATE SET
         display_name = EXCLUDED.display_name,
         description = EXCLUDED.description,
@@ -332,7 +323,7 @@ export async function seedTestDatabase(): Promise<void> {
     const roleAssignments: Array<[string, string]> = [
       [TEST_CONFIG.users.admin.email, 'super_admin'],
       [TEST_CONFIG.users.admin.email, 'admin'],
-      [TEST_CONFIG.users.staff.email, 'restaurant_staff'],
+      [TEST_CONFIG.users.staff.email, 'staff'],
       [TEST_CONFIG.users.customer.email, 'customer'],
     ];
 

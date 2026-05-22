@@ -200,16 +200,16 @@ describe('Permission Middleware Integration', () => {
     });
 
     describe('Restaurant Orders', () => {
-      it('should allow kitchen_staff to read orders', async () => {
-        const token = createTestToken('staff-1', [Roles.KITCHEN_STAFF]);
+      it('should allow staff to read orders', async () => {
+        const token = createTestToken('staff-1', [Roles.STAFF]);
         const response = await request(app)
           .get('/restaurant/orders')
           .set('Authorization', `Bearer ${token}`);
         expect(response.status).toBe(200);
       });
 
-      it('should allow bar_staff to read orders', async () => {
-        const token = createTestToken('staff-2', [Roles.BAR_STAFF]);
+      it('should allow manager to read orders', async () => {
+        const token = createTestToken('staff-2', [Roles.MANAGER]);
         const response = await request(app)
           .get('/restaurant/orders')
           .set('Authorization', `Bearer ${token}`);
@@ -318,8 +318,8 @@ describe('Permission Middleware Integration', () => {
 
   describe('Multiple Roles', () => {
     it('should grant combined permissions from multiple roles', async () => {
-      // User with both customer and kitchen_staff roles
-      const token = createTestToken('multi-role-user', [Roles.CUSTOMER, Roles.KITCHEN_STAFF]);
+      // User with both customer and staff roles
+      const token = createTestToken('multi-role-user', [Roles.CUSTOMER, Roles.STAFF]);
       
       // Can create orders (customer)
       const orderResponse = await request(app)
@@ -390,21 +390,21 @@ describe('Permission Matrix Validation', () => {
       expect(customerPerms).not.toContain(Permissions.ADMIN_DASHBOARD);
     });
 
-    it('kitchen_staff should have kitchen permissions', () => {
-      const kitchenPerms = RolePermissions[Roles.KITCHEN_STAFF];
-      expect(kitchenPerms).toContain(Permissions.RESTAURANT_ORDER_READ_ALL);
-      expect(kitchenPerms).toContain(Permissions.RESTAURANT_ORDER_UPDATE);
+    it('staff should have cross-module order/booking permissions', () => {
+      const staffPerms = RolePermissions[Roles.STAFF];
+      expect(staffPerms).toContain(Permissions.RESTAURANT_ORDER_READ_ALL);
+      expect(staffPerms).toContain(Permissions.RESTAURANT_ORDER_UPDATE);
     });
 
-    it('pool_staff should have pool permissions', () => {
-      const poolPerms = RolePermissions[Roles.POOL_STAFF];
-      expect(poolPerms).toContain(Permissions.POOL_SESSION_READ);
-      expect(poolPerms).toContain(Permissions.POOL_TICKET_VALIDATE);
+    it('staff should have pool permissions', () => {
+      const staffPerms = RolePermissions[Roles.STAFF];
+      expect(staffPerms).toContain(Permissions.POOL_SESSION_READ);
+      expect(staffPerms).toContain(Permissions.POOL_TICKET_VALIDATE);
     });
 
-    it('chalet_staff should have chalet permissions', () => {
-      const chaletPerms = RolePermissions[Roles.CHALET_STAFF];
-      expect(chaletPerms).toContain(Permissions.CHALET_BOOKING_READ_ALL);
+    it('staff should have booking permissions', () => {
+      const staffPerms = RolePermissions[Roles.STAFF];
+      expect(staffPerms).toContain(Permissions.CHALET_BOOKING_READ_ALL);
     });
   });
 });
