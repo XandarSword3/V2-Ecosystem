@@ -275,7 +275,7 @@ async function seed() {
     ];
 
     for (const addon of addons) {
-      await supabase.from('chalet_add_ons').upsert(addon, { onConflict: 'name' });
+      await supabase.from('accommodation_add_ons').upsert(addon, { onConflict: 'name' });
     }
     console.log('  ✓ Chalet add-ons created\n');
 

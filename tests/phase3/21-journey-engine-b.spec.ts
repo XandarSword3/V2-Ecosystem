@@ -41,7 +41,7 @@ async function apiCall(page: Page, method: string, path: string, opts?: {
 }
 
 async function listChalets(page: Page): Promise<any[]> {
-  const resp = await page.request.get(`${API}/api/v1/chalets`);
+  const resp = await page.request.get(`${API}/api/v1/units`);
   const body = await resp.json();
   const chalets = body.data || [];
 

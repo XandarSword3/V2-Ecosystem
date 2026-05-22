@@ -285,9 +285,9 @@ describe('J-03: Chalet Booking — Weekend with Add-ons', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// J-04: Pool Ticket Purchase
+// J-04: Shared Capacity Access Purchase
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('J-04: Pool Ticket Purchase — Multiple Guests', () => {
+describe('J-04: Shared Capacity Access Purchase — Multiple Guests', () => {
   it('should check pool availability', async () => {
     const bob = client(requireState('bobToken'));
     const res = await bob.getPoolAvailability(today(), state.afternoonSessionId);
@@ -346,9 +346,9 @@ describe('J-04: Pool Ticket Purchase — Multiple Guests', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// J-05: Pool Entry/Exit — Staff Validates & Tracks Capacity
+// J-05: Access Validation Flow — Entry/Exit & Capacity Tracking
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('J-05: Pool Entry/Exit', () => {
+describe('J-05: Access Validation Flow', () => {
   it('should record pool entry for Bob\'s ticket', async () => {
     const poolStaff = client(requireState('poolStaffToken'));
     const ticketId = requireState('j04TicketId');
