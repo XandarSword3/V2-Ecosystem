@@ -151,10 +151,11 @@ describe.skip('Offline Queue Backend Support', () => {
     it('tables should have created_at for ordering', async () => {
       const supabase = getSupabase();
       
-      // Check restaurant_orders has created_at
+      // Engine records live in transactions (see ARCHITECTURE_LAW.md)
       const { error } = await supabase
-        .from('restaurant_orders')
+        .from('transactions')
         .select('id, created_at')
+        .eq('engine_type', 'instant_transaction')
         .order('created_at', { ascending: false })
         .limit(1);
       
@@ -164,10 +165,10 @@ describe.skip('Offline Queue Backend Support', () => {
     it('tables should have updated_at for conflict detection', async () => {
       const supabase = getSupabase();
       
-      // Check restaurant_orders has updated_at
       const { error } = await supabase
-        .from('restaurant_orders')
+        .from('transactions')
         .select('id, updated_at')
+        .eq('engine_type', 'instant_transaction')
         .limit(1);
       
       expect(error).toBeNull();

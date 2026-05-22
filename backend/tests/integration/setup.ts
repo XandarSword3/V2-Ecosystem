@@ -266,6 +266,122 @@ export async function waitForServices(
 }
 
 /**
+ * Seed test users/roles via Supabase HTTP API when direct PG is unavailable.
+ */
+export async function seedTestDatabaseViaSupabase(): Promise<void> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error(
+      'Supabase HTTP seed requires SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY)',
+    );
+  }
+
+  const { createClient } = await import('@supabase/supabase-js');
+  const bcrypt = await import('bcryptjs');
+  const supabase = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const roles = [
+    { name: 'super_admin', display_name: 'Super Administrator', description: 'Full system access', business_unit: 'admin' },
+    { name: 'admin', display_name: 'Administrator', description: 'Administrative access', business_unit: 'admin' },
+    { name: 'manager', display_name: 'Manager', description: 'Manager access', business_unit: 'admin' },
+    { name: 'customer', display_name: 'Customer', description: 'Registered customer', business_unit: null },
+    { name: 'staff', display_name: 'Staff', description: 'Generic staff role', business_unit: null },
+  ];
+
+  const { error: rolesError } = await supabase.from('roles').upsert(roles, { onConflict: 'name' });
+  if (rolesError) {
+    throw new Error(`Supabase seed roles failed: ${rolesError.message}`);
+  }
+
+  const adminPasswordHash = await bcrypt.hash(TEST_CONFIG.users.admin.password, 12);
+  const staffPasswordHash = await bcrypt.hash(TEST_CONFIG.users.staff.password, 12);
+  const customerPasswordHash = await bcrypt.hash(TEST_CONFIG.users.customer.password, 12);
+
+  const users = [
+    {
+      id: '11111111-1111-1111-1111-111111111111',
+      email: TEST_CONFIG.users.admin.email,
+      password_hash: adminPasswordHash,
+      full_name: TEST_CONFIG.users.admin.fullName,
+      email_verified: true,
+      is_active: true,
+    },
+    {
+      id: '22222222-2222-2222-2222-222222222222',
+      email: TEST_CONFIG.users.staff.email,
+      password_hash: staffPasswordHash,
+      full_name: TEST_CONFIG.users.staff.fullName,
+      email_verified: true,
+      is_active: true,
+    },
+    {
+      id: '33333333-3333-3333-3333-333333333333',
+      email: TEST_CONFIG.users.customer.email,
+      password_hash: customerPasswordHash,
+      full_name: TEST_CONFIG.users.customer.fullName,
+      email_verified: true,
+      is_active: true,
+    },
+  ];
+
+  const { error: usersError } = await supabase.from('users').upsert(users, { onConflict: 'email' });
+  if (usersError) {
+    throw new Error(`Supabase seed users failed: ${usersError.message}`);
+  }
+
+  const roleAssignments: Array<[string, string]> = [
+    [TEST_CONFIG.users.admin.email, 'super_admin'],
+    [TEST_CONFIG.users.admin.email, 'admin'],
+    [TEST_CONFIG.users.staff.email, 'staff'],
+    [TEST_CONFIG.users.customer.email, 'customer'],
+  ];
+
+  for (const [email, roleName] of roleAssignments) {
+    const { data: userRow, error: userLookupError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
+    if (userLookupError || !userRow) {
+      throw new Error(`Supabase seed user lookup failed for ${email}: ${userLookupError?.message}`);
+    }
+
+    const { data: roleRow, error: roleLookupError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', roleName)
+      .single();
+    if (roleLookupError || !roleRow) {
+      throw new Error(`Supabase seed role lookup failed for ${roleName}: ${roleLookupError?.message}`);
+    }
+
+    const { data: existingLink } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('user_id', userRow.id)
+      .eq('role_id', roleRow.id)
+      .maybeSingle();
+
+    if (!existingLink) {
+      const { error: linkError } = await supabase.from('user_roles').insert({
+        user_id: userRow.id,
+        role_id: roleRow.id,
+      });
+      if (linkError) {
+        throw new Error(`Supabase seed user_roles failed: ${linkError.message}`);
+      }
+    }
+  }
+
+  console.log('✅ Test database seeded successfully via Supabase HTTP API');
+}
+
+/**
  * Seed test database with required data
  */
 export async function seedTestDatabase(): Promise<void> {
@@ -511,9 +627,20 @@ async function initializeIntegrationLifecycle(): Promise<void> {
     if (shouldSkipDbSeed) {
       console.log('⚠️ Skipping test database seed (TEST_SKIP_DB_SEED=true)');
     } else if (!dbReadyForSeed) {
-      console.log('⚠️ Skipping test database seed (database not reachable)');
+      console.log('⚠️ Direct PG unreachable — attempting Supabase HTTP seed...');
+      try {
+        await seedTestDatabaseViaSupabase();
+      } catch (supabaseSeedError) {
+        console.error('❌ Supabase HTTP seed failed:', supabaseSeedError);
+        console.log('⚠️ Continuing without seed; auth-dependent tests may return 401');
+      }
     } else {
-      await seedTestDatabase();
+      try {
+        await seedTestDatabase();
+      } catch (pgSeedError) {
+        console.warn('⚠️ PG seed failed, falling back to Supabase HTTP seed:', pgSeedError);
+        await seedTestDatabaseViaSupabase();
+      }
     }
 
     // Migrations seed active modules; routes mount only after loadDynamicModules().

@@ -55,9 +55,9 @@ async function fireN(
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// S-01: Concurrent Pool Ticket Purchases — Capacity Enforcement
+// S-01: Concurrent Shared Capacity Access Purchases — Capacity Enforcement
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('S-01: 35 Concurrent Pool Ticket Purchases vs 30 Capacity', () => {
+describe('S-01: 35 Concurrent Shared Capacity Purchases vs 30 Capacity', () => {
   it('should not allow more than max_capacity total guests', async () => {
     const sessionId = requireState('eveningSessionId');
     const ticketDate = futureDate(90); // Use a far-future date to avoid collisions

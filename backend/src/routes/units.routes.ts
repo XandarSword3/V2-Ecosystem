@@ -13,28 +13,30 @@ function asNumber(input: unknown, fallback = 0): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
+/** Columns exposed by bookable_units view (legacy view uses `price`, newer uses `base_price`). */
+const UNIT_LIST_COLUMNS = 'id, name, description, price, capacity, is_active, created_at, updated_at';
+
+function normalizeUnitRow(row: Record<string, unknown>): Record<string, unknown> {
+  const price = row.price ?? row.base_price;
+  return {
+    ...row,
+    base_price: price,
+    price,
+  };
+}
+
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
-    const { moduleId, propertyId } = _req.query;
-
     let query = supabase
       .from('bookable_units')
-      .select('*')
-      .eq('is_active', true)
-      .is('deleted_at', null);
-
-    if (typeof moduleId === 'string' && moduleId) {
-      query = query.eq('module_id', moduleId);
-    }
-    if (typeof propertyId === 'string' && propertyId) {
-      query = query.eq('property_id', propertyId);
-    }
+      .select(UNIT_LIST_COLUMNS)
+      .eq('is_active', true);
 
     const { data, error } = await query.order('name', { ascending: true });
     if (error) throw error;
 
-    res.json({ success: true, data: data ?? [] });
+    res.json({ success: true, data: (data ?? []).map((row) => normalizeUnitRow(row as Record<string, unknown>)) });
   } catch (error) {
     logger.error('[Units] GET /units failed', error);
     res.status(500).json({ success: false, error: 'Failed to list units' });
@@ -46,21 +48,13 @@ router.get('/', async (_req: Request, res: Response) => {
 router.get('/availability', async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
-    const { moduleId, start, end } = req.query;
-
-    let query = supabase
+    const { data, error } = await supabase
       .from('bookable_units')
-      .select('id, name, is_available, module_id, base_price')
+      .select(UNIT_LIST_COLUMNS)
       .eq('is_active', true)
-      .is('deleted_at', null);
-
-    if (typeof moduleId === 'string' && moduleId) {
-      query = query.eq('module_id', moduleId);
-    }
-
-    const { data, error } = await query.order('name', { ascending: true });
+      .order('name', { ascending: true });
     if (error) throw error;
-    res.json({ success: true, data: data ?? [] });
+    res.json({ success: true, data: (data ?? []).map((row) => normalizeUnitRow(row as Record<string, unknown>)) });
   } catch (error) {
     logger.error('[Units] GET /units/availability failed', error);
     res.status(500).json({ success: false, error: 'Failed to fetch availability' });
@@ -71,7 +65,7 @@ router.get('/add-ons', async (_req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
-      .from('chalet_add_ons')
+      .from('accommodation_add_ons')
       .select('*')
       .eq('is_active', true)
       .order('name', { ascending: true });
@@ -151,9 +145,8 @@ router.get('/:id', async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('bookable_units')
-      .select('*')
+      .select(UNIT_LIST_COLUMNS)
       .eq('id', req.params.id)
-      .is('deleted_at', null)
       .maybeSingle();
 
     if (error) throw error;
@@ -162,7 +155,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({ success: true, data });
+    res.json({ success: true, data: normalizeUnitRow(data as Record<string, unknown>) });
   } catch (error) {
     logger.error('[Units] GET /units/:id failed', error);
     res.status(500).json({ success: false, error: 'Failed to fetch unit' });
@@ -184,7 +177,6 @@ router.get('/:id/availability', async (req: Request, res: Response) => {
       .from('bookable_units')
       .select('id')
       .eq('id', unitId)
-      .is('deleted_at', null)
       .maybeSingle();
 
     if (unitError) throw unitError;
@@ -240,10 +232,9 @@ router.post('/bookings', authenticate, async (req: Request, res: Response) => {
 
     const supabase = getSupabase();
     const { data: unit, error: unitError } = await supabase
-      .from('bookable_units')
+      .from('accommodation_units')
       .select('id, name, base_price, module_id')
       .eq('id', unit_id)
-      .is('deleted_at', null)
       .maybeSingle();
 
     if (unitError) throw unitError;
@@ -265,7 +256,7 @@ router.post('/bookings', authenticate, async (req: Request, res: Response) => {
       .from('transactions')
       .insert({
         engine_type: 'time_exclusive_reservation',
-        module_id: unit.module_id,
+        module_id: unit.module_id ?? null,
         customer_id: req.user?.userId ?? null,
         status: 'pending',
         amount: pricing.totalAmount,

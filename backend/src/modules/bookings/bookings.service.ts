@@ -249,7 +249,7 @@ export async function calculateBookingPrice(
   if (addOns.length > 0) {
     const addOnIds = addOns.map(a => a.addOnId);
     const { data: addOnsList } = await supabase
-      .from('chalet_add_ons')
+      .from('accommodation_add_ons')
       .select('*')
       .in('id', addOnIds)
       .eq('is_active', true);

@@ -154,9 +154,9 @@ describe('I-02: Loyalty Points Consistency', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// I-03: Pool Capacity Accuracy
+// I-03: Shared Capacity Access Accuracy
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('I-03: Pool Capacity Accuracy', () => {
+describe('I-03: Shared Capacity Access Accuracy', () => {
   it('should have reported occupancy matching actual active tickets', async () => {
     const admin = client(requireState('adminToken'));
     const res = await admin.getPoolCapacity();

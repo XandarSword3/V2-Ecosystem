@@ -21,7 +21,7 @@ export async function logActivity(entry: AuditLogEntry) {
     const supabase = getSupabase();
 
     // Convert objects to strings if needed
-    const safePayload = {
+    const safePayload: Record<string, unknown> = {
       user_id: entry.user_id,
       action: entry.action,
       resource: entry.resource,
@@ -29,9 +29,11 @@ export async function logActivity(entry: AuditLogEntry) {
       old_value: entry.old_value ? (typeof entry.old_value === 'string' ? entry.old_value : JSON.stringify(entry.old_value)) : null,
       new_value: entry.new_value ? (typeof entry.new_value === 'string' ? entry.new_value : JSON.stringify(entry.new_value)) : null,
       ip_address: entry.ip_address,
-      user_agent: entry.user_agent,
-      property_id: entry.property_id
+      property_id: entry.property_id,
     };
+    if (entry.user_agent) {
+      safePayload.user_agent = entry.user_agent;
+    }
 
     const { error } = await supabase
       .from('audit_logs')

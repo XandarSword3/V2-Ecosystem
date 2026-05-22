@@ -7,6 +7,7 @@ import { getSupabase } from '../database/connection.js';
 import { getEngineService } from '../engines/engine-service.js';
 import { logger } from '../utils/logger.js';
 import { requirePropertyAccess } from '../middleware/propertyAccess.middleware.js';
+import { purchaseSharedCapacityAtomic } from '../lib/shared-capacity-purchase.js';
 
 // Import parsers
 import * as menuServiceParser from '../modules/shared/import/menu-service-import.parser.js';
@@ -102,6 +103,19 @@ function asNumber(input: unknown, fallback = 0): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
+async function getModuleCategoryIds(
+  supabase: ReturnType<typeof getSupabase>,
+  moduleId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('menu_categories')
+    .select('id')
+    .eq('module_id', moduleId);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.id as string);
+}
+
 function buildMenuServiceRouter(router: Router): void {
   router.get('/items', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
@@ -111,10 +125,15 @@ function buildMenuServiceRouter(router: Router): void {
       }
 
       const supabase = getSupabase();
+      const categoryIds = await getModuleCategoryIds(supabase, mounted.id);
+      if (categoryIds.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
       const { data, error } = await supabase
         .from('menu_items')
-        .select('id, category_id, name, description, price, is_available, module_id')
-        .eq('module_id', mounted.id)
+        .select('id, category_id, name, description, price, is_available')
+        .in('category_id', categoryIds)
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -142,10 +161,11 @@ function buildMenuServiceRouter(router: Router): void {
         .map((item: unknown) => (item as { menu_item_id?: string }).menu_item_id)
         .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
 
+      const categoryIds = await getModuleCategoryIds(supabase, mounted.id);
       const { data: menuRows, error: menuError } = await supabase
         .from('menu_items')
         .select('id, price')
-        .eq('module_id', mounted.id)
+        .in('category_id', categoryIds)
         .in('id', menuItemIds);
 
       if (menuError) throw menuError;
@@ -301,8 +321,9 @@ function buildMultiDayBookingRouter(router: Router): void {
       const { start, end } = req.query;
       let query = supabase
         .from('bookable_units')
-        .select('id, name, is_available, module_id')
-        .eq('module_id', mounted.id);
+        .select('id, name, is_active, module_id, base_price, capacity')
+        .eq('module_id', mounted.id)
+        .eq('is_active', true);
 
       if (typeof start === 'string' && typeof end === 'string') {
         query = query.gte('created_at', start).lte('created_at', end);
@@ -495,12 +516,17 @@ function buildSessionAccessRouter(router: Router): void {
       }
       const supabase = getSupabase();
       const { data, error } = await supabase
-        .from('sessions')
-        .select('id, name, date, start_time, end_time, max_capacity, current_count, module_id')
+        .from('pool_sessions')
+        .select('id, name, start_time, end_time, max_capacity, capacity, module_id, is_active, adult_price, child_price')
         .eq('module_id', mounted.id)
-        .order('date', { ascending: true });
+        .eq('is_active', true)
+        .order('start_time', { ascending: true });
       if (error) throw error;
-      res.json({ success: true, data: data ?? [] });
+      const normalized = (data ?? []).map((session) => ({
+        ...session,
+        max_capacity: session.max_capacity ?? session.capacity,
+      }));
+      res.json({ success: true, data: normalized });
     } catch (error) {
       logger.error('[Dynamic Router] GET /sessions failed', error);
       res.status(500).json({ success: false, error: 'Failed to list sessions' });
@@ -515,30 +541,60 @@ function buildSessionAccessRouter(router: Router): void {
       }
 
       const supabase = getSupabase();
-      const { session_id, quantity, unit_price } = req.body ?? {};
+      const { session_id, quantity, unit_price, metadata: bodyMetadata } = req.body ?? {};
       if (!session_id) {
         return res.status(400).json({ success: false, error: 'session_id is required' });
       }
 
-      const lineItems = [{ itemId: String(session_id), name: 'session_ticket', quantity: asNumber(quantity, 1), unitPrice: asNumber(unit_price, 0) }];
+      const guestCount = asNumber(quantity, 1);
+      const lineItems = [{
+        itemId: String(session_id),
+        name: 'session_ticket',
+        quantity: guestCount,
+        unitPrice: asNumber(unit_price, 0),
+      }];
       const pricing = await engineService.calculatePricing(
         mounted.template_type,
         lineItems,
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
 
+      const ticketDateRaw =
+        (bodyMetadata as Record<string, unknown> | undefined)?.ticket_date
+        ?? (bodyMetadata as Record<string, unknown> | undefined)?.date
+        ?? req.body?.ticket_date
+        ?? req.body?.visit_date;
+      const ticketDate = typeof ticketDateRaw === 'string'
+        ? ticketDateRaw.slice(0, 10)
+        : dayjs().format('YYYY-MM-DD');
+
+      const purchase = await purchaseSharedCapacityAtomic(supabase, {
+        sessionId: String(session_id),
+        moduleId: mounted.id,
+        propertyId: mounted.property_id ?? null,
+        customerId: req.user?.userId ?? null,
+        quantity: guestCount,
+        ticketDate,
+        amount: pricing.totalAmount,
+        metadata: {
+          ...(typeof bodyMetadata === 'object' && bodyMetadata !== null ? bodyMetadata : {}),
+          payment_method: req.body?.payment_method,
+        },
+      });
+
+      if (!purchase.success) {
+        const status = purchase.errorMessage?.includes('capacity') ? 409 : 400;
+        return res.status(status).json({
+          success: false,
+          error: purchase.errorMessage ?? 'Failed to reserve capacity',
+          availableCapacity: purchase.availableCapacity,
+        });
+      }
+
       const { data, error } = await supabase
         .from('transactions')
-        .insert({
-          engine_type: 'shared_capacity_access',
-          module_id: mounted.id,
-          customer_id: req.user?.userId ?? null,
-          status: 'confirmed',
-          amount: pricing.totalAmount,
-          reference_id: String(session_id),
-          metadata: { session_id, quantity: asNumber(quantity, 1) },
-        })
         .select('id, module_id, customer_id, status, amount, reference_id, metadata')
+        .eq('id', purchase.transactionId!)
         .single();
 
       if (error) throw error;
@@ -998,7 +1054,6 @@ async function commitImportForEngine(
           price: item.price,
           description: item.description,
           category_id: categoryId,
-          module_id: moduleId,
           is_available: item.is_available ?? true,
           discount_price: item.discount_price,
           preparation_time_minutes: item.preparation_time,
@@ -1038,13 +1093,15 @@ async function commitImportForEngine(
         memberDiscount?: number;
         description?: string;
       }>) {
-        const { error } = await supabase.from('sessions').insert({
+        const { error } = await supabase.from('pool_sessions').insert({
           name: item.name,
           start_time: item.startTime,
           end_time: item.endTime,
           adult_price: item.adultPrice,
           child_price: item.childPrice,
           max_capacity: item.capacity,
+          capacity: item.capacity,
+          price: item.adultPrice,
           gender_restriction: item.genderRestriction || 'mixed',
           days_of_week: item.daysOfWeek || [0, 1, 2, 3, 4, 5, 6],
           is_active: item.isActive ?? true,

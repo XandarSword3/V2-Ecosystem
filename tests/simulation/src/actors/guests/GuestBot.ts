@@ -1889,7 +1889,7 @@ export class GuestBot extends Actor {
   protected async browseChalets(): Promise<ActionResult> {
     const result = await this.apiCall<{ chalets: Array<{ id: string; name: string; type: string; capacity: number; pricePerDay: number }> }>(
       'GET',
-      '/api/v1/chalets?available=true'
+      '/api/v1/units?available=true'
     );
 
     if (result.success && result.data) {
@@ -1923,7 +1923,7 @@ export class GuestBot extends Actor {
 
     const result = await this.apiCall<{ available: boolean; chalets: Array<{ id: string; pricePerDay: number }> }>(
       'GET',
-      `/api/v1/chalets/availability?checkIn=${checkIn.toISOString()}&checkOut=${checkOut.toISOString()}`
+      `/api/v1/units/availability?checkIn=${checkIn.toISOString()}&checkOut=${checkOut.toISOString()}`
     );
 
     if (result.success && result.data) {
@@ -1963,7 +1963,7 @@ export class GuestBot extends Actor {
 
     const result = await this.apiCall<{ bookingId: string; totalAmount: number }>(
       'POST',
-      '/api/v1/chalets/bookings',
+      '/api/v1/units/bookings',
       {
         chaletId: chalet.id,
         guestId: this.id,
@@ -2013,7 +2013,7 @@ export class GuestBot extends Actor {
 
     const result = await this.apiCall<{ cancelled: boolean; refundAmount?: number }>(
       'POST',
-      `/api/v1/chalets/bookings/${bookingId}/cancel`
+      `/api/v1/units/bookings/${bookingId}/cancel`
     );
 
     if (result.success && result.data) {
@@ -2044,7 +2044,7 @@ export class GuestBot extends Actor {
   protected async viewChaletAddons(): Promise<ActionResult> {
     const result = await this.apiCall<{ addOns: Array<{ id: string; name: string; price: number; description: string }> }>(
       'GET',
-      '/api/v1/chalets/add-ons'
+      '/api/v1/units/add-ons'
     );
 
     if (result.success && result.data) {

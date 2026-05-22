@@ -243,7 +243,7 @@ apiRouter.use('/templates', templateRoutes);
 // Channel Webhooks - FIXED
 app.use('/webhooks/channels', channelWebhookRoutes);
 
-// Legacy route rewriting (must be mounted before API routes)
+// Legacy chalet paths return 410 Gone (must be mounted before API routes)
 app.use(legacyRouteHandler);
 
 app.use('/api/v1', apiRouter);
