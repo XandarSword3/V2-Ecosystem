@@ -1,11 +1,14 @@
 /**
  * Phase 2 Verification Program — Extended API Client
  *
- * Wraps all HTTP calls needed by the Phase 2 verification program.
- * Built on top of the existing TestApiClient pattern.
+ * Engine-refit aligned (ARCHITECTURE_LAW.md):
+ * - Commerce records are `transactions` rows (never restaurant_orders / pool_tickets / …).
+ * - Customer module routes: `/{moduleSlug}/orders|bookings|tickets|sessions`.
+ * - Staff module routes: `/staff/modules/{slug}/…` (entry, exit, capacity, validate-ticket).
  */
 
 import { TEST_CONFIG } from '../config';
+import { ModuleSlug, trackTransaction } from '../engine-refit-helpers';
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -195,7 +198,9 @@ export class Phase2Client {
 
   async getMenu(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
-    return this.get(`/restaurant/menu${qs}`, { auth: false });
+    const itemsRes = await this.get(`/${ModuleSlug.RESTAURANT}/items${qs}`);
+    if (itemsRes.success) return itemsRes;
+    return this.get(`/${ModuleSlug.RESTAURANT}/menu${qs}`);
   }
 
   async createCategory(data: {
@@ -205,7 +210,28 @@ export class Phase2Client {
     sort_order?: number;
     description?: string;
   }): Promise<ApiResponse> {
-    return this.post('/restaurant/admin/categories', data);
+    const res = await this.post('/admin/import/menu', {
+      moduleId: data.module_id,
+      items: [
+        {
+          name: `${data.name} Placeholder`,
+          category: data.name,
+          price: 0,
+          is_available: false,
+        },
+      ],
+    });
+
+    if (!res.success) return res;
+    const first = Array.isArray(res.data) ? res.data[0] : null;
+    const categoryId = first?.category_id;
+    return {
+      ...res,
+      data: {
+        id: categoryId,
+        category: { id: categoryId },
+      },
+    };
   }
 
   async createMenuItem(data: {
@@ -220,12 +246,29 @@ export class Phase2Client {
     is_vegan?: boolean;
     is_gluten_free?: boolean;
   }): Promise<ApiResponse> {
-    // Try the known endpoints - some systems use /admin/menu, some use /admin/items
-    let res = await this.post('/restaurant/admin/items', data);
-    if (!res.success && (res.status === 404 || res.status === 0)) {
-      res = await this.post('/restaurant/admin/menu', data);
-    }
-    return res;
+    const res = await this.post('/admin/import/menu', {
+      moduleId: data.module_id,
+      items: [
+        {
+          name: data.name,
+          category_id: data.category_id,
+          price: data.price,
+          description: data.description,
+          is_available: data.is_available,
+          is_featured: data.is_featured,
+          is_vegetarian: data.is_vegetarian,
+          is_vegan: data.is_vegan,
+          is_gluten_free: data.is_gluten_free,
+        },
+      ],
+    });
+
+    if (!res.success) return res;
+    const first = Array.isArray(res.data) ? res.data[0] : null;
+    return {
+      ...res,
+      data: first || res.data,
+    };
   }
 
   async createModifierGroup(data: {
@@ -240,16 +283,67 @@ export class Phase2Client {
       is_available?: boolean;
     }[];
   }): Promise<ApiResponse> {
-    return this.post('/restaurant/admin/modifiers/groups', data);
+    const selectionMode = (data.max_selections ?? 1) > 1 ? 'multiple' : 'single';
+    const groupRes = await this.post('/customizations/groups', {
+      name: data.name,
+      selectionMode,
+      minSelections: data.min_selections ?? 0,
+      maxSelections: data.max_selections ?? 1,
+      isRequired: data.is_required ?? false,
+      applicableEntityTypes: ['menu_item'],
+      isGlobal: false,
+    });
+
+    if (!groupRes.success) return groupRes;
+
+    const groupId = groupRes.data?.id;
+    if (!groupId) return groupRes;
+
+    const options: Array<{ id: string; name: string }> = [];
+    if (Array.isArray(data.options)) {
+      for (const option of data.options) {
+        const optionRes = await this.post('/customizations/options', {
+          groupId,
+          name: option.name,
+          customizationType: 'add',
+          priceAdjustment: option.price ?? 0,
+          priceType: 'fixed',
+          isAvailable: option.is_available ?? true,
+        });
+        if (optionRes.success && optionRes.data?.id) {
+          options.push({ id: optionRes.data.id, name: option.name });
+        }
+      }
+    }
+
+    return {
+      ...groupRes,
+      data: {
+        id: groupId,
+        options,
+      },
+    };
   }
 
   async linkModifiersToItem(
     menuItemId: string,
     modifierGroupIds: { groupId: string; sortOrder?: number }[]
   ): Promise<ApiResponse> {
-    return this.post(`/restaurant/admin/items/${menuItemId}/modifiers`, {
-      modifierGroupIds,
-    });
+    let lastRes: ApiResponse = { success: true, status: 200 };
+    for (const modifier of modifierGroupIds) {
+      lastRes = await this.post('/customizations/entity-links', {
+        entityType: 'menu_item',
+        entityId: menuItemId,
+        customizationGroupId: modifier.groupId,
+        sortOrder: modifier.sortOrder ?? 0,
+        isEnabled: true,
+        priceMultiplier: 1,
+      });
+      if (!lastRes.success) {
+        return lastRes;
+      }
+    }
+    return lastRes;
   }
 
   async createTable(data: {
@@ -263,7 +357,7 @@ export class Phase2Client {
 
   async getTables(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
-    return this.get(`/restaurant/tables${qs}`, { auth: false });
+    return this.get(`/restaurant/tables${qs}`);
   }
 
   async createOrder(data: {
@@ -285,25 +379,43 @@ export class Phase2Client {
     loyaltyPointsToRedeem?: number;
     loyaltyPointsDollarValue?: number;
   }): Promise<ApiResponse> {
-    return this.post('/restaurant/orders', data);
+    const items = data.items.map((item) => ({
+      menu_item_id: item.menuItemId,
+      quantity: item.quantity,
+    }));
+    const res = await this.post(`/${ModuleSlug.RESTAURANT}/orders`, {
+      items,
+      metadata: {
+        customer_name: data.customerName,
+        customer_phone: data.customerPhone,
+        order_type: data.orderType,
+        table_number: data.tableNumber,
+        payment_method: data.paymentMethod,
+        coupon_code: data.couponCode,
+      },
+    });
+    if (res.success && res.data?.id) {
+      trackTransaction(res.data.id);
+    }
+    return res;
   }
 
   async getOrder(id: string): Promise<ApiResponse> {
-    return this.get(`/restaurant/orders/${id}`);
+    return this.get(`/${ModuleSlug.RESTAURANT}/orders/${id}`);
   }
 
   async updateOrderStatus(id: string, status: string): Promise<ApiResponse> {
-    return this.patch(`/restaurant/staff/orders/${id}/status`, { status });
+    return this.patch(`/${ModuleSlug.RESTAURANT}/orders/${id}/status`, { status });
   }
 
   // ───────── Chalets ─────────
 
   async getChalets(): Promise<ApiResponse> {
-    return this.get('/chalets', { auth: false });
+    return this.get(`/${ModuleSlug.CHALETS}/availability`);
   }
 
   async getChalet(id: string): Promise<ApiResponse> {
-    return this.get(`/chalets/${id}`, { auth: false });
+    return this.get(`/${ModuleSlug.CHALETS}/bookings/${id}`);
   }
 
   async createChalet(data: {
@@ -317,7 +429,21 @@ export class Phase2Client {
     is_active?: boolean;
     module_id?: string;
   }): Promise<ApiResponse> {
-    return this.post('/chalets/admin/chalets', data);
+    const res = await this.post(`/${ModuleSlug.CHALETS}/import/commit`, {
+      moduleId: data.module_id,
+      items: [
+        {
+          name: data.name,
+          description: data.description,
+          maxGuests: data.capacity ?? 2,
+          basePrice: data.base_price ?? data.price_per_night ?? 100,
+        },
+      ],
+    });
+    if (!res.success) {
+      return this.post(`/${ModuleSlug.CHALETS}/bookings`, data);
+    }
+    return res;
   }
 
   async createPriceRule(data: {
@@ -345,7 +471,7 @@ export class Phase2Client {
 
   async getAddOns(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
-    return this.get(`/chalets/add-ons${qs}`, { auth: false });
+    return this.get(`/chalets/add-ons${qs}`);
   }
 
   async getChaletAvailability(
@@ -354,8 +480,7 @@ export class Phase2Client {
     endDate: string
   ): Promise<ApiResponse> {
     return this.get(
-      `/chalets/${chaletId}/availability?startDate=${startDate}&endDate=${endDate}`,
-      { auth: false }
+      `/${ModuleSlug.CHALETS}/availability?start=${startDate}&end=${endDate}`,
     );
   }
 
@@ -371,23 +496,40 @@ export class Phase2Client {
     addOns?: { addOnId: string; quantity?: number }[];
     notes?: string;
   }): Promise<ApiResponse> {
-    return this.post('/chalets/bookings', data);
+    const res = await this.post(`/${ModuleSlug.CHALETS}/bookings`, {
+      unit_id: data.chaletId,
+      check_in_date: data.checkInDate,
+      check_out_date: data.checkOutDate,
+      total_amount: 0,
+      metadata: {
+        customer_name: data.customerName,
+        customer_email: data.customerEmail,
+        customer_phone: data.customerPhone,
+        number_of_guests: data.numberOfGuests,
+        payment_method: data.paymentMethod,
+        add_ons: data.addOns,
+      },
+    });
+    if (res.success && res.data?.id) {
+      trackTransaction(res.data.id);
+    }
+    return res;
   }
 
   async getBooking(id: string): Promise<ApiResponse> {
-    return this.get(`/chalets/bookings/${id}`);
+    return this.get(`/${ModuleSlug.CHALETS}/bookings/${id}`);
   }
 
   async checkInBooking(bookingId: string): Promise<ApiResponse> {
-    return this.patch(`/chalets/staff/bookings/${bookingId}/check-in`);
+    return this.patch(`/${ModuleSlug.CHALETS}/bookings/${bookingId}/status`, { status: 'active' });
   }
 
   async checkOutBooking(bookingId: string): Promise<ApiResponse> {
-    return this.patch(`/chalets/staff/bookings/${bookingId}/check-out`);
+    return this.patch(`/${ModuleSlug.CHALETS}/bookings/${bookingId}/status`, { status: 'used' });
   }
 
   async cancelBooking(bookingId: string): Promise<ApiResponse> {
-    return this.post(`/chalets/bookings/${bookingId}/cancel`);
+    return this.patch(`/${ModuleSlug.CHALETS}/bookings/${bookingId}/status`, { status: 'cancelled' });
   }
 
   async getChaletSettings(): Promise<ApiResponse> {
@@ -402,7 +544,7 @@ export class Phase2Client {
 
   async getPoolSessions(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
-    return this.get(`/pool/sessions${qs}`, { auth: false });
+    return this.get(`/${ModuleSlug.POOL}/sessions${qs}`);
   }
 
   async createPoolSession(data: {
@@ -417,7 +559,19 @@ export class Phase2Client {
     module_id?: string;
     gender_restriction?: string;
   }): Promise<ApiResponse> {
-    return this.post('/pool/admin/sessions', data);
+    return this.post(`/${ModuleSlug.POOL}/import/commit`, {
+      moduleId: data.module_id,
+      items: [
+        {
+          name: data.name,
+          startTime: data.start_time,
+          endTime: data.end_time,
+          capacity: data.max_capacity ?? data.capacity ?? 50,
+          adultPrice: data.adult_price ?? data.price ?? 15,
+          childPrice: data.child_price ?? 8,
+        },
+      ],
+    });
   }
 
   async purchasePoolTicket(data: {
@@ -430,27 +584,45 @@ export class Phase2Client {
     paymentMethod?: string;
     guestType?: string;
   }): Promise<ApiResponse> {
-    return this.post('/pool/tickets', data);
+    const res = await this.post(`/${ModuleSlug.POOL}/tickets`, {
+      session_id: data.sessionId,
+      quantity: data.numberOfGuests ?? 1,
+      unit_price: 0,
+      metadata: {
+        customer_name: data.customerName,
+        customer_phone: data.customerPhone,
+        ticket_date: data.ticketDate ?? data.visitDate,
+        payment_method: data.paymentMethod,
+      },
+    });
+    if (res.success && res.data?.id) {
+      trackTransaction(res.data.id);
+    }
+    return res;
   }
 
   async getPoolTicket(id: string): Promise<ApiResponse> {
-    return this.get(`/pool/tickets/${id}`);
+    return this.get(`/${ModuleSlug.POOL}/tickets/${id}`);
   }
 
-  async validatePoolTicket(ticketId: string): Promise<ApiResponse> {
-    return this.post(`/pool/tickets/${ticketId}/validate`);
+  async validatePoolTicket(transactionId: string): Promise<ApiResponse> {
+    const patchRes = await this.patch(`/${ModuleSlug.POOL}/tickets/${transactionId}/validate`);
+    if (patchRes.status !== 404) return patchRes;
+    return this.post(`/staff/modules/${ModuleSlug.POOL}/validate-ticket`, {
+      ticketNumber: transactionId,
+    });
   }
 
-  async recordPoolEntry(ticketId: string): Promise<ApiResponse> {
-    return this.post(`/pool/tickets/${ticketId}/entry`);
+  async recordPoolEntry(transactionId: string): Promise<ApiResponse> {
+    return this.post(`/staff/modules/${ModuleSlug.POOL}/entry`, { ticketId: transactionId });
   }
 
-  async recordPoolExit(ticketId: string): Promise<ApiResponse> {
-    return this.post(`/pool/tickets/${ticketId}/exit`);
+  async recordPoolExit(transactionId: string): Promise<ApiResponse> {
+    return this.post(`/staff/modules/${ModuleSlug.POOL}/exit`, { ticketId: transactionId });
   }
 
   async getPoolCapacity(): Promise<ApiResponse> {
-    return this.get('/pool/staff/capacity');
+    return this.get(`/staff/modules/${ModuleSlug.POOL}/capacity`);
   }
 
   async getPoolAvailability(date?: string, sessionId?: string): Promise<ApiResponse> {
@@ -458,11 +630,11 @@ export class Phase2Client {
     if (date) params.push(`date=${date}`);
     if (sessionId) params.push(`sessionId=${sessionId}`);
     const qs = params.length ? `?${params.join('&')}` : '';
-    return this.get(`/pool/availability${qs}`, { auth: false });
+    return this.get(`/${ModuleSlug.POOL}/sessions${qs}`);
   }
 
   async getPoolSettings(): Promise<ApiResponse> {
-    return this.get('/pool/settings', { auth: false });
+    return this.get('/pool/settings');
   }
 
   async updatePoolSettings(data: any): Promise<ApiResponse> {
@@ -476,7 +648,7 @@ export class Phase2Client {
   // ───────── Loyalty ─────────
 
   async getLoyaltySettings(): Promise<ApiResponse> {
-    return this.get('/loyalty/settings', { auth: false });
+    return this.get('/loyalty/settings');
   }
 
   async updateLoyaltySettings(data: any): Promise<ApiResponse> {
@@ -484,7 +656,7 @@ export class Phase2Client {
   }
 
   async getLoyaltyTiers(): Promise<ApiResponse> {
-    return this.get('/loyalty/tiers', { auth: false });
+    return this.get('/loyalty/tiers');
   }
 
   async createLoyaltyTier(data: {

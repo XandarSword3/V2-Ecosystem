@@ -10,13 +10,9 @@ export const legacyRouteHandler = (req: Request, res: Response, next: NextFuncti
     const path = req.path;
     let newPath = path;
 
-    // Map legacy prefixes to new generic prefixes
+    // Map legacy chalet prefix to unified units endpoints
     if (path.startsWith('/api/v1/chalets')) {
         newPath = path.replace('/api/v1/chalets', '/api/v1/units');
-    } else if (path.startsWith('/api/v1/pool')) {
-        newPath = path.replace('/api/v1/pool', '/api/v1/facilities');
-    } else if (path.startsWith('/api/v1/restaurant')) {
-        newPath = path.replace('/api/v1/restaurant', '/api/v1/dining');
     }
 
     if (newPath !== path) {

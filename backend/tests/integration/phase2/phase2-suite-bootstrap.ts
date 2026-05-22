@@ -554,7 +554,7 @@ export async function initializePhase2SuiteState(): Promise<void> {
     await ensureModule(admin, {
       slug: 'pool',
       name: 'Pool',
-      template_type: 'ticketing',
+      template_type: 'session_access',
       stateKey: 'poolModuleId',
     });
 

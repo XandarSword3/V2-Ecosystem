@@ -11,6 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Phase2Client } from './phase2-client';
 import { state, requireState } from './phase2-state';
 import { initializePhase2SuiteState, cleanupPhase2SuiteState } from './phase2-suite-bootstrap';
+import { ModuleSlug } from '../engine-refit-helpers';
 
 // ─────────── Helpers ───────────
 
@@ -402,7 +403,7 @@ describe('J-06: Chalet Check-in Through Check-out with Housekeeping', () => {
     const bookingId = requireState('j03BookingId');
 
     const res = await admin.patch(
-      `/chalets/staff/bookings/${bookingId}/status`,
+      `/${ModuleSlug.CHALETS}/bookings/${bookingId}/status`,
       { status: 'confirmed' }
     );
     expect(res.status).toBeLessThan(500);
@@ -829,7 +830,7 @@ describe('J-12: Full Guest Stay — Cross-Engine Grand Journey', () => {
     const admin = client(requireState('adminToken'));
     const id = requireState('j12BookingId');
 
-    await admin.patch(`/chalets/staff/bookings/${id}/status`, { status: 'confirmed' });
+    await admin.patch(`/${ModuleSlug.CHALETS}/bookings/${id}/status`, { status: 'confirmed' });
 
     const chaletStaff = client(requireState('chaletStaffToken'));
     const res = await chaletStaff.checkInBooking(id);
@@ -923,9 +924,9 @@ describe('J-13: Admin Financial Reports Verification', () => {
 // J-14: Staff Role Authorization Boundaries
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 describe('J-14: Staff Role Authorization Boundaries', () => {
-  it('staff CAN access restaurant orders', async () => {
+  it('staff CAN list restaurant instant_transaction rows', async () => {
     const staff = client(requireState('kitchenStaffToken'));
-    const res = await staff.get('/restaurant/orders');
+    const res = await staff.get(`/${ModuleSlug.RESTAURANT}/orders`);
     expect([200, 304]).toContain(res.status);
   });
 
@@ -941,9 +942,9 @@ describe('J-14: Staff Role Authorization Boundaries', () => {
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
-  it('staff CAN access chalet bookings', async () => {
+  it('staff CAN list chalet time_exclusive_reservation rows', async () => {
     const staff = client(requireState('chaletStaffToken'));
-    const res = await staff.get('/chalets/bookings');
+    const res = await staff.get(`/${ModuleSlug.CHALETS}/bookings`);
     expect(res.status).toBeLessThan(500);
   });
 
@@ -979,9 +980,9 @@ describe('J-14: Staff Role Authorization Boundaries', () => {
 // J-15: Ghost Role Verification
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 describe('J-15: Ghost Role Ground Truth Verification', () => {
-  it('staff can view restaurant orders', async () => {
+  it('staff can view restaurant transactions', async () => {
     const staff = client(requireState('kitchenStaffToken'));
-    const res = await staff.get('/restaurant/orders');
+    const res = await staff.get(`/${ModuleSlug.RESTAURANT}/orders`);
     expect(res.status).toBeLessThan(400);
   });
 
@@ -999,10 +1000,12 @@ describe('J-15: Ghost Role Ground Truth Verification', () => {
     expect(res.status).toBeLessThan(400);
   });
 
-  it('staff can validate pool tickets', async () => {
+  it('staff can validate pool access transactions', async () => {
     const staff = client(requireState('poolStaffToken'));
-    const res = await staff.post('/pool/tickets/validate', { code: 'TEST-NONEXISTENT' });
-    // Should get 400 (bad ticket) or 404 (not found), NOT 403 (forbidden)
+    const res = await staff.patch(
+      `/${ModuleSlug.POOL}/tickets/00000000-0000-0000-0000-000000000001/validate`,
+    );
+    // Should get 400 (bad transition) or 404 (not found), NOT 403 (forbidden)
     expect(res.status).not.toBe(403);
   });
 });
