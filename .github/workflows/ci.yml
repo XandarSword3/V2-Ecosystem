@@ -184,6 +184,10 @@ jobs:
         run: |
           # psql comes pre-installed on ubuntu-latest
           export DB_URL="postgresql://postgres:postgres@localhost:15432/postgres"
+          # Grant BYPASSRLS to postgres superuser so the seed step can INSERT
+          # through RLS policies that require auth.uid() (which returns NULL in
+          # plain-Postgres CI — only Supabase GoTrue sets it via JWT claims).
+          psql "$DB_URL" -c "ALTER ROLE postgres BYPASSRLS;" 2>&1 || true
           echo "Applying $( ls supabase/migrations/*.sql | wc -l ) migration files..."
           for f in $(ls supabase/migrations/*.sql | sort); do
             case "$f" in

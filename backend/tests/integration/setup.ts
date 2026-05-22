@@ -272,9 +272,18 @@ export async function seedTestDatabase(): Promise<void> {
   }
 
 
+  // Acquire a dedicated client so we can run the entire seed inside a single
+  // transaction with row_security disabled.  RLS policies on the users table
+  // check auth.uid() which returns NULL in plain-Postgres CI (no GoTrue), so
+  // any INSERT/UPDATE via pool.query() would be silently blocked.  Using
+  // SET LOCAL inside a transaction scopes the bypass to this block only.
+  const seedClient = await pool.connect();
   try {
+    await seedClient.query('BEGIN');
+    await seedClient.query('SET LOCAL row_security = off');
+
     // Seed the role catalog required by auth/authorization middleware.
-    await pool.query(`
+    await seedClient.query(`
       INSERT INTO roles (name, display_name, description, business_unit)
       VALUES
         ('super_admin', 'Super Administrator', 'Full system access', 'admin'),
@@ -303,7 +312,7 @@ export async function seedTestDatabase(): Promise<void> {
     const customerPasswordHash = await bcrypt.hash(TEST_CONFIG.users.customer.password, 12);
 
     // Create test users
-    await pool.query(`
+    await seedClient.query(`
       INSERT INTO users (id, email, password_hash, full_name, email_verified, is_active)
       VALUES 
         ('11111111-1111-1111-1111-111111111111', $1, $2, $3, true, true),
@@ -328,7 +337,7 @@ export async function seedTestDatabase(): Promise<void> {
     ];
 
     for (const [email, roleName] of roleAssignments) {
-      await pool.query(
+      await seedClient.query(
         `
           INSERT INTO user_roles (user_id, role_id)
           SELECT u.id, r.id
@@ -346,8 +355,13 @@ export async function seedTestDatabase(): Promise<void> {
       );
     }
 
+    await seedClient.query('COMMIT');
     console.log('✅ Test database seeded successfully');
+  } catch (seedError) {
+    await seedClient.query('ROLLBACK').catch(() => {});
+    throw seedError;
   } finally {
+    seedClient.release();
     await pool.end();
   }
 }
