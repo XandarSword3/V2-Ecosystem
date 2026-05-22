@@ -163,7 +163,7 @@ describe('ModifierSelectionModal behavior', () => {
     );
 
     await screen.findByText('Choose Sauce');
-    await user.click(screen.getByText('Spicy Sauce'));
+    await user.click(await screen.findByText('Spicy Sauce'));
     await user.click(screen.getByRole('button', { name: /add to cart/i }));
 
     await waitFor(() => {
