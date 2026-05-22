@@ -67,10 +67,16 @@ export default defineConfig({
       RUN_INTEGRATION_TESTS: 'true',
       NODE_ENV: 'test',
       DATABASE_URL: process.env.DATABASE_URL!,
+      TEST_DATABASE_URL: process.env.TEST_DATABASE_URL || process.env.DATABASE_URL!,
       SUPABASE_URL: process.env.SUPABASE_URL!,
       SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY!,
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY!,
       SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
       JWT_SECRET: process.env.JWT_SECRET!,
+      JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET!,
+      REDIS_URL: process.env.REDIS_URL || process.env.TEST_REDIS_URL || '',
+      TEST_REDIS_URL: process.env.TEST_REDIS_URL || process.env.REDIS_URL || '',
+      CSRF_BYPASS_IN_TESTS: 'true',
     },
 
     // Setup file
