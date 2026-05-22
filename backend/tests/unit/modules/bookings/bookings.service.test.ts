@@ -351,7 +351,7 @@ describe('BookingsService', () => {
       const result = await createBooking(input);
 
       expect(result).toBeDefined();
-      expect(mockSupabase.from).toHaveBeenCalledWith('chalet_add_ons');
+      expect(mockSupabase.from).toHaveBeenCalledWith('accommodation_add_ons');
     });
   });
 
