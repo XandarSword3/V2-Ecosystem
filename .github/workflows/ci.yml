@@ -222,20 +222,23 @@ jobs:
           # @supabase/supabase-js v2 always appends /rest/v1 to the base URL,
           # so we expose :15420 as the Supabase-compatible base URL.
           sudo apt-get install -y nginx -q
-          sudo bash -c 'cat > /etc/nginx/conf.d/postgrest.conf << '"'"'NGINX'"'"'
-          server {
-            listen 15420;
-            location /rest/v1/ {
-              proxy_pass http://127.0.0.1:15421/;
-              proxy_set_header Host $host;
-            }
-            location / {
-              return 404;
-            }
-          }
-          NGINX'
+
+          # Write config to tmp (no sudo needed), then copy it in
+          cat > /tmp/nginx-postgrest.conf << 'NGINX'
+server {
+  listen 15420;
+  location /rest/v1/ {
+    proxy_pass http://127.0.0.1:15421/;
+    proxy_set_header Host $host;
+  }
+  location / {
+    return 404;
+  }
+}
+NGINX
+          sudo cp /tmp/nginx-postgrest.conf /etc/nginx/conf.d/postgrest.conf
           sudo nginx -t
-          sudo systemctl reload nginx
+          sudo systemctl restart nginx
           echo "nginx proxy ready on :15420 -> PostgREST :15421"
 
       - name: Set Supabase env vars
