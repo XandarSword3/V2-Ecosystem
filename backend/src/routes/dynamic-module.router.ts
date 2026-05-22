@@ -98,6 +98,31 @@ function actorForUser(req: Request): 'system' | 'staff' | 'customer' | 'admin' {
   return 'customer';
 }
 
+/**
+ * Resolve the action name for a target state.
+ * The state machine uses action names (e.g. 'confirm') not target state names
+ * (e.g. 'confirmed'). Clients send target state names for convenience, so we
+ * look up the first matching action that leads to that target state.
+ */
+function resolveAction(
+  templateType: string,
+  currentState: string,
+  targetStateOrAction: string,
+  actor: 'system' | 'staff' | 'customer' | 'admin',
+): string {
+  // First, try it as a direct action name (already correct format)
+  const available = engineService.getAvailableActions(templateType, currentState, actor);
+  const directMatch = available.find((a) => a.action === targetStateOrAction);
+  if (directMatch) return targetStateOrAction;
+
+  // Otherwise treat it as a target state and find the first matching action
+  const stateMatch = available.find((a) => a.targetState === targetStateOrAction);
+  if (stateMatch) return stateMatch.action;
+
+  // Fall through: return as-is (will fail gracefully in transitionState)
+  return targetStateOrAction;
+}
+
 function asNumber(input: unknown, fallback = 0): number {
   const value = Number(input);
   return Number.isFinite(value) ? value : fallback;
@@ -194,13 +219,28 @@ function buildMenuServiceRouter(router: Router): void {
           customer_id: req.user?.userId ?? null,
           status: 'pending',
           amount: pricing.totalAmount,
-          metadata: { notes: req.body?.notes ?? null },
+          metadata: {
+            notes: req.body?.notes ?? req.body?.metadata?.notes ?? null,
+            payment_method: req.body?.metadata?.payment_method ?? req.body?.payment_method ?? null,
+            order_type: req.body?.metadata?.order_type ?? req.body?.order_type ?? null,
+            table_number: req.body?.metadata?.table_number ?? req.body?.table_number ?? null,
+            customer_name: req.body?.metadata?.customer_name ?? req.body?.customer_name ?? null,
+          },
         })
-        .select('id, module_id, customer_id, status, amount, created_at')
+        .select('id, module_id, customer_id, status, amount, created_at, metadata')
         .single();
 
       if (createError) throw createError;
-      res.status(201).json({ success: true, data: created });
+      // Flatten metadata fields to top level for client convenience
+      const meta = (created?.metadata ?? {}) as Record<string, unknown>;
+      res.status(201).json({
+        success: true,
+        data: {
+          ...created,
+          payment_method: meta.payment_method ?? null,
+          payment_status: 'pending',
+        },
+      });
     } catch (error) {
       logger.error('[Dynamic Router] POST /orders failed', error);
       res.status(500).json({ success: false, error: 'Failed to create order' });
@@ -249,7 +289,15 @@ function buildMenuServiceRouter(router: Router): void {
 
       if (error) throw error;
       if (!data) return res.status(404).json({ success: false, error: 'Order not found' });
-      res.json({ success: true, data });
+      const meta = (data?.metadata ?? {}) as Record<string, unknown>;
+      res.json({
+        success: true,
+        data: {
+          ...data,
+          payment_method: meta.payment_method ?? null,
+          payment_status: data.status === 'completed' ? 'paid' : 'pending',
+        },
+      });
     } catch (error) {
       logger.error('[Dynamic Router] GET /orders/:id failed', error);
       res.status(500).json({ success: false, error: 'Failed to fetch order' });
@@ -280,11 +328,13 @@ function buildMenuServiceRouter(router: Router): void {
       if (currentError) throw currentError;
       if (!current) return res.status(404).json({ success: false, error: 'Order not found' });
 
+      const actor = actorForUser(req);
+      const action = resolveAction(mounted.template_type, current.status, newStatus, actor);
       const transition = await engineService.transitionState(
         mounted.template_type,
         current.status,
-        newStatus,
-        actorForUser(req),
+        action,
+        actor,
         { moduleId: mounted.id },
       );
 
@@ -368,6 +418,19 @@ function buildMultiDayBookingRouter(router: Router): void {
         .filter('metadata->>unit_id', 'eq', String(unit_id));
 
       if (existingError) throw existingError;
+
+      // Validate unit_id exists in bookable_units for this module
+      const { data: unitRow, error: unitError } = await supabase
+        .from('bookable_units')
+        .select('id')
+        .eq('id', String(unit_id))
+        .eq('module_id', mounted.id)
+        .maybeSingle();
+
+      if (unitError) throw unitError;
+      if (!unitRow) {
+        return res.status(404).json({ success: false, error: 'Unit not found' });
+      }
 
       const overlap = (existingBookings ?? []).some((booking) => {
         const status = String(booking.status || '');
@@ -478,11 +541,13 @@ function buildMultiDayBookingRouter(router: Router): void {
       if (currentError) throw currentError;
       if (!current) return res.status(404).json({ success: false, error: 'Booking not found' });
 
+      const actor = actorForUser(req);
+      const action = resolveAction(mounted.template_type, current.status, newStatus, actor);
       const transition = await engineService.transitionState(
         mounted.template_type,
         current.status,
-        newStatus,
-        actorForUser(req),
+        action,
+        actor,
         { moduleId: mounted.id },
       );
 
@@ -517,14 +582,13 @@ function buildSessionAccessRouter(router: Router): void {
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('pool_sessions')
-        .select('id, name, start_time, end_time, max_capacity, capacity, module_id, is_active, adult_price, child_price')
+        .select('id, name, start_time, end_time, max_capacity, module_id, is_active, adult_price, child_price')
         .eq('module_id', mounted.id)
         .eq('is_active', true)
         .order('start_time', { ascending: true });
       if (error) throw error;
       const normalized = (data ?? []).map((session) => ({
         ...session,
-        max_capacity: session.max_capacity ?? session.capacity,
       }));
       res.json({ success: true, data: normalized });
     } catch (error) {
@@ -667,11 +731,13 @@ function buildSessionAccessRouter(router: Router): void {
       if (readError) throw readError;
       if (!ticket) return res.status(404).json({ success: false, error: 'Ticket not found' });
 
+      const actor = actorForUser(req);
+      const action = resolveAction(mounted.template_type, ticket.status, 'validate', actor);
       const transition = await engineService.transitionState(
         mounted.template_type,
         ticket.status,
-        'validate',
-        actorForUser(req),
+        action,
+        actor,
         { moduleId: mounted.id },
       );
 
@@ -834,11 +900,13 @@ function buildSubscriptionRouter(router: Router): void {
       if (currentError) throw currentError;
       if (!current) return res.status(404).json({ success: false, error: 'Subscription not found' });
 
+      const actor = actorForUser(req);
+      const action = resolveAction(mounted.template_type, current.status, newStatus, actor);
       const transition = await engineService.transitionState(
         mounted.template_type,
         current.status,
-        newStatus,
-        actorForUser(req),
+        action,
+        actor,
         { moduleId: mounted.id },
       );
 
@@ -1100,7 +1168,6 @@ async function commitImportForEngine(
           adult_price: item.adultPrice,
           child_price: item.childPrice,
           max_capacity: item.capacity,
-          capacity: item.capacity,
           price: item.adultPrice,
           gender_restriction: item.genderRestriction || 'mixed',
           days_of_week: item.daysOfWeek || [0, 1, 2, 3, 4, 5, 6],
@@ -1151,18 +1218,9 @@ async function commitImportForEngine(
         const { error } = await supabase.from('bookable_units').insert({
           name: item.name,
           description: item.description,
-          max_guests: item.maxGuests,
-          bedrooms: item.bedrooms,
-          bathrooms: item.bathrooms,
           base_price: item.basePrice,
           weekend_price: item.weekendPrice,
-          weekly_discount: item.weeklyDiscount,
-          amenities: item.amenities,
-          check_in_time: item.policies?.checkInTime,
-          check_out_time: item.policies?.checkOutTime,
-          cancellation_hours: item.policies?.cancellationHours,
-          pet_friendly: item.policies?.petFriendly,
-          smoking_allowed: item.policies?.smokingAllowed,
+          capacity: item.maxGuests,   // bookable_units view maps to accommodation_units.capacity
           is_active: item.isActive ?? true,
           module_id: moduleId,
         });
