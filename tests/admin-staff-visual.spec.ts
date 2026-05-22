@@ -457,7 +457,7 @@ test.describe('Purchase Flow Tests', () => {
           checkOut.setDate(checkOut.getDate() + 2);
           
           // Create booking
-          const bookingRes = await request.post(`${API_URL}/api/v1/chalets/bookings`, {
+          const bookingRes = await request.post(`${API_URL}/api/v1/units/bookings`, {
             data: {
               chaletId: chalet.id,
               checkIn: checkIn.toISOString().split('T')[0],

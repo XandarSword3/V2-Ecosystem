@@ -611,8 +611,8 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 19: Pool Sessions ───────────
-  describe('Step 19: Pool Sessions', () => {
+  // ─────────── Step 19: Capacity Windows (shared_capacity_access) ───────────
+  describe('Step 19: Capacity Window Creation', () => {
     const sessions = [
       {
         name: 'Morning Swim',

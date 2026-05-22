@@ -167,10 +167,10 @@ async function testAdminChalets() {
   console.log('PHASE 3B: ADMIN CHALETS CRUD');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  const chalets = await request('GET', '/api/v1/chalets');
+  const chalets = await request('GET', '/api/v1/units');
   test('GET /chalets', chalets.status, chalets.status === 200);
 
-  const newChalet = await request('POST', '/api/v1/chalets/admin', {
+  const newChalet = await request('POST', '/api/v1/units/admin', {
     name: 'E2E Test Chalet', name_ar: 'شاليه اختبار', description: 'Test chalet',
     description_ar: 'شاليه اختبار', max_guests: 6, bedrooms: 2, bathrooms: 2,
     weekday_price: 120, weekend_price: 180, status: 'available',
@@ -180,37 +180,37 @@ async function testAdminChalets() {
   const chaletId = newChalet.data?.data?.id;
 
   if (chaletId) {
-    const getOne = await request('GET', `/api/v1/chalets/${chaletId}`);
+    const getOne = await request('GET', `/api/v1/units/${chaletId}`);
     test('GET /chalets/:id (read created)', getOne.status, getOne.status === 200);
-    const updChalet = await request('PUT', `/api/v1/chalets/admin/${chaletId}`, {
+    const updChalet = await request('PUT', `/api/v1/units/admin/${chaletId}`, {
       name: 'E2E Updated Chalet', weekday_price: 150
     });
     test('PUT /chalets/admin/:id (update)', updChalet.status, updChalet.status === 200);
-    const delChalet = await request('DELETE', `/api/v1/chalets/admin/${chaletId}`);
+    const delChalet = await request('DELETE', `/api/v1/units/admin/${chaletId}`);
     test('DELETE /chalets/admin/:id (delete)', delChalet.status, delChalet.status === 200 || delChalet.status === 204);
   }
 
   // Bookings management
-  const bookings = await request('GET', '/api/v1/chalets/admin/bookings');
+  const bookings = await request('GET', '/api/v1/units/admin/bookings');
   test('GET /chalets/admin/bookings', bookings.status, bookings.status === 200);
 
   // Add-ons CRUD
-  const addons = await request('GET', '/api/v1/chalets/add-ons');
+  const addons = await request('GET', '/api/v1/units/add-ons');
   test('GET /chalets/add-ons', addons.status, addons.status === 200);
 
-  const newAddon = await request('POST', '/api/v1/chalets/admin/add-ons', {
+  const newAddon = await request('POST', '/api/v1/units/admin/add-ons', {
     name: 'E2E Test Addon', name_ar: 'إضافة اختبار', price: 25, description: 'Test addon',
     is_available: true
   });
   test('POST /chalets/admin/add-ons (create)', newAddon.status, newAddon.status === 201 || newAddon.status === 200);
   const addonId = newAddon.data?.data?.id;
   if (addonId) {
-    const delAddon = await request('DELETE', `/api/v1/chalets/admin/add-ons/${addonId}`);
+    const delAddon = await request('DELETE', `/api/v1/units/admin/add-ons/${addonId}`);
     test('DELETE /chalets/admin/add-ons/:id', delAddon.status, delAddon.status === 200 || delAddon.status === 204);
   }
 
   // Pricing rules
-  const pricing = await request('GET', '/api/v1/chalets/admin/pricing-rules');
+  const pricing = await request('GET', '/api/v1/units/admin/pricing-rules');
   test('GET /chalets/admin/pricing-rules', pricing.status, pricing.status === 200);
 }
 

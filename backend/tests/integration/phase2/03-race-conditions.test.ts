@@ -117,9 +117,9 @@ describe('R-01: Gift Card Over-Redemption — Concurrent Race', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// R-02: Pool Capacity Breach (Risk H2)
+// R-02: Concurrent Capacity Allocation (Risk H2)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('R-02: Pool Capacity Breach — Concurrent Tickets', () => {
+describe('R-02: Concurrent Capacity Allocation', () => {
   it('should not allow 2 concurrent 2-guest tickets when only 2 spots remain', async () => {
     const sessionId = requireState('eveningSessionId');
     const ticketDate = today();

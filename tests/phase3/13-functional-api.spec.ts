@@ -234,7 +234,7 @@ test.describe('API Verification — Proves Backend Works', () => {
   // ──────────────────────────────────────────────
   test.describe('Chalet Endpoints', () => {
     test('chalets listing returns real properties', async ({ page }) => {
-      const resp = await page.request.get(`${API}/api/v1/chalets`);
+      const resp = await page.request.get(`${API}/api/v1/units`);
 
       expect(resp.status()).toBeLessThan(300);
       const json = await resp.json();
@@ -259,7 +259,7 @@ test.describe('API Verification — Proves Backend Works', () => {
 
     test('chalet availability shows open dates', async ({ page }) => {
       // Get a chalet ID first
-      const listResp = await page.request.get(`${API}/api/v1/chalets`);
+      const listResp = await page.request.get(`${API}/api/v1/units`);
       const chalets = (await listResp.json()).data || [];
       if (chalets.length === 0) return;
 
@@ -270,7 +270,7 @@ test.describe('API Verification — Proves Backend Works', () => {
       endDate.setDate(endDate.getDate() + 14);
 
       const resp = await page.request.get(
-        `${API}/api/v1/chalets/${chaletId}/availability?startDate=${startDate.toISOString().split('T')[0]}&endDate=${endDate.toISOString().split('T')[0]}`
+        `${API}/api/v1/units/${chaletId}/availability?startDate=${startDate.toISOString().split('T')[0]}&endDate=${endDate.toISOString().split('T')[0]}`
       );
 
       expect(resp.status()).toBeLessThan(300);

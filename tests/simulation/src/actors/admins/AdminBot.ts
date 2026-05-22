@@ -1757,7 +1757,7 @@ export class ChaletAdminBot extends AdminBot {
     const chaletTypes = ['standard', 'deluxe', 'premium', 'beachfront', 'hillside'];
     const result = await this.apiCall<{ id: string; name: string }>(
       'POST',
-      '/api/v1/chalets',
+      '/api/v1/units',
       {
         name: `Chalet ${Date.now()}`,
         type: chaletTypes[Math.floor(Math.random() * chaletTypes.length)],
@@ -1795,7 +1795,7 @@ export class ChaletAdminBot extends AdminBot {
     // Get existing chalets
     const chaletsResult = await this.apiCall<{ chalets: Array<{ id: string; name: string }> }>(
       'GET',
-      '/api/v1/chalets'
+      '/api/v1/units'
     );
 
     if (!chaletsResult.success || !chaletsResult.data?.chalets.length) {
@@ -1810,7 +1810,7 @@ export class ChaletAdminBot extends AdminBot {
 
     const result = await this.apiCall<{ updated: boolean }>(
       'PUT',
-      `/api/v1/chalets/${chalet.id}`,
+      `/api/v1/units/${chalet.id}`,
       {
         amenities: ['wifi', 'kitchen', 'bbq', 'parking', 'hot_tub'],
         description: 'Updated chalet description',
@@ -1845,7 +1845,7 @@ export class ChaletAdminBot extends AdminBot {
 
     const result = await this.apiCall<{ id: string }>(
       'POST',
-      '/api/v1/chalets/add-ons',
+      '/api/v1/units/add-ons',
       {
         name: addOn.replace('_', ' ').toUpperCase(),
         type: addOn,
@@ -1866,7 +1866,7 @@ export class ChaletAdminBot extends AdminBot {
   private async configureChaletPricing(): Promise<ActionResult> {
     const result = await this.apiCall<{ ruleId: string }>(
       'POST',
-      '/api/v1/chalets/price-rules',
+      '/api/v1/units/price-rules',
       {
         name: `Weekend Surge ${Date.now()}`,
         type: 'multiplier',
@@ -1903,7 +1903,7 @@ export class ChaletAdminBot extends AdminBot {
   private async reviewChaletBookings(): Promise<ActionResult> {
     const result = await this.apiCall<{ bookings: Array<{ id: string; status: string; chaletId: string }> }>(
       'GET',
-      '/api/v1/chalets/bookings?status=all'
+      '/api/v1/units/bookings?status=all'
     );
 
     return {

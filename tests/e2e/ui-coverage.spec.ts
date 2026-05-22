@@ -244,7 +244,7 @@ test.describe('Frontend UI Coverage Verification', () => {
 test.describe('API Coverage Verification', () => {
   
   test('Chalets API exists', async ({ request }) => {
-    const response = await request.get(`${API_BASE_URL}/api/v1/chalets`);
+    const response = await request.get(`${API_BASE_URL}/api/v1/units`);
     // 401 is fine (auth required), 404 would be bad
     expect([200, 401, 403]).toContain(response.status());
     console.log(`✅ Chalets API: Exists (status: ${response.status()})`);

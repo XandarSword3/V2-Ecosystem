@@ -479,12 +479,12 @@ test.describe('Phase 5: Verify Data Persistence', () => {
       test.skip(true, 'No booking was created');
     }
     
-    const response = await request.get(`${API_URL}/api/v1/chalets/bookings/${createdBookingId}`);
+    const response = await request.get(`${API_URL}/api/v1/units/bookings/${createdBookingId}`);
     expect([200, 404]).toContain(response.status());
   });
 
   test('API: Verify chalets are available', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/v1/chalets`);
+    const response = await request.get(`${API_URL}/api/v1/units`);
     // Accept 200, 401 (needs auth), or 404 (endpoint doesn't exist)
     expect([200, 401, 404]).toContain(response.status());
     
@@ -500,7 +500,7 @@ test.describe('Phase 5: Verify Data Persistence', () => {
     const startDate = getFutureDate(14);
     const endDate = getFutureDate(16);
     
-    const response = await request.get(`${API_URL}/api/v1/chalets/availability?startDate=${startDate}&endDate=${endDate}`);
+    const response = await request.get(`${API_URL}/api/v1/units/availability?startDate=${startDate}&endDate=${endDate}`);
     // Accept various status codes as the endpoint might not exist or may have errors
     expect([200, 401, 404, 500]).toContain(response.status());
   });

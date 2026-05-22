@@ -225,20 +225,20 @@ async function testChalets() {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('PHASE 2D: CHALET FLOWS');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-  const chalets = await request('GET', '/api/v1/chalets');
+  const chalets = await request('GET', '/api/v1/units');
   test('GET /chalets', chalets.status, chalets.status === 200);
   let firstChaletId = null;
   const chaletList = chalets.data?.data || [];
   if (chaletList.length > 0) firstChaletId = chaletList[0].id;
   console.log(`  📦 Chalets: ${chaletList.length}`);
   if (firstChaletId) {
-    const detail = await request('GET', `/api/v1/chalets/${firstChaletId}`);
+    const detail = await request('GET', `/api/v1/units/${firstChaletId}`);
     test('GET /chalets/:id', detail.status, detail.status === 200);
-    const avail = await request('GET', `/api/v1/chalets/${firstChaletId}/availability?startDate=2026-05-01&endDate=2026-05-07`);
+    const avail = await request('GET', `/api/v1/units/${firstChaletId}/availability?startDate=2026-05-01&endDate=2026-05-07`);
     test('GET /chalets/:id/availability', avail.status, avail.status === 200,
       typeof avail.data === 'object' ? (avail.data.error || '') : '');
   }
-  const addons = await request('GET', '/api/v1/chalets/add-ons');
+  const addons = await request('GET', '/api/v1/units/add-ons');
   test('GET /chalets/add-ons', addons.status, addons.status === 200);
   if (firstChaletId) {
     // Use random far-future dates to avoid conflicts from repeated test runs
@@ -246,7 +246,7 @@ async function testChalets() {
     const chaletMonth = Math.floor(Math.random() * 6) + 4; // Apr-Sep
     const cIn = `2027-${String(chaletMonth).padStart(2,'0')}-${String(chaletDay).padStart(2,'0')}`;
     const cOut = `2027-${String(chaletMonth).padStart(2,'0')}-${String(chaletDay + 2).padStart(2,'0')}`;
-    const booking = await request('POST', '/api/v1/chalets/bookings', {
+    const booking = await request('POST', '/api/v1/units/bookings', {
       chaletId: firstChaletId, customerId: userId,
       customerName: 'John Smith', customerEmail: 'john@test.com', customerPhone: '+12025551234',
       checkInDate: cIn, checkOutDate: cOut, numberOfGuests: 2,
@@ -256,11 +256,11 @@ async function testChalets() {
       booking.status === 201 || booking.status === 200 || booking.status === 400,
       typeof booking.data === 'object' ? (booking.data.error || booking.data.message || '').substring(0,100) : '');
     if (booking.data?.data?.id) {
-      const bg = await request('GET', `/api/v1/chalets/bookings/${booking.data.data.id}`);
+      const bg = await request('GET', `/api/v1/units/bookings/${booking.data.data.id}`);
       test('GET /chalets/bookings/:id', bg.status, bg.status === 200);
     }
   }
-  const myBookings = await request('GET', '/api/v1/chalets/my-bookings');
+  const myBookings = await request('GET', '/api/v1/units/my-bookings');
   test('GET /chalets/my-bookings', myBookings.status, myBookings.status === 200);
 }
 

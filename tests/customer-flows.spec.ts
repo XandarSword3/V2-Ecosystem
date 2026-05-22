@@ -300,7 +300,7 @@ test.describe('Customer API Endpoints', () => {
     const today = new Date().toISOString().split('T')[0];
     const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    const response = await request.get(`${API_URL}/api/v1/chalets/availability?startDate=${today}&endDate=${nextWeek}`);
+    const response = await request.get(`${API_URL}/api/v1/units/availability?startDate=${today}&endDate=${nextWeek}`);
     expect(response.status()).toBe(200);
     
     const data = await response.json();
