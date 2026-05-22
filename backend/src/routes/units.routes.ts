@@ -41,6 +41,111 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
+// ── Static routes MUST be before /:id to avoid UUID casting errors ──
+
+router.get('/availability', async (req: Request, res: Response) => {
+  try {
+    const supabase = getSupabase();
+    const { moduleId, start, end } = req.query;
+
+    let query = supabase
+      .from('bookable_units')
+      .select('id, name, is_available, module_id, base_price')
+      .eq('is_active', true)
+      .is('deleted_at', null);
+
+    if (typeof moduleId === 'string' && moduleId) {
+      query = query.eq('module_id', moduleId);
+    }
+
+    const { data, error } = await query.order('name', { ascending: true });
+    if (error) throw error;
+    res.json({ success: true, data: data ?? [] });
+  } catch (error) {
+    logger.error('[Units] GET /units/availability failed', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch availability' });
+  }
+});
+
+router.get('/add-ons', async (_req: Request, res: Response) => {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('chalet_add_ons')
+      .select('*')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    if (error) throw error;
+    res.json({ success: true, data: data ?? [] });
+  } catch (error) {
+    logger.error('[Units] GET /units/add-ons failed', error);
+    res.status(500).json({ success: false, error: 'Failed to list add-ons' });
+  }
+});
+
+router.get('/bookings', authenticate, async (req: Request, res: Response) => {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, customer_id, status, amount, metadata, created_at')
+      .eq('engine_type', 'time_exclusive_reservation')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    res.json({ success: true, data: data ?? [] });
+  } catch (error) {
+    logger.error('[Units] GET /units/bookings failed', error);
+    res.status(500).json({ success: false, error: 'Failed to list bookings' });
+  }
+});
+
+router.get('/bookings/:bookingId', authenticate, async (req: Request, res: Response) => {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, customer_id, status, amount, metadata, created_at')
+      .eq('engine_type', 'time_exclusive_reservation')
+      .eq('id', req.params.bookingId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      res.status(404).json({ success: false, error: 'Booking not found' });
+      return;
+    }
+    res.json({ success: true, data });
+  } catch (error) {
+    logger.error('[Units] GET /units/bookings/:id failed', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch booking' });
+  }
+});
+
+router.patch('/bookings/:bookingId/status', authenticate, async (req: Request, res: Response) => {
+  try {
+    const newStatus = String(req.body?.status ?? '');
+    if (!newStatus) {
+      res.status(400).json({ success: false, error: 'status is required' });
+      return;
+    }
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('transactions')
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq('engine_type', 'time_exclusive_reservation')
+      .eq('id', req.params.bookingId)
+      .select('id, status, updated_at')
+      .single();
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (error) {
+    logger.error('[Units] PATCH /units/bookings/:id/status failed', error);
+    res.status(500).json({ success: false, error: 'Failed to update booking status' });
+  }
+});
+
+// ── Parameterized routes ──
+
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
