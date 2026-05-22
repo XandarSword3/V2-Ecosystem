@@ -43,7 +43,7 @@ import docsRoutes from './routes/docs.routes.js';
 import searchRoutes from './routes/search.routes.js';
 import { getDynamicModulesRouter, loadDynamicModules as reloadDynamicModules } from './routes/dynamic-modules.loader.js';
 import unitsRoutes from './routes/units.routes.js';
-import { legacyRouteHandler } from './middleware/legacy-routes.middleware.js';
+// legacyRouteHandler removed — dynamic module router correctly handles all module slugs
 
 const app = express();
 
@@ -244,8 +244,6 @@ apiRouter.use('/templates', templateRoutes);
 app.use('/webhooks/channels', channelWebhookRoutes);
 
 // Legacy chalet paths return 410 Gone (must be mounted before API routes)
-app.use(legacyRouteHandler);
-
 app.use('/api/v1', apiRouter);
 
 // Documentation routes (Public)
