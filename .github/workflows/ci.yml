@@ -218,9 +218,29 @@ jobs:
             sleep 5
           done
 
+          # nginx proxy: translates /rest/v1/* -> PostgREST root
+          # @supabase/supabase-js v2 always appends /rest/v1 to the base URL,
+          # so we expose :15420 as the Supabase-compatible base URL.
+          sudo apt-get install -y nginx -q
+          sudo bash -c 'cat > /etc/nginx/conf.d/postgrest.conf << '"'"'NGINX'"'"'
+          server {
+            listen 15420;
+            location /rest/v1/ {
+              proxy_pass http://127.0.0.1:15421/;
+              proxy_set_header Host $host;
+            }
+            location / {
+              return 404;
+            }
+          }
+          NGINX'
+          sudo nginx -t
+          sudo systemctl reload nginx
+          echo "nginx proxy ready on :15420 -> PostgREST :15421"
+
       - name: Set Supabase env vars
         run: |
-          echo "SUPABASE_URL=http://127.0.0.1:15421" >> "$GITHUB_ENV"
+          echo "SUPABASE_URL=http://127.0.0.1:15420" >> "$GITHUB_ENV"
           echo "SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTcwMDAwMDAwMCwiZXhwIjo5OTk5OTk5OTk5fQ.tM2Q6u7jTiD0lxqqYkR-xZFHD3OUWJE0cFw5y_ZwTMA" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjk5OTk5OTk5OTl9.CvRO64tTDIEplrwz04VrlDVJy1RFA0yDr2O-ofo9ZdI" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjk5OTk5OTk5OTl9.CvRO64tTDIEplrwz04VrlDVJy1RFA0yDr2O-ofo9ZdI" >> "$GITHUB_ENV"

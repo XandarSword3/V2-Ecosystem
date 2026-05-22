@@ -20,7 +20,7 @@ export const Roles = {
   
   // Staff roles - engine-neutral generic staff role
   STAFF: 'staff',
-  
+
   // Manager role - cross-module oversight
   MANAGER: 'manager',
   
@@ -158,6 +158,7 @@ export const RolePermissions: Record<Role, (Permission | '*')[]> = {
   [Roles.CUSTOMER]: [
     Permissions.USER_READ_SELF,
     Permissions.USER_UPDATE_SELF,
+    Permissions.RESTAURANT_ORDER_CREATE,
     Permissions.PAYMENT_CREATE,
     Permissions.PAYMENT_READ_OWN,
     Permissions.LOYALTY_READ_SELF,
@@ -171,14 +172,27 @@ export const RolePermissions: Record<Role, (Permission | '*')[]> = {
     Permissions.DEVICE_REGISTER,
   ],
 
-  // Staff - generic staff role for all modules
+  // Staff - generic role covering all module operations (engine refit)
   [Roles.STAFF]: [
     Permissions.USER_READ_SELF,
     Permissions.USER_UPDATE_SELF,
-    Permissions.PAYMENT_RECORD_CASH,
-    Permissions.LOYALTY_EARN,
+    // Restaurant / menu service
+    Permissions.RESTAURANT_ORDER_CREATE,
+    Permissions.RESTAURANT_ORDER_READ_ALL,
+    Permissions.RESTAURANT_ORDER_UPDATE,
+    // Pool / session access
+    Permissions.POOL_SESSION_READ,
+    Permissions.POOL_TICKET_VALIDATE,
+    // Chalet / multi-day booking
+    Permissions.CHALET_BOOKING_READ_ALL,
+    Permissions.CHALET_BOOKING_UPDATE,
+    // Housekeeping
     Permissions.HOUSEKEEPING_TASK_READ,
     Permissions.HOUSEKEEPING_TASK_UPDATE,
+    // Payment & loyalty
+    Permissions.PAYMENT_RECORD_CASH,
+    Permissions.LOYALTY_EARN,
+    // Inventory
     Permissions.INVENTORY_READ,
     Permissions.INVENTORY_UPDATE,
     Permissions.DEVICE_REGISTER,
