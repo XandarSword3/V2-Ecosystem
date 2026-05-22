@@ -34,9 +34,16 @@ describe('Engine Integration Tests', () => {
     vi.clearAllMocks();
     
     // Instantiate actual service for true integration test
-    const couponResolver = vi.fn().mockResolvedValue({ isValid: true, discountAmount: 10 });
-    const giftCardResolver = vi.fn().mockResolvedValue({ isValid: true, balance: 50 });
-    const loyaltyResolver = vi.fn().mockResolvedValue({ isValid: true, conversionRate: 0.1, balance: 100 });
+    const couponResolver = {
+      apply: vi.fn().mockResolvedValue({ discountAmount: 10, taxSavings: 0, couponId: 'coupon-test' }),
+    };
+    const giftCardResolver = {
+      redeem: vi.fn().mockResolvedValue({ amountDeducted: 50, giftCardId: 'gc-test' }),
+    };
+    const loyaltyResolver = {
+      redeem: vi.fn().mockResolvedValue({ amountDeducted: 10, pointsUsed: 100 }),
+      earn: vi.fn().mockResolvedValue(50),
+    };
     
     engineService = new EngineService({
       couponResolver,

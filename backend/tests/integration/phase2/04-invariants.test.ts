@@ -4,7 +4,6 @@
  * Verify data consistency invariants hold across all engines after the
  * journey and race tests have executed.
  * Engine-refit: assertions use `transactions` via module REST surfaces (ARCHITECTURE_LAW.md).
- */
  *
  * Run:  npx vitest run --config vitest.integration.config.ts tests/integration/phase2/04-invariants.test.ts
  */
