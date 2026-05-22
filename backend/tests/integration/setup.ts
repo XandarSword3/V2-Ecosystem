@@ -138,13 +138,36 @@ export const testContext: TestContext = {
   createdResources: new Map(),
 };
 
+/** @see ARCHITECTURE_LAW.md — these tables/views must never be used again. */
+const DEAD_LEGACY_TABLES = new Set([
+  'restaurant_orders',
+  'pool_tickets',
+  'chalet_bookings',
+  'snack_orders',
+  'tickets',
+  'bookings',
+  'orders',
+]);
+
 /**
- * Track a created resource for cleanup
+ * Track a created resource for cleanup.
+ * Only real tables are allowed; engine records must use type `transactions`.
  */
 export function trackResource(type: string, id: string): void {
+  if (DEAD_LEGACY_TABLES.has(type)) {
+    throw new Error(
+      `ARCHITECTURE_LAW: cannot track "${type}" for cleanup. Use trackTransaction() from engine-refit-helpers.ts.`,
+    );
+  }
   const existing = testContext.createdResources.get(type) || [];
   existing.push(id);
   testContext.createdResources.set(type, existing);
+}
+
+/** Track an engine-refit transaction row for teardown. */
+export function trackTransaction(id: string): void {
+  if (!id) return;
+  trackResource('transactions', id);
 }
 
 /**
@@ -471,6 +494,21 @@ async function initializeIntegrationLifecycle(): Promise<void> {
       console.log('⚠️ Skipping test database seed (database not reachable)');
     } else {
       await seedTestDatabase();
+    }
+
+    // Migrations seed active modules; routes mount only after loadDynamicModules().
+    const dbReadyForModules = await isDatabaseAvailable();
+    if (dbReadyForModules) {
+      const { loadDynamicModules } = await import('../../src/routes/dynamic-modules.loader.js');
+      try {
+        await loadDynamicModules();
+      } catch (error) {
+        if (process.env.TEST_SKIP_DB_SEED === 'true') {
+          console.warn('⚠️ Failed to load dynamic modules (ok for isolated middleware tests):', error);
+        } else {
+          throw error;
+        }
+      }
     }
 
     await clearRateLimitState();

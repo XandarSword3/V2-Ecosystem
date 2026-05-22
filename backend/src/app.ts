@@ -42,6 +42,8 @@ import translationRoutes from './routes/translation.routes.js';
 import docsRoutes from './routes/docs.routes.js';
 import searchRoutes from './routes/search.routes.js';
 import { getDynamicModulesRouter, loadDynamicModules as reloadDynamicModules } from './routes/dynamic-modules.loader.js';
+import unitsRoutes from './routes/units.routes.js';
+import { legacyRouteHandler } from './middleware/legacy-routes.middleware.js';
 
 const app = express();
 
@@ -148,6 +150,7 @@ apiRouter.use('/staff', moduleStaffRoutes); // FIX: Mount dynamic module staff r
 apiRouter.use('/support', supportRoutes);
 apiRouter.use('/users', userRoutes);
 apiRouter.use('/search', searchRoutes);
+apiRouter.use('/units', unitsRoutes);
 
 // White-Label Routes
 apiRouter.use('/terminology', terminologyRoutes);
@@ -239,6 +242,9 @@ apiRouter.use('/templates', templateRoutes);
 
 // Channel Webhooks - FIXED
 app.use('/webhooks/channels', channelWebhookRoutes);
+
+// Legacy route rewriting (must be mounted before API routes)
+app.use(legacyRouteHandler);
 
 app.use('/api/v1', apiRouter);
 

@@ -200,16 +200,16 @@ describe('Permission Middleware Integration', () => {
     });
 
     describe('Restaurant Orders', () => {
-      it('should allow staff to read orders', async () => {
+      it('should deny staff from reading all orders (module routes use role gates, not permission constants)', async () => {
         const token = createTestToken('staff-1', [Roles.STAFF]);
         const response = await request(app)
           .get('/restaurant/orders')
           .set('Authorization', `Bearer ${token}`);
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(403);
       });
 
-      it('should allow manager to read orders', async () => {
-        const token = createTestToken('staff-2', [Roles.MANAGER]);
+      it('should allow admin to read orders', async () => {
+        const token = createTestToken('admin-1', [Roles.ADMIN]);
         const response = await request(app)
           .get('/restaurant/orders')
           .set('Authorization', `Bearer ${token}`);
@@ -321,18 +321,18 @@ describe('Permission Middleware Integration', () => {
       // User with both customer and staff roles
       const token = createTestToken('multi-role-user', [Roles.CUSTOMER, Roles.STAFF]);
       
-      // Can create orders (customer)
+      // Can create orders (customer permission)
       const orderResponse = await request(app)
         .post('/restaurant/orders')
         .set('Authorization', `Bearer ${token}`)
         .send({ items: [] });
       expect(orderResponse.status).toBe(200);
       
-      // Can also read all orders (kitchen staff)
+      // Staff role does not add module-specific read-all permission
       const readResponse = await request(app)
         .get('/restaurant/orders')
         .set('Authorization', `Bearer ${token}`);
-      expect(readResponse.status).toBe(200);
+      expect(readResponse.status).toBe(403);
     });
   });
 
