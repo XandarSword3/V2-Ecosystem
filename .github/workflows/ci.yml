@@ -594,6 +594,21 @@ jobs:
         working-directory: .
         run: npx playwright install --with-deps chromium
 
+
+      - name: Wait for production backend (Render cold-start)
+        run: |
+          echo "Giving Render up to 90 s to finish cold-start..."
+          for i in $(seq 1 9); do
+            if curl -sf --max-time 10 "$PRODUCTION_API_URL/api/health" >/dev/null 2>&1 || \
+               curl -sf --max-time 10 "$PRODUCTION_API_URL/api/healthz" >/dev/null 2>&1; then
+              echo "✅ Backend ready (attempt $i)"; break
+            fi
+            echo "  attempt $i/9 — sleeping 10 s..."
+            sleep 10
+          done
+        env:
+          PRODUCTION_API_URL: https://v2-ecosystem-backend.onrender.com
+
       - name: Run production connectivity smoke tests
         working-directory: .
         run: >
