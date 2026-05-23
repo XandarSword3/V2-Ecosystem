@@ -43,7 +43,8 @@ const SECRET_DEFINITIONS: SecretConfig[] = [
   { name: 'REDIS_URL', required: false, default: 'redis://localhost:6379', description: 'Redis connection URL' },
   
   // Encryption
-  { name: 'ENCRYPTION_KEY', required: true, validator: (v) => v.length === 64, description: 'AES-256 encryption key (64 hex chars)' },
+  // Not marked required here — we auto-derive from JWT_SECRET when absent (see loadSecrets).
+  { name: 'ENCRYPTION_KEY', required: false, validator: (v) => v.length === 64, description: 'AES-256 encryption key (64 hex chars)' },
   
   // External APIs
   { name: 'WEATHER_API_KEY', required: false, description: 'Weather API key' },
@@ -84,6 +85,17 @@ class SecretsManager {
     const secretsPath = process.env.SECRETS_FILE_PATH || '/run/secrets';
     if (fs.existsSync(secretsPath)) {
       this.loadFromSecretsDirectory(secretsPath);
+    }
+
+    // Derive ENCRYPTION_KEY from JWT_SECRET if not explicitly provided.
+    // This keeps the key stable across restarts as long as JWT_SECRET doesn't change.
+    if (!this.secrets.has('ENCRYPTION_KEY')) {
+      const jwtSecret = this.secrets.get('JWT_SECRET');
+      if (jwtSecret) {
+        const derived = crypto.createHash('sha256').update(jwtSecret).digest('hex'); // 64 hex chars
+        this.secrets.set('ENCRYPTION_KEY', derived);
+        console.log('[Secrets] ENCRYPTION_KEY derived from JWT_SECRET (set ENCRYPTION_KEY explicitly to override)');
+      }
     }
 
     // Validate all secrets
