@@ -26,7 +26,8 @@ const SECRET_DEFINITIONS: SecretConfig[] = [
   // Authentication
   { name: 'JWT_SECRET', required: true, validator: (v) => v.length >= 32, description: 'JWT signing secret (min 32 chars)' },
   { name: 'JWT_REFRESH_SECRET', required: true, validator: (v) => v.length >= 32, description: 'JWT refresh token secret' },
-  { name: 'SESSION_SECRET', required: true, validator: (v) => v.length >= 32, description: 'Session cookie secret' },
+  // Not marked required here — we auto-derive from JWT_SECRET when absent (see loadSecrets).
+  { name: 'SESSION_SECRET', required: false, validator: (v) => v.length >= 32, description: 'Session cookie secret' },
   
   // Stripe
   { name: 'STRIPE_SECRET_KEY', required: true, validator: (v) => v.startsWith('sk_'), description: 'Stripe secret API key' },
@@ -85,6 +86,16 @@ class SecretsManager {
     const secretsPath = process.env.SECRETS_FILE_PATH || '/run/secrets';
     if (fs.existsSync(secretsPath)) {
       this.loadFromSecretsDirectory(secretsPath);
+    }
+
+    // Derive SESSION_SECRET from JWT_SECRET if not explicitly provided.
+    if (!this.secrets.has('SESSION_SECRET')) {
+      const jwtSecret = this.secrets.get('JWT_SECRET');
+      if (jwtSecret) {
+        const derived = crypto.createHash('sha256').update(`session:${jwtSecret}`).digest('hex');
+        this.secrets.set('SESSION_SECRET', derived);
+        console.log('[Secrets] SESSION_SECRET derived from JWT_SECRET (set SESSION_SECRET explicitly to override)');
+      }
     }
 
     // Derive ENCRYPTION_KEY from JWT_SECRET if not explicitly provided.
