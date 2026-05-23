@@ -99,10 +99,10 @@ function actorForUser(req: Request): 'system' | 'staff' | 'customer' | 'admin' {
 }
 
 /**
- * Resolve the action name for a target state.
- * The state machine uses action names (e.g. 'confirm') not target state names
- * (e.g. 'confirmed'). Clients send target state names for convenience, so we
- * look up the first matching action that leads to that target state.
+ * Resolve the action name for a target state or legacy alias.
+ * Clients send target state names (e.g. 'confirmed') or legacy aliases
+ * (e.g. 'active', 'used') — map them to the real action name the
+ * state machine expects (e.g. 'confirm', 'validate_entry', 'record_exit').
  */
 function resolveAction(
   templateType: string,
@@ -110,14 +110,33 @@ function resolveAction(
   targetStateOrAction: string,
   actor: 'system' | 'staff' | 'customer' | 'admin',
 ): string {
-  // First, try it as a direct action name (already correct format)
   const available = engineService.getAvailableActions(templateType, currentState, actor);
-  const directMatch = available.find((a) => a.action === targetStateOrAction);
-  if (directMatch) return targetStateOrAction;
 
-  // Otherwise treat it as a target state and find the first matching action
+  // 1. Direct action name match (already correct)
+  if (available.find((a) => a.action === targetStateOrAction)) return targetStateOrAction;
+
+  // 2. Target state name match (client sent destination state, not action)
   const stateMatch = available.find((a) => a.targetState === targetStateOrAction);
   if (stateMatch) return stateMatch.action;
+
+  // 3. Legacy action name aliases (old API surface → new action names)
+  const ACTION_ALIASES: Record<string, string> = {
+    // shared_capacity_access
+    'validate':        'validate_entry',
+    'complete':        'record_exit',
+    // time_exclusive_reservation (old status names used as actions)
+    'active':          'check_in',
+    'used':            'check_out',
+    'check_in':        'check_in',
+    'check_out':       'check_out',
+    'cancel':          'cancel',
+    'cancelled':       'cancel',
+    'confirm':         'confirm',
+    'confirmed':       'confirm',
+    'no_show':         'mark_no_show',
+  };
+  const aliasedAction = ACTION_ALIASES[targetStateOrAction];
+  if (aliasedAction && available.find((a) => a.action === aliasedAction)) return aliasedAction;
 
   // Fall through: return as-is (will fail gracefully in transitionState)
   return targetStateOrAction;
@@ -126,19 +145,6 @@ function resolveAction(
 function asNumber(input: unknown, fallback = 0): number {
   const value = Number(input);
   return Number.isFinite(value) ? value : fallback;
-}
-
-async function getModuleCategoryIds(
-  supabase: ReturnType<typeof getSupabase>,
-  moduleId: string,
-): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('menu_categories')
-    .select('id')
-    .eq('module_id', moduleId);
-
-  if (error) throw error;
-  return (data ?? []).map((row) => row.id as string);
 }
 
 function buildMenuServiceRouter(router: Router): void {
@@ -150,22 +156,18 @@ function buildMenuServiceRouter(router: Router): void {
       }
 
       const supabase = getSupabase();
-      const categoryIds = await getModuleCategoryIds(supabase, mounted.id);
-      if (categoryIds.length === 0) {
-        return res.json({ success: true, data: [] });
-      }
-
       const { data, error } = await supabase
-        .from('menu_items')
-        .select('id, category_id, name, description, price, is_available')
-        .in('category_id', categoryIds)
+        .from('catalog_items')
+        .select('id, name, description, price, category, is_available')
+        .eq('module_id', mounted.id)
+        .eq('is_available', true)
         .order('name', { ascending: true });
 
       if (error) throw error;
       res.json({ success: true, data: data ?? [] });
     } catch (error) {
       logger.error('[Dynamic Router] GET /items failed', error);
-      res.status(500).json({ success: false, error: 'Failed to list menu items' });
+      res.status(500).json({ success: false, error: 'Failed to list items' });
     }
   });
 
@@ -182,25 +184,24 @@ function buildMenuServiceRouter(router: Router): void {
         return res.status(400).json({ success: false, error: 'At least one item is required' });
       }
 
-      const menuItemIds = items
+      const itemIds = items
         .map((item: unknown) => (item as { menu_item_id?: string }).menu_item_id)
         .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
 
-      const categoryIds = await getModuleCategoryIds(supabase, mounted.id);
-      const { data: menuRows, error: menuError } = await supabase
-        .from('menu_items')
+      const { data: catalogRows, error: catalogError } = await supabase
+        .from('catalog_items')
         .select('id, price')
-        .in('category_id', categoryIds)
-        .in('id', menuItemIds);
+        .eq('module_id', mounted.id)
+        .in('id', itemIds);
 
-      if (menuError) throw menuError;
+      if (catalogError) throw catalogError;
 
-      const priceMap = new Map((menuRows ?? []).map((row) => [row.id, asNumber(row.price, 0)]));
+      const priceMap = new Map((catalogRows ?? []).map((row) => [row.id, asNumber(row.price, 0)]));
       const lineItems = items.map((item: unknown) => {
         const currentItem = item as { menu_item_id: string; quantity?: number };
         return {
           itemId: currentItem.menu_item_id,
-          name: `menu_item:${currentItem.menu_item_id}`,
+          name: `catalog_item:${currentItem.menu_item_id}`,
           quantity: asNumber(currentItem.quantity, 1),
           unitPrice: priceMap.get(currentItem.menu_item_id) ?? 0,
         };
@@ -406,20 +407,8 @@ function buildMultiDayBookingRouter(router: Router): void {
       if (!checkIn.isValid() || !checkOut.isValid() || !checkOut.isAfter(checkIn)) {
         return res.status(400).json({ success: false, error: 'Invalid check-in/check-out dates' });
       }
-      if (checkIn.isBefore(dayjs().startOf('day'))) {
-        return res.status(400).json({ success: false, error: 'Check-in date must be in the future' });
-      }
 
-      const { data: existingBookings, error: existingError } = await supabase
-        .from('transactions')
-        .select('status, metadata')
-        .eq('engine_type', 'time_exclusive_reservation')
-        .eq('module_id', mounted.id)
-        .filter('metadata->>unit_id', 'eq', String(unit_id));
-
-      if (existingError) throw existingError;
-
-      // Validate unit_id exists in bookable_units for this module
+      // Validate unit exists for this module
       const { data: unitRow, error: unitError } = await supabase
         .from('bookable_units')
         .select('id')
@@ -432,41 +421,50 @@ function buildMultiDayBookingRouter(router: Router): void {
         return res.status(404).json({ success: false, error: 'Unit not found' });
       }
 
-      const overlap = (existingBookings ?? []).some((booking) => {
-        const status = String(booking.status || '');
-        if (['cancelled', 'no_show'].includes(status)) return false;
-        const metadata = booking.metadata as Record<string, unknown> | null;
-        const existingIn = metadata?.check_in_date ? dayjs(String(metadata.check_in_date)) : null;
-        const existingOut = metadata?.check_out_date ? dayjs(String(metadata.check_out_date)) : null;
-        if (!existingIn || !existingOut || !existingIn.isValid() || !existingOut.isValid()) return false;
-        return checkIn.isBefore(existingOut) && checkOut.isAfter(existingIn);
-      });
-
-      if (overlap) {
-        return res.status(409).json({ success: false, error: 'Unit is already booked' });
-      }
-
       const pricing = await engineService.calculatePricing(
         mounted.template_type,
         [{ itemId: String(unit_id), name: 'booking', quantity: 1, unitPrice: asNumber(total_amount, 0) }],
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
 
+      // Atomic insert with double-booking protection via advisory lock
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('reserve_unit_exclusive_atomic', {
+        p_unit_id:        String(unit_id),
+        p_module_id:      mounted.id,
+        p_check_in_date:  check_in_date,
+        p_check_out_date: check_out_date,
+        p_customer_id:    req.user?.userId ?? null,
+        p_amount:         pricing.totalAmount,
+        p_metadata:       {},
+      });
+
+      if (rpcError) throw rpcError;
+
+      const row = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
+      if (!row?.success) {
+        const msg = row?.error_message ?? 'Failed to create booking';
+        const status = msg.includes('past') ? 400 : msg.includes('booked') ? 409 : 400;
+        return res.status(status).json({ success: false, error: msg });
+      }
+
       const { data, error } = await supabase
         .from('transactions')
-        .insert({
-          engine_type: 'time_exclusive_reservation',
-          module_id: mounted.id,
-          customer_id: req.user?.userId ?? null,
-          status: 'pending',
-          amount: pricing.totalAmount,
-          metadata: { unit_id, check_in_date, check_out_date },
-        })
         .select('id, module_id, customer_id, status, amount, metadata')
+        .eq('id', row.transaction_id)
         .single();
 
       if (error) throw error;
-      res.status(201).json({ success: true, data });
+
+      const meta = (data?.metadata ?? {}) as Record<string, unknown>;
+      res.status(201).json({
+        success: true,
+        data: {
+          ...data,
+          check_in_date:  meta.check_in_date  ?? check_in_date,
+          check_out_date: meta.check_out_date ?? check_out_date,
+          unit_id:        meta.unit_id        ?? unit_id,
+        },
+      });
     } catch (error) {
       logger.error('[Dynamic Router] POST /bookings failed', error);
       res.status(500).json({ success: false, error: 'Failed to create booking' });
@@ -511,14 +509,23 @@ function buildMultiDayBookingRouter(router: Router): void {
         .maybeSingle();
       if (error) throw error;
       if (!data) return res.status(404).json({ success: false, error: 'Booking not found' });
-      res.json({ success: true, data });
+      const meta = (data?.metadata ?? {}) as Record<string, unknown>;
+      res.json({
+        success: true,
+        data: {
+          ...data,
+          check_in_date:  meta.check_in_date  ?? null,
+          check_out_date: meta.check_out_date ?? null,
+          unit_id:        meta.unit_id        ?? null,
+        },
+      });
     } catch (error) {
       logger.error('[Dynamic Router] GET /bookings/:id failed', error);
       res.status(500).json({ success: false, error: 'Failed to fetch booking' });
     }
   });
 
-  router.patch('/bookings/:id/status', authorize('staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
+  router.patch('/bookings/:id/status', authorize('customer', 'staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -581,14 +588,16 @@ function buildSessionAccessRouter(router: Router): void {
       }
       const supabase = getSupabase();
       const { data, error } = await supabase
-        .from('pool_sessions')
-        .select('id, name, start_time, end_time, max_capacity, module_id, is_active, adult_price, child_price')
+        .from('capacity_windows')
+        .select('id, name, start_time, end_time, max_capacity, price, module_id, is_active, metadata')
         .eq('module_id', mounted.id)
         .eq('is_active', true)
         .order('start_time', { ascending: true });
       if (error) throw error;
-      const normalized = (data ?? []).map((session) => ({
-        ...session,
+      const normalized = (data ?? []).map((w) => ({
+        ...w,
+        adult_price: (w.metadata as Record<string, unknown>)?.adult_price ?? w.price,
+        child_price: (w.metadata as Record<string, unknown>)?.child_price ?? 0,
       }));
       res.json({ success: true, data: normalized });
     } catch (error) {
@@ -1060,73 +1069,35 @@ async function commitImportForEngine(
 
   switch (engineType) {
     case 'menu_service': {
-      // Menu service commit: Create categories and menu items
+      // Menu service commit: Insert into catalog_items (generic, engine-level table)
       const results = {
         created: 0,
         failed: 0,
         errors: [] as string[],
       };
 
-      // Get unique categories
-      const categoryNames = [...new Set((items as Array<{ category: string }>).map(i => i.category).filter(Boolean))];
-      const categoryMap = new Map<string, string>();
-
-      // Create or find categories
-      for (const name of categoryNames) {
-        const { data: existing } = await supabase
-          .from('menu_categories')
-          .select('id')
-          .eq('name', name)
-          .eq('module_id', moduleId)
-          .single();
-
-        if (existing) {
-          categoryMap.set(name, existing.id);
-        } else {
-          const { data: newCat, error } = await supabase
-            .from('menu_categories')
-            .insert({ name, module_id: moduleId })
-            .select('id')
-            .single();
-
-          if (error) {
-            results.errors.push(`Failed to create category ${name}: ${error.message}`);
-          } else if (newCat) {
-            categoryMap.set(name, newCat.id);
-          }
-        }
-      }
-
-      // Create menu items
       for (const item of items as Array<{
         name: string;
         price: number;
-        category: string;
+        category?: string;
         description?: string;
         is_available?: boolean;
-        discount_price?: number;
         preparation_time?: number;
         calories?: number;
         allergens?: string[];
-        ingredients?: Array<{ name: string; estimatedQuantity: number; estimatedUnit: string }>;
       }>) {
-        const categoryId = categoryMap.get(item.category);
-        if (!categoryId) {
-          results.failed++;
-          results.errors.push(`Category not found for ${item.name}`);
-          continue;
-        }
-
-        const { error } = await supabase.from('menu_items').insert({
+        const { error } = await supabase.from('catalog_items').insert({
           name: item.name,
           price: item.price,
           description: item.description,
-          category_id: categoryId,
+          category: item.category ?? null,
           is_available: item.is_available ?? true,
-          discount_price: item.discount_price,
-          preparation_time_minutes: item.preparation_time,
-          calories: item.calories,
-          allergens: item.allergens,
+          module_id: moduleId,
+          metadata: {
+            preparation_time_minutes: item.preparation_time,
+            calories: item.calories,
+            allergens: item.allergens,
+          },
         });
 
         if (error) {
@@ -1161,20 +1132,19 @@ async function commitImportForEngine(
         memberDiscount?: number;
         description?: string;
       }>) {
-        const { error } = await supabase.from('pool_sessions').insert({
+        const { error } = await supabase.from('capacity_windows').insert({
           name: item.name,
           start_time: item.startTime,
           end_time: item.endTime,
-          adult_price: item.adultPrice,
-          child_price: item.childPrice,
           max_capacity: item.capacity,
           price: item.adultPrice,
-          gender_restriction: item.genderRestriction || 'mixed',
-          days_of_week: item.daysOfWeek || [0, 1, 2, 3, 4, 5, 6],
           is_active: item.isActive ?? true,
-          member_discount: item.memberDiscount,
-          description: item.description,
           module_id: moduleId,
+          metadata: {
+            adult_price: item.adultPrice,
+            child_price: item.childPrice ?? 0,
+            gender_restriction: item.genderRestriction ?? 'mixed',
+          },
         });
 
         if (error) {

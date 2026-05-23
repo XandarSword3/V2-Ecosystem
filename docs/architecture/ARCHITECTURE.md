@@ -267,3 +267,45 @@ cd frontend && npm run dev    # Port 3000
 - [Subsystem Registry](../meta/subsystem-registry.md) — Module listing
 - [Testing Guide](../guides/TESTING.md) — CI pipeline and test structure
 - [API Reference](../api/API.md) — Endpoint documentation
+
+---
+
+## Configuration Tables — The Rule
+
+The 4 engines govern **financial and access events**. Modules also need **configuration data** — what products exist, what time slots are available, what can be booked. These configuration tables are legitimate. But they must be **engine-generic, not module-specific.**
+
+### The distinction
+
+| ❌ Wrong — module-specific | ✅ Right — engine-generic |
+|---|---|
+| `pool_sessions` | `capacity_windows` |
+| `menu_items` | `catalog_items` |
+| `menu_categories` | Flat `category` text field on `catalog_items` |
+| `snack_items` | `catalog_items` |
+| `chalets` | `bookable_units` |
+| `chalet_add_ons` | Metadata on `catalog_items` or `bookable_units` |
+
+### The rule
+
+**If a configuration table name contains a module word (`pool_`, `menu_`, `chalet_`, `snack_`, `restaurant_`), it is wrong.** Replace it with the generic equivalent.
+
+### The test before naming any table
+
+Ask: **"Could a hotel, a marina, a gym, and a cinema all use this table?"**
+
+- Yes → the name belongs in the codebase.
+- No → you are hardcoding a business type. Stop. Use the generic equivalent.
+
+### Canonical configuration table per engine
+
+| Engine | Configuration table | What it stores |
+|---|---|---|
+| `instant_transaction` | `catalog_items` | Orderable products with price and category |
+| `time_exclusive_reservation` | `bookable_units` | Reservable units with base price and capacity |
+| `shared_capacity_access` | `capacity_windows` | Time slots with max capacity and pricing |
+| `ongoing_entitlement` | `membership_plans` | Subscription tiers with interval and pricing |
+
+### What happens with `transactions`
+
+All financial events flow through `transactions` regardless of engine. Configuration tables are read-only references — they define what exists. Transactions record what happened. Never duplicate financial state into a configuration table.
+
