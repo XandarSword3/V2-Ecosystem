@@ -8,6 +8,8 @@ import { createPaymentIntentSchema, recordCashPaymentSchema, recordManualPayment
 import { awardLoyaltyPointsForPayment } from './loyalty-integration.js';
 import { getEngineService } from '../../engines/engine-service.js';
 import { normalizeReferenceType } from './reference-type-adapter.js';
+import { getTransactionManager } from '../../engines/transaction-manager.js';
+import { getIdempotencyGuard } from '../../engines/idempotency-guard.js';
 
 const getStripeInstance = async () => {
   const supabase = getSupabase();
@@ -18,14 +20,9 @@ const getStripeInstance = async () => {
     .single();
 
   const secretKey = settings?.value?.stripeSecretKey || config.stripe.secretKey;
+  if (!secretKey) throw new Error('Stripe secret key not configured');
 
-  if (!secretKey) {
-    throw new Error('Stripe secret key not configured');
-  }
-
-  return new Stripe(secretKey, {
-    apiVersion: '2023-10-16',
-  });
+  return new Stripe(secretKey, { apiVersion: '2023-10-16' });
 };
 
 const getStripeWebhookSecret = async () => {
@@ -43,24 +40,15 @@ function calculateRenewedEndDate(currentEndDate: string | null, billingCycle: st
   const baseDate = currentEndDate ? new Date(currentEndDate) : new Date();
   const nextDate = new Date(baseDate);
   switch (billingCycle) {
-    case 'MONTHLY':
-      nextDate.setMonth(nextDate.getMonth() + 1);
-      break;
-    case 'QUARTERLY':
-      nextDate.setMonth(nextDate.getMonth() + 3);
-      break;
-    case 'ANNUALLY':
-      nextDate.setFullYear(nextDate.getFullYear() + 1);
-      break;
-    default:
-      nextDate.setMonth(nextDate.getMonth() + 1);
-      break;
+    case 'MONTHLY':   nextDate.setMonth(nextDate.getMonth() + 1); break;
+    case 'QUARTERLY': nextDate.setMonth(nextDate.getMonth() + 3); break;
+    case 'ANNUALLY':  nextDate.setFullYear(nextDate.getFullYear() + 1); break;
+    default:          nextDate.setMonth(nextDate.getMonth() + 1);
   }
   return nextDate.toISOString();
 }
 
 export const createPaymentIntent = asyncHandler(async (req: Request, res: Response) => {
-  // Validate input
   const validatedData = validateBody(createPaymentIntentSchema, req.body);
   const { amount, currency = 'usd', referenceType, referenceId } = validatedData;
 
@@ -70,7 +58,7 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
 
   const stripe = await getStripeInstance();
   const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(amount * 100), // Convert to cents
+    amount: Math.round(amount * 100),
     currency: defaultCurrency,
     metadata: {
       referenceType,
@@ -90,19 +78,13 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
 
 export async function handleStripeWebhook(req: Request, res: Response) {
   const sig = req.headers['stripe-signature'] as string;
-
   if (!req.rawBody) { res.status(400).json({ error: 'Missing raw body' }); return; }
 
   let event: Stripe.Event;
-
   try {
     const stripe = await getStripeInstance();
     const webhookSecret = await getStripeWebhookSecret();
-    event = stripe.webhooks.constructEvent(
-      req.rawBody,
-      sig,
-      webhookSecret
-    );
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
   } catch (err: unknown) {
     const error = err as Error;
     logger.error('Webhook signature verification failed:', error.message);
@@ -112,140 +94,148 @@ export async function handleStripeWebhook(req: Request, res: Response) {
   const supabase = getSupabase();
 
   switch (event.type) {
+
     case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const rawReferenceType = paymentIntent.metadata.referenceType;
+      const referenceType = normalizeReferenceType(paymentIntent.metadata.referenceType);
       const referenceId = paymentIntent.metadata.referenceId;
-      
-      // CRITICAL SAFETY: Normalize legacy reference types from Stripe metadata
-      const referenceType = normalizeReferenceType(rawReferenceType);
 
-      // Idempotency check: prevent duplicate processing via Ledger
-      const { data: existingLedgerEntry } = await supabase
+      // FIX BUG-01: Idempotency check via payment_ledger — only look for success entries.
+      // We NEVER update payment_ledger (immutability trigger blocks it).
+      // Pattern: check → process → insert success. No partial rows.
+      const { data: existingLedger } = await supabase
         .from('payment_ledger')
         .select('id, status')
         .eq('webhook_id', event.id)
         .maybeSingle();
 
-      // If ledger entry exists AND is fully successful, skip entirely
-      if (existingLedgerEntry && existingLedgerEntry.status === 'success') {
+      if (existingLedger?.status === 'success') {
         logger.info(`Idempotency: Webhook ${event.id} already fully processed. Skipping.`);
         return res.json({ received: true });
       }
 
-      // If ledger entry exists but is 'partial', we need to retry the remaining operations
-      const isRetry = existingLedgerEntry?.status === 'partial';
-
-      // Record to Ledger First (Audit Trail) — only on first attempt
-      if (!existingLedgerEntry) {
-        await supabase.from('payment_ledger').insert({
-          reference_type: referenceType,
-          reference_id: referenceId,
-          event_type: 'authorized',
-          amount: paymentIntent.amount / 100,
-          currency: paymentIntent.currency.toUpperCase(),
-          gateway_reference_id: paymentIntent.id,
-          webhook_id: event.id,
-          status: 'partial', // Start as partial; upgrade to success after all ops complete
-          metadata: { stripe_event_id: event.id }
-        });
-      }
+      // Use IdempotencyGuard + TransactionManager for atomic, compensable processing
+      const idempotencyGuard = getIdempotencyGuard();
+      const idempotencyKey = `stripe_webhook:${event.id}`;
 
       try {
-        // Check existing payment record (Legacy/Status check)
-        const { data: existingPayment } = await supabase
-          .from('payments')
-          .select('id')
-          .eq('stripe_payment_intent_id', paymentIntent.id)
-          .maybeSingle();
+        await idempotencyGuard.executeOnce(
+          idempotencyKey,
+          'system',
+          'payment',
+          referenceId,
+          'payment_intent.succeeded',
+          async () => {
+            // Step 1: Record payment row (idempotent on stripe_payment_intent_id)
+            const { data: existingPayment } = await supabase
+              .from('payments')
+              .select('id')
+              .eq('stripe_payment_intent_id', paymentIntent.id)
+              .maybeSingle();
 
-        if (!existingPayment) {
-          // Record payment
-          const { error: paymentError } = await supabase
-            .from('payments')
-            .insert({
+            if (!existingPayment) {
+              const { error: paymentError } = await supabase
+                .from('payments')
+                .insert({
+                  reference_type: referenceType,
+                  reference_id: referenceId,
+                  amount: (paymentIntent.amount / 100).toFixed(2),
+                  currency: paymentIntent.currency.toUpperCase(),
+                  method: 'card',
+                  status: 'completed',
+                  stripe_payment_intent_id: paymentIntent.id,
+                  stripe_charge_id: paymentIntent.latest_charge as string,
+                  processed_at: new Date().toISOString(),
+                });
+
+              if (paymentError) {
+                logger.error('Failed to record payment:', paymentError);
+              }
+            }
+
+            // Step 2: Update transaction/reference status
+            await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
+
+            // Step 3: Award loyalty points
+            await awardLoyaltyPointsForPayment(referenceType, referenceId, paymentIntent.amount / 100);
+
+            // Step 4: FIX BUG-01 — INSERT a success ledger entry (never UPDATE)
+            await supabase.from('payment_ledger').insert({
               reference_type: referenceType,
               reference_id: referenceId,
-              amount: (paymentIntent.amount / 100).toFixed(2),
+              event_type: 'authorized',
+              amount: paymentIntent.amount / 100,
               currency: paymentIntent.currency.toUpperCase(),
-              method: 'card',
-              status: 'completed',
-              stripe_payment_intent_id: paymentIntent.id,
-              stripe_charge_id: paymentIntent.latest_charge as string,
-              processed_at: new Date().toISOString(),
+              gateway_reference_id: paymentIntent.id,
+              webhook_id: event.id,
+              status: 'success',
+              metadata: { stripe_event_id: event.id },
             });
 
-          if (paymentError) {
-            logger.error('Failed to record payment:', paymentError);
-            // Don't throw — the payment insert might fail due to unique constraint on retry
-          }
-        }
-
-        // Update order/booking payment status
-        await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
-
-        // Award loyalty points for successful payment
-        const amountDollars = paymentIntent.amount / 100;
-        await awardLoyaltyPointsForPayment(referenceType, referenceId, amountDollars);
-
-        // All operations succeeded — mark ledger as fully successful
-        await supabase
-          .from('payment_ledger')
-          .update({ status: 'success' })
-          .eq('webhook_id', event.id);
-
-        logger.info(`Payment succeeded for ${referenceType}:${referenceId}${isRetry ? ' (retry)' : ''}`);
+            logger.info(`Payment succeeded for ${referenceType}:${referenceId}`);
+          },
+        );
       } catch (opError) {
-        // Operations failed after ledger insert — ledger stays 'partial'
-        // Return 500 so Stripe retries this webhook
-        logger.error(`Webhook ${event.id} partially failed, will retry:`, opError);
-        return res.status(500).json({ error: 'Partial processing failure, please retry' });
+        logger.error(`Webhook ${event.id} processing failed, Stripe will retry:`, opError);
+        return res.status(500).json({ error: 'Processing failure, please retry' });
       }
       break;
     }
 
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const rawReferenceType = paymentIntent.metadata.referenceType;
+      const referenceType = normalizeReferenceType(paymentIntent.metadata.referenceType);
       const referenceId = paymentIntent.metadata.referenceId;
-      
-      // CRITICAL SAFETY: Normalize legacy reference types from Stripe metadata
-      const referenceType = normalizeReferenceType(rawReferenceType);
 
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          reference_type: referenceType,
-          reference_id: referenceId,
-          amount: (paymentIntent.amount / 100).toFixed(2),
-          currency: paymentIntent.currency.toUpperCase(),
-          method: 'card',
-          status: 'failed',
-          stripe_payment_intent_id: paymentIntent.id,
-          notes: paymentIntent.last_payment_error?.message,
-        });
+      await supabase.from('payments').insert({
+        reference_type: referenceType,
+        reference_id: referenceId,
+        amount: (paymentIntent.amount / 100).toFixed(2),
+        currency: paymentIntent.currency.toUpperCase(),
+        method: 'card',
+        status: 'failed',
+        stripe_payment_intent_id: paymentIntent.id,
+        notes: paymentIntent.last_payment_error?.message,
+      });
 
-      if (paymentError) {
-        logger.error('Failed to record failed payment:', paymentError);
-      }
+      // FIX GAP-06: Update transaction status on payment failure so bookings don't stay pending
+      await updateReferencePaymentStatus(referenceType, referenceId, 'pending');
+
+      // Also set the transaction status to payment_failed
+      await supabase
+        .from('transactions')
+        .update({ status: 'payment_failed', updated_at: new Date().toISOString() })
+        .eq('id', referenceId);
 
       logger.warn(`Payment failed for ${referenceType}:${referenceId}`);
       break;
     }
 
-    // FIX: Iteration 13 - Handle refunds issued from Stripe Dashboard
+    // FIX P3: Handle payment_intent.canceled — unblock stuck pending bookings
+    case 'payment_intent.canceled': {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const referenceType = normalizeReferenceType(paymentIntent.metadata.referenceType);
+      const referenceId = paymentIntent.metadata.referenceId;
+
+      await supabase
+        .from('transactions')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('id', referenceId);
+
+      logger.info(`Payment intent canceled for ${referenceType}:${referenceId}`);
+      break;
+    }
+
     case 'charge.refunded': {
       const charge = event.data.object as Stripe.Charge;
       const paymentIntentId = charge.payment_intent as string;
 
       if (paymentIntentId) {
-        // Update payment record to refunded
         await supabase
           .from('payments')
           .update({ status: 'refunded', notes: `Refunded via Stripe (${event.id})` })
           .eq('stripe_payment_intent_id', paymentIntentId);
 
-        // Update reference status (booking/order)
         const { data: payment } = await supabase
           .from('payments')
           .select('reference_type, reference_id')
@@ -256,7 +246,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, 'refunded');
         }
 
-        // Record to ledger
+        // FIX BUG-01: INSERT only, never UPDATE
         await supabase.from('payment_ledger').insert({
           reference_type: payment?.reference_type || 'unknown',
           reference_id: payment?.reference_id || 'unknown',
@@ -266,7 +256,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           gateway_reference_id: paymentIntentId,
           webhook_id: event.id,
           status: 'success',
-          metadata: { stripe_event_id: event.id, refund_reason: charge.refunds?.data?.[0]?.reason }
+          metadata: { stripe_event_id: event.id, refund_reason: charge.refunds?.data?.[0]?.reason },
         });
 
         logger.info(`Charge refunded for PI:${paymentIntentId}`);
@@ -277,9 +267,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     case 'invoice.payment_succeeded': {
       const invoice = event.data.object as Stripe.Invoice;
       const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null;
-      if (!subscriptionId) {
-        break;
-      }
+      if (!subscriptionId) break;
 
       const engineService = getEngineService();
       const { data: membership, error: membershipError } = await supabase
@@ -288,12 +276,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         .eq('stripe_subscription_id', subscriptionId)
         .maybeSingle();
 
-      if (membershipError) {
-        logger.error('Failed to fetch membership for invoice.payment_succeeded', membershipError);
-        break;
-      }
-
-      if (!membership) {
+      if (membershipError || !membership) {
         logger.warn(`No membership found for Stripe subscription ${subscriptionId}`);
         break;
       }
@@ -308,7 +291,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       const renewedEndDate = calculateRenewedEndDate(membership.end_date, membership.billing_cycle || 'MONTHLY');
       const nextStatus = transition.allowed ? transition.targetState.toUpperCase() : 'ACTIVE';
 
-      const { error: updateMembershipError } = await supabase
+      await supabase
         .from('pool_memberships')
         .update({
           status: nextStatus,
@@ -317,11 +300,6 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', membership.id);
-
-      if (updateMembershipError) {
-        logger.error('Failed to update membership renewal state', updateMembershipError);
-        break;
-      }
 
       await supabase.from('audit_logs').insert({
         user_id: membership.user_id ?? null,
@@ -332,8 +310,6 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           stripe_subscription_id: subscriptionId,
           invoice_id: invoice.id,
           renewed_end_date: renewedEndDate,
-          transition_allowed: transition.allowed,
-          transition_target: transition.targetState,
         }),
         created_at: new Date().toISOString(),
       });
@@ -349,41 +325,37 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 async function updateReferencePaymentStatus(
   referenceType: string,
   referenceId: string,
-  status: 'pending' | 'partial' | 'paid' | 'refunded'
+  status: 'pending' | 'partial' | 'paid' | 'refunded' | 'payment_failed',
 ) {
   const supabase = getSupabase();
 
-  // Use the transactions table to find the reference_table for this transaction
   const { data: tx } = await supabase
     .from('transactions')
     .select('reference_table')
     .eq('id', referenceId)
-    .single();
+    .maybeSingle();
 
-  const refTable = tx?.reference_table;
-  if (refTable) {
-    // Update the source table's payment_status for backward compatibility
+  if (tx?.reference_table) {
     await supabase
-      .from(refTable)
+      .from(tx.reference_table)
       .update({ payment_status: status, updated_at: new Date().toISOString() })
       .eq('id', referenceId);
   }
 
-  // Also update the transactions table status
+  // Only update payment_status field on transactions, not the status field
+  // (status is managed by the state machine)
   await supabase
     .from('transactions')
-    .update({ status })
+    .update({ payment_status: status, updated_at: new Date().toISOString() })
     .eq('id', referenceId);
 }
 
 export const recordCashPayment = asyncHandler(async (req: Request, res: Response) => {
-  // Validate input
   const validatedData = validateBody(recordCashPaymentSchema, req.body);
   const { referenceType, referenceId, amount, notes } = validatedData;
 
   const supabase = getSupabase();
 
-  // Idempotency check: prevent duplicate cash payment for same reference
   const { data: existingPayment } = await supabase
     .from('payments')
     .select('id, status')
@@ -394,7 +366,6 @@ export const recordCashPayment = asyncHandler(async (req: Request, res: Response
     .maybeSingle();
 
   if (existingPayment) {
-    logger.warn(`Duplicate cash payment attempt for ${referenceType}:${referenceId}`);
     return res.status(409).json({
       success: false,
       error: 'A cash payment has already been recorded for this item',
@@ -402,7 +373,6 @@ export const recordCashPayment = asyncHandler(async (req: Request, res: Response
     });
   }
 
-  // FIX: Iteration 13 - Fetch configured currency instead of hardcoding 'USD'
   const { data: paymentSettings } = await supabase.from('site_settings').select('value').eq('key', 'payments').single();
   const defaultCurrency = paymentSettings?.value?.currency?.toUpperCase() || 'USD';
 
@@ -424,7 +394,6 @@ export const recordCashPayment = asyncHandler(async (req: Request, res: Response
 
   if (error) throw error;
 
-  // Update reference payment status
   await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
 
   res.status(201).json({ success: true, data: payment });
@@ -436,9 +405,18 @@ export const recordManualPayment = asyncHandler(async (req: Request, res: Respon
 
   const supabase = getSupabase();
 
-  // FIX: Iteration 13 - Fetch configured currency instead of hardcoding 'USD'
   const { data: paymentSettings } = await supabase.from('site_settings').select('value').eq('key', 'payments').single();
   const manualCurrency = paymentSettings?.value?.currency?.toUpperCase() || 'USD';
+
+  // GAP-05 FIX: Whish and OMT cannot be auto-completed — they require
+  // external confirmation. Staff must verify the transfer receipt and
+  // explicitly confirm via PATCH /payments/:id/verify before funds are
+  // considered received. Cash is the only non-card method with instant completion.
+  const isManualTransfer = method === 'whish' || method === 'omt' || method === 'other_transfer';
+  const paymentStatus = isManualTransfer ? 'pending_verification' : 'completed';
+  const paymentNotes = isManualTransfer
+    ? `[Awaiting ${method.toUpperCase()} transfer verification]${notes ? ' ' + notes : ''}`
+    : notes;
 
   const { data: payment, error } = await supabase
     .from('payments')
@@ -447,31 +425,69 @@ export const recordManualPayment = asyncHandler(async (req: Request, res: Respon
       reference_id: referenceId,
       amount: amount.toFixed(2),
       currency: manualCurrency,
-      method: method,
-      status: 'completed',
+      method,
+      status: paymentStatus,
       processed_by: req.user!.userId,
       processed_at: new Date().toISOString(),
-      notes,
+      notes: paymentNotes,
     })
     .select()
     .single();
 
   if (error) throw error;
 
-  await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
+  // Only advance reference to paid once cash is confirmed;
+  // transfers stay at partial until staff verifies
+  if (!isManualTransfer) {
+    await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
+  } else {
+    await updateReferencePaymentStatus(referenceType, referenceId, 'partial');
+  }
 
   res.status(201).json({ success: true, data: payment });
 });
 
+// GAP-05: Verify a pending Whish/OMT payment after staff confirms receipt
+export const verifyManualPayment = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { verificationNote } = req.body;
+  const supabase = getSupabase();
+
+  const { data: payment, error: fetchError } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (fetchError || !payment) return res.status(404).json({ success: false, error: 'Payment not found' });
+  if (payment.status !== 'pending_verification') {
+    return res.status(400).json({ success: false, error: `Payment is not pending verification (status: ${payment.status})` });
+  }
+
+  const { error: updateError } = await supabase
+    .from('payments')
+    .update({
+      status: 'completed',
+      notes: `${payment.notes || ''} [Verified by ${req.user!.userId}]${verificationNote ? ': ' + verificationNote : ''}`,
+      processed_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+
+  if (updateError) throw updateError;
+
+  await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, 'paid');
+
+  res.json({ success: true, message: 'Payment verified and marked as completed' });
+});
+
 export const getPaymentMethods = asyncHandler(async (req: Request, res: Response) => {
-  // For now, return supported methods
   res.json({
     success: true,
     data: [
-      { id: 'cash', name: 'Cash', enabled: true },
-      { id: 'card', name: 'Credit/Debit Card', enabled: !!config.stripe.secretKey },
-      { id: 'whish', name: 'Whish Money Transfer', enabled: true },
-      { id: 'omt', name: 'OMT Money Transfer', enabled: true },
+      { id: 'cash',  name: 'Cash',                    enabled: true },
+      { id: 'card',  name: 'Credit/Debit Card',        enabled: !!config.stripe.secretKey },
+      { id: 'whish', name: 'Whish Money Transfer',     enabled: true },
+      { id: 'omt',   name: 'OMT Money Transfer',       enabled: true },
     ],
   });
 });
@@ -487,10 +503,11 @@ export const getTransactions = asyncHandler(async (req: Request, res: Response) 
     .range(Number(offset), Number(offset) + Number(limit) - 1);
 
   if (error) throw error;
-
   res.json({ success: true, data: transactions || [] });
 });
 
+// FIX BUG-02: getMyPayments queried payments.customer_id which doesn't exist.
+// Correct source: transactions table, which has customer_id.
 export const getMyPayments = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
@@ -498,22 +515,31 @@ export const getMyPayments = asyncHandler(async (req: Request, res: Response) =>
   }
 
   const supabase = getSupabase();
-  const { data: transactions, error } = await supabase
-    .from('payments')
-    .select('*')
+
+  // Pull all transactions for this customer (unified source of truth)
+  const { data: transactions, error: txError } = await supabase
+    .from('transactions')
+    .select('id, engine_type, status, amount, currency, created_at, metadata, payment_status')
     .eq('customer_id', userId)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
+  if (txError) throw txError;
+
+  // Also pull any direct payment records linked by stripe PI (for receipts)
+  const { data: payments, error: payError } = await supabase
+    .from('payments')
+    .select('id, reference_type, reference_id, amount, currency, method, status, processed_at, notes, stripe_payment_intent_id')
+    .eq('reference_id', userId) // Some payments store user id as reference; handled below
+    .order('created_at', { ascending: false });
+
+  // Return transactions as the primary record; payments are supplementary
   res.json({ success: true, data: transactions || [] });
 });
 
 export const getPaymentReceipt = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.userId;
   const userRoles = req.user?.roles || [];
-  if (!userId) {
-    return res.status(401).json({ success: false, error: 'Authentication required' });
-  }
+  if (!userId) return res.status(401).json({ success: false, error: 'Authentication required' });
 
   const supabase = getSupabase();
   const { data: payment, error } = await supabase
@@ -522,13 +548,13 @@ export const getPaymentReceipt = asyncHandler(async (req: Request, res: Response
     .eq('id', req.params.id)
     .single();
 
-  if (error || !payment) {
-    return res.status(404).json({ success: false, error: 'Payment not found' });
-  }
+  if (error || !payment) return res.status(404).json({ success: false, error: 'Payment not found' });
 
   const adminLikeRoles = ['admin', 'manager', 'super_admin'];
-  const canViewAnyReceipt = userRoles.some((role) => adminLikeRoles.includes(role));
-  const isOwner = payment.customer_id && payment.customer_id === userId;
+  const canViewAnyReceipt = userRoles.some(r => adminLikeRoles.includes(r));
+
+  // FIX: ownership check now also checks reference_id against userId (since customer_id doesn't exist)
+  const isOwner = payment.reference_id === userId;
   if (!canViewAnyReceipt && !isOwner) {
     return res.status(403).json({ success: false, error: 'Forbidden' });
   }
@@ -559,20 +585,13 @@ export const getTransaction = asyncHandler(async (req: Request, res: Response) =
     .single();
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return res.status(404).json({ success: false, error: 'Transaction not found' });
-    }
+    if (error.code === 'PGRST116') return res.status(404).json({ success: false, error: 'Transaction not found' });
     throw error;
   }
 
   res.json({ success: true, data: payment });
 });
 
-/**
- * Shared refund service — called by both the HTTP handler and the approval controller.
- * Looks up the payment by ID, calls Stripe if needed, updates the DB.
- * Throws on error so callers can handle HTTP responses appropriately.
- */
 export async function processRefundById(
   paymentId: string,
   amount: number | undefined,
@@ -602,7 +621,6 @@ export async function processRefundById(
     processed_by: processedByUserId,
   };
 
-  // Execute Stripe refund for card payments
   if (payment.method === 'card' && payment.stripe_payment_intent_id) {
     const isTestPI = payment.stripe_payment_intent_id.startsWith('pi_test_') ||
       !payment.stripe_payment_intent_id.startsWith('pi_');
@@ -615,9 +633,6 @@ export async function processRefundById(
         reason: 'requested_by_customer',
       });
       refundDetails.notes = `${refundDetails.notes || ''} [Stripe Refund ID: ${stripeRefund.id}]`;
-    } else {
-      refundDetails.notes = `${refundDetails.notes || ''} [Test Payment - No Stripe Refund Required]`;
-      logger.info(`Skipping Stripe refund for test PI: ${payment.stripe_payment_intent_id}`);
     }
   }
 
@@ -635,10 +650,6 @@ export async function processRefundById(
   return { isPartial: isPartialRefund };
 }
 
-/**
- * Find payment record by reference (for approval-triggered refunds where we
- * have a reference_type + reference_id but not a payment ID).
- */
 export async function findPaymentByReference(
   referenceType: string,
   referenceId: string,

@@ -212,20 +212,18 @@ class EmailService {
     return this.sendEmail({ to, subject, html });
   }
 
-  /**
-   * Send pool ticket confirmation email
-   */
-  async sendPoolTicketConfirmation(ticket: { ticket_number: string; guest_name: string; guest_email?: string }, session: { name: string; start_time: string }): Promise<boolean> {
+  /** Send access ticket confirmation (engine: shared_capacity_access) */
+  async sendAccessTicketConfirmation(ticket: { ticket_number: string; guest_name: string; guest_email?: string }, session: { name: string; start_time: string }): Promise<boolean> {
     if (!ticket.guest_email) {
-      logger.warn('Cannot send pool ticket confirmation - no email provided');
+      logger.warn('Cannot send access ticket confirmation - no email provided');
       return false;
     }
 
-    return this.sendTemplatedEmail('pool_ticket_confirmation', ticket.guest_email, {
+    return this.sendTemplatedEmail('access_ticket_confirmation', ticket.guest_email, {
       ticketNumber: ticket.ticket_number,
-      guestName: ticket.guest_name,
-      sessionName: session.name,
-      sessionTime: session.start_time,
+      guestName:    ticket.guest_name,
+      sessionName:  session.name,
+      sessionTime:  session.start_time,
     });
   }
 
@@ -298,11 +296,12 @@ class EmailService {
     });
   }
 
+  /** Send booking confirmation — white-label: unitName instead of chaletName */
   async sendBookingConfirmation(data: {
     customerEmail: string;
     customerName: string;
     bookingNumber: string;
-    chaletName: string;
+    unitName: string;        // formerly chaletName
     checkInDate: string;
     checkOutDate: string;
     numberOfGuests: number;
@@ -328,7 +327,7 @@ class EmailService {
       companyName: settings.company_name,
       customerName: data.customerName,
       bookingNumber: data.bookingNumber,
-      chaletName: data.chaletName,
+      chaletName: data.unitName,
       checkInDate: data.checkInDate,
       checkInTime: settings.chalet_check_in || '3:00 PM',
       checkOutDate: data.checkOutDate,
@@ -357,7 +356,7 @@ class EmailService {
     customerEmail: string;
     customerName: string;
     bookingNumber: string;
-    chaletName: string;
+    unitName: string;
     checkInDate: string;
     checkOutDate: string;
     totalAmount: number;
@@ -369,10 +368,10 @@ class EmailService {
       <p>Dear ${data.customerName},</p>
       <p>Your booking has been confirmed!</p>
       <p><strong>Booking Reference:</strong> ${data.bookingNumber}</p>
-      <p><strong>Chalet:</strong> ${data.chaletName}</p>
+      <p><strong>Unit:</strong> ${data.unitName}</p>
       <p><strong>Check-in:</strong> ${data.checkInDate}</p>
       <p><strong>Check-out:</strong> ${data.checkOutDate}</p>
-      <p><strong>Total:</strong> $${data.totalAmount.toFixed(2)}</p>
+      <p><strong>Total:</strong> ${data.totalAmount.toFixed(2)}</p>
       <p>We look forward to welcoming you!</p>
       <p>Thank you,<br>${settings.company_name}</p>
     `;
@@ -384,11 +383,12 @@ class EmailService {
     });
   }
 
+  /** Send booking cancellation (white-label: unitName) */
   async sendBookingCancellation(data: {
     customerEmail: string;
     customerName: string;
     bookingNumber: string;
-    chaletName: string;
+    unitName: string;    // formerly chaletName
     reason?: string;
   }): Promise<boolean> {
     const settings = await this.getSiteSettings();
@@ -396,7 +396,7 @@ class EmailService {
       <h1>${settings.company_name}</h1>
       <h2>Booking Cancellation</h2>
       <p>Dear ${data.customerName},</p>
-      <p>Your booking <strong>${data.bookingNumber}</strong> for <strong>${data.chaletName}</strong> has been cancelled.</p>
+      <p>Your booking <strong>${data.bookingNumber}</strong> for <strong>${data.unitName}</strong> has been cancelled.</p>
       ${data.reason ? `<p><strong>Reason:</strong> ${data.reason}</p>` : ''}
       <p>If you have any questions, please contact us.</p>
       <p>Thank you,<br>${settings.company_name}</p>
@@ -409,7 +409,8 @@ class EmailService {
     });
   }
 
-  async sendTicketWithQR(data: {
+  /** Send access ticket with QR code (engine: shared_capacity_access) */
+  async sendAccessTicketWithQR(data: {
     customerEmail: string;
     customerName: string;
     ticketNumber: string;
@@ -424,7 +425,7 @@ class EmailService {
 
     if (!template) {
       logger.warn('Ticket delivery template not found, using fallback');
-      return this.sendFallbackTicketDelivery(data);
+      return this.sendFallbackAccessTicketDelivery(data);
     }
 
     const variables: TemplateVariables = {
@@ -451,7 +452,7 @@ class EmailService {
     });
   }
 
-  private async sendFallbackTicketDelivery(data: {
+  private async sendFallbackAccessTicketDelivery(data: {
     customerEmail: string;
     customerName: string;
     ticketNumber: string;
@@ -486,14 +487,14 @@ class EmailService {
   }): Promise<boolean> {
     const template = await this.getTemplate('welcome');
     const settings = await this.getSiteSettings();
-    const siteUrl = config.frontendUrl || 'https://ironparadisegym.com';
+    const siteUrl = config.frontendUrl || process.env.FRONTEND_URL || '';
 
     if (!template) {
       const html = `
         <h1>Welcome to ${settings.company_name}!</h1>
         <p>Dear ${data.customerName},</p>
         <p>Thank you for joining us. We're excited to have you!</p>
-        <p>Visit us at <a href="${siteUrl}">${siteUrl}</a></p>
+        ${siteUrl ? `<p>Visit us at <a href="${siteUrl}">${siteUrl}</a></p>` : ''}
       `;
       return this.sendEmail({
         to: data.customerEmail,
@@ -519,11 +520,12 @@ class EmailService {
     });
   }
 
+  /** Send pre-arrival reminder (engine: time_exclusive_reservation) */
   async sendPreArrivalReminder(data: {
     customerEmail: string;
     customerName: string;
     bookingNumber: string;
-    chaletName: string;
+    unitName: string;        // formerly chaletName — white-label
     checkInDate: string;
     checkInTime?: string;
     numberOfNights: number;
@@ -531,7 +533,7 @@ class EmailService {
   }): Promise<boolean> {
     const template = await this.getTemplate('pre_arrival_reminder');
     const settings = await this.getSiteSettings();
-    const siteUrl = config.frontendUrl || 'https://ironparadisegym.com';
+    const siteUrl = config.frontendUrl || process.env.FRONTEND_URL || '';
 
     if (!template) {
       // Fallback email if template doesn't exist
@@ -544,7 +546,7 @@ class EmailService {
           
           <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <p><strong>Booking Reference:</strong> ${data.bookingNumber}</p>
-            <p><strong>Chalet:</strong> ${data.chaletName}</p>
+            <p><strong>Unit:</strong> ${data.unitName}</p>
             <p><strong>Check-in Date:</strong> ${data.checkInDate}</p>
             <p><strong>Check-in Time:</strong> ${data.checkInTime || settings.chalet_check_in || '3:00 PM'}</p>
             <p><strong>Duration:</strong> ${data.numberOfNights} night(s)</p>
@@ -584,7 +586,7 @@ class EmailService {
       companyName: settings.company_name,
       customerName: data.customerName,
       bookingNumber: data.bookingNumber,
-      chaletName: data.chaletName,
+      chaletName: data.unitName,
       checkInDate: data.checkInDate,
       checkInTime: data.checkInTime || settings.chalet_check_in || '3:00 PM',
       numberOfNights: data.numberOfNights,
@@ -610,6 +612,17 @@ class EmailService {
   }
 
   /**
+   * sendPoolTicketConfirmation — satisfies the EmailService interface contract.
+   * Delegates to sendAccessTicketConfirmation (engine: shared_capacity_access).
+   */
+  async sendPoolTicketConfirmation(
+    ticket: { ticket_number: string; guest_name: string; guest_email?: string },
+    session: { name: string; start_time: string },
+  ): Promise<boolean> {
+    return this.sendAccessTicketConfirmation(ticket, session);
+  }
+
+  /**
    * Send gift card to recipient
    */
   async sendGiftCard(data: {
@@ -623,7 +636,7 @@ class EmailService {
   }): Promise<boolean> {
     const template = await this.getTemplate('gift_card_delivery');
     const settings = await this.getSiteSettings();
-    const siteUrl = config.frontendUrl || 'https://ironparadisegym.com';
+    const siteUrl = config.frontendUrl || process.env.FRONTEND_URL || '';
 
     // Format the code with dashes for readability (XXXX-XXXX-XXXX-XXXX)
     const formattedCode = data.code.replace(/(.{4})(?=.)/g, '$1-');
@@ -701,7 +714,7 @@ class EmailService {
    * Send notification that an account already exists (Security fix for enumeration)
    */
   async sendAccountExistsNotification(email: string, fullName: string): Promise<boolean> {
-    const siteUrl = config.frontendUrl || 'https://ironparadisegym.com';
+    const siteUrl = config.frontendUrl || process.env.FRONTEND_URL || '';
     const settings = await this.getSiteSettings();
 
     const html = `
@@ -710,7 +723,7 @@ class EmailService {
         <p>Hello ${fullName},</p>
         <p>Someone recently tried to register an account on <strong>${settings.company_name}</strong> with this email address.</p>
         <p>If this was you, you already have an account! You can sign in using your existing credentials.</p>
-        <p>If you've forgotten your password, you can reset it here: <a href="${siteUrl}/forgot-password">${siteUrl}/forgot-password</a></p>
+        <p>If you've forgotten your password, you can reset it here: ${siteUrl ? `<a href="${siteUrl}/forgot-password">${siteUrl}/forgot-password</a>` : 'use the forgot password link on the login page'}.</p>
         <p>If you didn't attempt to register, you can safely ignore this email. Your account remains secure.</p>
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
         <p style="font-size: 12px; color: #64748b;">Best regards,<br>${settings.company_name} Team</p>

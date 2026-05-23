@@ -366,6 +366,47 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   // Calculate pricing
   const pricing = await calculateBookingPrice(chaletId, checkInDate, checkOutDate, addOns);
 
+  // Create transaction using engine pricing pipeline
+  const engineService = getEngineService();
+  const lineItems: PricingLineItem[] = [{
+    itemId: chaletId,
+    name: chalet.name || 'Accommodation Unit',
+    quantity: numberOfNights,
+    unitPrice: parseFloat(chalet.base_price),
+  }];
+
+  for (const item of pricing.addOnItems) {
+    lineItems.push({
+      itemId: item.add_on_id,
+      name: 'Add-on',
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+    });
+  }
+
+  const pricingContext = {
+    propertyId: chalet.property_id,
+    customerId: customerId || undefined,
+    moduleId: chalet.module_id,
+    couponCode: undefined,
+    giftCardCode: undefined,
+    loyaltyPointsToRedeem: undefined,
+    staffId: undefined as string | undefined,
+  };
+
+  let enginePricing;
+  try {
+    enginePricing = await engineService.calculatePricing('multi_day_booking', lineItems, pricingContext);
+  } catch (_) {
+    // Fallback to manual calculation if engine fails
+    enginePricing = null;
+  }
+
+  const finalTotal = enginePricing ? enginePricing.totalAmount : pricing.totalAmount;
+  const finalDiscount = enginePricing ? enginePricing.totalDiscount : 0;
+  const finalTax = enginePricing ? enginePricing.taxAmount : 0;
+  const finalServiceCharge = enginePricing ? enginePricing.serviceCharge : 0;
+
   // Create transaction
   const { data: booking, error: bookingError } = await supabase
     .from('transactions')
@@ -375,11 +416,11 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
       engine_type: 'time_exclusive_reservation',
       property_id: chalet.property_id,
       customer_id: customerId,
-      amount: pricing.totalAmount,
-      tax_amount: 0, // Should be calculated
-      service_charge: 0,
-      discount_amount: 0,
-      net_amount: pricing.totalAmount,
+      amount: finalTotal,
+      tax_amount: finalTax,
+      service_charge: finalServiceCharge,
+      discount_amount: finalDiscount,
+      net_amount: finalTotal,
       currency: 'USD',
       status: 'pending',
       payment_status: 'pending',

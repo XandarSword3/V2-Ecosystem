@@ -593,15 +593,66 @@ export class MobileCheckinService {
   }
 
   private async issueMobileKey(keyId: string): Promise<void> {
-    // In production, this would call the lock provider API
-    // (ASSA ABLOY, Salto, dormakaba, OpenKey, etc.)
+    const { data: key } = await this.supabase
+      .from('mobile_keys')
+      .select('provider, property_id')
+      .eq('id', keyId)
+      .single();
 
-    // Simulating credential issuance
-    const providerCredential = {
-      credentialId: crypto.randomBytes(16).toString('hex'),
-      encryptedKey: crypto.randomBytes(32).toString('base64'),
-      issuedAt: new Date().toISOString()
-    };
+    if (!key) throw new Error('Mobile key record not found');
+
+    let providerCredential: Record<string, string>;
+
+    switch (key.provider?.toLowerCase()) {
+      case 'assa_abloy': {
+        const apiKey = process.env.ASSA_ABLOY_API_KEY;
+        const endpoint = process.env.ASSA_ABLOY_ENDPOINT;
+        if (!apiKey || !endpoint) throw new Error('ASSA ABLOY credentials not configured');
+        const resp = await fetch(`${endpoint}/credentials`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyId }),
+        });
+        if (!resp.ok) throw new Error(`ASSA ABLOY credential issuance failed: ${resp.status}`);
+        const body = await resp.json() as { credentialId: string; encryptedKey: string };
+        providerCredential = { credentialId: body.credentialId, encryptedKey: body.encryptedKey, issuedAt: new Date().toISOString() };
+        break;
+      }
+      case 'salto': {
+        const apiKey = process.env.SALTO_API_KEY;
+        const endpoint = process.env.SALTO_ENDPOINT;
+        if (!apiKey || !endpoint) throw new Error('Salto credentials not configured');
+        const resp = await fetch(`${endpoint}/mobile-access/issue`, {
+          method: 'POST',
+          headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reference: keyId }),
+        });
+        if (!resp.ok) throw new Error(`Salto credential issuance failed: ${resp.status}`);
+        const body = await resp.json() as { accessToken: string };
+        providerCredential = { credentialId: body.accessToken, encryptedKey: '', issuedAt: new Date().toISOString() };
+        break;
+      }
+      case 'openkey': {
+        const apiKey = process.env.OPENKEY_API_KEY;
+        const endpoint = process.env.OPENKEY_ENDPOINT || 'https://api.openkey.co';
+        if (!apiKey) throw new Error('OpenKey credentials not configured');
+        const resp = await fetch(`${endpoint}/v1/keys`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ externalId: keyId }),
+        });
+        if (!resp.ok) throw new Error(`OpenKey credential issuance failed: ${resp.status}`);
+        const body = await resp.json() as { keyId: string; payload: string };
+        providerCredential = { credentialId: body.keyId, encryptedKey: body.payload, issuedAt: new Date().toISOString() };
+        break;
+      }
+      default:
+        // No lock provider configured for this property — fail explicitly
+        throw new Error(
+          `No supported lock provider configured (got: '${key.provider}'). ` +
+          `Set ASSA_ABLOY_API_KEY, SALTO_API_KEY, or OPENKEY_API_KEY and configure the provider field.`
+        );
+    }
 
     const { error } = await this.supabase
       .from('mobile_keys')

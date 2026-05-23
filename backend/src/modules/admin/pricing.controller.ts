@@ -12,7 +12,7 @@ const router = Router();
 router.get(
   '/seasonal-rules',
   authenticate,
-  authorize(['admin', 'staff']),
+  authorize('admin', 'staff'),
   asyncHandler(async (req: Request, res: Response) => {
     const rules = await seasonalPricingService.getSeasonalRules();
 
@@ -27,7 +27,7 @@ router.get(
 router.post(
   '/seasonal-rules',
   authenticate,
-  authorize(['admin']),
+  authorize('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const { name, startDate, endDate, priceMultiplier, applicableTo, priority, isActive } = req.body;
 
@@ -70,7 +70,7 @@ router.post(
 router.put(
   '/seasonal-rules/:ruleId',
   authenticate,
-  authorize(['admin']),
+  authorize('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const { ruleId } = req.params;
     const updates = req.body;
@@ -106,7 +106,7 @@ router.put(
 router.delete(
   '/seasonal-rules/:ruleId',
   authenticate,
-  authorize(['admin']),
+  authorize('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const { ruleId } = req.params;
 
@@ -125,7 +125,7 @@ router.delete(
 router.get(
   '/dynamic-config',
   authenticate,
-  authorize(['admin', 'staff']),
+  authorize('admin', 'staff'),
   asyncHandler(async (req: Request, res: Response) => {
     const config = await seasonalPricingService.getDynamicPricingConfig();
 
@@ -140,7 +140,7 @@ router.get(
 router.put(
   '/dynamic-config',
   authenticate,
-  authorize(['admin']),
+  authorize('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const config = req.body;
 
@@ -238,7 +238,7 @@ router.get(
 router.get(
   '/analytics',
   authenticate,
-  authorize(['admin']),
+  authorize('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const { days = '30' } = req.query;
 

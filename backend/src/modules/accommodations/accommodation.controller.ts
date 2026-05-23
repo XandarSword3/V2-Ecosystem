@@ -210,7 +210,7 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
             });
         }
         
-        // Prepare pricing context
+        // Prepare pricing context — include all discount keys so resolvers fire
         const pricingContext = {
             propertyId: unit.property_id,
             customerId: req.user?.userId || undefined,
@@ -218,7 +218,10 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
             checkInDate: checkIn.toISOString(),
             checkOutDate: checkOut.toISOString(),
             numberOfGuests,
-            staffId: req.user?.userId || undefined
+            staffId: req.user?.userId || undefined,
+            couponCode: req.body?.couponCode || undefined,
+            giftCardCode: req.body?.giftCardCode || undefined,
+            loyaltyPointsToRedeem: req.body?.loyaltyPointsToRedeem || undefined,
         };
         
         // Calculate pricing using engine

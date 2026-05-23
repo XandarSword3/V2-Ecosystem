@@ -570,10 +570,12 @@ class KioskService {
       currency: string;
       paymentMethod: string;
       description?: string;
+      stripePaymentMethodId?: string; // Required for real card processing
     }
   ): Promise<{
     transactionId: string;
     paymentReference: string;
+    clientSecret?: string;
     success: boolean;
   }> {
     const transactionId = await this.createTransaction(
@@ -595,10 +597,39 @@ class KioskService {
         })
         .eq('id', transactionId);
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Real Stripe payment: create a PaymentIntent server-side
+      // The kiosk terminal confirms via Stripe Terminal SDK on the device
+      const stripeModule = await import('stripe');
+      const { data: settings } = await this.supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'payments')
+        .single();
+
+      const secretKey = settings?.value?.stripeSecretKey || process.env.STRIPE_SECRET_KEY;
+
+      if (!secretKey) {
+        throw new Error('Stripe not configured — cannot process kiosk payment');
+      }
+
+      const stripe = new stripeModule.default(secretKey, { apiVersion: '2023-10-16' });
+      const intent = await stripe.paymentIntents.create({
+        amount: Math.round(paymentData.amount * 100),
+        currency: paymentData.currency.toLowerCase(),
+        payment_method_types: ['card_present'],
+        capture_method: 'automatic',
+        description: paymentData.description || 'Kiosk payment',
+        metadata: {
+          kiosk_id: kioskId,
+          session_id: sessionId,
+          transaction_id: transactionId,
+        },
+      });
 
       await this.updateTransaction(transactionId, 'completed', {
         paymentReference,
+        stripePaymentIntentId: intent.id,
+        clientSecret: intent.client_secret,
         processedAt: new Date().toISOString()
       });
 
@@ -610,6 +641,7 @@ class KioskService {
       return {
         transactionId,
         paymentReference,
+        clientSecret: intent.client_secret ?? undefined,
         success: true
       };
     } catch (error) {

@@ -106,12 +106,47 @@ export interface SavedQuery {
 export class QueryBuilderService {
   private supabase = getSupabase();
 
+  // GAP-07 FIX: Whitelist of tables admins are allowed to query.
+  // Prevents arbitrary table exfiltration via config.table injection.
+  private static readonly ALLOWED_TABLES = new Set([
+    'transactions',
+    'payments',
+    'payment_ledger',
+    'modules',
+    'properties',
+    'users',
+    'staff',
+    'loyalty_profiles',
+    'loyalty_transactions',
+    'coupons',
+    'gift_cards',
+    'reviews',
+    'housekeeping_tasks',
+    'inventory_items',
+    'inventory_consumption',
+    'notifications',
+    'audit_logs',
+    'support_inquiries',
+  ]);
+
+  private assertTableAllowed(table: string): void {
+    if (!QueryBuilderService.ALLOWED_TABLES.has(table)) {
+      throw new Error(
+        `Query builder: table '${table}' is not in the allowed list. ` +
+        `Contact a super_admin to add it to the whitelist.`
+      );
+    }
+  }
+
   // =============================================
   // QUERY EXECUTION
   // =============================================
 
   async executeQuery(propertyId: string, config: QueryConfig): Promise<QueryResult> {
     const startTime = Date.now();
+
+    // GAP-07: Enforce table whitelist before any query execution
+    this.assertTableAllowed(config.table);
 
     try {
       // Build base query
@@ -502,7 +537,8 @@ export class QueryBuilderService {
     commonFilters: { field: string; operator: string; description: string }[];
     suggestedGroupings: { field: string; description: string }[];
   }> {
-    // Get field information from the table
+    // GAP-07: Enforce table whitelist
+    this.assertTableAllowed(table);
     const { data: sample, error } = await this.supabase
       .from(table)
       .select('*')
