@@ -116,8 +116,14 @@ describeIntegration('Double Booking Prevention (Integration)', () => {
         number_of_guests: 2,
       };
 
+      const loginRes = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: TEST_CONFIG.users.admin.email, password: TEST_CONFIG.users.admin.password });
+      const token = loginRes.body?.data?.accessToken || loginRes.body?.data?.tokens?.accessToken || '';
+
       const candidate = await request(app)
         .post('/api/v1/units/bookings')
+        .set('Authorization', `Bearer ${token}`)
         .send(candidatePayload);
 
       if ([200, 201].includes(candidate.status)) {
