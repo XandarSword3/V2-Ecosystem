@@ -38,4 +38,29 @@ describe('resolveCorsOrigins', () => {
       'http://localhost:3005',
     ]);
   });
+
+  it('always includes production Vercel origin and preview pattern in production', () => {
+    const origins = resolveCorsOrigins({ NODE_ENV: 'production' } as NodeJS.ProcessEnv);
+
+    const strings = origins.filter((o): o is string => typeof o === 'string');
+    const regexes = origins.filter((o): o is RegExp => o instanceof RegExp);
+
+    expect(strings).toContain('https://v2-ecosystem.vercel.app');
+    expect(regexes.length).toBeGreaterThan(0);
+    expect(regexes.some(r => r.test('https://v2-ecosystem.vercel.app'))).toBe(true);
+    expect(regexes.some(r => r.test('https://v2-ecosystem-abc123.vercel.app'))).toBe(true);
+    // Must NOT match unrelated Vercel deployments
+    expect(regexes.some(r => r.test('https://evil-site.vercel.app'))).toBe(false);
+  });
+
+  it('merges CORS_ORIGINS env var with production Vercel origins when NODE_ENV=production', () => {
+    const origins = resolveCorsOrigins({
+      NODE_ENV: 'production',
+      CORS_ORIGINS: 'https://custom-domain.com',
+    } as NodeJS.ProcessEnv);
+
+    const strings = origins.filter((o): o is string => typeof o === 'string');
+    expect(strings).toContain('https://custom-domain.com');
+    expect(strings).toContain('https://v2-ecosystem.vercel.app');
+  });
 });
