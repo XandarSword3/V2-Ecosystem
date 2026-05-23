@@ -739,10 +739,8 @@ export async function recordEntry(req: Request, res: Response) {
     if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
     
     // Execute state transition via engine (entry = validate_entry)
-    const engineType = TEMPLATE_TO_ENGINE[module.template_type] || 'instant_transaction';
-
     const transitionResult = await engineService.transitionState(
-      engineType,
+      module.template_type,
       currentTicket.status,
       'validate_entry',
       'staff',
@@ -805,10 +803,8 @@ export async function recordExit(req: Request, res: Response) {
     if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
     
     // Execute state transition via engine (exit = record_exit)
-    const engineType = TEMPLATE_TO_ENGINE[module.template_type] || 'instant_transaction';
-
     const transitionResult = await engineService.transitionState(
-      engineType,
+      module.template_type,
       currentTicket.status,
       'record_exit',
       'staff',
