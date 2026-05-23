@@ -738,26 +738,28 @@ export async function recordEntry(req: Request, res: Response) {
       
     if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
     
-    // Execute state transition via engine (entry = validate/use)
+    // Execute state transition via engine (entry = validate_entry)
     const engineType = TEMPLATE_TO_ENGINE[module.template_type] || 'instant_transaction';
 
     const transitionResult = await engineService.transitionState(
       engineType,
       currentTicket.status,
-      'validate',
+      'validate_entry',
       'staff',
-      { 
-        ticketId,
-        entryTime: new Date().toISOString(),
-        sessionId: currentTicket.reference_id
-      }
+      { ticketId, sessionId: currentTicket.reference_id }
     );
-    
-    // Get updated ticket
+
+    if (!transitionResult.allowed) {
+      return res.status(400).json({ success: false, error: transitionResult.error ?? 'Invalid transition' });
+    }
+
+    // Update status in transactions table
+    const entryTime = new Date().toISOString();
     const { data: ticket, error: updateError } = await supabase
       .from('transactions')
-      .select('*, session:pool_sessions!reference_id(id, name)')
+      .update({ status: transitionResult.targetState, updated_at: entryTime })
       .eq('id', ticketId)
+      .select('id, status, metadata, amount, created_at')
       .single();
 
     if (updateError) throw updateError;
@@ -802,26 +804,28 @@ export async function recordExit(req: Request, res: Response) {
       
     if (fetchError || !currentTicket) throw fetchError || new Error('Ticket not found');
     
-    // Execute state transition via engine (exit = complete)
+    // Execute state transition via engine (exit = record_exit)
     const engineType = TEMPLATE_TO_ENGINE[module.template_type] || 'instant_transaction';
 
     const transitionResult = await engineService.transitionState(
       engineType,
       currentTicket.status,
-      'complete',
+      'record_exit',
       'staff',
-      { 
-        ticketId,
-        exitTime: new Date().toISOString(),
-        sessionId: currentTicket.reference_id
-      }
+      { ticketId, sessionId: currentTicket.reference_id }
     );
-    
-    // Get updated ticket
+
+    if (!transitionResult.allowed) {
+      return res.status(400).json({ success: false, error: transitionResult.error ?? 'Invalid transition' });
+    }
+
+    // Update status in transactions table
+    const exitTime = new Date().toISOString();
     const { data: ticket, error: updateError } = await supabase
       .from('transactions')
-      .select('*, session:pool_sessions!reference_id(id, name)')
+      .update({ status: transitionResult.targetState, updated_at: exitTime })
       .eq('id', ticketId)
+      .select('id, status, metadata, amount, created_at')
       .single();
 
     if (updateError) throw updateError;

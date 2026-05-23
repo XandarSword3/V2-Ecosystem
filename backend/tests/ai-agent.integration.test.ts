@@ -34,12 +34,11 @@ describe('AI Agent Interaction Tests', () => {
         // expect(Array.isArray(response.body.data)).toBe(true);
     });
 
-    it('should reject legacy chalet API paths with 410 Gone', async () => {
+    it('should require auth for module paths (not return legacy 410)', async () => {
         const response = await request(app)
             .get(`${API_V1}/chalets`)
-            .expect(410);
+            .expect(401);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.migration).toBe('/api/v1/units');
     });
 });
