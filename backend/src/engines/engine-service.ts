@@ -33,6 +33,8 @@ import { getEngine, getEngineByTemplate, createStateMachine } from './registry.j
 import { PricingPipeline, type PricingPipelineDeps } from './pricing-pipeline.js';
 import { StateMachine, StateMachineError } from './state-machine.js';
 import { createDiscountResolvers } from './discount-resolvers.js';
+import { getFinancialLedgerService, type LedgerTransactionType } from './financial-ledger.js';
+import { getTransactionManager, type TransactionStep, type EngineOperationContext } from './transaction-manager.js';
 import { TaxService } from '../services/tax.service.js';
 import { OrderConfigService } from '../services/order-config.service.js';
 import { logger } from '../utils/logger.js';
@@ -232,6 +234,83 @@ export class EngineService {
     const engineType = this.resolveEngineType(templateType);
     const sm = this.getStateMachine(engineType);
     return sm.getInitialState();
+  }
+
+  // ============================================
+  // Financial Ledger Operations (MISSING-05)
+  // ============================================
+
+  /**
+   * Record a financial transaction to the engine ledger.
+   * Called after every successful engine-processed transaction.
+   * This is how FinancialLedgerService gets callsites — every module
+   * that creates or refunds a transaction calls this.
+   */
+  async recordToLedger(
+    pricingResult: PricingResult,
+    context: {
+      tenantId: string;
+      moduleId: string;
+      templateType: string;
+      entityId: string;
+      entityType: string;
+      transactionType: LedgerTransactionType;
+      actorType: 'system' | 'staff' | 'customer' | 'admin';
+      actorId?: string;
+      entityState?: string;
+      paymentMethod?: string;
+      paymentReference?: string;
+      idempotencyKey?: string;
+      notes?: string;
+    },
+  ): Promise<string> {
+    const engineType = this.resolveEngineType(context.templateType);
+    const ledger = getFinancialLedgerService();
+    return ledger.recordFromPricing(pricingResult, {
+      ...context,
+      engineType,
+    });
+  }
+
+  /**
+   * Record a refund to the engine ledger.
+   */
+  async recordRefundToLedger(
+    entityId: string,
+    context: {
+      tenantId: string;
+      moduleId: string;
+      templateType: string;
+      entityType: string;
+      refundAmount: number;
+      reason: string;
+      actorType: 'system' | 'staff' | 'customer' | 'admin';
+      actorId?: string;
+      idempotencyKey?: string;
+    },
+  ): Promise<string> {
+    const engineType = this.resolveEngineType(context.templateType);
+    const ledger = getFinancialLedgerService();
+    return ledger.recordRefund(entityId, { ...context, engineType });
+  }
+
+  /**
+   * Execute a multi-step engine operation atomically (Saga pattern).
+   * All steps succeed or all are compensated.
+   * This is how TransactionManager gets callsites.
+   */
+  async executeAtomicOperation<T = unknown>(
+    steps: TransactionStep[],
+    context: EngineOperationContext,
+  ): Promise<T> {
+    const tm = getTransactionManager();
+    const result = await tm.executeTransaction<T>(steps, context);
+    if (!result.success) {
+      throw new Error(
+        `Engine operation failed at step '${result.failedStep}': ${result.error}`,
+      );
+    }
+    return result.value as T;
   }
 
   /**

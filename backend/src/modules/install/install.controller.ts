@@ -192,18 +192,15 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
     }
 
     // 3. Seed core roles (idempotent via ON CONFLICT DO NOTHING)
+    // White-label roles only — no venue-specific names
     const rolesToSeed = [
-      { name: 'super_admin',      display_name: 'Super Administrator', description: 'Full system access',          business_unit: null },
-      { name: 'admin',            display_name: 'Administrator',        description: 'Property-level admin',        business_unit: null },
-      { name: 'customer',         display_name: 'Customer',             description: 'Registered customer',         business_unit: null },
-      { name: 'restaurant_admin', display_name: 'Restaurant Admin',     description: 'Restaurant management',       business_unit: 'restaurant' },
-      { name: 'restaurant_staff', display_name: 'Restaurant Staff',     description: 'Restaurant operations',       business_unit: 'restaurant' },
-      { name: 'snack_bar_admin',  display_name: 'Snack Bar Admin',      description: 'Snack bar management',        business_unit: 'snack_bar' },
-      { name: 'snack_bar_staff',  display_name: 'Snack Bar Staff',      description: 'Snack bar operations',        business_unit: 'snack_bar' },
-      { name: 'chalet_admin',     display_name: 'Chalet Admin',         description: 'Chalet management',           business_unit: 'chalets' },
-      { name: 'chalet_staff',     display_name: 'Chalet Staff',         description: 'Chalet operations',           business_unit: 'chalets' },
-      { name: 'pool_admin',       display_name: 'Pool Admin',           description: 'Pool management',             business_unit: 'pool' },
-      { name: 'pool_staff',       display_name: 'Pool Staff',           description: 'Pool operations',             business_unit: 'pool' },
+      { name: 'super_admin',  display_name: 'Super Administrator', description: 'Full system access',          business_unit: null },
+      { name: 'admin',        display_name: 'Administrator',       description: 'Property-level admin',        business_unit: null },
+      { name: 'manager',      display_name: 'Manager',             description: 'Operational manager',         business_unit: null },
+      { name: 'staff',        display_name: 'Staff',               description: 'General staff operations',    business_unit: null },
+      { name: 'customer',     display_name: 'Customer',            description: 'Registered customer',         business_unit: null },
+      { name: 'module_admin', display_name: 'Module Admin',        description: 'Module-level administration', business_unit: null },
+      { name: 'module_staff', display_name: 'Module Staff',        description: 'Module-level operations',     business_unit: null },
     ];
 
     const { error: rolesError } = await supabase
@@ -269,7 +266,25 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
       throw new Error(`Role assignment failed: ${roleAssignError.message}`);
     }
 
-    // 6. Seed site_settings
+    // 6. FIX BUG-03: Create a default property so all property-scoped module queries work
+    const { data: defaultProperty, error: propError } = await supabase
+      .from('properties')
+      .insert({
+        name: businessName,
+        slug: businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+        is_active: true,
+        owner_id: newUser.id,
+      })
+      .select('id')
+      .single();
+
+    if (propError) {
+      logger.warn('Install: default property creation failed (non-fatal)', { error: propError.message });
+    } else {
+      logger.info('Install: default property created', { propertyId: defaultProperty.id });
+    }
+
+    // 7. Seed site_settings
     //    a) onboarding_state (wizard will consume this)
     //    b) business_name   (used across the UI)
     await supabase.from('site_settings').upsert([
@@ -289,7 +304,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
       },
     ], { onConflict: 'key' });
 
-    // 7. Persist machine_id — this is what future status checks compare against
+    // 8. Persist machine_id — this is what future status checks compare against
     const { error: configError } = await supabase
       .from('system_config')
       .upsert(
@@ -309,7 +324,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
       throw new Error(`Failed to persist machine ID: ${configError.message}`);
     }
 
-    // 8. Issue JWT so the browser is immediately authenticated
+    // 9. Issue JWT so the browser is immediately authenticated
     const tokens = generateTokens({
       userId:       newUser.id,
       email:        newUser.email,

@@ -6,8 +6,9 @@ import { config } from "../../config/index.js";
 import { logger } from "../../utils/logger.js";
 import { emailService } from "../../services/email.service.js";
 import { AppError } from "../../utils/errors.js";
-import { validatePassword } from "../../services/password-policy.service.js"; // FIX: Iteration 20 - enforce password policy
+import { validatePassword } from "../../services/password-policy.service.js";
 import { isAccountLocked, recordFailedAttempt, recordSuccessfulLogin } from "./lockout.service.js";
+import { blacklistToken } from "../../services/token-blacklist.service.js";
 
 interface SessionMeta {
   ipAddress?: string;
@@ -409,27 +410,40 @@ export async function refreshAccessToken(refreshToken: string) {
   };
 }
 
-export async function logout(userId: string, refreshToken?: string) {
+export async function logout(userId: string, refreshToken?: string, accessTokenJti?: string) {
   const supabase = getSupabase();
 
   if (refreshToken) {
-    // Logout specific session
+    // Single-session logout
+    // 1. Deactivate the session
+    const { data: session } = await supabase
+      .from('sessions')
+      .select('id, token')
+      .eq('refresh_token', refreshToken)
+      .maybeSingle();
+
     await supabase
       .from('sessions')
       .update({ is_active: false })
       .eq('refresh_token', refreshToken);
+
+    // 2. Blacklist the access token so it's immediately invalid even before JWT expiry (P3)
+    if (accessTokenJti) {
+      // Access tokens expire after JWT_EXPIRES_IN (default 15m)
+      const expiresIn = config.jwt.expiresIn || '15m';
+      const ms = parseJwtExpiry(expiresIn);
+      await blacklistToken(accessTokenJti, userId, new Date(Date.now() + ms));
+    }
   } else {
-    // Logout all sessions - increment token_version to invalidate all JWTs
+    // Logout all sessions — increment token_version to invalidate all JWTs
     await supabase
       .from('sessions')
       .update({ is_active: false })
       .eq('user_id', userId);
 
-    // Increment token_version to invalidate all previously issued JWTs
     try {
       await supabase.rpc('increment_token_version', { p_user_id: userId });
     } catch {
-      // Fallback if RPC doesn't exist: direct update
       const { data: user } = await supabase
         .from('users')
         .select('token_version')
@@ -441,6 +455,19 @@ export async function logout(userId: string, refreshToken?: string) {
         .update({ token_version: (user?.token_version ?? 0) + 1 })
         .eq('id', userId);
     }
+  }
+}
+
+/** Parse JWT expiry string like '15m', '1h', '7d' into milliseconds */
+function parseJwtExpiry(expiry: string): number {
+  const unit = expiry.slice(-1);
+  const value = parseInt(expiry.slice(0, -1), 10);
+  switch (unit) {
+    case 's': return value * 1000;
+    case 'm': return value * 60 * 1000;
+    case 'h': return value * 60 * 60 * 1000;
+    case 'd': return value * 24 * 60 * 60 * 1000;
+    default:  return 15 * 60 * 1000; // fallback 15 minutes
   }
 }
 

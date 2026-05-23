@@ -460,7 +460,7 @@ async function findOrCreateOAuthUser(data: {
   // First, try to find user by OAuth provider ID
   let { data: existingUser, error: findError } = await supabase
     .from('users')
-    .select('id, email, full_name, profile_image_url')
+    .select('id, email, full_name, profile_image_url, token_version')
     .eq('oauth_provider', data.provider)
     .eq('oauth_provider_id', data.providerId)
     .single();
@@ -469,7 +469,7 @@ async function findOrCreateOAuthUser(data: {
   if (!existingUser) {
     const { data: emailUser } = await supabase
       .from('users')
-      .select('id, email, full_name, profile_image_url, oauth_provider')
+      .select('id, email, full_name, profile_image_url, oauth_provider, token_version')
       .eq('email', data.email.toLowerCase())
       .single();
 
@@ -486,7 +486,7 @@ async function findOrCreateOAuthUser(data: {
             email_verified: true, // OAuth emails are verified
           })
           .eq('id', emailUser.id)
-          .select('id, email, full_name, profile_image_url')
+          .select('id, email, full_name, profile_image_url, token_version')
           .single();
 
         if (updateError) {
@@ -517,7 +517,7 @@ async function findOrCreateOAuthUser(data: {
         email_verified: true, // OAuth emails are verified
         password_hash: null, // No password for OAuth users
       })
-      .select('id, email, full_name, profile_image_url')
+      .select('id, email, full_name, profile_image_url, token_version')
       .single();
 
     if (createError) {
@@ -563,6 +563,7 @@ async function findOrCreateOAuthUser(data: {
     userId: existingUser.id,
     email: existingUser.email,
     roles,
+    tokenVersion: existingUser.token_version ?? 0,
   });
 
   // Log activity
