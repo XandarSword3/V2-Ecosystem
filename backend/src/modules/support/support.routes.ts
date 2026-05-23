@@ -67,9 +67,16 @@ router.post('/contact', async (req: Request, res: Response, next: NextFunction) 
       const { data: siteSettings } = await supabase
         .from('site_settings')
         .select('key, value');
-      for (const s of siteSettings ?? []) {
-        if (s.key === 'general' && s.value?.siteName) siteName = s.value.siteName;
-        if (s.key === 'contact' && s.value?.email && !adminEmail) adminEmail = s.value.email;
+
+      if (Array.isArray(siteSettings)) {
+        for (const s of siteSettings) {
+          if (s.key === 'general' && s.value?.siteName) siteName = s.value.siteName;
+          if (s.key === 'contact' && s.value?.email && !adminEmail) adminEmail = s.value.email;
+        }
+      } else if (siteSettings && typeof siteSettings === 'object') {
+        const legacy = siteSettings as { site_name?: string; siteName?: string; contact_email?: string; email?: string };
+        if (legacy.site_name || legacy.siteName) siteName = legacy.site_name ?? legacy.siteName ?? siteName;
+        if (!adminEmail) adminEmail = legacy.contact_email ?? legacy.email ?? null;
       }
     } catch { /* non-fatal */ }
 
@@ -96,7 +103,7 @@ router.post('/contact', async (req: Request, res: Response, next: NextFunction) 
     try {
       await emailService.sendEmail({
         to:      validated.email,
-        subject: `We received your message — ${siteName}`,
+        subject: `Thank you for contacting ${siteName}`,
         html: `
           <h2>Thank you, ${validated.name}!</h2>
           <p>Your support request has been received (ticket #${inquiry.id}).</p>
