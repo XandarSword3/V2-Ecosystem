@@ -344,6 +344,13 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_NAME="V2 Ecosystem Management"
 ```
 
+Optional production smoke (Playwright):
+
+```bash
+PRODUCTION_FRONTEND_URL="https://your-production-frontend.example"
+PRODUCTION_API_URL="https://your-production-backend.example"
+```
+
 ### 3. Database Setup
 
 #### Supabase Local Development

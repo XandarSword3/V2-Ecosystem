@@ -223,6 +223,13 @@ cd ..
 npx playwright test -c playwright.config.ts
 ```
 
+Optional production smoke overrides:
+
+```powershell
+PRODUCTION_FRONTEND_URL=https://your-production-frontend.example
+PRODUCTION_API_URL=https://your-production-backend.example
+```
+
 ### Database Operations (160 Active Migrations)
 
 ```powershell
