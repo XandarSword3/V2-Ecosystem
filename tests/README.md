@@ -51,6 +51,8 @@ Depending on suite, CI/local runs may require:
 
 1. FRONTEND_URL
 2. API_URL
-3. E2E_CUSTOMER_EMAIL and E2E_CUSTOMER_PASSWORD
-4. E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD
-5. E2E_STAFF_EMAIL and E2E_STAFF_PASSWORD (when staff flows are exercised)
+3. PRODUCTION_FRONTEND_URL (for @production smoke)
+4. PRODUCTION_API_URL (for @production smoke)
+5. E2E_CUSTOMER_EMAIL and E2E_CUSTOMER_PASSWORD
+6. E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD
+7. E2E_STAFF_EMAIL and E2E_STAFF_PASSWORD (when staff flows are exercised)

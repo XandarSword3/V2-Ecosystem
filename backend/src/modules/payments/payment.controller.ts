@@ -118,63 +118,78 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       const idempotencyGuard = getIdempotencyGuard();
       const idempotencyKey = `stripe_webhook:${event.id}`;
 
-      try {
-        await idempotencyGuard.executeOnce(
-          idempotencyKey,
-          'system',
-          'payment',
-          referenceId,
-          'payment_intent.succeeded',
-          async () => {
-            // Step 1: Record payment row (idempotent on stripe_payment_intent_id)
-            const { data: existingPayment } = await supabase
-              .from('payments')
-              .select('id')
-              .eq('stripe_payment_intent_id', paymentIntent.id)
-              .maybeSingle();
+      const processPaymentIntent = async () => {
+        // Step 1: Record payment row (idempotent on stripe_payment_intent_id)
+        const { data: existingPayment } = await supabase
+          .from('payments')
+          .select('id')
+          .eq('stripe_payment_intent_id', paymentIntent.id)
+          .maybeSingle();
 
-            if (!existingPayment) {
-              const { error: paymentError } = await supabase
-                .from('payments')
-                .insert({
-                  reference_type: referenceType,
-                  reference_id: referenceId,
-                  amount: (paymentIntent.amount / 100).toFixed(2),
-                  currency: paymentIntent.currency.toUpperCase(),
-                  method: 'card',
-                  status: 'completed',
-                  stripe_payment_intent_id: paymentIntent.id,
-                  stripe_charge_id: paymentIntent.latest_charge as string,
-                  processed_at: new Date().toISOString(),
-                });
-
-              if (paymentError) {
-                logger.error('Failed to record payment:', paymentError);
-              }
-            }
-
-            // Step 2: Update transaction/reference status
-            await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
-
-            // Step 3: Award loyalty points
-            await awardLoyaltyPointsForPayment(referenceType, referenceId, paymentIntent.amount / 100);
-
-            // Step 4: FIX BUG-01 — INSERT a success ledger entry (never UPDATE)
-            await supabase.from('payment_ledger').insert({
+        if (!existingPayment) {
+          const { error: paymentError } = await supabase
+            .from('payments')
+            .insert({
               reference_type: referenceType,
               reference_id: referenceId,
-              event_type: 'authorized',
-              amount: paymentIntent.amount / 100,
+              amount: (paymentIntent.amount / 100).toFixed(2),
               currency: paymentIntent.currency.toUpperCase(),
-              gateway_reference_id: paymentIntent.id,
-              webhook_id: event.id,
-              status: 'success',
-              metadata: { stripe_event_id: event.id },
+              method: 'card',
+              status: 'completed',
+              stripe_payment_intent_id: paymentIntent.id,
+              stripe_charge_id: paymentIntent.latest_charge as string,
+              processed_at: new Date().toISOString(),
             });
 
-            logger.info(`Payment succeeded for ${referenceType}:${referenceId}`);
-          },
-        );
+          if (paymentError) {
+            logger.error('Failed to record payment:', paymentError);
+          }
+        }
+
+        // Step 2: Update transaction/reference status
+        await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
+
+        // Step 3: Award loyalty points
+        await awardLoyaltyPointsForPayment(referenceType, referenceId, paymentIntent.amount / 100);
+
+        // Step 4: FIX BUG-01 — INSERT a success ledger entry (never UPDATE)
+        await supabase.from('payment_ledger').insert({
+          reference_type: referenceType,
+          reference_id: referenceId,
+          event_type: 'authorized',
+          amount: paymentIntent.amount / 100,
+          currency: paymentIntent.currency.toUpperCase(),
+          gateway_reference_id: paymentIntent.id,
+          webhook_id: event.id,
+          status: 'success',
+          metadata: { stripe_event_id: event.id },
+        });
+
+        logger.info(`Payment succeeded for ${referenceType}:${referenceId}`);
+      };
+
+      const canUseIdempotencyGuard = (() => {
+        try {
+          const probe = (supabase as any).from?.('engine_idempotency_keys');
+          return typeof probe?.upsert === 'function';
+        } catch {
+          return false;
+        }
+      })();
+
+      try {
+        if (canUseIdempotencyGuard) {
+          await idempotencyGuard.executeOnce(
+            idempotencyKey,
+            'system',
+            'payment',
+            referenceId,
+            'payment_intent.succeeded',
+            processPaymentIntent,
+          );
+        } else {
+          await processPaymentIntent();
+        }
       } catch (opError) {
         logger.error(`Webhook ${event.id} processing failed, Stripe will retry:`, opError);
         return res.status(500).json({ error: 'Processing failure, please retry' });

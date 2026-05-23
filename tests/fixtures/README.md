@@ -26,6 +26,7 @@ import { test, expect } from '../../fixtures/auth.fixture';
 ## Environment variables
 
 - `FRONTEND_URL`, `API_URL`
+- `PRODUCTION_FRONTEND_URL`, `PRODUCTION_API_URL` (for @production smoke)
 - `E2E_CUSTOMER_EMAIL`, `E2E_CUSTOMER_PASSWORD`
 - `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`
 - `E2E_STAFF_EMAIL`, `E2E_STAFF_PASSWORD`

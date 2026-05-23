@@ -2,13 +2,19 @@ import { test, expect } from '../fixtures/auth.fixture';
 
 const FRONTEND_URL =
   process.env.PRODUCTION_FRONTEND_URL ||
-  process.env.FRONTEND_URL ||
-  'https://v2-ecosystem.vercel.app';
+  process.env.FRONTEND_URL;
 
 const API_URL =
   process.env.PRODUCTION_API_URL ||
-  process.env.API_URL ||
-  'https://v2-ecosystem-backend.onrender.com';
+  process.env.API_URL;
+
+if (!FRONTEND_URL) {
+  throw new Error('Missing FRONTEND_URL or PRODUCTION_FRONTEND_URL for production connectivity tests.');
+}
+
+if (!API_URL) {
+  throw new Error('Missing API_URL or PRODUCTION_API_URL for production connectivity tests.');
+}
 
 const CRITICAL_ENDPOINTS = [
   '/api/settings',
