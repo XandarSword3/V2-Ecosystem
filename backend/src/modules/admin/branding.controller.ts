@@ -58,7 +58,7 @@ interface BrandingSettings {
 router.get(
   '/',
   authenticate,
-  authorize(['admin']),
+  authorize('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const { data: settings, error } = await supabase
       .from('system_settings')
@@ -105,7 +105,7 @@ router.get(
 router.put(
   '/',
   authenticate,
-  authorize(['admin']),
+  authorize('admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const branding: BrandingSettings = req.body;
     const userId = req.user?.id;
@@ -155,7 +155,7 @@ router.put(
 router.post(
   '/logo',
   authenticate,
-  authorize(['admin']),
+  authorize('admin'),
   upload.single('logo'),
   asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) {
@@ -197,7 +197,7 @@ router.post(
 router.post(
   '/favicon',
   authenticate,
-  authorize(['admin']),
+  authorize('admin'),
   upload.single('favicon'),
   asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) {

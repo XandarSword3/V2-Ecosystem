@@ -16,7 +16,7 @@ export async function getSettings(req: Request, res: Response) {
         // Build response from database settings
         const result: Record<string, unknown> = {
             theme: 'default',
-            contact: { email: 'info@ironparadisegym.com' }
+            contact: { email: null }
         };
 
         if (settings) {
@@ -75,7 +75,7 @@ export async function getSettings(req: Request, res: Response) {
     } catch (error) {
         res.json({
             theme: 'default',
-            contact: { email: 'info@ironparadisegym.com' }
+            contact: { email: null }
         });
     }
 }

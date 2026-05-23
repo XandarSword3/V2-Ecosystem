@@ -19,6 +19,8 @@ router.get('/:id/receipt', authenticate, paymentController.getPaymentReceipt);
 const staffRoles = ['staff', 'manager', 'admin', 'super_admin'];
 router.post('/record-cash', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.recordCashPayment);
 router.post('/record-manual', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.recordManualPayment);
+// GAP-05: Verify Whish/OMT transfers before marking as completed
+router.patch('/:id/verify', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.verifyManualPayment);
 
 // Admin + manager routes — managers need refund access for daily operations
 const adminRoles = ['admin', 'manager', 'super_admin'];

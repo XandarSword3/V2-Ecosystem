@@ -174,23 +174,54 @@ async function collectUserData(userId: string): Promise<Record<string, any>> {
     .single();
   data.profile = user;
 
-  // Transactions (Unified source for Bookings, Tickets, and Orders)
+  // Transactions (unified source — covers all engine types)
   const { data: transactions } = await client
     .from('transactions')
     .select('*')
-    .eq('user_id', userId);
-  
+    .eq('customer_id', userId);
+
   const txs = transactions || [];
   data.reservations = txs.filter(t => t.engine_type === 'time_exclusive_reservation');
-  data.orders = txs.filter(t => t.engine_type === 'instant_transaction');
-  data.tickets = txs.filter(t => t.engine_type === 'shared_capacity_access');
+  data.orders       = txs.filter(t => t.engine_type === 'instant_transaction');
+  data.tickets      = txs.filter(t => t.engine_type === 'shared_capacity_access');
+  data.memberships  = txs.filter(t => t.engine_type === 'ongoing_entitlement');
 
-  // Payments (sanitized - no full card numbers)
-  const { data: payments } = await client
-    .from('payments')
-    .select('id, amount, currency, status, payment_method, created_at')
+  // Payments — match by reference_id since payments.customer_id does not exist
+  const txIds = txs.map(t => t.id);
+  if (txIds.length > 0) {
+    const { data: payments } = await client
+      .from('payments')
+      .select('id, amount, currency, status, method, processed_at, reference_type, reference_id')
+      .in('reference_id', txIds);
+    data.payments = payments || [];
+  } else {
+    data.payments = [];
+  }
+
+  // Loyalty account and transactions
+  const { data: loyaltyAccount } = await client
+    .from('loyalty_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  data.loyalty_account = loyaltyAccount || null;
+
+  if (loyaltyAccount?.id) {
+    const { data: loyaltyTx } = await client
+      .from('loyalty_transactions')
+      .select('*')
+      .eq('account_id', loyaltyAccount.id);
+    data.loyalty_transactions = loyaltyTx || [];
+  } else {
+    data.loyalty_transactions = [];
+  }
+
+  // Gift card transactions
+  const { data: giftCardTx } = await client
+    .from('gift_card_transactions')
+    .select('*')
     .eq('user_id', userId);
-  data.payments = payments || [];
+  data.gift_card_transactions = giftCardTx || [];
 
   // Consents
   const { data: consents } = await client
@@ -201,7 +232,7 @@ async function collectUserData(userId: string): Promise<Record<string, any>> {
 
   // Support tickets
   const { data: tickets } = await client
-    .from('support_tickets')
+    .from('support_inquiries')
     .select('*')
     .eq('user_id', userId);
   data.support_tickets = tickets || [];

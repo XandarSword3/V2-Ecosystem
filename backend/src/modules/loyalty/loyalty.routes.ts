@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { loyaltyController } from './loyalty.controller';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { validatePropertyAccess } from '../../middleware/propertyAccess.middleware.js';
 import loyaltyImportRoutes from './loyalty-import.routes.js';
 
 const router = Router();
 
-// Public routes (for checkout integration)
-router.post('/calculate', loyaltyController.calculatePoints.bind(loyaltyController));
+// Apply property isolation to all loyalty routes
+router.use(authenticate, validatePropertyAccess);
 
 // Customer routes (requires authentication)
 router.get('/me', authenticate, loyaltyController.getMyAccount.bind(loyaltyController));
