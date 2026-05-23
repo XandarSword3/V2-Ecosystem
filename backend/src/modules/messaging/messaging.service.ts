@@ -1006,6 +1006,48 @@ export class MessagingService {
         return this.sendViaTwilio(channel, conversation, content, options);
       case 'messagebird':
         return this.sendViaMessageBird(channel, conversation, content, options);
+      // MISSING-03 FIX: WhatsApp via Meta Cloud API
+      case 'whatsapp': {
+        const waToken = this.decryptApiKey(channel.api_key_encrypted) || process.env.WHATSAPP_CLOUD_TOKEN;
+        const waPhoneId = channel.from_number || process.env.WHATSAPP_PHONE_NUMBER_ID;
+        const to = conversation.guestIdentifier || options?.to;
+
+        if (!waToken || !waPhoneId) {
+          throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_CLOUD_TOKEN and WHATSAPP_PHONE_NUMBER_ID.');
+        }
+        if (!to) {
+          throw new Error('No destination phone number for WhatsApp message');
+        }
+
+        const resp = await fetch(
+          `https://graph.facebook.com/v19.0/${waPhoneId}/messages`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${waToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              recipient_type: 'individual',
+              to: to.replace(/[^0-9+]/g, ''),
+              type: 'text',
+              text: { preview_url: false, body: content },
+            }),
+          }
+        );
+
+        if (!resp.ok) {
+          const errText = await resp.text().catch(() => '');
+          throw new Error(`WhatsApp Cloud API error ${resp.status}: ${errText}`);
+        }
+
+        const body = await resp.json() as { messages?: Array<{ id: string }> };
+        return {
+          messageId: body.messages?.[0]?.id || uuidv4(),
+          status: 'sent',
+        };
+      }
       default:
         // Internal/mock provider
         return {
@@ -1064,12 +1106,43 @@ export class MessagingService {
     content: string,
     options?: any
   ): Promise<{ messageId: string; status: string }> {
-    // MessageBird integration placeholder
-    console.log(`[MessageBird] Sending to ${conversation.guestId}: ${content}`);
-    
+    // MISSING-02 FIX: Real MessageBird dispatch using REST API
+    const apiKey = this.decryptApiKey(channel.api_key_encrypted) || process.env.MESSAGEBIRD_API_KEY;
+    const fromNumber = channel.from_number || process.env.MESSAGEBIRD_FROM_NUMBER;
+
+    if (!apiKey) {
+      throw new Error('MessageBird API key not configured');
+    }
+
+    const to = conversation.guestIdentifier || options?.to;
+    if (!to) {
+      throw new Error('No destination number found for MessageBird message');
+    }
+
+    const resp = await fetch('https://rest.messagebird.com/messages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `AccessKey ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        originator: fromNumber || 'V2Platform',
+        recipients: [to.replace(/[^0-9+]/g, '')],
+        body: content,
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      throw new Error(`MessageBird API error ${resp.status}: ${errText}`);
+    }
+
+    const body = await resp.json() as { id: string; recipients?: { items?: Array<{ status: string }> } };
+    const status = body.recipients?.items?.[0]?.status || 'sent';
+
     return {
-      messageId: uuidv4(),
-      status: 'sent'
+      messageId: body.id,
+      status: status === 'failed' ? 'failed' : 'sent',
     };
   }
 

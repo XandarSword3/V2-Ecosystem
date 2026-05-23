@@ -189,14 +189,22 @@ jobs:
           # plain-Postgres CI — only Supabase GoTrue sets it via JWT claims).
           psql "$DB_URL" -c "ALTER ROLE postgres BYPASSRLS;" 2>&1 || true
           echo "Applying $( ls supabase/migrations/*.sql | wc -l ) migration files..."
+          FAILED_MIGRATIONS=0
           for f in $(ls supabase/migrations/*.sql | sort); do
             case "$f" in
               *DUPLICATE*) echo "Skipping duplicate: $f"; continue ;;
             esac
             echo "  -> $f"
-            psql "$DB_URL" -f "$f" 2>&1 || echo "  (non-fatal, continuing)"
+            if ! psql "$DB_URL" -f "$f" 2>&1; then
+              echo "::error::Migration FAILED: $f"
+              FAILED_MIGRATIONS=$((FAILED_MIGRATIONS + 1))
+            fi
           done
-          echo "Migrations done."
+          if [ "$FAILED_MIGRATIONS" -gt 0 ]; then
+            echo "::error::$FAILED_MIGRATIONS migration(s) failed — schema may be broken"
+            exit 1
+          fi
+          echo "All migrations applied successfully."
 
       - name: Start PostgREST
         run: |
@@ -542,7 +550,6 @@ jobs:
 
       - name: Deploy frontend to Vercel (staging)
         working-directory: frontend
-        continue-on-error: true
         run: |
           if [ -z "${VERCEL_TOKEN:-}" ]; then
             echo "VERCEL_TOKEN not set in runner environment, skipping Vercel deploy"
@@ -551,11 +558,16 @@ jobs:
           vercel deploy --token="$VERCEL_TOKEN" --confirm
 
       - name: Deploy backend to Render
-        continue-on-error: true
         run: |
           if [ -n "${RENDER_DEPLOY_HOOK:-}" ]; then
-            curl -s -X POST "$RENDER_DEPLOY_HOOK"
-            echo "Render deploy hook triggered"
+            RESPONSE=$(curl -s -o /tmp/render-response.json -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK")
+            echo "Render API response code: $RESPONSE"
+            cat /tmp/render-response.json || true
+            if [[ "$RESPONSE" != 2* ]]; then
+              echo "::error::Render deploy hook returned $RESPONSE — staging deployment may have failed"
+              exit 1
+            fi
+            echo "Render deploy hook triggered successfully"
           else
             echo "No Render deploy hook configured, skipping"
           fi

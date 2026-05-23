@@ -1,133 +1,153 @@
 import { Router } from 'express';
-import { asyncHandler } from '../../middleware/async-handler.js';
 import { Request, Response, NextFunction } from 'express';
-import { getSupabase } from '../../database/connection';
-import { emailService } from '../../services/email.service';
-import { logger } from '../../utils/logger';
+import { asyncHandler } from '../../middleware/async-handler.js';
+import { getSupabase } from '../../database/connection.js';
+import { emailService } from '../../services/email.service.js';
+import { logger } from '../../utils/logger.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
+import { requireRole } from '../../middleware/roleGuard.middleware.js';
 import { z } from 'zod';
+import {
+  listTickets,
+  getTicket,
+  updateTicket,
+  assignTicket,
+  addInternalNote,
+  escalateTicket,
+  getTicketStats,
+} from './support.controller.js';
 
 const router = Router();
 
-// Contact form validation schema
+// -------------------------------------------------------
+// Public — contact form (submit a ticket)
+// -------------------------------------------------------
 const contactFormSchema = z.object({
-  name: z.string().min(2).max(100),
-  email: z.string().email(),
-  phone: z.string().optional(),
-  subject: z.string().min(3).max(200),
-  message: z.string().min(10).max(2000),
+  name:     z.string().min(2).max(100),
+  email:    z.string().email(),
+  phone:    z.string().optional(),
+  subject:  z.string().min(3).max(200),
+  message:  z.string().min(10).max(5000),
+  priority: z.enum(['low','normal','high','urgent']).default('normal'),
+  tags:     z.array(z.string()).optional(),
 });
 
-// Submit contact form
+const SLA_MINUTES: Record<string, number> = { urgent: 60, high: 240, normal: 1440, low: 4320 };
+function computeSla(priority: string) {
+  return new Date(Date.now() + (SLA_MINUTES[priority] ?? 1440) * 60 * 1000).toISOString();
+}
+
 router.post('/contact', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validated = contactFormSchema.parse(req.body);
-    const supabase = getSupabase();
+    const supabase  = getSupabase();
 
-    // Store in database
     const { data: inquiry, error } = await supabase
       .from('support_inquiries')
       .insert({
-        name: validated.name,
-        email: validated.email,
-        phone: validated.phone || null,
-        subject: validated.subject,
-        message: validated.message,
-        status: 'new',
+        name:       validated.name,
+        email:      validated.email,
+        phone:      validated.phone ?? null,
+        subject:    validated.subject,
+        message:    validated.message,
+        priority:   validated.priority,
+        tags:       validated.tags ?? [],
+        status:     'new',
+        sla_due_at: computeSla(validated.priority),
       })
       .select()
       .single();
 
-    if (error) {
-      logger.error('Failed to store support inquiry:', error);
-      throw error;
-    }
+    if (error) { logger.error('Failed to store support inquiry:', error); throw error; }
 
-    // Pull white-label settings once for both emails
-    let adminEmail: string | null = process.env.ADMIN_EMAIL || null;
+    // Pull white-label settings
+    let adminEmail: string | null = process.env.ADMIN_EMAIL ?? null;
     let siteName = 'Our Team';
     try {
       const { data: siteSettings } = await supabase
         .from('site_settings')
-        .select('contact_email, site_name')
-        .single();
-      if (!adminEmail) adminEmail = siteSettings?.contact_email || null;
-      if (siteSettings?.site_name) siteName = siteSettings.site_name;
-    } catch (_) { /* non-fatal */ }
+        .select('key, value');
+      for (const s of siteSettings ?? []) {
+        if (s.key === 'general' && s.value?.siteName) siteName = s.value.siteName;
+        if (s.key === 'contact' && s.value?.email && !adminEmail) adminEmail = s.value.email;
+      }
+    } catch { /* non-fatal */ }
 
-    // Send notification email to admin (only if we have an address)
+    // Notify admin
     try {
       if (adminEmail) {
         await emailService.sendEmail({
-          to: adminEmail,
-          subject: `New Contact Form Submission: ${validated.subject}`,
+          to:      adminEmail,
+          subject: `[${validated.priority.toUpperCase()}] New Support Ticket: ${validated.subject}`,
           html: `
-            <h2>New Contact Form Submission</h2>
+            <h2>New Support Ticket</h2>
             <p><strong>From:</strong> ${validated.name} (${validated.email})</p>
-            <p><strong>Phone:</strong> ${validated.phone || 'Not provided'}</p>
+            <p><strong>Priority:</strong> ${validated.priority}</p>
             <p><strong>Subject:</strong> ${validated.subject}</p>
             <hr>
-            <p><strong>Message:</strong></p>
             <p>${validated.message.replace(/\n/g, '<br>')}</p>
+            <p><small>SLA due: ${computeSla(validated.priority)}</small></p>
           `,
         });
       }
-    } catch (emailError) {
-      logger.warn('Failed to send admin notification email:', emailError);
-    }
+    } catch (e) { logger.warn('Admin notification email failed:', e); }
 
-    // Send confirmation email to user
+    // Confirm to user
     try {
       await emailService.sendEmail({
-        to: validated.email,
-        subject: `Thank you for contacting ${siteName}`,
+        to:      validated.email,
+        subject: `We received your message — ${siteName}`,
         html: `
-          <h2>Thank you for reaching out!</h2>
-          <p>Dear ${validated.name},</p>
-          <p>We have received your message and will get back to you as soon as possible.</p>
-          <p>Here is a copy of your inquiry:</p>
+          <h2>Thank you, ${validated.name}!</h2>
+          <p>Your support request has been received (ticket #${inquiry.id}).</p>
+          <p>We aim to respond within ${SLA_MINUTES[validated.priority] / 60} hour(s).</p>
           <hr>
           <p><strong>Subject:</strong> ${validated.subject}</p>
-          <p><strong>Message:</strong></p>
           <p>${validated.message.replace(/\n/g, '<br>')}</p>
-          <hr>
           <p>Best regards,<br>${siteName}</p>
         `,
       });
-    } catch (emailError) {
-      logger.warn('Failed to send confirmation email:', emailError);
-    }
+    } catch (e) { logger.warn('Confirmation email failed:', e); }
 
     res.status(201).json({
       success: true,
-      data: { id: inquiry.id },
+      data:    { id: inquiry.id },
       message: 'Your message has been received. We will get back to you soon.',
     });
-  } catch (error: unknown) {
-    const err = error as Error & { name?: string; errors?: unknown };
-    if (err.name === 'ZodError') {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid form data',
-        details: err.errors,
-      });
+  } catch (err: unknown) {
+    const e = err as Error & { name?: string; errors?: unknown };
+    if (e.name === 'ZodError') {
+      return res.status(400).json({ success: false, error: 'Invalid form data', details: e.errors });
     }
-    next(error);
+    next(err);
   }
 });
 
-// Get FAQs
+// -------------------------------------------------------
+// Public — FAQs
+// -------------------------------------------------------
 router.get('/faq', asyncHandler(async (req: Request, res: Response) => {
-    const supabase = getSupabase();
-
-    const { data: faqs, error } = await supabase
-      .from('faqs')
-      .select('*')
-      .eq('is_published', true)
-      .order('sort_order', { ascending: true });
-
-    if (error) throw error;
-
-    res.json({ success: true, data: faqs || [] });
+  const supabase = getSupabase();
+  const { data: faqs, error } = await supabase
+    .from('faqs')
+    .select('*')
+    .eq('is_published', true)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  res.json({ success: true, data: faqs ?? [] });
 }));
+
+// -------------------------------------------------------
+// Staff/Admin — ticket management (authenticated)
+// -------------------------------------------------------
+const staffRoles = ['admin', 'super_admin', 'manager', 'staff'];
+
+router.get(   '/tickets',              authenticate, requireRole(staffRoles), asyncHandler(listTickets));
+router.get(   '/tickets/stats',        authenticate, requireRole(staffRoles), asyncHandler(getTicketStats));
+router.get(   '/tickets/:id',          authenticate, requireRole(staffRoles), asyncHandler(getTicket));
+router.patch( '/tickets/:id',          authenticate, requireRole(staffRoles), asyncHandler(updateTicket));
+router.post(  '/tickets/:id/assign',   authenticate, requireRole(staffRoles), asyncHandler(assignTicket));
+router.post(  '/tickets/:id/escalate', authenticate, requireRole(staffRoles), asyncHandler(escalateTicket));
+router.post(  '/tickets/:id/notes',    authenticate, requireRole(staffRoles), asyncHandler(addInternalNote));
 
 export default router;

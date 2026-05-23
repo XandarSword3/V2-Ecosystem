@@ -296,6 +296,8 @@ export interface AuthenticatedUser {
   email: string;
   roles: string[];
   permissions?: string[];
+  tokenVersion?: number;
+  jti?: string;
 }
 
 // Extend Express Request type
