@@ -161,7 +161,7 @@ describe('Admin inventory route coverage', () => {
     expect(screen.getByText('Tomatoes')).toBeInTheDocument();
 
     await user.click(screen.getByTitle('Record Transaction'));
-    await user.type(screen.getByPlaceholderText('Enter quantity'), '5');
+    await user.type(await screen.findByPlaceholderText('Enter quantity'), '5');
     await user.click(screen.getByRole('button', { name: /^Record Transaction$/i }));
 
     await waitFor(() => {
