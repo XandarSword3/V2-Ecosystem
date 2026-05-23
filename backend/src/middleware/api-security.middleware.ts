@@ -26,7 +26,7 @@ const SECURITY_CONFIG = {
   bodyLimit: '10mb',
   parameterLimit: 100,
   trustedProxies: ['127.0.0.1', '::1'],
-  allowedOrigins: (process.env.CORS_ORIGINS || 'http://localhost:3000').split(','),
+  allowedOrigins: (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000').split(',').map(o => o.trim()).filter(Boolean),
 };
 
 /**

@@ -27,8 +27,8 @@ services:
       - key: JWT_REFRESH_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        sync: false
+        value: https://v2-ecosystem.vercel.app
       - key: CORS_ORIGINS
-        sync: false
+        value: https://v2-ecosystem.vercel.app
       - key: API_URL
         sync: false

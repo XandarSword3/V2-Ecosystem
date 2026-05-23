@@ -6,18 +6,34 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
 const isTest = process.env.NODE_ENV === 'test';
 
-const DEFAULT_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3005'];
+const DEV_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3005'];
 
-export function resolveCorsOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
+// Known production frontend origins — always allowed regardless of env var configuration.
+// This prevents a missing/misconfigured CORS_ORIGINS env var from breaking the production
+// browser ↔ API connection. Vercel preview deployments (*.vercel.app) are also accepted.
+const PRODUCTION_CORS_ORIGINS = [
+  'https://v2-ecosystem.vercel.app',
+];
+
+const VERCEL_PREVIEW_PATTERN = /^https:\/\/v2-ecosystem(-[a-z0-9-]+)?\.vercel\.app$/;
+
+export function resolveCorsOrigins(env: NodeJS.ProcessEnv = process.env): (string | RegExp)[] {
   const rawOrigins = env.CORS_ORIGINS || env.CORS_ORIGIN || env.FRONTEND_URL;
-  if (!rawOrigins) return DEFAULT_CORS_ORIGINS;
 
-  const origins = rawOrigins
-    .split(',')
-    .map(origin => origin.trim())
-    .filter(Boolean);
+  const envOrigins: string[] = rawOrigins
+    ? rawOrigins.split(',').map(o => o.trim()).filter(Boolean)
+    : [];
 
-  return origins.length > 0 ? origins : DEFAULT_CORS_ORIGINS;
+  const base = envOrigins.length > 0 ? envOrigins : DEV_CORS_ORIGINS;
+
+  // In production, always merge the known Vercel origins so a missing env var
+  // does not silently break browser-side API access.
+  if (env.NODE_ENV === 'production') {
+    const merged = Array.from(new Set([...base, ...PRODUCTION_CORS_ORIGINS]));
+    return [...merged, VERCEL_PREVIEW_PATTERN];
+  }
+
+  return base;
 }
 
 /**
