@@ -6,8 +6,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticate } from '../../middleware/auth.middleware.js';
-import { roleGuard } from '../../middleware/roleGuard.middleware';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { emailService } from '../../services/email.service.js';
@@ -37,7 +36,7 @@ const emailConfigSchema = z.object({
 router.get(
   '/',
   authenticate,
-  roleGuard(['admin', 'super_admin']),
+  authorize('admin', 'super_admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { data: settings, error: settingsError } = await supabase
@@ -73,7 +72,7 @@ router.get(
 router.put(
   '/',
   authenticate,
-  roleGuard(['admin', 'super_admin']),
+  authorize('admin', 'super_admin'),
   asyncHandler(async (req: Request, res: Response) => {
     const validation = emailConfigSchema.safeParse(req.body);
       
@@ -161,7 +160,7 @@ router.put(
 router.post(
   '/test',
   authenticate,
-  roleGuard(['admin', 'super_admin']),
+  authorize('admin', 'super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { testRecipient, ...config } = req.body;
