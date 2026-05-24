@@ -17,6 +17,7 @@
  *   accommodation_units, unit_price_rules, modules.config, transaction metadata
  */
 
+import { randomBytes } from 'crypto';
 import dayjs from 'dayjs';
 import { getSupabase } from '../../database/connection';
 import { logger } from '../../utils/logger';
@@ -56,6 +57,9 @@ export interface Booking {
   payment_status: PaymentStatus;
   payment_method?: PaymentMethod;
   amount: string;
+  net_amount?: string;
+  tax_amount?: string;
+  discount_amount?: string;
   metadata: {
     unit_id: string;
     customer_name: string;
@@ -177,8 +181,10 @@ export interface AvailabilityResult {
 
 function generateBookingNumber(): string {
   const date = dayjs().format('YYMMDD');
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `BK-${date}-${random}`;
+  // randomBytes(4) gives 4,294,967,296 unique values per calendar day —
+  // safe under concurrent load without a DB sequence.
+  const suffix = randomBytes(4).toString('hex').toUpperCase();
+  return `BK-${date}-${suffix}`;
 }
 
 // =============================================
@@ -412,7 +418,12 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   let enginePricing;
   try {
     enginePricing = await engineService.calculatePricing('multi_day_booking', lineItems, pricingContext);
-  } catch (_) {
+  } catch (err: any) {
+    logger.warn('[booking] Engine pricing failed, falling back to base calculation', {
+      unitId,
+      moduleId,
+      error: err?.message,
+    });
     enginePricing = null;
   }
 
@@ -621,6 +632,22 @@ export async function getTodayBookings(): Promise<TodayBookings> {
 // UPDATE BOOKING
 // =============================================
 
+/**
+ * Fields that callers are allowed to update directly.
+ * `status` and all identity fields are intentionally excluded — status
+ * transitions must go through the engine state machine (cancelBooking,
+ * checkIn, checkOut) so invariants are always enforced.
+ */
+const BOOKING_UPDATE_ALLOWLIST = [
+  'payment_status',
+  'payment_method',
+  'amount',
+  'net_amount',
+  'tax_amount',
+  'discount_amount',
+  'metadata',
+] as const satisfies (keyof Booking)[];
+
 export async function updateBooking(
   bookingId: string,
   updates: Partial<Booking>
@@ -632,10 +659,27 @@ export async function updateBooking(
     throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
   }
 
+  // Build an allowlisted payload so callers cannot bypass the state machine
+  // by passing e.g. { status: 'checked_out' } directly.
+  const safeUpdates: Partial<Record<string, unknown>> = {};
+  for (const field of BOOKING_UPDATE_ALLOWLIST) {
+    if (Object.prototype.hasOwnProperty.call(updates, field)) {
+      safeUpdates[field] = updates[field as keyof typeof updates];
+    }
+  }
+
+  if (Object.keys(safeUpdates).length === 0) {
+    throw new BookingServiceError(
+      'No updateable fields provided — status changes must use the dedicated transition endpoints',
+      'INVALID_UPDATE',
+      400
+    );
+  }
+
   const { data, error } = await supabase
     .from('transactions')
     .update({
-      ...updates,
+      ...safeUpdates,
       updated_at: new Date().toISOString(),
     })
     .eq('id', bookingId)

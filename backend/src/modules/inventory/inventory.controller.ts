@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
+import { logger } from '../../utils/logger.js';
 import { z } from 'zod';
 
 // Validation schemas
@@ -46,30 +47,111 @@ const createCategorySchema = z.object({
 
 export class InventoryController {
   /**
+   * Resolves which module IDs the caller is allowed to read.
+   *
+   * The `validatePropertyAccess` middleware sets `req.propertyId` when the
+   * request carries a valid `x-property-id` header.  Without that header the
+   * middleware is a no-op and this helper returns `null`, meaning "no property
+   * scoping enforced" (single-property / unauthenticated dev mode).
+   *
+   * When a property IS identified:
+   *   - If the caller also supplied a `moduleId` we validate it actually
+   *     belongs to that property and return it as a single-element list.
+   *   - Otherwise we return ALL active module IDs for the property.
+   *
+   * Return value:
+   *   null  → no property restriction; apply caller-supplied moduleId if any
+   *   []    → property known but no accessible modules (caller gets empty result)
+   *   [...]  → restrict queries to these module IDs
+   */
+  private async resolvePropertyScope(
+    propertyId: string | undefined,
+    callerModuleId: string | undefined
+  ): Promise<{ moduleIds: string[] | null; denied?: string }> {
+    if (!propertyId) return { moduleIds: null };
+
+    const supabase = getSupabase();
+
+    if (callerModuleId) {
+      // Validate the caller-supplied moduleId belongs to this property.
+      const { data, error } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('id', callerModuleId)
+        .eq('property_id', propertyId)
+        .maybeSingle();
+      if (error) {
+        logger.error('[inventory] Module property validation failed', { callerModuleId, propertyId, error: error.message });
+        return { moduleIds: null }; // fail open: don't block on a lookup error
+      }
+      if (!data) {
+        return { moduleIds: [], denied: 'Module does not belong to this property' };
+      }
+      return { moduleIds: [callerModuleId] };
+    }
+
+    // No moduleId supplied — scope to all modules in the property.
+    const { data, error } = await supabase
+      .from('modules')
+      .select('id')
+      .eq('property_id', propertyId)
+      .eq('is_active', true);
+    if (error) {
+      logger.error('[inventory] Failed to fetch modules for property', { propertyId, error: error.message });
+      return { moduleIds: null }; // fail open
+    }
+    return { moduleIds: (data || []).map((m: any) => m.id) };
+  }
+
+  /**
    * Get all categories
    */
   async getCategories(req: Request, res: Response) {
     try {
       const { moduleId } = req.query;
+      const propertyId = (req as any).propertyId as string | undefined;
       const supabase = getSupabase();
+
+      // Resolve property-scoped module list before building the query.
+      const { moduleIds, denied } = await this.resolvePropertyScope(
+        propertyId, moduleId as string | undefined
+      );
+      if (denied) {
+        return res.status(403).json({ success: false, error: denied });
+      }
+      // Empty moduleIds means the property has no accessible modules.
+      if (moduleIds !== null && moduleIds.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
 
       // Scope to module when provided
       let catQuery = supabase
         .from('inventory_categories')
         .select('*')
         .order('name', { ascending: true });
-      if (moduleId) catQuery = catQuery.eq('module_id', moduleId as string);
+
+      if (moduleIds !== null) {
+        // Property-scoped: filter to allowed modules
+        catQuery = catQuery.in('module_id', moduleIds);
+      } else if (moduleId) {
+        // No property header but caller supplied moduleId — respect it
+        catQuery = catQuery.eq('module_id', moduleId as string);
+      }
 
       const { data: categories, error } = await catQuery;
 
       if (error) throw error;
 
-      // Get item counts for each category, scoped to same module
+      // Get item counts for each category, scoped to same module/property
       let itemsCountQuery = supabase
         .from('inventory_items')
         .select('category_id, current_stock')
         .eq('is_active', true);
-      if (moduleId) itemsCountQuery = itemsCountQuery.eq('module_id', moduleId as string);
+      if (moduleIds !== null) {
+        itemsCountQuery = itemsCountQuery.in('module_id', moduleIds);
+      } else if (moduleId) {
+        itemsCountQuery = itemsCountQuery.eq('module_id', moduleId as string);
+      }
       const { data: items } = await itemsCountQuery;
 
       const categoryStats = (categories || []).map(cat => {
@@ -257,17 +339,34 @@ export class InventoryController {
         sortBy = 'name',
         sortOrder = 'asc',
       } = req.query;
-      
+
+      const propertyId = (req as any).propertyId as string | undefined;
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
       const supabase = getSupabase();
+
+      // Resolve property-scoped module list before building the query.
+      const { moduleIds, denied } = await this.resolvePropertyScope(
+        propertyId, moduleId as string | undefined
+      );
+      if (denied) {
+        return res.status(403).json({ success: false, error: denied });
+      }
+      if (moduleIds !== null && moduleIds.length === 0) {
+        return res.json({
+          success: true, data: [],
+          pagination: { page: parseInt(page as string), limit: parseInt(limit as string), total: 0, totalPages: 0 },
+        });
+      }
 
       let query = supabase
         .from('inventory_items')
         .select('*', { count: 'exact' })
         .eq('is_active', true);
 
-      // Scope to module when provided
-      if (moduleId) {
+      // Apply module/property scope
+      if (moduleIds !== null) {
+        query = query.in('module_id', moduleIds);
+      } else if (moduleId) {
         query = query.eq('module_id', moduleId as string);
       }
 
@@ -1073,14 +1172,30 @@ export class InventoryController {
   async getStats(req: Request, res: Response) {
     try {
       const { moduleId } = req.query;
+      const propertyId = (req as any).propertyId as string | undefined;
       const supabase = getSupabase();
 
-      // Get all items, scoped to module when provided
+      // Resolve property-scoped module list.
+      const { moduleIds, denied } = await this.resolvePropertyScope(
+        propertyId, moduleId as string | undefined
+      );
+      if (denied) {
+        return res.status(403).json({ success: false, error: denied });
+      }
+      if (moduleIds !== null && moduleIds.length === 0) {
+        return res.json({ success: true, data: { summary: { total_items: 0, out_of_stock: 0, low_stock: 0, overstock: 0, total_value: 0, unresolvedAlerts: 0 }, categoryBreakdown: [], recentActivity: [], expiringItems: [] } });
+      }
+
+      // Get all items, scoped to property/module
       let itemsQuery = supabase
         .from('inventory_items')
         .select('*')
         .eq('is_active', true);
-      if (moduleId) itemsQuery = itemsQuery.eq('module_id', moduleId as string);
+      if (moduleIds !== null) {
+        itemsQuery = itemsQuery.in('module_id', moduleIds);
+      } else if (moduleId) {
+        itemsQuery = itemsQuery.eq('module_id', moduleId as string);
+      }
       const { data: items, error: itemsError } = await itemsQuery;
 
       if (itemsError) throw itemsError;
@@ -1101,9 +1216,13 @@ export class InventoryController {
         ),
       };
 
-      // Get categories, scoped to module when provided
+      // Get categories, scoped to same property/module
       let categoriesQuery = supabase.from('inventory_categories').select('*');
-      if (moduleId) categoriesQuery = categoriesQuery.eq('module_id', moduleId as string);
+      if (moduleIds !== null) {
+        categoriesQuery = categoriesQuery.in('module_id', moduleIds);
+      } else if (moduleId) {
+        categoriesQuery = categoriesQuery.eq('module_id', moduleId as string);
+      }
       const { data: categories } = await categoriesQuery;
 
       const categoryBreakdown = (categories || []).map(cat => {

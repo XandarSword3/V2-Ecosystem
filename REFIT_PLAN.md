@@ -1,5 +1,63 @@
 # V2 Engine Framework Refitting Plan
 
+## STATUS SUMMARY — updated after full audit pass (2026-05-24)
+
+### Prior fixes (unchanged)
+
+| Item | Status |
+|---|---|
+| `booking-modification.service.ts` legacy table refs (row 28) | ✅ DONE — fully rewritten to `transactions` |
+| `seasonal-pricing.service.ts` legacy occupancy query (row 29) | ✅ DONE — uses `accommodation_units` + `transactions` |
+| `payment.controller.ts` `canUseIdempotencyGuard` runtime probe | ✅ DONE — probe removed; `IdempotencyGuard` always used |
+| `bookings.service.ts` — `Math.random()` in `generateBookingNumber` | ✅ FIXED — replaced with `randomBytes(4)` |
+| `bookings.service.ts` — `updateBooking` unconstrained spread | ✅ FIXED — field allowlist enforced; `status` excluded |
+| `bookings.service.ts` — engine pricing failure silently swallowed | ✅ FIXED — `logger.warn` now emitted on catch |
+| `seasonal-pricing.service.ts` — TS2345 (`accommodation_units` type) | ✅ FIXED — type union extended |
+| `inventory.controller.ts` — missing `property_id` scoping | ✅ FIXED — `resolvePropertyScope` helper added |
+
+### Section 1A — Legacy table name references (full audit complete)
+
+| Row(s) | File | Status |
+|--------|------|--------|
+| 1–5 | `metrics-layer.service.ts` | ✅ CLEAN — migrated to `transactions` |
+| 6–8 | `dashboard.service.ts` | ✅ CLEAN — migrated to `transactions` |
+| 9–11 | `business-metrics.service.ts` | ✅ CLEAN — migrated to `transactions` |
+| 12–15 | `admin.controller.ts` | ✅ CLEAN — split into sub-controllers; legacy code removed |
+| 16 | `reports.controller.ts` | ✅ CLEAN |
+| 17 | `user.controller.ts` | ✅ CLEAN — `getMyStatement` queries `transactions` with `engine_type` |
+| 18–19 | `gdpr.controller.ts` | ✅ CLEAN — export and anonymize both use unified `transactions` |
+| 20 | `module-staff.controller.ts` | ✅ CLEAN — all data access via `transactions` |
+| 21 | `staff.controller.ts` | ✅ CLEAN — spend rollup uses `transactions` |
+| 22–23 | `shifts.controller.ts` | ✅ CLEAN — `calculateShiftFinancials` uses `transactions` |
+| 24 | `approvals.controller.ts` | ✅ CLEAN — void/comp act on `transactions`; refund via payment service |
+| 25 | `payment.controller.ts` | ✅ DONE (see prior fixes) |
+| 26 | `loyalty-integration.ts` | ✅ CLEAN — customer resolved from `transactions` via atomic RPC |
+| 27 | `booking-reminders.service.ts` | ✅ CLEAN — queries `transactions` with `engine_type: time_exclusive_reservation` |
+| 28 | `booking-modification.service.ts` | ✅ DONE (see prior fixes) |
+| 29 | `seasonal-pricing.service.ts` | ✅ DONE (see prior fixes) |
+| 30 | `transaction.ts` | ✅ CLEAN — inserts into `transactions` and `transaction_add_ons`; no legacy names |
+| 31 | `expire-pool-tickets.ts` | ✅ CLEAN — queries `transactions` with `engine_type: shared_capacity_access` |
+| 32 | `check_pool_schema.ts` | ✅ DELETED — file no longer exists on disk |
+| 33 | `reporting.service.ts` | ✅ ACCEPTABLE — `config.table \|\| 'bookings'` is generic; all KPI/revenue queries use `transactions` |
+
+### Section 1B — Legacy type strings (full audit complete)
+
+| Row(s) | File | Status |
+|--------|------|--------|
+| 1 | `container/types.ts` | ✅ CLEAN — `ReferenceType` = `'instant_transaction' \| 'time_exclusive_reservation' \| 'shared_capacity_access' \| 'ongoing_entitlement'` |
+| 2 | `payment.service.ts` | ✅ CLEAN — `VALID_REFERENCE_TYPES` uses engine types |
+| 3 | `validation/schemas.ts` | ✅ CLEAN — all `z.enum` schemas use engine type strings |
+| 4 | `stripe-platform.service.ts` | ✅ CLEAN — `referenceType` typed as engine type union |
+| 5 | `payment.v1.routes.ts` | ✅ CLEAN — `z.enum` uses engine types |
+| 6–7 | `business-metrics.service.ts` | ✅ CLEAN — confirmed in prior pass |
+| 8–9 | `dashboard.service.ts` | ✅ CLEAN — confirmed in prior pass |
+| 10–12 | `cockpit/page.tsx` | ⚠️ HARDCODED — `ENGINE_CONFIG` uses correct engine type keys but is a static constant, not derived from `/analytics/engines`. Non-blocking; addressed in Step 9 of migration plan. |
+| 13 | `StripePayment.tsx` | ✅ FIXED — `referenceType` prop updated to engine type union (fixed in this pass) |
+| 14 | `cartStore.ts` | ⚠️ HARDCODED — `type: 'restaurant'`, `moduleId: 'restaurant'` are UI routing strings, not analytics engine types. Low priority; non-blocking. |
+| 15 | `api.ts` | ✅ KEEP — engine-specific UI routes; marked intentional in plan |
+
+---
+
 ## 1. FULL AUDIT
 
 ### 1A. Files that hardcode legacy table names

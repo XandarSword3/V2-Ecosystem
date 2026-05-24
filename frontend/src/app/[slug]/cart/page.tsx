@@ -951,7 +951,7 @@ export default function ModuleCartPage() {
               <StripePayment
                 amount={total}
                 currency="USD"
-                referenceType="restaurant_order"
+                referenceType="instant_transaction"
                 referenceId={pendingOrderId}
                 onSuccess={handleStripePaymentSuccess}
                 onError={handleStripePaymentError}
