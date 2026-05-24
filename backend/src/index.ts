@@ -6,6 +6,7 @@ import { seedSystemModules } from './database/system-modules.seeder.js';
 import { initializeSocketServer, closeSocketServer } from './socket/index.js';
 import { initSentry } from './utils/sentry.js';
 import { SchedulerService } from './services/scheduler.service.js';
+import { registerEngineCleanupJobs } from './jobs/engine-cleanup.job.js';
 import http from 'http';
 import { permissionCache } from './security/permission-cache.service.js';
 
@@ -47,6 +48,7 @@ async function main() {
 
     // Initialize Scheduler
     SchedulerService.init();
+    registerEngineCleanupJobs();
 
     // Graceful shutdown with timeout and proper cleanup
     const shutdown = async (signal: string) => {
