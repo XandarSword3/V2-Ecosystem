@@ -22,10 +22,17 @@ export async function validatePropertyAccess(req: Request, res: Response, next: 
     return next();
   }
 
-  // Validate UUID format
+  // Validate UUID format — if malformed, ignore the header rather than
+  // rejecting the request with 400. The offline PWA service worker and other
+  // automated callers may send stale or placeholder values; blocking them with
+  // a hard error breaks the hydration loop. Treat an invalid value the same
+  // as a missing header (no property scoping applied).
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(propertyId)) {
-    res.status(400).json({ success: false, error: 'Invalid property ID format' });
-    return;
+    logger.warn('x-property-id header present but not a valid UUID — ignoring', {
+      path: req.path,
+      prefix: propertyId.substring(0, 8),
+    });
+    return next();
   }
 
   // Super admins can access any property

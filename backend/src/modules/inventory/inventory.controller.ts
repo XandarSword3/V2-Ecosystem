@@ -50,20 +50,27 @@ export class InventoryController {
    */
   async getCategories(req: Request, res: Response) {
     try {
+      const { moduleId } = req.query;
       const supabase = getSupabase();
-      
-      const { data: categories, error } = await supabase
+
+      // Scope to module when provided
+      let catQuery = supabase
         .from('inventory_categories')
         .select('*')
         .order('name', { ascending: true });
+      if (moduleId) catQuery = catQuery.eq('module_id', moduleId as string);
+
+      const { data: categories, error } = await catQuery;
 
       if (error) throw error;
 
-      // Get item counts for each category
-      const { data: items } = await supabase
+      // Get item counts for each category, scoped to same module
+      let itemsCountQuery = supabase
         .from('inventory_items')
         .select('category_id, current_stock')
         .eq('is_active', true);
+      if (moduleId) itemsCountQuery = itemsCountQuery.eq('module_id', moduleId as string);
+      const { data: items } = await itemsCountQuery;
 
       const categoryStats = (categories || []).map(cat => {
         const catItems = (items || []).filter(i => i.category_id === cat.id);
@@ -238,11 +245,12 @@ export class InventoryController {
    */
   async getItems(req: Request, res: Response) {
     try {
-      const { 
-        page = '1', 
-        limit = '50', 
-        categoryId, 
-        search, 
+      const {
+        page = '1',
+        limit = '50',
+        categoryId,
+        moduleId,
+        search,
         lowStock,
         outOfStock,
         expiringSoon,
@@ -258,12 +266,22 @@ export class InventoryController {
         .select('*', { count: 'exact' })
         .eq('is_active', true);
 
+      // Scope to module when provided
+      if (moduleId) {
+        query = query.eq('module_id', moduleId as string);
+      }
+
       if (categoryId) {
         query = query.eq('category_id', categoryId as string);
       }
 
       if (search) {
-        query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
+        // Strip PostgREST .or() structural characters ( , ) to prevent filter-string
+        // manipulation, then cap length to bound any remaining risk.
+        const sanitizedSearch = (search as string).replace(/[(),]/g, '').slice(0, 100);
+        if (sanitizedSearch.length > 0) {
+          query = query.or(`name.ilike.%${sanitizedSearch}%,sku.ilike.%${sanitizedSearch}%`);
+        }
       }
 
       if (lowStock === 'true') {
@@ -756,70 +774,93 @@ export class InventoryController {
       const { transactions } = validation.data;
       const userId = req.user?.id;
       const supabase = getSupabase();
-      const results: any[] = [];
-      const errors: any[] = [];
+
+      // --- Step 1: One batch SELECT for all unique items (replaces n individual SELECTs) ---
+      const uniqueItemIds = [...new Set(transactions.map(t => t.itemId))];
+      const { data: fetchedItems, error: fetchError } = await supabase
+        .from('inventory_items')
+        .select('*')
+        .in('id', uniqueItemIds);
+
+      if (fetchError) throw fetchError;
+
+      const itemsById = ((fetchedItems || []) as any[]).reduce(
+        (acc, item) => { acc[item.id] = item; return acc; },
+        {} as Record<string, any>,
+      );
+
+      // --- Step 2: Compute new stocks, build transaction insert rows ---
+      // newStockById tracks running stock so multiple txns on the same item are correct.
+      const newStockById: Record<string, number> = {};
+      const results: { itemId: string; newStock: number }[] = [];
+      const errors: { itemId: string; error: string }[] = [];
+      const txInserts: Record<string, any>[] = [];
 
       for (const txn of transactions) {
-        try {
-          // Get current stock
-          const { data: item } = await supabase
-            .from('inventory_items')
-            .select('*')
-            .eq('id', txn.itemId)
-            .single();
-
-          if (!item) {
-            errors.push({ itemId: txn.itemId, error: 'Item not found' });
-            continue;
-          }
-
-          const currentStock = parseFloat(item.current_stock);
-          let newStock = currentStock;
-
-          switch (txn.type) {
-            case 'in':
-            case 'return':
-              newStock = currentStock + txn.quantity;
-              break;
-            case 'out':
-            case 'waste':
-              if (currentStock < txn.quantity) {
-                errors.push({ itemId: txn.itemId, error: `Insufficient stock: ${currentStock}` });
-                continue;
-              }
-              newStock = currentStock - txn.quantity;
-              break;
-            case 'adjustment':
-              newStock = txn.quantity;
-              break;
-          }
-
-          // Record transaction
-          await supabase.from('inventory_transactions').insert({
-            item_id: txn.itemId,
-            transaction_type: txn.type === 'in' ? 'purchase' : txn.type === 'out' ? 'sale' : txn.type,
-            quantity: txn.quantity,
-            stock_before: currentStock,
-            stock_after: newStock,
-            reference_type: txn.referenceType,
-            notes: txn.notes,
-            performed_by: userId,
-          });
-
-          // Update stock
-          await supabase
-            .from('inventory_items')
-            .update({ 
-              current_stock: newStock,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', txn.itemId);
-
-          results.push({ itemId: txn.itemId, newStock });
-        } catch (err: any) {
-          errors.push({ itemId: txn.itemId, error: err.message });
+        const item = itemsById[txn.itemId];
+        if (!item) {
+          errors.push({ itemId: txn.itemId, error: 'Item not found' });
+          continue;
         }
+
+        // Use accumulated stock if this item already appeared earlier in the batch
+        const currentStock = newStockById[txn.itemId] !== undefined
+          ? newStockById[txn.itemId]
+          : parseFloat(item.current_stock);
+
+        let newStock = currentStock;
+
+        switch (txn.type) {
+          case 'in':
+          case 'return':
+            newStock = currentStock + txn.quantity;
+            break;
+          case 'out':
+          case 'waste':
+            if (currentStock < txn.quantity) {
+              errors.push({ itemId: txn.itemId, error: `Insufficient stock: ${currentStock}` });
+              continue;
+            }
+            newStock = currentStock - txn.quantity;
+            break;
+          case 'adjustment':
+            newStock = txn.quantity;
+            break;
+        }
+
+        newStockById[txn.itemId] = newStock;
+
+        txInserts.push({
+          item_id: txn.itemId,
+          transaction_type: txn.type === 'in' ? 'purchase' : txn.type === 'out' ? 'sale' : txn.type,
+          quantity: txn.quantity,
+          stock_before: currentStock,
+          stock_after: newStock,
+          reference_type: txn.referenceType,
+          notes: txn.notes,
+          performed_by: userId,
+        });
+
+        results.push({ itemId: txn.itemId, newStock });
       }
+
+      // --- Step 3: One batch INSERT for all transaction rows (replaces n individual INSERTs) ---
+      if (txInserts.length > 0) {
+        const { error: insertError } = await supabase
+          .from('inventory_transactions')
+          .insert(txInserts);
+        if (insertError) throw insertError;
+      }
+
+      // --- Step 4: Parallel UPDATEs, one per unique item (replaces n sequential UPDATEs) ---
+      await Promise.all(
+        Object.entries(newStockById).map(([itemId, newStock]) =>
+          supabase
+            .from('inventory_items')
+            .update({ current_stock: newStock, updated_at: new Date().toISOString() })
+            .eq('id', itemId),
+        ),
+      );
 
       res.json({
         success: errors.length === 0,
@@ -1031,13 +1072,16 @@ export class InventoryController {
    */
   async getStats(req: Request, res: Response) {
     try {
+      const { moduleId } = req.query;
       const supabase = getSupabase();
 
-      // Get all items
-      const { data: items, error: itemsError } = await supabase
+      // Get all items, scoped to module when provided
+      let itemsQuery = supabase
         .from('inventory_items')
         .select('*')
         .eq('is_active', true);
+      if (moduleId) itemsQuery = itemsQuery.eq('module_id', moduleId as string);
+      const { data: items, error: itemsError } = await itemsQuery;
 
       if (itemsError) throw itemsError;
 
@@ -1057,10 +1101,10 @@ export class InventoryController {
         ),
       };
 
-      // Get categories
-      const { data: categories } = await supabase
-        .from('inventory_categories')
-        .select('*');
+      // Get categories, scoped to module when provided
+      let categoriesQuery = supabase.from('inventory_categories').select('*');
+      if (moduleId) categoriesQuery = categoriesQuery.eq('module_id', moduleId as string);
+      const { data: categories } = await categoriesQuery;
 
       const categoryBreakdown = (categories || []).map(cat => {
         const catItems = allItems.filter(i => i.category_id === cat.id);

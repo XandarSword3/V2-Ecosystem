@@ -1,9 +1,20 @@
 /**
- * Bookings Service
- * 
- * Business logic for chalet bookings using Supabase.
- * Handles booking creation, availability checks, pricing calculations,
- * check-in/check-out, and cancellations.
+ * Time-Exclusive Reservation Service
+ *
+ * Engine: time_exclusive_reservation
+ * Handles reservation creation, availability checks, pricing calculations,
+ * check-in/check-out, and cancellations for any date-range unit
+ * (accommodation, courts, private event spaces, etc.).
+ *
+ * ALL records live in the `transactions` table.
+ * ALL unit-specific data lives in the metadata JSONB field.
+ * Booking creation delegates to reserve_unit_exclusive_atomic for
+ * atomic double-booking prevention via pg_advisory_xact_lock.
+ *
+ * Dead references eliminated:
+ *   chalets, chalet_price_rules, chalet_settings, chalet_booking_add_ons
+ * Replaced with:
+ *   accommodation_units, unit_price_rules, modules.config, transaction metadata
  */
 
 import dayjs from 'dayjs';
@@ -35,47 +46,51 @@ export type BookingStatus = 'pending' | 'confirmed' | 'checked_in' | 'checked_ou
 export type PaymentStatus = 'pending' | 'partial' | 'paid' | 'refunded';
 export type PaymentMethod = 'cash' | 'card' | 'whish' | 'online';
 
+/** A transaction row representing a time_exclusive_reservation booking. */
 export interface Booking {
   id: string;
   booking_number: string;
-  chalet_id: string;
+  module_id: string;
   customer_id?: string;
-  customer_name: string;
-  customer_email?: string;
-  customer_phone?: string;
-  check_in_date: string;
-  check_out_date: string;
-  number_of_guests: number;
-  number_of_nights: number;
-  base_amount: string;
-  add_ons_amount: string;
-  deposit_amount: string;
-  total_amount: string;
   status: BookingStatus;
   payment_status: PaymentStatus;
   payment_method?: PaymentMethod;
-  special_requests?: string;
-  metadata?: Record<string, unknown>;
-  checked_in_at?: string;
-  checked_in_by?: string;
-  checked_out_at?: string;
-  checked_out_by?: string;
-  cancelled_at?: string;
-  cancellation_reason?: string;
+  amount: string;
+  metadata: {
+    unit_id: string;
+    customer_name: string;
+    customer_email?: string;
+    customer_phone?: string;
+    check_in_date: string;
+    check_out_date: string;
+    number_of_guests: number;
+    number_of_nights: number;
+    base_amount: string;
+    add_ons_amount: string;
+    deposit_amount: string;
+    special_requests?: string;
+    add_ons?: UnitAddOnItem[];
+    checked_in_at?: string;
+    checked_in_by?: string;
+    checked_out_at?: string;
+    checked_out_by?: string;
+    cancelled_at?: string;
+    cancellation_reason?: string;
+    [key: string]: unknown;
+  };
   created_at: string;
   updated_at: string;
 }
 
-export interface Chalet {
+/** Accommodation unit from the accommodation_units catalog table. */
+export interface AccommodationUnit {
   id: string;
+  module_id: string;
+  property_id?: string;
   name: string;
   name_ar?: string;
   description?: string;
   capacity: number;
-  bedroom_count: number;
-  bathroom_count: number;
-  amenities: string[];
-  images: string[];
   base_price: string;
   weekend_price: string;
   is_active: boolean;
@@ -83,7 +98,8 @@ export interface Chalet {
   updated_at: string;
 }
 
-export interface ChaletAddOn {
+/** Add-on option from the accommodation_add_ons table. */
+export interface UnitAddOn {
   id: string;
   name: string;
   price: string;
@@ -91,9 +107,10 @@ export interface ChaletAddOn {
   is_active: boolean;
 }
 
-export interface ChaletPriceRule {
+/** Price rule from the unit_price_rules table. */
+export interface UnitPriceRule {
   id: string;
-  chalet_id: string;
+  unit_id: string;
   name: string;
   start_date: string;
   end_date: string;
@@ -102,19 +119,17 @@ export interface ChaletPriceRule {
   is_active: boolean;
 }
 
-export interface ChaletSettings {
-  id: string;
-  deposit_type: 'percentage' | 'fixed';
-  deposit_percentage?: number;
-  deposit_fixed?: number;
-  min_nights: number;
-  max_guests: number;
-  check_in_time: string;
-  check_out_time: string;
+/** Resolved add-on line item computed at pricing time. */
+export interface UnitAddOnItem {
+  add_on_id: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
 }
 
 export interface CreateBookingInput {
-  chaletId: string;
+  unitId: string;
+  moduleId: string;
   customerId?: string;
   customerName: string;
   customerEmail?: string;
@@ -125,10 +140,14 @@ export interface CreateBookingInput {
   addOns?: Array<{ addOnId: string; quantity: number }>;
   specialRequests?: string;
   paymentMethod?: PaymentMethod;
+  couponCode?: string;
+  giftCardCode?: string;
+  loyaltyPointsToRedeem?: number;
 }
 
 export interface BookingFilters {
-  chaletId?: string;
+  unitId?: string;
+  moduleId?: string;
   status?: string;
   startDate?: string;
   endDate?: string;
@@ -140,12 +159,7 @@ export interface PricingResult {
   depositAmount: number;
   totalAmount: number;
   numberOfNights: number;
-  addOnItems: Array<{
-    add_on_id: string;
-    quantity: number;
-    unit_price: number;
-    subtotal: number;
-  }>;
+  addOnItems: UnitAddOnItem[];
 }
 
 export interface TodayBookings {
@@ -164,7 +178,7 @@ export interface AvailabilityResult {
 function generateBookingNumber(): string {
   const date = dayjs().format('YYMMDD');
   const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `C-${date}-${random}`;
+  return `BK-${date}-${random}`;
 }
 
 // =============================================
@@ -172,25 +186,30 @@ function generateBookingNumber(): string {
 // =============================================
 
 /**
- * Calculate booking price including base price, add-ons, and deposit
+ * Calculate reservation price including base price, add-ons, and deposit.
+ *
+ * Unit config  → accommodation_units table
+ * Price rules  → unit_price_rules table
+ * Deposit cfg  → parent module config JSONB
+ * Add-ons      → accommodation_add_ons table (unchanged generic table)
  */
-export async function calculateBookingPrice(
-  chaletId: string,
+export async function calculateReservationPrice(
+  unitId: string,
+  moduleId: string,
   checkInDate: string,
   checkOutDate: string,
   addOns: Array<{ addOnId: string; quantity: number }> = []
 ): Promise<PricingResult> {
   const supabase = getSupabase();
 
-  // Get chalet
-  const { data: chalet, error: chaletError } = await supabase
-    .from('chalets')
+  const { data: unit, error: unitError } = await supabase
+    .from('accommodation_units')
     .select('*')
-    .eq('id', chaletId)
+    .eq('id', unitId)
     .single();
 
-  if (chaletError || !chalet) {
-    throw new BookingServiceError('Chalet not found', 'CHALET_NOT_FOUND', 404);
+  if (unitError || !unit) {
+    throw new BookingServiceError('Unit not found', 'UNIT_NOT_FOUND', 404);
   }
 
   const checkIn = dayjs(checkInDate);
@@ -201,19 +220,17 @@ export async function calculateBookingPrice(
     throw new BookingServiceError('Invalid date range', 'INVALID_DATE_RANGE', 400);
   }
 
-  // Get price rules
   const { data: priceRules } = await supabase
-    .from('chalet_price_rules')
+    .from('unit_price_rules')
     .select('*')
-    .eq('chalet_id', chaletId)
+    .eq('unit_id', unitId)
     .eq('is_active', true);
 
-  // Calculate base amount night-by-night
   let baseAmount = 0;
   let current = checkIn;
 
   while (current.isBefore(checkOut)) {
-    const activeRule = (priceRules || []).find((rule: ChaletPriceRule) => {
+    const activeRule = (priceRules || []).find((rule: UnitPriceRule) => {
       const start = dayjs(rule.start_date).startOf('day');
       const end = dayjs(rule.end_date).endOf('day');
       return (current.isSame(start) || current.isAfter(start)) &&
@@ -226,25 +243,24 @@ export async function calculateBookingPrice(
         nightPrice = parseFloat(activeRule.price);
       } else if (activeRule.price_multiplier) {
         const base = current.day() === 5 || current.day() === 6
-          ? parseFloat(chalet.weekend_price)
-          : parseFloat(chalet.base_price);
+          ? parseFloat(unit.weekend_price)
+          : parseFloat(unit.base_price);
         nightPrice = base * parseFloat(activeRule.price_multiplier);
       } else {
         const isWeekend = current.day() === 5 || current.day() === 6;
-        nightPrice = isWeekend ? parseFloat(chalet.weekend_price) : parseFloat(chalet.base_price);
+        nightPrice = isWeekend ? parseFloat(unit.weekend_price) : parseFloat(unit.base_price);
       }
     } else {
       const isWeekend = current.day() === 5 || current.day() === 6;
-      nightPrice = isWeekend ? parseFloat(chalet.weekend_price) : parseFloat(chalet.base_price);
+      nightPrice = isWeekend ? parseFloat(unit.weekend_price) : parseFloat(unit.base_price);
     }
 
     baseAmount += nightPrice;
     current = current.add(1, 'day');
   }
 
-  // Calculate add-ons amount
   let addOnsAmount = 0;
-  const addOnItems: Array<{ add_on_id: string; quantity: number; unit_price: number; subtotal: number }> = [];
+  const addOnItems: UnitAddOnItem[] = [];
 
   if (addOns.length > 0) {
     const addOnIds = addOns.map(a => a.addOnId);
@@ -254,7 +270,7 @@ export async function calculateBookingPrice(
       .in('id', addOnIds)
       .eq('is_active', true);
 
-    const addOnMap = new Map((addOnsList || []).map((a: ChaletAddOn) => [a.id, a]));
+    const addOnMap = new Map((addOnsList || []).map((a: UnitAddOn) => [a.id, a]));
 
     for (const item of addOns) {
       const addOn = addOnMap.get(item.addOnId);
@@ -273,17 +289,19 @@ export async function calculateBookingPrice(
     }
   }
 
-  // Get deposit settings
-  const { data: settings } = await supabase
-    .from('chalet_settings')
-    .select('*')
+  // Deposit settings come from module config, not a module-specific settings table
+  const { data: moduleRow } = await supabase
+    .from('modules')
+    .select('config')
+    .eq('id', moduleId)
     .single();
 
+  const moduleConfig = moduleRow?.config || {};
   let depositAmount: number;
-  if (settings?.deposit_type === 'fixed') {
-    depositAmount = settings.deposit_fixed || 100;
+  if (moduleConfig.deposit_type === 'fixed') {
+    depositAmount = moduleConfig.deposit_fixed || 100;
   } else {
-    depositAmount = (baseAmount * (settings?.deposit_percentage || 30)) / 100;
+    depositAmount = (baseAmount * (moduleConfig.deposit_percentage || 30)) / 100;
   }
 
   const totalAmount = baseAmount + addOnsAmount;
@@ -303,12 +321,20 @@ export async function calculateBookingPrice(
 // =============================================
 
 /**
- * Create a new booking
+ * Create a new reservation.
+ *
+ * Uses reserve_unit_exclusive_atomic RPC which:
+ *   1. Acquires pg_advisory_xact_lock on (module_id, unit_id)
+ *   2. Counts overlapping active transactions
+ *   3. Inserts atomically if no overlap — no separate checkAvailability call needed
+ *
+ * Add-ons are stored inside transaction metadata; no separate add-ons table.
  */
 export async function createBooking(input: CreateBookingInput): Promise<Booking> {
   const supabase = getSupabase();
   const {
-    chaletId,
+    unitId,
+    moduleId,
     customerId,
     customerName,
     customerEmail,
@@ -319,21 +345,23 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
     addOns = [],
     specialRequests,
     paymentMethod,
+    couponCode,
+    giftCardCode,
+    loyaltyPointsToRedeem,
   } = input;
 
-  // Get chalet
-  const { data: chalet, error: chaletError } = await supabase
-    .from('chalets')
+  const { data: unit, error: unitError } = await supabase
+    .from('accommodation_units')
     .select('*')
-    .eq('id', chaletId)
+    .eq('id', unitId)
     .single();
 
-  if (chaletError || !chalet) {
-    throw new BookingServiceError('Chalet not found', 'CHALET_NOT_FOUND', 404);
+  if (unitError || !unit) {
+    throw new BookingServiceError('Unit not found', 'UNIT_NOT_FOUND', 404);
   }
 
-  if (!chalet.is_active) {
-    throw new BookingServiceError('Chalet is not available', 'CHALET_UNAVAILABLE', 400);
+  if (!unit.is_active) {
+    throw new BookingServiceError('Unit is not available for booking', 'UNIT_UNAVAILABLE', 400);
   }
 
   const checkIn = dayjs(checkInDate);
@@ -344,35 +372,22 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
     throw new BookingServiceError('Invalid date range', 'INVALID_DATE_RANGE', 400);
   }
 
-  // Check capacity
-  if (numberOfGuests > chalet.capacity) {
+  if (numberOfGuests > unit.capacity) {
     throw new BookingServiceError(
-      `Chalet capacity is ${chalet.capacity} guests`,
+      `Unit capacity is ${unit.capacity} guests`,
       'CAPACITY_EXCEEDED',
       400
     );
   }
 
-  // Check availability
-  const isAvailable = await checkAvailability(chaletId, checkInDate, checkOutDate);
-  if (!isAvailable) {
-    throw new BookingServiceError(
-      'Chalet is already booked for the selected dates',
-      'NOT_AVAILABLE',
-      400
-    );
-  }
+  const pricing = await calculateReservationPrice(unitId, moduleId, checkInDate, checkOutDate, addOns);
 
-  // Calculate pricing
-  const pricing = await calculateBookingPrice(chaletId, checkInDate, checkOutDate, addOns);
-
-  // Create transaction using engine pricing pipeline
   const engineService = getEngineService();
   const lineItems: PricingLineItem[] = [{
-    itemId: chaletId,
-    name: chalet.name || 'Accommodation Unit',
+    itemId: unitId,
+    name: unit.name || 'Accommodation Unit',
     quantity: numberOfNights,
-    unitPrice: parseFloat(chalet.base_price),
+    unitPrice: parseFloat(unit.base_price),
   }];
 
   for (const item of pricing.addOnItems) {
@@ -385,12 +400,12 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   }
 
   const pricingContext = {
-    propertyId: chalet.property_id,
+    propertyId: unit.property_id,
     customerId: customerId || undefined,
-    moduleId: chalet.module_id,
-    couponCode: undefined,
-    giftCardCode: undefined,
-    loyaltyPointsToRedeem: undefined,
+    moduleId,
+    couponCode,
+    giftCardCode,
+    loyaltyPointsToRedeem,
     staffId: undefined as string | undefined,
   };
 
@@ -398,75 +413,82 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   try {
     enginePricing = await engineService.calculatePricing('multi_day_booking', lineItems, pricingContext);
   } catch (_) {
-    // Fallback to manual calculation if engine fails
     enginePricing = null;
   }
 
   const finalTotal = enginePricing ? enginePricing.totalAmount : pricing.totalAmount;
   const finalDiscount = enginePricing ? enginePricing.totalDiscount : 0;
   const finalTax = enginePricing ? enginePricing.taxAmount : 0;
-  const finalServiceCharge = enginePricing ? enginePricing.serviceCharge : 0;
 
-  // Create transaction
-  const { data: booking, error: bookingError } = await supabase
-    .from('transactions')
-    .insert({
-      booking_number: generateBookingNumber(),
-      module_id: chalet.module_id, // Ensure module_id is passed
-      engine_type: 'time_exclusive_reservation',
-      property_id: chalet.property_id,
-      customer_id: customerId,
-      amount: finalTotal,
-      tax_amount: finalTax,
-      service_charge: finalServiceCharge,
-      discount_amount: finalDiscount,
-      net_amount: finalTotal,
-      currency: 'USD',
-      status: 'pending',
-      payment_status: 'pending',
-      payment_method: paymentMethod,
-      staff_id: null,
-      metadata: {
-        chalet_id: chaletId,
-        customer_name: customerName,
-        customer_email: customerEmail,
-        customer_phone: customerPhone,
-        check_in_date: checkIn.toISOString(),
-        check_out_date: checkOut.toISOString(),
-        number_of_guests: numberOfGuests,
-        number_of_nights: pricing.numberOfNights,
-        base_amount: pricing.baseAmount.toFixed(2),
-        add_ons_amount: pricing.addOnsAmount.toFixed(2),
-        deposit_amount: pricing.depositAmount.toFixed(2),
-        special_requests: specialRequests,
-        add_ons: pricing.addOnItems
-      }
-    })
-    .select()
-    .single();
+  // All booking data, including add-ons, lives in metadata — no separate add-ons table
+  const bookingMetadata = {
+    unit_id: unitId,
+    customer_name: customerName,
+    customer_email: customerEmail,
+    customer_phone: customerPhone,
+    check_in_date: checkIn.toISOString(),
+    check_out_date: checkOut.toISOString(),
+    number_of_guests: numberOfGuests,
+    number_of_nights: pricing.numberOfNights,
+    base_amount: pricing.baseAmount.toFixed(2),
+    add_ons_amount: pricing.addOnsAmount.toFixed(2),
+    deposit_amount: pricing.depositAmount.toFixed(2),
+    special_requests: specialRequests,
+    add_ons: pricing.addOnItems,
+    payment_method: paymentMethod,
+  };
 
-  if (bookingError || !booking) {
-    logger.error('Failed to create booking', { error: bookingError });
+  // Atomic overlap check + insert. pg_advisory_xact_lock prevents races.
+  const { data: rpcResult, error: rpcError } = await supabase.rpc(
+    'reserve_unit_exclusive_atomic',
+    {
+      p_unit_id: unitId,
+      p_module_id: moduleId,
+      p_check_in_date: checkIn.format('YYYY-MM-DD'),
+      p_check_out_date: checkOut.format('YYYY-MM-DD'),
+      p_customer_id: customerId || null,
+      p_amount: finalTotal,
+      p_metadata: bookingMetadata,
+    }
+  );
+
+  if (rpcError) {
+    logger.error('reserve_unit_exclusive_atomic RPC error', { error: rpcError });
     throw new BookingServiceError('Failed to create booking', 'CREATE_FAILED', 500);
   }
 
-  // Create booking add-ons
-  if (pricing.addOnItems.length > 0) {
-    await supabase.from('chalet_booking_add_ons').insert(
-      pricing.addOnItems.map(item => ({
-        booking_id: booking.id,
-        add_on_id: item.add_on_id,
-        quantity: item.quantity,
-        unit_price: item.unit_price.toFixed(2),
-        subtotal: item.subtotal.toFixed(2),
-      }))
-    );
+  const result = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
+
+  if (!result?.success) {
+    const msg = result?.error_message || 'Unit is not available for the selected dates';
+    throw new BookingServiceError(msg, 'NOT_AVAILABLE', 409);
   }
 
-  logger.info('Booking created', {
-    bookingId: booking.id,
-    bookingNumber: booking.booking_number,
-  });
+  const { data: booking, error: fetchError } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', result.transaction_id)
+    .single();
+
+  if (fetchError || !booking) {
+    logger.error('Failed to fetch created booking', { transactionId: result.transaction_id });
+    throw new BookingServiceError('Failed to retrieve created booking', 'CREATE_FAILED', 500);
+  }
+
+  // Patch discount/tax if engine pricing ran (RPC only writes amount)
+  if (enginePricing && (finalDiscount > 0 || finalTax > 0)) {
+    await supabase
+      .from('transactions')
+      .update({
+        discount_amount: finalDiscount,
+        tax_amount: finalTax,
+        net_amount: finalTotal,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', booking.id);
+  }
+
+  logger.info('Booking created', { bookingId: booking.id });
 
   return booking as Booking;
 }
@@ -475,9 +497,6 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
 // GET BOOKINGS
 // =============================================
 
-/**
- * Get booking by ID
- */
 export async function getBookingById(id: string): Promise<Booking | null> {
   const supabase = getSupabase();
 
@@ -496,9 +515,6 @@ export async function getBookingById(id: string): Promise<Booking | null> {
   return data as Booking | null;
 }
 
-/**
- * Get booking by booking number
- */
 export async function getBookingByNumber(bookingNumber: string): Promise<Booking | null> {
   const supabase = getSupabase();
 
@@ -517,9 +533,6 @@ export async function getBookingByNumber(bookingNumber: string): Promise<Booking
   return data as Booking | null;
 }
 
-/**
- * Get bookings with optional filters
- */
 export async function getBookings(filters: BookingFilters): Promise<Booking[]> {
   const supabase = getSupabase();
 
@@ -529,8 +542,12 @@ export async function getBookings(filters: BookingFilters): Promise<Booking[]> {
     .eq('engine_type', 'time_exclusive_reservation')
     .order('created_at', { ascending: false });
 
-  if (filters.chaletId) {
-    query = query.filter('metadata->>chalet_id', 'eq', filters.chaletId);
+  if (filters.unitId) {
+    query = query.filter('metadata->>unit_id', 'eq', filters.unitId);
+  }
+
+  if (filters.moduleId) {
+    query = query.eq('module_id', filters.moduleId);
   }
 
   if (filters.status) {
@@ -555,9 +572,6 @@ export async function getBookings(filters: BookingFilters): Promise<Booking[]> {
   return (data || []) as Booking[];
 }
 
-/**
- * Get bookings for a specific customer
- */
 export async function getBookingsByCustomer(customerId: string): Promise<Booking[]> {
   const supabase = getSupabase();
 
@@ -576,9 +590,6 @@ export async function getBookingsByCustomer(customerId: string): Promise<Booking
   return (data || []) as Booking[];
 }
 
-/**
- * Get today's check-ins and check-outs
- */
 export async function getTodayBookings(): Promise<TodayBookings> {
   const supabase = getSupabase();
   const today = dayjs().format('YYYY-MM-DD');
@@ -610,16 +621,12 @@ export async function getTodayBookings(): Promise<TodayBookings> {
 // UPDATE BOOKING
 // =============================================
 
-/**
- * Update booking details
- */
 export async function updateBooking(
   bookingId: string,
   updates: Partial<Booking>
 ): Promise<Booking> {
   const supabase = getSupabase();
 
-  // Check if booking exists
   const existing = await getBookingById(bookingId);
   if (!existing) {
     throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
@@ -640,7 +647,7 @@ export async function updateBooking(
     throw new BookingServiceError('Failed to update booking', 'UPDATE_FAILED', 500);
   }
 
-  logger.info('Booking updated', { bookingId, updates });
+  logger.info('Booking updated', { bookingId });
 
   return data as Booking;
 }
@@ -649,9 +656,6 @@ export async function updateBooking(
 // CANCEL BOOKING
 // =============================================
 
-/**
- * Cancel a booking
- */
 export async function cancelBooking(
   bookingId: string,
   reason: string,
@@ -664,9 +668,8 @@ export async function cancelBooking(
     throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
   }
 
-  // === ENGINE-POWERED STATE TRANSITION (Engine B: time_exclusive_reservation) ===
   const engineService = getEngineService();
-  const actor = userId ? 'staff' : 'customer'; // Could be refined with actual role lookup
+  const actor = userId ? 'staff' : 'customer';
   const transitionResult = await engineService.transitionState(
     'multi_day_booking',
     booking.status,
@@ -689,7 +692,7 @@ export async function cancelBooking(
       metadata: {
         ...(booking.metadata as Record<string, any> || {}),
         cancelled_at: new Date().toISOString(),
-        cancellation_reason: reason
+        cancellation_reason: reason,
       },
       updated_at: new Date().toISOString(),
     })
@@ -711,9 +714,6 @@ export async function cancelBooking(
 // CHECK-IN / CHECK-OUT
 // =============================================
 
-/**
- * Check in a booking
- */
 export async function checkIn(bookingId: string, staffId: string): Promise<Booking> {
   const supabase = getSupabase();
 
@@ -722,7 +722,6 @@ export async function checkIn(bookingId: string, staffId: string): Promise<Booki
     throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
   }
 
-  // === ENGINE-POWERED STATE TRANSITION (Engine B: time_exclusive_reservation) ===
   const engineService = getEngineService();
   const transitionResult = await engineService.transitionState(
     'multi_day_booking',
@@ -746,7 +745,7 @@ export async function checkIn(bookingId: string, staffId: string): Promise<Booki
       metadata: {
         ...(booking.metadata as Record<string, any> || {}),
         checked_in_at: new Date().toISOString(),
-        checked_in_by: staffId
+        checked_in_by: staffId,
       },
       updated_at: new Date().toISOString(),
     })
@@ -764,9 +763,6 @@ export async function checkIn(bookingId: string, staffId: string): Promise<Booki
   return data as Booking;
 }
 
-/**
- * Check out a booking
- */
 export async function checkOut(bookingId: string, staffId: string): Promise<Booking> {
   const supabase = getSupabase();
 
@@ -775,7 +771,6 @@ export async function checkOut(bookingId: string, staffId: string): Promise<Book
     throw new BookingServiceError('Booking not found', 'BOOKING_NOT_FOUND', 404);
   }
 
-  // === ENGINE-POWERED STATE TRANSITION (Engine B: time_exclusive_reservation) ===
   const engineService = getEngineService();
   const transitionResult = await engineService.transitionState(
     'multi_day_booking',
@@ -799,7 +794,7 @@ export async function checkOut(bookingId: string, staffId: string): Promise<Book
       metadata: {
         ...(booking.metadata as Record<string, any> || {}),
         checked_out_at: new Date().toISOString(),
-        checked_out_by: staffId
+        checked_out_by: staffId,
       },
       updated_at: new Date().toISOString(),
     })
@@ -822,44 +817,49 @@ export async function checkOut(bookingId: string, staffId: string): Promise<Book
 // =============================================
 
 /**
- * Check if dates are available for a chalet
+ * Check if a unit is available for the given date range.
+ *
+ * Overlap condition (half-open intervals):
+ *   existing [bIn, bOut) conflicts with requested [checkIn, checkOut) when:
+ *   bIn < checkOut AND bOut > checkIn
+ *
+ * Both filters are pushed to the DB — no rows are fetched into memory.
+ * Note: createBooking uses reserve_unit_exclusive_atomic which re-checks
+ * atomically under an advisory lock; this function is for pre-flight UI checks.
  */
 export async function checkAvailability(
-  chaletId: string,
+  unitId: string,
+  moduleId: string,
   checkInDate: string,
   checkOutDate: string
 ): Promise<boolean> {
   const supabase = getSupabase();
 
-  const { data: bookings, error } = await supabase
+  const { count, error } = await supabase
     .from('transactions')
-    .select('id, metadata, status')
+    .select('id', { count: 'exact', head: true })
     .eq('engine_type', 'time_exclusive_reservation')
-    .filter('metadata->>chalet_id', 'eq', chaletId)
-    .not('status', 'in', '("cancelled","no_show")');
+    .eq('module_id', moduleId)
+    .filter('metadata->>unit_id', 'eq', unitId)
+    .not('status', 'in', '("cancelled","no_show")')
+    .filter('metadata->>check_in_date', 'lt', checkOutDate)
+    .filter('metadata->>check_out_date', 'gt', checkInDate);
 
   if (error) {
-    logger.error('Failed to check availability', { chaletId, error });
+    logger.error('Failed to check availability', { unitId, error });
     throw new BookingServiceError('Failed to check availability', 'AVAILABILITY_FAILED', 500);
   }
 
-  const checkIn = dayjs(checkInDate);
-  const checkOut = dayjs(checkOutDate);
-
-  const hasOverlap = (bookings || []).some((booking: any) => {
-    const bIn = dayjs(booking.metadata?.check_in_date);
-    const bOut = dayjs(booking.metadata?.check_out_date);
-    return checkIn.isBefore(bOut) && checkOut.isAfter(bIn);
-  });
-
-  return !hasOverlap;
+  return (count ?? 0) === 0;
 }
 
 /**
- * Get availability (blocked dates) for a chalet in a date range
+ * Get blocked dates for a unit within a calendar window.
+ * DB-filtered to the requested range — does not load historical records.
  */
 export async function getAvailability(
-  chaletId: string,
+  unitId: string,
+  moduleId: string,
   startDate: string,
   endDate: string
 ): Promise<AvailabilityResult> {
@@ -867,23 +867,22 @@ export async function getAvailability(
 
   const { data: bookings, error } = await supabase
     .from('transactions')
-    .select('metadata, status')
+    .select('metadata')
     .eq('engine_type', 'time_exclusive_reservation')
-    .filter('metadata->>chalet_id', 'eq', chaletId)
+    .eq('module_id', moduleId)
+    .filter('metadata->>unit_id', 'eq', unitId)
     .filter('metadata->>check_out_date', 'gte', startDate)
     .filter('metadata->>check_in_date', 'lte', endDate)
     .not('status', 'in', '("cancelled","no_show")');
 
   if (error) {
-    logger.error('Failed to get availability', { chaletId, error });
+    logger.error('Failed to get availability', { unitId, error });
     throw new BookingServiceError('Failed to get availability', 'AVAILABILITY_FAILED', 500);
   }
 
   const blockedDates: string[] = [];
 
   for (const booking of bookings || []) {
-    if (['cancelled', 'no_show'].includes(booking.status)) continue;
-
     let current = dayjs(booking.metadata?.check_in_date);
     const checkout = dayjs(booking.metadata?.check_out_date);
 

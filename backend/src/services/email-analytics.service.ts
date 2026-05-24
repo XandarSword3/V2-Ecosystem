@@ -4,6 +4,7 @@
  */
 
 import { supabase } from "../lib/supabase.js";
+import { logger } from '../utils/logger.js';
 
 export interface EmailMetrics {
   sent: number;
@@ -497,7 +498,11 @@ class EmailAnalyticsService {
    * Generate pixel tracking URL
    */
   generateTrackingPixel(messageId: string): string {
-    const baseUrl = process.env.BACKEND_URL || 'https://api.ironparadisegym.com';
+    const baseUrl = process.env.BACKEND_URL;
+    if (!baseUrl) {
+      logger.warn('[EmailAnalytics] BACKEND_URL is not set — tracking pixel URL will be empty');
+      return '';
+    }
     return `${baseUrl}/email/track/open/${messageId}`;
   }
 
@@ -505,7 +510,11 @@ class EmailAnalyticsService {
    * Generate click tracking URL
    */
   generateClickTrackingUrl(messageId: string, originalUrl: string): string {
-    const baseUrl = process.env.BACKEND_URL || 'https://api.ironparadisegym.com';
+    const baseUrl = process.env.BACKEND_URL;
+    if (!baseUrl) {
+      logger.warn('[EmailAnalytics] BACKEND_URL is not set — click tracking URL will be empty');
+      return originalUrl;
+    }
     const encoded = encodeURIComponent(originalUrl);
     return `${baseUrl}/email/track/click/${messageId}?url=${encoded}`;
   }

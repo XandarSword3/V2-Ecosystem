@@ -163,7 +163,7 @@ export default function Footer() {
     };
 
     return (
-        <footer className="relative bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 dark:from-slate-950 dark:via-slate-950 dark:to-black text-white py-20 overflow-hidden">
+        <footer className="relative bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-white py-20 overflow-hidden">
             {/* Background glass effects */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl" />
@@ -192,12 +192,12 @@ export default function Footer() {
                                     </span>
                                 </motion.div>
                             )}
-                            <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+                            <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                                 {footerConfig.logo.text}
                             </span>
                         </div>
 
-                        <p className="text-slate-400/90 leading-relaxed max-w-xs">
+                        <p className="text-slate-600/90 dark:text-slate-400/90 leading-relaxed max-w-xs">
                             {footerConfig.description}
                         </p>
 
@@ -211,7 +211,7 @@ export default function Footer() {
                                         rel="noopener noreferrer"
                                         whileHover={{ scale: 1.1, y: -3 }}
                                         whileTap={{ scale: 0.9 }}
-                                        className="p-2.5 bg-white/5 hover:bg-primary-500/20 backdrop-blur-lg border border-white/10 hover:border-primary-500/30 rounded-xl transition-all duration-300 text-slate-400 hover:text-primary-400"
+                                        className="p-2.5 bg-slate-900/5 dark:bg-white/5 hover:bg-primary-500/20 backdrop-blur-lg border border-slate-900/10 dark:border-white/10 hover:border-primary-500/30 rounded-xl transition-all duration-300 text-slate-500 dark:text-slate-400 hover:text-primary-400"
                                     >
                                         {getSocialIcon(social.platform)}
                                     </motion.a>
@@ -229,7 +229,7 @@ export default function Footer() {
                             viewport={{ once: true }}
                             transition={{ delay: 0.1 * (idx + 1) }}
                         >
-                            <h4 className="text-sm font-semibold uppercase tracking-wider text-white/80 mb-6 font-primary">
+                            <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-700/80 dark:text-white/80 mb-6 font-primary">
                                 {column.title}
                             </h4>
                             <ul className="space-y-4">
@@ -237,7 +237,7 @@ export default function Footer() {
                                     <li key={link.label}>
                                         <Link
                                             href={link.href}
-                                            className="text-slate-400/90 hover:text-white transition-all duration-300 flex items-center group"
+                                            className="text-slate-600/90 dark:text-slate-400/90 hover:text-slate-900 dark:hover:text-white transition-all duration-300 flex items-center group"
                                         >
                                             <span className="relative">
                                                 {link.label}
@@ -258,11 +258,11 @@ export default function Footer() {
                         viewport={{ once: true }}
                         transition={{ delay: 0.3 }}
                     >
-                        <h4 className="text-sm font-semibold uppercase tracking-wider text-white/80 mb-6">
+                        <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-700/80 dark:text-white/80 mb-6">
                             {tFooter('contact')}
                         </h4>
                         <address className="not-italic">
-                            <ul className="space-y-4 text-slate-400/90">
+                            <ul className="space-y-4 text-slate-600/90 dark:text-slate-400/90">
                                 {footerConfig.contact?.showAddress && (
                                     <li className="flex items-start gap-3 group">
                                         <div className="p-2 bg-primary-500/10 rounded-lg group-hover:bg-primary-500/20 transition-colors duration-300">
@@ -277,7 +277,7 @@ export default function Footer() {
                                             <Phone className="w-4 h-4 text-primary-400" aria-hidden="true" />
                                         </div>
                                         {/* FIX Iter-4: Use same fallback for href as display text */}
-                                        <a href={`tel:${settings.phone || tFooter('phone')}`} className="text-sm hover:text-white transition-colors">
+                                        <a href={`tel:${settings.phone || tFooter('phone')}`} className="text-sm hover:text-slate-900 dark:hover:text-white transition-colors">
                                             {settings.phone || tFooter('phone')}
                                         </a>
                                     </li>
@@ -288,7 +288,7 @@ export default function Footer() {
                                             <Mail className="w-4 h-4 text-primary-400" aria-hidden="true" />
                                         </div>
                                         {/* FIX Iter-4: Use same fallback for href as display text */}
-                                        <a href={`mailto:${settings.email || tFooter('email')}`} className="text-sm hover:text-white transition-colors">
+                                        <a href={`mailto:${settings.email || tFooter('email')}`} className="text-sm hover:text-slate-900 dark:hover:text-white transition-colors">
                                             {settings.email || tFooter('email')}
                                         </a>
                                     </li>
@@ -299,13 +299,13 @@ export default function Footer() {
                 </div>
 
                 {/* Bottom Bar with glass effect */}
-                <div className="mt-12 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <p className="text-sm text-slate-500">
+                <div className="mt-12 pt-8 border-t border-slate-200 dark:border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <p className="text-sm text-slate-500 dark:text-slate-500">
                         {footerConfig.copyright.replace('{year}', new Date().getFullYear().toString())}
                     </p>
                     <div className="flex items-center gap-4">
-                        <div className="px-4 py-1.5 bg-white/5 backdrop-blur-lg border border-white/10 rounded-full">
-                            <span className="text-xs text-slate-400 uppercase tracking-widest font-medium">
+                        <div className="px-4 py-1.5 bg-slate-900/5 dark:bg-white/5 backdrop-blur-lg border border-slate-200 dark:border-white/10 rounded-full">
+                            <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-medium">
                                 V2 Ecosystem v2.0
                             </span>
                         </div>
