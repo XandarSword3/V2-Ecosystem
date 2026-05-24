@@ -12,7 +12,7 @@ export interface SeasonalPricingRule {
   startDate: string; // MM-DD format
   endDate: string; // MM-DD format
   priceMultiplier: number; // e.g., 1.5 for 50% increase
-  applicableTo: ('chalets' | 'pool' | 'restaurant')[];
+  applicableTo: ('chalets' | 'pool' | 'restaurant' | 'accommodation_units')[];
   specificItems?: string[]; // Optional specific item IDs
   priority: number; // Higher priority rules override lower ones
   isActive: boolean;
@@ -60,7 +60,7 @@ class SeasonalPricingService {
       throw new Error('Failed to fetch seasonal pricing rules');
     }
 
-    return data.map(rule => ({
+    return data.map((rule: any) => ({
       id: rule.id,
       name: rule.name,
       startDate: rule.start_date,
@@ -196,7 +196,7 @@ class SeasonalPricingService {
 
   // Calculate price for a given item and date range
   async calculatePrice(
-    itemType: 'chalets' | 'pool' | 'restaurant',
+    itemType: 'chalets' | 'pool' | 'restaurant' | 'accommodation_units',
     itemId: string,
     basePrice: number,
     checkInDate: Date,
@@ -257,7 +257,7 @@ class SeasonalPricingService {
 
     // Apply dynamic pricing
     const dynamicConfig = await this.getDynamicPricingConfig();
-    if (dynamicConfig.enabled && itemType === 'chalets') {
+    if (dynamicConfig.enabled && (itemType === 'chalets' || itemType === 'accommodation_units')) {
       const daysUntilBooking = Math.ceil(
         (checkInDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );
@@ -356,13 +356,13 @@ class SeasonalPricingService {
 
   // Get current occupancy for a given date
   private async getCurrentOccupancy(
-    itemType: 'chalets' | 'pool' | 'restaurant',
+    itemType: 'chalets' | 'pool' | 'restaurant' | 'accommodation_units',
     date: Date
   ): Promise<number | null> {
     const dateString = date.toISOString().split('T')[0];
 
-    if (itemType === 'chalets') {
-      // Count booked chalets vs total
+    if (itemType === 'chalets' || itemType === 'accommodation_units') {
+      // Count booked accommodation units vs total
       const { count: totalChalets } = await supabase
         .from('accommodation_units')
         .select('*', { count: 'exact', head: true })
@@ -418,7 +418,7 @@ class SeasonalPricingService {
 
   // Get price preview for a date range (useful for calendar display)
   async getPricingCalendar(
-    itemType: 'chalets' | 'pool' | 'restaurant',
+    itemType: 'chalets' | 'pool' | 'restaurant' | 'accommodation_units',
     itemId: string,
     basePrice: number,
     startDate: Date,

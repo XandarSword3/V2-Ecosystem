@@ -8,7 +8,7 @@ export type PaymentMethodType = 'cash' | 'card' | 'online';
 interface PaymentMethodSelectorProps {
   amount: number;
   currency?: string;
-  referenceType: 'restaurant_order' | 'snack_order' | 'chalet_booking' | 'pool_ticket';
+  referenceType: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
   referenceId: string;
   onPaymentComplete: (method: PaymentMethodType) => void;
   onCancel?: () => void;

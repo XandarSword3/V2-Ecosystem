@@ -126,7 +126,7 @@ function PaymentForm({ clientSecret, onSuccess, onError, onCancel, amount, curre
 interface StripePaymentProps {
   amount: number;
   currency?: string;
-  referenceType: 'restaurant_order' | 'snack_order' | 'chalet_booking' | 'pool_ticket';
+  referenceType: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
   referenceId: string;
   onSuccess: () => void;
   onError: (error: string) => void;
