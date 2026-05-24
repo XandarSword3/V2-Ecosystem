@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -42,7 +43,6 @@ function strengthScore(pw: string): number {
   return score; // 0-5
 }
 
-const STRENGTH_LABELS = ['', 'Very weak', 'Weak', 'Fair', 'Strong', 'Very strong'];
 const STRENGTH_COLORS = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a'];
 
 // ---------------------------------------------------------------------------
@@ -51,6 +51,12 @@ const STRENGTH_COLORS = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34
 
 export default function InstallPage() {
   const router = useRouter();
+  const t = useTranslations('install');
+
+  const strengthLabel = (score: number): string => {
+    const keys = ['', 'strengthVeryWeak', 'strengthWeak', 'strengthFair', 'strengthStrong', 'strengthVeryStrong'] as const;
+    return score > 0 ? t(keys[score]) : '';
+  };
 
   const [checking, setChecking]   = useState(true);
   const [reason, setReason]       = useState<string>('first_boot');
@@ -94,11 +100,11 @@ export default function InstallPage() {
 
     // Client-side guard
     if (form.adminPassword !== form.confirmPw) {
-      setError('Passwords do not match.');
+      setError(t('passwordMismatch'));
       return;
     }
     if (pwScore < 3) {
-      setError('Please choose a stronger password.');
+      setError(t('weakPassword'));
       return;
     }
 
@@ -151,7 +157,7 @@ export default function InstallPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
       </div>
     );
@@ -163,15 +169,15 @@ export default function InstallPage() {
 
   if (step === 'done') {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="text-center"
         >
           <CheckCircle2 className="w-20 h-20 text-emerald-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Installation complete</h2>
-          <p className="text-slate-400">Opening setup wizard…</p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{t('done')}</h2>
+          <p className="text-slate-500 dark:text-slate-400">{t('openingWizard')}</p>
         </motion.div>
       </div>
     );
@@ -183,15 +189,15 @@ export default function InstallPage() {
 
   if (step === 'installing') {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="text-center space-y-4"
         >
           <Loader2 className="w-12 h-12 text-blue-400 animate-spin mx-auto" />
-          <p className="text-white text-lg font-medium">Setting up your system…</p>
-          <p className="text-slate-500 text-sm">Seeding roles · Creating your account · Recording machine identity</p>
+          <p className="text-slate-900 dark:text-white text-lg font-medium">{t('installing')}</p>
+          <p className="text-slate-500 text-sm">{t('installingDetails')}</p>
         </motion.div>
       </div>
     );
@@ -204,7 +210,7 @@ export default function InstallPage() {
   const isMigration = reason === 'machine_mismatch';
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -216,27 +222,22 @@ export default function InstallPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600/20 border border-blue-500/30 mb-4">
             <Server className="w-8 h-8 text-blue-400" />
           </div>
-          <h1 className="text-3xl font-bold text-white">
-            {isMigration ? 'Server migration detected' : 'Welcome to V2'}
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+            {isMigration ? t('migrationTitle') : t('pageTitle')}
           </h1>
-          <p className="text-slate-400 mt-2 text-sm leading-relaxed">
-            {isMigration
-              ? 'This machine does not match the stored installation. Re-run setup to confirm ownership and re-bind the system to this server.'
-              : 'This appears to be a first-run on a new machine. Create your owner account to get started.'}
+          <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm leading-relaxed">
+            {isMigration ? t('migrationSubtitle') : t('pageSubtitle')}
           </p>
         </div>
 
         {/* Machine ID badge */}
-        <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-lg bg-slate-800/60 border border-slate-700/50 text-xs text-slate-400">
-          <Cpu className="w-4 h-4 shrink-0 text-slate-500" />
-          <span>
-            Machine identity will be recorded on this server during installation.
-            This check prevents duplicate setups.
-          </span>
+        <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-lg bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 text-xs text-slate-600 dark:text-slate-400">
+          <Cpu className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-500" />
+          <span>{t('machineIdNote')}</span>
         </div>
 
         {/* Card */}
-        <div className="bg-slate-900 border border-slate-700/60 rounded-2xl p-8 shadow-2xl space-y-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-2xl p-8 shadow-2xl space-y-5">
 
           {/* Error banner */}
           <AnimatePresence>
@@ -245,96 +246,96 @@ export default function InstallPage() {
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="flex items-start gap-3 p-4 rounded-lg bg-red-950/40 border border-red-800/60"
+                className="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800/60"
               >
                 <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                <span className="text-red-300 text-sm">{error}</span>
+                <span className="text-red-600 dark:text-red-300 text-sm">{error}</span>
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Business name */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Business name
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              {t('businessName')}
             </label>
             <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
               <input
                 type="text"
                 value={form.businessName}
                 onChange={handleChange('businessName')}
-                placeholder="Seaside Resort & Spa"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
+                placeholder={t('businessNamePlaceholder')}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
               />
             </div>
           </div>
 
           {/* Divider */}
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-slate-700" />
+            <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
             <span className="text-slate-500 text-xs flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5" />
-              Owner account
+              {t('ownerAccount')}
             </span>
-            <div className="flex-1 h-px bg-slate-700" />
+            <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
           </div>
 
           {/* Full name */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Your full name
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              {t('fullName')}
             </label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
               <input
                 type="text"
                 value={form.adminFullName}
                 onChange={handleChange('adminFullName')}
-                placeholder="Alex Daher"
+                placeholder={t('fullNamePlaceholder')}
                 autoComplete="name"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
               />
             </div>
           </div>
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Email address
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              {t('emailAddress')}
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
               <input
                 type="email"
                 value={form.adminEmail}
                 onChange={handleChange('adminEmail')}
-                placeholder="owner@yourbusiness.com"
+                placeholder={t('emailPlaceholder')}
                 autoComplete="email"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
               />
             </div>
           </div>
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Password
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              {t('password')}
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
               <input
                 type={showPw ? 'text' : 'password'}
                 value={form.adminPassword}
                 onChange={handleChange('adminPassword')}
-                placeholder="Min. 8 chars, upper, number, symbol"
+                placeholder={t('passwordPlaceholder')}
                 autoComplete="new-password"
-                className="w-full pl-10 pr-10 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
               />
               <button
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               >
                 {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -353,7 +354,7 @@ export default function InstallPage() {
                   ))}
                 </div>
                 <p className="text-xs" style={{ color: STRENGTH_COLORS[pwScore] || '#64748b' }}>
-                  {STRENGTH_LABELS[pwScore]}
+                  {strengthLabel(pwScore)}
                 </p>
               </div>
             )}
@@ -361,26 +362,26 @@ export default function InstallPage() {
 
           {/* Confirm password */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Confirm password
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              {t('confirmPassword')}
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
               <input
                 type={showPw ? 'text' : 'password'}
                 value={form.confirmPw}
                 onChange={handleChange('confirmPw')}
-                placeholder="Repeat password"
+                placeholder={t('confirmPasswordPlaceholder')}
                 autoComplete="new-password"
-                className={`w-full pl-10 pr-4 py-2.5 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent text-sm ${
+                className={`w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-slate-800 border rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent text-sm ${
                   form.confirmPw && form.confirmPw !== form.adminPassword
                     ? 'border-red-600 focus:ring-red-500/50'
-                    : 'border-slate-600 focus:ring-blue-500/50 focus:border-blue-500'
+                    : 'border-slate-300 dark:border-slate-600 focus:ring-blue-500/50 focus:border-blue-500'
                 }`}
               />
             </div>
             {form.confirmPw && form.confirmPw !== form.adminPassword && (
-              <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
+              <p className="text-xs text-red-500 mt-1">{t('passwordMismatch')}</p>
             )}
           </div>
 
@@ -397,12 +398,12 @@ export default function InstallPage() {
             }
             className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-150 text-sm"
           >
-            Install V2 &amp; create owner account
+            {t('installButton')}
           </button>
         </div>
 
-        <p className="text-center text-slate-600 text-xs mt-6">
-          This page is only reachable when no installation is detected on this machine.
+        <p className="text-center text-slate-500 text-xs mt-6">
+          {t('footerNote')}
         </p>
       </motion.div>
     </div>

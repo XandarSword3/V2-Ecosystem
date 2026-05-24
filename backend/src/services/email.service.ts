@@ -102,8 +102,8 @@ class EmailService {
           settings.companyName = String(s.value.resortName || 'Your Resort');
         }
         if (s.key === 'contact' && s.value) {
-          settings.contact_email = String(s.value.email || 'info@ironparadisegym.com');
-          settings.contactEmail = String(s.value.email || 'info@ironparadisegym.com');
+          settings.contact_email = String(s.value.email || '');
+          settings.contactEmail = String(s.value.email || '');
           settings.contact_phone = String(s.value.phone || 'Not configured');
           settings.contactPhone = String(s.value.phone || 'Not configured');
           settings.contact_address = String(s.value.address || 'Your Resort');
@@ -123,11 +123,11 @@ class EmailService {
   private getDefaultSettings(): Record<string, string> {
     return {
       company_name: 'Your Resort',
-      contact_email: 'info@ironparadisegym.com',
+      contact_email: '',
       contact_phone: 'Not configured',
       contact_address: 'Your Resort',
       companyName: 'Your Resort',
-      contactEmail: 'info@ironparadisegym.com',
+      contactEmail: '',
       contactPhone: 'Not configured',
       companyAddress: 'Your Resort',
     };
@@ -174,7 +174,7 @@ class EmailService {
       return false;
     }
 
-    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@ironparadisegym.com';
+    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || '';
     const fromName = process.env.SMTP_FROM_NAME || 'Your Resort';
 
     try {

@@ -168,28 +168,20 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         logger.info(`Payment succeeded for ${referenceType}:${referenceId}`);
       };
 
-      const canUseIdempotencyGuard = (() => {
-        try {
-          const probe = (supabase as any).from?.('engine_idempotency_keys');
-          return typeof probe?.upsert === 'function';
-        } catch {
-          return false;
-        }
-      })();
-
+      // engine_idempotency_keys table is guaranteed to exist (migration 20260523000001).
+      // Always use the IdempotencyGuard — the runtime probe that previously checked
+      // typeof probe?.upsert === 'function' was misleading: supabase.from() returns a
+      // query-builder regardless of whether the table exists, so the probe always
+      // returned true and the else-branch was unreachable dead code.
       try {
-        if (canUseIdempotencyGuard) {
-          await idempotencyGuard.executeOnce(
-            idempotencyKey,
-            'system',
-            'payment',
-            referenceId,
-            'payment_intent.succeeded',
-            processPaymentIntent,
-          );
-        } else {
-          await processPaymentIntent();
-        }
+        await idempotencyGuard.executeOnce(
+          idempotencyKey,
+          'system',
+          'payment',
+          referenceId,
+          'payment_intent.succeeded',
+          processPaymentIntent,
+        );
       } catch (opError) {
         logger.error(`Webhook ${event.id} processing failed, Stripe will retry:`, opError);
         return res.status(500).json({ error: 'Processing failure, please retry' });
@@ -304,7 +296,8 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       );
 
       const renewedEndDate = calculateRenewedEndDate(membership.end_date, membership.billing_cycle || 'MONTHLY');
-      const nextStatus = transition.allowed ? transition.targetState.toUpperCase() : 'ACTIVE';
+      // Status must stay lowercase — the engine state machine expects lowercase values.
+      const nextStatus = transition.allowed ? transition.targetState : 'active';
 
       await supabase
         .from('pool_memberships')
