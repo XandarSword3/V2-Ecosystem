@@ -7,7 +7,7 @@ import { getSupabase } from '../database/connection.js';
 import { getEngineService } from '../engines/engine-service.js';
 import { logger } from '../utils/logger.js';
 import { requirePropertyAccess } from '../middleware/propertyAccess.middleware.js';
-import { purchaseSharedCapacityAtomic } from '../lib/shared-capacity-purchase.js';
+import { purchaseSharedCapacityAtomic } from '../services/shared-capacity-purchase.js';
 
 // Import parsers
 import * as menuServiceParser from '../modules/shared/import/menu-service-import.parser.js';

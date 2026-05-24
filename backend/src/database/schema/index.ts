@@ -4,10 +4,6 @@
 // ============================================
 
 export * from './auth.js';
-export * from './restaurant.js';
-export * from './chalets.js';
-export * from './pool.js';
-export * from './snack-bar.js';
 export * from './inventory.js';
 export * from './finance.js';
 export * from './loyalty.js';

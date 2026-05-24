@@ -104,10 +104,10 @@ class BusinessMetricsService {
 
     const metrics: BookingMetrics = {
       total_bookings: bookings?.length || 0,
-      confirmed_bookings: bookings?.filter((b) => b.status === 'confirmed').length || 0,
-      pending_bookings: bookings?.filter((b) => b.status === 'pending').length || 0,
-      cancelled_bookings: bookings?.filter((b) => b.status === 'cancelled').length || 0,
-      total_revenue: bookings?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0,
+      confirmed_bookings: bookings?.filter((b: any) => b.status === 'confirmed').length || 0,
+      pending_bookings: bookings?.filter((b: any) => b.status === 'pending').length || 0,
+      cancelled_bookings: bookings?.filter((b: any) => b.status === 'cancelled').length || 0,
+      total_revenue: bookings?.reduce((sum: number, b: any) => sum + (b.amount || 0), 0) || 0,
       average_booking_value: 0,
       occupancy_rate: 0,
       bookings_by_room_type: {},
@@ -115,7 +115,7 @@ class BusinessMetricsService {
     };
 
     // Calculate averages
-    const confirmedBookings = bookings?.filter((b) => b.status === 'confirmed') || [];
+    const confirmedBookings = bookings?.filter((b: any) => b.status === 'confirmed') || [];
     if (confirmedBookings.length > 0) {
       metrics.average_booking_value =
         metrics.total_revenue / confirmedBookings.length;
@@ -192,7 +192,7 @@ class BusinessMetricsService {
       .sort((a, b) => a.date.localeCompare(b.date));
 
     // Calculate average
-    const positiveTransactions = transactions?.filter((t) => t.amount > 0 && !['cancelled', 'refunded'].includes(t.status)) || [];
+    const positiveTransactions = transactions?.filter((t: any) => t.amount > 0 && !['cancelled', 'refunded'].includes(t.status)) || [];
     if (positiveTransactions.length > 0) {
       metrics.average_transaction_value =
         metrics.total_revenue / positiveTransactions.length;
@@ -300,8 +300,8 @@ class BusinessMetricsService {
 
     const metrics: OperationalMetrics = {
       transactions_today: txs.length,
-      transactions_pending: txs.filter((t) => t.status === 'pending').length,
-      transactions_completed: txs.filter((t) => t.status === 'completed').length,
+      transactions_pending: txs.filter((t: any) => t.status === 'pending').length,
+      transactions_completed: txs.filter((t: any) => t.status === 'completed').length,
       transactions_by_engine: transactionsByEngine,
       staff_online: staffOnline.count || 0,
       active_sessions: activeSessions,
