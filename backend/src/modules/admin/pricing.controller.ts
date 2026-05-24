@@ -254,8 +254,8 @@ router.get(
 
     // Calculate summary statistics
     const totalBookings = analytics?.length || 0;
-    const totalBaseValue = analytics?.reduce((sum, a) => sum + a.base_price, 0) || 0;
-    const totalFinalValue = analytics?.reduce((sum, a) => sum + a.final_price, 0) || 0;
+    const totalBaseValue = analytics?.reduce((sum: number, a: Record<string, number>) => sum + a.base_price, 0) || 0;
+    const totalFinalValue = analytics?.reduce((sum: number, a: Record<string, number>) => sum + a.final_price, 0) || 0;
     const totalAdjustment = totalFinalValue - totalBaseValue;
     const averageAdjustmentPercent = totalBaseValue > 0
       ? ((totalAdjustment / totalBaseValue) * 100)
@@ -263,7 +263,7 @@ router.get(
 
     // Group by applied rules
     const ruleUsage: Record<string, number> = {};
-    analytics?.forEach((a) => {
+    analytics?.forEach((a: Record<string, any>) => {
       const rules = a.applied_rules || [];
       rules.forEach((rule: any) => {
         ruleUsage[rule.name] = (ruleUsage[rule.name] || 0) + 1;
