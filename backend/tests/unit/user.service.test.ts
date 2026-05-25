@@ -5,7 +5,6 @@
  * Uses in-memory repository for testing.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   createUserService,
   UserService,

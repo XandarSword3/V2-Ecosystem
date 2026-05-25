@@ -4,7 +4,6 @@
  * Tests for OAuth user creation, token exchange, and account linking.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateOAuthState } from '../../src/modules/auth/oauth.service.js';
 
 // Mock fetch for API calls

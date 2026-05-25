@@ -2,7 +2,8 @@
  * Backup Verification Service
  * Handles database backup verification, integrity checks, and restoration testing
  */
-import { supabase } from "../lib/supabase.js";
+import { getSupabase } from "../database/connection.js";
+const supabase = getSupabase();
 import { logger } from "../utils/logger.js";
 
 interface BackupInfo {

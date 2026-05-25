@@ -7,7 +7,6 @@
  * Scenario extracted from stress test customer-bot behaviors.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   TestApiClient,
   createStaffClient,

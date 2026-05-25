@@ -7,7 +7,6 @@
  * Scenario extracted from stress test admin-bot behaviors.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   TestApiClient,
   createAdminClient,

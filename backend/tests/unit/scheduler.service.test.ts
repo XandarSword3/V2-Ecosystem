@@ -1,7 +1,6 @@
 /**
  * Scheduler Service Unit Tests
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock node-cron
 vi.mock('node-cron', () => ({

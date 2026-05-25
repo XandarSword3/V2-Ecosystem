@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Import the actual logger
 import { logger } from '../../src/utils/logger';

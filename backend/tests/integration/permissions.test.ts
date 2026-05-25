@@ -5,7 +5,6 @@
  * Uses test JWTs to verify 401/403 responses.
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { Express } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';

@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { registerSchema, loginSchema, changePasswordSchema } from '../../../src/modules/auth/auth.validation';
 
 describe('Auth Validation', () => {

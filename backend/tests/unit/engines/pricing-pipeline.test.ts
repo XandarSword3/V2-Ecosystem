@@ -6,7 +6,6 @@
  * discount application order, invariant validation, rounding, and edge cases.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PricingPipeline } from '../../../src/engines/pricing-pipeline.js';
 import type { PricingPipelineDeps, CouponResolver, GiftCardResolver, LoyaltyResolver } from '../../../src/engines/pricing-pipeline.js';
 import type { PricingLineItem, PricingConfig, PricingContext } from '../../../../shared/types/engines.js';

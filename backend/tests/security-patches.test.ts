@@ -1,5 +1,4 @@
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getSupabase } from '../src/database/supabase';
 
 describe('Security Hardening Migration Checks', () => {

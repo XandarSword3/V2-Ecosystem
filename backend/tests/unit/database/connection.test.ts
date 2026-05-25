@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock dependencies
 vi.mock('drizzle-orm/node-postgres', () => ({

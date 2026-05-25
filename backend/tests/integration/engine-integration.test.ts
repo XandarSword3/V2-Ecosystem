@@ -3,7 +3,6 @@
  * Comprehensive regression tests for all engine paths
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EngineService } from '../../src/engines/engine-service.js';
 import { getEngineByTemplate } from '../../src/engines/registry.js';
 import { OrderConfigService } from '../../src/services/order-config.service.js';

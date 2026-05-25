@@ -4,7 +4,8 @@
  */
 
 import Stripe from 'stripe';
-import { supabase } from "../lib/supabase.js";
+import { getSupabase } from "../database/connection.js";
+const supabase = getSupabase();
 import { emailService } from "./email.service.js";
 import { activityLogger } from "../utils/activityLogger.js";
 import { logger } from "../utils/logger.js";
