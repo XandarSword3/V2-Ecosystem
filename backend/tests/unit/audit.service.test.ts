@@ -3,7 +3,6 @@
  * Tests for DI-based audit/activity logging
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createAuditService, AuditServiceError } from '../../src/lib/services/audit.service.js';
 import { createInMemoryAuditRepository } from '../../src/lib/repositories/audit.repository.memory.js';
 import type { AuditLog, AuditAction, AuditResource, LoggerService } from '../../src/lib/container/types.js';

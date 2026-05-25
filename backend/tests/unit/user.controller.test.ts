@@ -6,7 +6,6 @@
  * getUserById, updateUserRoles.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createMockReqRes, createChainableMock } from './utils.js';
 
 // Mock dependencies before importing controller

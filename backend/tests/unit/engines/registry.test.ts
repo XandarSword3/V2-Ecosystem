@@ -5,7 +5,6 @@
  * and all engine definition validations.
  */
 
-import { describe, it, expect } from 'vitest';
 import {
   getEngine,
   getEngineByTemplate,

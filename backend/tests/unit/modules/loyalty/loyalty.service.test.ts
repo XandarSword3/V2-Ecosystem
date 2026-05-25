@@ -4,7 +4,6 @@
  * Tests for the loyalty module controller using Supabase chainable mock pattern.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock Supabase connection
 vi.mock('../../../../src/database/connection.js', () => ({

@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMockReqRes } from '../utils';
 import * as gdprController from '../../../src/modules/users/gdpr.controller';
 import { getSupabase } from '../../../src/database/connection';

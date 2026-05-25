@@ -4,7 +4,6 @@
  * Tests for the Double Submit Cookie CSRF protection implementation.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'crypto';
 
 // Mock request/response types

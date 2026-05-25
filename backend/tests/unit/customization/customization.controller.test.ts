@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock logger before importing controller
 vi.mock('../../../src/utils/logger.js', () => ({

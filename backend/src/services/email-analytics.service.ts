@@ -3,7 +3,8 @@
  * Tracks email metrics and provides insights
  */
 
-import { supabase } from "../lib/supabase.js";
+import { getSupabase } from "../database/connection.js";
+const supabase = getSupabase();
 import { logger } from '../utils/logger.js';
 
 export interface EmailMetrics {

@@ -4,7 +4,6 @@
  * Tests for bookings.service.ts using Vitest with chainable Supabase query mocks.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // =============================================
 // MOCK DATA STORAGE
@@ -94,16 +93,28 @@ const mockSupabase = {
         return createQueryMock(() => mockBookings);
       case 'chalet_bookings':
         return createQueryMock(() => mockBookings);
+      case 'accommodation_units':
+        // New table name post-refit (replaces 'chalets')
+        return createQueryMock(() => mockChalets);
       case 'chalets':
         return createQueryMock(() => mockChalets);
       case 'chalet_booking_add_ons':
         return createQueryMock(() => mockBookingAddOns);
       case 'chalet_add_ons':
         return createQueryMock(() => mockChaletAddOns);
+      case 'accommodation_add_ons':
+        // New table name post-refit
+        return createQueryMock(() => mockChaletAddOns);
       case 'chalet_price_rules':
+        return createQueryMock(() => mockChaletPriceRules);
+      case 'unit_price_rules':
+        // New table name post-refit
         return createQueryMock(() => mockChaletPriceRules);
       case 'chalet_settings':
         return createQueryMock(() => mockChaletSettings);
+      case 'modules':
+        // Deposit config now lives in modules.config JSONB
+        return createQueryMock(() => mockChaletSettings.map(s => ({ config: s })));
       case 'users':
         return createQueryMock(() => mockUsers);
       default:
@@ -142,7 +153,7 @@ import {
   checkOut,
   checkAvailability,
   getAvailability,
-  calculateBookingPrice,
+  calculateReservationPrice as calculateBookingPrice,
 } from '../../../../src/modules/bookings/bookings.service';
 
 // =============================================
@@ -501,7 +512,7 @@ describe('BookingsService', () => {
       mockBookings = [booking];
 
       const result = await updateBooking('booking-1', {
-        special_requests: 'Late checkout please',
+        payment_status: 'paid',
       });
 
       expect(result).toBeDefined();

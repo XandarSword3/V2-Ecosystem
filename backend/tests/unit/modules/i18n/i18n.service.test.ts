@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock supabase
 vi.mock('../../../../src/lib/supabase', () => ({

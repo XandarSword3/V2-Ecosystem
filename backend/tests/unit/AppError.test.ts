@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { AppError } from '../../src/utils/AppError';
 
 describe('AppError', () => {

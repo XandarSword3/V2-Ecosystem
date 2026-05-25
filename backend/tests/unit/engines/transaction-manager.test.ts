@@ -7,7 +7,6 @@
  *   - Optional step handling
  *   - Compensation failure logging
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TransactionManager } from '../../../src/engines/transaction-manager.js';
 import type { TransactionStep, EngineOperationContext } from '../../../src/engines/transaction-manager.js';
 

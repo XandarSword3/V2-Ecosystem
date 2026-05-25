@@ -5,7 +5,8 @@
  * Manages database-driven translations for white-label content.
  * This service handles dynamic, user-configurable translations stored in the DB.
  */
-import { supabase } from "../lib/supabase.js";
+import { getSupabase } from "../database/connection.js";
+const supabase = getSupabase();
 import { logger } from "../utils/logger.js";
 
 interface TranslationEntry {

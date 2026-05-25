@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response } from 'express';
 
 vi.mock('../../../src/database/connection.js', () => ({ getSupabase: vi.fn() }));

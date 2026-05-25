@@ -3,7 +3,8 @@
  * Provides detailed health status for monitoring and deployment verification
  */
 import { Router, Request, Response } from 'express';
-import { supabase } from "../lib/supabase.js";
+import { getSupabase } from "../database/connection.js";
+const supabase = getSupabase();
 
 interface HealthCheckResult {
   status: 'healthy' | 'degraded' | 'unhealthy';

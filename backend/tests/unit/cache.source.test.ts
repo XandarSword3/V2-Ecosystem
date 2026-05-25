@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Import the cache constants and class from source
 import { CacheKeys, CacheTTL } from '../../src/utils/cache';

@@ -4,10 +4,14 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    deps: {
+      inline: ['vitest'],
+    },
     include: ['tests/**/*.test.ts'],
     exclude: [
       'node_modules',
       'dist',
+      'tests/_pending/**',
       'tests/integration/**',
       'tests/criticalFlows.test.ts',
       'tests/ai-agent.integration.test.ts',

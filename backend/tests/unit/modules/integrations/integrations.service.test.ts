@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock Supabase
 function createQueryMock(mockDataFn: () => unknown[]) {

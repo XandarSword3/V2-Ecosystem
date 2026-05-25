@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { supabase } from '../../lib/supabase';
+import { getSupabase } from '../../database/connection.js';
+const supabase = getSupabase();
 import { authenticate, authorize } from '../../middleware/auth.middleware';
 import { asyncHandler } from '../../middleware/async-handler';
 import { AppError } from '../../utils/AppError';

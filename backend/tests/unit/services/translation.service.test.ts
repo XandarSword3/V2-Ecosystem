@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 // Mock logger before importing
 vi.mock('../../../src/utils/logger.js', () => ({

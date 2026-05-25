@@ -8,7 +8,6 @@
  * These tests use the REAL engine definitions (A, B, C, D) with mock external deps
  * (TaxService, OrderConfigService, discount resolvers).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createEngineService, EngineService, resetEngineService } from '../../../src/engines/engine-service.js';
 import type { PricingLineItem, PricingContext } from '../../../../shared/types/engines.js';
 

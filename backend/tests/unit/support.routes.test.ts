@@ -5,7 +5,6 @@
  * Tests contact form submission and FAQ retrieval.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createMockReqRes, createChainableMock } from './utils.js';
 import express from 'express';
 import request from 'supertest';
