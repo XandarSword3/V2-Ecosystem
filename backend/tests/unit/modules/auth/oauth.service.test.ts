@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // =============================================================================
 // Chainable Supabase Query Mock

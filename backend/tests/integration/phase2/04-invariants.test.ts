@@ -8,7 +8,6 @@
  * Run:  npx vitest run --config vitest.integration.config.ts tests/integration/phase2/04-invariants.test.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Phase2Client } from './phase2-client';
 import { state, requireState } from './phase2-state';
 import { initializePhase2SuiteState, cleanupPhase2SuiteState } from './phase2-suite-bootstrap';

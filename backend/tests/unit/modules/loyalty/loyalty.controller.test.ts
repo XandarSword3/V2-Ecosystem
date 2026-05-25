@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Proxy-based Supabase mock: every method call returns the proxy, awaiting resolves the next queued value
 let resolveQueue: any[];

@@ -4,7 +4,6 @@
  * Unit tests using Vitest mocks for MaintenanceService with chainable Supabase query pattern.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMaintenanceService, MaintenanceServiceError } from '../../../../src/lib/services/maintenance.service';
 import type {
   Container,
@@ -128,8 +127,8 @@ function createMockPart(overrides: Partial<WorkOrderPart> = {}): WorkOrderPart {
 // MOCK FACTORY
 // ============================================
 
-function createMockRepository(): MaintenanceRepository {
-  return {
+function createMockRepository(): any {
+  const mockRepo: any = {
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -140,7 +139,53 @@ function createMockRepository(): MaintenanceRepository {
     addPart: vi.fn(),
     getParts: vi.fn(),
     deletePart: vi.fn(),
+
+    // Map new methods to mocked functions
+    save: vi.fn().mockImplementation(async (order) => {
+      if (order.updatedAt === null) {
+        return mockRepo.create(order);
+      } else {
+        const originalPromise = mockRepo.getById(order.id);
+        const original = originalPromise && typeof originalPromise.then === 'function'
+          ? await originalPromise
+          : originalPromise;
+
+        const diff: any = {};
+        if (original) {
+          for (const key of Object.keys(order)) {
+            if (key === 'updatedAt') continue;
+            if (JSON.stringify(order[key]) !== JSON.stringify(original[key])) {
+              diff[key] = order[key];
+            }
+          }
+          if (order.status === 'in_progress' && order.startedAt !== null) {
+            diff.startedAt = order.startedAt;
+          }
+        } else {
+          Object.assign(diff, order);
+          delete diff.updatedAt;
+        }
+        return mockRepo.update(order.id, diff);
+      }
+    }),
+    findById: vi.fn().mockImplementation((id) => {
+      return mockRepo.getById(id);
+    }),
+    findAll: vi.fn().mockImplementation((filters) => {
+      return mockRepo.list(filters);
+    }),
+    savePart: vi.fn().mockImplementation((part) => {
+      const cleanPart = { ...part };
+      delete cleanPart.id;
+      if (cleanPart.supplier === null) delete cleanPart.supplier;
+      if (cleanPart.notes === null) delete cleanPart.notes;
+      return mockRepo.addPart(cleanPart);
+    }),
+    findParts: vi.fn().mockImplementation((workOrderId) => {
+      return mockRepo.getParts(workOrderId);
+    }),
   };
+  return mockRepo;
 }
 
 function createMockLogger(): LoggerService {
@@ -1463,7 +1508,7 @@ describe('MaintenanceService', () => {
     it('should return all category values', () => {
       const categories = service.getCategories();
 
-      expect(categories).toEqual(['electrical', 'plumbing', 'hvac', 'structural', 'appliance', 'general']);
+      expect(categories).toEqual(['plumbing','electrical','hvac','carpentry','painting','cleaning','landscaping','appliance','structural','safety','it','general']);
     });
 
     it('should return a new array each time', () => {

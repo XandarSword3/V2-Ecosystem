@@ -18,7 +18,6 @@
  *   I: Engine D — Ongoing Entitlement full lifecycle
  *   J: Cross-engine invariant enforcement
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createEngineService, EngineService } from '../../../src/engines/engine-service.js';
 import { TransactionManager } from '../../../src/engines/transaction-manager.js';
 import { IdempotencyGuard } from '../../../src/engines/idempotency-guard.js';

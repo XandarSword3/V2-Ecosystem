@@ -5,7 +5,6 @@
  * This file is imported before integration tests run.
  */
 
-import { beforeAll, afterAll, afterEach } from 'vitest';
 import http from 'http';
 import { TEST_CONFIG, getTestApiBaseUrl, getTestDatabaseUrl, getTestRedisUrl } from './config';
 import * as dotenv from 'dotenv';

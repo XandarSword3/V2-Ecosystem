@@ -1,5 +1,4 @@
 // File: backend/tests/ai-agent.integration.test.ts
-import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import app from '../src/app';
 

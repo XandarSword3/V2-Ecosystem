@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from '../../src/database/connection';
 import { createChainableMock, mockRequest, mockResponse, mockNext } from './utils';

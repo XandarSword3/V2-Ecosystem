@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createChainableMock } from '../utils';
 
 // Mock dependencies

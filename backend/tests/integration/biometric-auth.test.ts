@@ -12,7 +12,6 @@
  * Backend stores public keys and verifies signatures.
  */
 
-import { describe, it, expect } from 'vitest';
 import { getSupabase } from '../../src/database/connection.js';
 
 describe.skip('Biometric Auth Backend Support', () => {

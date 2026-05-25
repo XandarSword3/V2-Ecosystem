@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock socket.io before import
 vi.mock('socket.io', () => ({

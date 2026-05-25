@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock Supabase
 const mockInsert = vi.fn().mockResolvedValue({ error: null });

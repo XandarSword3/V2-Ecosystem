@@ -9,7 +9,6 @@
  *   - DB error fallback to disabled
  *   - Status report for all flags
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   FeatureFlagService,
   getFeatureFlagService,

@@ -5,7 +5,6 @@
  *        payment intent creation, cash/manual payments, transaction queries.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 
 // ── Mocks ────────────────────────────────────────────────────────────

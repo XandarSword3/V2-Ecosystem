@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createMockReqRes, createChainableMock } from '../utils';
 
 // Mock getSupabase
@@ -30,19 +29,17 @@ describe('Property Access Middleware', () => {
       expect(res.status).not.toHaveBeenCalled();
     });
 
-    it('should return 400 if x-property-id format is invalid', async () => {
+    it('should ignore invalid x-property-id format and call next (graceful fallback)', async () => {
       const { req, res, next } = createMockReqRes({
         headers: { 'x-property-id': 'invalid-uuid-format' }
       });
 
       await validatePropertyAccess(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        error: 'Invalid property ID format'
-      });
-      expect(next).not.toHaveBeenCalled();
+      // Middleware intentionally ignores malformed headers instead of blocking
+      // (PWA service workers may send stale/placeholder values)
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalledWith(400);
     });
 
     it('should bypass check if user is super_admin', async () => {

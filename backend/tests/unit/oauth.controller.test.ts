@@ -4,7 +4,6 @@
  * Tests for Google and Facebook OAuth authentication flows.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response } from 'express';
 import * as oauthController from '../../src/modules/auth/oauth.controller.js';
 import * as oauthService from '../../src/modules/auth/oauth.service.js';

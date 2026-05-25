@@ -6,7 +6,6 @@
  * getAllReviews (admin), updateReviewStatus, deleteReview.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createMockReqRes, createChainableMock } from './utils.js';
 
 // Mock Supabase before importing controller

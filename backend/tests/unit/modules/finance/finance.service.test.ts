@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock connection module before importing service
 vi.mock('../../../../src/database/connection.js', () => ({

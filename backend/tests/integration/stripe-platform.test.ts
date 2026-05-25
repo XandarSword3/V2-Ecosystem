@@ -10,7 +10,6 @@
  * Note: Tests mock Stripe API - no real charges created.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { 
   StripePlatformService, 
   CreatePaymentIntentInput,

@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 
 // Import the actual source
 import { AppError } from '../../src/utils/AppError';

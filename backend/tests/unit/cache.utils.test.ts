@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CacheKeys, CacheTTL } from '../../src/utils/cache';
 
 describe('Cache Utils - Constants', () => {

@@ -3,7 +3,6 @@
  * Tests for database-backed notification operations using chainable Supabase mocks
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // =============================================
 // MOCK FACTORY

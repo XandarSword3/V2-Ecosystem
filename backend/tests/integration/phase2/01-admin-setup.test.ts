@@ -9,7 +9,6 @@
  * Run:  npx vitest run --config vitest.integration.config.ts tests/integration/phase2/01-admin-setup.test.ts
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
 import { Phase2Client, createAuthenticatedClient } from './phase2-client';
 import { TEST_CONFIG } from '../config';
 import { state, saveState } from './phase2-state';

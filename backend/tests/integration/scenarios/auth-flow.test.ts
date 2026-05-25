@@ -7,7 +7,6 @@
  * Covers auth endpoints that stress tests don't fully exercise.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { TestApiClient, createGuestClient } from '../api-client';
 import {
   assertSuccess,

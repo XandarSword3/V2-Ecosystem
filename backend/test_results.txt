@@ -1,0 +1,145 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Alessandro/Work/Attempts to Code/V2 Ecosystem/v2-resort/backend[39m
+
+ [32m✓[39m tests/unit/services/rate-limiter.service.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m tests/unit/services/task.service.test.ts [2m([22m[2m72 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m tests/unit/services/maintenance.service.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m tests/unit/services/amenity.service.test.ts [2m([22m[2m68 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m tests/unit/services/invoice.service.test.ts [2m([22m[2m57 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m tests/unit/services/guest.service.test.ts [2m([22m[2m68 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m tests/unit/services/webhookIdempotency.service.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m tests/unit/services/email.service.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 212[2mms[22m[39m
+ [32m✓[39m tests/unit/services/backup.service.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/unit/services/terminology.service.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/unit/services/translation.service.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/unit/services/two-factor.service.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/unit/services/security-audit.service.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/unit/services/business-config.service.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [31m❯[39m tests/unit/services/currency.service.test.ts [2m([22m[2m26 tests[22m[2m | [22m[31m8 failed[39m[2m)[22m[32m 35[2mms[22m[39m
+[31m       [31m×[31m should return active currencies[39m[32m 5[2mms[22m[39m
+       [32m✓[39m should throw on error[32m 2[2mms[22m[39m
+[31m       [31m×[31m should return currency by code[39m[32m 3[2mms[22m[39m
+       [32m✓[39m should return null on error[32m 1[2mms[22m[39m
+[31m       [31m×[31m should return default currency from settings[39m[32m 1[2mms[22m[39m
+[31m       [31m×[31m should throw if default currency not found[39m[32m 4[2mms[22m[39m
+       [32m✓[39m should return same amount for same currency[32m 1[2mms[22m[39m
+[31m       [31m×[31m should convert between currencies[39m[32m 1[2mms[22m[39m
+       [32m✓[39m should handle case insensitive currency codes[32m 0[2mms[22m[39m
+[31m       [31m×[31m should return rate from database[39m[32m 1[2mms[22m[39m
+       [32m✓[39m should throw if rate not found[32m 0[2mms[22m[39m
+[31m       [31m×[31m should update rate and clear cache[39m[32m 1[2mms[22m[39m
+       [32m✓[39m should throw on error[32m 0[2mms[22m[39m
+       [32m✓[39m should format EUR amount[32m 13[2mms[22m[39m
+       [32m✓[39m should format USD amount[32m 0[2mms[22m[39m
+       [32m✓[39m should use default locale[32m 0[2mms[22m[39m
+       [32m✓[39m should return lowercase currency code[32m 0[2mms[22m[39m
+       [32m✓[39m should convert to cents for 2 decimal currencies[32m 0[2mms[22m[39m
+       [32m✓[39m should handle 3 decimal currencies (KWD)[32m 0[2mms[22m[39m
+       [32m✓[39m should round properly[32m 0[2mms[22m[39m
+       [32m✓[39m should convert from cents for 2 decimal currencies[32m 0[2mms[22m[39m
+       [32m✓[39m should handle 3 decimal currencies (KWD)[32m 0[2mms[22m[39m
+       [32m✓[39m should return true for supported currencies[32m 0[2mms[22m[39m
+       [32m✓[39m should return false for unsupported currencies[32m 0[2mms[22m[39m
+       [32m✓[39m should be case insensitive[32m 0[2mms[22m[39m
+[31m       [31m×[31m should return prices in multiple currencies[39m[32m 1[2mms[22m[39m
+ [32m✓[39m tests/unit/services/pool-membership.service.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/unit/services/scheduler.service.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/services/bounce-handler.service.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+[90mstdout[2m | tests/unit/services/sms.service.test.ts[2m > [22m[2mSMS Service[2m > [22m[2mSMS Templates[2m > [22m[2mshould have booking-confirmation template
+[22m[39m[SMSService] SMS disabled - would send to +1234567890: V2 Ecosystem: Your booking #B-001 is confirmed for 2024-01-15. Check-in: 15:00. Questions? Call +1-555-0123
+
+ [32m✓[39m tests/unit/services/email-rate-limiter.service.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 1293[2mms[22m[39m
+       [33m[2m✓[22m[39m should record email sent without error [33m 1286[2mms[22m[39m
+[90mstdout[2m | tests/unit/services/sms.service.test.ts[2m > [22m[2mSMS Service[2m > [22m[2mSMS Consent[2m > [22m[2mshould return failed when SMS service is disabled
+[22m[39m[SMSService] User user-123 has not opted in to SMS
+
+ [31m❯[39m tests/unit/services/sms.service.test.ts [2m([22m[2m5 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 2974[2mms[22m[39m
+       [33m[2m✓[22m[39m should warn about disabled SMS [33m 1093[2mms[22m[39m
+       [33m[2m✓[22m[39m should have booking-confirmation template [33m 1224[2mms[22m[39m
+       [32m✓[39m should throw for invalid template[32m 10[2mms[22m[39m
+       [32m✓[39m should normalize and validate phone numbers[32m 8[2mms[22m[39m
+[31m       [31m×[31m should return failed when SMS service is disabled[39m[33m 637[2mms[22m[39m
+ [31m❯[39m tests/unit/services/chargeback.service.test.ts [2m([22m[2m7 tests[22m[2m | [22m[31m3 failed[39m[2m | [22m[33m2 skipped[39m[2m)[22m[33m 3165[2mms[22m[39m
+       [2m[90m↓[39m[22m should create a chargeback record from dispute - complex integration test
+       [33m[2m✓[22m[39m should throw when payment not found [33m 1105[2mms[22m[39m
+[31m       [31m×[31m should return chargeback by ID[39m[33m 616[2mms[22m[39m
+       [33m[2m✓[22m[39m should return null when chargeback not found [33m 608[2mms[22m[39m
+[31m       [31m×[31m should return chargebacks with pagination[39m[33m 530[2mms[22m[39m
+       [2m[90m↓[39m[22m should filter by status - complex query builder test
+[31m       [31m×[31m should return chargeback statistics[39m[33m 305[2mms[22m[39m
+ [31m❯[39m tests/unit/services/webhook-retry.service.test.ts [2m([22m[2m7 tests[22m[2m | [22m[31m3 failed[39m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 4176[2mms[22m[39m
+[31m       [31m×[31m should record a webhook failure[39m[33m 2654[2mms[22m[39m
+[31m       [31m×[31m should throw on insert error[39m[33m 656[2mms[22m[39m
+       [32m✓[39m should register a webhook handler[32m 7[2mms[22m[39m
+       [33m[2m✓[22m[39m should return failure statistics [33m 553[2mms[22m[39m
+[31m       [31m×[31m should mark failure for manual review[39m[32m 298[2mms[22m[39m
+       [2m[90m↓[39m[22m should start background processing
+       [32m✓[39m should stop background processing even when not started[32m 7[2mms[22m[39m
+ [31m❯[39m tests/unit/services/dynamic-translation.service.test.ts [2m([22m[2m8 tests[22m[2m | [22m[31m4 failed[39m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 4317[2mms[22m[39m
+       [33m[2m✓[22m[39m should return translations for a language [33m 1086[2mms[22m[39m
+[31m       [31m×[31m should filter by namespace[39m[33m 808[2mms[22m[39m
+[31m       [31m×[31m should return a single translation[39m[33m 538[2mms[22m[39m
+       [33m[2m✓[22m[39m should return null when translation not found [33m 531[2mms[22m[39m
+[31m       [31m×[31m should set a translation[39m[33m 533[2mms[22m[39m
+[31m       [31m×[31m should set translation with namespace[39m[33m 522[2mms[22m[39m
+       [2m[90m↓[39m[22m should set multiple translations at once - complex signature
+       [32m✓[39m should delete a translation[32m 297[2mms[22m[39m
+ [31m❯[39m tests/unit/services/notification-preferences.service.test.ts [2m([22m[2m12 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[33m 5190[2mms[22m[39m
+       [32m✓[39m should have email enabled by default[32m 2[2mms[22m[39m
+       [32m✓[39m should have SMS disabled by default (opt-in)[32m 0[2mms[22m[39m
+       [32m✓[39m should have push enabled by default[32m 0[2mms[22m[39m
+       [32m✓[39m should have quiet hours configured[32m 0[2mms[22m[39m
+       [32m✓[39m should have language set to english by default[32m 0[2mms[22m[39m
+[31m       [31m×[31m should return user preferences merged with defaults[39m[33m 1298[2mms[22m[39m
+       [33m[2m✓[22m[39m should return default preferences on error [33m 629[2mms[22m[39m
+       [33m[2m✓[22m[39m should return default preferences when user has no preferences [33m 534[2mms[22m[39m
+[31m       [31m×[31m should update and return merged preferences[39m[33m 814[2mms[22m[39m
+       [33m[2m✓[22m[39m should throw on update error [33m 1085[2mms[22m[39m
+       [32m✓[39m should return true when channel and type are enabled[32m 294[2mms[22m[39m
+[31m       [31m×[31m should return false when channel is disabled[39m[33m 531[2mms[22m[39m
+ [31m❯[39m tests/unit/services/seasonal-pricing.service.test.ts [2m([22m[2m9 tests[22m[2m | [22m[31m7 failed[39m[2m)[22m[33m 5419[2mms[22m[39m
+[31m       [31m×[31m should return seasonal rules mapped correctly[39m[33m 1294[2mms[22m[39m
+[31m       [31m×[31m should throw error on database failure[39m[33m 600[2mms[22m[39m
+[31m       [31m×[31m should create a new seasonal rule[39m[33m 537[2mms[22m[39m
+[31m       [31m×[31m should throw error on insert failure[39m[33m 560[2mms[22m[39m
+[31m       [31m×[31m should update a seasonal rule[39m[33m 536[2mms[22m[39m
+[31m       [31m×[31m should handle partial updates[39m[33m 538[2mms[22m[39m
+       [33m[2m✓[22m[39m should throw error on update failure [33m 529[2mms[22m[39m
+[31m       [31m×[31m should delete a seasonal rule[39m[32m 287[2mms[22m[39m
+       [33m[2m✓[22m[39m should throw error on delete failure [33m 536[2mms[22m[39m
+ [31m❯[39m tests/unit/services/email-analytics.service.test.ts [2m([22m[2m10 tests[22m[2m | [22m[31m4 failed[39m[2m | [22m[33m4 skipped[39m[2m)[22m[33m 5516[2mms[22m[39m
+[31m       [31m×[31m should record email send event[39m[33m 1490[2mms[22m[39m
+[31m       [31m×[31m should record open event[39m[33m 1217[2mms[22m[39m
+[31m       [31m×[31m should record click event[39m[33m 1104[2mms[22m[39m
+[31m       [31m×[31m should process webhook events array[39m[33m 1703[2mms[22m[39m
+       [32m✓[39m should handle empty events array[32m 0[2mms[22m[39m
+       [2m[90m↓[39m[22m should return email metrics for period - complex date handling
+       [2m[90m↓[39m[22m should return performance metrics for templates - complex query chain
+       [2m[90m↓[39m[22m should return metrics for a campaign - complex query chain
+       [2m[90m↓[39m[22m should return null for non-existent campaign - complex query chain
+       [32m✓[39m should have required properties[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/services/password-policy.service.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 5788[2mms[22m[39m
+       [33m[2m✓[22m[39m should return default policy when no settings exist [33m 1305[2mms[22m[39m
+       [33m[2m✓[22m[39m should reject password shorter than minLength [33m 409[2mms[22m[39m
+       [33m[2m✓[22m[39m should reject password without uppercase [33m 596[2mms[22m[39m
+       [33m[2m✓[22m[39m should reject password without lowercase [33m 514[2mms[22m[39m
+       [33m[2m✓[22m[39m should reject password without numbers [33m 496[2mms[22m[39m
+       [33m[2m✓[22m[39m should reject password without special characters [33m 490[2mms[22m[39m
+       [33m[2m✓[22m[39m should reject common passwords [33m 493[2mms[22m[39m
+       [33m[2m✓[22m[39m should accept strong password [33m 494[2mms[22m[39m
+       [33m[2m✓[22m[39m should calculate password strength score [33m 985[2mms[22m[39m
+ [31m❯[39m tests/unit/services/business-metrics.service.test.ts [2m([22m[2m8 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[33m 6739[2mms[22m[39m
+[31m       [31m×[31m should return booking metrics for default period[39m[33m 1470[2mms[22m[39m
+       [33m[2m✓[22m[39m should handle empty bookings [33m 647[2mms[22m[39m
+[31m       [31m×[31m should calculate metrics for week period[39m[33m 527[2mms[22m[39m
+[31m       [31m×[31m should calculate metrics for day period[39m[32m 291[2mms[22m[39m
+[31m       [31m×[31m should return revenue metrics[39m[33m 493[2mms[22m[39m
+       [33m[2m✓[22m[39m should return user metrics [33m 1190[2mms[22m[39m
+       [33m[2m✓[22m[39m should return operational metrics structure [33m 938[2mms[22m[39m
+       [33m[2m✓[22m[39m should return all dashboard metrics combined [33m 1180[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m9 failed[39m[22m[2m | [22m[1m[32m19 passed[39m[22m[90m (28)[39m
+[2m      Tests [22m [1m[31m37 failed[39m[22m[2m | [22m[1m[32m544 passed[39m[22m[2m | [22m[33m8 skipped[39m[90m (589)[39m
+[2m   Start at [22m 08:46:16
+[2m   Duration [22m 8.32s[2m (transform 5.88s, setup 0ms, import 16.27s, tests 45.12s, environment 4ms)[22m
+

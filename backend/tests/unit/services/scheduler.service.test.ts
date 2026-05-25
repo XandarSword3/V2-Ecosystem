@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock node-cron before importing
 vi.mock('node-cron', () => ({

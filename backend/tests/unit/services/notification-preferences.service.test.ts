@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock supabase - getPreferences queries 'users' table
 vi.mock('../../../src/lib/supabase', () => ({
