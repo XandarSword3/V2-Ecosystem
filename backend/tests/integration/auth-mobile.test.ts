@@ -10,7 +10,6 @@
  * Real table: device_tokens (not user_devices)
  */
 
-import { describe, it, expect } from 'vitest';
 import { getSupabase } from '../../src/database/connection.js';
 
 describe.skip('Mobile Auth Lifecycle', () => {

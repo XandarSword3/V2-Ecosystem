@@ -9,7 +9,6 @@
  *   - Key generation
  *   - Cleanup of expired keys
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { IdempotencyGuard, IdempotencyConflictError } from '../../../src/engines/idempotency-guard.js';
 
 // ============================================

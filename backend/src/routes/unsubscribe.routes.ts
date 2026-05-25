@@ -5,7 +5,8 @@
 
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { supabase } from "../lib/supabase.js";
+import { getSupabase } from "../database/connection.js";
+const supabase = getSupabase();
 import { notificationPreferencesService } from "../services/notification-preferences.service.js";
 import { activityLogger } from "../utils/activityLogger.js";
 

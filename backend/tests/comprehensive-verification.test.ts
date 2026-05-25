@@ -1,6 +1,5 @@
 
 import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import app from '../src/app';
 import { getSupabase } from '../src/database/connection';
 import { generateTokens } from '../src/modules/auth/auth.utils';

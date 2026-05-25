@@ -5,7 +5,6 @@
  * This ensures the API contract stays in sync with implementation.
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
 import { openApiV1Spec } from '../../src/docs/openapi.v1.js';
 import fs from 'fs';
 import path from 'path';

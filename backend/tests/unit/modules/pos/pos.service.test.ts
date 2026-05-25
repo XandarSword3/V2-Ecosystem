@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
 
 // ============================================
 // Hoisted mocks (executed before imports)

@@ -3,7 +3,8 @@
  * Handles failed webhook processing with exponential backoff
  */
 
-import { supabase } from '../lib/supabase.js';
+import { getSupabase } from '../database/connection.js';
+const supabase = getSupabase();
 import { activityLogger } from '../utils/activityLogger.js';
 import { logger } from '../utils/logger.js';
 

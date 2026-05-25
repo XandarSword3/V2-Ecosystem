@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock pattern for chainable Supabase queries
 function createQueryMock(mockDataFn: () => unknown[]) {

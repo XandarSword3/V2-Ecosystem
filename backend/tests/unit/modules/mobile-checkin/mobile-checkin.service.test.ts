@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock data arrays
 let mockBookings: Array<Record<string, unknown>> = [];

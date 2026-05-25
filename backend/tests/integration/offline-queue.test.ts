@@ -11,7 +11,6 @@
  * Note: Offline queue is CLIENT-SIDE. These tests verify backend idempotency support.
  */
 
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { getSupabase } from '../../src/database/connection.js';
 import * as idempotencyService from '../../src/services/webhookIdempotency.service.js';
 

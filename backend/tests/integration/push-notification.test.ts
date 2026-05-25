@@ -11,7 +11,6 @@
  * Without it, tests verify mock behavior and DB operations.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getSupabase } from '../../src/database/connection.js';
 import * as pushService from '../../src/services/pushNotification.service.js';
 

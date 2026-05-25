@@ -9,7 +9,6 @@
  * 3. Set RUN_INTEGRATION_TESTS=true in environment
  */
 
-import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import app from '../src/app';
 import { TEST_CONFIG } from './integration/config';

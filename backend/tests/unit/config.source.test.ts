@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 
 // Import the actual config from source
 import { config } from '../../src/config/index';

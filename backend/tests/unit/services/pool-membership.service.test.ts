@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock prisma before importing
 vi.mock('../../../src/config/database', () => ({

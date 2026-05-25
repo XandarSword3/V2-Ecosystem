@@ -1,7 +1,6 @@
 /**
  * Two-Factor Authentication Service Unit Tests
  */
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 
 // Set JWT_SECRET before any imports that might need it
 process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-min-32-chars';

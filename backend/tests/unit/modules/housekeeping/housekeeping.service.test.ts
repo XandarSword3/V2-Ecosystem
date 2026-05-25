@@ -4,7 +4,6 @@
  * Unit tests using Vitest mocks for the HousekeepingService.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHousekeepingService, HousekeepingServiceError } from '../../../../src/lib/services/housekeeping.service';
 import type {
   Container,

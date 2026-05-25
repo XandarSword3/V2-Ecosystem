@@ -2,7 +2,6 @@
  * Admin Controller Unit Tests
  * Tests logic in admin.controller.ts
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSupabase } from '../../src/database/connection.js';
 import { createChainableMock, createMockReqRes } from './utils.js';
 import { 

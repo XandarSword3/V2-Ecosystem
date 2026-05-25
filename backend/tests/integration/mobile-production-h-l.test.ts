@@ -8,7 +8,6 @@
  * L: Feature Flags
  */
 
-import { describe, it, expect } from 'vitest';
 import { getSupabase } from '../../src/database/connection.js';
 
 // ===== PHASE H: DEEP LINKING =====

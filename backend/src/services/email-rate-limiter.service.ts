@@ -4,7 +4,8 @@
  */
 
 import Redis from 'ioredis';
-import { supabase } from "../lib/supabase.js";
+import { getSupabase } from "../database/connection.js";
+const supabase = getSupabase();
 import { Request, Response, NextFunction } from 'express';
 
 // Redis client for rate limiting

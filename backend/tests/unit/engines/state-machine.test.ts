@@ -6,7 +6,6 @@
  * guards, side effects, and error conditions.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StateMachine, StateMachineError } from '../../../src/engines/state-machine.js';
 import { instantTransactionStateMachine } from '../../../src/engines/definitions/instant-transaction.js';
 import { timeExclusiveReservationStateMachine } from '../../../src/engines/definitions/time-exclusive-reservation.js';

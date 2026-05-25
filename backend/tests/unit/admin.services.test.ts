@@ -2,7 +2,6 @@
  * Admin Services Unit Tests
  * Tests for dashboard, settings, role, and user services
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createChainableMock } from './utils.js';
 
 // Mock dependencies

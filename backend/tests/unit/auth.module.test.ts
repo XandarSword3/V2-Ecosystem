@@ -2,7 +2,6 @@
  * Auth Service Unit Tests
  * Tests authentication flows: register, login, logout, token refresh
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createChainableMock } from './utils.js';
 
 // Mock dependencies

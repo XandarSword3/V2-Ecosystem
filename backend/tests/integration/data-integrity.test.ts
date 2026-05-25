@@ -5,7 +5,6 @@
  * and backup/restore integrity for production readiness.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { getSupabase } from '../../src/database/connection.js';
 import { BackupService } from '../../src/services/backup.service.js';
 

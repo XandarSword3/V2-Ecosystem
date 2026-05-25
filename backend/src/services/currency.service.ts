@@ -3,7 +3,8 @@
  * Handles currency conversion and management
  */
 
-import { supabase } from "../lib/supabase.js";
+import { getSupabase } from "../database/connection.js";
+const supabase = getSupabase();
 import Stripe from 'stripe';
 import { logger } from "../utils/logger.js";
 

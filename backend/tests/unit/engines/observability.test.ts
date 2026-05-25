@@ -4,7 +4,6 @@
  * Tests EngineMetrics counters, EngineObserver event emission,
  * state transition logging, pricing event logging, and audit trail writing.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   EngineMetrics,
   EngineObserver,

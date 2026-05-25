@@ -4,7 +4,6 @@
  * Tests for device registration and push notification management.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock Supabase connection
 vi.mock('../../../../src/database/connection.js', () => ({

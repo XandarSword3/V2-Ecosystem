@@ -2,7 +2,6 @@
  * Security Middleware Unit Tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import {
   enhancedSecurityHeaders,

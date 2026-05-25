@@ -5,7 +5,6 @@
  *        cascade delete, permission enforcement, optimistic locking, soft delete.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 
 // ── Mocks (must be declared before imports) ──────────────────────────

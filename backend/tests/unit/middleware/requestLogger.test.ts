@@ -5,7 +5,6 @@
  * that can cause "Cannot set headers after they are sent" errors
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 
 // Mock the logger to prevent actual logging during tests
