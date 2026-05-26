@@ -47,6 +47,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const t = useTranslations('admin');
   const { modules, settings } = useSiteSettings();
   const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const onboardingBypassEnabled = process.env.NEXT_PUBLIC_ADMIN_SETUP_BYPASS === 'true';
   
   // Dynamic branding from CMS
   const resortName = settings.resortName || 'Your Business';
@@ -199,6 +200,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   useEffect(() => {
     if (onboardingChecked) return;
 
+    if (onboardingBypassEnabled) {
+      setOnboardingChecked(true);
+      return;
+    }
+
     async function checkOnboarding() {
       try {
         const res = await api.get('/admin/onboarding');
@@ -234,7 +240,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     router.push('/');
   };
 
-  if (isLoading || !authChecked || !isAuthenticated || (!onboardingChecked && pathname !== '/admin/setup')) {
+  if (isLoading || !authChecked || !isAuthenticated || (!onboardingChecked && !onboardingBypassEnabled && pathname !== '/admin/setup')) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <motion.div
