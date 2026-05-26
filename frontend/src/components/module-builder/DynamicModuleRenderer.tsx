@@ -438,7 +438,40 @@ function safeArray(val: unknown): any[] {
   return [];
 }
 
-export function BlockRenderer({ block, module }: { block: UIBlock; module: Module }) {
+// ─── Inline editing helper ──────────────────────────────────────────────────
+// Returns contentEditable props when active=true; an empty object otherwise.
+// The dashed indigo underline signals editability without changing visual style.
+// Pressing Enter commits the edit (same as blur). Shift+Enter inserts a newline.
+function ep(
+  active: boolean,
+  onCommit: (v: string) => void,
+): React.HTMLAttributes<HTMLElement> {
+  if (!active) return {};
+  return {
+    contentEditable: true,
+    suppressContentEditableWarning: true,
+    onBlur: (e) => onCommit((e.currentTarget as HTMLElement).textContent?.trim() ?? ''),
+    onKeyDown: (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        (e.currentTarget as HTMLElement).blur();
+      }
+      // Stop propagation so canvas keyboard shortcuts don't fire while typing
+      e.stopPropagation();
+    },
+    onClick: (e) => e.stopPropagation(),
+    style: { outline: 'none', cursor: 'text', borderBottom: '1.5px dashed rgba(99,102,241,0.55)' },
+  };
+}
+
+export function BlockRenderer({
+  block, module, isEditing = false, onUpdateProps,
+}: {
+  block: UIBlock;
+  module: Module;
+  isEditing?: boolean;
+  onUpdateProps?: (updates: Record<string, any>) => void;
+}) {
   const { type, style } = block;
 
   // Validate Block Type - Added new glassmorphic components
@@ -480,8 +513,16 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
           {props.backgroundImage && <div className="absolute inset-0 bg-black/40 z-0" />}
 
           <div className="relative z-10 px-4 py-10 text-center w-full h-full flex flex-col items-center justify-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">{props.title || module.name}</h1>
-            <p className="text-xl md:text-2xl opacity-90">{props.subtitle || module.description}</p>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">
+              <span {...ep(isEditing, (v) => onUpdateProps?.({ title: v }))}>
+                {props.title || module.name}
+              </span>
+            </h1>
+            <p className="text-xl md:text-2xl opacity-90">
+              <span {...ep(isEditing, (v) => onUpdateProps?.({ subtitle: v }))}>
+                {props.subtitle || module.description}
+              </span>
+            </p>
           </div>
         </section>
       );
@@ -511,7 +552,11 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
 
     case 'text_block':
       content = (
-        <div style={inlineStyle} className="w-full h-full p-4 whitespace-pre-wrap">
+        <div
+          style={inlineStyle}
+          className="w-full h-full p-4 whitespace-pre-wrap"
+          {...ep(isEditing, (v) => onUpdateProps?.({ content: v }))}
+        >
           {props.content || 'Empty Text Block'}
         </div>
       );
@@ -519,12 +564,23 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
 
     case 'image':
       content = (
-        <div style={inlineStyle} className="w-full h-full p-2 flex items-center justify-center">
+        <div style={inlineStyle} className="relative w-full h-full p-2 flex items-center justify-center">
           <img
             src={props.src || '/placeholder-image.jpg'}
             alt={props.alt || 'Module Image'}
             className="max-w-full max-h-full object-contain rounded-lg shadow-md"
           />
+          {isEditing && (
+            <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded px-2 py-1">
+              <span className="text-[10px] text-slate-400 font-medium flex-shrink-0">Alt:</span>
+              <span
+                className="text-xs text-white flex-1 min-w-0"
+                {...ep(true, (v) => onUpdateProps?.({ alt: v }))}
+              >
+                {props.alt || 'Image description…'}
+              </span>
+            </div>
+          )}
         </div>
       );
       break;
@@ -563,7 +619,9 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
           className={`${sizeClass} rounded-lg font-medium transition-all hover:opacity-90 inline-block`}
           style={buttonStyle}
         >
-          {props.text || 'Button'}
+          <span {...ep(isEditing, (v) => onUpdateProps?.({ text: v }))}>
+            {props.text || 'Button'}
+          </span>
         </button>
       );
 
@@ -587,7 +645,7 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
       break;
 
     case 'pricing_table':
-      content = <PricingTableComponent module={module} props={props} />;
+      content = <PricingTableComponent module={module} props={props} isEditing={isEditing} onUpdateProps={onUpdateProps} />;
       break;
 
     // ============================================
@@ -626,7 +684,7 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
           )}
 
           {/* Eyebrow / Badge */}
-          {(props.eyebrow || props.badgeText) && (
+          {(props.eyebrow || props.badgeText || isEditing) && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -638,7 +696,9 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
               }}
             >
               <Sparkles className="w-4 h-4" />
-              {props.eyebrow || props.badgeText}
+              <span {...ep(isEditing, (v) => onUpdateProps?.({ eyebrow: v }))}>
+                {props.eyebrow || props.badgeText || (isEditing ? 'Eyebrow…' : '')}
+              </span>
             </motion.div>
           )}
 
@@ -650,14 +710,18 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
             className={`relative z-10 px-4 ${props.align === 'left' ? 'text-left' : props.align === 'right' ? 'text-right' : 'text-center'}`}
           >
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
-              {props.title || module.name}
+              <span {...ep(isEditing, (v) => onUpdateProps?.({ title: v }))}>
+                {props.title || module.name}
+              </span>
               {props.highlight && (
                 <span className="text-amber-400"> {props.highlight}</span>
               )}
             </h1>
-            {props.subtitle && (
+            {(props.subtitle || isEditing) && (
               <p className="text-xl text-white/90 mb-2">
-                {props.subtitle}
+                <span {...ep(isEditing, (v) => onUpdateProps?.({ subtitle: v }))}>
+                  {props.subtitle || (isEditing ? 'Subtitle…' : '')}
+                </span>
               </p>
             )}
             {props.description && (
@@ -674,20 +738,26 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
                 transition={{ delay: 0.3 }}
                 className="flex gap-4 flex-wrap justify-center mt-6"
               >
-                {props.primaryButton && (
+                {(props.primaryButton || isEditing) && (
                   <a
-                    href={props.primaryUrl || '#'}
+                    href={isEditing ? undefined : (props.primaryUrl || '#')}
+                    onClick={isEditing ? (e) => e.preventDefault() : undefined}
                     className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold rounded-lg transition-colors shadow-lg"
                   >
-                    {props.primaryButton}
+                    <span {...ep(isEditing, (v) => onUpdateProps?.({ primaryButton: v }))}>
+                      {props.primaryButton || (isEditing ? 'Primary Button' : '')}
+                    </span>
                   </a>
                 )}
-                {props.secondaryButton && (
+                {(props.secondaryButton || isEditing) && (
                   <a
-                    href={props.secondaryUrl || '#'}
+                    href={isEditing ? undefined : (props.secondaryUrl || '#')}
+                    onClick={isEditing ? (e) => e.preventDefault() : undefined}
                     className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-lg border border-white/30 transition-colors backdrop-blur-sm"
                   >
-                    {props.secondaryButton}
+                    <span {...ep(isEditing, (v) => onUpdateProps?.({ secondaryButton: v }))}>
+                      {props.secondaryButton || (isEditing ? 'Secondary Button' : '')}
+                    </span>
                   </a>
                 )}
               </motion.div>
@@ -727,8 +797,18 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
                 </div>
               )}
               <div className="p-6">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{card.title}</h3>
-                <p className="text-slate-600 dark:text-slate-400">{card.description}</p>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                  <span {...ep(isEditing, (v) => {
+                    const updated = safeCards.map((c: any, i: number) => i === index ? { ...c, title: v } : c);
+                    onUpdateProps?.({ cards: updated });
+                  })}>{card.title}</span>
+                </h3>
+                <p className="text-slate-600 dark:text-slate-400">
+                  <span {...ep(isEditing, (v) => {
+                    const updated = safeCards.map((c: any, i: number) => i === index ? { ...c, description: v } : c);
+                    onUpdateProps?.({ cards: updated });
+                  })}>{card.description}</span>
+                </p>
               </div>
             </motion.div>
           ))}
@@ -757,9 +837,17 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
                 }}
               >
                 <div className="text-3xl md:text-4xl font-bold mb-1" style={{ color: props.accentColor || '#6366f1' }}>
-                  {stat.value}
+                  <span {...ep(isEditing, (v) => {
+                    const updated = safeArray(props.stats).map((s: any, i: number) => i === index ? { ...s, value: v } : s);
+                    onUpdateProps?.({ stats: updated });
+                  })}>{stat.value}</span>
                 </div>
-                <div className="text-slate-600 dark:text-slate-400 text-sm">{stat.label}</div>
+                <div className="text-slate-600 dark:text-slate-400 text-sm">
+                  <span {...ep(isEditing, (v) => {
+                    const updated = safeArray(props.stats).map((s: any, i: number) => i === index ? { ...s, label: v } : s);
+                    onUpdateProps?.({ stats: updated });
+                  })}>{stat.label}</span>
+                </div>
               </motion.div>
             ))}
             {safeArray(props.stats).length === 0 && <div className="col-span-full text-center p-8">Add stats in the builder</div>}
@@ -792,8 +880,18 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
                   <Check className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white mb-1">{feature.title}</h3>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm">{feature.description}</p>
+                  <h3 className="font-bold text-slate-900 dark:text-white mb-1">
+                    <span {...ep(isEditing, (v) => {
+                      const updated = safeArray(props.features).map((f: any, i: number) => i === index ? { ...f, title: v } : f);
+                      onUpdateProps?.({ features: updated });
+                    })}>{feature.title}</span>
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm">
+                    <span {...ep(isEditing, (v) => {
+                      const updated = safeArray(props.features).map((f: any, i: number) => i === index ? { ...f, description: v } : f);
+                      onUpdateProps?.({ features: updated });
+                    })}>{feature.description}</span>
+                  </p>
                 </div>
               </motion.div>
             ))}
@@ -815,16 +913,22 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
             }}
           >
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              {props.title || 'Ready to get started?'}
+              <span {...ep(isEditing, (v) => onUpdateProps?.({ title: v }))}>
+                {props.title || 'Ready to get started?'}
+              </span>
             </h2>
             <p className="text-white/80 text-lg mb-8 max-w-2xl mx-auto">
-              {props.description || 'Join us today and experience the difference.'}
+              <span {...ep(isEditing, (v) => onUpdateProps?.({ description: v }))}>
+                {props.description || 'Join us today and experience the difference.'}
+              </span>
             </p>
             <button
-              onClick={() => props.buttonUrl && (window.location.href = props.buttonUrl)}
+              onClick={() => !isEditing && props.buttonUrl && (window.location.href = props.buttonUrl)}
               className="px-8 py-4 bg-white text-slate-900 rounded-xl font-semibold hover:bg-white/90 transition-colors shadow-xl"
             >
-              {props.buttonText || 'Get Started'}
+              <span {...ep(isEditing, (v) => onUpdateProps?.({ buttonText: v }))}>
+                {props.buttonText || 'Get Started'}
+              </span>
             </button>
           </motion.div>
         </div>
@@ -863,7 +967,7 @@ export function BlockRenderer({ block, module }: { block: UIBlock; module: Modul
       break;
 
     case 'testimonials_carousel':
-      content = <TestimonialsCarouselComponent module={module} props={props} />;
+      content = <TestimonialsCarouselComponent module={module} props={props} isEditing={isEditing} onUpdateProps={onUpdateProps} />;
       break;
 
     default:
@@ -1427,7 +1531,7 @@ function TestimonialsComponent({ props }: { props: BlockProps }) {
 // ============================================
 // Pricing Table Component
 // ============================================
-function PricingTableComponent({ module, props }: { module: Module; props: BlockProps }) {
+function PricingTableComponent({ module, props, isEditing = false, onUpdateProps }: { module: Module; props: BlockProps; isEditing?: boolean; onUpdateProps?: (updates: Record<string, any>) => void }) {
   const { data: pricingRes } = useQuery({
     queryKey: ['module-pricing', module.slug, module.template_type],
     queryFn: async () => {
@@ -1482,13 +1586,27 @@ function PricingTableComponent({ module, props }: { module: Module; props: Block
                 Most Popular
               </span>
             )}
-            <h3 className="text-2xl font-bold mb-2 dark:text-white">{plan.name}</h3>
-            <div className="text-4xl font-bold mb-6 text-primary-600">{plan.price}</div>
+            <h3 className="text-2xl font-bold mb-2 dark:text-white">
+              <span {...ep(isEditing, (v) => {
+                const updated = plans.map((p: any, j: number) => j === i ? { ...p, name: v } : p);
+                onUpdateProps?.({ plans: updated });
+              })}>{plan.name}</span>
+            </h3>
+            <div className="text-4xl font-bold mb-6 text-primary-600">
+              <span {...ep(isEditing, (v) => {
+                const updated = plans.map((p: any, j: number) => j === i ? { ...p, price: v } : p);
+                onUpdateProps?.({ plans: updated });
+              })}>{plan.price}</span>
+            </div>
             <ul className="space-y-4 mb-8 flex-grow">
               {plan.features.map((feature: string, f: number) => (
                 <li key={f} className="flex items-center gap-3 text-slate-600 dark:text-slate-400">
                   <Check className="w-5 h-5 text-green-500 shrink-0" />
-                  <span>{feature}</span>
+                  <span {...ep(isEditing, (v) => {
+                    const updatedFeatures = plan.features.map((feat: string, fi: number) => fi === f ? v : feat);
+                    const updated = plans.map((p: any, j: number) => j === i ? { ...p, features: updatedFeatures } : p);
+                    onUpdateProps?.({ plans: updated });
+                  })}>{feature}</span>
                 </li>
               ))}
             </ul>
@@ -1642,7 +1760,7 @@ function CalendarComponent({ module, props }: { module: Module; props: BlockProp
 // ============================================
 // Testimonials Carousel Component
 // ============================================
-function TestimonialsCarouselComponent({ module, props }: { module: Module; props: BlockProps }) {
+function TestimonialsCarouselComponent({ module, props, isEditing = false, onUpdateProps }: { module: Module; props: BlockProps; isEditing?: boolean; onUpdateProps?: (updates: Record<string, any>) => void }) {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const testimonials = props.testimonials || [
@@ -1679,12 +1797,27 @@ function TestimonialsCarouselComponent({ module, props }: { module: Module; prop
                   <Star key={i} className="w-4 h-4 text-amber-500 fill-current" />
                 ))}
               </div>
-              <p className="text-slate-300 italic mb-6 leading-relaxed">&ldquo;{testimonial.text}&rdquo;</p>
+              <p className="text-slate-300 italic mb-6 leading-relaxed">
+                &ldquo;<span {...ep(isEditing, (v) => {
+                  const updated = testimonials.map((t: any, i: number) => i === index ? { ...t, text: v } : t);
+                  onUpdateProps?.({ testimonials: updated });
+                })}>{testimonial.text}</span>&rdquo;
+              </p>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-amber-500 font-semibold text-sm">{testimonial.avatar}</div>
                 <div>
-                  <div className="font-semibold text-white">{testimonial.name}</div>
-                  <div className="text-xs text-slate-500">{testimonial.role}</div>
+                  <div className="font-semibold text-white">
+                    <span {...ep(isEditing, (v) => {
+                      const updated = testimonials.map((t: any, i: number) => i === index ? { ...t, name: v } : t);
+                      onUpdateProps?.({ testimonials: updated });
+                    })}>{testimonial.name}</span>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    <span {...ep(isEditing, (v) => {
+                      const updated = testimonials.map((t: any, i: number) => i === index ? { ...t, role: v } : t);
+                      onUpdateProps?.({ testimonials: updated });
+                    })}>{testimonial.role}</span>
+                  </div>
                 </div>
               </div>
             </motion.div>

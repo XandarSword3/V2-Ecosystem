@@ -35,6 +35,11 @@ function isAlwaysAllowed(pathname: string): boolean {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const installBypassEnabled = process.env.NEXT_PUBLIC_INSTALL_BYPASS === 'true';
+
+  if (installBypassEnabled) {
+    return NextResponse.next();
+  }
 
   if (isAlwaysAllowed(pathname)) {
     return NextResponse.next();
