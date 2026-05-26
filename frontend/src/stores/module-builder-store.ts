@@ -1,39 +1,8 @@
 import { create } from 'zustand';
-import { UIBlock, UIComponentType, CanvasMode } from '@/types/module-builder';
+import { UIBlock, UIComponentType, CanvasMode, AlignmentDirection, BlockPosition } from '@/types/module-builder';
 
-interface ModuleBuilderStore {
-  activeModuleId: string | null;
-  layout: UIBlock[];
-  selectedBlockId: string | null;
-  isPreview: boolean;
-  previewDevice: 'desktop' | 'mobile';
-  zoom: number;
-  canvasMode: CanvasMode;
-  history: UIBlock[][];
-  historyIndex: number;
-  _futureStates: UIBlock[][];
+// ─── Helper ──────────────────────────────────────────────────────────────────
 
-  // Actions
-  setActiveModuleId: (id: string) => void;
-  setLayout: (layout: UIBlock[], skipHistory?: boolean) => void;
-  selectBlock: (id: string | null) => void;
-  togglePreview: () => void;
-  setPreviewDevice: (device: 'desktop' | 'mobile') => void;
-  setZoom: (zoom: number) => void;
-  setCanvasMode: (mode: CanvasMode) => void;
-  undo: () => void;
-  redo: () => void;
-  canUndo: () => boolean;
-  canRedo: () => boolean;
-
-  addBlock: (type: UIComponentType, parentId?: string) => void;
-  updateBlock: (id: string, updates: Partial<UIBlock>) => void;
-  removeBlock: (id: string) => void;
-  moveBlock: (activeId: string, overId: string) => void;
-  duplicateBlock: (id: string) => void;
-}
-
-// Helper to find path to node
 const findNode = (nodes: UIBlock[], id: string): UIBlock | undefined => {
   for (const node of nodes) {
     if (node.id === id) return node;
@@ -45,228 +14,447 @@ const findNode = (nodes: UIBlock[], id: string): UIBlock | undefined => {
   return undefined;
 };
 
-// Simple history management: past holds previous states, future holds undone states
-// When we make a change, we push current to past and clear future
-// When we undo, we push current to future and pop from past
-// When we redo, we push current to past and pop from future
+/** Parse a position dimension (e.g. '400px', '50%', 400) into a pixel number. Falls back to `fallback`. */
+const parsePx = (val: string | number | undefined, fallback = 200): number => {
+  if (val === undefined || val === null) return fallback;
+  if (typeof val === 'number') return val;
+  const n = parseFloat(val);
+  return isNaN(n) ? fallback : n;
+};
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ModuleBuilderStore {
+  // ── Existing state ──────────────────────────────────────────────────────────
+  activeModuleId: string | null;
+  layout: UIBlock[];
+  selectedBlockId: string | null;
+  isPreview: boolean;
+  previewDevice: 'desktop' | 'mobile';
+  zoom: number;
+  /** @deprecated Dead code — canvas auto-detects mode from position data. Will be removed in Phase 7. */
+  canvasMode: CanvasMode;
+  history: UIBlock[][];
+  historyIndex: number;
+  _futureStates: UIBlock[][];
+
+  // ── Phase 1: multi-select, inline edit, lock ─────────────────────────────
+  /** All currently selected block IDs. Kept in sync with selectedBlockId. */
+  selectedBlockIds: string[];
+  /** Block currently being inline-edited (Phase 3). */
+  inlineEditingBlockId: string | null;
+  /** Blocks locked from canvas interaction. Stored as IDs for O(1) lookup. */
+  lockedBlockIds: string[];
+
+  // ── Existing actions ─────────────────────────────────────────────────────
+  setActiveModuleId: (id: string) => void;
+  setLayout: (layout: UIBlock[], skipHistory?: boolean) => void;
+  selectBlock: (id: string | null) => void;
+  togglePreview: () => void;
+  setPreviewDevice: (device: 'desktop' | 'mobile') => void;
+  setZoom: (zoom: number) => void;
+  /** @deprecated See canvasMode note above. */
+  setCanvasMode: (mode: CanvasMode) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  addBlock: (type: UIComponentType, position?: Partial<BlockPosition>) => void;
+  updateBlock: (id: string, updates: Partial<UIBlock>) => void;
+  removeBlock: (id: string) => void;
+  moveBlock: (activeId: string, overId: string) => void;
+  duplicateBlock: (id: string) => void;
+
+  // ── Phase 1 actions ──────────────────────────────────────────────────────
+  /** Replace the entire selection set. Also sets selectedBlockId to ids[0]. */
+  selectMultiple: (ids: string[]) => void;
+  /** Add one block to the current selection. */
+  addToSelection: (id: string) => void;
+  /** Remove one block from the current selection. */
+  removeFromSelection: (id: string) => void;
+  /** Clear all selections. */
+  clearSelection: () => void;
+  /** Enter inline-edit mode for a block (Phase 3). */
+  setInlineEditing: (id: string | null) => void;
+  /** Toggle locked state for a block. */
+  toggleLock: (id: string) => void;
+  /** Align selected blocks along an axis. Requires ≥2 selected blocks. */
+  alignBlocks: (ids: string[], alignment: AlignmentDirection) => void;
+  /** Distribute selected blocks evenly. Requires ≥3 selected blocks. */
+  distributeBlocks: (ids: string[], direction: 'horizontal' | 'vertical') => void;
+}
+
+// ─── Default props per block type ────────────────────────────────────────────
+
+function buildDefaultProps(type: UIComponentType): Record<string, any> {
+  switch (type) {
+    case 'hero':
+      return { title: 'Welcome', subtitle: 'Discover our services' };
+    case 'hero_v2':
+      return { eyebrow: 'Welcome', title: 'Hero Title', subtitle: 'Discover our services', primaryButton: 'Get Started', align: 'center' };
+    case 'grid':
+      return { columns: '3', dataSource: 'menu' };
+    case 'button':
+      return { text: 'Click me', backgroundColor: '#6366f1', variant: 'solid', size: 'md' };
+    case 'form_container':
+      return { formAction: 'contact', submitText: 'Submit' };
+    case 'text_block':
+      return { content: 'Enter your text here...', fontSize: 'base' };
+    case 'image':
+      return { alt: 'Image', objectFit: 'cover' };
+    case 'testimonials':
+      return { source: 'static', count: 3, showRatings: true };
+    case 'pricing_table':
+      return {
+        title: 'Our Pricing',
+        plans: [
+          { name: 'Basic', price: '$10', features: ['Feature 1', 'Feature 2'] },
+          { name: 'Pro', price: '$20', features: ['Feature 1', 'Feature 2', 'Feature 3'], popular: true },
+        ],
+      };
+    case 'features':
+      return {
+        title: 'Our Features',
+        features: [
+          { icon: 'Star', title: 'Feature 1', description: 'Description here' },
+          { icon: 'Heart', title: 'Feature 2', description: 'Description here' },
+          { icon: 'Zap', title: 'Feature 3', description: 'Description here' },
+        ],
+      };
+    case 'cta':
+      return { title: 'Ready to get started?', buttonText: 'Get Started', align: 'center' };
+    case 'class_schedule':
+      return {
+        title: 'Next Classes',
+        subtitle: 'UPCOMING SESSIONS',
+        classes: [
+          { id: '1', name: 'Class 1', time: '09:00 AM', trainer: 'Trainer', category: 'Category', icon: 'Dumbbell' },
+          { id: '2', name: 'Class 2', time: '11:00 AM', trainer: 'Trainer', category: 'Category', icon: 'Heart' },
+        ],
+      };
+    case 'calendar':
+      return { title: 'Schedule' };
+    case 'testimonials_carousel':
+      return {
+        title: 'Testimonials',
+        subtitle: 'WHAT PEOPLE SAY',
+        testimonials: [
+          { id: '1', text: 'Great experience!', name: 'John D.', role: 'Member', rating: 5, avatar: 'JD' },
+          { id: '2', text: 'Highly recommended!', name: 'Jane S.', role: 'Member', rating: 5, avatar: 'JS' },
+          { id: '3', text: 'Amazing service!', name: 'Bob M.', role: 'Member', rating: 5, avatar: 'BM' },
+        ],
+      };
+    case 'stats':
+      return {
+        title: 'Our Impact',
+        stats: [
+          { value: '10K+', label: 'Happy Guests', icon: 'Users' },
+          { value: '50+', label: 'Activities', icon: 'Zap' },
+          { value: '99%', label: 'Satisfaction', icon: 'Heart' },
+        ],
+      };
+    case 'card_grid':
+      return {
+        title: 'Our Services',
+        cards: [
+          { title: 'Service 1', description: 'Description', icon: 'Star' },
+          { title: 'Service 2', description: 'Description', icon: 'Heart' },
+          { title: 'Service 3', description: 'Description', icon: 'Zap' },
+        ],
+      };
+    case 'divider':
+      return { accentColor: '#6366f1' };
+    case 'spacer':
+      return { height: 40 };
+    default:
+      return {};
+  }
+}
+
+// ─── Store ───────────────────────────────────────────────────────────────────
 
 export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
+  // ── Existing state ──────────────────────────────────────────────────────────
   activeModuleId: null,
   layout: [],
   selectedBlockId: null,
   isPreview: false,
   previewDevice: 'desktop',
   zoom: 100,
-  canvasMode: 'stack',
-  history: [], // past states
-  historyIndex: -1, // not used in new approach, keeping for compatibility
+  canvasMode: 'stack', // deprecated
+  history: [],
+  historyIndex: -1,
   _futureStates: [],
 
+  // ── Phase 1 state ────────────────────────────────────────────────────────
+  selectedBlockIds: [],
+  inlineEditingBlockId: null,
+  lockedBlockIds: [],
+
+  // ── Existing actions ──────────────────────────────────────────────────────
+
   setActiveModuleId: (id) => set({ activeModuleId: id }),
-  setLayout: (layout, skipHistory = false) => set((state) => {
-    if (skipHistory) return { layout };
-    const newHistory = [...state.history, [...state.layout]].slice(-50);
-    return { layout, history: newHistory, _futureStates: [] };
-  }),
-  selectBlock: (id) => set({ selectedBlockId: id }),
-  togglePreview: () => set((state) => ({ isPreview: !state.isPreview, selectedBlockId: null })),
+
+  setLayout: (layout, skipHistory = false) =>
+    set((state) => {
+      if (skipHistory) return { layout };
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout, history: newHistory, _futureStates: [] };
+    }),
+
+  selectBlock: (id) =>
+    set({
+      selectedBlockId: id,
+      selectedBlockIds: id ? [id] : [],
+      inlineEditingBlockId: null,
+    }),
+
+  togglePreview: () =>
+    set((state) => ({
+      isPreview: !state.isPreview,
+      selectedBlockId: null,
+      selectedBlockIds: [],
+      inlineEditingBlockId: null,
+    })),
+
   setPreviewDevice: (previewDevice) => set({ previewDevice }),
-  setZoom: (zoom) => set({ zoom: Math.max(50, Math.min(150, zoom)) }),
-  setCanvasMode: (mode) => set({ canvasMode: mode }),
+  setZoom: (zoom) => set({ zoom: Math.max(25, Math.min(200, zoom)) }),
+  setCanvasMode: (mode) => set({ canvasMode: mode }), // deprecated, kept for compat
 
-  undo: () => set((state) => {
-    if (state.history.length === 0) return state;
-    const newHistory = [...state.history];
-    const previousLayout = newHistory.pop()!;
-    const newFuture = [...state._futureStates, [...state.layout]];
-    return {
-      layout: [...previousLayout],
-      history: newHistory,
-      _futureStates: newFuture
-    };
-  }),
+  undo: () =>
+    set((state) => {
+      if (state.history.length === 0) return state;
+      const newHistory = [...state.history];
+      const previousLayout = newHistory.pop()!;
+      const newFuture = [...state._futureStates, [...state.layout]];
+      return { layout: [...previousLayout], history: newHistory, _futureStates: newFuture };
+    }),
 
-  redo: () => set((state) => {
-    if (!state._futureStates.length) return state;
-    const newFuture = [...state._futureStates];
-    const nextLayout = newFuture.pop()!;
-    const newHistory = [...state.history, [...state.layout]];
-    return {
-      layout: [...nextLayout],
-      history: newHistory,
-      _futureStates: newFuture
-    };
-  }),
+  redo: () =>
+    set((state) => {
+      if (!state._futureStates.length) return state;
+      const newFuture = [...state._futureStates];
+      const nextLayout = newFuture.pop()!;
+      const newHistory = [...state.history, [...state.layout]];
+      return { layout: [...nextLayout], history: newHistory, _futureStates: newFuture };
+    }),
 
   canUndo: () => get().history.length > 0,
   canRedo: () => get()._futureStates.length > 0,
 
-  addBlock: (type, parentId) => set((state) => {
-    const defaultProps: Record<string, any> = {};
+  addBlock: (type, position) =>
+    set((state) => {
+      const n = state.layout.length;
+      const newBlock: UIBlock = {
+        id: crypto.randomUUID(),
+        type,
+        label: `New ${type.replace(/_/g, ' ')}`,
+        props: buildDefaultProps(type),
+        style: { width: '100%' },
+        position: {
+          x: position?.x ?? 100 + (n % 10) * 30,
+          y: position?.y ?? 100 + (n % 10) * 30,
+          width: position?.width ?? '400px',
+          height: position?.height ?? 'auto',
+          z: n + 1,
+        },
+        children:
+          type === 'container' || type === 'grid' || type === 'form_container'
+            ? []
+            : undefined,
+      };
+      const newLayout = [...state.layout, newBlock];
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout: newLayout, history: newHistory, _futureStates: [] };
+    }),
 
-    // Set default props based on type
-    if (type === 'hero') {
-      defaultProps.title = 'Welcome';
-      defaultProps.subtitle = 'Discover our services';
-    } else if (type === 'grid') {
-      defaultProps.columns = '3';
-      defaultProps.dataSource = 'menu';
-    } else if (type === 'button') {
-      defaultProps.text = 'Click me';
-      defaultProps.backgroundColor = '#6366f1';
-      defaultProps.variant = 'solid';
-      defaultProps.size = 'md';
-    } else if (type === 'form_container') {
-      defaultProps.formAction = 'contact';
-      defaultProps.submitText = 'Submit';
-    } else if (type === 'text_block') {
-      defaultProps.content = 'Enter your text here...';
-      defaultProps.fontSize = 'base';
-    } else if (type === 'image') {
-      defaultProps.alt = 'Image';
-      defaultProps.objectFit = 'cover';
-    } else if (type === 'testimonials') {
-      defaultProps.source = 'static'; // or 'dynamic'
-      defaultProps.count = 3;
-      defaultProps.showRatings = true;
-    } else if (type === 'pricing_table') {
-      defaultProps.title = 'Our Pricing';
-      defaultProps.plans = JSON.stringify([
-        { name: 'Basic', price: '$10', features: ['Feature 1', 'Feature 2'] },
-        { name: 'Pro', price: '$20', features: ['Feature 1', 'Feature 2', 'Feature 3'], popular: true }
-      ]);
-    } else if (type === 'hero_v2') {
-      defaultProps.eyebrow = 'Welcome';
-      defaultProps.title = 'Hero Title';
-      defaultProps.subtitle = 'Discover our services';
-      defaultProps.primaryButton = 'Get Started';
-      defaultProps.align = 'center';
-    } else if (type === 'features') {
-      defaultProps.title = 'Our Features';
-      defaultProps.features = [
-        { icon: 'Star', title: 'Feature 1', description: 'Description here' },
-        { icon: 'Heart', title: 'Feature 2', description: 'Description here' },
-        { icon: 'Zap', title: 'Feature 3', description: 'Description here' }
-      ];
-    } else if (type === 'cta') {
-      defaultProps.title = 'Ready to get started?';
-      defaultProps.buttonText = 'Get Started';
-      defaultProps.align = 'center';
-    } else if (type === 'class_schedule') {
-      defaultProps.title = 'Next Classes';
-      defaultProps.subtitle = 'UPCOMING SESSIONS';
-      defaultProps.classes = [
-        { id: '1', name: 'Class 1', time: '09:00 AM', trainer: 'Trainer', category: 'Category', icon: 'Dumbbell' },
-        { id: '2', name: 'Class 2', time: '11:00 AM', trainer: 'Trainer', category: 'Category', icon: 'Heart' }
-      ];
-    } else if (type === 'calendar') {
-      defaultProps.title = 'Schedule';
-    } else if (type === 'testimonials_carousel') {
-      defaultProps.title = 'Testimonials';
-      defaultProps.subtitle = 'WHAT PEOPLE SAY';
-      defaultProps.testimonials = [
-        { id: '1', text: 'Great experience!', name: 'John D.', role: 'Member', rating: 5, avatar: 'JD' },
-        { id: '2', text: 'Highly recommended!', name: 'Jane S.', role: 'Member', rating: 5, avatar: 'JS' },
-        { id: '3', text: 'Amazing service!', name: 'Bob M.', role: 'Member', rating: 5, avatar: 'BM' }
-      ];
-    } else if (type === 'stats') {
-      defaultProps.title = 'Our Impact';
-      defaultProps.stats = [
-        { value: '10K+', label: 'Happy Guests', icon: 'Users' },
-        { value: '50+', label: 'Activities', icon: 'Zap' },
-        { value: '99%', label: 'Satisfaction', icon: 'Heart' }
-      ];
-    } else if (type === 'card_grid') {
-      defaultProps.title = 'Our Services';
-      defaultProps.cards = [
-        { title: 'Service 1', description: 'Description', icon: 'Star' },
-        { title: 'Service 2', description: 'Description', icon: 'Heart' },
-        { title: 'Service 3', description: 'Description', icon: 'Zap' }
-      ];
-    } else if (type === 'divider') {
-      defaultProps.accentColor = '#6366f1';
-    } else if (type === 'spacer') {
-      defaultProps.height = 40;
-    }
+  updateBlock: (id, updates) =>
+    set((state) => {
+      const updateRecursive = (nodes: UIBlock[]): UIBlock[] =>
+        nodes.map((node) => {
+          if (node.id === id) return { ...node, ...updates };
+          if (node.children) return { ...node, children: updateRecursive(node.children) };
+          return node;
+        });
+      const newLayout = updateRecursive(state.layout);
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout: newLayout, history: newHistory, _futureStates: [] };
+    }),
 
-    const newBlock: UIBlock = {
-      id: crypto.randomUUID(),
-      type,
-      label: `New ${type}`,
-      props: defaultProps,
-      style: { width: '100%' },
-      position: { x: 100 + (state.layout.length % 10) * 30, y: 100 + (state.layout.length % 10) * 30, width: '400px', height: 'auto', z: state.layout.length + 1 },
-      children: type === 'container' || type === 'grid' || type === 'form_container' ? [] : undefined
-    };
+  removeBlock: (id) =>
+    set((state) => {
+      const removeRecursive = (nodes: UIBlock[]): UIBlock[] =>
+        nodes
+          .filter((n) => n.id !== id)
+          .map((n) => ({ ...n, children: n.children ? removeRecursive(n.children) : undefined }));
+      const newLayout = removeRecursive(state.layout);
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return {
+        layout: newLayout,
+        selectedBlockId: state.selectedBlockId === id ? null : state.selectedBlockId,
+        selectedBlockIds: state.selectedBlockIds.filter((i) => i !== id),
+        inlineEditingBlockId: state.inlineEditingBlockId === id ? null : state.inlineEditingBlockId,
+        history: newHistory,
+        _futureStates: [],
+      };
+    }),
 
-    const newLayout = [...state.layout, newBlock];
-    const newHistory = [...state.history, [...state.layout]].slice(-50);
-    return { layout: newLayout, history: newHistory, _futureStates: [] };
-  }),
+  moveBlock: (activeId, overId) =>
+    set((state) => {
+      const oldIndex = state.layout.findIndex((x) => x.id === activeId);
+      const newIndex = state.layout.findIndex((x) => x.id === overId);
+      if (oldIndex === -1 || newIndex === -1) return state;
+      const newLayout = [...state.layout];
+      const [moved] = newLayout.splice(oldIndex, 1);
+      newLayout.splice(newIndex, 0, moved);
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout: newLayout, history: newHistory, _futureStates: [] };
+    }),
 
-  updateBlock: (id, updates) => set((state) => {
-    const updateRecursive = (nodes: UIBlock[]): UIBlock[] => {
-      return nodes.map(node => {
-        if (node.id === id) {
-          return { ...node, ...updates };
-        }
-        if (node.children) {
-          return { ...node, children: updateRecursive(node.children) };
-        }
-        return node;
-      });
-    };
-    const newLayout = updateRecursive(state.layout);
-    const newHistory = [...state.history, [...state.layout]].slice(-50);
-    return { layout: newLayout, history: newHistory, _futureStates: [] };
-  }),
+  duplicateBlock: (id) =>
+    set((state) => {
+      const src = state.layout.find((b) => b.id === id);
+      if (!src) return state;
+      const dup: UIBlock = {
+        ...src,
+        id: crypto.randomUUID(),
+        label: `${src.label ?? src.type} (copy)`,
+        position: src.position
+          ? { ...src.position, x: (src.position.x ?? 100) + 24, y: (src.position.y ?? 100) + 24 }
+          : src.position,
+      };
+      const index = state.layout.findIndex((b) => b.id === id);
+      const newLayout = [...state.layout];
+      newLayout.splice(index + 1, 0, dup);
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout: newLayout, history: newHistory, _futureStates: [] };
+    }),
 
-  removeBlock: (id) => set((state) => {
-    const removeRecursive = (nodes: UIBlock[]): UIBlock[] => {
-      return nodes.filter(node => node.id !== id).map(node => ({
-        ...node,
-        children: node.children ? removeRecursive(node.children) : undefined
+  // ── Phase 1 actions ────────────────────────────────────────────────────────
+
+  selectMultiple: (ids) =>
+    set({ selectedBlockIds: ids, selectedBlockId: ids[0] ?? null, inlineEditingBlockId: null }),
+
+  addToSelection: (id) =>
+    set((state) => {
+      if (state.selectedBlockIds.includes(id)) return state;
+      const ids = [...state.selectedBlockIds, id];
+      return { selectedBlockIds: ids, selectedBlockId: state.selectedBlockId ?? id, inlineEditingBlockId: null };
+    }),
+
+  removeFromSelection: (id) =>
+    set((state) => {
+      const ids = state.selectedBlockIds.filter((i) => i !== id);
+      return {
+        selectedBlockIds: ids,
+        selectedBlockId: ids.length > 0 ? ids[ids.length - 1] : null,
+        inlineEditingBlockId: null,
+      };
+    }),
+
+  clearSelection: () =>
+    set({ selectedBlockId: null, selectedBlockIds: [], inlineEditingBlockId: null }),
+
+  setInlineEditing: (id) => set({ inlineEditingBlockId: id }),
+
+  toggleLock: (id) =>
+    set((state) => {
+      const isLocked = state.lockedBlockIds.includes(id);
+      const lockedBlockIds = isLocked
+        ? state.lockedBlockIds.filter((i) => i !== id)
+        : [...state.lockedBlockIds, id];
+      // Also update the locked field on the block itself (for renderer awareness)
+      const layout = state.layout.map((b) =>
+        b.id === id ? { ...b, locked: !isLocked } : b
+      );
+      return { lockedBlockIds, layout };
+    }),
+
+  alignBlocks: (ids, alignment) =>
+    set((state) => {
+      if (ids.length < 2) return state;
+      const blocks = ids
+        .map((id) => state.layout.find((b) => b.id === id))
+        .filter((b): b is UIBlock => b !== undefined && b.position !== undefined);
+      if (blocks.length < 2) return state;
+
+      const bounds = blocks.map((b) => ({
+        id: b.id,
+        x: b.position!.x ?? 0,
+        y: b.position!.y ?? 0,
+        w: parsePx(b.position!.width, 400),
+        h: parsePx(b.position!.height, 200),
       }));
-    };
-    const newLayout = removeRecursive(state.layout);
-    const newHistory = [...state.history, [...state.layout]].slice(-50);
-    return {
-      layout: newLayout,
-      selectedBlockId: state.selectedBlockId === id ? null : state.selectedBlockId,
-      history: newHistory,
-      _futureStates: []
-    };
-  }),
 
-  moveBlock: (activeId, overId) => set((state) => {
-    const oldIndex = state.layout.findIndex((x) => x.id === activeId);
-    const newIndex = state.layout.findIndex((x) => x.id === overId);
+      const newLayout = state.layout.map((block) => {
+        if (!ids.includes(block.id) || !block.position) return block;
+        const b = bounds.find((bd) => bd.id === block.id)!;
+        let x = b.x;
+        let y = b.y;
 
-    if (oldIndex === -1 || newIndex === -1) return state;
+        switch (alignment) {
+          case 'left':   x = Math.min(...bounds.map((bd) => bd.x)); break;
+          case 'right':  x = Math.max(...bounds.map((bd) => bd.x + bd.w)) - b.w; break;
+          case 'center': x = (Math.min(...bounds.map((bd) => bd.x)) + Math.max(...bounds.map((bd) => bd.x + bd.w))) / 2 - b.w / 2; break;
+          case 'top':    y = Math.min(...bounds.map((bd) => bd.y)); break;
+          case 'bottom': y = Math.max(...bounds.map((bd) => bd.y + bd.h)) - b.h; break;
+          case 'middle': y = (Math.min(...bounds.map((bd) => bd.y)) + Math.max(...bounds.map((bd) => bd.y + bd.h))) / 2 - b.h / 2; break;
+        }
 
-    const newLayout = [...state.layout];
-    const [movedItem] = newLayout.splice(oldIndex, 1);
-    newLayout.splice(newIndex, 0, movedItem);
+        return { ...block, position: { ...block.position, x, y } };
+      });
 
-    const newHistory = [...state.history, [...state.layout]].slice(-50);
-    return { layout: newLayout, history: newHistory, _futureStates: [] };
-  }),
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout: newLayout, history: newHistory, _futureStates: [] };
+    }),
 
-  duplicateBlock: (id) => set((state) => {
-    const blockToDuplicate = state.layout.find((b) => b.id === id);
-    if (!blockToDuplicate) return state;
+  distributeBlocks: (ids, direction) =>
+    set((state) => {
+      if (ids.length < 3) return state;
+      const blocks = ids
+        .map((id) => state.layout.find((b) => b.id === id))
+        .filter((b): b is UIBlock => b !== undefined && b.position !== undefined);
+      if (blocks.length < 3) return state;
 
-    const duplicatedBlock: UIBlock = {
-      ...blockToDuplicate,
-      id: crypto.randomUUID(),
-      label: `${blockToDuplicate.label} (copy)`,
-    };
+      const bounds = blocks.map((b) => ({
+        id: b.id,
+        x: b.position!.x ?? 0,
+        y: b.position!.y ?? 0,
+        w: parsePx(b.position!.width, 400),
+        h: parsePx(b.position!.height, 200),
+      }));
 
-    const index = state.layout.findIndex((b) => b.id === id);
-    const newLayout = [...state.layout];
-    newLayout.splice(index + 1, 0, duplicatedBlock);
+      let newLayout = [...state.layout];
 
-    const newHistory = [...state.history, [...state.layout]].slice(-50);
-    return { layout: newLayout, history: newHistory, _futureStates: [] };
-  }),
+      if (direction === 'horizontal') {
+        const sorted = [...bounds].sort((a, b) => a.x - b.x);
+        const totalWidth = sorted.reduce((s, b) => s + b.w, 0);
+        const span = sorted[sorted.length - 1].x + sorted[sorted.length - 1].w - sorted[0].x;
+        const gap = (span - totalWidth) / (sorted.length - 1);
+        let cursor = sorted[0].x;
+        sorted.forEach((b) => {
+          const nx = cursor;
+          newLayout = newLayout.map((block) =>
+            block.id === b.id ? { ...block, position: { ...block.position, x: nx } } : block
+          );
+          cursor += b.w + gap;
+        });
+      } else {
+        const sorted = [...bounds].sort((a, b) => a.y - b.y);
+        const totalHeight = sorted.reduce((s, b) => s + b.h, 0);
+        const span = sorted[sorted.length - 1].y + sorted[sorted.length - 1].h - sorted[0].y;
+        const gap = (span - totalHeight) / (sorted.length - 1);
+        let cursor = sorted[0].y;
+        sorted.forEach((b) => {
+          const ny = cursor;
+          newLayout = newLayout.map((block) =>
+            block.id === b.id ? { ...block, position: { ...block.position, y: ny } } : block
+          );
+          cursor += b.h + gap;
+        });
+      }
+
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout: newLayout, history: newHistory, _futureStates: [] };
+    }),
 }));

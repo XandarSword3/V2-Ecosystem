@@ -6,8 +6,7 @@ import { defaultLocale, type Locale } from '@/i18n';
 
 import Header from '@/components/layout/Header';
 import Footer from '@/components/Footer';
-import { ModuleTransition } from '@/components/effects/ModuleTransition';
-import { LoadingScreenWrapper } from '@/components/effects/LoadingScreen';
+
 import { OfflineStatusIndicator } from '@/components/offline/OfflineStatusIndicator';
 import { JsonLd, generateResortSchema } from '@/lib/structured-data';
 
@@ -183,15 +182,13 @@ export default async function RootLayout({
         className={`${isRtl ? 'font-arabic' : 'font-sans'} bg-cms-background transition-colors duration-300 overflow-x-hidden min-h-dvh`}
       >
         <Providers>
-          <LoadingScreenWrapper minDuration={2000}>
-            <Header />
-            <main className="min-h-[60vh] overflow-x-clip">
-              <ModuleTransition>{children}</ModuleTransition>
-            </main>
-            <Footer />
-            <Toaster position={isRtl ? 'top-left' : 'top-right'} richColors />
-            <OfflineStatusIndicator />
-          </LoadingScreenWrapper>
+          <Header />
+          <main className="min-h-[60vh] overflow-x-clip">
+            {children}
+          </main>
+          <Footer />
+          <Toaster position={isRtl ? 'top-left' : 'top-right'} richColors />
+          <OfflineStatusIndicator />
         </Providers>
       </body>
     </html>
