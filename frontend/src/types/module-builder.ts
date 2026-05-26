@@ -4,28 +4,24 @@
 export type BackgroundType = 'color' | 'gradient' | 'image' | 'video';
 
 export interface BackgroundOverlay {
-  color: string; // e.g., '#000000' or 'rgba(0,0,0,0.5)'
+  color: string;
   opacity: number; // 0-1
 }
 
 export interface SectionBackground {
   type: BackgroundType;
-  // For color background
   color?: string;
-  // For gradient background
   gradient?: {
-    direction: string; // 'to right', '135deg', etc.
-    stops: string[]; // ['#0ea5e9', '#6366f1', '#8b5cf6']
+    direction: string;
+    stops: string[];
   };
-  // For image background
   image?: {
     url: string;
-    position?: string; // 'center', 'top left', etc.
+    position?: string;
     size?: 'cover' | 'contain' | string;
     repeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y';
     attachment?: 'scroll' | 'fixed' | 'local';
   };
-  // For video background
   video?: {
     url: string;
     poster?: string;
@@ -33,14 +29,19 @@ export interface SectionBackground {
     loop?: boolean;
     autoplay?: boolean;
   };
-  // Overlay for text readability
   overlay?: BackgroundOverlay;
 }
 
 // ============================================
 // LAYER 2: Section Layout Modes
 // ============================================
-export type SectionLayout = 'full-width' | 'contained' | 'split-50-50' | 'split-60-40' | 'split-40-60' | 'centered-narrow';
+export type SectionLayout =
+  | 'full-width'
+  | 'contained'
+  | 'split-50-50'
+  | 'split-60-40'
+  | 'split-40-60'
+  | 'centered-narrow';
 
 // ============================================
 // LAYER 3: Element Positioning
@@ -72,23 +73,14 @@ export interface ElementLayer {
 // LAYER 4: Advanced Visual Controls
 // ============================================
 export interface AdvancedStyle extends Omit<UIBlockStyle, 'transform'> {
-  // Opacity and visibility
-  opacity?: number; // 0-1
+  opacity?: number;
   visibility?: 'visible' | 'hidden';
-
-  // Blur and filters
-  backdropFilter?: string; // e.g., 'blur(20px)'
-  filter?: string; // e.g., 'brightness(1.2) contrast(0.9)'
-
-  // Borders
+  backdropFilter?: string;
+  filter?: string;
   borderWidth?: string;
   borderStyle?: 'solid' | 'dashed' | 'dotted' | 'none';
   borderColor?: string;
-
-  // Shadows
-  boxShadow?: string; // e.g., '0 10px 30px rgba(0,0,0,0.15)'
-
-  // Transforms (as object for editor, converted to string for CSS)
+  boxShadow?: string;
   transform?: {
     translateX?: string;
     translateY?: string;
@@ -97,9 +89,21 @@ export interface AdvancedStyle extends Omit<UIBlockStyle, 'transform'> {
     skewX?: string;
     skewY?: string;
   };
-
-  // Blend modes
-  mixBlendMode?: 'normal' | 'multiply' | 'screen' | 'overlay' | 'soft-light' | 'hard-light' | 'color-dodge' | 'color-burn' | 'difference' | 'exclusion' | 'hue' | 'saturation' | 'color' | 'luminosity';
+  mixBlendMode?:
+    | 'normal'
+    | 'multiply'
+    | 'screen'
+    | 'overlay'
+    | 'soft-light'
+    | 'hard-light'
+    | 'color-dodge'
+    | 'color-burn'
+    | 'difference'
+    | 'exclusion'
+    | 'hue'
+    | 'saturation'
+    | 'color'
+    | 'luminosity';
 }
 
 // ============================================
@@ -109,13 +113,13 @@ export type HeightMode = 'auto' | 'fixed' | 'min-height' | 'full-screen' | 'view
 
 export interface SectionHeight {
   mode: HeightMode;
-  value?: string; // e.g., '500px', '100vh', 'min-600px'
+  value?: string;
   minHeight?: string;
   maxHeight?: string;
 }
 
 // ============================================
-// CORE TYPE DEFINITIONS (Extended)
+// CORE TYPE DEFINITIONS
 // ============================================
 export type UIComponentType =
   | 'container'
@@ -130,7 +134,6 @@ export type UIComponentType =
   | 'form_container'
   | 'testimonials'
   | 'pricing_table'
-  // New glassmorphic components
   | 'hero_v2'
   | 'card_grid'
   | 'stats'
@@ -138,14 +141,11 @@ export type UIComponentType =
   | 'cta'
   | 'divider'
   | 'spacer'
-  // Gym/Session specific components
   | 'class_schedule'
   | 'calendar'
   | 'testimonials_carousel'
-  // Section wrapper for backgrounds
   | 'section';
 
-// Base UIBlockStyle (backward compatible)
 export interface UIBlockStyle {
   backgroundColor?: string;
   backgroundImage?: string;
@@ -160,7 +160,6 @@ export interface UIBlockStyle {
   gap?: string;
   justifyContent?: string;
   alignItems?: string;
-  // Extended properties (Layer 4)
   opacity?: number;
   backdropFilter?: string;
   filter?: string;
@@ -170,7 +169,6 @@ export interface UIBlockStyle {
   boxShadow?: string;
   transform?: string;
   mixBlendMode?: string;
-  // Text formatting (PowerPoint-style)
   fontFamily?: string;
   fontSize?: string;
   fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
@@ -179,23 +177,36 @@ export interface UIBlockStyle {
   textAlign?: 'left' | 'center' | 'right' | 'justify';
   lineHeight?: string;
   letterSpacing?: string;
+  // Visibility (used by LayersPanel eye toggle)
+  visibility?: 'visible' | 'hidden';
 }
 
-// Freeform positioning for PowerPoint-style canvas
 export interface BlockPosition {
-  x?: number;          // left offset in px (or % with unit)
-  y?: number;          // top offset in px (or % with unit)
-  z?: number;          // z-index for stacking/overlap
-  width?: string;      // explicit width (e.g. '300px', '50%')
-  height?: string;     // explicit height (e.g. '200px', 'auto')
-  rotation?: number;   // degrees of rotation
-  scale?: number;      // scale factor (1 = 100%)
+  x?: number;
+  y?: number;
+  z?: number;
+  width?: string;
+  height?: string;
+  rotation?: number;
+  scale?: number;
 }
 
-// Layout mode for the canvas
 export type CanvasMode = 'stack' | 'freeform';
 
-// Extended UIBlock with all 5 layers
+// ============================================
+// ALIGNMENT TYPES (Phase 1 multi-select)
+// ============================================
+export type AlignmentDirection =
+  | 'left'
+  | 'center'
+  | 'right'
+  | 'top'
+  | 'middle'
+  | 'bottom';
+
+// ============================================
+// EXTENDED UIBLOCK — 5 layers + Phase 1 fields
+// ============================================
 export interface UIBlock {
   id: string;
   type: UIComponentType;
@@ -210,14 +221,17 @@ export interface UIBlock {
   // LAYER 2: Section Layout
   sectionLayout?: SectionLayout;
 
-  // LAYER 3: Element Layers (for positioned content)
+  // LAYER 3: Element Layers
   layers?: ElementLayer[];
 
   // LAYER 5: Section Height Control
   sectionHeight?: SectionHeight;
 
-  // Freeform positioning (PowerPoint-style canvas)
+  // Freeform canvas positioning
   position?: BlockPosition;
+
+  // Phase 1: LayersPanel controls
+  locked?: boolean;            // prevents canvas selection/drag when true
 }
 
 export interface ModuleTemplate {
@@ -233,7 +247,7 @@ export interface ModuleBuilderState {
   activeModuleId: string | null;
   layout: UIBlock[];
   selectedBlockId: string | null;
-  selectedLayerId?: string | null; // For Layer 3
+  selectedLayerId?: string | null;
   history: UIBlock[][];
   historyIndex: number;
 }
