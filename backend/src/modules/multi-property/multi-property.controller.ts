@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as multiPropertyService from './multi-property.service.js';
 import * as settingsService from './settings-resolution.service.js';
+import { assertPropertyLimit } from '../../services/feature-limits.service.js';
 
 // ==================== PROPERTY GROUPS ====================
 
@@ -416,41 +417,56 @@ export async function calculateBenchmarks(req: Request, res: Response): Promise<
 
 export async function createProperty(req: Request, res: Response): Promise<void> {
   try {
-    const { name, property_code, property_type, address, city, country, timezone, currency, phone, email, total_rooms, group_id } = req.body;
+    // Enforce tenant property limit before any DB work
+    await assertPropertyLimit(req);
+
+    const { name, property_code, property_type, address, city, country, timezone, currency, phone, email, total_rooms, group_id, slug } = req.body;
 
     if (!name) {
       res.status(400).json({ error: 'Property name is required' });
       return;
     }
 
-    const property = await multiPropertyService.createProperty({
-      name,
-      property_code,
-      property_type,
-      address,
-      city,
-      country,
-      timezone,
-      currency,
-      phone,
-      email,
-      total_rooms,
-      group_id,
-    });
+    const { getSupabase } = await import('../../database/connection.js');
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+      .from('properties')
+      .insert({
+        name,
+        group_id: group_id ?? null,
+        property_code: property_code ?? null,
+        property_type: property_type ?? 'hotel',
+        address: address ?? null,
+        city: city ?? null,
+        country: country ?? null,
+        timezone: timezone ?? 'UTC',
+        currency: currency ?? null,
+        phone: phone ?? null,
+        email: email ?? null,
+        total_rooms: total_rooms ?? null,
+        slug: slug ?? name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     // Grant the creating user admin access to the new property
     const userId = req.user?.id;
     if (userId) {
-      await multiPropertyService.grantPropertyAccess(userId, property.id, 'admin', userId, { isPrimary: true });
+      await multiPropertyService.grantPropertyAccess(userId, data.id, 'admin', userId, { isPrimary: true });
     }
 
     res.status(201).json({
       success: true,
-      data: property,
+      data,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create property';
-    res.status(400).json({ error: message });
+    const status = (error as any)?.statusCode ?? 400;
+    res.status(status).json({ error: message });
   }
 }
 
@@ -548,3 +564,4 @@ export async function updateGroupSetting(req: Request, res: Response): Promise<v
     res.status(400).json({ error: message });
   }
 }
+

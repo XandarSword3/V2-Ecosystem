@@ -298,6 +298,8 @@ export interface AuthenticatedUser {
   permissions?: string[];
   tokenVersion?: number;
   jti?: string;
+  tenantId?: string;
+  isPlatformAdmin?: boolean;
 }
 
 // Extend Express Request type

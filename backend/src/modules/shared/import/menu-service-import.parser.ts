@@ -195,20 +195,122 @@ function validateAndTransformMenuItem(raw: unknown): ParsedMenuItem | null {
   return item;
 }
 
+// ─── Header normalisation ────────────────────────────────────────────────────
+// Maps every reasonable variation a human might write to the canonical field
+// name the parser/validator expects.  Keys are lower-cased + spaces-stripped.
+const HEADER_ALIASES: Record<string, string> = {
+  // name
+  'name':            'name',
+  'itemname':        'name',
+  'item name':       'name',
+  'item_name':       'name',
+  'menuitem':        'name',
+  'menu item':       'name',
+  'product':         'name',
+  'product name':    'name',
+  'productname':     'name',
+  'title':           'name',
+  // price
+  'price':           'price',
+  'unitprice':       'price',
+  'unit price':      'price',
+  'cost':            'price',
+  'amount':          'price',
+  // category
+  'category':        'category',
+  'cat':             'category',
+  'section':         'category',
+  'group':           'category',
+  'type':            'category',
+  // description
+  'description':     'description',
+  'desc':            'description',
+  'details':         'description',
+  'notes':           'description',
+  'info':            'description',
+  // is_available
+  'is_available':    'is_available',
+  'isavailable':     'is_available',
+  'available':       'is_available',
+  'active':          'is_available',
+  'enabled':         'is_available',
+  'visibility':      'is_available',
+  'visible':         'is_available',
+  'status':          'is_available',
+  // discount_price
+  'discount_price':  'discount_price',
+  'discountprice':   'discount_price',
+  'discount':        'discount_price',
+  'sale price':      'discount_price',
+  'saleprice':       'discount_price',
+  // preparation_time
+  'preparation_time':'preparation_time',
+  'preparationtime': 'preparation_time',
+  'prep time':       'preparation_time',
+  'preptime':        'preparation_time',
+  'prep':            'preparation_time',
+  // calories
+  'calories':        'calories',
+  'cal':             'calories',
+  'kcal':            'calories',
+  'energy':          'calories',
+  // allergens / dietary tags
+  'allergens':       'allergens',
+  'allergen':        'allergens',
+  'dietary tags':    'allergens',
+  'dietarytags':     'allergens',
+  'dietary':         'allergens',
+  'diet':            'allergens',
+  'tags':            'allergens',
+};
+
+function normaliseHeader(raw: string): string {
+  const key = raw.trim().toLowerCase();
+  return HEADER_ALIASES[key] ?? key; // fall back to the trimmed original
+}
+
+// ─── Truthy value normalisation ───────────────────────────────────────────────
+const TRUTHY = new Set(['true', '1', 'yes', 'y', 'on', 'active', 'available', 'visible']);
+
 /**
- * Parse CSV buffer into menu items
+ * Parse CSV buffer into menu items.
+ *
+ * Accepts flexible column names (see HEADER_ALIASES above).
+ * Rows with quoted fields (RFC 4180) are handled correctly.
  */
 export async function parseCsvImport(buffer: Buffer): Promise<MenuImportResult> {
-  // CSV parsing for menu items - simplified implementation
-  // In production, use a proper CSV parser library
   const warnings: string[] = [];
   const errors: string[] = [];
 
   try {
-    const text = buffer.toString('utf-8');
-    const lines = text.split('\n').filter(line => line.trim());
-    
-    if (lines.length < 2) {
+    // Normalise line endings (Windows CRLF → LF)
+    const text = buffer.toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const rawLines = text.split('\n');
+
+    // RFC-4180 field splitter — handles quoted fields containing commas
+    const splitCsvLine = (line: string): string[] => {
+      const fields: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let ci = 0; ci < line.length; ci++) {
+        const ch = line[ci];
+        if (ch === '"') {
+          if (inQuotes && line[ci + 1] === '"') { current += '"'; ci++; } // escaped quote
+          else { inQuotes = !inQuotes; }
+        } else if (ch === ',' && !inQuotes) {
+          fields.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      fields.push(current.trim());
+      return fields;
+    };
+
+    const nonEmptyLines = rawLines.filter(l => l.trim());
+
+    if (nonEmptyLines.length < 2) {
       return {
         items: [],
         warnings,
@@ -218,27 +320,41 @@ export async function parseCsvImport(buffer: Buffer): Promise<MenuImportResult> 
       };
     }
 
-    // Simple CSV to JSON conversion
-    // Expected headers: name, price, category, description, is_available, etc.
-    const headers = lines[0].split(',').map(h => h.trim());
+    // Normalise headers
+    const rawHeaders = splitCsvLine(nonEmptyLines[0]);
+    const headers = rawHeaders.map(normaliseHeader);
+
+    // Warn about any header that wasn't recognised and will be ignored
+    rawHeaders.forEach((raw, idx) => {
+      if (headers[idx] === raw.trim().toLowerCase() && !(
+        ['name','price','category','description','is_available',
+         'discount_price','preparation_time','calories','allergens']
+          .includes(headers[idx])
+      )) {
+        warnings.push(`Unrecognised column "${raw}" — it will be ignored`);
+      }
+    });
+
+    const numericFields = new Set(['price', 'discount_price', 'preparation_time', 'calories']);
     const items: ParsedMenuItem[] = [];
 
-    for (let i = 1; i < lines.length; i++) {
+    for (let i = 1; i < nonEmptyLines.length; i++) {
       try {
-        const values = lines[i].split(',').map(v => v.trim());
+        const values = splitCsvLine(nonEmptyLines[i]);
         const obj: Record<string, unknown> = {};
-        
+
         headers.forEach((h, idx) => {
-          if (values[idx] !== undefined) {
-            if (h === 'price' || h === 'discount_price' || h === 'preparation_time' || h === 'calories') {
-              obj[h] = parseFloat(values[idx]) || 0;
-            } else if (h === 'is_available') {
-              obj[h] = values[idx].toLowerCase() === 'true';
-            } else if (h === 'allergens') {
-              obj[h] = values[idx].split(';').filter(Boolean);
-            } else {
-              obj[h] = values[idx];
-            }
+          const raw = values[idx] ?? '';
+          if (numericFields.has(h)) {
+            const n = parseFloat(raw);
+            if (!isNaN(n)) obj[h] = n;
+          } else if (h === 'is_available') {
+            obj[h] = TRUTHY.has(raw.toLowerCase());
+          } else if (h === 'allergens') {
+            // Accept semicolon-separated OR comma-would-be-fine-if-unquoted values
+            obj[h] = raw.split(/[;|]/).map(s => s.trim()).filter(Boolean);
+          } else {
+            obj[h] = raw;
           }
         });
 
@@ -253,7 +369,7 @@ export async function parseCsvImport(buffer: Buffer): Promise<MenuImportResult> 
       items,
       warnings,
       errors,
-      totalParsed: lines.length - 1,
+      totalParsed: nonEmptyLines.length - 1,
       successful: items.length,
     };
   } catch (err) {

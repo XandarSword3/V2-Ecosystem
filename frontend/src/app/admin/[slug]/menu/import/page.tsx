@@ -49,8 +49,8 @@ export default function MenuImportPage() {
   return (
     <ImportWizard<MenuItem>
       title="Import Menu"
-      parseEndpoint={`/api/modules/${slug}/import/parse`}
-      commitEndpoint={`/api/modules/${slug}/import/commit`}
+      parseEndpoint={`/${slug}/import/parse`}
+      commitEndpoint={`/${slug}/import/commit`}
       llmPlaceholder={`Paste your menu here in any format. Examples:
 • Margherita Pizza $12.99 - Classic tomato and mozzarella
 • Greek Salad $8.50 (Salads) - Fresh cucumber and feta

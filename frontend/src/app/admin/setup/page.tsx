@@ -184,9 +184,12 @@ export default function SetupWizardPage() {
     }
   };
 
-  // Helper: parse CSV string
+  // Helper: parse CSV string (handles Windows CRLF and Unix LF)
   const parseCsvText = (text: string) => {
-    const lines = text.split('\n');
+    // Normalise line endings — Windows CSVs use \r\n which leaves stray \r
+    // on every last-column cell value if we only split on \n.
+    const normalised = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = normalised.split('\n');
     return lines.map(line => {
       const result: string[] = [];
       let current = '';

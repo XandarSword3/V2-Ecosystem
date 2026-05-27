@@ -21,6 +21,22 @@ export function useOfflineSync() {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    // Only initialize offline sync if the user has an auth token.
+    // Without a token the hydration calls will 401 before login is complete.
+    const token =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('auth_token') ||
+          localStorage.getItem('token') ||
+          sessionStorage.getItem('auth_token') ||
+          sessionStorage.getItem('token')
+        : null;
+
+    if (!token) {
+      // No token yet — skip init. The hook will re-run if the component re-mounts
+      // after login, or the sync can be triggered manually.
+      return;
+    }
+
     // Initialize offline sync
     initOfflineSync().then(() => {
       setInitialized(true);

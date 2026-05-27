@@ -3,8 +3,7 @@
  * Tracks and exposes business-level KPIs and metrics
  */
 
-import { getSupabase } from "../database/connection.js";
-const supabase = getSupabase();
+import { supabase } from "../lib/supabase.js";
 import { getRedis } from "../config/session-store.js";
 
 export interface BookingMetrics {

@@ -44,6 +44,9 @@ import searchRoutes from './routes/search.routes.js';
 import { getDynamicModulesRouter, loadDynamicModules as reloadDynamicModules } from './routes/dynamic-modules.loader.js';
 import unitsRoutes from './routes/units.routes.js';
 // legacyRouteHandler removed — dynamic module router correctly handles all module slugs
+import platformRoutes from './modules/platform/platform.routes.js';
+import { handleSaasStripeWebhook } from './modules/platform/saas-webhook.controller.js';
+import { skipTenantGate, tenantGate } from './middleware/tenantAccess.middleware.js';
 
 const app = express();
 
@@ -61,6 +64,15 @@ app.use(helmet());
 app.use(cors({ origin: config.corsOrigins, credentials: true }));
 app.use(compression());
 app.use(cookieParser());
+// SaaS Stripe webhook — must receive raw body BEFORE express.json() is applied
+// express.raw() preserves the buffer Stripe needs for signature verification
+app.post(
+  '/api/webhooks/stripe/saas',
+  skipTenantGate,
+  express.raw({ type: 'application/json' }),
+  handleSaasStripeWebhook,
+);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -128,6 +140,13 @@ const apiRouter = express.Router();
 // GDPR: Log staff access to PII-containing routes
 import { gdprAccessLogger } from './middleware/gdpr-access-logger.js';
 apiRouter.use(gdprAccessLogger);
+
+// ── Tenant gate ──────────────────────────────────────────────────────────────
+// Resolves the calling tenant (via X-Tenant-ID header, X-Tenant-Slug header,
+// or subdomain) and blocks suspended/cancelled tenants with 402.
+// Passes through cleanly when no tenant resolves (legacy single-tenant mode).
+apiRouter.use(tenantGate);
+// ────────────────────────────────────────────────────────────────────────────
 
 // Add health check to API router
 apiRouter.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
@@ -235,6 +254,9 @@ apiRouter.use(getDynamicModulesRouter());
 // Economics Routes
 import { economicsRoutes } from './modules/economics/economics.routes.js';
 apiRouter.use('/economics', economicsRoutes);
+
+// Platform SaaS routes (checkout, billing portal, control plane)
+apiRouter.use('/platform', platformRoutes);
 
 // Module Templates Routes
 import templateRoutes from './modules/templates/templates.routes.js';

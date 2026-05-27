@@ -17,21 +17,27 @@ function getNotificationService() {
 }
 
 export const getNotifications = asyncHandler(async (req: Request, res: Response) => {
-  const svc = getNotificationService();
-  const { userId } = req.query;
-  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+  try {
+    const svc = getNotificationService();
+    const { userId } = req.query;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
 
-  const notifications = await svc.getForUser(
-    userId as string || req.user?.userId || '',
-    {
-      unreadOnly: req.query.unreadOnly === 'true',
-      type: req.query.type as any,
-      limit: parseInt(req.query.limit as string) || 20,
-      propertyId,
-    }
-  );
+    const notifications = await svc.getForUser(
+      userId as string || req.user?.userId || '',
+      {
+        unreadOnly: req.query.unreadOnly === 'true',
+        type: req.query.type as any,
+        limit: parseInt(req.query.limit as string) || 20,
+        propertyId,
+      }
+    );
 
-  res.json({ success: true, data: notifications, total: notifications.length });
+    res.json({ success: true, data: notifications, total: notifications.length });
+  } catch (err) {
+    // Log but return empty — polling clients should not get cascading 500s
+    logger.warn('getNotifications failed, returning empty list:', err instanceof Error ? err.message : String(err));
+    res.json({ success: true, data: [], total: 0 });
+  }
 });
 
 export const markNotificationRead = asyncHandler(async (req: Request, res: Response) => {

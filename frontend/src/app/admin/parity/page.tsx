@@ -31,15 +31,17 @@ import api from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface ParityStats {
+  totalChecksToday: number;
+  violationsToday: number;
+  complianceRate: number;
+  mostProblematicChannel: string | null;
+}
+
 interface ParityDashboard {
   config: ParityConfig;
   recentAlerts: ParityAlert[];
-  stats: {
-    totalChecksToday: number;
-    violationsToday: number;
-    complianceRate: number;
-    mostProblematicChannel: string | null;
-  };
+  stats: ParityStats;
   recentChecks: ParityCheck[];
 }
 
@@ -130,6 +132,26 @@ const fmtPct = (n?: number) => n != null ? `${n > 0 ? '+' : ''}${n.toFixed(1)}%`
 const fmtRate = (n?: number, currency = 'USD') =>
   n != null ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(n) : '—';
 
+// Safe stats accessor — returns zeroed defaults if stats is missing
+const safeStats = (dashboard: ParityDashboard | undefined): ParityStats => ({
+  totalChecksToday: dashboard?.stats?.totalChecksToday ?? 0,
+  violationsToday: dashboard?.stats?.violationsToday ?? 0,
+  complianceRate: dashboard?.stats?.complianceRate ?? 0,
+  mostProblematicChannel: dashboard?.stats?.mostProblematicChannel ?? null,
+});
+
+// Safely extract an array from any API response envelope
+function extractArray<T>(raw: unknown): T[] {
+  if (Array.isArray(raw)) return raw as T[];
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    for (const key of ['checks', 'data', 'alerts', 'results', 'items']) {
+      if (Array.isArray(obj[key])) return obj[key] as T[];
+    }
+  }
+  return [];
+}
+
 type Tab = 'dashboard' | 'alerts' | 'history' | 'config';
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -165,7 +187,7 @@ export default function ParityPage() {
     queryKey: ['parity-alerts', activePropertyId],
     queryFn: async () => {
       const res = await api.get(`/rate-parity/properties/${activePropertyId}/alerts`);
-      return (res.data?.alerts || res.data || []) as ParityAlert[];
+      return extractArray<ParityAlert>(res.data);
     },
     enabled: !!activePropertyId && activeTab === 'alerts',
   });
@@ -174,7 +196,8 @@ export default function ParityPage() {
     queryKey: ['parity-history', activePropertyId, historyStart, historyEnd],
     queryFn: async () => {
       const res = await api.get(`/rate-parity/properties/${activePropertyId}/history?start=${historyStart}&end=${historyEnd}`);
-      return (res.data?.checks || res.data || []) as ParityCheck[];
+      // Defensively extract array regardless of response envelope shape
+      return extractArray<ParityCheck>(res.data);
     },
     enabled: !!activePropertyId && activeTab === 'history',
   });
@@ -231,6 +254,9 @@ export default function ParityPage() {
   });
 
   const cfg = configDraft || config;
+
+  // Derive safe stats once (avoids repeated optional chaining throughout JSX)
+  const stats = safeStats(dashboard);
 
   if (!activePropertyId) {
     return (
@@ -295,9 +321,9 @@ export default function ParityPage() {
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
-              {tab.id === 'alerts' && dashboard && dashboard.stats.violationsToday > 0 && (
+              {tab.id === 'alerts' && stats.violationsToday > 0 && (
                 <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 font-semibold">
-                  {dashboard.stats.violationsToday}
+                  {stats.violationsToday}
                 </span>
               )}
             </button>
@@ -325,34 +351,34 @@ export default function ParityPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                     <p className="text-xs text-gray-500 mb-1">Compliance Rate</p>
-                    <p className={`text-3xl font-bold ${dashboard.stats.complianceRate >= 90 ? 'text-green-600' : dashboard.stats.complianceRate >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>
-                      {dashboard.stats.complianceRate.toFixed(0)}%
+                    <p className={`text-3xl font-bold ${stats.complianceRate >= 90 ? 'text-green-600' : stats.complianceRate >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      {stats.complianceRate.toFixed(0)}%
                     </p>
                     <p className="text-xs text-gray-400 mt-1">Today</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                     <p className="text-xs text-gray-500 mb-1">Checks Today</p>
-                    <p className="text-3xl font-bold text-gray-900">{dashboard.stats.totalChecksToday}</p>
+                    <p className="text-3xl font-bold text-gray-900">{stats.totalChecksToday}</p>
                     <p className="text-xs text-gray-400 mt-1">across all room types</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                     <p className="text-xs text-gray-500 mb-1">Violations Today</p>
-                    <p className={`text-3xl font-bold ${dashboard.stats.violationsToday > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      {dashboard.stats.violationsToday}
+                    <p className={`text-3xl font-bold ${stats.violationsToday > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {stats.violationsToday}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">price disparities detected</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                     <p className="text-xs text-gray-500 mb-1">Problem Channel</p>
                     <p className="text-lg font-bold text-gray-900 truncate">
-                      {dashboard.stats.mostProblematicChannel || '—'}
+                      {stats.mostProblematicChannel ?? '—'}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">most violations (30d)</p>
                   </div>
                 </div>
 
                 {/* Recent alerts */}
-                {dashboard.recentAlerts.length > 0 && (
+                {(dashboard.recentAlerts?.length ?? 0) > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                       <h3 className="font-semibold text-gray-900 text-sm">Recent Alerts</h3>
@@ -361,7 +387,7 @@ export default function ParityPage() {
                       </button>
                     </div>
                     <div className="divide-y divide-gray-50">
-                      {dashboard.recentAlerts.slice(0, 5).map(alert => (
+                      {(dashboard.recentAlerts ?? []).slice(0, 5).map(alert => (
                         <div key={alert.id} className="px-5 py-3 flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${severityColor(alert.severity)}`}>
@@ -389,13 +415,13 @@ export default function ParityPage() {
                 )}
 
                 {/* Recent checks */}
-                {dashboard.recentChecks.length > 0 && (
+                {(dashboard.recentChecks?.length ?? 0) > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className="px-5 py-4 border-b border-gray-100">
                       <h3 className="font-semibold text-gray-900 text-sm">Recent Checks</h3>
                     </div>
                     <div className="divide-y divide-gray-50">
-                      {dashboard.recentChecks.slice(0, 8).map(check => (
+                      {(dashboard.recentChecks ?? []).slice(0, 8).map(check => (
                         <div key={check.id} className="px-5 py-3 flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${checkStatusColor(check.status)}`}>
@@ -753,7 +779,7 @@ export default function ParityPage() {
                       <span key={email} className="flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs">
                         {email}
                         <button
-                          onClick={() => setConfigDraft(p => ({ ...p!, notification_emails: ( p!.notification_emails || []).filter(e => e !== email) }))}
+                          onClick={() => setConfigDraft(p => ({ ...p!, notification_emails: (p!.notification_emails || []).filter(e => e !== email) }))}
                           className="hover:text-red-500"
                         >
                           <X className="w-3 h-3" />

@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/Button';
 
 interface ModuleWithLayout {
   id: string;
-  template_type: 'menu_service' | 'multi_day_booking' | 'session_access';
+  template_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
   name: string;
   slug: string;
   description?: string;
@@ -175,14 +175,22 @@ export default function ModulePage() {
     return <DynamicModuleRenderer layout={currentModule.settings.layout} module={currentModule} />;
   }
 
-  // Fallback to legacy hardcoded templates
+  // Fallback to legacy hardcoded templates for modules that have no custom layout.
+  // Maps real engine types → nearest legacy component.
   switch (currentModule.template_type) {
-    case 'menu_service':
+    case 'instant_transaction':
       return <MenuService module={currentModule} />;
-    case 'multi_day_booking':
+    case 'time_exclusive_reservation':
       return <BookingService module={currentModule} />;
-    case 'session_access':
+    case 'shared_capacity_access':
       return <SessionService module={currentModule} />;
+    case 'ongoing_entitlement':
+      // No dedicated legacy component yet — fall through to generic message.
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <p>Module type &quot;{currentModule.template_type}&quot; has no default renderer. Build a layout in the Visual Builder.</p>
+        </div>
+      );
     default:
       return (
         <div className="min-h-screen flex items-center justify-center">

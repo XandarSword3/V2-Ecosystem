@@ -502,13 +502,13 @@ export default function AdminDashboard() {
                 let href = `/admin/${module.slug}`;
                 let label = `Manage ${module.name}`;
                 
-                if (module.template_type === 'menu_service') {
+                if (module.template_type === 'instant_transaction') {
                   href = `/admin/${module.slug}/menu`;
                   label = `${module.name} Menu`;
-                } else if (module.template_type === 'multi_day_booking') {
+                } else if (module.template_type === 'time_exclusive_reservation') {
                   href = `/admin/${module.slug}/bookings`;
                   label = `${module.name} Bookings`;
-                } else if (module.template_type === 'session_access') {
+                } else if (module.template_type === 'shared_capacity_access') {
                   href = `/admin/${module.slug}/sessions`;
                   label = `${module.name} Sessions`;
                 }
