@@ -1535,7 +1535,7 @@ function PricingTableComponent({ module, props, isEditing = false, onUpdateProps
   const { data: pricingRes } = useQuery({
     queryKey: ['module-pricing', module.slug, module.template_type],
     queryFn: async () => {
-      if (module.template_type === 'session_access') {
+      if (module.template_type === 'shared_capacity_access') {
         return api.get(`/${module.slug}/sessions`);
       }
       return api.get(`/${module.slug}/plans`);
@@ -1544,7 +1544,7 @@ function PricingTableComponent({ module, props, isEditing = false, onUpdateProps
   });
 
   let plans: any[] = [];
-  if (module.template_type === 'session_access') {
+  if (module.template_type === 'shared_capacity_access') {
     plans = (pricingRes?.data?.data || []).map((s: any) => ({
       name: s.name || s.session_name || 'Session',
       price: String(s.price || s.adult_price || 0),

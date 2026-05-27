@@ -57,6 +57,7 @@ export function OfflineStatusIndicator() {
         {/* Offline Warning */}
         {!isOnline && (
           <motion.div
+            key="offline-warning"
             initial={{ opacity: 0, y: 20, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
@@ -70,6 +71,7 @@ export function OfflineStatusIndicator() {
         {/* Syncing Indicator */}
         {isSyncing && (
           <motion.div
+            key="syncing"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
@@ -83,6 +85,7 @@ export function OfflineStatusIndicator() {
         {/* Staleness / Last Updated Indicator */}
         {lastSyncAt && isOnline && !isSyncing && (
           <motion.div
+            key="last-updated"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className={`px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm font-medium transition-colors ${
@@ -99,6 +102,7 @@ export function OfflineStatusIndicator() {
         {/* Pending Actions Count */}
         {pendingCount > 0 && !isSyncing && (
           <motion.div
+            key="pending"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-slate-800 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm font-medium"
@@ -111,6 +115,7 @@ export function OfflineStatusIndicator() {
         {/* Success Indicator */}
         {showSyncSuccess && isOnline && (
           <motion.div
+            key="sync-success"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
@@ -124,6 +129,7 @@ export function OfflineStatusIndicator() {
         {/* Error Indicator */}
         {error && (
           <motion.div
+            key="sync-error"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-red-600 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm font-medium"

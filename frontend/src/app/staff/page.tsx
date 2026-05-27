@@ -327,12 +327,12 @@ export default function StaffDashboard() {
       let bgColor = 'bg-blue-50 dark:bg-blue-950/30';
       let description = 'Manage module';
 
-      if (m.template_type === 'menu_service') {
+      if (m.template_type === 'instant_transaction') {
         icon = ChefHat;
         color = 'from-orange-400 to-rose-500';
         bgColor = 'bg-orange-50 dark:bg-orange-950/30';
         description = 'Kitchen view';
-      } else if (m.template_type === 'session_access') {
+      } else if (m.template_type === 'shared_capacity_access') {
         icon = Waves;
         color = 'from-primary-400 to-secondary-500';
         bgColor = 'bg-primary-50 dark:bg-primary-950/30';

@@ -152,9 +152,10 @@ export default function DynamicModuleDashboard() {
 
   return (
     <div className="space-y-6">
-      {currentModule.template_type === 'menu_service' && renderMenuServiceDashboard()}
-      {currentModule.template_type === 'multi_day_booking' && renderBookingDashboard()}
-      {currentModule.template_type === 'session_access' && renderSessionDashboard()}
+      {currentModule.template_type === 'instant_transaction' && renderMenuServiceDashboard()}
+      {currentModule.template_type === 'time_exclusive_reservation' && renderBookingDashboard()}
+      {currentModule.template_type === 'shared_capacity_access' && renderSessionDashboard()}
+      {currentModule.template_type === 'ongoing_entitlement' && renderSessionDashboard()}
     </div>
   );
 }

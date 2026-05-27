@@ -92,7 +92,20 @@ export default function NavbarSettingsPage() {
         try {
             const { data } = await api.get('/admin/settings');
             if (data?.data?.navbar) {
-                setNavbar(data.data.navbar);
+                // Deep-merge with DEFAULT_CONFIG so navbar.config is always
+                // populated even when the stored value was written by the
+                // auto-add-module path (which only stores { links: [...] }).
+                setNavbar({
+                    ...DEFAULT_CONFIG,
+                    ...data.data.navbar,
+                    config: {
+                        ...DEFAULT_CONFIG.config,
+                        ...(data.data.navbar.config ?? {}),
+                    },
+                    links: Array.isArray(data.data.navbar.links)
+                        ? data.data.navbar.links
+                        : DEFAULT_CONFIG.links,
+                });
             }
         } catch (error) {
             console.error('Failed to fetch navbar settings:', error);

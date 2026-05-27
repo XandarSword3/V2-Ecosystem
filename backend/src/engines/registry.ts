@@ -20,6 +20,7 @@ import { instantTransactionEngine } from './definitions/instant-transaction.js';
 import { timeExclusiveReservationEngine } from './definitions/time-exclusive-reservation.js';
 import { sharedCapacityAccessEngine } from './definitions/shared-capacity-access.js';
 import { ongoingEntitlementEngine } from './definitions/ongoing-entitlement.js';
+import { platformEntitlementEngine } from './definitions/platform-entitlement.js';
 
 // ============================================
 // Engine Registry
@@ -30,6 +31,7 @@ const ENGINE_REGISTRY: Record<EngineType, EngineDefinition> = {
   time_exclusive_reservation: timeExclusiveReservationEngine,
   shared_capacity_access: sharedCapacityAccessEngine,
   ongoing_entitlement: ongoingEntitlementEngine,
+  platform_entitlement: platformEntitlementEngine,
 };
 
 /**
@@ -124,3 +126,4 @@ export { instantTransactionEngine } from './definitions/instant-transaction.js';
 export { timeExclusiveReservationEngine } from './definitions/time-exclusive-reservation.js';
 export { sharedCapacityAccessEngine } from './definitions/shared-capacity-access.js';
 export { ongoingEntitlementEngine } from './definitions/ongoing-entitlement.js';
+export { platformEntitlementEngine } from './definitions/platform-entitlement.js';

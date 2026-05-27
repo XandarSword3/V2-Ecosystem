@@ -1,4 +1,4 @@
-import { getSupabase } from '../database/connection.js';
+import { getSupabase } from '../lib/supabase.js';
 const supabase = getSupabase();
 import { logger } from '../utils/logger.js';
 import Stripe from 'stripe';
@@ -238,7 +238,6 @@ class SeasonalPricingService {
     // Apply weekend pricing (if applicable)
     const dayOfWeek = checkInDate.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6) {
-      // Get weekend pricing from settings
       const { data: weekendSettings } = await supabase
         .from('system_settings')
         .select('value')
@@ -263,7 +262,6 @@ class SeasonalPricingService {
         (checkInDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );
 
-      // Early bird discount
       if (daysUntilBooking >= dynamicConfig.advanceBookingDays) {
         const earlyBirdAdjustment = basePrice * -dynamicConfig.earlyBirdDiscount;
         dynamicAdjustment += earlyBirdAdjustment;
@@ -272,9 +270,7 @@ class SeasonalPricingService {
           multiplier: 1 - dynamicConfig.earlyBirdDiscount,
           type: 'early_bird',
         });
-      }
-      // Last minute pricing
-      else if (daysUntilBooking <= dynamicConfig.lastMinuteDays) {
+      } else if (daysUntilBooking <= dynamicConfig.lastMinuteDays) {
         const lastMinuteAdjustment = basePrice * dynamicConfig.lastMinutePremium;
         dynamicAdjustment += lastMinuteAdjustment;
         if (dynamicConfig.lastMinutePremium !== 0) {
@@ -286,19 +282,15 @@ class SeasonalPricingService {
         }
       }
 
-      // Occupancy-based pricing
       const occupancy = await this.getCurrentOccupancy(itemType, checkInDate);
       if (occupancy !== null) {
         let occupancyMultiplier = 1;
 
         if (occupancy >= dynamicConfig.maxOccupancyThreshold) {
-          // High demand - increase prices
           occupancyMultiplier = dynamicConfig.maxPriceMultiplier;
         } else if (occupancy <= dynamicConfig.minOccupancyThreshold) {
-          // Low demand - decrease prices
           occupancyMultiplier = dynamicConfig.minPriceMultiplier;
         } else {
-          // Linear interpolation between thresholds
           const range = dynamicConfig.maxOccupancyThreshold - dynamicConfig.minOccupancyThreshold;
           const position = (occupancy - dynamicConfig.minOccupancyThreshold) / range;
           occupancyMultiplier = dynamicConfig.minPriceMultiplier +
@@ -315,11 +307,8 @@ class SeasonalPricingService {
       }
     }
 
-    // Calculate final price
     const totalAdjustments = seasonalAdjustment + dynamicAdjustment + weekendAdjustment;
     finalPrice = Math.max(0, basePrice + totalAdjustments);
-
-    // Round to 2 decimal places
     finalPrice = Math.round(finalPrice * 100) / 100;
 
     return {
@@ -336,7 +325,6 @@ class SeasonalPricingService {
     };
   }
 
-  // Helper to check if a date string is in a range (handles year wrap)
   private isDateInRange(date: string, start: string, end: string): boolean {
     const [dateMonth, dateDay] = date.split('-').map(Number);
     const [startMonth, startDay] = start.split('-').map(Number);
@@ -347,15 +335,12 @@ class SeasonalPricingService {
     const endValue = endMonth * 100 + endDay;
 
     if (startValue <= endValue) {
-      // Normal range (e.g., June 1 - August 31)
       return dateValue >= startValue && dateValue <= endValue;
     } else {
-      // Wrapped range (e.g., December 15 - January 5)
       return dateValue >= startValue || dateValue <= endValue;
     }
   }
 
-  // Get current occupancy for a given date
   private async getCurrentOccupancy(
     itemType: 'chalets' | 'pool' | 'restaurant' | 'accommodation_units',
     date: Date
@@ -363,7 +348,6 @@ class SeasonalPricingService {
     const dateString = date.toISOString().split('T')[0];
 
     if (itemType === 'chalets' || itemType === 'accommodation_units') {
-      // Count booked accommodation units vs total
       const { count: totalChalets } = await supabase
         .from('accommodation_units')
         .select('*', { count: 'exact', head: true })
@@ -381,7 +365,6 @@ class SeasonalPricingService {
         return ((bookedChalets || 0) / totalChalets) * 100;
       }
     } else if (itemType === 'pool') {
-      // Check pool capacity
       const { data: capacity } = await supabase
         .from('pool_daily_capacity')
         .select('current_count, max_capacity')
@@ -396,20 +379,17 @@ class SeasonalPricingService {
     return null;
   }
 
-  // Sync prices with Stripe products
   async syncPricesToStripe(
     productId: string,
     basePrice: number,
     currency: string = 'eur'
   ): Promise<void> {
     try {
-      // Create or update the price in Stripe
       const price = await stripe.prices.create({
         product: productId,
-        unit_amount: Math.round(basePrice * 100), // Stripe uses cents
+        unit_amount: Math.round(basePrice * 100),
         currency,
       });
-
       logger.info(`Synced price to Stripe: ${price.id}`);
     } catch (error) {
       logger.error('Failed to sync price to Stripe', error);
@@ -417,7 +397,6 @@ class SeasonalPricingService {
     }
   }
 
-  // Get price preview for a date range (useful for calendar display)
   async getPricingCalendar(
     itemType: 'chalets' | 'pool' | 'restaurant' | 'accommodation_units',
     itemId: string,
@@ -430,12 +409,7 @@ class SeasonalPricingService {
 
     while (currentDate <= endDate) {
       const dateKey = currentDate.toISOString().split('T')[0];
-      const priceResult = await this.calculatePrice(
-        itemType,
-        itemId,
-        basePrice,
-        new Date(currentDate)
-      );
+      const priceResult = await this.calculatePrice(itemType, itemId, basePrice, new Date(currentDate));
       calendar.set(dateKey, priceResult);
       currentDate.setDate(currentDate.getDate() + 1);
     }

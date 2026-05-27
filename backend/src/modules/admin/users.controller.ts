@@ -19,6 +19,7 @@ import {
   EnhancedUser,
   deriveSlugFromPermission 
 } from './types.js';
+import { assertStaffUserLimit } from '../../services/feature-limits.service.js';
 
 // Interface for user with roles from Supabase query
 interface UserWithRolesQuery extends UserRow {
@@ -357,6 +358,9 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
 // ============================================
 
 export const createUser = asyncHandler(async (req: Request, res: Response) => {
+    // Enforce tenant staff limit before any DB work
+    await assertStaffUserLimit(req);
+
     // Validate input with strong password requirements
     const validatedData = validateBody(createUserSchema, req.body);
     const { email, password, full_name, phone, roles } = validatedData;
@@ -385,6 +389,10 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     const bcrypt = bcryptModule.default || bcryptModule;
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Inherit tenant_id from the resolved tenant on the request (set by tenantGate).
+    // Falls back to undefined in legacy single-tenant mode.
+    const tenantId = req.tenant?.id ?? undefined;
+
     // Create user
     const { data: user, error: userError } = await supabase
       .from('users')
@@ -395,6 +403,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
         phone,
         is_active: true,
         email_verified: true, // Admin-created users are auto-verified
+        ...(tenantId ? { tenant_id: tenantId } : {}),
       })
       .select('id, email, full_name, phone, is_active, created_at')
       .single();
@@ -416,10 +425,18 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     // Assign roles - roles has default value from schema so is guaranteed to exist
     const rolesToAssign = roles || ['customer'];
     if (rolesToAssign.length > 0) {
-      const { data: roleRecords } = await supabase
+      // When a tenant is resolved, scope role lookup to that tenant so we get
+      // the tenant-seeded roles rather than global/system roles.
+      let roleQuery = supabase
         .from('roles')
         .select('id, name')
         .in('name', rolesToAssign);
+
+      if (tenantId) {
+        roleQuery = roleQuery.eq('tenant_id', tenantId);
+      }
+
+      const { data: roleRecords } = await roleQuery;
 
       if (roleRecords && roleRecords.length > 0) {
         const roleInserts = roleRecords.map(role => ({
@@ -452,36 +469,20 @@ const checkPropertyAccess = async (supabase: any, targetUserId: string, property
 };
 
 export const updateUser = asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { id } = req.params;
     const validatedData = validateBody(adminUpdateUserSchema, req.body);
     const { propertyId, isSuperAdmin } = getPropertyContext(req);
 
-    if (!isSuperAdmin && !propertyId) {
-      res.status(400).json({ success: false, error: 'Property ID context is required' });
-      return;
-    }
-
-    const supabase = getSupabase();
-
-    const hasAccess = await checkPropertyAccess(supabase, req.params.id, propertyId, isSuperAdmin);
+    const hasAccess = await checkPropertyAccess(supabase, id, propertyId, isSuperAdmin);
     if (!hasAccess) {
-      res.status(403).json({ success: false, error: 'Access denied: User does not belong to this property context' });
-      return;
+      return res.status(403).json({ success: false, error: 'Access denied to this user' });
     }
 
-    const updateData: Record<string, unknown> = {
-      updated_at: new Date().toISOString()
-    };
-
-    if (validatedData.fullName !== undefined) updateData.full_name = validatedData.fullName;
-    if (validatedData.phone !== undefined) updateData.phone = validatedData.phone;
-    if (validatedData.isActive !== undefined) updateData.is_active = validatedData.isActive;
-    if (validatedData.emailVerified !== undefined) updateData.email_verified = validatedData.emailVerified;
-    if (validatedData.preferredLanguage !== undefined) updateData.preferred_language = validatedData.preferredLanguage;
-
-    const { data: user, error } = await supabase
+    const { data, error } = await supabase
       .from('users')
-      .update(updateData)
-      .eq('id', req.params.id)
+      .update(validatedData)
+      .eq('id', id)
       .select()
       .single();
 
@@ -491,103 +492,32 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
       user_id: req.user!.userId,
       action: 'UPDATE_USER',
       resource: 'users',
-      resource_id: req.params.id,
-      new_value: updateData
+      resource_id: id
     });
 
-    res.json({ success: true, data: user });
-});
-
-export const updateUserRoles = asyncHandler(async (req: Request, res: Response) => {
-    const validatedData = validateBody(assignUserRolesSchema, req.body);
-    const { propertyId, isSuperAdmin } = getPropertyContext(req);
-
-    if (!isSuperAdmin && !propertyId) {
-      res.status(400).json({ success: false, error: 'Property ID context is required' });
-      return;
-    }
-
-    const supabase = getSupabase();
-    const userId = req.params.id;
-
-    const hasAccess = await checkPropertyAccess(supabase, userId, propertyId, isSuperAdmin);
-    if (!hasAccess) {
-      res.status(403).json({ success: false, error: 'Access denied: User does not belong to this property context' });
-      return;
-    }
-
-    let { roleIds, roles } = validatedData;
-
-    // If roles (names) provided instead of roleIds, look them up
-    if (!roleIds || roleIds.length === 0) {
-      if (roles && roles.length > 0) {
-        const { data: roleData, error: lookupError } = await supabase
-          .from('roles')
-          .select('id, name')
-          .in('name', roles);
-        
-        if (lookupError) throw lookupError;
-        roleIds = (roleData || []).map(r => r.id);
-      }
-    }
-
-    // Remove existing roles
-    const { error: deleteError } = await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId);
-
-    if (deleteError) throw deleteError;
-
-    // Add new roles
-    if (roleIds && roleIds.length > 0) {
-      const { error: insertError } = await supabase
-        .from('user_roles')
-        .insert(
-          roleIds.map((roleId: string) => ({
-            user_id: userId,
-            role_id: roleId,
-            granted_by: req.user!.userId,
-          }))
-        );
-
-      if (insertError) throw insertError;
-    }
-
-    await logActivity({
-      user_id: req.user!.userId,
-      action: 'UPDATE_ROLES',
-      resource: 'users',
-      resource_id: userId,
-      new_value: { roleIds }
-    });
-
-    res.json({ success: true, message: 'Roles updated' });
+    res.json({ success: true, data });
 });
 
 export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { id } = req.params;
     const { propertyId, isSuperAdmin } = getPropertyContext(req);
 
-    if (!isSuperAdmin && !propertyId) {
-      res.status(400).json({ success: false, error: 'Property ID context is required' });
-      return;
+    // Prevent self-deletion
+    if (req.user?.userId === id) {
+      return res.status(400).json({ success: false, error: 'Cannot delete your own account' });
     }
 
-    const supabase = getSupabase();
-
-    const hasAccess = await checkPropertyAccess(supabase, req.params.id, propertyId, isSuperAdmin);
+    const hasAccess = await checkPropertyAccess(supabase, id, propertyId, isSuperAdmin);
     if (!hasAccess) {
-      res.status(403).json({ success: false, error: 'Access denied: User does not belong to this property context' });
-      return;
+      return res.status(403).json({ success: false, error: 'Access denied to this user' });
     }
 
+    // Soft delete
     const { error } = await supabase
       .from('users')
-      .update({
-        deleted_at: new Date().toISOString(),
-        is_active: false
-      })
-      .eq('id', req.params.id);
+      .update({ is_active: false, deleted_at: new Date().toISOString() })
+      .eq('id', id);
 
     if (error) throw error;
 
@@ -595,8 +525,83 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
       user_id: req.user!.userId,
       action: 'DELETE_USER',
       resource: 'users',
-      resource_id: req.params.id
+      resource_id: id
     });
 
-    res.json({ success: true, message: 'User deleted' });
+    res.json({ success: true, message: 'User deactivated' });
+});
+
+export const assignUserRoles = asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { id } = req.params;
+    const { roleIds } = validateBody(assignUserRolesSchema, req.body);
+    const { propertyId, isSuperAdmin } = getPropertyContext(req);
+
+    const hasAccess = await checkPropertyAccess(supabase, id, propertyId, isSuperAdmin);
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, error: 'Access denied to this user' });
+    }
+
+    // Replace all roles
+    await supabase.from('user_roles').delete().eq('user_id', id);
+
+    if (roleIds && roleIds.length > 0) {
+      const roleInserts = roleIds.map((roleId: string) => ({
+        user_id: id,
+        role_id: roleId,
+      }));
+      const { error } = await supabase.from('user_roles').insert(roleInserts);
+      if (error) throw error;
+    }
+
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'ASSIGN_USER_ROLES',
+      resource: 'users',
+      resource_id: id,
+      new_value: { roleIds }
+    });
+
+    res.json({ success: true, message: 'Roles updated' });
+});
+
+export const toggleUserStatus = asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { id } = req.params;
+    const { propertyId, isSuperAdmin } = getPropertyContext(req);
+
+    if (req.user?.userId === id) {
+      return res.status(400).json({ success: false, error: 'Cannot toggle your own account status' });
+    }
+
+    const hasAccess = await checkPropertyAccess(supabase, id, propertyId, isSuperAdmin);
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, error: 'Access denied to this user' });
+    }
+
+    const { data: current } = await supabase
+      .from('users')
+      .select('is_active')
+      .eq('id', id)
+      .single();
+
+    if (!current) return res.status(404).json({ success: false, error: 'User not found' });
+
+    const { data, error } = await supabase
+      .from('users')
+      .update({ is_active: !current.is_active })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await logActivity({
+      user_id: req.user!.userId,
+      action: data.is_active ? 'ACTIVATE_USER' : 'DEACTIVATE_USER',
+      resource: 'users',
+      resource_id: id
+    });
+
+    res.json({ success: true, data });
 });

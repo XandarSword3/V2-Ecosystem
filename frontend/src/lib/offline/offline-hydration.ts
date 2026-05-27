@@ -68,7 +68,18 @@ export async function hydrateOfflineStores(force: boolean = false): Promise<void
   try {
     // Step 1: Fetch active modules if not already loaded
     if (activeModules.length === 0 || force) {
-      const response = await api.get('/admin/modules', { params: { activeOnly: 'true' } });
+      let response;
+      try {
+        response = await api.get('/admin/modules', { params: { activeOnly: 'true' } });
+      } catch (err: any) {
+        // Not authenticated yet — bail silently. Hydration will retry on the next
+        // online event or when the background refresh fires after login.
+        if (err?.response?.status === 401 || err?.response?.status === 403) {
+          console.log('[Offline] Not authenticated, skipping hydration');
+          return;
+        }
+        throw err; // Re-throw unexpected errors
+      }
       activeModules = (response.data?.modules || []).filter((m: ActiveModule) => m.is_active);
       console.log(`[Offline] Loaded ${activeModules.length} active modules`);
     }
@@ -86,7 +97,12 @@ export async function hydrateOfflineStores(force: boolean = false): Promise<void
     await hydrateCustomers(force);
 
     console.log('[Offline] Hydration cycle complete.');
-  } catch (error) {
+  } catch (error: any) {
+    // Silently skip auth errors — the user isn't logged in yet
+    if (error?.response?.status === 401 || error?.response?.status === 403) {
+      console.log('[Offline] Not authenticated, skipping hydration');
+      return;
+    }
     console.error('[Offline] Failed to hydrate stores:', error);
   }
 }

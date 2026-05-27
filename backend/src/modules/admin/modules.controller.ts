@@ -10,11 +10,13 @@ import { logger } from "../../utils/logger.js";
 import { loadDynamicModules } from "../../routes/dynamic-modules.loader.js";
 import { buildModulePermissionRows } from "../../security/template-permission-presets.js";
 import { permissionCache } from "../../security/permission-cache.service.js";
+import { assertModuleLimit } from "../../services/feature-limits.service.js";
 
 export async function getModules(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
     const { activeOnly } = req.query;
+    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
 
     let query = supabase
       .from('modules')
@@ -28,6 +30,17 @@ export async function getModules(req: Request, res: Response, next: NextFunction
     // Optionally filter by show_in_main if requested
     if (req.query.showInMain === 'true') {
       query = query.eq('show_in_main', true);
+    }
+
+    // Scope to property if context is available, fall back to global (null) modules
+    if (propertyId) {
+      query = query.or(`property_id.eq.${propertyId},property_id.is.null`);
+    }
+
+    // Scope to tenant — only show this tenant's modules plus any unscoped (null) global modules
+    const tenantId = (req as any).tenant?.id || (req.headers['x-tenant-id'] as string);
+    if (tenantId) {
+      query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
     }
 
     const { data, error } = await query;
@@ -74,7 +87,10 @@ export const getModule = asyncHandler(async (req: Request, res: Response) => {
 
 export const createModule = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-    
+
+    // Enforce tenant module limit before any DB work
+    await assertModuleLimit(req);
+
     // Validate input using schema to prevent XSS and ensure data integrity
     const { template_type, name, slug, description, settings } = validateBody(createModuleSchema, req.body);
 
@@ -94,7 +110,9 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         settings: settings || {},
         settings_version: SETTINGS_VERSION,
         is_active: true,
-        show_in_main: true 
+        show_in_main: true,
+        property_id: (req as any).propertyId || (req.headers['x-property-id'] as string) || null,
+        tenant_id: (req as any).tenant?.id || (req.headers['x-tenant-id'] as string) || null,
       })
       .select()
       .single();
@@ -147,8 +165,11 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
           type: 'module',
           moduleSlug: finalSlug,
           label: name,
-          icon: template_type === 'menu_service' ? 'UtensilsCrossed' : 
-                template_type === 'session_access' ? 'Waves' : 'Home'
+          // Icon mapped to real engine types (no legacy aliases)
+          icon: template_type === 'instant_transaction'        ? 'UtensilsCrossed' :
+                template_type === 'shared_capacity_access'     ? 'Waves'            :
+                template_type === 'time_exclusive_reservation' ? 'Home'             :
+                template_type === 'ongoing_entitlement'        ? 'Layers'           : 'Home',
         };
         
         const updatedLinks = [...settings.navbar.links, newNavLink];
@@ -171,77 +192,73 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
 
     // --- Auto-create Roles & Staff User ---
     try {
-      // 1. Create Roles
+      // 1. Upsert Roles (use upsert to avoid unique-constraint crash when the
+      //    role already exists — e.g. from a previous failed attempt or duplicate slug)
       const roleNames = [`${finalSlug}_admin`, `${finalSlug}_staff`];
       const { data: rolesData, error: rolesError } = await supabase
         .from('roles')
-        .insert(roleNames.map(r => ({ name: r, description: `Role for ${name}` })))
+        .upsert(
+          roleNames.map(r => ({ name: r, description: `Role for ${name}` })),
+          { onConflict: 'name', ignoreDuplicates: false }
+        )
         .select();
 
       if (!rolesError && rolesData) {
-        // 2. Create Module Permissions (granular)
+        // 2. Permissions were already upserted in the block above — no need to call
+        //    buildModulePermissionRows a second time.  Re-use the slugs we already
+        //    pushed and just wire them up to the new module-specific roles.
         const modulePermissionSlugs = buildModulePermissionRows(finalSlug, template_type);
-        const modulePermissions = modulePermissionSlugs.map((permissionSlug) => ({
-          slug: permissionSlug,
-          description: `Auto-generated permission for module ${name}`,
-          module_slug: finalSlug,
-        }));
 
-        await supabase.from('app_permissions').upsert(modulePermissions, { onConflict: 'slug' });
-
-        // 3. Link Permissions to Roles using app_role_permissions
-        const rolePermissions: { role_name: string; permission_slug: string }[] = [];
-        
-        const adminRoleName = `${finalSlug}_admin`; 
+        const adminRoleName = `${finalSlug}_admin`;
         const staffRoleName = `${finalSlug}_staff`;
 
-        // Admin gets all
-        modulePermissions.forEach(p => {
-             rolePermissions.push({ role_name: adminRoleName, permission_slug: p.slug });
-        });
-        // Staff gets view
-        modulePermissions.filter(p => p.slug.includes(':view')).forEach(p => {
-             rolePermissions.push({ role_name: staffRoleName, permission_slug: p.slug });
+        const rolePermissions: { role_name: string; permission_slug: string }[] = [];
+        modulePermissionSlugs.forEach(slug => {
+          rolePermissions.push({ role_name: adminRoleName, permission_slug: slug });
+          if (slug.endsWith(':view')) {
+            rolePermissions.push({ role_name: staffRoleName, permission_slug: slug });
+          }
         });
 
         if (rolePermissions.length > 0) {
-            await supabase.from('app_role_permissions').upsert(rolePermissions, { onConflict: 'role_name,permission_slug' });
-            logger.info(`[Modules] Created ${rolePermissions.length} role-permission links for ${finalSlug}`);
-            await permissionCache.refreshCache();
+          await supabase.from('app_role_permissions').upsert(rolePermissions, { onConflict: 'role_name,permission_slug' });
+          logger.info(`[Modules] Created ${rolePermissions.length} role-permission links for ${finalSlug}`);
+          await permissionCache.refreshCache();
         }
 
-        // 4. Create Default Staff User
+        // 3. Create Default Staff User (one per module, idempotent via email)
         const staffEmail = `staff.${finalSlug}@v2ecosystem.com`;
         const staffPassword = await bcrypt.hash(`Staff${finalSlug.charAt(0).toUpperCase() + finalSlug.slice(1)}123!`, 10);
 
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .insert({
-            email: staffEmail,
-            password: staffPassword,
-            full_name: `${name} Staff`,
-            phone: '',
-            is_active: true,
-            email_verified: true,
-            roles: roleNames 
-          })
+          .upsert(
+            {
+              email: staffEmail,
+              password: staffPassword,
+              full_name: `${name} Staff`,
+              phone: '',
+              is_active: true,
+              email_verified: true,
+              roles: roleNames,
+            },
+            { onConflict: 'email', ignoreDuplicates: false }
+          )
           .select()
           .single();
 
         if (!userError && userData) {
-          // 5. Link User to Roles (using user_roles junction table if it exists and uses UUIDs)
-          // We fetched rolesData which has IDs.
           const userRolesInserts = rolesData.map((role: { id: string; name: string }) => ({
             user_id: userData.id,
-            role_id: role.id
+            role_id: role.id,
           }));
-          await supabase.from('user_roles').insert(userRolesInserts);
-          logger.info(`[Modules] Created staff user ${staffEmail} with roles for ${finalSlug}`);
+          await supabase.from('user_roles').upsert(userRolesInserts, { onConflict: 'user_id,role_id', ignoreDuplicates: true });
+          logger.info(`[Modules] Created/updated staff user ${staffEmail} with roles for ${finalSlug}`);
         }
       }
     } catch (innerError) {
       logger.error('Failed to auto-create staff/roles/permissions for module:', innerError);
-      // We don't fail the module creation itself, just log
+      // Non-fatal — module row is already committed above, log and continue
     }
 
     emitToAll('modules.updated', data);

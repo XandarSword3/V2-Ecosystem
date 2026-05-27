@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { UIBlock, UIComponentType, CanvasMode, AlignmentDirection, BlockPosition } from '@/types/module-builder';
+import { UIBlock, UIComponentType, AlignmentDirection, BlockPosition } from '@/types/module-builder';
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
@@ -32,10 +32,7 @@ interface ModuleBuilderStore {
   isPreview: boolean;
   previewDevice: 'desktop' | 'mobile';
   zoom: number;
-  /** @deprecated Dead code — canvas auto-detects mode from position data. Will be removed in Phase 7. */
-  canvasMode: CanvasMode;
   history: UIBlock[][];
-  historyIndex: number;
   _futureStates: UIBlock[][];
 
   // ── Phase 1: multi-select, inline edit, lock ─────────────────────────────
@@ -53,8 +50,6 @@ interface ModuleBuilderStore {
   togglePreview: () => void;
   setPreviewDevice: (device: 'desktop' | 'mobile') => void;
   setZoom: (zoom: number) => void;
-  /** @deprecated See canvasMode note above. */
-  setCanvasMode: (mode: CanvasMode) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -181,9 +176,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
   isPreview: false,
   previewDevice: 'desktop',
   zoom: 100,
-  canvasMode: 'stack', // deprecated
   history: [],
-  historyIndex: -1,
   _futureStates: [],
 
   // ── Phase 1 state ────────────────────────────────────────────────────────
@@ -219,7 +212,6 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
 
   setPreviewDevice: (previewDevice) => set({ previewDevice }),
   setZoom: (zoom) => set({ zoom: Math.max(25, Math.min(200, zoom)) }),
-  setCanvasMode: (mode) => set({ canvasMode: mode }), // deprecated, kept for compat
 
   undo: () =>
     set((state) => {
@@ -363,7 +355,6 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
       const lockedBlockIds = isLocked
         ? state.lockedBlockIds.filter((i) => i !== id)
         : [...state.lockedBlockIds, id];
-      // Also update the locked field on the block itself (for renderer awareness)
       const layout = state.layout.map((b) =>
         b.id === id ? { ...b, locked: !isLocked } : b
       );

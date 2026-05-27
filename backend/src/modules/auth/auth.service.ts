@@ -199,6 +199,8 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     email: user.email,
     roles: roleNames,
     tokenVersion: user.token_version ?? 0,
+    tenantId: user.tenant_id ?? undefined,
+    isPlatformAdmin: user.is_platform_admin ?? false,
   });
 
   // Create session
@@ -285,6 +287,8 @@ export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
     email: user.email,
     roles: roleNames,
     tokenVersion: user.token_version ?? 0,
+    tenantId: user.tenant_id ?? undefined,
+    isPlatformAdmin: user.is_platform_admin ?? false,
   });
 
   // Create session
