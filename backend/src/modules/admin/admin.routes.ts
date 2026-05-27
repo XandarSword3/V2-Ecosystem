@@ -22,6 +22,7 @@ import * as reportsController from "./controllers/reports.controller";
 import { validatePropertyAccess } from "../../middleware/propertyAccess.middleware.js";
 import * as onboardingController from "./controllers/onboarding.controller.js";
 import * as importController from "./controllers/import.controller.js";
+import * as moduleTemplatesController from "./controllers/module-templates.controller.js";
 
 const router = Router();
 
@@ -49,6 +50,10 @@ router.post('/modules', authorize('super_admin'), modulesController.createModule
 router.put('/modules/:id', modulesController.updateModule);
 router.delete('/modules/:id', modulesController.deleteModule);
 
+// Module Templates (read-only — official templates are seeded via migrations)
+router.get('/module-templates', moduleTemplatesController.getModuleTemplates);
+router.get('/module-templates/:id', moduleTemplatesController.getModuleTemplate);
+
 
 // --- SHARED ADMIN/MANAGER ROUTES ---
 
@@ -61,7 +66,7 @@ router.get('/users', authorizeManager, usersController.getUsers); // Supports ?t
 router.post('/users', authorizeManager, usersController.createUser);
 router.get('/users/:id', authorizeManager, usersController.getUserDetails); // Enhanced details
 router.put('/users/:id', authorizeManager, usersController.updateUser);
-router.put('/users/:id/roles', authorize('admin', 'super_admin'), usersController.updateUserRoles); // Role assignment is sensitive
+router.put('/users/:id/roles', authorize('admin', 'super_admin'), usersController.assignUserRoles); // Role assignment is sensitive
 router.delete('/users/:id', authorize('super_admin'), usersController.deleteUser);
 router.put('/users/:id/permissions', authorize('super_admin'), permissionsController.updateUserPermissions); // User Override
 

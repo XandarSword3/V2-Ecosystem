@@ -31,7 +31,7 @@ import {
 
 export interface Module {
   id: string;
-  template_type: 'menu_service' | 'multi_day_booking' | 'session_access';
+  template_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
   name: string;
   slug: string;
   description?: string;
@@ -83,9 +83,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   'tickets': Ticket,
   
   // Default by template type
-  'menu_service': UtensilsCrossed,
-  'multi_day_booking': Home,
-  'session_access': Ticket,
+  'instant_transaction': UtensilsCrossed,
+  'time_exclusive_reservation': Home,
+  'shared_capacity_access': Ticket,
+  'ongoing_entitlement': Trophy,
 };
 
 /**
@@ -139,11 +140,11 @@ export function getNavModules(modules: Module[]): Module[] {
  */
 export function getModuleDefaultDescription(module: Module): string {
   switch (module.template_type) {
-    case 'menu_service':
+    case 'instant_transaction':
       return `Browse our ${module.name.toLowerCase()} menu and place orders`;
-    case 'multi_day_booking':
+    case 'time_exclusive_reservation':
       return `Book your stay at our ${module.name.toLowerCase()}`;
-    case 'session_access':
+    case 'shared_capacity_access':
       return `Purchase tickets and passes for ${module.name.toLowerCase()}`;
     default:
       return `Explore our ${module.name.toLowerCase()} services`;
@@ -155,11 +156,11 @@ export function getModuleDefaultDescription(module: Module): string {
  */
 export function getModuleStatLabel(module: Module): string {
   switch (module.template_type) {
-    case 'menu_service':
+    case 'instant_transaction':
       return 'Menu Items';
-    case 'multi_day_booking':
+    case 'time_exclusive_reservation':
       return 'Units Available';
-    case 'session_access':
+    case 'shared_capacity_access':
       return 'Daily Visitors';
     default:
       return 'Available';
@@ -172,11 +173,11 @@ export function getModuleStatLabel(module: Module): string {
  */
 export function getModuleStatPlaceholder(module: Module): number {
   switch (module.template_type) {
-    case 'menu_service':
+    case 'instant_transaction':
       return 50;
-    case 'multi_day_booking':
+    case 'time_exclusive_reservation':
       return 10;
-    case 'session_access':
+    case 'shared_capacity_access':
       return 100;
     default:
       return 25;

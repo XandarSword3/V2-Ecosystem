@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import dayjs from 'dayjs';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { requireModule } from '../middleware/moduleGuard.middleware.js';
@@ -14,7 +15,7 @@ import * as menuServiceParser from '../modules/shared/import/menu-service-import
 import * as sessionAccessParser from '../modules/shared/import/session-access-import.parser.js';
 import * as multiDayBookingParser from '../modules/shared/import/multi-day-booking-import.parser.js';
 
-type TemplateType = 'menu_service' | 'multi_day_booking' | 'session_access' | 'subscription' | 'membership_access';
+type TemplateType = 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
 
 interface MountedModuleContext {
   id: string;
@@ -29,6 +30,10 @@ interface DynamicRequest extends Request {
 
 const engineService = getEngineService();
 const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
+
+// Memory-based multer: files stay in-process as Buffer, nothing touches disk.
+// 10 MB cap — large enough for any realistic CSV/JSON import.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 function getMountedModule(req: Request): MountedModuleContext | null {
   const dynamicReq = req as DynamicRequest;
@@ -948,6 +953,7 @@ function buildImportRouter(router: Router, templateType: TemplateType): void {
   router.post(
     '/import/parse',
     authorize('admin', 'super_admin'),
+    upload.single('file'),
     asyncHandler(async (req: DynamicRequest, res: Response) => {
       try {
         const mountedModule = req.mountedModule!;
@@ -1025,27 +1031,38 @@ async function parseImportForEngine(
   data: unknown,
   format: 'json' | 'csv' | 'llm'
 ): Promise<{ items: unknown[]; warnings: string[]; errors: string[]; totalParsed: number; successful: number }> {
-  switch (engineType) {
-    case 'menu_service':
-      if (format === 'llm') {
-        return await menuServiceParser.parseLlmImport(data as string);
-      } else if (format === 'csv') {
-        return await menuServiceParser.parseCsvImport(data as Buffer);
-      } else {
-        return menuServiceParser.parseJsonImport(data);
-      }
-    case 'session_access':
-      if (format === 'llm') {
-        return await sessionAccessParser.parseLlmImport(data as string);
-      } else {
-        return sessionAccessParser.parseJsonImport(data);
-      }
-    case 'multi_day_booking':
-      if (format === 'llm') {
-        return await multiDayBookingParser.parseLlmImport(data as string);
-      } else {
-        return multiDayBookingParser.parseJsonImport(data);
-      }
+  // Resolve legacy aliases so the switch always sees canonical engine type names
+  const LEGACY: Record<string, TemplateType> = {
+    menu_service:    'instant_transaction',
+    multi_day_booking: 'time_exclusive_reservation',
+    session_access:  'shared_capacity_access',
+    subscription:    'ongoing_entitlement',
+    membership_access: 'ongoing_entitlement',
+    class_scheduling:  'shared_capacity_access',
+    appointment_booking: 'time_exclusive_reservation',
+  };
+  const canonical = (LEGACY[engineType] ?? engineType) as TemplateType;
+
+  switch (canonical) {
+    case 'instant_transaction':
+      if (format === 'llm') return await menuServiceParser.parseLlmImport(data as string);
+      if (format === 'csv')  return await menuServiceParser.parseCsvImport(data as Buffer);
+      return menuServiceParser.parseJsonImport(data);
+    case 'shared_capacity_access':
+      if (format === 'llm') return await sessionAccessParser.parseLlmImport(data as string);
+      return sessionAccessParser.parseJsonImport(data);
+    case 'time_exclusive_reservation':
+      if (format === 'llm') return await multiDayBookingParser.parseLlmImport(data as string);
+      return multiDayBookingParser.parseJsonImport(data);
+    case 'ongoing_entitlement':
+      // No structured parser yet — fall back gracefully
+      return {
+        items: [],
+        warnings: ['Import wizard not yet implemented for membership modules. Use the Loyalty page instead.'],
+        errors: [],
+        totalParsed: 0,
+        successful: 0,
+      };
     default:
       return {
         items: [],
@@ -1067,8 +1084,20 @@ async function commitImportForEngine(
 ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
   const supabase = getSupabase();
 
-  switch (engineType) {
-    case 'menu_service': {
+  // Resolve legacy aliases
+  const LEGACY: Record<string, TemplateType> = {
+    menu_service:        'instant_transaction',
+    multi_day_booking:   'time_exclusive_reservation',
+    session_access:      'shared_capacity_access',
+    subscription:        'ongoing_entitlement',
+    membership_access:   'ongoing_entitlement',
+    class_scheduling:    'shared_capacity_access',
+    appointment_booking: 'time_exclusive_reservation',
+  };
+  const canonical = (LEGACY[engineType] ?? engineType) as TemplateType;
+
+  switch (canonical) {
+    case 'instant_transaction': {
       // Menu service commit: Insert into catalog_items (generic, engine-level table)
       const results = {
         created: 0,
@@ -1111,7 +1140,7 @@ async function commitImportForEngine(
       return { success: true, data: results };
     }
 
-    case 'session_access': {
+    case 'shared_capacity_access': {
       // Session access commit: Create sessions
       const results = {
         created: 0,
@@ -1158,7 +1187,7 @@ async function commitImportForEngine(
       return { success: true, data: results };
     }
 
-    case 'multi_day_booking': {
+    case 'time_exclusive_reservation': {
       // Multi-day booking commit: Create bookable units
       const results = {
         created: 0,
@@ -1213,7 +1242,19 @@ async function commitImportForEngine(
 
 export function buildModuleRouter(templateType: string): Router {
   const router = Router();
-  const normalizedType = templateType as TemplateType;
+
+  // Resolve legacy alias names to canonical engine type
+  const LEGACY: Record<string, string> = {
+    menu_service:        'instant_transaction',
+    multi_day_booking:   'time_exclusive_reservation',
+    session_access:      'shared_capacity_access',
+    subscription:        'ongoing_entitlement',
+    membership_access:   'ongoing_entitlement',
+    class_scheduling:    'shared_capacity_access',
+    appointment_booking: 'time_exclusive_reservation',
+    saas_subscription:   'platform_entitlement',
+  };
+  const normalizedType = (LEGACY[templateType] ?? templateType) as TemplateType;
 
   // Every dynamic route is auth-protected and module-guarded.
   router.use(authenticate, requireMountedModule, enforceMountedModuleActive, enforceMountedModulePropertyAccess);
@@ -1222,17 +1263,16 @@ export function buildModuleRouter(templateType: string): Router {
   buildImportRouter(router, normalizedType);
 
   switch (normalizedType) {
-    case 'menu_service':
+    case 'instant_transaction':
       buildMenuServiceRouter(router);
       break;
-    case 'multi_day_booking':
+    case 'time_exclusive_reservation':
       buildMultiDayBookingRouter(router);
       break;
-    case 'session_access':
+    case 'shared_capacity_access':
       buildSessionAccessRouter(router);
       break;
-    case 'subscription':
-    case 'membership_access':
+    case 'ongoing_entitlement':
       buildSubscriptionRouter(router);
       break;
     default:

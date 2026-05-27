@@ -113,16 +113,17 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 function Input({
-  value, onChange, type = 'text', min, max, step, suffix, className = '',
+  value, onChange, type = 'text', min, max, step, suffix, placeholder, className = '',
 }: {
   value: string | number; onChange: (v: string) => void;
   type?: string; min?: number; max?: number; step?: number;
-  suffix?: string; className?: string;
+  suffix?: string; placeholder?: string; className?: string;
 }) {
   return (
     <div className="relative flex items-center">
       <input
         type={type} value={value} min={min} max={max} step={step}
+        placeholder={placeholder}
         onChange={e => onChange(e.target.value)}
         className={`w-full h-7 px-2 text-xs bg-slate-50 border border-slate-200 rounded
           text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1

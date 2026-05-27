@@ -3,8 +3,7 @@
  * Manages user notification preferences across all channels
  */
 
-import { getSupabase } from "../database/connection.js";
-const supabase = getSupabase();
+import { supabase } from "../lib/supabase.js";
 import { activityLogger } from "../utils/activityLogger.js";
 
 export interface NotificationPreferences {

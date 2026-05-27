@@ -163,7 +163,7 @@ export default function HomePage() {
       return {
         value: getModuleStatPlaceholder(module),
         label: module.name,
-        suffix: module.template_type === 'menu_service' ? '+' : '',
+        suffix: module.template_type === 'instant_transaction' ? '+' : '',
         icon: <IconComponent className="w-6 h-6" />,
       };
     });

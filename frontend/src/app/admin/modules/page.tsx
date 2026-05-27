@@ -32,7 +32,7 @@ const BUILTIN_TEMPLATES = [
     id: 'blank',
     name: 'Blank',
     description: 'Start from scratch with an empty canvas.',
-    template_type: 'menu_service',
+    template_type: 'instant_transaction',
     icon: '⬜',
     color: '#6366f1',
     accent: '#a5b4fc',
@@ -42,7 +42,7 @@ const BUILTIN_TEMPLATES = [
     id: 'restaurant',
     name: 'Restaurant / Bar',
     description: 'Hero section, menu grid, and a call-to-action. Ready for food & drink modules.',
-    template_type: 'menu_service',
+    template_type: 'instant_transaction',
     icon: '🍽️',
     color: '#f97316',
     accent: '#fbbf24',
@@ -77,7 +77,7 @@ const BUILTIN_TEMPLATES = [
     id: 'pool',
     name: 'Pool / Beach Club',
     description: 'Hero, session picker, and pricing table. Built for session-based access.',
-    template_type: 'session_access',
+    template_type: 'shared_capacity_access',
     icon: '🏊',
     color: '#0ea5e9',
     accent: '#38bdf8',
@@ -112,7 +112,7 @@ const BUILTIN_TEMPLATES = [
     id: 'gym',
     name: 'Gym / Fitness',
     description: 'Hero, class schedule, stats, and testimonials. Ideal for fitness centres.',
-    template_type: 'session_access',
+    template_type: 'shared_capacity_access',
     icon: '🏋️',
     color: '#7c3aed',
     accent: '#a78bfa',
@@ -155,7 +155,7 @@ const BUILTIN_TEMPLATES = [
     id: 'hotel',
     name: 'Hotel / Chalets',
     description: 'Hero, availability calendar, features, and a booking CTA.',
-    template_type: 'multi_day_booking',
+    template_type: 'time_exclusive_reservation',
     icon: '🏡',
     color: '#15803d',
     accent: '#4ade80',
@@ -190,7 +190,7 @@ const BUILTIN_TEMPLATES = [
     id: 'spa',
     name: 'Spa / Wellness',
     description: 'Elegant hero, features list, and a booking CTA. Designed for spa experiences.',
-    template_type: 'session_access',
+    template_type: 'shared_capacity_access',
     icon: '🧖',
     color: '#db2777',
     accent: '#f9a8d4',
@@ -258,9 +258,16 @@ function TemplatePicker({
       : null) ?? BUILTIN_TEMPLATES;
 
   const TYPE_LABEL: Record<string, string> = {
-    menu_service:     'Menu Service',
-    multi_day_booking:'Booking',
-    session_access:   'Session Access',
+    instant_transaction:        'Instant Transaction',
+    time_exclusive_reservation: 'Time-Exclusive Reservation',
+    shared_capacity_access:     'Shared Capacity Access',
+    ongoing_entitlement:        'Ongoing Entitlement',
+    // legacy aliases shown correctly on old DB rows
+    menu_service:               'Instant Transaction',
+    multi_day_booking:          'Time-Exclusive Reservation',
+    session_access:             'Shared Capacity Access',
+    subscription:               'Ongoing Entitlement',
+    membership_access:          'Ongoing Entitlement',
   };
 
   return (
@@ -654,7 +661,7 @@ function ModuleForm({ initialData, templateDefaults, onSubmit, onCancel, isLoadi
     name:          initialData?.name          ?? templateDefaults?.name        ?? '',
     slug:          initialData?.slug          ?? (templateDefaults?.name ? normalizeSlug(templateDefaults.name) : ''),
     description:   initialData?.description   ?? templateDefaults?.description ?? '',
-    template_type: initialData?.template_type ?? templateDefaults?.template_type ?? 'menu_service',
+    template_type: initialData?.template_type ?? templateDefaults?.template_type ?? 'instant_transaction',
     is_active:     initialData?.is_active     ?? true,
     show_in_main:  initialData?.show_in_main  ?? true,
     settings:      initialData?.settings      ?? {
@@ -728,9 +735,10 @@ function ModuleForm({ initialData, templateDefaults, onSubmit, onCancel, isLoadi
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500"
               disabled={!!initialData}
             >
-              <option value="menu_service">Menu Service (Restaurant / Bar)</option>
-              <option value="multi_day_booking">Multi-Day Booking (Chalets / Hotel)</option>
-              <option value="session_access">Session Access (Pool / Gym / Spa)</option>
+              <option value="instant_transaction">Instant Transaction — Restaurant / Bar / Retail</option>
+              <option value="time_exclusive_reservation">Time-Exclusive Reservation — Chalets / Hotel / Courts</option>
+              <option value="shared_capacity_access">Shared Capacity Access — Pool / Gym / Spa</option>
+              <option value="ongoing_entitlement">Ongoing Entitlement — Membership / Subscription</option>
             </select>
           </div>
           <div className="flex flex-col gap-2 pt-6">

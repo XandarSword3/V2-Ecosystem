@@ -79,7 +79,7 @@ export default function AdminSettingsPage() {
     
     activeModules.forEach(module => {
       // Add settings tab for modules that have configurable settings
-      if (module.template_type === 'multi_day_booking') {
+      if (module.template_type === 'time_exclusive_reservation') {
         tabs.push({
           id: `module-${module.slug}` as const,
           label: module.name,
@@ -87,7 +87,7 @@ export default function AdminSettingsPage() {
           moduleSlug: module.slug,
           templateType: module.template_type
         });
-      } else if (module.template_type === 'session_access') {
+      } else if (module.template_type === 'shared_capacity_access') {
         tabs.push({
           id: `module-${module.slug}` as const,
           label: module.name,
@@ -522,7 +522,7 @@ export default function AdminSettingsPage() {
           
           const moduleSettings = (formSettings.moduleSettings as Record<string, Record<string, string | number>> || {})[moduleSlug] || {};
           
-          if (module.template_type === 'multi_day_booking') {
+          if (module.template_type === 'time_exclusive_reservation') {
             // Multi-day booking settings (like chalets/rooms)
             return (
               <div className="space-y-8">
@@ -599,8 +599,7 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
             );
-          } else if (module.template_type === 'session_access') {
-            // Session-based access settings (like pool, gym, spa)
+          } else if (module.template_type === 'shared_capacity_access') {
             return (
               <div className="space-y-6">
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl p-4 border border-blue-100 dark:border-blue-800 mb-4">

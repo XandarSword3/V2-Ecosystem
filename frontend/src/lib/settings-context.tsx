@@ -267,7 +267,7 @@ export interface ModuleSettings {
 
 export interface Module {
   id: string;
-  template_type: 'menu_service' | 'multi_day_booking' | 'session_access';
+  template_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
   name: string;
   slug: string;
   description?: string;

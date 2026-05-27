@@ -3,10 +3,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { config } from '../../config/index.js';
 
 interface TokenPayload {
-  userId:       string;
-  email:        string;
-  roles:        string[];
-  tokenVersion?: number;
+  userId:          string;
+  email:           string;
+  roles:           string[];
+  tokenVersion?:   number;
+  tenantId?:       string;
+  isPlatformAdmin?: boolean;
 }
 
 function parseExpiryToSeconds(expiresIn: string | number): number {
@@ -44,11 +46,13 @@ export function generateTokens(payload: TokenPayload): {
 
   const accessToken = jwt.sign(
     {
-      userId:       payload.userId,
-      email:        payload.email,
-      roles:        payload.roles,
+      userId:          payload.userId,
+      email:           payload.email,
+      roles:           payload.roles,
       tokenVersion,
       jti,
+      tenantId:        payload.tenantId,
+      isPlatformAdmin: payload.isPlatformAdmin ?? false,
     },
     config.jwt.secret,
     { expiresIn: accessExpiresIn },
@@ -90,21 +94,25 @@ export function verifyRefreshToken(token: string): {
 }
 
 export function verifyToken(token: string): {
-  userId:       string;
-  email:        string;
-  roles:        string[];
-  tokenVersion?: number;
-  jti?:         string;
-  iat?:         number;
-  exp?:         number;
+  userId:          string;
+  email:           string;
+  roles:           string[];
+  tokenVersion?:   number;
+  jti?:            string;
+  iat?:            number;
+  exp?:            number;
+  tenantId?:       string;
+  isPlatformAdmin?: boolean;
 } {
   return jwt.verify(token, config.jwt.secret) as {
-    userId:       string;
-    email:        string;
-    roles:        string[];
-    tokenVersion?: number;
-    jti?:         string;
-    iat?:         number;
-    exp?:         number;
+    userId:          string;
+    email:           string;
+    roles:           string[];
+    tokenVersion?:   number;
+    jti?:            string;
+    iat?:            number;
+    exp?:            number;
+    tenantId?:       string;
+    isPlatformAdmin?: boolean;
   };
 }

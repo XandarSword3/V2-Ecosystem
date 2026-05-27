@@ -275,7 +275,10 @@ export const updateReviewStatusSchema = z.object({
 // ============ MODULE SCHEMAS ============
 
 export const createModuleSchema = z.object({
-  template_type: z.enum(['menu_service', 'multi_day_booking', 'session_access', 'appointment_booking', 'membership_access', 'class_scheduling']),
+  // template_type must be a real engine type — no alias names.
+  // platform_entitlement is excluded: it is SaaS billing between operators and
+  // V2, not a module type that tenants can create.
+  template_type: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement']),
   name: z.string().min(2).max(100),
   slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase letters, numbers, and hyphens only').optional(),
   description: sanitizedString(500).optional(),

@@ -255,7 +255,7 @@ export default function MessagingPage() {
     queryFn: async () => {
       if (!activePropertyId) return [];
       const res = await api.get(`/messaging/conversations/property/${activePropertyId}?status=${statusFilter}`);
-      return (res.data?.conversations || res.data || []) as Conversation[];
+      return (res.data?.conversations || res.data?.data || []) as Conversation[];
     },
     enabled: !!activePropertyId,
     refetchInterval: 15000,
