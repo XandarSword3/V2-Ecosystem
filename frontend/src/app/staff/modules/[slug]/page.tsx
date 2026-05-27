@@ -78,13 +78,13 @@ export default function ModulesSlugPage() {
   }
 
   switch (module.template_type) {
-    case 'menu_service':
+    case 'instant_transaction':
       return <KitchenView slug={slug} moduleName={module.name} moduleId={module.id} />;
 
-    case 'session_access':
+    case 'shared_capacity_access':
       return <SessionAccessDashboard slug={slug} moduleName={module.name} />;
 
-    case 'multi_day_booking':
+    case 'time_exclusive_reservation':
       return <MultiDayBookingDashboard slug={slug} moduleName={module.name} moduleId={module.id} />;
 
     case 'ongoing_entitlement':

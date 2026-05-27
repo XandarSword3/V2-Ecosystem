@@ -22,7 +22,7 @@ export const getUsers = usersController.getUsers;
 export const createUser = usersController.createUser;
 export const getUser = usersController.getUserDetails;
 export const updateUser = usersController.updateUser;
-export const updateUserRoles = usersController.updateUserRoles;
+export const updateUserRoles = usersController.assignUserRoles;
 export const deleteUser = usersController.deleteUser;
 
 // Role Management

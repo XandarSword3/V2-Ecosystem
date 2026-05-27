@@ -48,15 +48,16 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
 
       if (data.length > 0) {
         const storedId = localStorage.getItem('activePropertyId');
-        const hasAccessToStored = data.find((p: PropertyAccess) => p.property_id === storedId);
+              const hasAccessToStored = data.find((p: any) => p.id === storedId);
         
         if (storedId && hasAccessToStored) {
           setActivePropertyIdState(storedId);
         } else {
           // Fall back to primary or first available
-          const primary = data.find((p: PropertyAccess) => p.is_primary) || data[0];
-          setActivePropertyIdState(primary.property_id);
-          localStorage.setItem('activePropertyId', primary.property_id);
+          const primary = data.find((p: any) => p.is_primary) || data[0];
+          const primaryId = primary?.id;
+          setActivePropertyIdState(primaryId);
+          localStorage.setItem('activePropertyId', primaryId);
         }
       } else {
         setActivePropertyIdState(null);

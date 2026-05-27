@@ -27,8 +27,8 @@ export default function SessionsImportPage() {
   return (
     <ImportWizard<SessionItem>
       title={`Import ${currentModule.name} Sessions`}
-      parseEndpoint={`/api/modules/${slug}/import/parse`}
-      commitEndpoint={`/api/modules/${slug}/import/commit`}
+      parseEndpoint={`/${slug}/import/parse`}
+      commitEndpoint={`/${slug}/import/commit`}
       llmPlaceholder={`Paste your session schedule here. Examples:
 
 Session Name: Morning Swim

@@ -12,6 +12,8 @@ interface JwtPayload {
   jti?: string;
   iat?: number;
   exp?: number;
+  tenantId?: string;
+  isPlatformAdmin?: boolean;
 }
 
 async function resolveUserFromToken(token: string): Promise<JwtPayload> {
@@ -69,12 +71,14 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     }
 
     req.user = {
-      userId:       payload.userId,
-      id:           payload.userId,
-      email:        payload.email,
-      roles:        payload.roles || [],
-      tokenVersion: payload.tokenVersion,
-      jti:          payload.jti,
+      userId:          payload.userId,
+      id:              payload.userId,
+      email:           payload.email,
+      roles:           payload.roles || [],
+      tokenVersion:    payload.tokenVersion,
+      jti:             payload.jti,
+      tenantId:        payload.tenantId,
+      isPlatformAdmin: payload.isPlatformAdmin ?? false,
     };
 
     next();

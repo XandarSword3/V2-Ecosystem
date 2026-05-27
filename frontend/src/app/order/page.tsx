@@ -88,7 +88,7 @@ function TableOrderContent() {
   const [submitting, setSubmitting] = useState(false);
   const [customerName, setCustomerName] = useState('');
 
-  const restaurantModule = modules?.find(m => m.template_type === 'menu_service' && m.slug === 'restaurant' && m.is_active);
+  const restaurantModule = modules?.find(m => m.template_type === 'instant_transaction' && m.slug === 'restaurant' && m.is_active);
 
   const fetchMenu = useCallback(async () => {
     try {

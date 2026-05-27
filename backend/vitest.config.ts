@@ -56,10 +56,10 @@ export default defineConfig({
       // Current: ~68% statements, ~59% branches, ~67% functions
       // Target: 80% statements, 70% branches, 75% functions
       thresholds: {
-        statements: 65,
-        branches: 55,
-        functions: 65,
-        lines: 65,
+        statements: 70,
+        branches: 60,
+        functions: 70,
+        lines: 70,
       },
     },
   },

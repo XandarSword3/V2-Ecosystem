@@ -39,6 +39,10 @@ import { formatCurrency, formatNumber } from '@/lib/utils';
 // ENGINE CONFIGURATION
 // ============================================
 
+// ENGINE_CONFIG is the local display-metadata fallback.
+// The cockpit derives which engines to show from the /analytics/engines
+// API response — this map is only consulted for color/name/entity when
+// the API doesn't supply those fields directly.
 const ENGINE_CONFIG = {
   instant_transaction: {
     name: 'Instant Transaction',
@@ -62,6 +66,12 @@ const ENGINE_CONFIG = {
     name: 'Ongoing Entitlement',
     color: '#9B5DE5',
     templateType: 'subscription',
+    entity: 'subscription',
+  },
+  platform_entitlement: {
+    name: 'Platform Subscription',
+    color: '#FF6B6B',
+    templateType: 'saas_subscription',
     entity: 'subscription',
   },
 } as const;
@@ -95,6 +105,16 @@ const ALERT_COLORS = {
 // ============================================
 
 type EngineType = keyof typeof ENGINE_CONFIG;
+
+// Helper: resolve display metadata for an engine, preferring API-supplied
+// values and falling back to ENGINE_CONFIG. Handles unknown engine types
+// gracefully so future engines don't break the UI.
+function getEngineDisplay(type: string): { name: string; color: string } {
+  const known = ENGINE_CONFIG[type as EngineType];
+  if (known) return { name: known.name, color: known.color };
+  // Unknown engine from API — render with a neutral colour
+  return { name: type.replace(/_/g, ' '), color: '#8A95A5' };
+}
 type AlertSeverity = 'info' | 'warning' | 'critical';
 type ServiceStatus = 'operational' | 'degraded' | 'down';
 
@@ -375,11 +395,19 @@ function EngineHealthGrid({
   engines: EngineHealth[];
   isLoading: boolean;
 }) {
+  // Derive the list of engines to display from the API response when available.
+  // Fall back to ENGINE_CONFIG keys so the grid isn't empty on first load.
+  const engineTypes: string[] = engines.length > 0
+    ? engines.map((e) => e.type)
+    : (Object.keys(ENGINE_CONFIG) as EngineType[]);
+
+  const columnCount = Math.max(4, engineTypes.length);
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, background: '#1A222C' }}>
-      {(Object.keys(ENGINE_CONFIG) as EngineType[]).map((engineType) => {
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columnCount}, 1fr)`, gap: 1, background: '#1A222C' }}>
+      {engineTypes.map((engineType) => {
         const engine = engines.find((e) => e.type === engineType);
-        const config = ENGINE_CONFIG[engineType];
+        const config = getEngineDisplay(engineType);
 
         if (isLoading) {
           return (
@@ -415,7 +443,7 @@ function EngineHealthGrid({
                   padding: '2px 8px',
                 }}
               >
-                {engine?.moduleCount || 0} modules
+                {engine?.moduleCount ?? 0} modules
               </Badge>
             </div>
 
@@ -436,7 +464,7 @@ function EngineHealthGrid({
                   >
                     <span style={{ fontSize: 11, color: '#5B6B7F' }}>Revenue Today</span>
                     <span style={{ fontSize: 16, fontWeight: 600, color: config.color, fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCurrency(engine.revenue)}
+                      {formatCurrency(engine?.revenue ?? 0)}
                     </span>
                   </div>
 
@@ -766,7 +794,7 @@ function TopExceptions({ exceptions, isLoading, onAcknowledge }: { exceptions: E
         ) : (
           exceptions.map((exception) => {
             const colors = ALERT_COLORS[exception.severity];
-            const engineColor = ENGINE_CONFIG[exception.engineType].color;
+            const engineColor = getEngineDisplay(exception.engineType).color;
 
             return (
               <div
@@ -1040,7 +1068,7 @@ function Timeline({ events, isLoading }: { events: TimelineEvent[]; isLoading: b
       <div style={{ maxHeight: 300, overflowY: 'auto' }}>
         {events.map((event) => {
           const colors = ALERT_COLORS[event.severity];
-          const engineColor = ENGINE_CONFIG[event.engineType].color;
+          const engineColor = getEngineDisplay(event.engineType).color;
 
           return (
             <div
