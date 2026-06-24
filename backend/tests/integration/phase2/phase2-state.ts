@@ -9,8 +9,8 @@ export interface Phase2State {
   // Auth tokens
   adminToken: string;
   kitchenStaffToken: string;
-  poolStaffToken: string;
-  chaletStaffToken: string;
+  capacityStaffToken: string;
+  accommodationStaffToken: string;
   hkStaffToken: string;
   managerToken: string;
   aliceToken: string;
@@ -18,12 +18,12 @@ export interface Phase2State {
   carolToken: string;
 
   // Module IDs
-  restaurantModuleId: string;
-  chaletsModuleId: string;
-  poolModuleId: string;
-  snackModuleId: string;
+  menuServiceModuleId: string;
+  accommodationModuleId: string;
+  capacityModuleId: string;
+  kioskModuleId: string;
 
-  // Restaurant category IDs
+  // MenuService category IDs
   appetizersCatId: string;
   mainsCatId: string;
   dessertsCatId: string;
@@ -57,16 +57,16 @@ export interface Phase2State {
   table2Id: string;
   tableT1Id: string;
 
-  // Chalet IDs
-  chaletAId: string; // Mountain View A
-  chaletBId: string; // Lakeside B
-  chaletCId: string; // Garden C
+  // AccommodationUnit IDs
+  unitAId: string; // Mountain View A
+  unitBId: string; // Lakeside B
+  unitCId: string; // Garden C
 
-  // Chalet pricing rule IDs
+  // AccommodationUnit pricing rule IDs
   summerPeakRuleId: string;
   mountainPremiumRuleId: string;
 
-  // Chalet add-on IDs
+  // AccommodationUnit add-on IDs
   bbqAddonId: string;
   basketAddonId: string;
   beddingAddonId: string;

@@ -35,7 +35,7 @@ describe('AI Agent Interaction Tests', () => {
 
     it('should require auth for module paths (not return legacy 410)', async () => {
         const response = await request(app)
-            .get(`${API_V1}/chalets`)
+            .get(`${API_V1}/accommodation_units`)
             .expect(401);
 
         expect(response.body.success).toBe(false);

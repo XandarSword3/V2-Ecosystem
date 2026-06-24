@@ -15,16 +15,8 @@ export async function migrate() {
 
     logger.info('Running migrations...');
 
-    // Create enums
+    // Create enums (generic state enums only — no module-specific types)
     await pool.query(`
-      DO $$ BEGIN
-        CREATE TYPE business_unit AS ENUM ('restaurant', 'snack_bar', 'chalets', 'pool', 'admin');
-      EXCEPTION WHEN duplicate_object THEN null; END $$;
-      
-      DO $$ BEGIN
-        CREATE TYPE order_type AS ENUM ('dine_in', 'takeaway', 'delivery');
-      EXCEPTION WHEN duplicate_object THEN null; END $$;
-      
       DO $$ BEGIN
         CREATE TYPE order_status AS ENUM ('pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled');
       EXCEPTION WHEN duplicate_object THEN null; END $$;
@@ -41,17 +33,6 @@ export async function migrate() {
         CREATE TYPE booking_status AS ENUM ('pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'no_show');
       EXCEPTION WHEN duplicate_object THEN null; END $$;
       
-      DO $$ BEGIN
-        CREATE TYPE ticket_status AS ENUM ('valid', 'used', 'expired', 'cancelled');
-      EXCEPTION WHEN duplicate_object THEN null; END $$;
-      
-      DO $$ BEGIN
-        CREATE TYPE snack_category AS ENUM ('sandwich', 'drink', 'snack', 'ice_cream');
-      EXCEPTION WHEN duplicate_object THEN null; END $$;
-      
-      DO $$ BEGIN
-        CREATE TYPE price_type AS ENUM ('per_night', 'one_time');
-      EXCEPTION WHEN duplicate_object THEN null; END $$;
     `);
 
     // Users & Auth tables
@@ -146,155 +127,9 @@ export async function migrate() {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_permissions_slug ON permissions(slug);
     `);
 
-    // Restaurant tables
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS menu_categories (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name VARCHAR(100) NOT NULL,
-        name_ar VARCHAR(100),
-        name_fr VARCHAR(100),
-        description TEXT,
-        display_order INTEGER DEFAULT 0,
-        is_active BOOLEAN DEFAULT true,
-        image_url TEXT,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        deleted_at TIMESTAMP
-      );
 
-      CREATE TABLE IF NOT EXISTS menu_items (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        category_id UUID REFERENCES menu_categories(id) NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        name_ar VARCHAR(255),
-        name_fr VARCHAR(255),
-        description TEXT,
-        description_ar TEXT,
-        description_fr TEXT,
-        price DECIMAL(10,2) NOT NULL,
-        preparation_time_minutes INTEGER,
-        calories INTEGER,
-        is_vegetarian BOOLEAN DEFAULT false,
-        is_vegan BOOLEAN DEFAULT false,
-        is_gluten_free BOOLEAN DEFAULT false,
-        allergens TEXT[],
-        image_url TEXT,
-        is_available BOOLEAN DEFAULT true,
-        is_featured BOOLEAN DEFAULT false,
-        display_order INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        deleted_at TIMESTAMP
-      );
 
-      CREATE TABLE IF NOT EXISTS restaurant_tables (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        table_number VARCHAR(20) NOT NULL UNIQUE,
-        capacity INTEGER NOT NULL,
-        location VARCHAR(100),
-        qr_code TEXT,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
 
-      -- Legacy tables removed per ARCHITECTURE_LAW.md
-      -- restaurant_orders, restaurant_order_items, restaurant_order_status_history
-      -- All records now use the unified 'transactions' table
-    `);
-
-    // Snack Bar tables
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS snack_items (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name VARCHAR(255) NOT NULL,
-        name_ar VARCHAR(255),
-        name_fr VARCHAR(255),
-        description TEXT,
-        price DECIMAL(10,2) NOT NULL,
-        category snack_category NOT NULL,
-        image_url TEXT,
-        is_available BOOLEAN DEFAULT true,
-        display_order INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        deleted_at TIMESTAMP
-      );
-
-      -- Legacy tables removed per ARCHITECTURE_LAW.md
-      -- snack_orders, snack_order_items
-    `);
-
-    // Chalets tables
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS chalets (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name VARCHAR(100) NOT NULL,
-        name_ar VARCHAR(100),
-        name_fr VARCHAR(100),
-        description TEXT,
-        description_ar TEXT,
-        description_fr TEXT,
-        capacity INTEGER NOT NULL,
-        bedroom_count INTEGER NOT NULL,
-        bathroom_count INTEGER NOT NULL,
-        amenities TEXT[],
-        images TEXT[],
-        base_price DECIMAL(10,2) NOT NULL,
-        weekend_price DECIMAL(10,2) NOT NULL,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        deleted_at TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS chalet_add_ons (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name VARCHAR(100) NOT NULL,
-        name_ar VARCHAR(100),
-        name_fr VARCHAR(100),
-        description TEXT,
-        price DECIMAL(10,2) NOT NULL,
-        price_type price_type NOT NULL,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS chalet_price_rules (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        chalet_id UUID REFERENCES chalets(id),
-        name VARCHAR(100) NOT NULL,
-        start_date TIMESTAMP NOT NULL,
-        end_date TIMESTAMP NOT NULL,
-        price_multiplier DECIMAL(5,2) NOT NULL,
-        priority INTEGER DEFAULT 0,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
-
-      -- Legacy tables removed per ARCHITECTURE_LAW.md
-      -- chalet_bookings, chalet_booking_add_ons
-    `);
-
-    // Pool tables
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS pool_sessions (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name VARCHAR(100) NOT NULL,
-        start_time VARCHAR(5) NOT NULL,
-        end_time VARCHAR(5) NOT NULL,
-        max_capacity INTEGER NOT NULL,
-        price DECIMAL(10,2) NOT NULL,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
-      );
-
-      -- Legacy tables removed per ARCHITECTURE_LAW.md
-      -- pool_tickets
-    `);
 
     // Payments & Notifications tables
     await pool.query(`
@@ -387,14 +222,6 @@ export async function migrate() {
         END IF;
       END $$;
 
-      -- Insert default modules
-      INSERT INTO modules (template_type, name, slug, description, sort_order, is_active)
-      VALUES 
-        ('menu_service', 'Restaurant', 'restaurant', 'Fine dining restaurant management', 1, true),
-        ('multi_day_booking', 'Chalets', 'chalets', 'Chalet booking and management', 2, true),
-        ('session_access', 'Pool', 'pool', 'Pool access and session management', 3, true),
-        ('menu_service', 'Snack Bar', 'snack-bar', 'Quick service snack bar', 4, true)
-      ON CONFLICT (slug) DO NOTHING;
     `);
 
     // Create transactions table (engine-refit unified table)
@@ -573,7 +400,7 @@ export async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_payments_reference ON payments(reference_type, reference_id);
     `);
 
-    // Legacy restaurant_orders module_id backfill removed per ARCHITECTURE_LAW.md
+    // Legacy backfill removed per ARCHITECTURE_LAW.md
 
     let shouldReplaySqlMigrations = true;
     const supabaseMigrationTableResult = await pool.query<{ table_name: string | null }>(

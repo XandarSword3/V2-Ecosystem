@@ -218,60 +218,53 @@ CREATE INDEX IF NOT EXISTS idx_backups_created_at ON backups(created_at DESC);
 -- Links content to existing tables
 -- ============================================
 
--- Add module_id to menu_categories if not exists
+-- Add module_id to catalog_categories (pre-rename: catalog_categories) if not exists
 DO $$ BEGIN
-  ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);
-EXCEPTION WHEN duplicate_column THEN null; END $$;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'catalog_categories') THEN
+    ALTER TABLE catalog_categories ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);
+  ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'catalog_categories') THEN
+    ALTER TABLE catalog_categories ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);
+  END IF;
+END $$;
 
--- Add module_id to chalets if not exists
+-- Add module_id to accommodation_units if not exists
 DO $$ BEGIN
-  ALTER TABLE chalets ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);
-EXCEPTION WHEN duplicate_column THEN null; END $$;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'accommodation_units') THEN
+    ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);
+  END IF;
+END $$;
 
--- Add module_id to pool_sessions if not exists
+-- Add module_id to capacity_windows if not exists
 DO $$ BEGIN
-  ALTER TABLE pool_sessions ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);
-EXCEPTION WHEN duplicate_column THEN null; END $$;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'capacity_windows') THEN
+    ALTER TABLE capacity_windows ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);
+  END IF;
+END $$;
 
--- Add module_id to snack_items if not exists
+-- snack_items removed (legacy table eliminated)
+
+-- Create indexes for module_id columns (guarded: only if tables exist)
 DO $$ BEGIN
-  ALTER TABLE snack_items ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);
-EXCEPTION WHEN duplicate_column THEN null; END $$;
-
--- Create indexes for module_id columns
-CREATE INDEX IF NOT EXISTS idx_menu_categories_module ON menu_categories(module_id);
-CREATE INDEX IF NOT EXISTS idx_chalets_module ON chalets(module_id);
-CREATE INDEX IF NOT EXISTS idx_pool_sessions_module ON pool_sessions(module_id);
-CREATE INDEX IF NOT EXISTS idx_snack_items_module ON snack_items(module_id);
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'catalog_categories') THEN
+    CREATE INDEX IF NOT EXISTS idx_catalog_categories_module ON catalog_categories(module_id);
+  ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'catalog_categories') THEN
+    CREATE INDEX IF NOT EXISTS idx_catalog_categories_module ON catalog_categories(module_id);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'accommodation_units') THEN
+    CREATE INDEX IF NOT EXISTS idx_accommodation_units_module ON accommodation_units(module_id);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'capacity_windows') THEN
+    CREATE INDEX IF NOT EXISTS idx_capacity_windows_module ON capacity_windows(module_id);
+  END IF;
+END $$;
 
 -- ============================================
 -- SEED DATA: MODULES
 -- ============================================
-INSERT INTO modules (template_type, name, name_ar, name_fr, slug, description, icon, is_active, sort_order) VALUES
-  ('menu_service', 'Restaurant', 'المطعم', 'Restaurant', 'restaurant', 'Fine dining experience with diverse menu options', 'UtensilsCrossed', true, 1),
-  ('multi_day_booking', 'Chalets', 'الشاليهات', 'Chalets', 'chalets', 'Luxurious beachfront accommodations', 'Home', true, 2),
-  ('session_access', 'Pool', 'المسبح', 'Piscine', 'pool', 'Refreshing pool sessions with beautiful views', 'Waves', true, 3),
-  ('menu_service', 'Snack Bar', 'سناك بار', 'Snack-Bar', 'snack-bar', 'Quick bites and refreshments', 'Coffee', true, 4)
-ON CONFLICT (slug) DO UPDATE SET
-  name = EXCLUDED.name,
-  name_ar = EXCLUDED.name_ar,
-  name_fr = EXCLUDED.name_fr,
-  updated_at = NOW();
+-- Legacy module seeds removed — modules are created dynamically via the platform UI.
 
--- Link existing content to modules (update rows where module_id is NULL)
--- Use DO block to avoid errors if tables are empty or missing
-DO $$ BEGIN
-    UPDATE menu_categories SET module_id = (SELECT id FROM modules WHERE slug = 'restaurant') WHERE module_id IS NULL;
-EXCEPTION WHEN undefined_table THEN null; END $$;
-
-DO $$ BEGIN
-    UPDATE chalets SET module_id = (SELECT id FROM modules WHERE slug = 'chalets') WHERE module_id IS NULL;
-EXCEPTION WHEN undefined_table THEN null; END $$;
-
-DO $$ BEGIN
-    UPDATE pool_sessions SET module_id = (SELECT id FROM modules WHERE slug = 'pool') WHERE module_id IS NULL;
-EXCEPTION WHEN undefined_table THEN null; END $$;
-
-DO $$ BEGIN
-    UPDATE snack_items SET module_id = (SELECT id FROM modules WHERE slug = 'snack-bar') WHERE module_id IS NULL;
-EXCEPTION WHEN undefined_table THEN null; END $$;
+-- Module linkage is managed dynamically via the platform UI; no static seed associations needed.

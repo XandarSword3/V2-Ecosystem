@@ -53,7 +53,7 @@ router.post(
       startDate,
       endDate,
       priceMultiplier,
-      applicableTo: applicableTo || ['chalets'],
+      applicableTo: applicableTo || ['accommodation'],
       priority: priority || 0,
       isActive: isActive ?? true,
     });
@@ -188,8 +188,9 @@ router.post(
       throw new AppError('itemType, itemId, basePrice, and checkInDate are required', 400);
     }
 
+    type PricingItemType = 'time_exclusive_reservation' | 'shared_capacity_access' | 'instant_transaction' | 'accommodation_units';
     const result = await seasonalPricingService.calculatePrice(
-      itemType,
+      itemType as PricingItemType,
       itemId,
       basePrice,
       new Date(checkInDate),
@@ -214,8 +215,9 @@ router.get(
       throw new AppError('All query parameters are required', 400);
     }
 
+    type PricingItemType = 'time_exclusive_reservation' | 'shared_capacity_access' | 'instant_transaction' | 'accommodation_units';
     const calendar = await seasonalPricingService.getPricingCalendar(
-      itemType as 'chalets' | 'pool' | 'restaurant',
+      itemType as PricingItemType,
       itemId as string,
       parseFloat(basePrice as string),
       new Date(startDate as string),

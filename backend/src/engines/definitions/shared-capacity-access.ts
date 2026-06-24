@@ -3,10 +3,12 @@
  * 
  * Economic Pattern: Purchase → Validate → Enter → Exit
  * Commercial Entity: Ticket
- * Examples: Pool, Gym, Spa, Waterpark, Game Room, Cinema
+ * Examples: Pool, Fitness Center, Spa, Waterpark, Game Room, Cinema
  * 
  * This engine handles:
- *   - Sessions with time slots, capacity limits, and pricing
+ *   - Sessions with TIMESTAMPTZ time slots — midnight-spanning supported (24h day pass, etc.)
+ *   - personal_duration_minutes: when set on a session, each ticket-holder gets that many
+ *     minutes from their own check-in time rather than the shared session ends_at
  *   - Ticket purchase with adult/child pricing
  *   - QR code generation for ticket validation
  *   - Entry/exit tracking with real-time capacity management
@@ -39,7 +41,7 @@ export const sharedCapacityAccessStateMachine: StateMachineDefinition<SharedCapa
       to: 'active',
       action: 'validate_entry',
       allowedActors: ['staff', 'system'],
-      guardDescription: 'Ticket is for today; session time has started; capacity not exceeded',
+      guardDescription: 'NOW() is between starts_at and ends_at; capacity not exceeded; if personal_duration_minutes is set on the session, personal_expires_at = NOW() + personal_duration_minutes is stored in transaction metadata at this point',
     },
     {
       from: 'active',
@@ -58,13 +60,22 @@ export const sharedCapacityAccessStateMachine: StateMachineDefinition<SharedCapa
       guardDescription: 'Ticket date is in the future (no same-day cancellation unless policy allows)',
     },
 
-    // Expiration
+    // Expiration — no entry before session ended
     {
       from: 'valid',
       to: 'expired',
       action: 'expire',
       allowedActors: ['system'],
-      guardDescription: 'Ticket date has passed without entry (auto-expired by cron)',
+      guardDescription: 'NOW() > ends_at and ticket never validated; auto-expired by cron',
+    },
+
+    // Personal duration expiry — guest is inside but their personal timer ran out
+    {
+      from: 'active',
+      to: 'expired',
+      action: 'expire_personal',
+      allowedActors: ['system'],
+      guardDescription: 'personal_duration_minutes was set on session; NOW() > personal_expires_at stored in transaction metadata at check-in; auto-expired by cron',
     },
   ],
 };
@@ -116,6 +127,14 @@ export const sharedCapacityAccessInteractions: InteractionContract[] = [
     idempotent: true,
     failureMode: 'log_and_continue',
   },
+  {
+    name: 'set_personal_expiry_on_entry',
+    applicableEngines: ['shared_capacity_access'],
+    trigger: 'on_check_in',
+    guardDescription: 'Session has personal_duration_minutes set; stores personal_expires_at = NOW() + personal_duration_minutes as TIMESTAMPTZ in transaction metadata; cron uses this to fire expire_personal',
+    idempotent: true,
+    failureMode: 'log_and_continue',
+  },
 ];
 
 // ============================================
@@ -125,7 +144,7 @@ export const sharedCapacityAccessInteractions: InteractionContract[] = [
 export const sharedCapacityAccessEngine: EngineDefinition<SharedCapacityAccessStatus> = {
   type: 'shared_capacity_access',
   name: 'Shared Capacity Access',
-  description: 'Purchase → Validate → Enter → Exit. Session-based shared facility access.',
+  description: 'Purchase → Validate → Enter → Exit. Session-based shared facility access. Sessions use TIMESTAMPTZ (midnight-spanning supported). personal_duration_minutes enables per-holder timed access from check-in.',
   commercialEntity: 'ticket',
   stateMachine: sharedCapacityAccessStateMachine,
   pricing: sharedCapacityAccessPricing,

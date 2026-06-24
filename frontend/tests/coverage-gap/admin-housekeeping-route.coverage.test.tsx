@@ -60,7 +60,7 @@ function seedEndpoints() {
               notes: 'VIP arrival',
               assigned_to: undefined,
               assigned_to_name: undefined,
-              chalet_name: 'Chalet A',
+              chalet_name: 'AccommodationUnit A',
               scheduled_for: '2025-01-02T08:00:00.000Z',
               estimated_duration: 30,
               created_at: '2025-01-02T06:00:00.000Z',

@@ -216,13 +216,13 @@ describe('beta testing service', () => {
 
     vi.spyOn(service, 'sendBetaInviteEmail').mockResolvedValue();
 
-    const invited = await service.inviteBetaTester('beta@resort.test', 'Beta User', 'vip');
+    const invited = await service.inviteBetaTester('beta@v2-hub.test', 'Beta User', 'vip');
     expect(invited.success).toBe(true);
     expect(invited.inviteLink).toContain('/beta/activate?token=');
     expect(tables.beta_testers.length).toBe(1);
     expect(tables.beta_invite_tokens.length).toBe(1);
 
-    const duplicate = await service.inviteBetaTester('beta@resort.test', 'Beta User');
+    const duplicate = await service.inviteBetaTester('beta@v2-hub.test', 'Beta User');
     expect(duplicate.success).toBe(false);
 
     const token = String(tables.beta_invite_tokens[0].token);
@@ -250,7 +250,7 @@ describe('beta testing service', () => {
 
     tables.beta_testers.push({
       id: 'tester-1',
-      email: 'active@resort.test',
+      email: 'active@v2-hub.test',
       name: 'Active Tester',
       role: 'external',
       status: 'active',
@@ -273,8 +273,8 @@ describe('beta testing service', () => {
       timezone: 'UTC',
     });
 
-    await service.trackPageVisit(sessionId, '/restaurant');
-    await service.trackAction(sessionId, 'click', 'button', '/restaurant', { source: 'menu' });
+    await service.trackPageVisit(sessionId, '/menu service');
+    await service.trackAction(sessionId, 'click', 'button', '/menu service', { source: 'menu' });
     await service.trackError(sessionId, 'runtime', 'Boom', 'stack');
     await service.endSession(sessionId);
 

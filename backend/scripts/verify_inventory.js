@@ -111,11 +111,11 @@ async function runTest() {
     const { error: linkError } = await supabase
       .from('menu_item_ingredients')
       .upsert({
-        menu_item_id: menuItem.id,
+        catalog_item_id: menuItem.id,
         inventory_item_id: finalInvStart.id,
         quantity_required: 0.5,
         unit: finalInvStart.unit
-      }, { onConflict: 'menu_item_id,inventory_item_id' });
+      }, { onConflict: 'catalog_item_id,inventory_item_id' });
     
     if (linkError) throw new Error(`Link setup failed: ${linkError.message}`);
     console.log(`✓ Linked: 1 ${menuItem.name} requires 0.5 ${finalInvStart.unit} ${finalInvStart.name}`);
@@ -147,7 +147,7 @@ async function runTest() {
       .from('restaurant_order_items')
       .insert({
         order_id: order.id,
-        menu_item_id: menuItem.id,
+        catalog_item_id: menuItem.id,
         quantity: 2,
         unit_price: 10,
         subtotal: 20

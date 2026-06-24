@@ -107,7 +107,7 @@ describe('Admin live users route coverage', () => {
           {
             socketId: 'sock-2',
             roles: [],
-            currentPage: '/restaurant',
+            currentPage: '/menu service',
             connectedAt: '2025-01-03T09:10:00.000Z',
             lastActivity: new Date().toISOString(),
             userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile',

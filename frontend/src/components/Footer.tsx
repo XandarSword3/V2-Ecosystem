@@ -22,7 +22,6 @@ export default function Footer() {
     const pathname = usePathname();
     // useLocale() call triggers re-render on language change
     useLocale();
-    const tNav = useTranslations('nav');
     const tFooter = useTranslations('footer');
     const { settings, modules } = useSiteSettings();
 
@@ -34,17 +33,8 @@ export default function Footer() {
             .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     }, [modules]);
 
-    // Helper to translate nav items
-    const getNavTranslation = (slug: string) => {
-        const navMap: Record<string, string> = {
-            'restaurant': tNav('restaurant'),
-            'chalets': tNav('chalets'),
-            'pool': tNav('pool'),
-            'snack-bar': tNav('snackBar'),
-            'snackbar': tNav('snackBar'),
-        };
-        return navMap[slug.toLowerCase()] || slug;
-    };
+    // Helper to translate nav items — falls back to module name for dynamic slugs
+    const getNavTranslation = (slug: string) => slug;
 
     // Build dynamic Quick Links from active modules
     const dynamicQuickLinks = useMemo(() => {
@@ -57,7 +47,7 @@ export default function Footer() {
 
         // Build links from active modules
         const moduleLinks = activeModules.map(m => ({
-            label: getNavTranslation(m.slug) || m.name,
+            label: m.name,
             href: `/${m.slug}`,
             moduleSlug: m.slug
         }));
@@ -66,7 +56,7 @@ export default function Footer() {
         moduleLinks.push({ label: tFooter('giftCards') || 'Gift Cards', href: '/giftcards', moduleSlug: '' });
 
         return moduleLinks;
-    }, [activeModules, tNav, tFooter]);
+    }, [activeModules, tFooter]);
 
     // Don't show footer on admin or staff pages
     if (pathname?.startsWith('/admin') || pathname?.startsWith('/staff')) {
@@ -75,7 +65,7 @@ export default function Footer() {
 
     // Build footer with translations - always use translated defaults
     const defaultFooterConfig = {
-        logo: { text: settings.resortName || 'Your Resort', showIcon: true },
+        logo: { text: settings.siteName || settings.siteName || 'Your Business', showIcon: true },
         description: tFooter('description'),
         columns: [
             {
@@ -146,7 +136,7 @@ export default function Footer() {
             links: col.links?.map((link: FooterLink) => ({
                 ...link,
                 // Translate link labels for module links
-                label: link.moduleSlug ? getNavTranslation(link.moduleSlug) :
+                label: link.moduleSlug ? (link.label || link.moduleSlug) :
                     link.labelKey ? tFooter(link.labelKey) : link.label
             }))
         })) || defaultFooterConfig.columns,

@@ -1,8 +1,8 @@
-<!-- Last updated: 2026-05-10 -->
+<!-- Last updated: 2026-06-24 -->
 
 # V2 Ecosystem
 
-> **Modules:** 37 | **Engines:** 4 | **Commits:** 257 | **Tests:** 422 | **API Endpoints:** 711 | **Frontend Pages:** 108
+> **Modules:** 40 | **Engines:** 4 | **Commits:** 327 | **Tests:** 795 | **API Endpoints:** 744 | **Frontend Pages:** 113
 
 [![CI Pipeline](https://img.shields.io/badge/CI-Passing-success)](https://github.com/XandarSword3/V2-Ecosystem)
 [![Coverage](https://img.shields.io/badge/Coverage-43.16%25-informational)](https://github.com/XandarSword3/V2-Ecosystem)
@@ -13,11 +13,19 @@ A state-of-the-art, monorepo-based platform management ecosystem designed for lu
 ## ✨ Core Pillars
 
 - **⚡ 4-Engine Framework**: Unified transaction system handling instant transactions, time-exclusive reservations, shared capacity access, and ongoing entitlements
-- **🚀 Dynamic Architecture**: Decoupled module routing and a visual **Module Builder** for rapid feature deployment across 37 modules
+- **🚀 Dynamic Architecture**: Decoupled module routing and a visual **Module Builder** for rapid feature deployment across 40 modules
 - **📱 Multi-Platform**: Full-featured Next.js 14 web application and an Expo-based mobile companion (in progress)
 - **🛡️ Enterprise Security**: Role-Based Access Control (RBAC), 2FA, JWT with rotation, and full audit logging
 - **🌐 Global Ready**: Native i18n support (EN/AR/FR/DE/IT) with RTL layout handling and multi-currency formatting
 - **🔌 Offline Resilience**: Workbox-powered PWA with IndexedDB syncing, allowing critical staff operations during connectivity outages
+
+## 🚀 Recent Developments (June 2026)
+
+Over the past month of extensive system hardening and feature consolidation, the following structural milestones were achieved:
+- **SaaS Tenant Layer**: Provisioned multi-tenant routing based on subdomain classification, allowing tenant-specific subdomains (e.g. `xandar.localhost`) to serve isolated resources.
+- **Unified Customization & Themes**: Integrated granular control over branding themes, layouts, overrides, and terminology configurations from the admin panel.
+- **User Scope Model**: Hardened authorization by moving to a structured `user_scope` primitive (`super_admin` down to `customer`) with a strict scope-tenant integrity database check.
+- **100% RLS Isolation Compliance**: Remediated database-level leaks by adding `tenant_id` and `property_id` columns to all operational tables, executing transitive relationship backfilling for legacy records, and creating type-polymorphic, dual-scoped Row-Level Security (RLS) policies across all tables.
 
 ## 🏗️ System Architecture
 
@@ -64,7 +72,7 @@ All engines operate through a **unified `transactions` table** that provides:
 
 ### Module Architecture
 
-The platform consists of **37 confirmed domain modules** organized by engine type:
+The platform consists of **40 confirmed domain modules** organized by engine type:
 
 #### Module Distribution by Engine
 
@@ -98,7 +106,7 @@ backend/src/modules/{module-name}/
 #### Supabase Integration
 
 - **Database:** PostgreSQL via Supabase
-- **Active Migrations:** 158 confirmed timestamped migrations
+- **Active Migrations:** 165 confirmed timestamped migrations
 - **ORM:** Drizzle ORM with type-safe queries
 - **Tables:** 255 confirmed database tables
 - **Real-time:** Supabase real-time subscriptions
@@ -116,9 +124,9 @@ backend/src/modules/{module-name}/
 #### Next.js 14 App Router
 
 - **Framework:** Next.js 14 with App Router
-- **Pages:** 108 confirmed page.tsx files
-- **Customer Pages:** 39 customer-facing pages
-- **Admin Pages:** 69 admin interface pages
+- **Pages:** 113 confirmed page.tsx files
+- **Customer Pages:** 42 customer-facing pages
+- **Admin Pages:** 71 admin interface pages
 - **Routing:** Dynamic routing for module-based pages
 
 #### Frontend Technology Stack
@@ -156,7 +164,7 @@ frontend/src/
 #### Unified API Design
 
 - **Base URL:** `/api/v1` for all endpoints
-- **Total Endpoints:** 711 confirmed endpoints across 40 route files
+- **Total Endpoints:** 744 confirmed endpoints across 48 route files
 - **Authentication:** JWT with refresh token rotation
 - **Rate Limiting:** Express rate limiting with Redis
 - **Documentation:** OpenAPI/Swagger specification
@@ -273,7 +281,7 @@ frontend/src/
 git clone https://github.com/XandarSword3/V2-Ecosystem.git v2-ecosystem
 cd v2-ecosystem
 
-# Install workspace dependencies (37 modules + shared dependencies)
+# Install workspace dependencies (40 modules + shared dependencies)
 npm install
 
 # Verify installation
@@ -360,7 +368,7 @@ PRODUCTION_API_URL="https://your-production-backend.example"
 cd supabase
 supabase start
 
-# Run database migrations (158 confirmed migrations)
+# Run database migrations (165 confirmed migrations)
 supabase db reset
 
 # Seed initial data
@@ -721,13 +729,13 @@ All documentation follows strict accuracy rules:
 ### Quick Reference
 
 #### System Metrics (Confirmed)
-- **Total modules:** 37
+- **Total modules:** 40
 - **Engine types:** 4 (`instant_transaction`, `time_exclusive_reservation`, `shared_capacity_access`, `ongoing_entitlement`)
-- **API endpoints:** 711
-- **Frontend pages:** 108 (69 admin + 39 customer)
-- **Database tables:** 255
-- **Active migrations:** 158
-- **Test files:** 422 total (219 backend + 113 frontend + 90 E2E)
+- **API endpoints:** 744
+- **Frontend pages:** 113 (71 admin + 42 customer)
+- **Database tables:** 255+
+- **Active migrations:** 165
+- **Test files:** 795 total
 - **External integrations:** 8
 
 #### Development Commands
@@ -760,7 +768,7 @@ npm run build:verify     # Verify build
 1. **Fork the repository** and create a feature branch
 2. **Set up development environment** using the Getting Started guide
 3. **Make changes** following the established patterns
-4. **Run tests** to ensure quality (332 tests must pass)
+4. **Run tests** to ensure quality
 5. **Update documentation** with any changes
 6. **Submit pull request** with detailed description
 
@@ -880,7 +888,7 @@ This project is licensed under a **PROPRIETARY LICENSE** - see the [LICENSE](LIC
 #### Phase 3 Enhancements
 - **Mobile application** completion (React Native/Expo)
 - **Advanced analytics** and reporting features
-- **Multi-tenant support** for resort chains
+- ~~**Multi-tenant support** for resort chains~~ ✅ Implemented (June 2026)
 - **Enhanced offline capabilities** for staff operations
 - **AI-powered recommendations** and optimizations
 

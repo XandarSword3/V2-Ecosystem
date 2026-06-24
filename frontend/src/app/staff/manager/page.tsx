@@ -120,7 +120,7 @@ export default function ManagerDashboard() {
 
   // Check for manager role
   const isManager = user?.roles?.some(r => 
-    ['admin', 'super_admin', 'restaurant_manager', 'chalet_manager', 'pool_manager', 'manager'].includes(r)
+    ['admin', 'super_admin', 'manager'].includes(r)
   );
 
   useEffect(() => {
@@ -582,39 +582,17 @@ export default function ManagerDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Link href="/staff/restaurant" className="block">
-                  <Button variant="outline" className="w-full justify-start gap-3">
-                    <ChefHat className="w-5 h-5 text-orange-500" />
-                    Restaurant Orders
-                    <Badge className="ml-auto bg-orange-100 text-orange-700">{stats.pendingOrders}</Badge>
-                  </Button>
-                </Link>
-                <Link href="/staff/chalets" className="block">
-                  <Button variant="outline" className="w-full justify-start gap-3">
-                    <Home className="w-5 h-5 text-green-500" />
-                    Chalet Check-ins
-                  </Button>
-                </Link>
-                <Link href="/staff/pool" className="block">
-                  <Button variant="outline" className="w-full justify-start gap-3">
-                    <Waves className="w-5 h-5 text-blue-500" />
-                    Pool Management
-                  </Button>
-                </Link>
-                {/* Dynamic modules */}
-                {(activeModules || [])
-                  .filter((m: any) => !['restaurant', 'snack-bar', 'chalets', 'pool'].includes(m.slug))
-                  .slice(0, 6)
-                  .map((m: any) => (
-                    <Link key={m.id} href={`/staff/${m.slug}`} className="block">
-                      <Button variant="outline" className="w-full justify-start gap-3">
-                        {m.template_type === 'menu_service' && <ChefHat className="w-5 h-5 text-amber-500" />}
-                        {m.template_type === 'multi_day_booking' && <Calendar className="w-5 h-5 text-indigo-500" />}
-                        {m.template_type === 'session_access' && <Users className="w-5 h-5 text-teal-500" />}
-                        {m.name}
-                      </Button>
-                    </Link>
-                  ))}
+                {/* Dynamic active modules */}
+                {(activeModules || []).slice(0, 6).map((m: any) => (
+                  <Link key={m.id} href={`/staff/${m.slug}`} className="block">
+                    <Button variant="outline" className="w-full justify-start gap-3">
+                      {m.template_type === 'menu_service' && <ChefHat className="w-5 h-5 text-amber-500" />}
+                      {m.template_type === 'multi_day_booking' && <Calendar className="w-5 h-5 text-indigo-500" />}
+                      {m.template_type === 'session_access' && <Users className="w-5 h-5 text-teal-500" />}
+                      {m.name}
+                    </Button>
+                  </Link>
+                ))}
                 <Link href="/admin/housekeeping" className="block">
                   <Button variant="outline" className="w-full justify-start gap-3">
                     <ClipboardList className="w-5 h-5 text-purple-500" />

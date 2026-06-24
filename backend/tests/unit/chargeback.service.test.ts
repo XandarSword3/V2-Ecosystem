@@ -6,12 +6,18 @@
  */
 
 
+const mockStripe = vi.hoisted(() => ({
+  disputes: {
+    update: vi.fn().mockResolvedValue({ id: 'dp_mock' }),
+  },
+}));
+
 vi.mock('stripe', () => {
-  const MockStripe = vi.fn().mockImplementation(() => ({
-    disputes: {
-      update: vi.fn().mockResolvedValue({ id: 'dp_mock' }),
-    },
-  }));
+  class MockStripe {
+    constructor() {
+      return mockStripe;
+    }
+  }
   return { default: MockStripe };
 });
 
@@ -25,22 +31,30 @@ vi.mock('../../src/services/email.service.js', () => ({
   emailService: { sendEmail: vi.fn().mockResolvedValue(true) },
 }));
 
-const mockChain = {
-  from: vi.fn(),
-  select: vi.fn(),
-  insert: vi.fn(),
-  update: vi.fn(),
-  eq: vi.fn(),
-  lte: vi.fn(),
-  gte: vi.fn(),
-  single: vi.fn(),
-  order: vi.fn(),
-  range: vi.fn(),
-  filter: vi.fn(),
-};
-Object.keys(mockChain).forEach((k) => {
-  (mockChain as any)[k].mockReturnValue(mockChain);
+const mockChain = vi.hoisted(() => {
+  const chain = {
+    from: vi.fn(),
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+    eq: vi.fn(),
+    lte: vi.fn(),
+    gte: vi.fn(),
+    single: vi.fn(),
+    order: vi.fn(),
+    range: vi.fn(),
+    filter: vi.fn(),
+  };
+  Object.keys(chain).forEach((k) => (chain as any)[k].mockReturnValue(chain));
+  return chain;
 });
+
+vi.mock('../../src/lib/supabase.js', () => ({
+  getSupabase: vi.fn(() => mockChain),
+  getSupabaseAdmin: vi.fn(() => mockChain),
+  supabase: mockChain,
+  supabaseAdmin: mockChain,
+}));
 
 vi.mock('../../src/database/connection.js', () => ({
   getSupabase: vi.fn(() => mockChain),

@@ -219,29 +219,63 @@ export async function deletePropertySetting(
 
 /**
  * Get all settings for a property showing the effective value and source.
+ *
+ * Key discovery uses the UNION of:
+ *   1. system_defaults — keys with a global baseline (any tier)
+ *   2. property_settings for this property — keys written directly at the
+ *      property level that may have no system default (e.g. navbar, footer,
+ *      homepage which are per-property CMS settings)
+ *
+ * This prevents property-level writes from becoming invisible on read just
+ * because the key was never seeded into system_defaults.
  */
 export async function getEffectiveSettings(
   propertyId: string,
   category?: string
 ): Promise<ResolvedSetting[]> {
-  // Get all system defaults as baseline
-  let sysQuery = supabase().from('system_defaults').select('setting_key, setting_value, category, description');
+  // Fetch system defaults and property-level keys in parallel
+  let sysQuery = supabase()
+    .from('system_defaults')
+    .select('setting_key, setting_value, category, description');
   if (category) sysQuery = sysQuery.eq('category', category);
-  const { data: sysDefaults } = await sysQuery;
 
-  const allKeys = (sysDefaults || []).map(s => s.setting_key);
+  let propQuery = supabase()
+    .from('property_settings')
+    .select('setting_key, category')
+    .eq('property_id', propertyId);
+  if (category) propQuery = propQuery.eq('category', category);
+
+  const [{ data: sysDefaults }, { data: propKeys }] = await Promise.all([
+    sysQuery,
+    propQuery,
+  ]);
+
+  // Build unified key set — property keys fill any gaps not covered by system_defaults
+  const sysKeySet = new Set((sysDefaults || []).map(s => s.setting_key));
+  const allKeys = [...sysKeySet];
+  for (const row of propKeys || []) {
+    if (!sysKeySet.has(row.setting_key)) {
+      allKeys.push(row.setting_key);
+    }
+  }
 
   if (allKeys.length === 0) return [];
 
   const resolved = await resolveSettings(propertyId, allKeys);
 
-  // Attach category and description from sysDefaults
-  sysDefaults?.forEach(sys => {
-    if (resolved[sys.setting_key]) {
-      resolved[sys.setting_key].category = sys.category;
-      resolved[sys.setting_key].description = sys.description;
+  // Attach category and description from sysDefaults where available
+  const sysMetaMap = new Map(
+    (sysDefaults || []).map(s => [s.setting_key, { category: s.category, description: s.description }])
+  );
+  for (const key of allKeys) {
+    if (resolved[key]) {
+      const meta = sysMetaMap.get(key);
+      if (meta) {
+        resolved[key].category = meta.category;
+        resolved[key].description = meta.description;
+      }
     }
-  });
+  }
 
   return Object.values(resolved);
 }

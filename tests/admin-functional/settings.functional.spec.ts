@@ -11,33 +11,33 @@ test.describe('Admin functional - Settings', () => {
 
     const before = await apiJson(page.request, { method: 'GET', path: '/admin/settings', token });
     expect(before.status).toBe(200);
-    const prevName = String(before.body?.data?.resortName || 'V2 Ecosystem');
+    const prevName = String(before.body?.data?.propertyName || 'V2 Ecosystem');
     const nextName = `${prevName} E2E`;
 
     const put = await apiJson(page.request, {
       method: 'PUT',
       path: '/admin/settings',
       token,
-      data: { resortName: nextName },
+      data: { propertyName: nextName },
     });
     expect([200, 204]).toContain(put.status);
 
     const after = await apiJson(page.request, { method: 'GET', path: '/admin/settings', token });
     expect(after.status).toBe(200);
-    expect(String(after.body?.data?.resortName)).toBe(nextName);
+    expect(String(after.body?.data?.propertyName)).toBe(nextName);
 
     await page.goto('/admin/settings', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('button', { name: /^save$/i })).toBeVisible();
-    const resortNameInput = page.getByPlaceholder(/enter your resort name/i);
-    await expect(resortNameInput).toHaveValue(nextName, { timeout: 15000 });
+    const propertyNameInput = page.getByPlaceholder(/enter your resort name/i);
+    await expect(propertyNameInput).toHaveValue(nextName, { timeout: 15000 });
 
     // Cleanup (restore original)
     await apiJson(page.request, {
       method: 'PUT',
       path: '/admin/settings',
       token,
-      data: { resortName: prevName },
+      data: { propertyName: prevName },
     });
   });
 

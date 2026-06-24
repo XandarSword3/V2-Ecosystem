@@ -15,10 +15,10 @@ const toastErrorMock = vi.hoisted(() => vi.fn());
 const siteSettingsMock = vi.hoisted(() => ({
   modules: [
     {
-      id: 'module-restaurant',
+      id: 'module-menu service',
       template_type: 'menu_service',
-      name: 'Restaurant',
-      slug: 'restaurant',
+      name: 'MenuService',
+      slug: 'menu_service',
       is_active: true,
       sort_order: 1,
     },
@@ -129,7 +129,7 @@ const customizationGroupsSeed = [
 
 describe('Admin module menu route coverage', () => {
   beforeEach(() => {
-    useParamsMock.mockReturnValue({ slug: 'restaurant' });
+    useParamsMock.mockReturnValue({ slug: 'menu_service' });
 
     apiGetMock.mockReset();
     apiPostMock.mockReset();
@@ -140,16 +140,16 @@ describe('Admin module menu route coverage', () => {
     toastErrorMock.mockReset();
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/restaurant/items') {
+      if (url === '/menu_service/items') {
         return Promise.resolve({ data: { data: itemsSeed } });
       }
-      if (url === '/restaurant/categories') {
+      if (url === '/menu_service/categories') {
         return Promise.resolve({ data: { data: categoriesSeed } });
       }
       if (url === '/inventory/items') {
         return Promise.resolve({ data: { data: ingredientsSeed } });
       }
-      if (url === '/restaurant/customization-groups') {
+      if (url === '/menu_service/modifiers') {
         return Promise.resolve({ data: { data: customizationGroupsSeed } });
       }
       return Promise.resolve({ data: { data: [] } });
@@ -172,7 +172,7 @@ describe('Admin module menu route coverage', () => {
     await user.click(screen.getByRole('button', { name: /Hide$/i }));
 
     await waitFor(() => {
-      expect(apiPutMock).toHaveBeenCalledWith('/restaurant/admin/items/item-1', {
+      expect(apiPutMock).toHaveBeenCalledWith('/menu_service/admin/items/item-1', {
         is_available: false,
       });
     });
@@ -185,7 +185,7 @@ describe('Admin module menu route coverage', () => {
 
     render(<DynamicMenuPage />);
 
-    await screen.findByText('Restaurant Menu');
+    await screen.findByText('MenuService Menu');
 
   await user.click(screen.getByRole('button', { name: /Add Item/i }));
   expect(await screen.findByText('Add New Menu Item')).toBeInTheDocument();

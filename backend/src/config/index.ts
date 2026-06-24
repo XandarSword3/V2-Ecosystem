@@ -1,12 +1,20 @@
-import dotenv from 'dotenv';
+import { config as dotenvConfig } from 'dotenv';
 import crypto from 'crypto';
-dotenv.config();
+dotenvConfig();
 
 const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
 const isTest = process.env.NODE_ENV === 'test';
 
-const DEV_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3005'];
+const DEV_CORS_ORIGINS = [
+  /^http:\/\/localhost:\d+$/,
+  /^http:\/\/.*\.v2platform\.local:\d+$/,
+  /^https:\/\/.*\.v2platform\.com$/, // For production domain
+];
+
+// Matches any subdomain (including multi-level, e.g. resort-1.tenant-a.v2platform.local)
+// used by the property-level dev URLs introduced in session 7-8.
+const DEV_SUBDOMAIN_PATTERN = /^http:\/\/(?:[a-z0-9-]+\.)+(?:v2platform\.local|localhost)(?::\d+)?$/;
 
 // Known production frontend origins — always allowed regardless of env var configuration.
 // This prevents a missing/misconfigured CORS_ORIGINS env var from breaking the production
@@ -33,7 +41,8 @@ export function resolveCorsOrigins(env: NodeJS.ProcessEnv = process.env): (strin
     return [...merged, VERCEL_PREVIEW_PATTERN];
   }
 
-  return base;
+  // In development, include the subdomain pattern for multi-property routing
+  return [...base, DEV_SUBDOMAIN_PATTERN];
 }
 
 /**

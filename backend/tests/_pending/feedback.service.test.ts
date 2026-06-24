@@ -47,7 +47,7 @@ describe('FeedbackService', () => {
         guestEmail: 'john@example.com',
         type: 'general',
         subject: 'Great Stay',
-        message: 'We had a wonderful time at your resort!',
+        message: 'We had a wonderful time at your property!',
       });
 
       expect(feedback).toBeDefined();

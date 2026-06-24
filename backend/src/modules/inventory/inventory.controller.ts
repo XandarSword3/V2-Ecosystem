@@ -521,20 +521,20 @@ export class InventoryController {
       // Get linked menu items
       const { data: linkedMenuItems } = await supabase
         .from('menu_item_ingredients')
-        .select('menu_item_id, quantity_needed')
+        .select('catalog_item_id, quantity_needed')
         .eq('inventory_item_id', id);
 
       let menuItemsInfo: any[] = [];
       if (linkedMenuItems && linkedMenuItems.length > 0) {
-        const menuItemIds = linkedMenuItems.map(l => l.menu_item_id);
+        const menuItemIds = linkedMenuItems.map(l => l.catalog_item_id);
         const { data: menuItems } = await supabase
-          .from('menu_items')
+          .from('catalog_items')
           .select('id, name')
           .in('id', menuItemIds);
         
         menuItemsInfo = (linkedMenuItems || []).map(link => ({
-          id: link.menu_item_id,
-          name: menuItems?.find(m => m.id === link.menu_item_id)?.name,
+          id: link.catalog_item_id,
+          name: menuItems?.find(m => m.id === link.catalog_item_id)?.name,
           quantity_needed: link.quantity_needed,
         }));
       }
@@ -1467,14 +1467,14 @@ export class InventoryController {
   async linkToMenuItem(req: Request, res: Response) {
     try {
       const { itemId } = req.params;
-      const { menuItemId, quantityNeeded } = req.body;
+      const { catalogItemId, quantityNeeded } = req.body;
       const supabase = getSupabase();
 
       // Check if link exists
       const { data: existing } = await supabase
         .from('menu_item_ingredients')
         .select('id')
-        .eq('menu_item_id', menuItemId)
+        .eq('catalog_item_id', catalogItemId)
         .eq('inventory_item_id', itemId)
         .single();
 
@@ -1486,12 +1486,12 @@ export class InventoryController {
             quantity_needed: quantityNeeded,
             updated_at: new Date().toISOString(),
           })
-          .eq('menu_item_id', menuItemId)
+          .eq('catalog_item_id', catalogItemId)
           .eq('inventory_item_id', itemId);
       } else {
         // Insert
         await supabase.from('menu_item_ingredients').insert({
-          menu_item_id: menuItemId,
+          catalog_item_id: catalogItemId,
           inventory_item_id: itemId,
           quantity_needed: quantityNeeded,
         });

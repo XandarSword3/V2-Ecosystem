@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import { getSupabase } from '../database/connection.js';
-import { config } from '../config/index.js';
+import { config } from '../config/index';
 import { logger } from '../utils/logger.js';
 
 interface EmailOptions {
@@ -98,20 +98,22 @@ class EmailService {
       const settings: Record<string, string> = {};
       (data || []).forEach((s: { key: string; value: Record<string, unknown> | null }) => {
         if (s.key === 'general' && s.value) {
-          settings.company_name = String(s.value.resortName || 'Your Resort');
-          settings.companyName = String(s.value.resortName || 'Your Resort');
+          settings.company_name = String(s.value.siteName || s.value.businessName || s.value.resortName || 'Your Business');
+          settings.companyName = String(s.value.siteName || s.value.businessName || s.value.resortName || 'Your Business');
         }
         if (s.key === 'contact' && s.value) {
           settings.contact_email = String(s.value.email || '');
           settings.contactEmail = String(s.value.email || '');
           settings.contact_phone = String(s.value.phone || 'Not configured');
           settings.contactPhone = String(s.value.phone || 'Not configured');
-          settings.contact_address = String(s.value.address || 'Your Resort');
-          settings.companyAddress = String(s.value.address || 'Your Resort');
+          settings.contact_address = String(s.value.address || 'Your Business');
+          settings.companyAddress = String(s.value.address || 'Your Business');
         }
-        if (s.key === 'chalets' && s.value) {
-          settings.chalet_check_in = String(s.value.checkIn || s.value.check_in_time || '3:00 PM');
-          settings.chalet_check_out = String(s.value.checkOut || s.value.check_out_time || '12:00 PM');
+        if (s.key === 'accommodation' && s.value) {
+          settings.unit_check_in = String(s.value.checkIn || s.value.check_in_time || '3:00 PM');
+          settings.unit_check_out = String(s.value.checkOut || s.value.check_out_time || '12:00 PM');
+          settings.chalet_check_in = settings.unit_check_in;
+          settings.chalet_check_out = settings.unit_check_out;
         }
       });
       return { ...this.getDefaultSettings(), ...settings };
@@ -122,14 +124,14 @@ class EmailService {
 
   private getDefaultSettings(): Record<string, string> {
     return {
-      company_name: 'Your Resort',
+      company_name: 'Your Business',
       contact_email: '',
       contact_phone: 'Not configured',
-      contact_address: 'Your Resort',
-      companyName: 'Your Resort',
+      contact_address: 'Your Business',
+      companyName: 'Your Business',
       contactEmail: '',
       contactPhone: 'Not configured',
-      companyAddress: 'Your Resort',
+      companyAddress: 'Your Business',
     };
   }
 
@@ -175,7 +177,7 @@ class EmailService {
     }
 
     const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || '';
-    const fromName = process.env.SMTP_FROM_NAME || 'Your Resort';
+    const fromName = process.env.SMTP_FROM_NAME || 'Your Business';
 
     try {
       const info = await this.transporter.sendMail({
@@ -329,9 +331,9 @@ class EmailService {
       bookingNumber: data.bookingNumber,
       chaletName: data.unitName,
       checkInDate: data.checkInDate,
-      checkInTime: settings.chalet_check_in || '3:00 PM',
+      checkInTime: settings.unit_check_in || '3:00 PM',
       checkOutDate: data.checkOutDate,
-      checkOutTime: settings.chalet_check_out || '12:00 PM',
+      checkOutTime: settings.unit_check_out || '12:00 PM',
       numberOfGuests: data.numberOfGuests,
       numberOfNights: data.numberOfNights,
       addOns: addOnsHtml ? `<ul>${addOnsHtml}</ul>` : '',
@@ -463,9 +465,9 @@ class EmailService {
     const settings = await this.getSiteSettings();
     const html = `
       <h1>${settings.company_name}</h1>
-      <h2>Your Pool Ticket</h2>
+      <h2>Your Access Ticket</h2>
       <p>Dear ${data.customerName},</p>
-      <p>Your pool ticket is ready!</p>
+      <p>Your access ticket is ready!</p>
       <p><strong>Ticket Number:</strong> ${data.ticketNumber}</p>
       <p><strong>Session:</strong> ${data.sessionName}</p>
       <p><strong>Date:</strong> ${data.ticketDate}</p>
@@ -476,7 +478,7 @@ class EmailService {
 
     return this.sendEmail({
       to: data.customerEmail,
-      subject: `Your Pool Ticket - ${data.ticketNumber}`,
+      subject: `Your Access Ticket - ${data.ticketNumber}`,
       html,
     });
   }
@@ -548,14 +550,14 @@ class EmailService {
             <p><strong>Booking Reference:</strong> ${data.bookingNumber}</p>
             <p><strong>Unit:</strong> ${data.unitName}</p>
             <p><strong>Check-in Date:</strong> ${data.checkInDate}</p>
-            <p><strong>Check-in Time:</strong> ${data.checkInTime || settings.chalet_check_in || '3:00 PM'}</p>
+            <p><strong>Check-in Time:</strong> ${data.checkInTime || settings.unit_check_in || '3:00 PM'}</p>
             <p><strong>Duration:</strong> ${data.numberOfNights} night(s)</p>
           </div>
 
           <h3>Before You Arrive</h3>
           <ul>
             <li>Bring a valid ID for check-in</li>
-            <li>Your chalet will be ready by check-in time</li>
+            <li>Your accommodation will be ready by check-in time</li>
             <li>Early check-in may be available upon request</li>
             <li>Free parking is available on-site</li>
           </ul>
@@ -588,7 +590,7 @@ class EmailService {
       bookingNumber: data.bookingNumber,
       chaletName: data.unitName,
       checkInDate: data.checkInDate,
-      checkInTime: data.checkInTime || settings.chalet_check_in || '3:00 PM',
+      checkInTime: data.checkInTime || settings.unit_check_in || '3:00 PM',
       numberOfNights: data.numberOfNights,
       specialInstructions: data.specialInstructions || '',
       contactPhone: settings.contact_phone,

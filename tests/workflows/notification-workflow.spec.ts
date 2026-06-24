@@ -141,7 +141,7 @@ let adminPage: Page;
     // Fill body with variables
     const bodyInput = adminPage.locator('textarea[placeholder*="body" i], textarea[placeholder*="message" i]').first();
     if (await bodyInput.isVisible()) {
-      await bodyInput.fill('Hello {{name}}, welcome to our resort! Your booking at {{chalet}} is confirmed for {{date}}.');
+      await bodyInput.fill('Hello {{name}}, welcome to our resort! Your booking at {{accommodation unit}} is confirmed for {{date}}.');
     }
     
     // Select type

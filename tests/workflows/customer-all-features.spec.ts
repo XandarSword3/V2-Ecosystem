@@ -6,8 +6,8 @@
  * 
  * Features Tested:
  * - Homepage & Navigation
- * - Restaurant Menu & Ordering
- * - Chalets Browsing & Booking
+ * - MenuService Menu & Ordering
+ * - AccommodationUnits Browsing & Booking
  * - Pool Tickets Purchase
  * - Profile Management
  * - Booking History
@@ -99,8 +99,8 @@ let page: Page;
     await expect(nav.first()).toBeVisible();
   });
 
-  test('1.5 Click restaurant link', async () => {
-    const restaurantLink = page.locator('a:has-text("Restaurant"), a[href*="restaurant"]').first();
+  test('1.5 Click menu service link', async () => {
+    const restaurantLink = page.locator('a:has-text("MenuService"), a[href*="menu_service"]').first();
     if (await restaurantLink.isVisible().catch(() => false)) {
       await restaurantLink.click();
       await page.waitForLoadState('load');
@@ -109,9 +109,9 @@ let page: Page;
     await expect(page.locator('main').first()).toBeVisible();
   });
 
-  test('1.6 Click chalets link', async () => {
+  test('1.6 Click accommodation_units link', async () => {
     await navigateTo(page, '/');
-    const chaletsLink = page.locator('a:has-text("Chalet"), a[href*="chalet"]').first();
+    const chaletsLink = page.locator('a:has-text("AccommodationUnit"), a[href*="accommodation unit"]').first();
     if (await chaletsLink.isVisible().catch(() => false)) {
       await chaletsLink.click();
       await page.waitForLoadState('load');
@@ -121,7 +121,7 @@ let page: Page;
 
   test('1.7 Click pool link', async () => {
     await navigateTo(page, '/');
-    const poolLink = page.locator('a:has-text("Pool"), a[href*="pool"]').first();
+    const poolLink = page.locator('a:has-text("Pool"), a[href*="capacity"]').first();
     if (await poolLink.isVisible()) {
       await poolLink.click();
       await page.waitForLoadState('load');
@@ -146,7 +146,7 @@ let page: Page;
 // ============================================
 // SECTION 2: RESTAURANT MENU & ORDERING
 // ============================================
-test.describe('2. Restaurant Menu & Ordering', () => {
+test.describe('2. MenuService Menu & Ordering', () => {
 let page: Page;
   
   test.beforeAll(async ({ browser }) => {
@@ -158,15 +158,15 @@ let page: Page;
     await page.close();
   });
 
-  test('2.1 View restaurant page', async () => {
-    await navigateTo(page, '/restaurant');
+  test('2.1 View menu service page', async () => {
+    await navigateTo(page, '/menu service');
     await expect(page.locator('main').first()).toBeVisible();
   });
 
   test('2.2 View menu categories', async () => {
     await page.waitForLoadState('networkidle');
     const categories = page.locator('[data-testid="category"], [role="tab"], button:has-text("Main"), button:has-text("Appetizer")');
-    // Verify restaurant page has loaded with content
+    // Verify menu service page has loaded with content
     await expect(page.locator('main').first()).toBeVisible();
   });
 
@@ -245,7 +245,7 @@ let page: Page;
 
   test('2.11 View total', async () => {
     const total = page.locator('text=/Total|Subtotal|\\$/');
-    // Verify restaurant page has pricing/total content
+    // Verify menu service page has pricing/total content
     await expect(page.locator('main').first()).toBeVisible();
   });
 
@@ -260,7 +260,7 @@ let page: Page;
 // ============================================
 // SECTION 3: CHALETS BROWSING & BOOKING
 // ============================================
-test.describe('3. Chalets Browsing & Booking', () => {
+test.describe('3. AccommodationUnits Browsing & Booking', () => {
 let page: Page;
   
   test.beforeAll(async ({ browser }) => {
@@ -272,21 +272,21 @@ let page: Page;
     await page.close();
   });
 
-  test('3.1 View chalets page', async () => {
-    await navigateTo(page, '/chalets');
+  test('3.1 View accommodation_units page', async () => {
+    await navigateTo(page, '/accommodation_units');
     await expect(page.locator('main').first()).toBeVisible();
   });
 
-  test('3.2 View chalet cards', async () => {
+  test('3.2 View accommodation unit cards', async () => {
     await page.waitForLoadState('networkidle');
-    // Check for any chalet-related content
-    const pageContent = page.locator('text=/Chalet|Book|Stay|Night|Reserve/i');
+    // Check for any accommodation unit-related content
+    const pageContent = page.locator('text=/AccommodationUnit|Book|Stay|Night|Reserve/i');
     const count = await pageContent.count();
     expect(count).toBeGreaterThan(0);
   });
 
-  test('3.3 View chalet images', async () => {
-    const images = page.locator('[class*="chalet"] img, [data-testid="chalet-card"] img');
+  test('3.3 View accommodation unit images', async () => {
+    const images = page.locator('[class*="accommodation unit"] img, [data-testid="accommodation unit-card"] img');
     const count = await images.count();
     expect(count).toBeGreaterThan(0);
   });
@@ -316,8 +316,8 @@ let page: Page;
     }
   });
 
-  test('3.7 View chalet details', async () => {
-    const chaletLink = page.locator('a[href*="/chalets/"], [data-testid="chalet-card"]').first();
+  test('3.7 View accommodation unit details', async () => {
+    const chaletLink = page.locator('a[href*="/accommodation_units/"], [data-testid="accommodation unit-card"]').first();
     if (await chaletLink.isVisible()) {
       await chaletLink.click();
       await page.waitForLoadState('load');
@@ -326,7 +326,7 @@ let page: Page;
 
   test('3.8 View amenities', async () => {
     const amenities = page.locator('text=/amenities|wifi|pool|kitchen/i');
-    // Verify chalet detail page loaded with content
+    // Verify accommodation unit detail page loaded with content
     await expect(page.locator('main').first()).toBeVisible();
   });
 
@@ -344,7 +344,7 @@ let page: Page;
 
   test('3.10 View availability calendar', async () => {
     const calendar = page.locator('[class*="Calendar"], [class*="calendar"], [role="grid"]');
-    // Verify chalet page is still loaded
+    // Verify accommodation unit page is still loaded
     await expect(page.locator('main').first()).toBeVisible();
   });
 

@@ -1,7 +1,7 @@
 {
   "name": "Platform Management Platform",
-  "short_name": "Your Resort",
-  "description": "Complete platform management system with hotel, restaurant, pool, and activity bookings",
+  "short_name": "V2 Platform",
+  "description": "Complete platform management system for hospitality, dining, accommodations, and activity bookings",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
@@ -76,10 +76,10 @@
       ]
     },
     {
-      "name": "Restaurant",
+      "name": "Dining",
       "short_name": "Dining",
       "description": "View menu and order food",
-      "url": "/restaurant",
+      "url": "/dining",
       "icons": [
         {
           "src": "/icons/icon-512x512.svg",

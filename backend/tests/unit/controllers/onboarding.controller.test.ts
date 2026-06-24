@@ -29,7 +29,7 @@ vi.mock('stripe', () => ({
     accounts = {
       retrieve: vi.fn().mockResolvedValue({
         id: 'acct_123',
-        business_profile: { name: 'Test Resort' },
+        business_profile: { name: 'Test Property' },
         charges_enabled: true,
         details_submitted: true,
         email: 'billing@testresort.com'
@@ -150,7 +150,7 @@ describe('OnboardingController', () => {
         message: 'Stripe connection successful',
         data: {
           accountId: 'acct_123',
-          businessName: 'Test Resort',
+          businessName: 'Test Property',
           chargesEnabled: true,
           detailsSubmitted: true
         }
@@ -214,9 +214,9 @@ describe('OnboardingController', () => {
       const mockState = {
         completed: false,
         steps: {
-          resort_details: { data: { name: 'Alpine Chalet', slug: 'alpine-chalet', address: '123 Peak St', phone: '123', email: 'alpine@test.com' } },
+          resort_details: { data: { name: 'Alpine AccommodationUnit', slug: 'alpine-accommodation unit', address: '123 Peak St', phone: '123', email: 'alpine@test.com' } },
           visual_design: { data: { themeColor: '#123456', accentColor: '#abcdef' } },
-          modules: { data: { modules: ['restaurant', 'accommodation'] } },
+          modules: { data: { modules: ['menu_service', 'accommodation'] } },
           staff_invitations: { data: { invitations: [{ email: 'staff1@test.com', name: 'John Doe', role: 'staff' }] } }
         }
       };
@@ -230,7 +230,7 @@ describe('OnboardingController', () => {
           return createChainableMock([{ id: 'group-1' }]);
         }
         if (table === 'properties') {
-          return createChainableMock({ id: 'prop-123', name: 'Alpine Chalet', slug: 'alpine-chalet' });
+          return createChainableMock({ id: 'prop-123', name: 'Alpine AccommodationUnit', slug: 'alpine-accommodation unit' });
         }
         if (table === 'user_property_access') {
           return createChainableMock({});
@@ -272,7 +272,7 @@ describe('OnboardingController', () => {
         message: 'Onboarding setup finalized successfully!',
         data: expect.objectContaining({
           propertyId: 'prop-123',
-          propertyName: 'Alpine Chalet'
+          propertyName: 'Alpine AccommodationUnit'
         })
       });
     });
@@ -360,7 +360,7 @@ describe('OnboardingController', () => {
         steps: {
           resort_details: { data: { name: "<script>alert('xss')</script> Resort", address: "Address \" onload=\"alert(1)" } },
           visual_design: { data: { themeColor: "blue; background: url(javascript:alert(1))" } },
-          modules: { data: { modules: ['restaurant'] } }
+          modules: { data: { modules: ['menu_service'] } }
         }
       };
 

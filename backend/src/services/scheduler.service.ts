@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { BackupService } from './backup.service.js';
 import { logger } from '../utils/logger.js';
-import { expirePoolTickets } from '../scripts/expire-pool-tickets.js';
+import { expireCapacityAccessTickets } from '../scripts/expire-capacity-access-tickets.js';
 import { getSupabase } from '../database/connection.js';
 import { bookingRemindersService } from './booking-reminders.service.js';
 import { reportingService } from '../modules/reporting/reporting.service.js';
@@ -20,8 +20,11 @@ export class SchedulerService {
     // Daily Backup at 3:00 AM
     this.scheduleDailyBackup();
     
-    // Pool ticket expiration at midnight and every 4 hours
-    this.schedulePoolTicketExpiry();
+    // Shared-capacity access ticket expiration at midnight and every 4 hours
+    this.scheduleCapacityAccessExpiry();
+
+    // Expired OTP / 2FA token purge
+    this.scheduleOTPPurge();
     
     // Session cleanup - expire stale user sessions
     this.scheduleSessionCleanup();
@@ -66,35 +69,82 @@ export class SchedulerService {
   }
 
   /**
-   * Schedule pool ticket expiration check
-   * Runs at midnight and every 4 hours to catch expired tickets
+   * Schedule shared-capacity access ticket expiration check.
+   * Expires transactions whose session date has passed.
+   * Runs at midnight and every 4 hours to catch expired tickets.
    */
-  private static schedulePoolTicketExpiry() {
+  private static scheduleCapacityAccessExpiry() {
     // Run at midnight every day
     cron.schedule('0 0 * * *', async () => {
-      logger.info('Starting scheduled pool ticket expiry (midnight)...');
+      logger.info('Starting scheduled capacity access ticket expiry (midnight)...');
       try {
-        const result = await expirePoolTickets();
-        logger.info(`Pool ticket expiry completed. Expired: ${result.expired} tickets`);
+        const result = await expireCapacityAccessTickets();
+        logger.info(`Capacity access ticket expiry completed. Expired: ${result.expired} tickets`);
       } catch (error) {
-        logger.error('Scheduled pool ticket expiry failed:', error);
+        logger.error('Scheduled capacity access ticket expiry failed:', error);
       }
     });
     
     // Also run at 4 AM, 8 AM, 12 PM, 4 PM, 8 PM for better coverage
     cron.schedule('0 4,8,12,16,20 * * *', async () => {
-      logger.info('Starting scheduled pool ticket expiry (4-hour check)...');
+      logger.info('Starting scheduled capacity access ticket expiry (4-hour check)...');
       try {
-        const result = await expirePoolTickets();
+        const result = await expireCapacityAccessTickets();
         if (result.expired > 0) {
-          logger.info(`Pool ticket expiry completed. Expired: ${result.expired} tickets`);
+          logger.info(`Capacity access ticket expiry completed. Expired: ${result.expired} tickets`);
         }
       } catch (error) {
-        logger.error('Scheduled pool ticket expiry failed:', error);
+        logger.error('Scheduled capacity access ticket expiry failed:', error);
       }
     });
     
-    logger.info('Scheduled pool ticket expiry jobs (0 0 * * * and every 4 hours)');
+    logger.info('Scheduled capacity access ticket expiry jobs (0 0 * * * and every 4 hours)');
+  }
+
+  /**
+   * Purge expired OTP and 2FA tokens from the sessions table.
+   * Deletes rows where the token is flagged as an OTP/2FA type and
+   * `expires_at` is in the past. Keeps the session table lean.
+   * Runs daily at 3:30 AM (between the 3:00 AM backup and the 4:00 AM
+   * session-cleanup sweep so each job has a clear time slot).
+   */
+  private static scheduleOTPPurge() {
+    cron.schedule('30 3 * * *', async () => {
+      logger.info('Starting scheduled OTP/2FA token purge...');
+      try {
+        const supabase = getSupabase();
+        const now = new Date().toISOString();
+
+        const { data: purged, error } = await supabase
+          .from('sessions')
+          .delete()
+          .lt('expires_at', now)
+          .not('name', 'is', null)           // OTP/2FA rows carry a `name` discriminator
+          .select('id');
+
+        if (error) {
+          logger.error('OTP purge query failed:', error);
+          return;
+        }
+
+        const count = purged?.length ?? 0;
+        if (count > 0) {
+          logger.info(`OTP/2FA token purge completed. Removed ${count} expired tokens.`);
+          await supabase.from('audit_logs').insert({
+            user_id: 'system',
+            action: 'otp_token_purge',
+            resource: 'sessions',
+            new_value: JSON.stringify({ tokens_removed: count, purge_time: now }),
+          });
+        } else {
+          logger.info('OTP/2FA token purge completed. No expired tokens found.');
+        }
+      } catch (error) {
+        logger.error('OTP/2FA token purge failed:', error);
+      }
+    });
+
+    logger.info('Scheduled OTP/2FA token purge job (30 3 * * *)');
   }
 
   /**

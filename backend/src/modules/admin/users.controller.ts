@@ -9,6 +9,8 @@ import {
   validateBody, 
   adminUpdateUserSchema,
   assignUserRolesSchema,
+  assignUserScopeSchema,
+  createUserSchemaWithScope,
 } from "../../validation/schemas.js";
 import { 
   UserRow, 
@@ -362,8 +364,8 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     await assertStaffUserLimit(req);
 
     // Validate input with strong password requirements
-    const validatedData = validateBody(createUserSchema, req.body);
-    const { email, password, full_name, phone, roles } = validatedData;
+    const validatedData = validateBody(createUserSchemaWithScope, req.body);
+    const { email, password, fullName, phone, scope } = validatedData;
     const { propertyId, isSuperAdmin } = getPropertyContext(req);
 
     if (!isSuperAdmin && !propertyId) {
@@ -393,19 +395,20 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     // Falls back to undefined in legacy single-tenant mode.
     const tenantId = req.tenant?.id ?? undefined;
 
-    // Create user
+    // Create user with scope (defaults to 'customer' if not provided)
     const { data: user, error: userError } = await supabase
       .from('users')
       .insert({
         email: email.toLowerCase(),
         password_hash: passwordHash,
-        full_name,
+        full_name: fullName,
         phone,
         is_active: true,
         email_verified: true, // Admin-created users are auto-verified
+        scope: scope || 'customer',
         ...(tenantId ? { tenant_id: tenantId } : {}),
       })
-      .select('id, email, full_name, phone, is_active, created_at')
+      .select('id, email, full_name, phone, is_active, scope, created_at')
       .single();
 
     if (userError) throw userError;
@@ -422,31 +425,6 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
       if (accessError) throw accessError;
     }
 
-    // Assign roles - roles has default value from schema so is guaranteed to exist
-    const rolesToAssign = roles || ['customer'];
-    if (rolesToAssign.length > 0) {
-      // When a tenant is resolved, scope role lookup to that tenant so we get
-      // the tenant-seeded roles rather than global/system roles.
-      let roleQuery = supabase
-        .from('roles')
-        .select('id, name')
-        .in('name', rolesToAssign);
-
-      if (tenantId) {
-        roleQuery = roleQuery.eq('tenant_id', tenantId);
-      }
-
-      const { data: roleRecords } = await roleQuery;
-
-      if (roleRecords && roleRecords.length > 0) {
-        const roleInserts = roleRecords.map(role => ({
-          user_id: user.id,
-          role_id: role.id,
-        }));
-
-        await supabase.from('user_roles').insert(roleInserts);
-      }
-    }
     await logActivity({
       user_id: req.user!.userId,
       action: 'CREATE_USER',
@@ -454,7 +432,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
       resource_id: user.id
     });
 
-    res.status(201).json({ success: true, data: { ...user, roles } });
+    res.status(201).json({ success: true, data: user });
 });
 
 const checkPropertyAccess = async (supabase: any, targetUserId: string, propertyId: string | undefined, isSuperAdmin: boolean | undefined) => {
@@ -563,6 +541,37 @@ export const assignUserRoles = asyncHandler(async (req: Request, res: Response) 
     });
 
     res.json({ success: true, message: 'Roles updated' });
+});
+
+// New scope-based assignment endpoint (replaces role-based assignment)
+export const assignUserScope = asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { id } = req.params;
+    const { scope } = validateBody(assignUserScopeSchema, req.body);
+    const { propertyId, isSuperAdmin } = getPropertyContext(req);
+
+    const hasAccess = await checkPropertyAccess(supabase, id, propertyId, isSuperAdmin);
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, error: 'Access denied to this user' });
+    }
+
+    // Update user's scope directly
+    const { error } = await supabase
+      .from('users')
+      .update({ scope })
+      .eq('id', id);
+
+    if (error) throw error;
+
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'ASSIGN_USER_SCOPE',
+      resource: 'users',
+      resource_id: id,
+      new_value: { scope }
+    });
+
+    res.json({ success: true, message: 'Scope updated' });
 });
 
 export const toggleUserStatus = asyncHandler(async (req: Request, res: Response) => {

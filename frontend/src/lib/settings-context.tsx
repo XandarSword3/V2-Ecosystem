@@ -2,8 +2,10 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useSocket } from './socket';
-import { ResortTheme } from './theme-config';
+import { SiteTheme } from './theme-config';
 import { settingsLogger } from './logger';
+import { extractHostSegments } from './api';
+import { getStoredPropertyId } from './property-id';
 
 export interface DPAAgreement {
   status: boolean;
@@ -13,10 +15,7 @@ export interface DPAAgreement {
 
 export interface SiteSettings {
   // General
-  resortName: string;
-  restaurantName: string;
-  snackBarName: string;
-  poolName: string;
+  siteName: string;
   tagline: string;
   description: string;
   currency: string;
@@ -32,21 +31,13 @@ export interface SiteSettings {
   address: string;
 
   // Hours
-  poolHours: string;
-  restaurantHours: string;
   receptionHours: string;
 
-  // Chalets
+  // Bookings
   checkIn: string;
   checkOut: string;
   depositPercent: number;
   cancellationPolicy: string;
-
-  // Pool
-  adultPrice: number;
-  childPrice: number;
-  infantPrice: number;
-  capacity: number;
 
   // Legal
   privacyPolicy: string;
@@ -54,7 +45,7 @@ export interface SiteSettings {
   refundPolicy: string;
 
   // Appearance
-  theme: ResortTheme;
+  theme: SiteTheme;
   themeColors?: {
     primary: string;
     secondary: string;
@@ -90,6 +81,19 @@ export interface SiteSettings {
   showWeatherWidget?: boolean;
   weatherLocation?: string;
   weatherEffect?: 'auto' | 'waves' | 'snow' | 'rain' | 'leaves' | 'stars' | 'fireflies' | 'none';
+
+  // Brand & Identity
+  logoUrl?: string;
+  logoDarkUrl?: string;
+  faviconUrl?: string;
+  logoMaxWidth?: number;
+  fontHeading?: string;
+  fontBody?: string;
+  fontScale?: 'sm' | 'md' | 'lg';
+  headingTracking?: 'tight' | 'normal' | 'wide';
+  borderRadius?: 'sharp' | 'rounded' | 'pill';
+  density?: 'compact' | 'default' | 'spacious';
+  glassmorphism?: 'none' | 'subtle' | 'heavy';
 
   // CMS
   footer?: FooterConfig | null;
@@ -140,6 +144,8 @@ export interface HomepageConfig {
   ctaButtonText?: string;
   ctaButtonLink?: string;
   stats?: { value: string; label: string }[];
+  rotationInterval?: number;
+  includeDefaultSlide?: boolean;
 }
 
 export interface FooterLogo {
@@ -215,10 +221,7 @@ export interface NavbarLink {
 }
 
 const defaultSettings: SiteSettings = {
-  resortName: '', // Will be loaded from database
-  restaurantName: '',
-  snackBarName: '',
-  poolName: '',
+  siteName: '', // Will be loaded from database
   tagline: '',
   description: '',
   currency: 'USD',
@@ -231,17 +234,11 @@ const defaultSettings: SiteSettings = {
   phone: '',
   email: '',
   address: '',
-  poolHours: '',
-  restaurantHours: '',
   receptionHours: '',
   checkIn: '3:00 PM',
   checkOut: '12:00 PM',
   depositPercent: 50,
   cancellationPolicy: '',
-  adultPrice: 15,
-  childPrice: 10,
-  infantPrice: 0,
-  capacity: 100,
   privacyPolicy: '',
   termsOfService: '',
   refundPolicy: '',
@@ -267,7 +264,8 @@ export interface ModuleSettings {
 
 export interface Module {
   id: string;
-  template_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
+  engine_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement' | 'platform_entitlement';
+  template_type?: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement'; // Backward compatibility
   name: string;
   slug: string;
   description?: string;
@@ -312,15 +310,55 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
       const apiUrl = baseUrl.replace(/\/api\/?$/, '');
-      settingsLogger.debug('Fetching settings from', `${apiUrl}/api/settings`);
+      const settingsUrl = `${apiUrl}/api/settings?t=${Date.now()}`;
+      const modulesUrl = `${apiUrl}/api/modules?activeOnly=true&t=${Date.now()}`;
+      console.log('Settings context - fetching from:', settingsUrl);
+      settingsLogger.debug('Fetching settings from', settingsUrl);
+
+      // FIX (CONTEXT.md "Public/Admin Property Context Contamination",
+      // session 7-9): this used to read getStoredPropertyId() from
+      // localStorage (the same key the admin's PropertyContext writes to on
+      // every property switch) and stamp it onto x-property-id here. Since
+      // SettingsProvider wraps the entire app including the public
+      // storefront, an admin switching their dashboard's active property
+      // would silently desync what guests saw on the public site in the
+      // same browser. The backend no longer trusts this header on the
+      // public /api/settings and /api/modules routes anyway — it derives
+      // property from the request itself (X-Property-Slug from the Host
+      // header, or the single-property fallback) via resolveProperty,
+      // mounted ahead of these routes in app.ts. No header needed here.
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+
+      if (typeof window !== 'undefined') {
+        const { tenant: tenantSlug, property: propertySlug } = extractHostSegments(window.location.host);
+        if (tenantSlug) {
+          headers['X-Tenant-Slug'] = tenantSlug;
+        }
+        if (propertySlug) {
+          headers['X-Property-Slug'] = propertySlug;
+        }
+
+        // If we are on the admin path, pass the active property ID to get the correct admin settings preview.
+        // This is safe and avoids any guest context contamination because it only triggers on /admin URLs.
+        if (window.location.pathname.startsWith('/admin')) {
+          const activePropertyId = getStoredPropertyId();
+          if (activePropertyId) {
+            headers['x-property-id'] = activePropertyId;
+          }
+        }
+      }
+
       const [settingsRes, modulesRes] = await Promise.all([
-        fetch(`${apiUrl}/api/settings`),
-        fetch(`${apiUrl}/api/modules?activeOnly=true`)
+        fetch(settingsUrl, { headers, cache: 'no-store' } as RequestInit),
+        fetch(modulesUrl, { headers, cache: 'no-store' } as RequestInit)
       ]);
       if (!settingsRes.ok) {
         throw new Error('Failed to fetch settings');
       }
       const settingsData = await settingsRes.json();
+      console.log('Settings context - received data:', settingsData);
       settingsLogger.debug('Received settings data', settingsData);
       // Handle both { success, data } format and direct data format
       const data = settingsData.data || settingsData;

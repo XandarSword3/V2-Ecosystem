@@ -31,7 +31,7 @@ const describeIf = describe.skip;
 
 describeIf('Booking Flow Integration', () => {
   let authToken: string;
-  let testChaletId: string;
+  let testUnitId: string;
   let testBookingId: string;
 
   beforeAll(async () => {
@@ -54,18 +54,18 @@ describeIf('Booking Flow Integration', () => {
     // Resolve a real bookable unit via the API rather than direct DB
     const unitsRes = await request(app).get('/api/v1/units');
     const units = unitsRes.body?.data ?? [];
-    testChaletId = units[0]?.id ?? '00000000-0000-0000-0000-000000000001';
+    testUnitId = units[0]?.id ?? '00000000-0000-0000-0000-000000000001';
   });
 
-  describe('Chalet Availability Search', () => {
-    it('should return available chalets for date range', async () => {
+  describe('AccommodationUnit Availability Search', () => {
+    it('should return available accommodation_units for date range', async () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const checkOut = new Date(tomorrow);
       checkOut.setDate(checkOut.getDate() + 3);
 
       const response = await request(app)
-        .get(`/api/v1/units/${testChaletId}/availability`)
+        .get(`/api/v1/units/${testUnitId}/availability`)
         .query({
           startDate: tomorrow.toISOString().split('T')[0],
           endDate: checkOut.toISOString().split('T')[0],
@@ -96,7 +96,7 @@ describeIf('Booking Flow Integration', () => {
         .post('/api/v1/units/bookings')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          unit_id: testChaletId,
+          unit_id: testUnitId,
           check_in_date: tomorrow.toISOString().split('T')[0],
           check_out_date: checkOut.toISOString().split('T')[0],
           number_of_guests: 4,
@@ -113,7 +113,7 @@ describeIf('Booking Flow Integration', () => {
       const response = await request(app)
         .post('/api/v1/units/bookings')
         .send({
-          unit_id: testChaletId,
+          unit_id: testUnitId,
           check_in_date: '2025-08-01',
           check_out_date: '2025-08-03',
           number_of_guests: 4,
@@ -128,7 +128,7 @@ describeIf('Booking Flow Integration', () => {
       if (!testBookingId) return;
 
       const response = await request(app)
-        .post(`/api/v1/bookings/chalets/${testBookingId}/cancel`)
+        .post(`/api/v1/bookings/accommodation_units/${testBookingId}/cancel`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ reason: 'Changed travel plans' });
 
@@ -154,11 +154,11 @@ describeIf('Pool Ticket Booking Integration', () => {
   });
 });
 
-describeIf('Restaurant Booking Integration', () => {
+describeIf('MenuService Booking Integration', () => {
   describe('Table Reservation', () => {
     it('should find suitable table for party size', async () => {
       const response = await request(app)
-        .get('/api/v1/restaurant/tables/available')
+        .get('/api/v1/${slug}/tables/available')
         .query({ date: '2025-08-15', time: '20:00', partySize: 6 });
 
       expect(response.status).toBe(200);

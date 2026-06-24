@@ -50,9 +50,9 @@ describe('Part 1: Admin Setup Sequence', () => {
   describe('Step 2: System Identity — General Settings', () => {
     it('should configure resort name and branding', async () => {
       const res = await admin.updateSettings('general', {
-        resortName: 'V2 Test Resort',
+        propertyName: 'V2 Test Property',
         tagline: 'Verification Resort Platform',
-        description: 'A fully configured resort for verification testing',
+        description: 'A fully configured property for verification testing',
       });
 
       // Settings PUT may return 200 or 201
@@ -135,14 +135,14 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 8: Create Restaurant Module ───────────
-  describe('Step 8: Restaurant Module (Engine A)', () => {
-    it('should create the restaurant module', async () => {
+  // ─────────── Step 8: Create MenuService Module ───────────
+  describe('Step 8: MenuService Module (Engine A)', () => {
+    it('should create the menu service module', async () => {
       const res = await admin.createModule({
-        name: 'Restaurant',
-        slug: 'restaurant',
+        name: 'MenuService',
+        slug: 'menu_service',
         description: 'Full-service dining',
-        template_type: 'menu_service',
+        template_type: 'instant_transaction',
         is_active: true,
         show_in_main: true,
         settings: {
@@ -154,33 +154,33 @@ describe('Part 1: Admin Setup Sequence', () => {
       });
 
       if (res.success) {
-        state.restaurantModuleId = res.data?.id || res.data?.module?.id;
+        state.menuServiceModuleId = res.data?.id || res.data?.module?.id;
       } else {
         // Module may already exist (duplicate slug) — look it up
         const modules = await admin.getModules();
         const all = Array.isArray(modules.data) ? modules.data : modules.data?.modules || [];
-        const found = all.find((m: any) => m.slug === 'restaurant' || m.name === 'Restaurant');
-        state.restaurantModuleId = found?.id;
+        const found = all.find((m: any) => m.slug === 'menu_service' || m.name === 'MenuService');
+        state.menuServiceModuleId = found?.id;
       }
-      expect(state.restaurantModuleId).toBeTruthy();
+      expect(state.menuServiceModuleId).toBeTruthy();
     });
 
-    it('should verify restaurant module is active', async () => {
+    it('should verify menu service module is active', async () => {
       const res = await admin.getModules();
       expect(res.success).toBe(true);
       const modules = Array.isArray(res.data) ? res.data : res.data?.modules || [];
-      const restaurant = modules.find(
-        (m: any) => m.slug === 'restaurant' || m.name === 'Restaurant'
+      const menu_service = modules.find(
+        (m: any) => m.slug === 'menu_service' || m.name === 'MenuService'
       );
-      expect(restaurant).toBeDefined();
-      if (!state.restaurantModuleId) {
-        state.restaurantModuleId = restaurant.id;
+      expect(menu_service).toBeDefined();
+      if (!state.menuServiceModuleId) {
+        state.menuServiceModuleId = menu_service.id;
       }
     });
   });
 
-  // ─────────── Step 9: Create Restaurant Categories ───────────
-  describe('Step 9: Restaurant Menu Categories', () => {
+  // ─────────── Step 9: Create MenuService Categories ───────────
+  describe('Step 9: MenuService Menu Categories', () => {
     const categories = [
       { name: 'Appetizers', order: 1, key: 'appetizersCatId' as const },
       { name: 'Main Courses', order: 2, key: 'mainsCatId' as const },
@@ -192,7 +192,7 @@ describe('Part 1: Admin Setup Sequence', () => {
       it(`should create "${cat.name}" category`, async () => {
         const res = await admin.createCategory({
           name: cat.name,
-          module_id: state.restaurantModuleId!,
+          module_id: state.menuServiceModuleId!,
           display_order: cat.order,
           sort_order: cat.order,
         });
@@ -201,7 +201,7 @@ describe('Part 1: Admin Setup Sequence', () => {
           state[cat.key] = res.data?.id || res.data?.category?.id;
         } else if (res.status === 409 || res.status === 400) {
           // May already exist — fetch all and find
-          const menu = await admin.getMenu(state.restaurantModuleId);
+          const menu = await admin.getMenu(state.menuServiceModuleId);
           const categories = menu.data?.categories || menu.data || [];
           const found = (Array.isArray(categories) ? categories : []).find(
             (c: any) => c.name === cat.name
@@ -214,7 +214,7 @@ describe('Part 1: Admin Setup Sequence', () => {
   });
 
   // ─────────── Step 10: Create Menu Items ───────────
-  describe('Step 10: Restaurant Menu Items', () => {
+  describe('Step 10: MenuService Menu Items', () => {
     const items = [
       {
         name: 'Bruschetta',
@@ -262,7 +262,7 @@ describe('Part 1: Admin Setup Sequence', () => {
           name: item.name,
           category_id: state[item.category]!,
           price: item.price,
-          module_id: state.restaurantModuleId!,
+          module_id: state.menuServiceModuleId!,
           description: `${item.name} for testing`,
           is_available: true,
           is_featured: item.is_featured,
@@ -276,7 +276,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         }
         // If item creation returns conflict, search for it
         if (!state[item.stateKey]) {
-          const menu = await admin.getMenu(state.restaurantModuleId);
+          const menu = await admin.getMenu(state.menuServiceModuleId);
           const allItems = extractMenuItems(menu.data);
           const found = allItems.find((i: any) => i.name === item.name);
           if (found) state[item.stateKey] = found.id;
@@ -294,7 +294,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         min_selections: 1,
         max_selections: 1,
         is_required: true,
-        module_id: state.restaurantModuleId!,
+        module_id: state.menuServiceModuleId!,
         options: [
           { name: 'Rare', price: 0, is_available: true },
           { name: 'Medium Rare', price: 0, is_available: true },
@@ -323,7 +323,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         min_selections: 0,
         max_selections: 2,
         is_required: false,
-        module_id: state.restaurantModuleId!,
+        module_id: state.menuServiceModuleId!,
         options: [
           { name: 'French Fries', price: 3.50, is_available: true },
           { name: 'Caesar Salad', price: 4.00, is_available: true },
@@ -357,8 +357,8 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 12: Restaurant Tables ───────────
-  describe('Step 12: Restaurant Tables', () => {
+  // ─────────── Step 12: MenuService Tables ───────────
+  describe('Step 12: MenuService Tables', () => {
     const tables = [
       { number: '501', capacity: 4, section: 'indoor', key: 'table1Id' as const },
       { number: '502', capacity: 6, section: 'indoor', key: 'table2Id' as const },
@@ -371,7 +371,7 @@ describe('Part 1: Admin Setup Sequence', () => {
           table_number: t.number,
           capacity: t.capacity,
           section: t.section,
-          module_id: state.restaurantModuleId,
+          module_id: state.menuServiceModuleId,
         });
 
         if (res.success) {
@@ -379,7 +379,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         }
         if (!state[t.key]) {
           // Try to fetch tables and find it
-          const tables = await admin.getTables(state.restaurantModuleId);
+          const tables = await admin.getTables(state.menuServiceModuleId);
           const all = Array.isArray(tables.data) ? tables.data : tables.data?.tables || [];
           const found = all.find(
             (tb: any) => tb.table_number === t.number || tb.number === t.number
@@ -391,14 +391,14 @@ describe('Part 1: Admin Setup Sequence', () => {
     }
   });
 
-  // ─────────── Step 13: Chalets Module (Engine B) ───────────
-  describe('Step 13: Chalets Module (Engine B)', () => {
-    it('should create chalets module', async () => {
+  // ─────────── Step 13: AccommodationUnits Module (Engine B) ───────────
+  describe('Step 13: AccommodationUnits Module (Engine B)', () => {
+    it('should create accommodation_units module', async () => {
       const res = await admin.createModule({
-        name: 'Chalets',
-        slug: 'chalets',
-        description: 'Private chalet accommodations',
-        template_type: 'multi_day_booking',
+        name: 'AccommodationUnits',
+        slug: 'accommodation_units',
+        description: 'Private accommodation unit accommodations',
+        template_type: 'time_exclusive_reservation',
         is_active: true,
         show_in_main: true,
         settings: {
@@ -410,23 +410,23 @@ describe('Part 1: Admin Setup Sequence', () => {
       });
 
       if (res.success) {
-        state.chaletsModuleId = res.data?.id || res.data?.module?.id;
+        state.accommodationModuleId = res.data?.id || res.data?.module?.id;
       } else {
         const modules = await admin.getModules();
         const all = Array.isArray(modules.data) ? modules.data : modules.data?.modules || [];
         const found = all.find(
-          (m: any) => m.slug === 'chalets' || m.name === 'Chalets'
+          (m: any) => m.slug === 'accommodation_units' || m.name === 'AccommodationUnits'
         );
-        state.chaletsModuleId = found?.id;
+        state.accommodationModuleId = found?.id;
       }
-      expect(state.chaletsModuleId).toBeTruthy();
+      expect(state.accommodationModuleId).toBeTruthy();
     });
   });
 
-  // ─────────── Step 14: Chalet Configuration ───────────
-  describe('Step 14: Chalet Deposit & Check-in Times', () => {
-    it('should configure chalet settings', async () => {
-      const res = await admin.updateSettings('chalets', {
+  // ─────────── Step 14: AccommodationUnit Configuration ───────────
+  describe('Step 14: AccommodationUnit Deposit & Check-in Times', () => {
+    it('should configure accommodation unit settings', async () => {
+      const res = await admin.updateSettings('accommodation_units', {
         checkIn: '15:00',
         checkOut: '11:00',
         depositPercent: 30,
@@ -439,38 +439,38 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 15: Create Chalet Units ───────────
-  describe('Step 15: Chalet Units', () => {
-    const chalets = [
+  // ─────────── Step 15: Create AccommodationUnit Units ───────────
+  describe('Step 15: AccommodationUnit Units', () => {
+    const accommodation_units = [
       {
         name: 'Mountain View A',
-        desc: 'Luxury chalet with mountain views',
+        desc: 'Luxury accommodation unit with mountain views',
         capacity: 4,
         price: 200.0,
         weekend: 250.0,
-        key: 'chaletAId' as const,
+        key: 'unitAId' as const,
       },
       {
         name: 'Lakeside B',
-        desc: 'Chalet overlooking the lake',
+        desc: 'AccommodationUnit overlooking the lake',
         capacity: 6,
         price: 300.0,
         weekend: 350.0,
-        key: 'chaletBId' as const,
+        key: 'unitBId' as const,
       },
       {
         name: 'Garden C',
-        desc: 'Cozy garden chalet',
+        desc: 'Cozy garden accommodation unit',
         capacity: 2,
         price: 150.0,
         weekend: 180.0,
-        key: 'chaletCId' as const,
+        key: 'unitCId' as const,
       },
     ];
 
-    for (const ch of chalets) {
-      it(`should create chalet "${ch.name}"`, async () => {
-        const res = await admin.createChalet({
+    for (const ch of accommodation_units) {
+      it(`should create accommodation unit "${ch.name}"`, async () => {
+        const res = await admin.createAccommodationUnit({
           name: ch.name,
           description: ch.desc,
           capacity: ch.capacity,
@@ -479,15 +479,15 @@ describe('Part 1: Admin Setup Sequence', () => {
           weekend_price: ch.weekend,
           images: [],
           is_active: true,
-          module_id: state.chaletsModuleId,
+          module_id: state.accommodationModuleId,
         });
 
         if (res.success) {
-          state[ch.key] = res.data?.id || res.data?.chalet?.id;
+          state[ch.key] = res.data?.id || res.data?.accommodation unit?.id;
         }
         if (!state[ch.key]) {
-          const chalets = await admin.getChalets();
-          const all = Array.isArray(chalets.data) ? chalets.data : chalets.data?.chalets || [];
+          const accommodation_units = await admin.getAccommodationUnits();
+          const all = Array.isArray(accommodation_units.data) ? accommodation_units.data : accommodation_units.data?.accommodation_units || [];
           const found = all.find((c: any) => c.name === ch.name);
           if (found) state[ch.key] = found.id;
         }
@@ -496,11 +496,11 @@ describe('Part 1: Admin Setup Sequence', () => {
     }
   });
 
-  // ─────────── Step 16: Chalet Pricing Rules ───────────
-  describe('Step 16: Chalet Pricing Rules', () => {
+  // ─────────── Step 16: AccommodationUnit Pricing Rules ───────────
+  describe('Step 16: AccommodationUnit Pricing Rules', () => {
     it('should create Summer Peak Season rule', async () => {
       const res = await admin.createPriceRule({
-        chalet_id: null,
+        unit_id: null,
         name: 'Summer Peak Season',
         start_date: '2026-06-01',
         end_date: '2026-08-31',
@@ -515,9 +515,9 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
 
     it('should create Mountain View Premium rule', async () => {
-      if (!state.chaletAId) return;
+      if (!state.unitAId) return;
       const res = await admin.createPriceRule({
-        chalet_id: state.chaletAId,
+        unit_id: state.unitAId,
         name: 'Mountain View Premium',
         start_date: '2026-03-01',
         end_date: '2026-12-31',
@@ -531,8 +531,8 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 17: Chalet Add-ons ───────────
-  describe('Step 17: Chalet Add-ons', () => {
+  // ─────────── Step 17: AccommodationUnit Add-ons ───────────
+  describe('Step 17: AccommodationUnit Add-ons', () => {
     const addons = [
       {
         name: 'BBQ Equipment',
@@ -570,7 +570,7 @@ describe('Part 1: Admin Setup Sequence', () => {
           state[addon.key] = res.data?.id || res.data?.addOn?.id || res.data?.add_on?.id;
         }
         if (!state[addon.key]) {
-          const all = await admin.getAddOns(state.chaletsModuleId);
+          const all = await admin.getAddOns(state.accommodationModuleId);
           const items = Array.isArray(all.data) ? all.data : all.data?.addOns || [];
           const found = items.find((a: any) => a.name === addon.name);
           if (found) state[addon.key] = found.id;
@@ -585,9 +585,9 @@ describe('Part 1: Admin Setup Sequence', () => {
     it('should create pool module', async () => {
       const res = await admin.createModule({
         name: 'Pool',
-        slug: 'pool',
-        description: 'Resort swimming pool',
-        template_type: 'session_access',
+        slug: 'capacity',
+        description: 'Property swimming pool',
+        template_type: 'shared_capacity_access',
         is_active: true,
         show_in_main: true,
         settings: {
@@ -599,14 +599,14 @@ describe('Part 1: Admin Setup Sequence', () => {
       });
 
       if (res.success) {
-        state.poolModuleId = res.data?.id || res.data?.module?.id;
+        state.capacityModuleId = res.data?.id || res.data?.module?.id;
       } else {
         const modules = await admin.getModules();
         const all = Array.isArray(modules.data) ? modules.data : modules.data?.modules || [];
-        const found = all.find((m: any) => m.slug === 'pool' || m.name === 'Pool');
-        state.poolModuleId = found?.id;
+        const found = all.find((m: any) => m.slug === 'capacity' || m.name === 'Pool');
+        state.capacityModuleId = found?.id;
       }
-      expect(state.poolModuleId).toBeTruthy();
+      expect(state.capacityModuleId).toBeTruthy();
     });
   });
 
@@ -653,7 +653,7 @@ describe('Part 1: Admin Setup Sequence', () => {
           adult_price: s.adult,
           child_price: s.child,
           price: s.adult,
-          module_id: state.poolModuleId,
+          module_id: state.capacityModuleId,
           gender_restriction: 'mixed',
         });
 
@@ -661,7 +661,7 @@ describe('Part 1: Admin Setup Sequence', () => {
           state[s.key] = res.data?.id || res.data?.session?.id;
         }
         if (!state[s.key]) {
-          const sess = await admin.getPoolSessions(state.poolModuleId);
+          const sess = await admin.getCapacityWindows(state.capacityModuleId);
           const all = Array.isArray(sess.data) ? sess.data : sess.data?.sessions || [];
           const found = all.find((x: any) => x.name === s.name);
           if (found) state[s.key] = found.id;
@@ -674,7 +674,7 @@ describe('Part 1: Admin Setup Sequence', () => {
   // ─────────── Step 20: Pool Settings ───────────
   describe('Step 20: Pool Settings', () => {
     it('should configure pool pricing defaults', async () => {
-      const res = await admin.updateSettings('pool', {
+      const res = await admin.updateSettings('capacity', {
         adultPrice: 15.0,
         childPrice: 8.0,
         infantPrice: 0,
@@ -684,14 +684,14 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 21: Snack Bar Module ───────────
-  describe('Step 21: Snack Bar Module', () => {
-    it('should create snack bar module', async () => {
+  // ─────────── Step 21: KioskItem Bar Module ───────────
+  describe('Step 21: KioskItem Bar Module', () => {
+    it('should create kiosk module', async () => {
       const res = await admin.createModule({
-        name: 'Snack Bar',
-        slug: 'snack-bar',
-        description: 'Poolside snacks and drinks',
-        template_type: 'menu_service',
+        name: 'KioskItem Bar',
+        slug: 'kiosk',
+        description: 'Poolside kiosk items and drinks',
+        template_type: 'instant_transaction',
         is_active: true,
         show_in_main: true,
         settings: {
@@ -703,25 +703,25 @@ describe('Part 1: Admin Setup Sequence', () => {
       });
 
       if (res.success) {
-        state.snackModuleId = res.data?.id || res.data?.module?.id;
+        state.kioskModuleId = res.data?.id || res.data?.module?.id;
       } else {
         const modules = await admin.getModules();
         const all = Array.isArray(modules.data) ? modules.data : modules.data?.modules || [];
         const found = all.find(
-          (m: any) => m.slug === 'snack-bar' || m.name === 'Snack Bar'
+          (m: any) => m.slug === 'kiosk' || m.name === 'KioskItem Bar'
         );
-        state.snackModuleId = found?.id;
+        state.kioskModuleId = found?.id;
       }
-      expect(state.snackModuleId).toBeTruthy();
+      expect(state.kioskModuleId).toBeTruthy();
     });
   });
 
-  // ─────────── Step 22: Snack Bar Menu ───────────
-  describe('Step 22: Snack Bar Menu', () => {
-    it('should create Snacks category', async () => {
+  // ─────────── Step 22: KioskItem Bar Menu ───────────
+  describe('Step 22: KioskItem Bar Menu', () => {
+    it('should create KioskItems category', async () => {
       const res = await admin.createCategory({
-        name: 'Snacks',
-        module_id: state.snackModuleId!,
+        name: 'KioskItems',
+        module_id: state.kioskModuleId!,
         display_order: 1,
         sort_order: 1,
       });
@@ -729,10 +729,10 @@ describe('Part 1: Admin Setup Sequence', () => {
         state.snacksCatId = res.data?.id || res.data?.category?.id;
       }
       if (!state.snacksCatId) {
-        const menu = await admin.getMenu(state.snackModuleId);
+        const menu = await admin.getMenu(state.kioskModuleId);
         const cats = menu.data?.categories || [];
         const found = (Array.isArray(cats) ? cats : []).find(
-          (c: any) => c.name === 'Snacks'
+          (c: any) => c.name === 'KioskItems'
         );
         if (found) state.snacksCatId = found.id;
       }
@@ -744,7 +744,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         name: 'Club Sandwich',
         category_id: state.snacksCatId!,
         price: 10.0,
-        module_id: state.snackModuleId!,
+        module_id: state.kioskModuleId!,
         is_available: true,
       });
       if (res.success) {
@@ -758,7 +758,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         name: 'Fresh Juice',
         category_id: state.snacksCatId!,
         price: 6.0,
-        module_id: state.snackModuleId!,
+        module_id: state.kioskModuleId!,
         is_available: true,
       });
       if (res.success) {
@@ -784,15 +784,15 @@ describe('Part 1: Admin Setup Sequence', () => {
         password: 'Staff123!',
         role: 'staff',
         idKey: 'poolStaffId' as const,
-        tokenKey: 'poolStaffToken' as const,
+        tokenKey: 'capacityStaffToken' as const,
       },
       {
-        name: 'Chalet Staff',
+        name: 'AccommodationUnit Staff',
         email: 'chalet1@v2ecosystem.com',
         password: 'Staff123!',
         role: 'staff',
         idKey: 'chaletStaffId' as const,
-        tokenKey: 'chaletStaffToken' as const,
+        tokenKey: 'accommodationStaffToken' as const,
       },
       {
         name: 'Housekeeping Staff',
@@ -803,7 +803,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         tokenKey: 'hkStaffToken' as const,
       },
       {
-        name: 'Resort Manager',
+        name: 'Property Manager',
         email: 'manager@v2ecosystem.com',
         password: 'Manager123!',
         role: 'admin',
@@ -1023,7 +1023,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         name: 'Pool Module Only',
         discount_type: 'percentage',
         discount_value: 15,
-        applies_to: 'pool',
+        applies_to: 'capacity',
         max_uses: 50,
         key: 'poolOnlyId' as const,
       },
@@ -1176,15 +1176,15 @@ describe('Part 1: Admin Setup Sequence', () => {
       expect(activeModules.length).toBeGreaterThanOrEqual(4);
     });
 
-    it('should have chalet units created', async () => {
-      const res = await admin.getChalets();
+    it('should have accommodation unit units created', async () => {
+      const res = await admin.getAccommodationUnits();
       expect(res.success).toBe(true);
-      const chalets = Array.isArray(res.data) ? res.data : res.data?.chalets || [];
-      expect(chalets.length).toBeGreaterThanOrEqual(3);
+      const accommodation_units = Array.isArray(res.data) ? res.data : res.data?.accommodation_units || [];
+      expect(accommodation_units.length).toBeGreaterThanOrEqual(3);
     });
 
     it('should have pool sessions created', async () => {
-      const res = await admin.getPoolSessions(state.poolModuleId);
+      const res = await admin.getCapacityWindows(state.capacityModuleId);
       expect(res.success).toBe(true);
       const sessions = Array.isArray(res.data) ? res.data : res.data?.sessions || [];
       expect(sessions.length).toBeGreaterThanOrEqual(3);

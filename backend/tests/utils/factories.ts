@@ -110,7 +110,7 @@ export function createMenuItem(overrides?: Partial<FactoryMenuItem>): FactoryMen
 export interface FactoryOrderItem {
   id: string;
   order_id: string;
-  menu_item_id: string;
+  catalog_item_id: string;
   quantity: number;
   unit_price: string;
   subtotal: string;
@@ -129,7 +129,7 @@ export function createOrderItem(overrides?: Partial<FactoryOrderItem>): FactoryO
   return {
     id: randomUUID(),
     order_id: randomUUID(),
-    menu_item_id: randomUUID(),
+    catalog_item_id: randomUUID(),
     quantity: qty,
     unit_price: price,
     subtotal,
@@ -143,9 +143,9 @@ export function createOrderItem(overrides?: Partial<FactoryOrderItem>): FactoryO
   };
 }
 
-// ─── Restaurant Order ────────────────────────────────────────────────
+// ─── MenuService Order ────────────────────────────────────────────────
 
-export interface FactoryRestaurantOrder {
+export interface FactoryMenuServiceOrder {
   id: string;
   order_number: string;
   customer_id: string | null;
@@ -168,8 +168,8 @@ export interface FactoryRestaurantOrder {
 }
 
 export function createRestaurantOrder(
-  overrides?: Partial<FactoryRestaurantOrder>,
-): FactoryRestaurantOrder {
+  overrides?: Partial<FactoryMenuServiceOrder>,
+): FactoryMenuServiceOrder {
   const items = overrides?.order_items ?? [createOrderItem(), createOrderItem()];
   const subtotal =
     overrides?.subtotal ??
@@ -203,9 +203,9 @@ export function createRestaurantOrder(
   };
 }
 
-// ─── Chalet ──────────────────────────────────────────────────────────
+// ─── AccommodationUnit ──────────────────────────────────────────────────────────
 
-export interface FactoryChalet {
+export interface FactoryAccommodationUnit {
   id: string;
   name: string;
   name_ar: string | null;
@@ -224,13 +224,13 @@ export interface FactoryChalet {
   updated_at: string;
 }
 
-export function createChalet(overrides?: Partial<FactoryChalet>): FactoryChalet {
+export function createAccommodationUnit(overrides?: Partial<FactoryAccommodationUnit>): FactoryAccommodationUnit {
   return {
     id: randomUUID(),
-    name: 'Sunset Chalet',
+    name: 'Sunset AccommodationUnit',
     name_ar: null,
     name_fr: null,
-    description: 'Spacious lakeside chalet with mountain views',
+    description: 'Spacious lakeside accommodation unit with mountain views',
     capacity: 6,
     bedroom_count: 2,
     bathroom_count: 1,
@@ -246,12 +246,12 @@ export function createChalet(overrides?: Partial<FactoryChalet>): FactoryChalet 
   };
 }
 
-// ─── Chalet Booking ──────────────────────────────────────────────────
+// ─── AccommodationUnit Booking ──────────────────────────────────────────────────
 
-export interface FactoryChaletBooking {
+export interface FactoryUnitBooking {
   id: string;
   booking_number: string;
-  chalet_id: string;
+  unit_id: string;
   customer_id: string | null;
   customer_name: string;
   customer_email: string;
@@ -274,12 +274,12 @@ export interface FactoryChaletBooking {
 }
 
 export function createChaletBooking(
-  overrides?: Partial<FactoryChaletBooking>,
-): FactoryChaletBooking {
+  overrides?: Partial<FactoryUnitBooking>,
+): FactoryUnitBooking {
   return {
     id: randomUUID(),
     booking_number: `BK-${Date.now().toString(36).toUpperCase()}`,
-    chalet_id: randomUUID(),
+    unit_id: randomUUID(),
     customer_id: null,
     customer_name: 'Jane Doe',
     customer_email: 'jane@example.com',
@@ -305,7 +305,7 @@ export function createChaletBooking(
 
 // ─── Pool Session ────────────────────────────────────────────────────
 
-export interface FactoryPoolSession {
+export interface FactoryCapacityWindow {
   id: string;
   name: string;
   start_time: string;
@@ -319,8 +319,8 @@ export interface FactoryPoolSession {
 }
 
 export function createPoolSession(
-  overrides?: Partial<FactoryPoolSession>,
-): FactoryPoolSession {
+  overrides?: Partial<FactoryCapacityWindow>,
+): FactoryCapacityWindow {
   return {
     id: randomUUID(),
     name: 'Morning Swim',
@@ -338,7 +338,7 @@ export function createPoolSession(
 
 // ─── Pool Ticket ─────────────────────────────────────────────────────
 
-export interface FactoryPoolTicket {
+export interface FactoryCapacityTicket {
   id: string;
   ticket_number: string;
   session_id: string;
@@ -357,8 +357,8 @@ export interface FactoryPoolTicket {
 }
 
 export function createPoolTicket(
-  overrides?: Partial<FactoryPoolTicket>,
-): FactoryPoolTicket {
+  overrides?: Partial<FactoryCapacityTicket>,
+): FactoryCapacityTicket {
   return {
     id: randomUUID(),
     ticket_number: `PT-${Date.now().toString(36).toUpperCase()}`,
@@ -402,7 +402,7 @@ export interface FactoryPayment {
 export function createPayment(overrides?: Partial<FactoryPayment>): FactoryPayment {
   return {
     id: randomUUID(),
-    reference_type: 'restaurant_order',
+    reference_type: 'menu_service_order',
     reference_id: randomUUID(),
     amount: '65.00',
     currency: 'USD',
@@ -619,9 +619,9 @@ export function createModule(overrides?: Partial<FactoryModule>): FactoryModule 
   const slug = `module-${randomUUID().slice(0, 8)}`;
   return {
     id: randomUUID(),
-    name: 'Restaurant',
+    name: 'MenuService',
     slug,
-    description: 'Main restaurant module',
+    description: 'Main menu service module',
     template_type: null,
     icon: 'utensils',
     version: '1.0.0',

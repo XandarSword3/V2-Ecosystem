@@ -5,8 +5,8 @@ const mockSupabaseResponse = {
   error: null,
 };
 
-vi.mock('../../../src/lib/supabase', () => ({
-  supabase: {
+vi.mock('../../../src/lib/supabase', () => {
+  const mockClient = {
     from: vi.fn(() => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
@@ -28,8 +28,13 @@ vi.mock('../../../src/lib/supabase', () => ({
       })),
       insert: vi.fn(() => Promise.resolve(mockSupabaseResponse)),
     })),
-  },
-}));
+  };
+  return {
+    supabase: mockClient,
+    getSupabase: vi.fn().mockReturnValue(mockClient),
+    getSupabaseAdmin: vi.fn(),
+  };
+});
 
 vi.mock('../../../src/utils/logger', () => ({
   logger: {

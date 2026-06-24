@@ -13,7 +13,7 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
     try {
-        const businessType = (req.query.business_type as string) || 'resort';
+        const businessType = (req.query.business_type as string) || 'hotel';
         const language = (req.query.language as string) || 'en';
 
         const terms = await terminologyService.getTerminology(businessType, language);

@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger.js';
 
 // Validation schemas
 const createTaskSchema = z.object({
-  chaletId: z.string().uuid(),
+  unitId: z.string().uuid(),
   taskType: z.enum(['standard_cleaning', 'deep_cleaning', 'turnover', 'inspection', 'maintenance']),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
   notes: z.string().optional(),
@@ -31,7 +31,7 @@ const inspectionSchema = z.object({
   notes: z.string().optional(),
 });
 
-const blockChaletSchema = z.object({
+const blockUnitSchema = z.object({
   reason: z.string(),
   expectedClearDate: z.string().optional(),
 });
@@ -116,7 +116,7 @@ export class HousekeepingAdvancedController {
       const { data: task, error } = await supabase
         .from('housekeeping_tasks')
         .insert({
-          chalet_id: data.chaletId,
+          unit_id: data.unitId,
           task_type: data.taskType,
           priority: data.priority,
           status: 'pending',
@@ -131,11 +131,10 @@ export class HousekeepingAdvancedController {
 
       if (error) throw error;
 
-      // Update chalet status
       await supabase
-        .from('chalets')
+        .from('accommodation_units')
         .update({ cleaning_status: 'pending', updated_at: new Date().toISOString() })
-        .eq('id', data.chaletId);
+        .eq('id', data.unitId);
 
       res.status(201).json({ success: true, data: task });
     } catch (error: any) {
@@ -180,11 +179,10 @@ export class HousekeepingAdvancedController {
 
       if (error) throw error;
 
-      // Update chalet status
       await supabase
-        .from('chalets')
+        .from('accommodation_units')
         .update({ cleaning_status: 'in_progress', updated_at: new Date().toISOString() })
-        .eq('id', task.chalet_id);
+        .eq('id', task.unit_id);
 
       res.json({ success: true, data: updated });
     } catch (error: any) {
@@ -252,16 +250,15 @@ export class HousekeepingAdvancedController {
 
       if (error) throw error;
 
-      // Update chalet status - needs inspection or clean
       const newStatus = task.task_type === 'turnover' ? 'pending_inspection' : 'clean';
       await supabase
-        .from('chalets')
+        .from('accommodation_units')
         .update({
           cleaning_status: newStatus,
           last_cleaned: completedAt.toISOString(),
           updated_at: completedAt.toISOString(),
         })
-        .eq('id', task.chalet_id);
+        .eq('id', task.unit_id);
 
       res.json({ success: true, data: updated });
     } catch (error: any) {
@@ -300,7 +297,7 @@ export class HousekeepingAdvancedController {
         .from('housekeeping_inspections')
         .insert({
           task_id: data.taskId,
-          chalet_id: task.chalet_id,
+          unit_id: task.unit_id,
           inspector_id: userId,
           checklist_items: data.checklistItems,
           overall_rating: data.overallRating,
@@ -323,21 +320,20 @@ export class HousekeepingAdvancedController {
         })
         .eq('id', data.taskId);
 
-      // Update chalet status
-      const chaletStatus = data.requiresRework ? 'dirty' : 'clean';
+      const unitStatus = data.requiresRework ? 'dirty' : 'clean';
       await supabase
-        .from('chalets')
+        .from('accommodation_units')
         .update({
-          cleaning_status: chaletStatus,
+          cleaning_status: unitStatus,
           last_inspected: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq('id', task.chalet_id);
+        .eq('id', task.unit_id);
 
       // If rework needed, create new task
       if (data.requiresRework) {
         await supabase.from('housekeeping_tasks').insert({
-          chalet_id: task.chalet_id,
+          unit_id: task.unit_id,
           task_type: task.task_type,
           priority: 'high',
           status: 'pending',
@@ -356,41 +352,40 @@ export class HousekeepingAdvancedController {
   }
 
   /**
-   * Check if chalet can accept check-in
+   * Check if a unit can accept check-in
    */
   async canCheckIn(req: Request, res: Response) {
     try {
-      const { chaletId } = req.params;
+      const { unitId } = req.params;
       const supabase = getSupabase();
 
       const { data: result, error } = await supabase.rpc('can_check_in', {
-        p_chalet_id: chaletId,
+        p_unit_id: unitId,
       });
 
       if (error) throw error;
 
-      // Get chalet details
-      const { data: chalet } = await supabase
-        .from('chalets')
+      const { data: unit } = await supabase
+        .from('accommodation_units')
         .select('id, name, cleaning_status, is_blocked, block_reason')
-        .eq('id', chaletId)
+        .eq('id', unitId)
         .single();
 
       // Get pending tasks
       const { data: pendingTasks } = await supabase
         .from('housekeeping_tasks')
         .select('id, task_type, status, priority')
-        .eq('chalet_id', chaletId)
+        .eq('unit_id', unitId)
         .in('status', ['pending', 'in_progress', 'rework_needed']);
 
       res.json({
         success: true,
         data: {
           canCheckIn: result,
-          chalet,
+          unit,
           blockingIssues: result ? [] : [
-            ...(chalet?.is_blocked ? [`Blocked: ${chalet.block_reason}`] : []),
-            ...(chalet?.cleaning_status !== 'clean' ? [`Cleaning status: ${chalet?.cleaning_status}`] : []),
+            ...(unit?.is_blocked ? [`Blocked: ${unit.block_reason}`] : []),
+            ...(unit?.cleaning_status !== 'clean' ? [`Cleaning status: ${unit?.cleaning_status}`] : []),
             ...((pendingTasks || []).map(t => `Pending ${t.task_type} (${t.status})`)),
           ],
         },
@@ -402,12 +397,12 @@ export class HousekeepingAdvancedController {
   }
 
   /**
-   * Block a chalet
+   * Block a unit
    */
-  async blockChalet(req: Request, res: Response) {
+  async blockUnit(req: Request, res: Response) {
     try {
-      const { chaletId } = req.params;
-      const validation = blockChaletSchema.safeParse(req.body);
+      const { unitId } = req.params;
+      const validation = blockUnitSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ success: false, error: validation.error.errors });
       }
@@ -415,53 +410,53 @@ export class HousekeepingAdvancedController {
       const data = validation.data;
       const supabase = getSupabase();
 
-      const { data: chalet, error } = await supabase
-        .from('chalets')
+      const { data: unit, error } = await supabase
+        .from('accommodation_units')
         .update({
           is_blocked: true,
           block_reason: data.reason,
           blocked_until: data.expectedClearDate,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', chaletId)
+        .eq('id', unitId)
         .select()
         .single();
 
       if (error) throw error;
 
-      res.json({ success: true, data: chalet });
+      res.json({ success: true, data: unit });
     } catch (error: any) {
-      logger.error('Error blocking chalet:', error);
-      res.status(500).json({ success: false, error: 'Failed to block chalet', message: error.message });
+      logger.error('Error blocking unit:', error);
+      res.status(500).json({ success: false, error: 'Failed to block unit', message: error.message });
     }
   }
 
   /**
-   * Unblock a chalet
+   * Unblock a unit
    */
-  async unblockChalet(req: Request, res: Response) {
+  async unblockUnit(req: Request, res: Response) {
     try {
-      const { chaletId } = req.params;
+      const { unitId } = req.params;
       const supabase = getSupabase();
 
-      const { data: chalet, error } = await supabase
-        .from('chalets')
+      const { data: unit, error } = await supabase
+        .from('accommodation_units')
         .update({
           is_blocked: false,
           block_reason: null,
           blocked_until: null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', chaletId)
+        .eq('id', unitId)
         .select()
         .single();
 
       if (error) throw error;
 
-      res.json({ success: true, data: chalet });
+      res.json({ success: true, data: unit });
     } catch (error: any) {
-      logger.error('Error unblocking chalet:', error);
-      res.status(500).json({ success: false, error: 'Failed to unblock chalet', message: error.message });
+      logger.error('Error unblocking unit:', error);
+      res.status(500).json({ success: false, error: 'Failed to unblock unit', message: error.message });
     }
   }
 
@@ -531,14 +526,14 @@ export class HousekeepingAdvancedController {
   }
 
   /**
-   * Get room state machine status
+   * Get unit state machine status
    */
   async getRoomStates(req: Request, res: Response) {
     try {
       const supabase = getSupabase();
 
-      const { data: chalets, error } = await supabase
-        .from('chalets')
+      const { data: units, error } = await supabase
+        .from('accommodation_units')
         .select(`
           id, name, cleaning_status, is_blocked, block_reason, blocked_until,
           last_cleaned, last_inspected,
@@ -548,14 +543,14 @@ export class HousekeepingAdvancedController {
 
       if (error) throw error;
 
-      // Categorize chalets
+      // Categorize units
       const states = {
-        clean: (chalets || []).filter(c => c.cleaning_status === 'clean' && !c.is_blocked),
-        dirty: (chalets || []).filter(c => c.cleaning_status === 'dirty' && !c.is_blocked),
-        pending: (chalets || []).filter(c => c.cleaning_status === 'pending' && !c.is_blocked),
-        in_progress: (chalets || []).filter(c => c.cleaning_status === 'in_progress' && !c.is_blocked),
-        pending_inspection: (chalets || []).filter(c => c.cleaning_status === 'pending_inspection' && !c.is_blocked),
-        blocked: (chalets || []).filter(c => c.is_blocked),
+        clean: (units || []).filter(c => c.cleaning_status === 'clean' && !c.is_blocked),
+        dirty: (units || []).filter(c => c.cleaning_status === 'dirty' && !c.is_blocked),
+        pending: (units || []).filter(c => c.cleaning_status === 'pending' && !c.is_blocked),
+        in_progress: (units || []).filter(c => c.cleaning_status === 'in_progress' && !c.is_blocked),
+        pending_inspection: (units || []).filter(c => c.cleaning_status === 'pending_inspection' && !c.is_blocked),
+        blocked: (units || []).filter(c => c.is_blocked),
       };
 
       res.json({
@@ -610,14 +605,13 @@ export class HousekeepingAdvancedController {
 
       if (error) throw error;
 
-      // Update chalet to clean
       await supabase
-        .from('chalets')
+        .from('accommodation_units')
         .update({
           cleaning_status: 'clean',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', task.chalet_id);
+        .eq('id', task.unit_id);
 
       res.json({ success: true, data: updated });
     } catch (error: any) {
@@ -678,7 +672,7 @@ export class HousekeepingAdvancedController {
       const { data: task, error } = await supabase
         .from('housekeeping_tasks')
         .insert({
-          chalet_id: chaletId,
+          unit_id: chaletId,
           task_type: 'turnover',
           priority,
           status: assignedStaff ? 'assigned' : 'pending',
@@ -693,9 +687,8 @@ export class HousekeepingAdvancedController {
 
       if (error) throw error;
 
-      // Update chalet status
       await supabase
-        .from('chalets')
+        .from('accommodation_units')
         .update({ cleaning_status: 'dirty', updated_at: now.toISOString() })
         .eq('id', chaletId);
 
@@ -767,7 +760,7 @@ export class HousekeepingAdvancedController {
         type: 'housekeeping_task',
         title: 'New Housekeeping Task',
         message: `You have been assigned a ${task.task_type} task (${task.priority} priority)`,
-        metadata: { taskId: task.id, chaletId: task.chalet_id },
+        metadata: { taskId: task.id, unitId: task.unit_id },
       });
     } catch (e) {
       logger.error('Failed to notify staff:', e);
@@ -893,9 +886,8 @@ export class HousekeepingAdvancedController {
     try {
       const supabase = getSupabase();
 
-      // Get all chalets with their current status
-      const { data: chalets, error } = await supabase
-        .from('chalets')
+      const { data: units, error } = await supabase
+        .from('accommodation_units')
         .select(`
           id, name, cleaning_status, is_blocked, block_reason,
           last_cleaned, last_inspected
@@ -918,7 +910,7 @@ export class HousekeepingAdvancedController {
       // Get active tasks
       const { data: activeTasks } = await supabase
         .from('housekeeping_tasks')
-        .select('id, chalet_id, task_type, status, priority, assigned_to, sla_due, started_at')
+        .select('id, unit_id, task_type, status, priority, assigned_to, sla_due, started_at')
         .in('status', ['pending', 'assigned', 'in_progress', 'pending_inspection']);
 
       // Get staff on duty
@@ -930,12 +922,12 @@ export class HousekeepingAdvancedController {
         .eq('is_active', true);
 
       // Calculate metrics
-      const totalRooms = (chalets || []).length;
-      const readyRooms = (chalets || []).filter(c => c.cleaning_status === 'clean' && !c.is_blocked).length;
-      const dirtyRooms = (chalets || []).filter(c => c.cleaning_status === 'dirty').length;
-      const inProgress = (chalets || []).filter(c => c.cleaning_status === 'in_progress').length;
-      const pendingInspection = (chalets || []).filter(c => c.cleaning_status === 'pending_inspection').length;
-      const blocked = (chalets || []).filter(c => c.is_blocked).length;
+      const totalRooms = (units || []).length;
+      const readyRooms = (units || []).filter(c => c.cleaning_status === 'clean' && !c.is_blocked).length;
+      const dirtyRooms = (units || []).filter(c => c.cleaning_status === 'dirty').length;
+      const inProgress = (units || []).filter(c => c.cleaning_status === 'in_progress').length;
+      const pendingInspection = (units || []).filter(c => c.cleaning_status === 'pending_inspection').length;
+      const blocked = (units || []).filter(c => c.is_blocked).length;
 
       // SLA at risk tasks
       const now = new Date();
@@ -951,22 +943,22 @@ export class HousekeepingAdvancedController {
         return new Date(t.sla_due) < now;
       });
 
-      // Map chalets with booking status
-      const chaletStatus = (chalets || []).map(chalet => {
-        const bookings = (todayBookings || []).filter(b => b.unit_id === chalet.id);
+      // Map units with booking status
+      const unitStatus = (units || []).map(unit => {
+        const bookings = (todayBookings || []).filter(b => b.unit_id === unit.id);
         const checkingOut = bookings.find(b => (b.metadata as any)?.check_out_date === today);
         const checkingIn = bookings.find(b => (b.metadata as any)?.check_in_date === today);
-        const tasks = (activeTasks || []).filter(t => t.chalet_id === chalet.id);
+        const tasks = (activeTasks || []).filter(t => t.unit_id === unit.id);
 
         return {
-          ...chalet,
+          ...unit,
           checkingOut: !!checkingOut,
           checkingIn: !!checkingIn,
           activeTasks: tasks,
-          urgency: checkingIn && chalet.cleaning_status !== 'clean' 
-            ? 'critical' 
-            : tasks.some(t => t.priority === 'urgent') 
-              ? 'urgent' 
+          urgency: checkingIn && unit.cleaning_status !== 'clean'
+            ? 'critical'
+            : tasks.some(t => t.priority === 'urgent')
+              ? 'urgent'
               : 'normal',
         };
       });
@@ -986,7 +978,7 @@ export class HousekeepingAdvancedController {
             slaBreachedCount: slaBreached.length,
             staffOnDuty: (staffOnDuty || []).length,
           },
-          chalets: chaletStatus,
+          units: unitStatus,
           slaAtRisk,
           slaBreached,
           staffOnDuty,
@@ -1074,7 +1066,7 @@ export class HousekeepingAdvancedController {
       // Get unassigned tasks
       const { data: unassignedTasks } = await supabase
         .from('housekeeping_tasks')
-        .select('id, chalet_id, task_type, priority, scheduled_for')
+        .select('id, unit_id, task_type, priority, scheduled_for')
         .is('assigned_to', null)
         .in('status', ['pending'])
         .order('priority', { ascending: false }) // Urgent first

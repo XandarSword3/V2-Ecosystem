@@ -16,6 +16,16 @@ const TOTP_OPTIONS = {
   algorithm: 'sha1' as const,
 };
 
+// otplib v13's `verify()` defaults epochTolerance to 0 seconds, meaning the
+// submitted code must land in the exact current time step with zero
+// allowance for clock drift, network latency, or the time it takes a user
+// to type the code. RFC 6238 recommends allowing at least one step of
+// tolerance in each direction; we apply that only at verification time
+// (not generation) so setup/issuance is unaffected.
+const TOTP_VERIFY_TOLERANCE = {
+  epochTolerance: [30, 30] as [number, number], // ±1 step (30s) past and future
+};
+
 interface TwoFactorSetup {
   secret: string;
   qrCodeDataUrl: string;
@@ -109,7 +119,7 @@ class TwoFactorService {
     
     // Decrypt secret and verify code (v13 functional API)
     const secret = this.decryptSecret(pending.secret);
-    const result = await verify({ token: code, secret, ...TOTP_OPTIONS });
+    const result = await verify({ token: code, secret, ...TOTP_OPTIONS, ...TOTP_VERIFY_TOLERANCE });
     
     if (!result.valid) {
       logger.warn(`Invalid 2FA code during setup for user: ${userId}`);
@@ -160,7 +170,7 @@ class TwoFactorService {
     const secret = this.decryptSecret(twoFactor.secret);
     
     // Try TOTP verification first (v13 functional API)
-    const result = await verify({ token: code, secret, ...TOTP_OPTIONS });
+    const result = await verify({ token: code, secret, ...TOTP_OPTIONS, ...TOTP_VERIFY_TOLERANCE });
     if (result.valid) {
       logger.info(`2FA code verified for user: ${userId}`);
       return true;

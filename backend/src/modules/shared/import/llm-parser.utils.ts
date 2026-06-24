@@ -1,6 +1,6 @@
 /**
  * Shared LLM Parser Utility
- * Extracted from restaurant module to be used across all import modules
+ * Shared across all dynamic import module types
  */
 
 import axios from 'axios';
@@ -53,7 +53,7 @@ export async function callLlmParser(systemPrompt: string, userInput: string): Pr
  * Base system prompts for different module imports
  */
 export const LLM_SYSTEM_PROMPTS = {
-  menu_service: `You are a menu parsing expert. Convert the following unstructured text into a structured JSON array of menu items.
+  instant_transaction: `You are a menu parsing expert. Convert the following unstructured text into a structured JSON array of menu items.
 Each item must follow this schema:
 {
   "name": string (required),
@@ -84,10 +84,10 @@ Rules:
 1. Prices must be numbers. If a range is given, use the lowest price.
 2. If multiple sizes are given, create one item with a 'Size' modifier group.
 3. Respond ONLY with the JSON array. No preamble or markdown.
-4. If ingredients or components are mentioned or strongly implied by the item name (e.g. 'Cheese Pizza' implies mozzarella, dough, tomato sauce), add an 'ingredients' array. Each ingredient: { name, estimatedQuantity, estimatedUnit }. Use sensible restaurant quantities (e.g. mozzarella: 80g, dough: 200g). If you cannot reasonably infer ingredients, omit the field.
+4. If ingredients or components are mentioned or strongly implied by the item name (e.g. 'Cheese Pizza' implies mozzarella, dough, tomato sauce), add an 'ingredients' array. Each ingredient: { name, estimatedQuantity, estimatedUnit }. Use sensible F&B quantities (e.g. mozzarella: 80g, dough: 200g). If you cannot reasonably infer ingredients, omit the field.
 5. If a modifier option is an ingredient (e.g. 'extra cheese +$1.50'), add inventoryItemName to the option with the ingredient name.`,
 
-  session_access: `You are a session-based access configuration parsing expert. Convert unstructured text into a structured JSON array of sessions.
+  shared_capacity_access: `You are a session-based access configuration parsing expert. Convert unstructured text into a structured JSON array of sessions.
 Each session must follow this schema:
 {
   "name": string (required, e.g., "Morning Session"),
@@ -108,7 +108,7 @@ Rules:
 3. Gender restriction: use "mixed" unless specified otherwise.
 4. Respond ONLY with the JSON array. No preamble or markdown.`,
 
-  multi_day_booking: `You are an accommodation/bookable unit parsing expert. Convert unstructured text into a structured JSON array of bookable units.
+  time_exclusive_reservation: `You are an accommodation/bookable unit parsing expert. Convert unstructured text into a structured JSON array of bookable units.
 Each unit must follow this schema:
 {
   "name": string (required, e.g., "Unit A", "Sunset Villa"),
@@ -175,7 +175,7 @@ Each coupon must follow this schema:
   "usageLimit": number (optional, total redemptions allowed),
   "perUserLimit": number (optional, per-customer limit),
   "expiresAt": string (optional, ISO date string),
-  "appliesTo": "all" | "restaurant" | "pool" | "chalets" | "snack" (optional, default "all")
+  "appliesTo": "all" | "<module-slug>" (optional, default "all" — pass the target module's slug or "all" for sitewide)
 }
 Rules:
 1. If a code is given, use it. If not, it will be auto-generated.

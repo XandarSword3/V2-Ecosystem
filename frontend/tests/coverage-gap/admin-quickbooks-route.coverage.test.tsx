@@ -48,7 +48,7 @@ describe('QuickBooks integration route coverage', () => {
             connected: true,
             connectionId: 'qb-1',
             companyId: '12345',
-            companyName: 'Acme Resort LLC',
+            companyName: 'Acme Property LLC',
             syncEnabled: true,
             lastSync: '2025-01-05T10:00:00.000Z',
             lastSyncStatus: 'completed_with_errors',
@@ -81,7 +81,7 @@ describe('QuickBooks integration route coverage', () => {
             categories: [
               {
                 key: 'restaurant_sales',
-                name: 'Restaurant Sales',
+                name: 'MenuService Sales',
                 defaultType: 'Income',
                 mapped: null,
               },
@@ -131,7 +131,7 @@ describe('QuickBooks integration route coverage', () => {
     render(<QuickBooksIntegrationPage />);
 
     expect(await screen.findByText('QuickBooks Integration')).toBeInTheDocument();
-    expect(await screen.findByText('Acme Resort LLC')).toBeInTheDocument();
+    expect(await screen.findByText('Acme Property LLC')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Sync Now/i }));
 
@@ -150,7 +150,7 @@ describe('QuickBooks integration route coverage', () => {
     });
 
     await user.click(screen.getByRole('tab', { name: /Account Mappings/i }));
-    expect(await screen.findByText('Restaurant Sales')).toBeInTheDocument();
+    expect(await screen.findByText('MenuService Sales')).toBeInTheDocument();
 
     const mappingSelect = screen.getByDisplayValue('Select account...');
     await user.selectOptions(mappingSelect, 'acc-income');

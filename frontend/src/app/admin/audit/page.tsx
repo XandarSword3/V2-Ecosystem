@@ -60,7 +60,7 @@ const entityConfig: Record<string, { icon: React.ElementType; label: string }> =
   users: { icon: User, label: 'User' },
   menu_item: { icon: Database, label: 'Menu Item' },
   category: { icon: Database, label: 'Category' },
-  chalet: { icon: Database, label: 'Chalet' },
+  accommodation_unit: { icon: Database, label: 'Accommodation Unit' },
   booking: { icon: Calendar, label: 'Booking' },
   order: { icon: Activity, label: 'Order' },
   settings: { icon: Settings, label: 'Settings' },

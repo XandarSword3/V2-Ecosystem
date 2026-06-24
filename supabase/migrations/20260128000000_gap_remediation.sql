@@ -31,11 +31,11 @@ CREATE TABLE IF NOT EXISTS menu_modifier_options (
 
 CREATE TABLE IF NOT EXISTS menu_item_modifiers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    menu_item_id UUID REFERENCES menu_items(id) ON DELETE CASCADE,
+    catalog_item_id UUID REFERENCES catalog_items(id) ON DELETE CASCADE,
     modifier_group_id UUID REFERENCES menu_modifier_groups(id) ON DELETE CASCADE,
     sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(menu_item_id, modifier_group_id)
+    UNIQUE(catalog_item_id, modifier_group_id)
 );
 
 -- 2. Cash Drawer (POS & Finance)

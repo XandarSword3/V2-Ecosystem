@@ -6,7 +6,7 @@
  */
 
 import { createBookingService, BookingServiceError, BookingService } from '../../../src/lib/services/booking.service.js';
-import { createInMemoryChaletRepository, InMemoryChaletRepository } from '../../../src/lib/repositories/chalet.repository.memory.js';
+import { createInMemoryChaletRepository, InMemoryAccommodationRepository } from '../../../src/lib/repositories/accommodation unit.repository.memory.js';
 import { 
   createMockEmailService, 
   createMockLogger, 
@@ -20,7 +20,7 @@ import type {
   ActivityLoggerService, 
   SocketEmitter,
   AppConfig, 
-  Chalet,
+  AccommodationUnit,
   ChaletAddOn,
   ChaletPriceRule,
 } from '../../../src/lib/container/types.js';
@@ -28,7 +28,7 @@ import dayjs from 'dayjs';
 
 describe('BookingService', () => {
   let bookingService: BookingService;
-  let chaletRepository: InMemoryChaletRepository;
+  let accommodationRepository: InMemoryAccommodationRepository;
   let mockEmailService: ReturnType<typeof createMockEmailService>;
   let mockLogger: ReturnType<typeof createMockLogger>;
   let mockActivityLogger: ReturnType<typeof createMockActivityLogger>;
@@ -36,17 +36,17 @@ describe('BookingService', () => {
   let config: AppConfig;
 
   // Test data builders
-  function buildChalet(overrides: Partial<Chalet> = {}): Chalet {
-    const id = overrides.id || `chalet-${Math.random().toString(36).slice(2)}`;
+  function buildAccommodationUnit(overrides: Partial<AccommodationUnit> = {}): AccommodationUnit {
+    const id = overrides.id || `accommodation unit-${Math.random().toString(36).slice(2)}`;
     return {
       id,
-      name: 'Beach Chalet',
+      name: 'Beach AccommodationUnit',
       name_ar: 'شاليه الشاطئ',
-      description: 'A beautiful beach chalet',
+      description: 'A beautiful beach accommodation unit',
       capacity: 6,
       bedroom_count: 2,
       bathroom_count: 1,
-      amenities: ['wifi', 'pool', 'bbq'],
+      amenities: ['wifi', 'capacity', 'bbq'],
       images: ['image1.jpg', 'image2.jpg'],
       base_price: '100.00',
       weekend_price: '150.00',
@@ -74,7 +74,7 @@ describe('BookingService', () => {
   function buildPriceRule(overrides: Partial<ChaletPriceRule> = {}): ChaletPriceRule {
     return {
       id: `rule-${Math.random().toString(36).slice(2)}`,
-      chalet_id: 'chalet-1',
+      unit_id: 'accommodation unit-1',
       name: 'Holiday Season',
       start_date: dayjs().add(30, 'day').format('YYYY-MM-DD'),
       end_date: dayjs().add(60, 'day').format('YYYY-MM-DD'),
@@ -108,7 +108,7 @@ describe('BookingService', () => {
 
   beforeEach(() => {
     // Create fresh instances for each test
-    chaletRepository = createInMemoryChaletRepository();
+    accommodationRepository = createInMemoryChaletRepository();
     mockEmailService = createMockEmailService();
     mockLogger = createMockLogger();
     mockActivityLogger = createMockActivityLogger();
@@ -116,7 +116,7 @@ describe('BookingService', () => {
     config = createTestConfig();
 
     bookingService = createBookingService({
-      chaletRepository,
+      accommodationRepository,
       emailService: mockEmailService as unknown as EmailService,
       logger: mockLogger as unknown as LoggerService,
       activityLogger: mockActivityLogger as unknown as ActivityLoggerService,
@@ -125,22 +125,22 @@ describe('BookingService', () => {
     });
 
     // Add default test data
-    chaletRepository.addChalet(buildChalet({ 
-      id: 'chalet-1', 
-      name: 'Beach Chalet',
+    accommodationRepository.addChalet(buildAccommodationUnit({ 
+      id: 'accommodation unit-1', 
+      name: 'Beach AccommodationUnit',
       base_price: '100.00',
       weekend_price: '150.00',
       capacity: 6,
     }));
-    chaletRepository.addChalet(buildChalet({ 
-      id: 'chalet-2', 
-      name: 'Mountain Chalet',
+    accommodationRepository.addChalet(buildAccommodationUnit({ 
+      id: 'accommodation unit-2', 
+      name: 'Mountain AccommodationUnit',
       base_price: '200.00',
       weekend_price: '250.00',
       capacity: 8,
     }));
-    chaletRepository.addAddOn(buildAddOn({ id: 'addon-bbq', name: 'BBQ Equipment', price: '25.00', price_type: 'one_time' }));
-    chaletRepository.addAddOn(buildAddOn({ id: 'addon-breakfast', name: 'Breakfast', price: '20.00', price_type: 'per_night' }));
+    accommodationRepository.addAddOn(buildAddOn({ id: 'addon-bbq', name: 'BBQ Equipment', price: '25.00', price_type: 'one_time' }));
+    accommodationRepository.addAddOn(buildAddOn({ id: 'addon-breakfast', name: 'Breakfast', price: '20.00', price_type: 'per_night' }));
   });
 
   // ============================================
@@ -153,7 +153,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const result = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         customerEmail: 'john@example.com',
         customerPhone: '+1234567890',
@@ -165,7 +165,7 @@ describe('BookingService', () => {
       expect(result.booking.customer_name).toBe('John Doe');
       expect(result.booking.status).toBe('pending');
       expect(result.booking.booking_number).toMatch(/^C-\d{6}-\d{3}$/);
-      expect(result.chalet.name).toBe('Beach Chalet');
+      expect(result.accommodation unit.name).toBe('Beach AccommodationUnit');
     });
 
     it('should calculate base pricing correctly for weekdays', async () => {
@@ -173,7 +173,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const result = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -190,7 +190,7 @@ describe('BookingService', () => {
       const sunday = friday.add(2, 'day');
 
       const result = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: friday.format('YYYY-MM-DD'),
         checkOutDate: sunday.format('YYYY-MM-DD'),
@@ -202,13 +202,13 @@ describe('BookingService', () => {
     });
 
     it('should calculate deposit correctly (percentage)', async () => {
-      chaletRepository.setSettings({ deposit_percentage: 30, deposit_type: 'percentage' });
+      accommodationRepository.setSettings({ deposit_percentage: 30, deposit_type: 'percentage' });
       
       const checkIn = getNextWeekday();
       const checkOut = checkIn.add(2, 'day');
 
       const result = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -220,13 +220,13 @@ describe('BookingService', () => {
     });
 
     it('should calculate deposit correctly (fixed)', async () => {
-      chaletRepository.setSettings({ deposit_type: 'fixed', deposit_fixed: 100 });
+      accommodationRepository.setSettings({ deposit_type: 'fixed', deposit_fixed: 100 });
       
       const checkIn = getNextWeekday();
       const checkOut = checkIn.add(2, 'day');
 
       const result = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -241,7 +241,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const result = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -259,7 +259,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(3, 'day');
 
       const result = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -271,12 +271,12 @@ describe('BookingService', () => {
       expect(parseFloat(result.booking.add_ons_amount)).toBe(120);
     });
 
-    it('should throw for non-existent chalet', async () => {
+    it('should throw for non-existent accommodation unit', async () => {
       const checkIn = getNextWeekday();
       const checkOut = checkIn.add(2, 'day');
 
       await expect(bookingService.createBooking({
-        chaletId: 'non-existent',
+        unitId: 'non-existent',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -284,26 +284,26 @@ describe('BookingService', () => {
       })).rejects.toThrow(BookingServiceError);
     });
 
-    it('should throw for inactive chalet', async () => {
-      chaletRepository.addChalet(buildChalet({ id: 'inactive-chalet', is_active: false }));
+    it('should throw for inactive accommodation unit', async () => {
+      accommodationRepository.addChalet(buildAccommodationUnit({ id: 'inactive-accommodation unit', is_active: false }));
       
       const checkIn = getNextWeekday();
       const checkOut = checkIn.add(2, 'day');
 
       await expect(bookingService.createBooking({
-        chaletId: 'inactive-chalet',
+        unitId: 'inactive-accommodation unit',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
         numberOfGuests: 2,
-      })).rejects.toThrow('Chalet is not available');
+      })).rejects.toThrow('AccommodationUnit is not available');
     });
 
     it('should throw for invalid date range', async () => {
       const date = getNextWeekday();
 
       await expect(bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: date.format('YYYY-MM-DD'),
         checkOutDate: date.format('YYYY-MM-DD'), // Same day
@@ -316,12 +316,12 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       await expect(bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
         numberOfGuests: 10, // Capacity is 6
-      })).rejects.toThrow('Chalet capacity is 6 guests');
+      })).rejects.toThrow('AccommodationUnit capacity is 6 guests');
     });
 
     it('should throw when dates overlap with existing booking', async () => {
@@ -330,7 +330,7 @@ describe('BookingService', () => {
 
       // Create first booking
       await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'First Guest',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -339,12 +339,12 @@ describe('BookingService', () => {
 
       // Try overlapping booking
       await expect(bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'Second Guest',
         checkInDate: checkIn.add(1, 'day').format('YYYY-MM-DD'),
         checkOutDate: checkIn.add(4, 'day').format('YYYY-MM-DD'),
         numberOfGuests: 2,
-      })).rejects.toThrow('Chalet is already booked for the selected dates');
+      })).rejects.toThrow('AccommodationUnit is already booked for the selected dates');
     });
 
     it('should emit socket event for new booking', async () => {
@@ -352,7 +352,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -360,11 +360,11 @@ describe('BookingService', () => {
       });
 
       expect(mockSocketEmitter.emitToUnit).toHaveBeenCalledWith(
-        'chalets',
+        'accommodation_units',
         'booking:new',
         expect.objectContaining({
           customerName: 'John Doe',
-          chaletName: 'Beach Chalet',
+          chaletName: 'Beach AccommodationUnit',
         })
       );
     });
@@ -374,7 +374,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerId: 'user-123',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
@@ -385,7 +385,7 @@ describe('BookingService', () => {
       expect(mockActivityLogger.log).toHaveBeenCalledWith(
         'CREATE_BOOKING',
         expect.objectContaining({
-          chaletId: 'chalet-1',
+          unitId: 'accommodation unit-1',
         }),
         'user-123'
       );
@@ -402,7 +402,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -424,7 +424,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -440,7 +440,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -460,7 +460,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -480,7 +480,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -502,7 +502,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -521,7 +521,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -531,7 +531,7 @@ describe('BookingService', () => {
       await bookingService.cancelBooking(booking.id, 'Changed plans');
 
       expect(mockSocketEmitter.emitToUnit).toHaveBeenCalledWith(
-        'chalets',
+        'accommodation_units',
         'booking:cancelled',
         expect.objectContaining({
           reason: 'Changed plans',
@@ -544,7 +544,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -562,7 +562,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -587,7 +587,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const available = await bookingService.checkAvailability(
-        'chalet-1',
+        'accommodation unit-1',
         checkIn.format('YYYY-MM-DD'),
         checkOut.format('YYYY-MM-DD')
       );
@@ -600,7 +600,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(3, 'day');
 
       await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -608,7 +608,7 @@ describe('BookingService', () => {
       });
 
       const available = await bookingService.checkAvailability(
-        'chalet-1',
+        'accommodation unit-1',
         checkIn.add(1, 'day').format('YYYY-MM-DD'),
         checkIn.add(4, 'day').format('YYYY-MM-DD')
       );
@@ -621,7 +621,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(3, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -631,7 +631,7 @@ describe('BookingService', () => {
       await bookingService.cancelBooking(booking.id, 'Cancelled');
 
       const available = await bookingService.checkAvailability(
-        'chalet-1',
+        'accommodation unit-1',
         checkIn.format('YYYY-MM-DD'),
         checkOut.format('YYYY-MM-DD')
       );
@@ -646,7 +646,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(3, 'day');
 
       await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -654,7 +654,7 @@ describe('BookingService', () => {
       });
 
       const result = await bookingService.getAvailability(
-        'chalet-1',
+        'accommodation unit-1',
         checkIn.format('YYYY-MM-DD'),
         checkIn.add(7, 'day').format('YYYY-MM-DD')
       );
@@ -676,7 +676,7 @@ describe('BookingService', () => {
       const checkOut = checkIn.add(2, 'day');
 
       const { booking } = await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
         checkOutDate: checkOut.format('YYYY-MM-DD'),
@@ -700,7 +700,7 @@ describe('BookingService', () => {
       const checkIn = getNextWeekday();
 
       await bookingService.createBooking({
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
         customerId: 'customer-1',
         customerName: 'John Doe',
         checkInDate: checkIn.format('YYYY-MM-DD'),
@@ -709,7 +709,7 @@ describe('BookingService', () => {
       });
 
       await bookingService.createBooking({
-        chaletId: 'chalet-2',
+        unitId: 'accommodation unit-2',
         customerId: 'customer-2',
         customerName: 'Jane Doe',
         checkInDate: checkIn.add(5, 'day').format('YYYY-MM-DD'),

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const pathnameState = vi.hoisted(() => ({ pathname: '/' }));
 const siteState = vi.hoisted(() => ({
   settings: {
-    resortName: 'V2 Ecosystem',
+    propertyName: 'V2 Ecosystem',
     footer: undefined as
       | undefined
       | {
@@ -72,13 +72,13 @@ describe('Footer behavior', () => {
   beforeEach(() => {
     pathnameState.pathname = '/';
     siteState.settings = {
-      resortName: 'V2 Ecosystem',
+      propertyName: 'V2 Ecosystem',
       footer: undefined,
     };
     siteState.modules = [
-      { slug: 'restaurant', name: 'Restaurant', is_active: true, show_in_main: true, sort_order: 1 },
-      { slug: 'pool', name: 'Pool', is_active: true, show_in_main: true, sort_order: 2 },
-      { slug: 'snack-bar', name: 'Snack', is_active: false, show_in_main: true, sort_order: 3 },
+      { slug: 'menu_service', name: 'MenuService', is_active: true, show_in_main: true, sort_order: 1 },
+      { slug: 'capacity', name: 'Pool', is_active: true, show_in_main: true, sort_order: 2 },
+      { slug: 'kiosk', name: 'KioskItem', is_active: false, show_in_main: true, sort_order: 3 },
     ];
   });
 
@@ -95,8 +95,8 @@ describe('Footer behavior', () => {
   it('renders quick links from active customer modules and gift cards', () => {
     render(<Footer />);
 
-    expect(screen.getByRole('link', { name: /restaurant/i })).toHaveAttribute('href', '/restaurant');
-    expect(screen.getByRole('link', { name: /pool/i })).toHaveAttribute('href', '/pool');
+    expect(screen.getByRole('link', { name: /MenuService/i })).toHaveAttribute('href', '/menu_service');
+    expect(screen.getByRole('link', { name: /pool/i })).toHaveAttribute('href', '/capacity');
     expect(screen.queryByRole('link', { name: /snackBar/i })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /giftCards/i })).toHaveAttribute('href', '/giftcards');
   });

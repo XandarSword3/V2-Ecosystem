@@ -9,9 +9,17 @@
  *   1. Upsert tenants row (idempotency key: stripe_subscription_id)
  *   2. Upsert property_groups row linked to tenant
  *   3. Upsert default property inside the group
- *   4. Seed roles (super_admin, admin, staff, customer) scoped to tenant
+ *   4. Seed roles (tenant_owner, admin, staff, customer) scoped to tenant
  *   5. Create owner user account with hashed temporary password
- *   6. Assign super_admin role to owner within tenant
+ *   6. Assign tenant_owner + admin roles to owner within tenant
+ *
+ * NOTE: the owner role is named 'tenant_owner', NOT 'super_admin'. The string
+ * 'super_admin' is treated as an unconditional, tenant-blind bypass by
+ * authorize() (auth.middleware.ts) and by requirePermission/canAccess
+ * (permission.middleware.ts) — it is reserved for the actual platform
+ * operator (is_platform_root tenant / isPlatformAdmin flag). Never assign a
+ * role literally named 'super_admin' here; doing so previously handed every
+ * paying customer the same unconditional bypass as the platform operator.
  *   7. Queue welcome / credential email (fire-and-forget)
  *
  * On partial failure the service logs the error and re-throws so the webhook
@@ -50,19 +58,81 @@ export interface ProvisioningResult {
   created: boolean;
 }
 
-// Default roles seeded for every new tenant
+// Default roles seeded for every new tenant.
+//
+// IMPORTANT: the tenant owner's role is named 'tenant_owner', never
+// 'super_admin'. authorize() (auth.middleware.ts) and the permission.middleware.ts
+// helpers treat the literal string 'super_admin' as an unconditional, tenant-
+// blind bypass reserved for the platform operator. Seeding that name here
+// would hand every paying customer the same unconditional bypass as the
+// platform operator — which is exactly what happened before this fix.
 const DEFAULT_ROLES = [
-  { name: 'super_admin', description: 'Full platform access within this tenant', permissions: ['*'] },
+  { name: 'tenant_owner', description: 'Full administrative access within this tenant (tenant owner only)', permissions: ['*'] },
   { name: 'admin',       description: 'Administrative access excluding billing',  permissions: ['admin.*'] },
   { name: 'staff',       description: 'Day-to-day operational access',            permissions: ['staff.*'] },
   { name: 'customer',    description: 'Guest-facing access',                      permissions: ['customer.*'] },
 ];
 
 // ============================================
+// Slug generation for properties.public_slug
+//
+// public_slug is the customer-facing routing identifier used to resolve a
+// property from its subdomain ({public_slug}.{tenant_subdomain}.v2platform.com).
+// It is DISTINCT from property_code, which is reserved for external OTA
+// channel mappings (Booking.com / Expedia / Airbnb hotel_id pairings) — see
+// the public_slug column comment in the migration for the full reasoning.
+// Must satisfy the DB-level DNS label CHECK constraint:
+//   ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$
+// ============================================
+
+function slugify(input: string): string {
+  const slug = input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 50);
+  return slug || 'property';
+}
+
+// ============================================
 // ProvisioningService
 // ============================================
 
 export class ProvisioningService {
+
+  /**
+   * Generate a public_slug for a new property that doesn't collide with any
+   * existing property in the same group. Mirrors the collision-suffix logic
+   * in the 20260620010000_add_property_public_slug.sql backfill so newly
+   * provisioned properties follow the same convention as backfilled ones.
+   */
+  private async generateUniquePublicSlug(name: string, groupId: string): Promise<string> {
+    const supabase = getSupabase();
+    const base = slugify(name);
+
+    let candidate = base;
+    let suffix = 1;
+
+    // Bounded loop — defends against an unexpected runaway collision chain
+    // rather than looping forever on a pathological input.
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const { data: existing } = await supabase
+        .from('properties')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('public_slug', candidate)
+        .maybeSingle();
+
+      if (!existing) return candidate;
+
+      suffix += 1;
+      candidate = `${base}-${suffix}`;
+    }
+
+    // Extremely unlikely fallback — append a short random suffix instead of
+    // looping indefinitely.
+    return `${base}-${crypto.randomBytes(3).toString('hex')}`;
+  }
 
   /**
    * Provision a tenant from a Stripe event payload.
@@ -146,6 +216,16 @@ export class ProvisioningService {
     }
 
     // ---- Step 3: Create tenant row ----
+    // Resolve plan_id + feature_limits from the LIVE plans table (the
+    // admin-editable source of truth) rather than a hardcoded duplicate.
+    // Non-fatal if the lookup fails or no row matches: falls back to the
+    // hardcoded FALLBACK_FEATURE_LIMITS so provisioning never breaks if the
+    // plans table is empty, mid-migration, or a tier has no matching plan
+    // row yet. plan_id stays null in that case — tenantAccess.middleware.ts
+    // already falls back to the tenants.feature_limits snapshot when plan_id
+    // is null, so this degrades safely either way.
+    const { plan_id: resolvedPlanId, feature_limits: resolvedFeatureLimits } = await resolvePlanForTier(tier);
+
     const tenantId = crypto.randomUUID();
     const { error: tenantErr } = await supabase
       .from('tenants')
@@ -154,10 +234,11 @@ export class ProvisioningService {
         subdomain,
         property_group_id: group.id,
         subscription_tier: tier,
+        plan_id: resolvedPlanId,
         billing_status: billingStatus,
         stripe_customer_id: stripeCustomerId,
         stripe_subscription_id: stripeSubscriptionId,
-        feature_limits: defaultFeatureLimits(tier),
+        feature_limits: resolvedFeatureLimits,
         trial_ends_at: trialEndsAt?.toISOString() ?? null,
       });
 
@@ -166,12 +247,15 @@ export class ProvisioningService {
     }
 
     // ---- Step 4: Create default property ----
+    const propertyName = `${operatorName}'s Property`;
+    const publicSlug = await this.generateUniquePublicSlug(propertyName, group.id);
+
     const { data: property, error: propErr } = await supabase
       .from('properties')
       .insert({
-        name: `${operatorName}'s Property`,
+        name: propertyName,
         group_id: group.id,
-        slug: subdomain,
+        public_slug: publicSlug,
         is_active: true,
       })
       .select('id')
@@ -218,19 +302,30 @@ export class ProvisioningService {
       throw new Error(`[PROVISIONING] Failed to create owner user: ${userErr?.message}`);
     }
 
-    // ---- Step 7: Assign super_admin role ----
-    const { data: superAdminRole } = await supabase
+    // ---- Step 7: Assign tenant_owner + admin roles ----
+    // tenant_owner: the elevated, owner-only actions within this tenant
+    // (roles/permissions management, user deletion, etc. — see admin.routes.ts).
+    // admin: the standard tenant-admin role, so the owner also has full access
+    // to every route already gated by authorize('admin', ...) / authorizeManager,
+    // same as any staff member promoted to admin within this tenant.
+    const { data: ownerRoles } = await supabase
       .from('roles')
-      .select('id')
-      .eq('name', 'super_admin')
+      .select('id, name')
       .eq('tenant_id', tenantId)
-      .maybeSingle();
+      .in('name', ['tenant_owner', 'admin']);
 
-    if (superAdminRole) {
-      await supabase
+    if (ownerRoles && ownerRoles.length > 0) {
+      const roleAssignments = ownerRoles.map((r) => ({ user_id: user.id, role_id: r.id }));
+      const { error: roleAssignErr } = await supabase
         .from('user_roles')
-        .insert({ user_id: user.id, role_id: superAdminRole.id })
+        .insert(roleAssignments)
         .select();
+
+      if (roleAssignErr) {
+        logger.warn('[PROVISIONING] Owner role assignment had errors (non-fatal)', { error: roleAssignErr.message });
+      }
+    } else {
+      logger.error('[PROVISIONING] tenant_owner/admin roles not found after seeding — owner will have no admin access', { tenantId });
     }
 
     // ---- Step 8: Property access for owner ----
@@ -266,6 +361,11 @@ export class ProvisioningService {
   /**
    * Update billing_status for an existing tenant.
    * Called by the webhook handler on every Stripe subscription event.
+   *
+   * If `tier` is provided (subscription upgrade/downgrade), plan_id is
+   * re-resolved against the live plans table so the tenant's enforced
+   * feature_limits switch to the new plan immediately, same as a fresh
+   * signup.
    */
   async updateBillingStatus(
     stripeSubscriptionId: string,
@@ -278,7 +378,11 @@ export class ProvisioningService {
       billing_status: newStatus,
       updated_at: new Date().toISOString(),
     };
-    if (tier) update.subscription_tier = tier;
+    if (tier) {
+      update.subscription_tier = tier;
+      const { plan_id } = await resolvePlanForTier(tier);
+      update.plan_id = plan_id;
+    }
 
     const { data, error } = await supabase
       .from('tenants')
@@ -324,42 +428,89 @@ export class ProvisioningService {
 }
 
 // ============================================
-// Feature limits per tier
+// Plan resolution (DB-backed, with non-fatal fallback)
 // ============================================
 
-function defaultFeatureLimits(tier: SubscriptionTier): Record<string, unknown> {
-  const limits: Record<SubscriptionTier, Record<string, unknown>> = {
-    starter: {
-      maxProperties: 1,
-      maxModules: 5,
-      maxStaffUsers: 10,
-      analyticsRetentionDays: 30,
-      customDomain: false,
-      whiteLabel: false,
-      apiAccess: false,
-    },
-    growth: {
-      maxProperties: 10,
-      maxModules: -1, // unlimited
-      maxStaffUsers: 50,
-      analyticsRetentionDays: 90,
-      customDomain: true,
-      whiteLabel: true,
-      apiAccess: true,
-    },
-    enterprise: {
-      maxProperties: -1,
-      maxModules: -1,
-      maxStaffUsers: -1,
-      analyticsRetentionDays: 365,
-      customDomain: true,
-      whiteLabel: true,
-      apiAccess: true,
-    },
-  };
+/**
+ * Resolve a tier string to its live plan row in the `plans` table.
+ *
+ * This is the fix for the bug where editing a plan's feature_limits in the
+ * admin Plans CRUD had zero effect on anyone — provisioning previously read
+ * from FALLBACK_FEATURE_LIMITS below (a hardcoded duplicate) instead of the
+ * database. Now: DB is checked first, every time, for both new signups and
+ * tier changes. The hardcoded object below is ONLY used if the plans table
+ * lookup fails or returns no matching row — kept so provisioning never hard-
+ * fails just because a plan row is missing or the table isn't seeded yet,
+ * matching the same non-fatal-fallback pattern already used for Stripe sync
+ * elsewhere in this codebase (see plans.controller.ts).
+ *
+ * Returns plan_id: null when falling back — tenantAccess.middleware.ts
+ * already treats a null plan_id as "use the tenants.feature_limits snapshot
+ * instead", so this degrades safely.
+ */
+async function resolvePlanForTier(
+  tier: SubscriptionTier,
+): Promise<{ plan_id: string | null; feature_limits: Record<string, unknown> }> {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('plans')
+      .select('id, feature_limits')
+      .eq('code', tier)
+      .eq('is_active', true)
+      .maybeSingle();
 
-  return limits[tier];
+    if (error) {
+      logger.warn('[PROVISIONING] plans table lookup failed, falling back to hardcoded feature_limits', { tier, error: error.message });
+      return { plan_id: null, feature_limits: FALLBACK_FEATURE_LIMITS[tier] };
+    }
+
+    if (!data) {
+      logger.warn('[PROVISIONING] No active plan row found for tier, falling back to hardcoded feature_limits', { tier });
+      return { plan_id: null, feature_limits: FALLBACK_FEATURE_LIMITS[tier] };
+    }
+
+    return { plan_id: data.id, feature_limits: (data.feature_limits as Record<string, unknown>) ?? FALLBACK_FEATURE_LIMITS[tier] };
+  } catch (err) {
+    logger.error('[PROVISIONING] Unexpected error resolving plan for tier, falling back to hardcoded feature_limits', { tier, err });
+    return { plan_id: null, feature_limits: FALLBACK_FEATURE_LIMITS[tier] };
+  }
 }
+
+/**
+ * Last-resort fallback only — NOT the source of truth. The plans table
+ * (edited via the admin Plans CRUD) is the source of truth; see
+ * resolvePlanForTier() above. This only fires if that lookup fails.
+ */
+const FALLBACK_FEATURE_LIMITS: Record<SubscriptionTier, Record<string, unknown>> = {
+  starter: {
+    maxProperties: 1,
+    maxModules: 5,
+    maxStaffUsers: 10,
+    analyticsRetentionDays: 30,
+    customDomain: false,
+    whiteLabel: false,
+    apiAccess: false,
+  },
+  growth: {
+    maxProperties: 10,
+    maxModules: -1, // unlimited
+    maxStaffUsers: 50,
+    analyticsRetentionDays: 90,
+    customDomain: true,
+    whiteLabel: true,
+    apiAccess: true,
+  },
+  enterprise: {
+    maxProperties: -1,
+    maxModules: -1,
+    maxStaffUsers: -1,
+    analyticsRetentionDays: 365,
+    customDomain: true,
+    whiteLabel: true,
+    apiAccess: true,
+  },
+};
 
 // ============================================
 // Singleton

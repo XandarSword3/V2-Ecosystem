@@ -12,18 +12,18 @@
 
 import Redis from 'ioredis';
 import { logger } from './logger.js';
-import { config } from '../config/index.js';
+import { config } from '../config/index';
 
 // Cache key prefixes for organization
 export const CacheKeys = {
-  MENU: 'menu:',
-  MENU_ITEM: 'menu:item:',
-  MENU_CATEGORY: 'menu:category:',
+  CATALOG: 'catalog:',           // canonical: replaces legacy MENU
+  CATALOG_ITEM: 'catalog:item:', // canonical: replaces legacy MENU_ITEM
+  CATALOG_CATEGORY: 'catalog:category:', // canonical: replaces legacy MENU_CATEGORY
   SETTINGS: 'settings:',
   SESSION: 'session:',
   USER: 'user:',
   RATE_LIMIT: 'rate:',
-  CHALET: 'chalet:',
+  UNIT: 'unit:',                 // canonical prefix
   AVAILABILITY: 'availability:'
 } as const;
 
@@ -302,35 +302,44 @@ if (process.env.REDIS_URL) {
 // ============================================
 
 /**
- * Cache menu items
+ * Cache catalog items (replaces legacy cacheMenuItems)
  */
-export async function cacheMenuItems(items: unknown[], moduleId?: string): Promise<void> {
-  const key = moduleId 
-    ? `${CacheKeys.MENU}${moduleId}:items` 
-    : `${CacheKeys.MENU}all`;
+export async function cacheCatalogItems(items: unknown[], moduleId?: string): Promise<void> {
+  const key = moduleId
+    ? `${CacheKeys.CATALOG}${moduleId}:items`
+    : `${CacheKeys.CATALOG}all`;
   await cache.set(key, items, CacheTTL.MEDIUM);
 }
 
+/** @deprecated Use cacheCatalogItems */
+export const cacheMenuItems = cacheCatalogItems;
+
 /**
- * Get cached menu items
+ * Get cached catalog items
  */
-export async function getCachedMenuItems<T>(moduleId?: string): Promise<T[] | null> {
-  const key = moduleId 
-    ? `${CacheKeys.MENU}${moduleId}:items` 
-    : `${CacheKeys.MENU}all`;
+export async function getCachedCatalogItems<T>(moduleId?: string): Promise<T[] | null> {
+  const key = moduleId
+    ? `${CacheKeys.CATALOG}${moduleId}:items`
+    : `${CacheKeys.CATALOG}all`;
   return cache.get<T[]>(key);
 }
 
+/** @deprecated Use getCachedCatalogItems */
+export const getCachedMenuItems = getCachedCatalogItems;
+
 /**
- * Invalidate menu cache
+ * Invalidate catalog cache for a module
  */
-export async function invalidateMenuCache(moduleId?: string): Promise<void> {
+export async function invalidateCatalogCache(moduleId?: string): Promise<void> {
   if (moduleId) {
-    await cache.del(`${CacheKeys.MENU}${moduleId}:items`);
+    await cache.del(`${CacheKeys.CATALOG}${moduleId}:items`);
   } else {
-    await cache.delPattern(`${CacheKeys.MENU}*`);
+    await cache.delPattern(`${CacheKeys.CATALOG}*`);
   }
 }
+
+/** @deprecated Use invalidateCatalogCache */
+export const invalidateMenuCache = invalidateCatalogCache;
 
 /**
  * Cache settings

@@ -122,7 +122,7 @@ export class ManagerBot extends Actor {
   protected shouldHandleComplaint(payload: { category?: string; [key: string]: any }): boolean {
     const categoryMap: Record<ManagerRole, string[]> = {
       front_office_manager: ['room', 'billing', 'service'],
-      fb_manager: ['food', 'restaurant', 'service'],
+      fb_manager: ['food', 'menu_service', 'service'],
       spa_manager: ['spa'],
       housekeeping_supervisor: ['cleanliness'],
       duty_manager: ['room', 'billing', 'service', 'food', 'cleanliness'], // All

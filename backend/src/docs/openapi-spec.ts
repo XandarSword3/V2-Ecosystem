@@ -1,5 +1,5 @@
 /**
- * Comprehensive OpenAPI 3.0.3 Specification for Iron Paradise Gym API
+ * Comprehensive OpenAPI 3.0.3 Specification for V2 Ecosystem — Hospitality Management Platform API
  * 
  * Covers ALL route groups registered in the application.
  * Generated as part of Phase 4: API Documentation remediation.
@@ -75,12 +75,12 @@ const secured: OpenAPIV3.SecurityRequirementObject[] = [{ bearerAuth: [] }];
 export const openApiFullSpec: OpenAPIV3.Document = {
   openapi: '3.0.3',
   info: {
-    title: 'Iron Paradise Gym Management API',
+    title: 'V2 Ecosystem — Hospitality Management API',
     version: '1.1.0',
     description: `
-# Iron Paradise Gym Management System — Full API Reference
+# V2 Ecosystem — Hospitality Management Platform — Full API Reference
 
-Comprehensive REST API for managing all resort operations: accommodation, dining, pool/facilities, loyalty, payments, staff, marketing, GDPR, channel management, and more.
+Comprehensive REST API for managing all property operations: dynamic modules, bookings, transactions, loyalty, payments, staff, marketing, GDPR, channel management, and more.
 
 ## Base URL
 All endpoints are served under \`/api/v1\`.
@@ -114,7 +114,7 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
 { "success": false, "error": "Human message", "code": "ERROR_CODE", "requestId": "uuid" }
 \`\`\`
 `,
-    contact: { name: 'Iron Paradise Gym API Support', email: 'api-support@ironparadisegym.com' },
+    contact: { name: 'V2 Ecosystem API Support', email: 'api-support@v2ecosystem.com' },
     license: { name: 'Proprietary' },
   },
 
@@ -128,12 +128,7 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
     { name: 'Health', description: 'Liveness & readiness probes' },
     { name: 'Auth', description: 'Registration, login, OAuth, 2FA, biometric auth' },
     { name: 'Users', description: 'User profile, data export, GDPR self-service' },
-    { name: 'Restaurant', description: 'Menu, categories, orders, tables, reservations' },
-    { name: 'Restaurant Modifiers', description: 'Modifier groups for menu items' },
-    { name: 'Restaurant Waitlist', description: 'Waitlist management' },
-    { name: 'Snack Bar', description: 'Snack bar menu, orders' },
-    { name: 'Chalets', description: 'Chalet listings, bookings, add-ons, pricing' },
-    { name: 'Pool', description: 'Pool sessions, tickets, bracelets, maintenance' },
+    { name: 'Dynamic Modules', description: 'Generic module routes — all engine types. Paths use /{moduleSlug}/. Engine types: instant_transaction, time_exclusive_reservation, shared_capacity_access, ongoing_entitlement, platform_entitlement' },
     { name: 'Payments', description: 'Stripe intents, cash, transactions, refunds' },
     { name: 'Finance', description: 'Cash drawer open/close/transactions' },
     { name: 'Loyalty', description: 'Points, tiers, earn/redeem/adjust' },
@@ -159,7 +154,7 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
     { name: 'Groups', description: 'Group bookings & event management' },
     { name: 'Marketing', description: 'Campaigns, email tracking, segments, automations' },
     { name: 'Mobile Check-in', description: 'Self-service check-in/out, ID verification' },
-    { name: 'Kiosk', description: 'Kiosk sessions, ordering, payments' },
+
     { name: 'Messaging', description: 'Guest messaging, templates, broadcasts' },
     { name: 'i18n', description: 'Internationalisation — languages, translations, localisation' },
     { name: 'Terminology', description: 'White-label terminology customisation' },
@@ -286,135 +281,53 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
     '/users/{id}/roles': { put: { tags: ['Users'], operationId: 'updateUserRoles', summary: 'Update user roles (super_admin)', security: secured, parameters: [idParam('User')], requestBody: jsonBody({ type: 'object', properties: { roles: { type: 'array', items: { type: 'string' } } } }), responses: { '200': jsonResponse('Roles updated') } } },
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // RESTAURANT
+    // DYNAMIC MODULES — all engine types share these routes via /{moduleSlug}/
+    // Engine types: instant_transaction | time_exclusive_reservation |
+    //               shared_capacity_access | ongoing_entitlement | platform_entitlement
     // ═══════════════════════════════════════════════════════════════════════════
-    '/restaurant/menu': { get: { tags: ['Restaurant'], operationId: 'getMenu', summary: 'Get full menu', parameters: [{ name: 'category', in: 'query', schema: { type: 'string' } }, { name: 'dietary', in: 'query', schema: { type: 'string' } }], responses: { '200': jsonResponse('Menu', listWrap('MenuItem')) } } },
-    '/restaurant/menu/categories': { get: { tags: ['Restaurant'], operationId: 'getMenuCategories', summary: 'Get menu categories', responses: { '200': jsonResponse('Categories') } } },
-    '/restaurant/menu/items': { get: { tags: ['Restaurant'], operationId: 'getMenuItems', summary: 'Get menu items', responses: { '200': jsonResponse('Items', listWrap('MenuItem')) } } },
-    '/restaurant/menu/items/{id}': { get: { tags: ['Restaurant'], operationId: 'getMenuItem', summary: 'Get single menu item', parameters: [idParam('MenuItem')], responses: { '200': jsonResponse('Item', { $ref: '#/components/schemas/MenuItem' }) } } },
-    '/restaurant/menu/featured': { get: { tags: ['Restaurant'], operationId: 'getFeaturedItems', summary: 'Get featured items', responses: { '200': jsonResponse('Featured') } } },
-    '/restaurant/orders': {
-      post: { tags: ['Restaurant'], operationId: 'createOrder', summary: 'Create order', requestBody: jsonBody({ $ref: '#/components/schemas/CreateOrder' }), responses: { '201': jsonResponse('Created', { $ref: '#/components/schemas/Order' }), '400': responses.BadRequest } },
+    '/{moduleSlug}/items': {
+      get: { tags: ['Dynamic Modules'], operationId: 'getModuleItems', summary: 'List catalog items for module', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, { name: 'category', in: 'query', schema: { type: 'string' } }, { name: 'dietary', in: 'query', schema: { type: 'string' } }], responses: { '200': jsonResponse('Items') } },
     },
-    '/restaurant/my-orders': { get: { tags: ['Restaurant'], operationId: 'getMyOrders', summary: 'Get own orders', security: secured, responses: { '200': jsonResponse('Orders') } } },
-    '/restaurant/staff/orders': { get: { tags: ['Restaurant'], operationId: 'getStaffOrders', summary: 'Get orders (staff)', security: secured, parameters: [{ name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'] } }, ...paginationParams], responses: { '200': jsonResponse('Orders') } } },
-    '/restaurant/staff/orders/live': { get: { tags: ['Restaurant'], operationId: 'getLiveOrders', summary: 'Live orders feed (staff)', security: secured, responses: { '200': jsonResponse('Live orders') } } },
-    '/restaurant/staff/orders/{id}/status': { patch: { tags: ['Restaurant'], operationId: 'updateOrderStatus', summary: 'Update order status (staff)', security: secured, parameters: [idParam('Order')], requestBody: jsonBody({ type: 'object', required: ['status'], properties: { status: { type: 'string', enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'] } } }), responses: { '200': jsonResponse('Updated'), '404': responses.NotFound } } },
-    '/restaurant/tables': { get: { tags: ['Restaurant'], operationId: 'getTables', summary: 'Get tables', responses: { '200': jsonResponse('Tables') } } },
-    '/restaurant/tables/available': { get: { tags: ['Restaurant'], operationId: 'getAvailableTables', summary: 'Get available tables', responses: { '200': jsonResponse('Available tables') } } },
-    '/restaurant/staff/tables': { get: { tags: ['Restaurant'], operationId: 'getStaffTables', summary: 'Get tables (staff)', security: secured, responses: { '200': jsonResponse('Tables') } } },
-    '/restaurant/staff/tables/{id}': { patch: { tags: ['Restaurant'], operationId: 'updateTable', summary: 'Update table (staff)', security: secured, parameters: [idParam('Table')], responses: { '200': jsonResponse('Updated') } } },
-    '/restaurant/reservations': { get: { tags: ['Restaurant'], operationId: 'getReservations', summary: 'List reservations (staff)', security: secured, responses: { '200': jsonResponse('Reservations') } } },
-    '/restaurant/reservations/availability': { get: { tags: ['Restaurant'], operationId: 'getReservationAvailability', summary: 'Check reservation availability', responses: { '200': jsonResponse('Availability') } } },
-
-    // ── Restaurant Modifiers ─────────────────────────────────────────────────
-    '/restaurant/modifiers': {
-      get: { tags: ['Restaurant Modifiers'], operationId: 'getModifierGroups', summary: 'List modifier groups', responses: { '200': jsonResponse('Modifier groups') } },
-      post: { tags: ['Restaurant Modifiers'], operationId: 'createModifierGroup', summary: 'Create modifier group (admin)', security: secured, requestBody: jsonBody({ type: 'object', required: ['name'], properties: { name: { type: 'string' }, options: { type: 'array', items: { type: 'object' } } } }), responses: { '201': jsonResponse('Created') } },
+    '/{moduleSlug}/items/{id}': {
+      get: { tags: ['Dynamic Modules'], operationId: 'getModuleItem', summary: 'Get single catalog item', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, idParam('Item')], responses: { '200': jsonResponse('Item') } },
     },
-    '/restaurant/modifiers/{id}': {
-      put: { tags: ['Restaurant Modifiers'], operationId: 'updateModifierGroup', summary: 'Update modifier group (admin)', security: secured, parameters: [idParam('ModifierGroup')], responses: { '200': jsonResponse('Updated') } },
-      delete: { tags: ['Restaurant Modifiers'], operationId: 'deleteModifierGroup', summary: 'Delete modifier group (admin)', security: secured, parameters: [idParam('ModifierGroup')], responses: { '200': jsonResponse('Deleted') } },
+    '/{moduleSlug}/categories': {
+      get: { tags: ['Dynamic Modules'], operationId: 'getModuleCategories', summary: 'List categories for module', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Categories') } },
     },
-
-    // ── Restaurant Waitlist ──────────────────────────────────────────────────
-    '/restaurant/waitlist': {
-      get: { tags: ['Restaurant Waitlist'], operationId: 'getWaitlist', summary: 'Get current waitlist', responses: { '200': jsonResponse('Waitlist entries') } },
-      post: { tags: ['Restaurant Waitlist'], operationId: 'joinWaitlist', summary: 'Join waitlist', requestBody: jsonBody({ type: 'object', required: ['partyName', 'partySize'], properties: { partyName: { type: 'string' }, partySize: { type: 'integer' }, phone: { type: 'string' } } }), responses: { '201': jsonResponse('Entry created') } },
+    '/{moduleSlug}/modifiers': {
+      get: { tags: ['Dynamic Modules'], operationId: 'getModuleModifiers', summary: 'List modifier/customization groups', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Modifier groups') } },
+      post: { tags: ['Dynamic Modules'], operationId: 'createModuleModifier', summary: 'Create modifier group (admin)', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '201': jsonResponse('Created') } },
     },
-    '/restaurant/waitlist/join': { post: { tags: ['Restaurant Waitlist'], operationId: 'joinWaitlistAlt', summary: 'Join waitlist (alias)', requestBody: jsonBody({ type: 'object', required: ['partyName', 'partySize'], properties: { partyName: { type: 'string' }, partySize: { type: 'integer' } } }), responses: { '201': jsonResponse('Entry created') } } },
-    '/restaurant/waitlist/{id}': {
-      get: { tags: ['Restaurant Waitlist'], operationId: 'getWaitlistEntry', summary: 'Get waitlist entry', parameters: [idParam('WaitlistEntry')], responses: { '200': jsonResponse('Entry') } },
-      delete: { tags: ['Restaurant Waitlist'], operationId: 'removeFromWaitlist', summary: 'Remove from waitlist (staff)', security: secured, parameters: [idParam('WaitlistEntry')], responses: { '200': jsonResponse('Removed') } },
+    '/{moduleSlug}/orders': {
+      post: { tags: ['Dynamic Modules'], operationId: 'createModuleOrder', summary: 'Create order (instant_transaction)', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], requestBody: jsonBody({ $ref: '#/components/schemas/CreateOrder' }), responses: { '201': jsonResponse('Created', { $ref: '#/components/schemas/Order' }), '400': responses.BadRequest } },
     },
-    '/restaurant/waitlist/{id}/status': { patch: { tags: ['Restaurant Waitlist'], operationId: 'updateWaitlistStatus', summary: 'Update waitlist entry status (staff)', security: secured, parameters: [idParam('WaitlistEntry')], responses: { '200': jsonResponse('Updated') } } },
-    '/restaurant/waitlist/{id}/notify': { post: { tags: ['Restaurant Waitlist'], operationId: 'notifyWaitlistEntry', summary: 'Notify guest from waitlist (staff)', security: secured, parameters: [idParam('WaitlistEntry')], responses: { '200': jsonResponse('Notified') } } },
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SNACK BAR
-    // ═══════════════════════════════════════════════════════════════════════════
-    '/snack/categories': { get: { tags: ['Snack Bar'], operationId: 'getSnackCategories', summary: 'Get snack categories', responses: { '200': jsonResponse('Categories') } } },
-    '/snack/items': { get: { tags: ['Snack Bar'], operationId: 'getSnackItems', summary: 'Get snack items', responses: { '200': jsonResponse('Items') } } },
-    '/snack/items/{id}': { get: { tags: ['Snack Bar'], operationId: 'getSnackItem', summary: 'Get single snack item', parameters: [idParam('SnackItem')], responses: { '200': jsonResponse('Item') } } },
-    '/snack/orders': { post: { tags: ['Snack Bar'], operationId: 'createSnackOrder', summary: 'Create snack order', requestBody: jsonBody({ type: 'object', required: ['items'], properties: { items: { type: 'array', items: { type: 'object' } } } }), responses: { '201': jsonResponse('Created') } } },
-    '/snack/orders/my': { get: { tags: ['Snack Bar'], operationId: 'getMySnackOrders', summary: 'Get own snack orders', security: secured, responses: { '200': jsonResponse('Orders') } } },
-    '/snack/orders/{id}': { get: { tags: ['Snack Bar'], operationId: 'getSnackOrder', summary: 'Get single snack order', parameters: [idParam('SnackOrder')], responses: { '200': jsonResponse('Order') } } },
-    '/snack/orders/{id}/status': { get: { tags: ['Snack Bar'], operationId: 'getSnackOrderStatus', summary: 'Get snack order status', parameters: [idParam('SnackOrder')], responses: { '200': jsonResponse('Status') } } },
-    '/snack/staff/orders': { get: { tags: ['Snack Bar'], operationId: 'getSnackStaffOrders', summary: 'Get orders (staff)', security: secured, responses: { '200': jsonResponse('Orders') } } },
-    '/snack/staff/orders/live': { get: { tags: ['Snack Bar'], operationId: 'getSnackLiveOrders', summary: 'Live snack orders (staff)', security: secured, responses: { '200': jsonResponse('Live orders') } } },
-    '/snack/staff/orders/{id}/status': { patch: { tags: ['Snack Bar'], operationId: 'updateSnackOrderStatus', summary: 'Update snack order status (staff)', security: secured, parameters: [idParam('SnackOrder')], responses: { '200': jsonResponse('Updated') } } },
-    '/snack/admin/categories': { post: { tags: ['Snack Bar'], operationId: 'createSnackCategory', summary: 'Create snack category (admin)', security: secured, responses: { '201': jsonResponse('Created') } } },
-    '/snack/admin/categories/{id}': {
-      put: { tags: ['Snack Bar'], operationId: 'updateSnackCategory', summary: 'Update snack category (admin)', security: secured, parameters: [idParam('Category')], responses: { '200': jsonResponse('Updated') } },
-      delete: { tags: ['Snack Bar'], operationId: 'deleteSnackCategory', summary: 'Delete snack category (admin)', security: secured, parameters: [idParam('Category')], responses: { '200': jsonResponse('Deleted') } },
+    '/{moduleSlug}/my-orders': { get: { tags: ['Dynamic Modules'], operationId: 'getMyModuleOrders', summary: 'Get own orders', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Orders') } } },
+    '/{moduleSlug}/staff/orders': { get: { tags: ['Dynamic Modules'], operationId: 'getStaffModuleOrders', summary: 'Get orders (staff)', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, { name: 'status', in: 'query', schema: { type: 'string' } }, ...paginationParams], responses: { '200': jsonResponse('Orders') } } },
+    '/{moduleSlug}/staff/orders/live': { get: { tags: ['Dynamic Modules'], operationId: 'getLiveModuleOrders', summary: 'Live orders feed (staff)', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Live orders') } } },
+    '/{moduleSlug}/staff/orders/{id}/status': { patch: { tags: ['Dynamic Modules'], operationId: 'updateModuleOrderStatus', summary: 'Update order status (staff)', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, idParam('Order')], responses: { '200': jsonResponse('Updated'), '404': responses.NotFound } } },
+    '/{moduleSlug}/admin/items': {
+      post: { tags: ['Dynamic Modules'], operationId: 'createModuleItem', summary: 'Create catalog item (admin)', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '201': jsonResponse('Created') } },
     },
-    '/snack/admin/items': { post: { tags: ['Snack Bar'], operationId: 'createSnackItem', summary: 'Create snack item (admin)', security: secured, responses: { '201': jsonResponse('Created') } } },
-    '/snack/admin/items/{id}': {
-      put: { tags: ['Snack Bar'], operationId: 'updateSnackItem', summary: 'Update snack item (admin)', security: secured, parameters: [idParam('SnackItem')], responses: { '200': jsonResponse('Updated') } },
-      delete: { tags: ['Snack Bar'], operationId: 'deleteSnackItem', summary: 'Delete snack item (admin)', security: secured, parameters: [idParam('SnackItem')], responses: { '200': jsonResponse('Deleted') } },
+    '/{moduleSlug}/admin/items/{id}': {
+      put: { tags: ['Dynamic Modules'], operationId: 'updateModuleItem', summary: 'Update catalog item (admin)', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, idParam('Item')], responses: { '200': jsonResponse('Updated') } },
+      delete: { tags: ['Dynamic Modules'], operationId: 'deleteModuleItem', summary: 'Delete catalog item (admin)', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, idParam('Item')], responses: { '200': jsonResponse('Deleted') } },
     },
-    '/snack/admin/items/{id}/availability': { patch: { tags: ['Snack Bar'], operationId: 'toggleSnackAvailability', summary: 'Toggle snack item availability (admin)', security: secured, parameters: [idParam('SnackItem')], responses: { '200': jsonResponse('Toggled') } } },
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CHALETS
-    // ═══════════════════════════════════════════════════════════════════════════
-    '/chalets': { get: { tags: ['Chalets'], operationId: 'getChalets', summary: 'List chalets', responses: { '200': jsonResponse('Chalets', listWrap('Chalet')) } } },
-    '/chalets/{id}': { get: { tags: ['Chalets'], operationId: 'getChalet', summary: 'Get single chalet', parameters: [idParam('Chalet')], responses: { '200': jsonResponse('Chalet', { $ref: '#/components/schemas/Chalet' }) } } },
-    '/chalets/{id}/availability': { get: { tags: ['Chalets'], operationId: 'getChaletAvailability', summary: 'Check chalet availability', parameters: [idParam('Chalet'), { name: 'startDate', in: 'query', required: true, schema: { type: 'string', format: 'date' } }, { name: 'endDate', in: 'query', required: true, schema: { type: 'string', format: 'date' } }], responses: { '200': jsonResponse('Availability') } } },
-    '/chalets/add-ons': { get: { tags: ['Chalets'], operationId: 'getAddOns', summary: 'Get chalet add-ons', responses: { '200': jsonResponse('Add-ons') } } },
-    '/chalets/bookings': { post: { tags: ['Chalets'], operationId: 'createBooking', summary: 'Create chalet booking', requestBody: jsonBody({ $ref: '#/components/schemas/CreateBooking' }), responses: { '201': jsonResponse('Booking created'), '400': responses.BadRequest, '409': responses.Conflict } } },
-    '/chalets/bookings/{id}': { get: { tags: ['Chalets'], operationId: 'getBooking', summary: 'Get single booking', parameters: [idParam('Booking')], responses: { '200': jsonResponse('Booking') } } },
-    '/chalets/bookings/{id}/cancel': { post: { tags: ['Chalets'], operationId: 'cancelBooking', summary: 'Cancel booking', parameters: [idParam('Booking')], responses: { '200': jsonResponse('Cancelled') } } },
-    '/chalets/my-bookings': { get: { tags: ['Chalets'], operationId: 'getMyBookings', summary: 'Get own bookings', security: secured, responses: { '200': jsonResponse('Bookings') } } },
-    '/chalets/staff/bookings': { get: { tags: ['Chalets'], operationId: 'getStaffBookings', summary: 'Get bookings (staff)', security: secured, responses: { '200': jsonResponse('Bookings') } } },
-    '/chalets/staff/bookings/today': { get: { tags: ['Chalets'], operationId: 'getTodayBookings', summary: 'Get today bookings (staff)', security: secured, responses: { '200': jsonResponse('Bookings') } } },
-    '/chalets/staff/bookings/{id}/check-in': { patch: { tags: ['Chalets'], operationId: 'checkIn', summary: 'Check-in guest (staff)', security: secured, parameters: [idParam('Booking')], responses: { '200': jsonResponse('Checked in') } } },
-    '/chalets/staff/bookings/{id}/check-out': { patch: { tags: ['Chalets'], operationId: 'checkOut', summary: 'Check-out guest (staff)', security: secured, parameters: [idParam('Booking')], responses: { '200': jsonResponse('Checked out') } } },
-    '/chalets/staff/bookings/{id}/status': { patch: { tags: ['Chalets'], operationId: 'updateBookingStatus', summary: 'Update booking status (staff)', security: secured, parameters: [idParam('Booking')], responses: { '200': jsonResponse('Updated') } } },
-    '/chalets/admin/chalets': { post: { tags: ['Chalets'], operationId: 'createChalet', summary: 'Create chalet (admin)', security: secured, responses: { '201': jsonResponse('Created') } } },
-    '/chalets/admin/chalets/{id}': {
-      put: { tags: ['Chalets'], operationId: 'updateChalet', summary: 'Update chalet (admin)', security: secured, parameters: [idParam('Chalet')], responses: { '200': jsonResponse('Updated') } },
-      delete: { tags: ['Chalets'], operationId: 'deleteChalet', summary: 'Delete chalet (admin)', security: secured, parameters: [idParam('Chalet')], responses: { '200': jsonResponse('Deleted') } },
+    '/{moduleSlug}/units': { get: { tags: ['Dynamic Modules'], operationId: 'getModuleUnits', summary: 'List bookable units (time_exclusive_reservation)', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Units') } } },
+    '/{moduleSlug}/units/{id}/availability': { get: { tags: ['Dynamic Modules'], operationId: 'getUnitAvailability', summary: 'Check unit availability', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, idParam('Unit'), { name: 'startDate', in: 'query', required: true, schema: { type: 'string', format: 'date' } }, { name: 'endDate', in: 'query', required: true, schema: { type: 'string', format: 'date' } }], responses: { '200': jsonResponse('Availability') } } },
+    '/{moduleSlug}/bookings': {
+      post: { tags: ['Dynamic Modules'], operationId: 'createModuleBooking', summary: 'Create booking (time_exclusive_reservation)', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], requestBody: jsonBody({ $ref: '#/components/schemas/CreateBooking' }), responses: { '201': jsonResponse('Booking created'), '400': responses.BadRequest, '409': responses.Conflict } },
     },
-    '/chalets/admin/add-ons': { get: { tags: ['Chalets'], operationId: 'getAdminAddOns', summary: 'List add-ons (admin)', security: secured, responses: { '200': jsonResponse('Add-ons') } }, post: { tags: ['Chalets'], operationId: 'createAddOn', summary: 'Create add-on (admin)', security: secured, responses: { '201': jsonResponse('Created') } } },
-    '/chalets/admin/add-ons/{id}': {
-      put: { tags: ['Chalets'], operationId: 'updateAddOn', summary: 'Update add-on (admin)', security: secured, parameters: [idParam('AddOn')], responses: { '200': jsonResponse('Updated') } },
-      delete: { tags: ['Chalets'], operationId: 'deleteAddOn', summary: 'Delete add-on (admin)', security: secured, parameters: [idParam('AddOn')], responses: { '200': jsonResponse('Deleted') } },
+    '/{moduleSlug}/bookings/{id}': { get: { tags: ['Dynamic Modules'], operationId: 'getModuleBooking', summary: 'Get single booking', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, idParam('Booking')], responses: { '200': jsonResponse('Booking') } } },
+    '/{moduleSlug}/bookings/{id}/cancel': { post: { tags: ['Dynamic Modules'], operationId: 'cancelModuleBooking', summary: 'Cancel booking', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, idParam('Booking')], responses: { '200': jsonResponse('Cancelled') } } },
+    '/{moduleSlug}/my-bookings': { get: { tags: ['Dynamic Modules'], operationId: 'getMyModuleBookings', summary: 'Get own bookings', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Bookings') } } },
+    '/{moduleSlug}/capacity-windows': { get: { tags: ['Dynamic Modules'], operationId: 'getCapacityWindows', summary: 'Get capacity windows (shared_capacity_access)', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, { name: 'date', in: 'query', schema: { type: 'string', format: 'date' } }], responses: { '200': jsonResponse('Capacity windows') } } },
+    '/{moduleSlug}/capacity-windows/{id}': { get: { tags: ['Dynamic Modules'], operationId: 'getCapacityWindow', summary: 'Get single capacity window', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }, idParam('Window')], responses: { '200': jsonResponse('Window') } } },
+    '/{moduleSlug}/waitlist': {
+      get: { tags: ['Dynamic Modules'], operationId: 'getModuleWaitlist', summary: 'Get waitlist', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Waitlist entries') } },
+      post: { tags: ['Dynamic Modules'], operationId: 'joinModuleWaitlist', summary: 'Join waitlist', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '201': jsonResponse('Entry created') } },
     },
-    '/chalets/admin/price-rules': { get: { tags: ['Chalets'], operationId: 'getPriceRules', summary: 'Get price rules (admin)', security: secured, responses: { '200': jsonResponse('Price rules') } } },
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // POOL
-    // ═══════════════════════════════════════════════════════════════════════════
-    '/pool/sessions': { get: { tags: ['Pool'], operationId: 'getPoolSessions', summary: 'Get pool sessions', parameters: [{ name: 'date', in: 'query', schema: { type: 'string', format: 'date' } }], responses: { '200': jsonResponse('Sessions', listWrap('PoolSession')) } } },
-    '/pool/sessions/{id}': { get: { tags: ['Pool'], operationId: 'getPoolSession', summary: 'Get single session', parameters: [idParam('Session')], responses: { '200': jsonResponse('Session') } } },
-    '/pool/availability': { get: { tags: ['Pool'], operationId: 'getPoolAvailability', summary: 'Get pool availability', responses: { '200': jsonResponse('Availability') } } },
-    '/pool/tickets': {
-      post: { tags: ['Pool'], operationId: 'purchaseTicket', summary: 'Purchase pool ticket', requestBody: jsonBody({ type: 'object', required: ['sessionId', 'customerName', 'customerEmail'], properties: { sessionId: { type: 'string', format: 'uuid' }, customerName: { type: 'string' }, customerEmail: { type: 'string', format: 'email' }, customerPhone: { type: 'string' }, quantity: { type: 'integer', minimum: 1, maximum: 10, default: 1 } } }), responses: { '201': jsonResponse('Ticket purchased'), '400': responses.BadRequest } },
-    },
-    '/pool/tickets/{id}': {
-      get: { tags: ['Pool'], operationId: 'getTicket', summary: 'Get ticket details', parameters: [idParam('Ticket')], responses: { '200': jsonResponse('Ticket') } },
-      delete: { tags: ['Pool'], operationId: 'cancelTicket', summary: 'Cancel ticket', security: secured, parameters: [idParam('Ticket')], responses: { '200': jsonResponse('Cancelled') } },
-    },
-    '/pool/my-tickets': { get: { tags: ['Pool'], operationId: 'getMyTickets', summary: 'Get own tickets', security: secured, responses: { '200': jsonResponse('Tickets') } } },
-    '/pool/staff/validate': { post: { tags: ['Pool'], operationId: 'validateTicket', summary: 'Validate ticket (staff)', security: secured, responses: { '200': jsonResponse('Validated') } } },
-    '/pool/tickets/{id}/entry': { post: { tags: ['Pool'], operationId: 'recordEntry', summary: 'Record pool entry (staff)', security: secured, parameters: [idParam('Ticket')], responses: { '200': jsonResponse('Entry recorded') } } },
-    '/pool/tickets/{id}/exit': { post: { tags: ['Pool'], operationId: 'recordExit', summary: 'Record pool exit (staff)', security: secured, parameters: [idParam('Ticket')], responses: { '200': jsonResponse('Exit recorded') } } },
-    '/pool/staff/capacity': { get: { tags: ['Pool'], operationId: 'getCurrentCapacity', summary: 'Get current pool capacity (staff)', security: secured, responses: { '200': jsonResponse('Capacity') } } },
-    '/pool/staff/tickets/today': { get: { tags: ['Pool'], operationId: 'getTodayTickets', summary: 'Get today tickets (staff)', security: secured, responses: { '200': jsonResponse('Tickets') } } },
-    '/pool/staff/maintenance': {
-      get: { tags: ['Pool'], operationId: 'getMaintenanceLogs', summary: 'Get maintenance logs (staff)', security: secured, responses: { '200': jsonResponse('Logs') } },
-      post: { tags: ['Pool'], operationId: 'createMaintenanceLog', summary: 'Create maintenance log (staff)', security: secured, responses: { '201': jsonResponse('Created') } },
-    },
-    '/pool/tickets/{id}/bracelet': {
-      post: { tags: ['Pool'], operationId: 'assignBracelet', summary: 'Assign bracelet (staff)', security: secured, parameters: [idParam('Ticket')], responses: { '200': jsonResponse('Assigned') } },
-      delete: { tags: ['Pool'], operationId: 'returnBracelet', summary: 'Return bracelet (staff)', security: secured, parameters: [idParam('Ticket')], responses: { '200': jsonResponse('Returned') } },
-    },
-    '/pool/staff/bracelets/active': { get: { tags: ['Pool'], operationId: 'getActiveBracelets', summary: 'Get active bracelets (staff)', security: secured, responses: { '200': jsonResponse('Bracelets') } } },
-    '/pool/staff/bracelets/search': { get: { tags: ['Pool'], operationId: 'searchByBracelet', summary: 'Search by bracelet (staff)', security: secured, responses: { '200': jsonResponse('Results') } } },
-    '/pool/settings': { get: { tags: ['Pool'], operationId: 'getPoolSettings', summary: 'Get pool settings', responses: { '200': jsonResponse('Settings') } } },
-    '/pool/admin/settings': { put: { tags: ['Pool'], operationId: 'updatePoolSettings', summary: 'Update pool settings (admin)', security: secured, responses: { '200': jsonResponse('Updated') } } },
-    '/pool/admin/reset-occupancy': { post: { tags: ['Pool'], operationId: 'resetOccupancy', summary: 'Reset occupancy counter (admin)', security: secured, responses: { '200': jsonResponse('Reset') } } },
+    '/{moduleSlug}/settings': { get: { tags: ['Dynamic Modules'], operationId: 'getModuleSettings', summary: 'Get module settings', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Settings') } } },
+    '/{moduleSlug}/admin/settings': { put: { tags: ['Dynamic Modules'], operationId: 'updateModuleSettings', summary: 'Update module settings (admin)', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Updated') } } },
 
     // ═══════════════════════════════════════════════════════════════════════════
     // PAYMENTS
@@ -749,7 +662,7 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
     // GENERIC (WHITE-LABEL) ROUTES
     // ═══════════════════════════════════════════════════════════════════════════
     '/units': {
-      get: { tags: ['Generic (White-Label)'], operationId: 'getUnits', summary: 'List units (generic chalets)', responses: { '200': jsonResponse('Units') } },
+      get: { tags: ['Generic (White-Label)'], operationId: 'getUnits', summary: 'List bookable units (time_exclusive_reservation)', responses: { '200': jsonResponse('Units') } },
       post: { tags: ['Generic (White-Label)'], operationId: 'createUnit', summary: 'Create unit (admin)', security: secured, responses: { '201': jsonResponse('Created') } },
     },
     '/units/{id}': {
@@ -853,9 +766,9 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
             type: 'array',
             items: {
               type: 'object',
-              required: ['menuItemId', 'quantity'],
+              required: ['catalogItemId', 'quantity'],
               properties: {
-                menuItemId: { type: 'string', format: 'uuid' },
+                catalogItemId: { type: 'string', format: 'uuid' },
                 quantity: { type: 'integer', minimum: 1 },
                 notes: { type: 'string' },
               },
@@ -875,7 +788,7 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
           createdAt: { type: 'string', format: 'date-time' },
         },
       },
-      Chalet: {
+      ReservationUnit: {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'uuid' },
@@ -889,9 +802,9 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
       },
       CreateBooking: {
         type: 'object',
-        required: ['chaletId', 'customerName', 'customerEmail', 'checkInDate', 'checkOutDate', 'numberOfGuests', 'paymentMethod'],
+        required: ['unitId', 'customerName', 'customerEmail', 'checkInDate', 'checkOutDate', 'numberOfGuests', 'paymentMethod'],
         properties: {
-          chaletId: { type: 'string', format: 'uuid' },
+          unitId: { type: 'string', format: 'uuid' },
           customerName: { type: 'string' },
           customerEmail: { type: 'string', format: 'email' },
           customerPhone: { type: 'string' },
@@ -902,7 +815,7 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
           specialRequests: { type: 'string' },
         },
       },
-      PoolSession: {
+      CapacityWindow: {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'uuid' },
@@ -918,12 +831,12 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
       Terminology: {
         type: 'object',
         properties: {
-          unit_singular: { type: 'string', example: 'Chalet' },
-          unit_plural: { type: 'string', example: 'Chalets' },
+          unit_singular: { type: 'string', example: 'Villa' },
+          unit_plural: { type: 'string', example: 'Villas' },
           facility_singular: { type: 'string', example: 'Pool' },
           facility_plural: { type: 'string', example: 'Pools' },
-          dining_singular: { type: 'string', example: 'Restaurant' },
-          dining_plural: { type: 'string', example: 'Restaurants' },
+          dining_singular: { type: 'string', example: 'Bistro' },
+          dining_plural: { type: 'string', example: 'Bistros' },
         },
       },
     },

@@ -6,7 +6,7 @@
 BEGIN;
 
 -- 1. ADD property_id TO MISSING TABLES
-ALTER TABLE IF EXISTS restaurant_tables ADD COLUMN IF NOT EXISTS property_id UUID REFERENCES properties(id) ON DELETE CASCADE;
+-- restaurant_tables non-canonical — no-op
 ALTER TABLE IF EXISTS inventory_items ADD COLUMN IF NOT EXISTS property_id UUID REFERENCES properties(id) ON DELETE CASCADE;
 ALTER TABLE IF EXISTS inventory_categories ADD COLUMN IF NOT EXISTS property_id UUID REFERENCES properties(id) ON DELETE CASCADE;
 ALTER TABLE IF EXISTS gift_cards ADD COLUMN IF NOT EXISTS property_id UUID REFERENCES properties(id) ON DELETE CASCADE;
@@ -30,7 +30,7 @@ BEGIN
     IF default_prop_id IS NOT NULL THEN
         -- Standard transactional/config tables
         -- Use EXECUTE to avoid failing if table doesn't exist
-        EXECUTE 'UPDATE restaurant_tables SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
+        -- restaurant_tables non-canonical — skipped
         EXECUTE 'UPDATE inventory_items SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
         EXECUTE 'UPDATE inventory_categories SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
         EXECUTE 'UPDATE gift_cards SET property_id = $1 WHERE property_id IS NULL' USING default_prop_id;
@@ -50,11 +50,7 @@ EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 -- 3. REFACTOR UNIQUE CONSTRAINTS TO BE PROPERTY-AWARE
--- restaurant_tables: number should be unique per property
-DO $$ BEGIN
-  ALTER TABLE IF EXISTS restaurant_tables DROP CONSTRAINT IF EXISTS restaurant_tables_number_key;
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_tables_num_prop ON restaurant_tables(property_id, number);
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+-- restaurant_tables non-canonical — no-op
 
 -- inventory_items: sku should be unique per property
 DO $$ BEGIN
@@ -92,7 +88,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Apply to all relevant tables
-SELECT apply_property_isolation('restaurant_tables');
+-- restaurant_tables non-canonical — apply_property_isolation skipped
 SELECT apply_property_isolation('inventory_items');
 SELECT apply_property_isolation('inventory_categories');
 SELECT apply_property_isolation('gift_cards');
@@ -104,10 +100,8 @@ SELECT apply_property_isolation('loyalty_members');
 SELECT apply_property_isolation('loyalty_tiers');
 SELECT apply_property_isolation('site_settings');
 SELECT apply_property_isolation('modules');
--- These might be views or tables depending on the state, helper handles it
-SELECT apply_property_isolation('restaurant_orders');
-SELECT apply_property_isolation('chalet_bookings');
-SELECT apply_property_isolation('pool_tickets');
+-- Apply isolation to transactions instead of legacy tables
+SELECT apply_property_isolation('transactions');
 
 -- 5. SPECIAL CASE: system_settings
 -- Global settings (property_id IS NULL) are readable by all; property settings are isolated

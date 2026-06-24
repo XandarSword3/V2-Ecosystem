@@ -146,7 +146,7 @@ describe('Housekeeping Advanced Controller', () => {
 
     it('should create task successfully', async () => {
       mockReq.body = {
-        chaletId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        unitId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
         taskType: 'standard_cleaning',
         priority: 'high',
       };
@@ -168,7 +168,7 @@ describe('Housekeeping Advanced Controller', () => {
             single: vi.fn().mockResolvedValue({
               data: {
                 id: 'task-1',
-                chalet_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+                unit_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
                 task_type: 'standard_cleaning',
                 status: 'pending',
               },
@@ -194,7 +194,7 @@ describe('Housekeeping Advanced Controller', () => {
 
     it('should handle errors', async () => {
       mockReq.body = {
-        chaletId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        unitId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
         taskType: 'standard_cleaning',
       };
 

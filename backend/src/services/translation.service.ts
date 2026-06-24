@@ -240,7 +240,7 @@ export async function batchTranslate(texts: string[], sourceLang: string = 'en')
   return Promise.all(texts.map(text => translateText(text, sourceLang)));
 }
 
-// Helper to create a translatable item (for menu items, chalets, etc.)
+// Helper to create a translatable item (for catalog items, accommodation units, etc.)
 export function createTranslatableFields<T extends Record<string, any>>(
   item: T,
   translations: TranslationResult,

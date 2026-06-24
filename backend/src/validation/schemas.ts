@@ -81,55 +81,6 @@ export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-// ============ CHALET BOOKING SCHEMAS ============
-
-export const createChaletBookingSchema = z.object({
-  chaletId: uuidSchema,
-  customerName: nameSchema,
-  customerEmail: emailSchema,
-  customerPhone: phoneSchema,
-  checkInDate: dateSchema,
-  checkOutDate: dateSchema,
-  numberOfGuests: z.number().int().min(1).max(20, 'Maximum 20 guests allowed'),
-  addOns: z.array(z.object({
-    addOnId: uuidSchema,
-    quantity: z.number().int().min(1).max(10),
-  })).optional(),
-  specialRequests: sanitizedString(1000).optional(),
-  paymentMethod: z.enum(['cash', 'card', 'online']),
-}).refine((data) => {
-  const checkIn = new Date(data.checkInDate);
-  const checkOut = new Date(data.checkOutDate);
-  return checkOut > checkIn;
-}, { message: 'Check-out date must be after check-in date' });
-
-export const updateChaletBookingSchema = z.object({
-  status: z.enum(['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled']).optional(),
-  numberOfGuests: z.number().int().min(1).max(20).optional(),
-  specialRequests: sanitizedString(1000).optional(),
-  checkInDate: dateSchema.optional(),
-  checkOutDate: dateSchema.optional(),
-});
-
-// ============ POOL TICKET SCHEMAS ============
-
-export const purchasePoolTicketSchema = z.object({
-  sessionId: uuidSchema,
-  ticketDate: dateSchema,
-  customerName: nameSchema,
-  customerEmail: emailSchema.optional(),
-  customerPhone: phoneSchema,
-  numberOfGuests: z.number().int().min(1).max(20, 'Maximum 20 guests per ticket'),
-  numberOfAdults: z.number().int().min(0).max(20).default(0),
-  numberOfChildren: z.number().int().min(0).max(20).default(0),
-  paymentMethod: z.enum(['cash', 'card', 'online']),
-});
-
-export const updatePoolTicketSchema = z.object({
-  status: z.enum(['pending', 'valid', 'used', 'expired', 'cancelled']).optional(),
-  numberOfGuests: z.number().int().min(1).max(20).optional(),
-});
-
 // ============ TRANSACTION SCHEMAS ============
 
 // Schema for gift card redemption
@@ -234,11 +185,30 @@ export const assignUserRolesSchema = z.object({
   return data;
 });
 
+// New scope-based assignment schema (replaces role-based assignment)
+export const assignUserScopeSchema = z.object({
+  scope: z.enum(['super_admin', 'platform_admin', 'tenant_owner', 'tenant_admin', 'property_manager', 'property_staff', 'customer']),
+});
+
+// Updated createUserSchema to accept scope instead of roles
+export const createUserSchemaWithScope = z.object({
+  email: emailSchema,
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(128, 'Password must be 128 characters or less'),
+  fullName: nameSchema,
+  phone: phoneSchema,
+  scope: z.enum(['super_admin', 'platform_admin', 'tenant_owner', 'tenant_admin', 'property_manager', 'property_staff', 'customer']).optional(),
+});
+
 export const createRoleSchema = z.object({
   name: z.string().min(2).max(50).regex(/^[a-z_]+$/, 'Role name must be lowercase with underscores only'),
   displayName: z.string().min(2).max(100),
   description: sanitizedString(500).optional(),
-  businessUnit: z.enum(['restaurant', 'chalets', 'pool', 'snack_bar', 'admin', 'general']).optional(),
+  // Free-form string so roles can be associated with any dynamic module slug.
+  // The legacy enum locked role creation to the original four module slugs,
+  // blocking role creation for any module created after the legacy era.
+  businessUnit: z.string().max(100).optional(),
 });
 
 export const updateRoleSchema = z.object({
@@ -263,7 +233,7 @@ export const assignRolePermissionsSchema = z.object({
 export const createReviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
   comment: sanitizedString(2000),
-  reviewType: z.enum(['restaurant', 'pool', 'chalet', 'general']).optional(),
+  reviewType: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement', 'general']).optional(),
   referenceId: uuidSchema.optional(),
 });
 
@@ -275,10 +245,10 @@ export const updateReviewStatusSchema = z.object({
 // ============ MODULE SCHEMAS ============
 
 export const createModuleSchema = z.object({
-  // template_type must be a real engine type — no alias names.
+  // engine_type must be a real engine type — no alias names.
   // platform_entitlement is excluded: it is SaaS billing between operators and
   // V2, not a module type that tenants can create.
-  template_type: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement']),
+  engine_type: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement']),
   name: z.string().min(2).max(100),
   slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase letters, numbers, and hyphens only').optional(),
   description: sanitizedString(500).optional(),

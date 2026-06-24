@@ -1,5 +1,5 @@
 -- Atomic shared-capacity purchase using transactions (Engine Refit)
--- Replaces legacy purchase_pool_ticket_atomic which wrote to pool_tickets.
+-- Replaces legacy per-module atomic purchase functions.
 
 CREATE OR REPLACE FUNCTION purchase_shared_capacity_atomic(
   p_session_id UUID,
@@ -36,7 +36,7 @@ BEGIN
 
   SELECT *
   INTO v_session
-  FROM pool_sessions
+  FROM capacity_windows
   WHERE id = p_session_id
   FOR UPDATE;
 
@@ -114,7 +114,7 @@ BEGIN
     p_amount,
     p_amount,
     p_session_id,
-    'pool_sessions',
+    'capacity_windows',
     v_meta
   )
   RETURNING id INTO v_new_id;
@@ -127,6 +127,3 @@ BEGIN
     NULL::TEXT;
 END;
 $$;
-
-COMMENT ON FUNCTION purchase_shared_capacity_atomic IS
-  'Atomically reserves shared-capacity access in transactions with FOR UPDATE session lock.';

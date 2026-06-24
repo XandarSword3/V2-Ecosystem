@@ -1003,7 +1003,7 @@ export class SystemAdminBot extends AdminBot {
   }
 
   private async createStaffUser(): Promise<ActionResult> {
-    const roles = ['front_desk', 'housekeeping', 'restaurant', 'concierge'];
+    const roles = ['front_desk', 'housekeeping', 'menu_service', 'concierge'];
     const role = roles[Math.floor(Math.random() * roles.length)];
 
     const result = await this.apiCall<{ userId: string }>(
@@ -1043,7 +1043,7 @@ export class SystemAdminBot extends AdminBot {
     const permissions: Record<string, string[]> = {
       front_desk: ['check_in', 'check_out', 'view_reservations', 'post_charges'],
       housekeeping: ['view_rooms', 'update_room_status', 'report_issues'],
-      restaurant: ['view_orders', 'update_orders', 'manage_tables'],
+      menu service: ['view_orders', 'update_orders', 'manage_tables'],
       concierge: ['view_guests', 'create_tickets', 'book_services'],
     };
     return permissions[role] || [];
@@ -1689,7 +1689,7 @@ export class GroupSalesBot extends AdminBot {
 // CHALET ADMIN BOT
 // =============================================
 
-export class ChaletAdminBot extends AdminBot {
+export class AccommodationAdminBot extends AdminBot {
   constructor(config: Omit<AdminConfig, 'adminRole' | 'type' | 'role' | 'profile'> & { profile?: Partial<AdminProfile> }) {
     const defaultProfile: AdminProfile = {
       automationLevel: 'semi_auto',
@@ -1707,16 +1707,16 @@ export class ChaletAdminBot extends AdminBot {
   protected registerActions(): void {
     super.registerActions();
 
-    // Create new chalet
+    // Create new accommodation unit
     this.registerAction({
       name: 'create_chalet',
       weight: 1,
       cooldown: 24 * 60 * 60 * 1000,
       preconditions: () => this.adminState.isActive,
-      execute: async () => this.createChalet(),
+      execute: async () => this.createAccommodationUnit(),
     });
 
-    // Update chalet configuration
+    // Update accommodation unit configuration
     this.registerAction({
       name: 'update_chalet',
       weight: 2,
@@ -1725,7 +1725,7 @@ export class ChaletAdminBot extends AdminBot {
       execute: async () => this.updateChalet(),
     });
 
-    // Manage chalet add-ons
+    // Manage accommodation unit add-ons
     this.registerAction({
       name: 'manage_chalet_addons',
       weight: 2,
@@ -1743,7 +1743,7 @@ export class ChaletAdminBot extends AdminBot {
       execute: async () => this.configureChaletPricing(),
     });
 
-    // View chalet bookings
+    // View accommodation unit bookings
     this.registerAction({
       name: 'review_chalet_bookings',
       weight: 3,
@@ -1753,25 +1753,25 @@ export class ChaletAdminBot extends AdminBot {
     });
   }
 
-  private async createChalet(): Promise<ActionResult> {
+  private async createAccommodationUnit(): Promise<ActionResult> {
     const chaletTypes = ['standard', 'deluxe', 'premium', 'beachfront', 'hillside'];
     const result = await this.apiCall<{ id: string; name: string }>(
       'POST',
       '/api/v1/units',
       {
-        name: `Chalet ${Date.now()}`,
+        name: `AccommodationUnit ${Date.now()}`,
         type: chaletTypes[Math.floor(Math.random() * chaletTypes.length)],
         capacity: Math.floor(Math.random() * 6) + 2,
         basePrice: 150 + Math.floor(Math.random() * 200),
         amenities: ['wifi', 'kitchen', 'bbq', 'parking'],
-        description: 'A beautiful chalet for guests',
+        description: 'A beautiful accommodation unit for guests',
         status: 'active',
       }
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.CHALET_CREATED, 'chalet', {
-        chaletId: result.data.id,
+      this.emitEvent(EventTypes.ACCOMMODATION_UNIT_CREATED, 'accommodation unit', {
+        unitId: result.data.id,
         chaletName: result.data.name,
         adminId: this.id,
       });
@@ -1780,62 +1780,62 @@ export class ChaletAdminBot extends AdminBot {
         success: true,
         action: 'create_chalet',
         data: result.data,
-        cascades: [EventTypes.CHALET_CREATED],
+        cascades: [EventTypes.ACCOMMODATION_UNIT_CREATED],
       };
     }
 
     return {
       success: false,
       action: 'create_chalet',
-      error: result.error || 'Failed to create chalet',
+      error: result.error || 'Failed to create accommodation unit',
     };
   }
 
   private async updateChalet(): Promise<ActionResult> {
-    // Get existing chalets
-    const chaletsResult = await this.apiCall<{ chalets: Array<{ id: string; name: string }> }>(
+    // Get existing accommodation_units
+    const chaletsResult = await this.apiCall<{ accommodation_units: Array<{ id: string; name: string }> }>(
       'GET',
       '/api/v1/units'
     );
 
-    if (!chaletsResult.success || !chaletsResult.data?.chalets.length) {
+    if (!chaletsResult.success || !chaletsResult.data?.accommodation_units.length) {
       return {
         success: false,
         action: 'update_chalet',
-        error: 'No chalets available to update',
+        error: 'No accommodation_units available to update',
       };
     }
 
-    const chalet = chaletsResult.data.chalets[Math.floor(Math.random() * chaletsResult.data.chalets.length)];
+    const accommodation unit = chaletsResult.data.accommodation_units[Math.floor(Math.random() * chaletsResult.data.accommodation_units.length)];
 
     const result = await this.apiCall<{ updated: boolean }>(
       'PUT',
-      `/api/v1/units/${chalet.id}`,
+      `/api/v1/units/${accommodation unit.id}`,
       {
         amenities: ['wifi', 'kitchen', 'bbq', 'parking', 'hot_tub'],
-        description: 'Updated chalet description',
+        description: 'Updated accommodation unit description',
       }
     );
 
     if (result.success) {
-      this.emitEvent(EventTypes.CHALET_UPDATED, 'chalet', {
-        chaletId: chalet.id,
-        chaletName: chalet.name,
+      this.emitEvent(EventTypes.ACCOMMODATION_UNIT_UPDATED, 'accommodation unit', {
+        unitId: accommodation unit.id,
+        chaletName: accommodation unit.name,
         adminId: this.id,
       });
 
       return {
         success: true,
         action: 'update_chalet',
-        data: { chaletId: chalet.id },
-        cascades: [EventTypes.CHALET_UPDATED],
+        data: { unitId: accommodation unit.id },
+        cascades: [EventTypes.ACCOMMODATION_UNIT_UPDATED],
       };
     }
 
     return {
       success: false,
       action: 'update_chalet',
-      error: result.error || 'Failed to update chalet',
+      error: result.error || 'Failed to update accommodation unit',
     };
   }
 
@@ -1850,7 +1850,7 @@ export class ChaletAdminBot extends AdminBot {
         name: addOn.replace('_', ' ').toUpperCase(),
         type: addOn,
         price: 20 + Math.floor(Math.random() * 50),
-        description: `${addOn} add-on for chalets`,
+        description: `${addOn} add-on for accommodation_units`,
         available: true,
       }
     );
@@ -1880,7 +1880,7 @@ export class ChaletAdminBot extends AdminBot {
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.CHALET_PRICE_RULE_CREATED, 'chalet', {
+      this.emitEvent(EventTypes.CHALET_PRICE_RULE_CREATED, 'accommodation unit', {
         ruleId: result.data.ruleId,
         adminId: this.id,
       });
@@ -1901,7 +1901,7 @@ export class ChaletAdminBot extends AdminBot {
   }
 
   private async reviewChaletBookings(): Promise<ActionResult> {
-    const result = await this.apiCall<{ bookings: Array<{ id: string; status: string; chaletId: string }> }>(
+    const result = await this.apiCall<{ bookings: Array<{ id: string; status: string; unitId: string }> }>(
       'GET',
       '/api/v1/units/bookings?status=all'
     );
@@ -1916,10 +1916,10 @@ export class ChaletAdminBot extends AdminBot {
 }
 
 // =============================================
-// SNACK BAR ADMIN BOT
+// kiosk ADMIN BOT
 // =============================================
 
-export class SnackBarAdminBot extends AdminBot {
+export class KioskAdminBot extends AdminBot {
   constructor(config: Omit<AdminConfig, 'adminRole' | 'type' | 'role' | 'profile'> & { profile?: Partial<AdminProfile> }) {
     const defaultProfile: AdminProfile = {
       automationLevel: 'semi_auto',
@@ -1937,7 +1937,7 @@ export class SnackBarAdminBot extends AdminBot {
   protected registerActions(): void {
     super.registerActions();
 
-    // Create snack category
+    // Create kiosk item category
     this.registerAction({
       name: 'create_snack_category',
       weight: 1,
@@ -1946,7 +1946,7 @@ export class SnackBarAdminBot extends AdminBot {
       execute: async () => this.createSnackCategory(),
     });
 
-    // Create snack item
+    // Create kiosk item item
     this.registerAction({
       name: 'create_snack_item',
       weight: 2,
@@ -1964,7 +1964,7 @@ export class SnackBarAdminBot extends AdminBot {
       execute: async () => this.toggleSnackAvailability(),
     });
 
-    // Review snack orders
+    // Review kiosk item orders
     this.registerAction({
       name: 'review_snack_orders',
       weight: 3,
@@ -1975,22 +1975,22 @@ export class SnackBarAdminBot extends AdminBot {
   }
 
   private async createSnackCategory(): Promise<ActionResult> {
-    const categories = ['Hot Dogs', 'Burgers', 'Sandwiches', 'Salads', 'Ice Cream', 'Drinks', 'Snacks'];
+    const categories = ['Hot Dogs', 'Burgers', 'Sandwiches', 'Salads', 'Ice Cream', 'Drinks', 'KioskItems'];
     const category = categories[Math.floor(Math.random() * categories.length)];
 
     const result = await this.apiCall<{ id: string; name: string }>(
       'POST',
-      '/api/v1/snack/categories',
+      '/api/v1/kiosk item/categories',
       {
         name: `${category} - ${Date.now()}`,
-        description: `Delicious ${category.toLowerCase()} from the snack bar`,
+        description: `Delicious ${category.toLowerCase()} from the kiosk`,
         sortOrder: Math.floor(Math.random() * 10),
         active: true,
       }
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.SNACK_CATEGORY_CREATED, 'snack', {
+      this.emitEvent(EventTypes.SNACK_CATEGORY_CREATED, 'kiosk item', {
         categoryId: result.data.id,
         categoryName: result.data.name,
         adminId: this.id,
@@ -2015,7 +2015,7 @@ export class SnackBarAdminBot extends AdminBot {
     // Get categories first
     const categoriesResult = await this.apiCall<{ categories: Array<{ id: string; name: string }> }>(
       'GET',
-      '/api/v1/snack/categories'
+      '/api/v1/kiosk item/categories'
     );
 
     if (!categoriesResult.success || !categoriesResult.data?.categories?.length) {
@@ -2031,11 +2031,11 @@ export class SnackBarAdminBot extends AdminBot {
 
     const result = await this.apiCall<{ id: string; name: string }>(
       'POST',
-      '/api/v1/snack/items',
+      '/api/v1/kiosk item/items',
       {
         categoryId: category.id,
         name: `${items[Math.floor(Math.random() * items.length)]} #${Date.now()}`,
-        description: 'A tasty treat from our snack bar',
+        description: 'A tasty treat from our kiosk',
         price: 5 + Math.floor(Math.random() * 15),
         preparationTime: 5 + Math.floor(Math.random() * 10),
         available: true,
@@ -2044,7 +2044,7 @@ export class SnackBarAdminBot extends AdminBot {
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.SNACK_ITEM_CREATED, 'snack', {
+      this.emitEvent(EventTypes.SNACK_ITEM_CREATED, 'kiosk item', {
         itemId: result.data.id,
         itemName: result.data.name,
         adminId: this.id,
@@ -2069,7 +2069,7 @@ export class SnackBarAdminBot extends AdminBot {
     // Get items
     const itemsResult = await this.apiCall<{ items: Array<{ id: string; name: string; available: boolean }> }>(
       'GET',
-      '/api/v1/snack/items'
+      '/api/v1/kiosk item/items'
     );
 
     if (!itemsResult.success || !itemsResult.data?.items?.length) {
@@ -2084,11 +2084,11 @@ export class SnackBarAdminBot extends AdminBot {
 
     const result = await this.apiCall<{ toggled: boolean }>(
       'POST',
-      `/api/v1/snack/items/${item.id}/toggle-availability`
+      `/api/v1/kiosk item/items/${item.id}/toggle-availability`
     );
 
     if (result.success) {
-      this.emitEvent(EventTypes.SNACK_ITEM_TOGGLED, 'snack', {
+      this.emitEvent(EventTypes.SNACK_ITEM_TOGGLED, 'kiosk item', {
         itemId: item.id,
         itemName: item.name,
         newAvailability: !item.available,
@@ -2113,7 +2113,7 @@ export class SnackBarAdminBot extends AdminBot {
   private async reviewSnackOrders(): Promise<ActionResult> {
     const result = await this.apiCall<{ orders: Array<{ id: string; status: string }> }>(
       'GET',
-      '/api/v1/snack/orders?status=all'
+      '/api/v1/kiosk item/orders?status=all'
     );
 
     return {
@@ -2200,7 +2200,7 @@ export class POSAdminBot extends AdminBot {
     }
 
     // Register a reader at a location
-    const locations = ['front_desk', 'restaurant', 'pool_bar', 'spa', 'snack_bar'];
+    const locations = ['front_desk', 'menu_service', 'pool_bar', 'spa', 'kiosk'];
     const location = locations[Math.floor(Math.random() * locations.length)];
 
     const result = await this.apiCall<{ readerId: string; status: string }>(
@@ -2385,7 +2385,7 @@ export class PromotionsAdminBot extends AdminBot {
 
   private async createPromotion(): Promise<ActionResult> {
     const promoTypes = ['percentage_discount', 'fixed_discount', 'buy_one_get_one', 'free_upgrade', 'bundle'];
-    const targets = ['room', 'spa', 'restaurant', 'pool', 'chalet', 'snack_bar'];
+    const targets = ['room', 'spa', 'menu_service', 'capacity', 'accommodation unit', 'kiosk'];
     
     const promoType = promoTypes[Math.floor(Math.random() * promoTypes.length)];
     const target = targets[Math.floor(Math.random() * targets.length)];
@@ -2539,7 +2539,7 @@ export class PromotionsAdminBot extends AdminBot {
 
 // Factory function
 export function createAdminBot(
-  type: 'revenue' | 'marketing' | 'system' | 'channel_manager' | 'group_sales' | 'chalet' | 'snack_bar' | 'pos' | 'promotions',
+  type: 'revenue' | 'marketing' | 'system' | 'channel_manager' | 'group_sales' | 'accommodation unit' | 'kiosk' | 'pos' | 'promotions',
   config: Omit<AdminConfig, 'adminRole' | 'type' | 'role' | 'profile'> & { profile?: Partial<AdminProfile> }
 ): AdminBot {
   switch (type) {
@@ -2553,10 +2553,10 @@ export function createAdminBot(
       return new ChannelManagerBot(config);
     case 'group_sales':
       return new GroupSalesBot(config);
-    case 'chalet':
-      return new ChaletAdminBot(config);
-    case 'snack_bar':
-      return new SnackBarAdminBot(config);
+    case 'accommodation unit':
+      return new AccommodationAdminBot(config);
+    case 'kiosk':
+      return new KioskAdminBot(config);
     case 'pos':
       return new POSAdminBot(config);
     case 'promotions':

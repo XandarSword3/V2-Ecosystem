@@ -30,7 +30,7 @@ describe('ModuleGuard Middleware', () => {
         from: vi.fn().mockReturnValue(createChainableMock({ is_active: true }))
       } as any);
 
-      const middleware = requireModule('restaurant');
+      const middleware = requireModule('menu_service');
       const { req, res, next } = createMockReqRes({});
 
       await middleware(req, res, next);
@@ -44,7 +44,7 @@ describe('ModuleGuard Middleware', () => {
         from: vi.fn().mockReturnValue(createChainableMock({ is_active: false }))
       } as any);
 
-      const middleware = requireModule('pool');
+      const middleware = requireModule('capacity');
       const { req, res, next } = createMockReqRes({});
       (req as any).path = '/api/pool/tickets';
 
@@ -82,7 +82,7 @@ describe('ModuleGuard Middleware', () => {
       const mockFrom = vi.fn().mockReturnValue(createChainableMock({ is_active: true }));
       vi.mocked(getSupabase).mockReturnValue({ from: mockFrom } as any);
 
-      const middleware = requireModule('restaurant');
+      const middleware = requireModule('menu_service');
       
       const { req: req1, res: res1, next: next1 } = createMockReqRes({});
       await middleware(req1, res1, next1);
@@ -101,7 +101,7 @@ describe('ModuleGuard Middleware', () => {
         from: vi.fn().mockReturnValue(createChainableMock(null, { code: 'NETWORK_ERROR' }))
       } as any);
 
-      const middleware = requireModule('restaurant');
+      const middleware = requireModule('menu_service');
       const { req, res, next } = createMockReqRes({});
 
       await middleware(req, res, next);
@@ -122,13 +122,13 @@ describe('ModuleGuard Middleware', () => {
         from: vi.fn().mockReturnValue(createChainableMock({ is_active: true }))
       } as any);
 
-      const middleware = requireModule('restaurant');
+      const middleware = requireModule('menu_service');
       
       const { req: req1, res: res1, next: next1 } = createMockReqRes({});
       await middleware(req1, res1, next1);
 
       // Clear specific module cache
-      clearModuleCache('restaurant');
+      clearModuleCache('menu_service');
 
       const { req: req2, res: res2, next: next2 } = createMockReqRes({});
       await middleware(req2, res2, next2);

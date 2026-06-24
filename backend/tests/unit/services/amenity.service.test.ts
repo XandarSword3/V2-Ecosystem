@@ -25,7 +25,7 @@ describe('AmenityService', () => {
   const validAmenityInput = {
     name: 'Main Pool',
     description: 'Olympic-sized swimming pool',
-    category: 'pool' as AmenityCategory,
+    category: 'capacity' as AmenityCategory,
     location: 'Ground Floor',
     capacity: 50,
     openingTime: '06:00',
@@ -60,7 +60,7 @@ describe('AmenityService', () => {
       expect(amenity.id).toBeDefined();
       expect(amenity.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       expect(amenity.name).toBe('Main Pool');
-      expect(amenity.category).toBe('pool');
+      expect(amenity.category).toBe('capacity');
       expect(amenity.status).toBe('available');
       expect(amenity.isActive).toBe(true);
       expect(amenity.createdAt).toBeDefined();
@@ -85,7 +85,7 @@ describe('AmenityService', () => {
       const amenity = await service.createAmenity({
         name: 'Test Amenity',
         description: 'Test',
-        category: 'pool',
+        category: 'capacity',
         location: 'Test Location',
         openingTime: '08:00',
         closingTime: '20:00'
@@ -137,7 +137,7 @@ describe('AmenityService', () => {
       await service.createAmenity(validAmenityInput);
       await service.createAmenity({ ...validAmenityInput, name: 'Spa', category: 'spa' });
 
-      const poolAmenities = await service.getAmenitiesByCategory('pool');
+      const poolAmenities = await service.getAmenitiesByCategory('capacity');
       const spaAmenities = await service.getAmenitiesByCategory('spa');
 
       expect(poolAmenities).toHaveLength(1);
@@ -742,7 +742,7 @@ describe('AmenityService', () => {
 
   describe('edge cases', () => {
     it('should handle all amenity categories', async () => {
-      const categories: AmenityCategory[] = ['pool', 'spa', 'fitness', 'dining', 'entertainment', 'sports', 'recreation', 'business', 'kids', 'other'];
+      const categories: AmenityCategory[] = ['capacity', 'spa', 'fitness', 'dining', 'entertainment', 'sports', 'recreation', 'business', 'kids', 'other'];
 
       for (const category of categories) {
         const amenity = await service.createAmenity({

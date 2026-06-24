@@ -96,7 +96,7 @@ export default function PrivacyPage() {
                 <ul className="list-disc pl-5 mt-2 space-y-1">
                   <li>
                     <strong>Name:</strong>{' '}
-                    {settings.resortName || 'The Platform Operator'}
+                    {settings.siteName || 'The Platform Operator'}
                   </li>
                   <li>
                     <strong>Email:</strong>{' '}

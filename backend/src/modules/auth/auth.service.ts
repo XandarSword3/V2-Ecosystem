@@ -2,13 +2,14 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { getSupabase } from "../../database/connection.js";
 import { generateTokens, verifyRefreshToken } from "./auth.utils.js";
-import { config } from "../../config/index.js";
+import { config } from "../../config/index";
 import { logger } from "../../utils/logger.js";
 import { emailService } from "../../services/email.service.js";
 import { AppError } from "../../utils/errors.js";
 import { validatePassword } from "../../services/password-policy.service.js";
 import { isAccountLocked, recordFailedAttempt, recordSuccessfulLogin } from "./lockout.service.js";
 import { blacklistToken } from "../../services/token-blacklist.service.js";
+import { scopeToRoles, scopeIsPlatformAdmin } from "../../security/permissions.js";
 
 interface SessionMeta {
   ipAddress?: string;
@@ -69,21 +70,7 @@ export async function register(data: RegisterData) {
     throw userError;
   }
 
-  // Assign default customer role
-  const { data: customerRole, error: roleError } = await supabase
-    .from('roles')
-    .select('id')
-    .eq('name', 'customer')
-    .limit(1);
-
-  if (!roleError && customerRole && customerRole.length > 0) {
-    await supabase
-      .from('user_roles')
-      .insert({
-        user_id: user.id,
-        role_id: customerRole[0].id,
-      });
-  }
+  // scope is set to 'customer' by DEFAULT in the database schema
   // FIX: Send email verification link (fire-and-forget — don't block registration)
   sendVerificationEmail(user.id, user.email, user.full_name).catch(err => {
     logger.error('Failed to send verification email:', err);
@@ -94,6 +81,7 @@ export async function register(data: RegisterData) {
   const tokens = generateTokens({
     userId: user.id,
     email: user.email,
+    scope: 'customer',
     roles: ['customer'],
     tokenVersion: 0,
   });
@@ -157,50 +145,37 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     };
   }
 
-  // Get user roles
-  // Prefer the denormalized users.roles array. It is kept in sync by DB triggers
-  // (see 20260424000002_unify_user_roles_junction.sql) and avoids flaky join shapes.
-  let roleNames: string[] = [];
-  if (Array.isArray(user.roles) && user.roles.length > 0) {
-    roleNames = user.roles;
-  } else if (typeof user.role === 'string' && user.role.length > 0) {
-    roleNames = [user.role];
-  } else {
-    const { data: userRolesList, error: rolesError } = await supabase
-      .from('user_roles')
-      .select(`
-        role_id,
-        roles (id, name, display_name)
-      `)
-      .eq('user_id', user.id);
+  // Get user scope - this is the new source of truth
+  const userScope = user.scope || 'customer';
+  
+  // Derive roles[] from scope for backward compatibility
+  const roleNames = scopeToRoles(userScope as any);
+  
+  // Derive isPlatformAdmin from scope
+  const isPlatformAdmin = scopeIsPlatformAdmin(userScope as any);
 
-    if (rolesError) {
-      logger.error('Error getting user roles:', rolesError.message);
-      throw rolesError;
-    }
-
-    // Handle Supabase join which may return roles as array or object
-    interface RoleJoinResult { role_id?: string; roles?: { name?: string }[] | { name?: string } | null }
-    roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
-      const roles = r.roles;
-      if (!roles) return undefined;
-      if (Array.isArray(roles)) return roles[0]?.name;
-      return (roles as { name?: string }).name;
-    }).filter(Boolean) as string[];
-  }
-
-  if (roleNames.length === 0) {
-    roleNames = ['customer'];
+  // Q103 — Enforce mandatory 2FA for privileged scopes.
+  // A super_admin or tenant_admin without 2FA enabled is blocked here
+  // and must complete 2FA enrollment before tokens are issued.
+  const requiresMandatory2FA = userScope === 'super_admin' || userScope === 'tenant_admin';
+  if (requiresMandatory2FA && !user.two_factor_enabled) {
+    return {
+      requiresTwoFactorSetup: true,
+      userId: user.id,
+      email: user.email,
+      message: 'Two-factor authentication is mandatory for admin accounts. Please enrol in 2FA before logging in.',
+    };
   }
 
   // Generate tokens
   const tokens = generateTokens({
     userId: user.id,
     email: user.email,
+    scope: userScope,
     roles: roleNames,
     tokenVersion: user.token_version ?? 0,
     tenantId: user.tenant_id ?? undefined,
-    isPlatformAdmin: user.is_platform_admin ?? false,
+    isPlatformAdmin,
   });
 
   // Create session
@@ -235,7 +210,9 @@ export async function login(email: string, password: string, meta: SessionMeta) 
       fullName: user.full_name,
       profileImageUrl: user.profile_image_url,
       preferredLanguage: user.preferred_language,
+      scope: userScope,
       roles: roleNames,
+      is_platform_admin: isPlatformAdmin,
     },
     tokens,
   };
@@ -262,33 +239,24 @@ export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
     throw new AppError('Account is disabled', 403, 'ACCOUNT_DISABLED');
   }
 
-  // Get user roles
-  const { data: userRolesList, error: rolesError } = await supabase
-    .from('user_roles')
-    .select(`
-      role_id,
-      roles (id, name, display_name)
-    `)
-    .eq('user_id', user.id);
-
-  if (rolesError) throw rolesError;
-
-  interface RoleJoinResult { role_id?: string; roles?: { name?: string }[] | { name?: string } | null }
-  const roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
-    const roles = r.roles;
-    if (!roles) return undefined;
-    if (Array.isArray(roles)) return roles[0]?.name;
-    return (roles as { name?: string }).name;
-  }).filter(Boolean) as string[];
+  // Get user scope - this is the new source of truth
+  const userScope = user.scope || 'customer';
+  
+  // Derive roles[] from scope for backward compatibility
+  const roleNames = scopeToRoles(userScope as any);
+  
+  // Derive isPlatformAdmin from scope
+  const isPlatformAdmin = scopeIsPlatformAdmin(userScope as any);
 
   // Generate tokens
   const tokens = generateTokens({
     userId: user.id,
     email: user.email,
+    scope: userScope,
     roles: roleNames,
     tokenVersion: user.token_version ?? 0,
     tenantId: user.tenant_id ?? undefined,
-    isPlatformAdmin: user.is_platform_admin ?? false,
+    isPlatformAdmin,
   });
 
   // Create session
@@ -323,7 +291,9 @@ export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
       fullName: user.full_name,
       profileImageUrl: user.profile_image_url,
       preferredLanguage: user.preferred_language,
+      scope: userScope,
       roles: roleNames,
+      is_platform_admin: isPlatformAdmin,
     },
     tokens,
   };
@@ -369,27 +339,24 @@ export async function refreshAccessToken(refreshToken: string) {
     throw new Error('Token has been invalidated. Please log in again.');
   }
 
-  const { data: userRolesList } = await supabase
-    .from('user_roles')
-    .select(`
-      roles (name)
-    `)
-    .eq('user_id', user.id);
-
-  interface RoleJoinResult { roles?: { name?: string }[] | { name?: string } | null }
-  const roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
-    const roles = r.roles;
-    if (!roles) return undefined;
-    if (Array.isArray(roles)) return roles[0]?.name;
-    return (roles as { name?: string }).name;
-  }).filter(Boolean) as string[];
+  // Get user scope - this is the new source of truth
+  const userScope = user.scope || 'customer';
+  
+  // Derive roles[] from scope for backward compatibility
+  const roleNames = scopeToRoles(userScope as any);
+  
+  // Derive isPlatformAdmin from scope
+  const isPlatformAdmin = scopeIsPlatformAdmin(userScope as any);
 
   // Generate new tokens
   const tokens = generateTokens({
     userId: user.id,
     email: user.email,
+    scope: userScope,
     roles: roleNames,
     tokenVersion: user.token_version ?? 0,
+    tenantId: user.tenant_id ?? undefined,
+    isPlatformAdmin,
   });
 
   // Update session
@@ -408,7 +375,9 @@ export async function refreshAccessToken(refreshToken: string) {
       fullName: user.full_name,
       profileImageUrl: user.profile_image_url,
       preferredLanguage: user.preferred_language,
+      scope: userScope,
       roles: roleNames,
+      is_platform_admin: isPlatformAdmin,
     },
     tokens,
   };
@@ -480,7 +449,7 @@ export async function getCurrentUser(userId: string) {
 
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, email, full_name, phone, profile_image_url, preferred_language')
+    .select('id, email, full_name, phone, profile_image_url, preferred_language, scope, tenant_id')
     .eq('id', userId)
     .single();
 
@@ -488,21 +457,14 @@ export async function getCurrentUser(userId: string) {
     throw new AppError('User not found', 404, 'USER_NOT_FOUND');
   }
 
-  // Get roles
-  const { data: userRolesList } = await supabase
-    .from('user_roles')
-    .select(`
-      roles (name)
-    `)
-    .eq('user_id', userId);
-
-  interface RoleJoinResult { roles?: { name?: string }[] | { name?: string } | null }
-  const roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
-    const roles = r.roles;
-    if (!roles) return undefined;
-    if (Array.isArray(roles)) return roles[0]?.name;
-    return (roles as { name?: string }).name;
-  }).filter(Boolean) as string[];
+  // Get user scope - this is the new source of truth
+  const userScope = user.scope || 'customer';
+  
+  // Derive roles[] from scope for backward compatibility
+  const roleNames = scopeToRoles(userScope as any);
+  
+  // Derive isPlatformAdmin from scope
+  const isPlatformAdmin = scopeIsPlatformAdmin(userScope as any);
 
   return {
     id: user.id,
@@ -511,7 +473,10 @@ export async function getCurrentUser(userId: string) {
     phone: user.phone,
     profileImageUrl: user.profile_image_url,
     preferredLanguage: user.preferred_language,
+    scope: userScope,
+    tenantId: user.tenant_id,
     roles: roleNames,
+    is_platform_admin: isPlatformAdmin,
   };
 }
 
@@ -560,6 +525,11 @@ export async function changePassword(userId: string, currentPassword: string, ne
   if (updateError) {
     throw new AppError('Failed to update password', 500, 'INTERNAL_ERROR');
   }
+
+  // Q102 — Invalidate all active sessions after a password change so that
+  // stolen tokens cannot be replayed. Increments token_version which
+  // immediately rejects all existing JWTs on the next request.
+  await logout(userId);
 
   logger.info(`Password changed for user ${userId}`);
 }
@@ -707,11 +677,8 @@ export async function resetPassword(token: string, newPassword: string) {
   // Invalidate reset token
   await supabase.from('sessions').delete().eq('id', session.id);
 
-  // Invalidate all other sessions for security
-  await supabase
-    .from('sessions')
-    .update({ is_active: false })
-    .eq('user_id', session.user_id);
+  // Invalidate all other sessions for security and increment token version
+  await logout(session.user_id);
 
   return { user_id: session.user_id };
 }

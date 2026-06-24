@@ -60,7 +60,7 @@ export const NormalWeekdayScenario: ScenarioConfig = {
  */
 export const LunchRushScenario: ScenarioConfig = {
   name: 'Lunch Rush',
-  description: 'Peak lunch service (11:30 AM - 2:00 PM) with 90% restaurant occupancy',
+  description: 'Peak lunch service (11:30 AM - 2:00 PM) with 90% menu service occupancy',
   duration: {
     days: 0.125, // 3 hours
     startTime: new Date(new Date().setHours(11, 30, 0, 0)),
@@ -179,7 +179,7 @@ export const ConferenceDayScenario: ScenarioConfig = {
  */
 export const StressTestScenario: ScenarioConfig = {
   name: 'Stress Test',
-  description: '95% occupancy, sold-out restaurants, full spa, multiple events',
+  description: '95% occupancy, sold-out menu services, full spa, multiple events',
   duration: {
     days: 1,
   },

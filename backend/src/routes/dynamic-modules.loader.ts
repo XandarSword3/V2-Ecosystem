@@ -9,7 +9,8 @@ const dynamicModuleMounts = new Set<string>();
 interface ActiveModuleRow {
   id: string;
   slug: string;
-  template_type: string;
+  engine_type: string;
+  template_type?: string; // Backward compatibility
   property_id?: string | null;
 }
 
@@ -22,10 +23,10 @@ export async function loadDynamicModules(): Promise<void> {
 
   const { data: modules, error } = await supabase
     .from('modules')
-    .select('id, slug, template_type, property_id')
+    .select('id, slug, engine_type, property_id')
     .eq('is_active', true)
     .not('slug', 'is', null)
-    .not('template_type', 'is', null);
+    .not('engine_type', 'is', null);
 
   if (error) {
     logger.error('[Dynamic Modules] Failed to load modules', error);
@@ -36,18 +37,18 @@ export async function loadDynamicModules(): Promise<void> {
   dynamicModuleMounts.clear();
 
   (modules as ActiveModuleRow[] | null)?.forEach((module) => {
-    if (!module.slug || !module.template_type) return;
+    if (!module.slug || !module.engine_type) return;
 
-    const moduleRouter = buildModuleRouter(module.template_type);
+    const moduleRouter = buildModuleRouter(module.engine_type);
     dynamicModulesRouter.use(
       `/${module.slug}`,
       (req, _res, next) => {
         (req as express.Request & {
-          mountedModule?: { id: string; slug: string; template_type: string; property_id?: string | null };
+          mountedModule?: { id: string; slug: string; engine_type: string; property_id?: string | null };
         }).mountedModule = {
           id: module.id,
           slug: module.slug,
-          template_type: module.template_type,
+          engine_type: module.engine_type,
           property_id: module.property_id,
         };
         next();
@@ -56,7 +57,7 @@ export async function loadDynamicModules(): Promise<void> {
     );
 
     dynamicModuleMounts.add(module.slug);
-    logger.info(`[Dynamic Modules] Mounted /api/v1/${module.slug} (${module.template_type})`);
+    logger.info(`[Dynamic Modules] Mounted /api/v1/${module.slug} (${module.engine_type})`);
   });
 
   logger.info(`[Dynamic Modules] Loaded ${dynamicModuleMounts.size} dynamic module route(s).`);

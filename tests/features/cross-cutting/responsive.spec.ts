@@ -27,9 +27,9 @@ test.describe('Responsive Design [CUS-NAV-003, CUS-NAV-004]', () => {
     await expect(nav).toBeVisible();
   });
 
-  test('restaurant page is responsive', async ({ page }) => {
+  test('menu service page is responsive', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto(`${BASE}/restaurant`);
+    await page.goto(`${BASE}/menu service`);
     await expect(page.locator('main').first()).toBeVisible();
     // Content should be present
     const body = await page.locator('body').textContent() || '';

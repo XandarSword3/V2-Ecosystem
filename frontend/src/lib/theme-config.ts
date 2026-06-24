@@ -1,8 +1,8 @@
-// Resort Theme Configuration System
-// Supports multiple resort themes configurable by admins
+// Site Theme Configuration System
+// Supports multiple site themes configurable by admins
 // Each theme has BOTH light and dark mode variants
 
-export type ResortTheme = 'beach' | 'mountain' | 'sunset' | 'forest' | 'midnight' | 'luxury';
+export type SiteTheme = 'beach' | 'mountain' | 'sunset' | 'forest' | 'midnight' | 'luxury';
 
 export interface ThemeColors {
   primary: string;
@@ -49,7 +49,7 @@ export interface ThemeGradients {
 }
 
 export interface ThemeConfig {
-  id: ResortTheme;
+  id: SiteTheme;
   name: string;
   description: string;
   icon: string;
@@ -69,7 +69,7 @@ export interface ThemeConfig {
   weatherEffect?: 'waves' | 'snow' | 'rain' | 'leaves' | 'stars' | 'fireflies' | 'none';
 }
 
-export const resortThemes: Record<ResortTheme, ThemeConfig> = {
+export const siteThemes: Record<SiteTheme, ThemeConfig> = {
   beach: {
     id: 'beach',
     name: 'Beach Paradise',
@@ -409,4 +409,4 @@ export const resortThemes: Record<ResortTheme, ThemeConfig> = {
   },
 };
 
-export const defaultTheme: ResortTheme = 'beach';
+export const defaultTheme: SiteTheme = 'beach';

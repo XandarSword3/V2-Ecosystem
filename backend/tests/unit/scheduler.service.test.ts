@@ -23,8 +23,8 @@ vi.mock('../../src/services/backup.service.js', () => ({
 }));
 
 // Mock the pool ticket expiry script
-vi.mock('../../src/scripts/expire-pool-tickets.js', () => ({
-  expirePoolTickets: vi.fn().mockResolvedValue({ expired: 5 }),
+vi.mock('../../src/scripts/expire-capacity-access-tickets.js', () => ({
+  expireCapacityAccessTickets: vi.fn().mockResolvedValue({ expired: 5 }),
 }));
 
 // Mock database connection
@@ -68,7 +68,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 
 import cron from 'node-cron';
 import { BackupService } from '../../src/services/backup.service.js';
-import { expirePoolTickets } from '../../src/scripts/expire-pool-tickets.js';
+import { expireCapacityAccessTickets } from '../../src/scripts/expire-capacity-access-tickets.js';
 import { SchedulerService } from '../../src/services/scheduler.service.js';
 
 describe('Scheduler Service', () => {
@@ -132,7 +132,7 @@ describe('Scheduler Service', () => {
       }
     });
 
-    it('pool expiry job should call expirePoolTickets', async () => {
+    it('pool expiry job should call expireCapacityAccessTickets', async () => {
       SchedulerService.init();
       
       const calls = vi.mocked(cron.schedule).mock.calls;
@@ -141,7 +141,7 @@ describe('Scheduler Service', () => {
       if (expiryCall) {
         await expiryCall[1]();
         
-        expect(expirePoolTickets).toHaveBeenCalled();
+        expect(expireCapacityAccessTickets).toHaveBeenCalled();
       }
     });
 
@@ -176,7 +176,7 @@ describe('Scheduler Service', () => {
     });
 
     it('should handle pool expiry failures gracefully', async () => {
-      vi.mocked(expirePoolTickets).mockRejectedValueOnce(new Error('Expiry failed'));
+      vi.mocked(expireCapacityAccessTickets).mockRejectedValueOnce(new Error('Expiry failed'));
       
       SchedulerService.init();
       

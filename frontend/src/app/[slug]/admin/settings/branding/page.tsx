@@ -436,7 +436,7 @@ export default function AdminBrandingPage() {
                       <FormItem>
                         <FormLabel>Business Name *</FormLabel>
                         <FormControl>
-                          <Input placeholder="Your Resort Name" {...field} />
+                          <Input placeholder="Your Business Name" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -468,7 +468,7 @@ export default function AdminBrandingPage() {
                         <FormLabel>Description</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Brief description of your resort..."
+                            placeholder="Brief description of your business..."
                             rows={3}
                             {...field}
                           />
@@ -712,7 +712,7 @@ export default function AdminBrandingPage() {
                           <FormControl>
                             <Input
                               type="email"
-                              placeholder="contact@resort.com"
+                              placeholder="contact@example.com"
                               {...field}
                             />
                           </FormControl>
@@ -744,7 +744,7 @@ export default function AdminBrandingPage() {
                         <FormLabel>Address</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="123 Resort Way, Beach City, BC 12345"
+                            placeholder="123 Main Street, Beach City, BC 12345"
                             rows={2}
                             {...field}
                           />
@@ -872,7 +872,7 @@ export default function AdminBrandingPage() {
                             Show "Powered By" Footer
                           </FormLabel>
                           <FormDescription>
-                            Display Your Resort attribution in the footer
+                            Display Your Business attribution in the footer
                           </FormDescription>
                         </div>
                         <FormControl>

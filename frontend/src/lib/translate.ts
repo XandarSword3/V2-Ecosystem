@@ -1,7 +1,7 @@
 /**
  * Dynamic Content Translation Service
  * 
- * This service handles automatic translation of dynamic content (menu items, chalets, etc.)
+ * This service handles automatic translation of dynamic content (catalog items, accommodation units, etc.)
  * It uses a combination of:
  * 1. Pre-defined translations stored in the database (name_ar, name_fr, description_ar, etc.)
  * 2. Fallback to the default language if translation is not available

@@ -116,7 +116,7 @@ describe('Offline Sync Service', () => {
       
       const pending = await syncQueue.getPending();
       expect(pending).toHaveLength(1);
-      expect(pending[0].entityType).toBe('pool_ticket');
+      expect(pending[0].entityType).toBe('capacity_ticket');
     });
   });
 
@@ -177,7 +177,7 @@ describe('Offline Sync Service', () => {
       await createOfflinePoolEntry('ticket_123');
       
       const pending = await syncQueue.getPending();
-      expect(pending[0].entityType).toBe('pool_ticket');
+      expect(pending[0].entityType).toBe('capacity_ticket');
       expect(pending[0].data.type).toBe('entry');
       
       const activity = await offlineActivityStore.getAll();
@@ -188,7 +188,7 @@ describe('Offline Sync Service', () => {
       await createOfflinePoolExit('ticket_123');
       
       const pending = await syncQueue.getPending();
-      expect(pending[0].entityType).toBe('pool_ticket');
+      expect(pending[0].entityType).toBe('capacity_ticket');
       expect(pending[0].data.type).toBe('exit');
     });
   });

@@ -66,7 +66,7 @@ describe('settings context', () => {
           json: async () => ({
             success: true,
             data: {
-              resortName: 'Oceanic Resort',
+              propertyName: 'Oceanic Resort',
               theme: 'forest',
               currency: 'EUR',
             },
@@ -83,8 +83,8 @@ describe('settings context', () => {
               {
                 id: 'mod-1',
                 template_type: 'menu_service',
-                name: 'Restaurant',
-                slug: 'restaurant',
+                name: 'MenuService',
+                slug: 'menu_service',
                 is_active: true,
                 sort_order: 1,
               },
@@ -106,10 +106,10 @@ describe('settings context', () => {
     await waitFor(() => expect(hook.result.current.loading).toBe(false));
 
     expect(hook.result.current.error).toBeNull();
-    expect(hook.result.current.settings.resortName).toBe('Oceanic Resort');
+    expect(hook.result.current.settings.propertyName).toBe('Oceanic Resort');
     expect(hook.result.current.settings.currency).toBe('EUR');
     expect(hook.result.current.modules).toHaveLength(1);
-    expect(hook.result.current.modules[0].slug).toBe('restaurant');
+    expect(hook.result.current.modules[0].slug).toBe('menu_service');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -158,7 +158,7 @@ describe('settings context', () => {
           json: async () => ({
             success: true,
             data: {
-              resortName: `Resort ${settingsVersion}`,
+              propertyName: `Resort ${settingsVersion}`,
             },
           }),
         } as Response;
@@ -178,7 +178,7 @@ describe('settings context', () => {
     const hook = renderHook(() => mod.useSiteSettings(), { wrapper });
 
     await waitFor(() => expect(hook.result.current.loading).toBe(false));
-    expect(hook.result.current.settings.resortName).toBe('Resort 1');
+    expect(hook.result.current.settings.propertyName).toBe('Resort 1');
 
     settingsVersion = 2;
 
@@ -191,7 +191,7 @@ describe('settings context', () => {
       );
     });
 
-    await waitFor(() => expect(hook.result.current.settings.resortName).toBe('Resort 2'));
+    await waitFor(() => expect(hook.result.current.settings.propertyName).toBe('Resort 2'));
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
@@ -206,7 +206,7 @@ describe('settings context', () => {
           json: async () => ({
             success: true,
             data: {
-              resortName: 'Socket Resort',
+              propertyName: 'Socket Resort',
             },
           }),
         } as Response;
@@ -234,7 +234,7 @@ describe('settings context', () => {
     expect(modulesHandler).toBeTypeOf('function');
 
     await act(async () => {
-      await settingsHandler?.({ resortName: 'ignored' });
+      await settingsHandler?.({ propertyName: 'ignored' });
     });
 
     await act(async () => {

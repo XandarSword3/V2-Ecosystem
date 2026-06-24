@@ -249,7 +249,7 @@ describe('Cache - Convenience Functions', () => {
       
       const { cacheMenuItems } = await import('../../src/utils/cache');
       
-      await expect(cacheMenuItems([{ id: 1 }], 'restaurant')).resolves.toBeUndefined();
+      await expect(cacheMenuItems([{ id: 1 }], 'menu_service')).resolves.toBeUndefined();
       
       process.env.REDIS_URL = originalUrl;
     });
@@ -273,7 +273,7 @@ describe('Cache - Convenience Functions', () => {
       delete process.env.REDIS_URL;
       
       const { getCachedMenuItems } = await import('../../src/utils/cache');
-      const result = await getCachedMenuItems('restaurant');
+      const result = await getCachedMenuItems('menu_service');
       
       expect(result).toBeNull();
       
@@ -299,7 +299,7 @@ describe('Cache - Convenience Functions', () => {
       
       const { invalidateMenuCache } = await import('../../src/utils/cache');
       
-      await expect(invalidateMenuCache('restaurant')).resolves.toBeUndefined();
+      await expect(invalidateMenuCache('menu_service')).resolves.toBeUndefined();
       
       process.env.REDIS_URL = originalUrl;
     });

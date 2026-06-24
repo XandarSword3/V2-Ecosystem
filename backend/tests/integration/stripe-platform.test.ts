@@ -147,11 +147,11 @@ describe('Stripe Platform Service', () => {
         amount: 1500,
         platform: 'ios',
         userId: 'user-123',
-        referenceType: 'pool_ticket',
+        referenceType: 'capacity_ticket',
         referenceId: 'ticket-001',
       };
       
-      expect(['order', 'booking', 'pool_ticket', 'snack_order']).toContain(input.referenceType);
+      expect(['order', 'booking', 'capacity_ticket', 'kiosk_order']).toContain(input.referenceType);
       expect(input.referenceId).toBeTruthy();
     });
   });
@@ -267,28 +267,28 @@ describe('Stripe Platform Service', () => {
       expect(input.referenceType).toBe('booking');
     });
 
-    it('should support pool_ticket reference type', async () => {
+    it('should support capacity_ticket reference type', async () => {
       const input: CreatePaymentIntentInput = {
         amount: 500,
         platform: 'web',
         userId: 'user-789',
-        referenceType: 'pool_ticket',
+        referenceType: 'capacity_ticket',
         referenceId: 'pt_001',
       };
       
-      expect(input.referenceType).toBe('pool_ticket');
+      expect(input.referenceType).toBe('capacity_ticket');
     });
 
-    it('should support snack_order reference type', async () => {
+    it('should support kiosk_order reference type', async () => {
       const input: CreatePaymentIntentInput = {
         amount: 350,
         platform: 'ios',
         userId: 'user-111',
-        referenceType: 'snack_order',
+        referenceType: 'kiosk_order',
         referenceId: 'sn_222',
       };
       
-      expect(input.referenceType).toBe('snack_order');
+      expect(input.referenceType).toBe('kiosk_order');
     });
   });
 

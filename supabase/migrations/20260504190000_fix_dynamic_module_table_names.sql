@@ -3,6 +3,17 @@
 
 BEGIN;
 
+-- Add missing columns to capacity_windows that the sessions view and trigger require.
+-- The base schema stub only has id/name/start_time/end_time/capacity/price/is_active.
+ALTER TABLE capacity_windows ADD COLUMN IF NOT EXISTS max_capacity       INTEGER;
+ALTER TABLE capacity_windows ADD COLUMN IF NOT EXISTS adult_price        DECIMAL(10,2);
+ALTER TABLE capacity_windows ADD COLUMN IF NOT EXISTS child_price        DECIMAL(10,2);
+ALTER TABLE capacity_windows ADD COLUMN IF NOT EXISTS gender_restriction VARCHAR(20);
+ALTER TABLE capacity_windows ADD COLUMN IF NOT EXISTS date               DATE;
+ALTER TABLE capacity_windows ADD COLUMN IF NOT EXISTS created_at         TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE capacity_windows ADD COLUMN IF NOT EXISTS updated_at         TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE capacity_windows ADD COLUMN IF NOT EXISTS module_id          UUID REFERENCES modules(id);
+
 -- =====================================================
 -- 1. ACCOMMODATION/CHALET MODULE
 -- Router queries: bookable_units
@@ -79,73 +90,74 @@ CREATE TRIGGER bookable_units_view_trigger
     FOR EACH ROW EXECUTE FUNCTION bookable_units_view_trigger();
 
 -- =====================================================
--- 2. SESSION ACCESS MODULE (POOL)
+-- 2. SESSION ACCESS MODULE (CAPACITY ACCESS)
 -- Router queries: sessions, tickets
--- Database has: pool_sessions, pool_tickets
+-- sessions aliases capacity_windows; tickets queries transactions
 -- =====================================================
 
--- Create view to alias pool_sessions as sessions
 DO $$ BEGIN
     DROP VIEW IF EXISTS sessions;
-EXCEPTION WHEN wrong_object_type THEN 
-    -- sessions is a table, not a view, so we'll create the view with a different name
+EXCEPTION WHEN wrong_object_type THEN
     NULL;
 END $$;
 
--- Only create sessions view if it doesn't exist as a table
 DO $$ BEGIN
     CREATE VIEW sessions AS
-    SELECT 
+    SELECT
         id,
         name,
         start_time,
         end_time,
         max_capacity,
         COALESCE(
-            (SELECT COUNT(*) FROM pool_tickets pt WHERE pt.session_id = pool_sessions.id AND pt.status != 'cancelled'),
-            0
-        ) as current_count,
-        adult_price as price,
-        child_price,
-        gender_restriction,
-        is_active,
-        module_id,
-        created_at,
-        updated_at
-    FROM pool_sessions;
-EXCEPTION WHEN duplicate_table THEN 
-    -- sessions already exists as a table, skip view creation
+            (SELECT SUM(COALESCE((metadata->>'number_of_guests')::int, 1))
+             FROM transactions t
+             WHERE (t.metadata->>'session_id')::UUID = capacity_windows.id
+             AND t.engine_type = 'shared_capacity_access'
+             AND t.status IN ('confirmed', 'active', 'used')),
+             0
+             ) AS current_count,
+             adult_price AS price,
+             child_price,
+             gender_restriction,
+             is_active,
+             module_id,
+             created_at,
+             updated_at
+FROM capacity_windows;
+EXCEPTION WHEN duplicate_table THEN
     NULL;
 END $$;
 
--- Create view to alias pool_tickets as tickets
+-- tickets view reads from transactions (shared_capacity_access)
 DROP VIEW IF EXISTS tickets;
 CREATE VIEW tickets AS
-SELECT 
+SELECT
     id,
     module_id,
-    session_id,
-    COALESCE(customer_id, user_id) as customer_id,
+    (metadata->>'session_id')::UUID    AS session_id,
+    customer_id,
     status,
-    COALESCE(total_amount, total_price, 0) as total_amount,
-    number_of_guests,
-    ticket_number,
-    qr_code,
-    entry_time,
-    exit_time,
-    used_at,
-    payment_status,
-    payment_method,
+    amount                             AS total_amount,
+    COALESCE((metadata->>'number_of_guests')::int, 1) AS number_of_guests,
+    metadata->>'ticket_number'         AS ticket_number,
+    metadata->>'qr_code'               AS qr_code,
+    (metadata->>'entry_time')::TIMESTAMPTZ AS entry_time,
+    (metadata->>'exit_time')::TIMESTAMPTZ  AS exit_time,
+    (metadata->>'used_at')::TIMESTAMPTZ    AS used_at,
+    metadata->>'payment_status'        AS payment_status,
+    metadata->>'payment_method'        AS payment_method,
     created_at,
     updated_at
-FROM pool_tickets;
+FROM transactions
+WHERE engine_type = 'shared_capacity_access';
 
--- Make sessions view insertable/updatable
+-- sessions view trigger (writes to capacity_windows)
 CREATE OR REPLACE FUNCTION sessions_view_trigger()
 RETURNS TRIGGER AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        INSERT INTO pool_sessions (
+        INSERT INTO capacity_windows (
             name, date, start_time, end_time, max_capacity,
             adult_price, child_price, gender_restriction, is_active, module_id
         ) VALUES (
@@ -154,22 +166,16 @@ BEGIN
         ) RETURNING id INTO NEW.id;
         RETURN NEW;
     ELSIF TG_OP = 'UPDATE' THEN
-        UPDATE pool_sessions SET
-            name = NEW.name,
-            date = NEW.date,
-            start_time = NEW.start_time,
-            end_time = NEW.end_time,
-            max_capacity = NEW.max_capacity,
-            adult_price = NEW.adult_price,
-            child_price = NEW.child_price,
-            gender_restriction = NEW.gender_restriction,
-            is_active = NEW.is_active,
-            module_id = NEW.module_id,
-            updated_at = NOW()
+        UPDATE capacity_windows SET
+            name = NEW.name, date = NEW.date,
+            start_time = NEW.start_time, end_time = NEW.end_time,
+            max_capacity = NEW.max_capacity, adult_price = NEW.adult_price,
+            child_price = NEW.child_price, gender_restriction = NEW.gender_restriction,
+            is_active = NEW.is_active, module_id = NEW.module_id, updated_at = NOW()
         WHERE id = OLD.id;
         RETURN NEW;
     ELSIF TG_OP = 'DELETE' THEN
-        DELETE FROM pool_sessions WHERE id = OLD.id;
+        DELETE FROM capacity_windows WHERE id = OLD.id;
         RETURN OLD;
     END IF;
     RETURN NULL;
@@ -181,66 +187,21 @@ DO $$ BEGIN
     CREATE TRIGGER sessions_view_trigger
         INSTEAD OF INSERT OR UPDATE OR DELETE ON sessions
         FOR EACH ROW EXECUTE FUNCTION sessions_view_trigger();
-EXCEPTION WHEN wrong_object_type THEN 
-    -- sessions is a table, not a view, skip trigger creation
+EXCEPTION WHEN wrong_object_type THEN
     NULL;
 END $$;
-
--- Make tickets view insertable
-CREATE OR REPLACE FUNCTION tickets_view_trigger()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF TG_OP = 'INSERT' THEN
-        INSERT INTO pool_tickets (
-            module_id, session_id, customer_id, user_id, status,
-            total_amount, total_price, number_of_guests, quantity,
-            ticket_number, qr_code, payment_status
-        ) VALUES (
-            NEW.module_id, NEW.session_id, NEW.customer_id, NEW.customer_id, NEW.status,
-            NEW.total_amount, NEW.total_amount, NEW.number_of_guests, NEW.number_of_guests,
-            NEW.ticket_number, NEW.qr_code, COALESCE(NEW.payment_status, 'pending')
-        ) RETURNING id INTO NEW.id;
-        RETURN NEW;
-    ELSIF TG_OP = 'UPDATE' THEN
-        UPDATE pool_tickets SET
-            module_id = NEW.module_id,
-            session_id = NEW.session_id,
-            customer_id = NEW.customer_id,
-            user_id = NEW.customer_id,
-            status = NEW.status,
-            total_amount = NEW.total_amount,
-            total_price = NEW.total_amount,
-            number_of_guests = NEW.number_of_guests,
-            quantity = NEW.number_of_guests,
-            ticket_number = NEW.ticket_number,
-            qr_code = NEW.qr_code,
-            entry_time = NEW.entry_time,
-            exit_time = NEW.exit_time,
-            used_at = NEW.used_at,
-            payment_status = NEW.payment_status,
-            updated_at = NOW()
-        WHERE id = OLD.id;
-        RETURN NEW;
-    ELSIF TG_OP = 'DELETE' THEN
-        DELETE FROM pool_tickets WHERE id = OLD.id;
-        RETURN OLD;
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS tickets_view_trigger ON tickets;
-CREATE TRIGGER tickets_view_trigger
-    INSTEAD OF INSERT OR UPDATE OR DELETE ON tickets
-    FOR EACH ROW EXECUTE FUNCTION tickets_view_trigger();
 
 -- =====================================================
 -- 3. CREATE INDEXES FOR VIEW PERFORMANCE
 -- =====================================================
 
-CREATE INDEX IF NOT EXISTS idx_pool_tickets_session_id ON pool_tickets(session_id);
-CREATE INDEX IF NOT EXISTS idx_pool_tickets_customer_id ON pool_tickets(customer_id);
-CREATE INDEX IF NOT EXISTS idx_pool_tickets_module_id ON pool_tickets(module_id);
-CREATE INDEX IF NOT EXISTS idx_accommodation_units_module_id ON accommodation_units(module_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_session_id
+  ON transactions((metadata->>'session_id'))
+  WHERE engine_type = 'shared_capacity_access';
+CREATE INDEX IF NOT EXISTS idx_transactions_shared_customer
+  ON transactions(customer_id)
+  WHERE engine_type = 'shared_capacity_access';
+CREATE INDEX IF NOT EXISTS idx_accommodation_units_module_id
+  ON accommodation_units(module_id);
 
 COMMIT;

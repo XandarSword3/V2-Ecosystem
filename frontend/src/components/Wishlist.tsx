@@ -13,7 +13,7 @@ import Link from 'next/link';
 // Wishlist store
 interface WishlistItem {
   id: string;
-  type: 'chalet' | 'menu-item' | 'pool-session';
+  type: 'accommodation' | 'catalog-item' | 'capacity-session';
   name: string;
   price: number;
   imageUrl?: string;
@@ -127,12 +127,12 @@ export function WishlistPanel({
 
   const getItemLink = (item: WishlistItem) => {
     switch (item.type) {
-      case 'chalet':
-        return `/chalets/${item.id}`;
-      case 'menu-item':
-        return '/restaurant';
-      case 'pool-session':
-        return '/pool';
+      case 'accommodation':
+        return `/${item.id}`;
+      case 'catalog-item':
+        return '/';
+      case 'capacity-session':
+        return '/';
       default:
         return '/';
     }

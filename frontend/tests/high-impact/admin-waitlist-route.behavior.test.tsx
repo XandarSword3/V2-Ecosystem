@@ -19,12 +19,12 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  useParams: () => ({ slug: 'restaurant' }),
+  useParams: () => ({ slug: 'menu_service' }),
 }));
 
 vi.mock('@/lib/settings-context', () => ({
   useSiteSettings: () => ({
-    modules: [{ id: 'rest-1', slug: 'restaurant', name: 'Restaurant' }],
+    modules: [{ id: 'rest-1', slug: 'menu_service', name: 'MenuService' }],
   }),
 }));
 

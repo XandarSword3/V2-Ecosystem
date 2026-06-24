@@ -29,7 +29,7 @@ async function loginUser(request: APIRequestContext, baseUrl: string, user: Test
 }
 
 async function createTestOrder(request: APIRequestContext, baseUrl: string, token: string, items: any[]) {
-  return request.post(`${baseUrl}/api/v1/restaurant/orders`, {
+  return request.post(`${baseUrl}/api/v1/${slug}/orders`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { items },
   });
@@ -51,7 +51,7 @@ test.describe('Concurrency Stress Tests', () => {
     // Create multiple order requests simultaneously
     const orderPromises = Array(concurrentOrders).fill(null).map(async (_, i) => {
       try {
-        const response = await request.post(`${baseUrl}/api/v1/restaurant/orders`, {
+        const response = await request.post(`${baseUrl}/api/v1/${slug}/orders`, {
           data: {
             items: [{ menuItemId: itemId, quantity: 1 }],
             tableNumber: i + 1,
@@ -99,7 +99,7 @@ test.describe('Concurrency Stress Tests', () => {
   });
 
   test('concurrent booking requests should prevent double-booking', async ({ request }) => {
-    const chaletId = process.env.TEST_CHALET_ID || 'test-chalet-uuid';
+    const unitId = process.env.TEST_CHALET_ID || 'test-accommodation unit-uuid';
     const checkIn = '2025-02-15';
     const checkOut = '2025-02-17';
     const concurrentBookings = 5;
@@ -108,7 +108,7 @@ test.describe('Concurrency Stress Tests', () => {
       try {
         const response = await request.post(`${baseUrl}/api/v1/units/bookings`, {
           data: {
-            chaletId,
+            unitId,
             checkInDate: checkIn,
             checkOutDate: checkOut,
             guestEmail: `guest${i}@test.com`,
@@ -141,10 +141,10 @@ test.describe('Race Condition Tests', () => {
     
     // Simulate two staff trying to merge the same tabs simultaneously
     const mergePromises = [
-      request.post(`${baseUrl}/api/v1/restaurant/pos/tabs/merge`, {
+      request.post(`${baseUrl}/api/v1/${slug}/pos/tabs/merge`, {
         data: { tabIds: [tab1, tab2], targetTabId: tab1 },
       }),
-      request.post(`${baseUrl}/api/v1/restaurant/pos/tabs/merge`, {
+      request.post(`${baseUrl}/api/v1/${slug}/pos/tabs/merge`, {
         data: { tabIds: [tab1, tab2], targetTabId: tab2 },
       }),
     ];
@@ -199,10 +199,10 @@ test.describe('Double-Submit Prevention', () => {
     
     // Simulate rapid double-click (two requests <100ms apart)
     const [response1, response2] = await Promise.all([
-      request.post(`${baseUrl}/api/v1/restaurant/orders`, { data: orderData }),
+      request.post(`${baseUrl}/api/v1/${slug}/orders`, { data: orderData }),
       new Promise<any>(resolve => 
         setTimeout(() => 
-          resolve(request.post(`${baseUrl}/api/v1/restaurant/orders`, { data: orderData }))
+          resolve(request.post(`${baseUrl}/api/v1/${slug}/orders`, { data: orderData }))
         , 50)
       ),
     ]);
@@ -247,7 +247,7 @@ test.describe('Idempotency Verification', () => {
     const idempotencyKey = `idem-test-${Date.now()}`;
     
     // First request
-    const response1 = await request.post(`${baseUrl}/api/v1/restaurant/orders`, {
+    const response1 = await request.post(`${baseUrl}/api/v1/${slug}/orders`, {
       data: {
         items: [{ menuItemId: 'test-item', quantity: 1 }],
         idempotencyKey,
@@ -255,7 +255,7 @@ test.describe('Idempotency Verification', () => {
     });
     
     // Retry with same key
-    const response2 = await request.post(`${baseUrl}/api/v1/restaurant/orders`, {
+    const response2 = await request.post(`${baseUrl}/api/v1/${slug}/orders`, {
       data: {
         items: [{ menuItemId: 'test-item', quantity: 1 }],
         idempotencyKey,
@@ -307,7 +307,7 @@ test.describe('Load Tests', () => {
     for (let i = 0; i < totalRequests; i++) {
       const start = Date.now();
       try {
-        const response = await request.get(`${baseUrl}/api/v1/restaurant/menu`);
+        const response = await request.get(`${baseUrl}/api/v1/${slug}/menu`);
         results.push({ 
           success: response.ok(), 
           latency: Date.now() - start 
@@ -339,7 +339,7 @@ test.describe('Load Tests', () => {
     const start = Date.now();
     
     const promises = Array(burstSize).fill(null).map(() =>
-      request.get(`${baseUrl}/api/v1/restaurant/menu`)
+      request.get(`${baseUrl}/api/v1/${slug}/menu`)
         .then(r => ({ success: r.ok(), status: r.status() }))
         .catch(() => ({ success: false, status: 0 }))
     );
@@ -372,7 +372,7 @@ test.describe('Data Integrity Tests', () => {
   const baseUrl = process.env.API_URL || 'http://localhost:3005';
   
   test('order total calculation matches item sum', async ({ request }) => {
-    const orderResponse = await request.post(`${baseUrl}/api/v1/restaurant/orders`, {
+    const orderResponse = await request.post(`${baseUrl}/api/v1/${slug}/orders`, {
       data: {
         items: [
           { menuItemId: 'item-1', quantity: 2, price: 10.00 },

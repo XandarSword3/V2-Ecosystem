@@ -5,34 +5,12 @@
 -- 1. POS / TAB SYSTEM
 -- ============================================
 
--- Tab/Running Order support
-CREATE TABLE IF NOT EXISTS restaurant_tabs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    table_id UUID REFERENCES restaurant_tables(id),
-    customer_id UUID REFERENCES users(id),
-    waiter_id UUID REFERENCES users(id),
-    status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'closed', 'merged', 'split', 'void')),
-    name VARCHAR(100), -- e.g., "Table 5 - Smith Party"
-    guest_count INT DEFAULT 1,
-    opened_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    closed_at TIMESTAMP WITH TIME ZONE,
-    auto_close_at TIMESTAMP WITH TIME ZONE, -- For idle timeout
-    credit_limit DECIMAL(10,2) DEFAULT 500.00,
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- restaurant_tabs removed (legacy: referenced restaurant_tables)
 
--- Link orders to tabs
-ALTER TABLE restaurant_orders ADD COLUMN IF NOT EXISTS tab_id UUID REFERENCES restaurant_tabs(id);
-ALTER TABLE restaurant_orders ADD COLUMN IF NOT EXISTS split_from_order_id UUID REFERENCES restaurant_orders(id);
-ALTER TABLE restaurant_orders ADD COLUMN IF NOT EXISTS waiter_id UUID REFERENCES users(id);
-ALTER TABLE restaurant_orders ADD COLUMN IF NOT EXISTS served_by UUID REFERENCES users(id);
-
--- Payment splits
+-- Payment splits (linked to transactions)
 CREATE TABLE IF NOT EXISTS order_payment_splits (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    order_id UUID NOT NULL REFERENCES restaurant_orders(id),
+    transaction_id UUID NOT NULL REFERENCES transactions(id),
     amount DECIMAL(10,2) NOT NULL,
     payment_method VARCHAR(50) NOT NULL,
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
@@ -40,7 +18,7 @@ CREATE TABLE IF NOT EXISTS order_payment_splits (
     gift_card_id UUID REFERENCES gift_cards(id),
     loyalty_points_used INT DEFAULT 0,
     payer_name VARCHAR(100),
-    payer_seat INT, -- For seat-based splits
+    payer_seat INT,
     processed_at TIMESTAMP WITH TIME ZONE,
     processed_by UUID REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -187,10 +165,10 @@ CREATE TABLE IF NOT EXISTS inventory_purchase_order_items (
 -- ============================================
 
 -- Unit/Room states
-ALTER TABLE chalets ADD COLUMN IF NOT EXISTS clean_state VARCHAR(30) DEFAULT 'clean' CHECK (clean_state IN ('clean', 'dirty', 'cleaning', 'inspected', 'out_of_service', 'blocked'));
-ALTER TABLE chalets ADD COLUMN IF NOT EXISTS last_cleaned_at TIMESTAMP WITH TIME ZONE;
-ALTER TABLE chalets ADD COLUMN IF NOT EXISTS last_inspected_at TIMESTAMP WITH TIME ZONE;
-ALTER TABLE chalets ADD COLUMN IF NOT EXISTS maintenance_notes TEXT;
+ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS clean_state VARCHAR(30) DEFAULT 'clean' CHECK (clean_state IN ('clean', 'dirty', 'cleaning', 'inspected', 'out_of_service', 'blocked'));
+ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS last_cleaned_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS last_inspected_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS maintenance_notes TEXT;
 
 -- SLA configuration
 CREATE TABLE IF NOT EXISTS housekeeping_sla (
@@ -224,7 +202,7 @@ ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMP W
 CREATE TABLE IF NOT EXISTS housekeeping_inspections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     task_id UUID REFERENCES housekeeping_tasks(id),
-    chalet_id UUID REFERENCES chalets(id),
+    unit_id UUID REFERENCES accommodation_units(id),
     inspector_id UUID REFERENCES users(id),
     passed BOOLEAN NOT NULL,
     score INT CHECK (score >= 0 AND score <= 100),
@@ -384,7 +362,7 @@ CREATE TABLE IF NOT EXISTS report_hourly_metrics (
 CREATE TABLE IF NOT EXISTS report_product_performance (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     date DATE NOT NULL,
-    menu_item_id UUID REFERENCES menu_items(id),
+    catalog_item_id UUID REFERENCES catalog_items(id),
     quantity_sold INT DEFAULT 0,
     revenue DECIMAL(10,2) DEFAULT 0,
     cost DECIMAL(10,2) DEFAULT 0,
@@ -393,7 +371,7 @@ CREATE TABLE IF NOT EXISTS report_product_performance (
     waste_quantity DECIMAL(10,2) DEFAULT 0,
     waste_cost DECIMAL(10,2) DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(date, menu_item_id)
+    UNIQUE(date, catalog_item_id)
 );
 
 -- ============================================
@@ -472,7 +450,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Validate coupon with stacking rules
+-- validate_coupon_with_stacking: first-order check now uses transactions table
 CREATE OR REPLACE FUNCTION validate_coupon_with_stacking(
     p_code VARCHAR,
     p_user_id UUID,
@@ -485,7 +463,6 @@ DECLARE
     v_user_usage INT;
     v_is_first_order BOOLEAN;
 BEGIN
-    -- Get coupon
     SELECT * INTO v_coupon FROM coupons 
     WHERE UPPER(code) = UPPER(p_code) AND is_active = TRUE;
     
@@ -493,7 +470,6 @@ BEGIN
         RETURN jsonb_build_object('valid', false, 'error', 'Coupon not found');
     END IF;
     
-    -- Check dates
     IF v_coupon.start_date IS NOT NULL AND NOW() < v_coupon.start_date THEN
         RETURN jsonb_build_object('valid', false, 'error', 'Coupon not yet active');
     END IF;
@@ -501,13 +477,11 @@ BEGIN
         RETURN jsonb_build_object('valid', false, 'error', 'Coupon expired');
     END IF;
     
-    -- Check global usage
     SELECT COUNT(*) INTO v_usage_count FROM coupon_usage WHERE coupon_id = v_coupon.id;
     IF v_coupon.usage_limit IS NOT NULL AND v_usage_count >= v_coupon.usage_limit THEN
         RETURN jsonb_build_object('valid', false, 'error', 'Coupon usage limit reached');
     END IF;
     
-    -- Check per-user usage
     IF p_user_id IS NOT NULL THEN
         SELECT COUNT(*) INTO v_user_usage FROM coupon_usage 
         WHERE coupon_id = v_coupon.id AND user_id = p_user_id;
@@ -516,33 +490,33 @@ BEGIN
         END IF;
     END IF;
     
-    -- Check minimum spend
     IF v_coupon.min_spend IS NOT NULL AND p_order_subtotal < v_coupon.min_spend THEN
         RETURN jsonb_build_object('valid', false, 'error', 
             format('Minimum spend of %s required', v_coupon.min_spend));
     END IF;
     
-    -- Check first order requirement
+    -- First order check uses transactions table
     IF v_coupon.first_order_only AND p_user_id IS NOT NULL THEN
-        SELECT NOT EXISTS(SELECT 1 FROM restaurant_orders WHERE customer_id = p_user_id AND status = 'completed')
-        INTO v_is_first_order;
+        SELECT NOT EXISTS(
+            SELECT 1 FROM transactions
+            WHERE customer_id = p_user_id
+              AND engine_type = 'instant_transaction'
+              AND status = 'completed'
+        ) INTO v_is_first_order;
         IF NOT v_is_first_order THEN
             RETURN jsonb_build_object('valid', false, 'error', 'This coupon is for first orders only');
         END IF;
     END IF;
     
-    -- Check stacking
     IF array_length(p_existing_coupons, 1) > 0 THEN
         IF NOT v_coupon.stackable THEN
             RETURN jsonb_build_object('valid', false, 'error', 'This coupon cannot be combined with other coupons');
         END IF;
-        -- Check if any existing coupon is non-stackable
         IF EXISTS(SELECT 1 FROM coupons WHERE id = ANY(p_existing_coupons) AND NOT stackable) THEN
             RETURN jsonb_build_object('valid', false, 'error', 'Cannot add coupon - existing coupon is not stackable');
         END IF;
     END IF;
     
-    -- Calculate discount
     DECLARE
         v_discount DECIMAL;
     BEGIN
@@ -570,30 +544,30 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Check if unit can be checked into (housekeeping state)
-CREATE OR REPLACE FUNCTION can_check_in(p_chalet_id UUID) RETURNS JSONB AS $$
+CREATE OR REPLACE FUNCTION can_check_in(p_unit_id UUID) RETURNS JSONB AS $$
 DECLARE
-    v_chalet RECORD;
+    v_unit RECORD;
     v_pending_tasks INT;
 BEGIN
-    SELECT * INTO v_chalet FROM chalets WHERE id = p_chalet_id;
+    SELECT * INTO v_unit FROM accommodation_units WHERE id = p_unit_id;
     
     IF NOT FOUND THEN
         RETURN jsonb_build_object('allowed', false, 'reason', 'Unit not found');
     END IF;
     
     -- Check clean state
-    IF v_chalet.clean_state NOT IN ('clean', 'inspected') THEN
+    IF v_unit.clean_state NOT IN ('clean', 'inspected') THEN
         RETURN jsonb_build_object(
             'allowed', false, 
-            'reason', format('Unit is %s - cannot check in', v_chalet.clean_state),
-            'clean_state', v_chalet.clean_state
+            'reason', format('Unit is %s - cannot check in', v_unit.clean_state),
+            'clean_state', v_unit.clean_state
         );
     END IF;
     
     -- Check for pending critical tasks
     SELECT COUNT(*) INTO v_pending_tasks 
     FROM housekeeping_tasks 
-    WHERE chalet_id = p_chalet_id 
+    WHERE unit_id = p_unit_id 
     AND status IN ('pending', 'in_progress')
     AND priority IN ('high', 'urgent');
     
@@ -605,111 +579,65 @@ BEGIN
         );
     END IF;
     
-    RETURN jsonb_build_object('allowed', true, 'clean_state', v_chalet.clean_state);
+    RETURN jsonb_build_object('allowed', true, 'clean_state', v_unit.clean_state);
 END;
 $$ LANGUAGE plpgsql;
 
--- Auto-create housekeeping task on checkout
+-- Checkout housekeeping trigger fires on transactions (time_exclusive_reservation)
 CREATE OR REPLACE FUNCTION trigger_checkout_housekeeping() RETURNS TRIGGER AS $$
 DECLARE
     v_task_type_id UUID;
     v_is_same_day_turnover BOOLEAN;
+    v_unit_id UUID;
 BEGIN
-    -- Only trigger on checkout (status change to 'checked_out')
-    IF NEW.status = 'checked_out' AND (OLD.status IS NULL OR OLD.status != 'checked_out') THEN
-        -- Get checkout cleaning task type
-        SELECT id INTO v_task_type_id FROM housekeeping_task_types 
+    -- Only trigger on time_exclusive_reservation transactions transitioning to checked_out
+    IF NEW.engine_type = 'time_exclusive_reservation'
+       AND (NEW.metadata->>'status') = 'checked_out'
+       AND (OLD.metadata->>'status') IS DISTINCT FROM 'checked_out' THEN
+
+        v_unit_id := (NEW.metadata->>'unit_id')::UUID;
+        IF v_unit_id IS NULL THEN RETURN NEW; END IF;
+
+        SELECT id INTO v_task_type_id FROM housekeeping_task_types
         WHERE name ILIKE '%checkout%' OR name ILIKE '%cleaning%' LIMIT 1;
-        
-        IF v_task_type_id IS NULL THEN
-            RETURN NEW;
-        END IF;
-        
-        -- Check for same-day turnover
+        IF v_task_type_id IS NULL THEN RETURN NEW; END IF;
+
         SELECT EXISTS(
-            SELECT 1 FROM chalet_bookings 
-            WHERE chalet_id = NEW.chalet_id 
-            AND DATE(start_date) = CURRENT_DATE
-            AND id != NEW.id
-            AND status IN ('confirmed', 'pending')
+            SELECT 1 FROM transactions
+            WHERE engine_type = 'time_exclusive_reservation'
+              AND (metadata->>'unit_id')::UUID = v_unit_id
+              AND DATE((metadata->>'check_in_date')::TIMESTAMPTZ) = CURRENT_DATE
+              AND id != NEW.id
+              AND status IN ('confirmed', 'pending')
         ) INTO v_is_same_day_turnover;
-        
-        -- Create housekeeping task
+
         INSERT INTO housekeeping_tasks (
-            chalet_id, task_type_id, title, priority, 
-            scheduled_for, notes, status
+            unit_id, task_type_id, title, priority, scheduled_for, notes, status
         ) VALUES (
-            NEW.chalet_id, 
+            v_unit_id,
             v_task_type_id,
-            'Checkout Cleaning - ' || (SELECT name FROM chalets WHERE id = NEW.chalet_id),
+            'Checkout Cleaning - ' || COALESCE(NEW.metadata->>'unit_name', v_unit_id::TEXT),
             CASE WHEN v_is_same_day_turnover THEN 'urgent' ELSE 'high' END,
             NOW(),
             CASE WHEN v_is_same_day_turnover THEN 'URGENT: Same-day turnover!' ELSE NULL END,
             'pending'
         );
-        
-        -- Update chalet state
-        UPDATE chalets SET clean_state = 'dirty' WHERE id = NEW.chalet_id;
+
+        UPDATE accommodation_units SET clean_state = 'dirty' WHERE id = v_unit_id;
     END IF;
-    
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_checkout_housekeeping ON chalet_bookings;
+DROP TRIGGER IF EXISTS trg_checkout_housekeeping ON transactions;
 CREATE TRIGGER trg_checkout_housekeeping
-    AFTER UPDATE ON chalet_bookings
+    AFTER UPDATE ON transactions
     FOR EACH ROW
     EXECUTE FUNCTION trigger_checkout_housekeeping();
 
--- Deduct inventory for completed order (existing but improved)
-DROP FUNCTION IF EXISTS deduct_inventory_for_order(UUID);
-CREATE OR REPLACE FUNCTION deduct_inventory_for_order(p_order_id UUID) RETURNS JSONB AS $$
-DECLARE
-    v_item RECORD;
-    v_ingredient RECORD;
-    v_result JSONB;
-    v_total_deducted INT := 0;
-    v_errors TEXT[] := '{}';
-BEGIN
-    -- Get all order items
-    FOR v_item IN 
-        SELECT oi.menu_item_id, oi.quantity 
-        FROM restaurant_order_items oi
-        WHERE oi.order_id = p_order_id
-    LOOP
-        -- Get ingredients for this menu item
-        FOR v_ingredient IN
-            SELECT mii.inventory_item_id, mii.quantity_needed, ii.name
-            FROM menu_item_ingredients mii
-            JOIN inventory_items ii ON ii.id = mii.inventory_item_id
-            WHERE mii.menu_item_id = v_item.menu_item_id
-        LOOP
-            -- Deduct using FIFO
-            v_result := deduct_stock_fifo(
-                v_ingredient.inventory_item_id,
-                v_ingredient.quantity_needed * v_item.quantity,
-                'order',
-                NULL
-            );
-            
-            IF (v_result->>'success')::BOOLEAN THEN
-                v_total_deducted := v_total_deducted + 1;
-            ELSE
-                v_errors := array_append(v_errors, 
-                    format('Insufficient stock for %s', v_ingredient.name));
-            END IF;
-        END LOOP;
-    END LOOP;
-    
-    RETURN jsonb_build_object(
-        'items_deducted', v_total_deducted,
-        'errors', v_errors
-    );
-END;
-$$ LANGUAGE plpgsql;
+-- deduct_inventory_for_order removed (legacy: referenced order_items)
 
--- Daily sales aggregation function
+-- Daily sales aggregation from unified transactions table
 CREATE OR REPLACE FUNCTION aggregate_daily_sales(p_date DATE) RETURNS VOID AS $$
 BEGIN
     INSERT INTO report_daily_sales (
@@ -718,29 +646,29 @@ BEGIN
         total_tips, cash_revenue, card_revenue, gift_card_revenue,
         loyalty_redemptions, new_customers, returning_customers
     )
-    SELECT 
+    SELECT
         p_date,
-        COALESCE(SUM(CASE WHEN status = 'completed' THEN total_amount::DECIMAL ELSE 0 END), 0),
-        COALESCE(SUM(CASE WHEN status = 'completed' THEN total_amount::DECIMAL - COALESCE(discount_amount::DECIMAL, 0) ELSE 0 END), 0),
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END), 0),
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN net_amount ELSE 0 END), 0),
         COUNT(*),
         COUNT(*) FILTER (WHERE status = 'completed'),
         COUNT(*) FILTER (WHERE status = 'cancelled'),
-        COALESCE(AVG(CASE WHEN status = 'completed' THEN total_amount::DECIMAL END), 0),
-        COALESCE(SUM(discount_amount::DECIMAL), 0),
-        COALESCE(SUM(CASE WHEN status = 'refunded' THEN total_amount::DECIMAL ELSE 0 END), 0),
-        0, -- Tips would come from payment splits
-        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status = 'completed' THEN total_amount::DECIMAL ELSE 0 END), 0),
-        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status = 'completed' THEN total_amount::DECIMAL ELSE 0 END), 0),
-        COALESCE(SUM(gift_card_amount::DECIMAL), 0),
-        COALESCE(SUM(loyalty_discount::DECIMAL), 0),
-        (SELECT COUNT(DISTINCT customer_id) FROM restaurant_orders 
-         WHERE DATE(created_at) = p_date AND customer_id IS NOT NULL
-         AND NOT EXISTS(SELECT 1 FROM restaurant_orders o2 WHERE o2.customer_id = restaurant_orders.customer_id AND DATE(o2.created_at) < p_date)),
-        (SELECT COUNT(DISTINCT customer_id) FROM restaurant_orders 
-         WHERE DATE(created_at) = p_date AND customer_id IS NOT NULL
-         AND EXISTS(SELECT 1 FROM restaurant_orders o2 WHERE o2.customer_id = restaurant_orders.customer_id AND DATE(o2.created_at) < p_date))
-    FROM restaurant_orders
-    WHERE DATE(created_at) = p_date
+        COALESCE(AVG(CASE WHEN status = 'completed' THEN amount END), 0),
+        COALESCE(SUM(discount_amount), 0),
+        COALESCE(SUM(CASE WHEN status = 'refunded' THEN amount ELSE 0 END), 0),
+        0,
+        COALESCE(SUM(CASE WHEN (metadata->>'payment_method') = 'cash' AND status = 'completed' THEN amount ELSE 0 END), 0),
+        COALESCE(SUM(CASE WHEN (metadata->>'payment_method') = 'card' AND status = 'completed' THEN amount ELSE 0 END), 0),
+        COALESCE(SUM(CASE WHEN (metadata->>'payment_method') = 'gift_card' AND status = 'completed' THEN amount ELSE 0 END), 0),
+        0,
+        (SELECT COUNT(DISTINCT customer_id) FROM transactions
+         WHERE DATE(created_at) = p_date AND customer_id IS NOT NULL AND engine_type = 'instant_transaction'
+         AND NOT EXISTS(SELECT 1 FROM transactions t2 WHERE t2.customer_id = transactions.customer_id AND DATE(t2.created_at) < p_date)),
+        (SELECT COUNT(DISTINCT customer_id) FROM transactions
+         WHERE DATE(created_at) = p_date AND customer_id IS NOT NULL AND engine_type = 'instant_transaction'
+         AND EXISTS(SELECT 1 FROM transactions t2 WHERE t2.customer_id = transactions.customer_id AND DATE(t2.created_at) < p_date))
+    FROM transactions
+    WHERE DATE(created_at) = p_date AND engine_type = 'instant_transaction'
     ON CONFLICT (date) DO UPDATE SET
         total_revenue = EXCLUDED.total_revenue,
         net_revenue = EXCLUDED.net_revenue,
@@ -761,9 +689,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_orders_created_date ON restaurant_orders(created_at);
-CREATE INDEX IF NOT EXISTS idx_orders_module_status ON restaurant_orders(module_id, status);
-CREATE INDEX IF NOT EXISTS idx_tabs_table_status ON restaurant_tabs(table_id, status);
+CREATE INDEX IF NOT EXISTS idx_transactions_created_date ON transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_transactions_module_status ON transactions(module_id, status);
+CREATE INDEX IF NOT EXISTS idx_transactions_engine_type ON transactions(engine_type);
+-- idx_tabs_table_status removed (legacy: referenced restaurant_tabs)
 CREATE INDEX IF NOT EXISTS idx_batches_item_status ON inventory_batches(item_id, status);
-CREATE INDEX IF NOT EXISTS idx_tasks_chalet_status ON housekeeping_tasks(chalet_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_unit_status ON housekeeping_tasks(unit_id, status);
 CREATE INDEX IF NOT EXISTS idx_loyalty_batches_user ON loyalty_point_batches(user_id, is_expired);

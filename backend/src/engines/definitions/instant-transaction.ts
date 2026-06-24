@@ -3,7 +3,7 @@
  * 
  * Economic Pattern: Order → Prepare → Deliver → Done
  * Commercial Entity: Order
- * Examples: Restaurant, Snack Bar, Room Service, any menu-based ordering
+ * Examples: Menu service, kiosk, room service, any catalog-based instant ordering
  * 
  * This engine handles:
  *   - Menu items with categories, modifiers, and variants

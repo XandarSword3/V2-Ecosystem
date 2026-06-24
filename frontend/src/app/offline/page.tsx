@@ -1,6 +1,38 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
+// Q200 — Tenant-branded offline page.
+// Reads cached siteName from localStorage (written by SettingsProvider on
+// every successful fetch) so staff see the correct brand during outages.
+function getCachedSiteName(): string {
+  if (typeof window === 'undefined') return 'Your Business';
+  try {
+    // Zustand settingsStore may persist to localStorage under this key
+    const raw = localStorage.getItem('v2-ecosystem-settings');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.state?.settings?.siteName || parsed?.siteName || 'Your Business';
+    }
+    // Fallback: try the direct settings key written by HydrateSettingsFromBackend
+    const direct = localStorage.getItem('v2-site-settings');
+    if (direct) {
+      const parsed = JSON.parse(direct);
+      return parsed?.siteName || 'Your Business';
+    }
+  } catch {
+    // ignore
+  }
+  return 'Your Business';
+}
+
 export default function OfflinePage() {
+  const [siteName, setSiteName] = useState('Your Business');
+
+  useEffect(() => {
+    setSiteName(getCachedSiteName());
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="text-center">
@@ -19,29 +51,34 @@ export default function OfflinePage() {
             />
           </svg>
         </div>
-        
+
+        {/* Q200 — Display cached tenant name so staff see their brand, not a generic page */}
+        <p className="text-slate-400 text-sm mb-2 uppercase tracking-widest">
+          {siteName}
+        </p>
+
         <h1 className="text-3xl font-bold text-white mb-4">
           You&apos;re Offline
         </h1>
-        
+
         <p className="text-slate-400 mb-8 max-w-md">
-          It looks like you&apos;ve lost your internet connection. 
+          It looks like you&apos;ve lost your internet connection.
           Some features may not be available until you&apos;re back online.
         </p>
-        
+
         <div className="space-y-4">
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
           >
             Try Again
           </button>
-          
+
           <p className="text-sm text-slate-500">
             Your pending actions will sync automatically when you&apos;re back online.
           </p>
         </div>
-        
+
         <div className="mt-12 pt-8 border-t border-slate-700">
           <h2 className="text-lg font-semibold text-white mb-4">
             Available Offline:

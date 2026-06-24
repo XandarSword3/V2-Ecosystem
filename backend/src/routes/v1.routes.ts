@@ -30,6 +30,8 @@ import devicesRoutes from '../modules/devices/devices.routes.js';
 import promotionsRoutes from '../modules/promotions/promotions.routes.js';
 // NEW: Terminology System
 import terminologyRoutes from './terminology.routes.js';
+import { getSupabase } from '../database/connection.js';
+import { asyncHandler } from '../middleware/async-handler.js';
 
 const router = Router();
 
@@ -49,6 +51,36 @@ router.get('/', (_req: Request, res: Response) => {
     },
   });
 });
+
+// Public asset proxy — downloads files from Supabase storage server-side and streams
+// them to the client. No redirect is issued, so the Supabase project URL never appears
+// anywhere in the browser (not in HTML, JS, API responses, or the network tab).
+// No authentication required; these are public brand/content assets.
+router.get('/assets/*', asyncHandler(async (req: Request, res: Response) => {
+  const storagePath = (req.params as any)[0] as string;
+
+  if (!storagePath || storagePath.includes('..')) {
+    return res.status(400).json({ success: false, error: 'Invalid asset path' }) as any;
+  }
+
+  const supabase = getSupabase();
+
+  const { data: fileData, error } = await supabase.storage
+    .from('assets')
+    .download(storagePath);
+
+  if (error || !fileData) {
+    return res.status(404).json({ success: false, error: 'Asset not found' }) as any;
+  }
+
+  const buffer = Buffer.from(await fileData.arrayBuffer());
+
+  res.setHeader('Content-Type', fileData.type || 'application/octet-stream');
+  // 24 h browser cache — filenames include a timestamp so they never collide across uploads
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.setHeader('Content-Length', buffer.length);
+  res.send(buffer);
+}));
 
 // Core routes
 router.use('/auth', authRoutes);

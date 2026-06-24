@@ -11,7 +11,7 @@
 
 import { logger } from '../utils/logger.js';
 import { getSupabase } from '../database/connection.js';
-import { config } from '../config/index.js';
+import { config } from '../config/index';
 
 // Types for push notifications
 export interface PushNotificationPayload {

@@ -132,6 +132,7 @@ END $$;
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 
 -- Only service role can read/write tenants
+DROP POLICY IF EXISTS tenants_service_role_all ON tenants;
 CREATE POLICY tenants_service_role_all
   ON tenants
   FOR ALL
@@ -142,6 +143,7 @@ CREATE POLICY tenants_service_role_all
 -- Authenticated users with is_platform_admin flag can SELECT
 -- (for the control plane dashboard — reads are proxied via the backend anyway,
 --  but this policy provides defence-in-depth)
+DROP POLICY IF EXISTS tenants_platform_admin_read ON tenants;
 CREATE POLICY tenants_platform_admin_read
   ON tenants
   FOR SELECT

@@ -152,7 +152,7 @@ export class GuestSegmentationService {
       // Preferred room type (most booked)
       const roomTypeCounts: Record<string, number> = {};
       for (const b of validBookings) {
-        const rtName = (b.metadata as any)?.room_type_name || 'Chalet';
+        const rtName = (b.metadata as any)?.room_type_name || 'Unit';
         roomTypeCounts[rtName] = (roomTypeCounts[rtName] || 0) + 1;
       }
       const preferredRoomType = Object.entries(roomTypeCounts)

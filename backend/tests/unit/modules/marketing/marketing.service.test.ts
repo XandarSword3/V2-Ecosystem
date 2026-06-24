@@ -75,7 +75,7 @@ const mockTemplate = {
   property_id: 'prop-1',
   name: 'Welcome Email',
   category: 'welcome',
-  subject: 'Welcome to our resort!',
+  subject: 'Welcome to our property!',
   preview_text: 'Thank you for joining',
   html_content: '<h1>Welcome {{guest_name}}</h1>',
   text_content: 'Welcome {{guest_name}}',

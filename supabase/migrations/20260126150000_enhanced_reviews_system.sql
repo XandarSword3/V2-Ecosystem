@@ -62,12 +62,12 @@ DO $$ BEGIN
         FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
     ELSIF EXISTS (
       SELECT 1 FROM information_schema.tables
-      WHERE table_schema = 'public' AND table_name = 'menu_items'
+      WHERE table_schema = 'public' AND table_name = 'catalog_items'
     ) THEN
       ALTER TABLE product_reviews DROP CONSTRAINT IF EXISTS product_reviews_product_id_fkey;
       ALTER TABLE product_reviews
         ADD CONSTRAINT product_reviews_product_id_fkey
-        FOREIGN KEY (product_id) REFERENCES menu_items(id) ON DELETE CASCADE;
+        FOREIGN KEY (product_id) REFERENCES catalog_items(id) ON DELETE CASCADE;
     END IF;
 
     IF EXISTS (
@@ -78,14 +78,6 @@ DO $$ BEGIN
       ALTER TABLE product_reviews
         ADD CONSTRAINT product_reviews_order_item_id_fkey
         FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE SET NULL;
-    ELSIF EXISTS (
-      SELECT 1 FROM information_schema.tables
-      WHERE table_schema = 'public' AND table_name = 'restaurant_order_items'
-    ) THEN
-      ALTER TABLE product_reviews DROP CONSTRAINT IF EXISTS product_reviews_order_item_id_fkey;
-      ALTER TABLE product_reviews
-        ADD CONSTRAINT product_reviews_order_item_id_fkey
-        FOREIGN KEY (order_item_id) REFERENCES restaurant_order_items(id) ON DELETE SET NULL;
     END IF;
   END IF;
 END $$;
@@ -95,23 +87,11 @@ DO $$ BEGIN
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = 'public' AND table_name = 'booking_reviews'
   ) THEN
-    IF EXISTS (
-      SELECT 1 FROM information_schema.tables
-      WHERE table_schema = 'public' AND table_name = 'bookings'
-    ) THEN
-      ALTER TABLE booking_reviews DROP CONSTRAINT IF EXISTS booking_reviews_booking_id_fkey;
-      ALTER TABLE booking_reviews
-        ADD CONSTRAINT booking_reviews_booking_id_fkey
-        FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE;
-    ELSIF EXISTS (
-      SELECT 1 FROM information_schema.tables
-      WHERE table_schema = 'public' AND table_name = 'chalet_bookings'
-    ) THEN
-      ALTER TABLE booking_reviews DROP CONSTRAINT IF EXISTS booking_reviews_booking_id_fkey;
-      ALTER TABLE booking_reviews
-        ADD CONSTRAINT booking_reviews_booking_id_fkey
-        FOREIGN KEY (booking_id) REFERENCES chalet_bookings(id) ON DELETE CASCADE;
-    END IF;
+    -- booking_id always references transactions (time_exclusive_reservation)
+    ALTER TABLE booking_reviews DROP CONSTRAINT IF EXISTS booking_reviews_booking_id_fkey;
+    ALTER TABLE booking_reviews
+      ADD CONSTRAINT booking_reviews_booking_id_fkey
+      FOREIGN KEY (booking_id) REFERENCES transactions(id) ON DELETE CASCADE;
 
     IF EXISTS (
       SELECT 1 FROM information_schema.tables
@@ -123,12 +103,12 @@ DO $$ BEGIN
         FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL;
     ELSIF EXISTS (
       SELECT 1 FROM information_schema.tables
-      WHERE table_schema = 'public' AND table_name = 'chalets'
+      WHERE table_schema = 'public' AND table_name = 'accommodation_units'
     ) THEN
       ALTER TABLE booking_reviews DROP CONSTRAINT IF EXISTS booking_reviews_unit_id_fkey;
       ALTER TABLE booking_reviews
         ADD CONSTRAINT booking_reviews_unit_id_fkey
-        FOREIGN KEY (unit_id) REFERENCES chalets(id) ON DELETE SET NULL;
+        FOREIGN KEY (unit_id) REFERENCES accommodation_units(id) ON DELETE SET NULL;
     END IF;
   END IF;
 END $$;

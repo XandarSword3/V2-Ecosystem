@@ -1,13 +1,13 @@
 import { test, expect } from '../../fixtures/auth.fixture';
 
-test.describe('Chalet Operations [STF-CHAL]', () => {
+test.describe('AccommodationUnit Operations [STF-CHAL]', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:3000/login');
     await page.fill('input[type="email"]', 'staff@v2ecosystem.com');
     await page.fill('input[type="password"]', 'staff123');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(staff|dashboard)/);
-    await page.goto('http://localhost:3000/staff/chalets');
+    await page.goto('http://localhost:3000/staff/accommodation_units');
     await page.waitForLoadState('networkidle');
   });
 
@@ -41,17 +41,17 @@ test.describe('Chalet Operations [STF-CHAL]', () => {
 
   test('STF-CHAL-004: Booking list with guest info', async ({ page }) => {
     const rows = page.locator('tr, [class*="booking-row"], [class*="list-item"], [class*="card"]').filter({
-      hasText: /chalet|guest|room|booking/i,
+      hasText: /accommodation unit|guest|room|booking/i,
     });
     const rowCount = await rows.count();
     expect(rowCount).toBeGreaterThanOrEqual(0);
-    const heading = page.locator('h1, h2, h3').filter({ hasText: /chalet|booking|accommodation/i });
+    const heading = page.locator('h1, h2, h3').filter({ hasText: /accommodation unit|booking|accommodation/i });
     await expect(heading.first()).toBeVisible();
   });
 
   test('STF-CHAL-005: Booking detail modal', async ({ page }) => {
     const row = page.locator('tr, [class*="booking"], [class*="card"]').filter({
-      hasText: /chalet|guest|room/i,
+      hasText: /accommodation unit|guest|room/i,
     }).first();
     const hasRow = await row.isVisible().catch(() => false);
     if (hasRow) {
@@ -59,7 +59,7 @@ test.describe('Chalet Operations [STF-CHAL]', () => {
       const modal = page.locator('[role="dialog"], [class*="modal"], [class*="detail"], [class*="drawer"]');
       await expect(modal.first()).toBeVisible({ timeout: 5000 });
     } else {
-      const emptyState = page.locator('text=/no booking|no chalet|empty/i');
+      const emptyState = page.locator('text=/no booking|no accommodation unit|empty/i');
       await expect(emptyState).toBeVisible();
     }
   });

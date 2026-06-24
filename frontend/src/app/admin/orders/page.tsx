@@ -13,9 +13,7 @@ import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import { useSocket } from '@/lib/socket';
 import {
   UtensilsCrossed,
-  Cookie,
   Search,
-  Filter,
   RefreshCw,
   CheckCircle2,
   Clock,
@@ -39,7 +37,8 @@ interface OrderItem {
 interface Order {
   id: string;
   order_number: string;
-  source: 'restaurant' | 'snack_bar';
+  module_slug: string;
+  module_name: string;
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'completed' | 'cancelled';
   total_amount: number;
   items: OrderItem[];
@@ -63,6 +62,7 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
 export default function AdminOrdersPage() {
   const t = useTranslations('admin');
   const [orders, setOrders] = useState<Order[]>([]);
+  const [modules, setModules] = useState<Array<{ slug: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -73,27 +73,34 @@ export default function AdminOrdersPage() {
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch both restaurant and snack bar orders
-      const [restaurantRes, snackRes] = await Promise.all([
-        api.get('/restaurant/admin/orders').catch(() => ({ data: { data: [] } })),
-        api.get('/snack/staff/orders').catch(() => ({ data: { data: [] } })),
-      ]);
 
-      const restaurantOrders = (restaurantRes.data.data || []).map((o: Omit<Order, 'source'>) => ({
-        ...o,
-        source: 'restaurant' as const,
-      }));
-      const snackOrders = (snackRes.data.data || []).map((o: Omit<Order, 'source'>) => ({
-        ...o,
-        source: 'snack_bar' as const,
-      }));
+      // Discover all active instant_transaction modules
+      const modsRes = await api.get('/admin/modules').catch(() => ({ data: { data: [] } }));
+      const allMods: Array<{ id: string; slug: string; name: string; engine_type?: string; template_type?: string }> =
+        modsRes.data?.data || [];
+      const instantMods = allMods.filter(
+        m => m.engine_type === 'instant_transaction' || m.template_type === 'menu_service'
+      );
+      setModules(instantMods.map(m => ({ slug: m.slug, name: m.name })));
 
-      // Combine and sort by date
-      const allOrders = [...restaurantOrders, ...snackOrders].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      // Fetch orders for each module in parallel
+      const orderResponses = await Promise.all(
+        instantMods.map(m =>
+          api.get(`/staff/modules/${m.slug}/orders`).catch(() => ({ data: { data: [] } }))
+        )
       );
 
-      setOrders(allOrders);
+      const allOrders = orderResponses.flatMap((res, i) =>
+        (res.data?.data || res.data || []).map((o: Omit<Order, 'module_slug' | 'module_name'>) => ({
+          ...o,
+          module_slug: instantMods[i].slug,
+          module_name: instantMods[i].name,
+        }))
+      );
+
+      setOrders(
+        allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      );
     } catch (error) {
       toast.error('Failed to fetch orders');
     } finally {
@@ -133,18 +140,14 @@ export default function AdminOrdersPage() {
     }
   }, [socket]);
 
-  const updateOrderStatus = async (orderId: string, source: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string, moduleSlug: string, newStatus: string) => {
     try {
-      const endpoint = source === 'restaurant' 
-        ? `/restaurant/admin/orders/${orderId}/status`
-        : `/snack/staff/orders/${orderId}/status`;
-      
-      await api.put(endpoint, { status: newStatus });
-      
+      await api.put(`/staff/modules/${moduleSlug}/orders/${orderId}/status`, { status: newStatus });
+
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus as Order['status'] } : o))
       );
-      
+
       toast.success('Order status updated');
     } catch (error) {
       toast.error('Failed to update order status');
@@ -153,7 +156,7 @@ export default function AdminOrdersPage() {
 
   const filteredOrders = orders.filter((o) => {
     if (statusFilter !== 'all' && o.status !== statusFilter) return false;
-    if (sourceFilter !== 'all' && o.source !== sourceFilter) return false;
+    if (sourceFilter !== 'all' && o.module_slug !== sourceFilter) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -198,7 +201,7 @@ export default function AdminOrdersPage() {
             Orders
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Manage restaurant and snack bar orders in real-time
+            Manage orders across all active transaction modules in real-time
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -290,9 +293,10 @@ export default function AdminOrdersPage() {
               onChange={(e) => setSourceFilter(e.target.value)}
               className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
             >
-              <option value="all">All Sources</option>
-              <option value="restaurant">Restaurant</option>
-              <option value="snack_bar">Snack Bar</option>
+              <option value="all">All Modules</option>
+              {modules.map(m => (
+                <option key={m.slug} value={m.slug}>{m.name}</option>
+              ))}
             </select>
 
             {/* Status Filter */}
@@ -341,11 +345,7 @@ export default function AdminOrdersPage() {
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          {order.source === 'restaurant' ? (
-                            <UtensilsCrossed className="w-5 h-5 text-blue-500" />
-                          ) : (
-                            <Cookie className="w-5 h-5 text-orange-500" />
-                          )}
+                          <Package className="w-5 h-5 text-blue-500" />
                           <CardTitle className="text-lg">
                             #{order.order_number || order.id.slice(0, 8)}
                           </CardTitle>
@@ -404,7 +404,7 @@ export default function AdminOrdersPage() {
                           <Button
                             size="sm"
                             className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.source, 'confirmed')}
+                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'confirmed')}
                           >
                             <CheckCircle2 className="w-4 h-4 mr-1" />
                             Confirm
@@ -414,7 +414,7 @@ export default function AdminOrdersPage() {
                           <Button
                             size="sm"
                             className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.source, 'preparing')}
+                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'preparing')}
                           >
                             <ChefHat className="w-4 h-4 mr-1" />
                             Start
@@ -424,7 +424,7 @@ export default function AdminOrdersPage() {
                           <Button
                             size="sm"
                             className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.source, 'ready')}
+                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'ready')}
                           >
                             <Package className="w-4 h-4 mr-1" />
                             Ready
@@ -434,7 +434,7 @@ export default function AdminOrdersPage() {
                           <Button
                             size="sm"
                             className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.source, 'delivered')}
+                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'delivered')}
                           >
                             <Truck className="w-4 h-4 mr-1" />
                             Deliver
@@ -444,7 +444,7 @@ export default function AdminOrdersPage() {
                           <Button
                             size="sm"
                             className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.source, 'completed')}
+                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'completed')}
                           >
                             <CheckCircle2 className="w-4 h-4 mr-1" />
                             Complete
@@ -501,10 +501,10 @@ export default function AdminOrdersPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-slate-500 dark:text-slate-400">Source</span>
-                    <p className="font-medium text-slate-900 dark:text-white capitalize">
-                      {selectedOrder.source.replace('_', ' ')}
-                    </p>
+                  <span className="text-slate-500 dark:text-slate-400">Module</span>
+                  <p className="font-medium text-slate-900 dark:text-white capitalize">
+                  {selectedOrder.module_name}
+                  </p>
                   </div>
                   <div>
                     <span className="text-slate-500 dark:text-slate-400">Status</span>

@@ -1,9 +1,27 @@
 
 // Mock supabase
-vi.mock('../../../src/lib/supabase', () => ({
-  supabase: {
+const mockChain = vi.hoisted(() => {
+  const chain = {
     from: vi.fn(),
-  },
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+    eq: vi.fn(),
+    single: vi.fn(),
+  };
+  Object.keys(chain).forEach((k) => (chain as any)[k].mockReturnValue(chain));
+  return chain;
+});
+
+vi.mock('../../../src/database/connection.js', () => ({
+  getSupabase: vi.fn(() => mockChain),
+}));
+
+vi.mock('../../../src/lib/supabase', () => ({
+  supabase: mockChain,
+  getSupabase: vi.fn(() => mockChain),
+  getSupabaseAdmin: vi.fn(() => mockChain),
+  supabaseAdmin: mockChain,
 }));
 
 // Mock ioredis

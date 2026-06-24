@@ -1,7 +1,7 @@
 -- =============================================
 -- UNIFIED CUSTOMIZATION SYSTEM
 -- Module-agnostic customization engine for all present and future modules
--- Supports: Restaurant, Chalets, Pool, Snack Bar, Spa, Activities, and ANY future module
+-- Supports: any engine type — menu_service, accommodation, capacity_windows, kiosk, and any future module
 -- =============================================
 
 -- 1. Create enum for customization types (what happens when selected)
@@ -17,10 +17,10 @@ DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'customizable_entity_type') THEN
         CREATE TYPE customizable_entity_type AS ENUM (
-            'menu_item',       -- Restaurant menu items
-            'snack_bar_item',  -- Snack bar items
-            'chalet',          -- Chalet/accommodation units
-            'pool_session',    -- Pool sessions/bookings
+            'catalog_item',       -- Menu service catalog items
+            'kiosk_item',         -- Kiosk catalog items
+            'accommodation_unit', -- Accommodation units
+            'capacity_window',    -- Capacity windows
             'spa_service',     -- Spa services (future)
             'activity',        -- Activities/excursions (future)
             'rental_item',     -- Equipment rentals (future)
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS entity_customizations (
     
     -- Entity reference (polymorphic)
     entity_type customizable_entity_type NOT NULL,
-    entity_id UUID NOT NULL, -- References the actual entity (menu_item, chalet, etc.)
+    entity_id UUID NOT NULL, -- References the actual entity (catalog_item, accommodation_unit, etc.)
     
     -- Customization group
     customization_group_id UUID NOT NULL REFERENCES customization_groups(id) ON DELETE CASCADE,
@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS order_customizations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     
     -- Order reference (polymorphic)
-    order_type TEXT NOT NULL, -- 'restaurant_order', 'chalet_booking', 'pool_booking', 'snack_bar_order', etc.
+    order_type TEXT NOT NULL,
     order_id UUID NOT NULL,
     order_item_id UUID, -- For item-level customizations (nullable for booking-level)
     
@@ -704,7 +704,7 @@ BEGIN
             COALESCE(v_old_group.min_selections, 0),
             COALESCE(v_old_group.max_selections, 1),
             COALESCE(v_old_group.is_required, false),
-            ARRAY['menu_item', 'snack_bar_item']::customizable_entity_type[],
+            ARRAY['catalog_item', 'kiosk_item']::customizable_entity_type[],
             COALESCE(v_old_group.sort_order, 0),
             v_old_group.created_at
         )
@@ -752,8 +752,8 @@ BEGIN
         INSERT INTO entity_customizations (
             entity_type, entity_id, customization_group_id, sort_order, created_at
         ) VALUES (
-            'menu_item',
-            v_old_link.menu_item_id,
+            'catalog_item',
+            v_old_link.catalog_item_id,
             v_old_link.modifier_group_id,
             COALESCE(v_old_link.sort_order, 0),
             v_old_link.created_at
@@ -768,9 +768,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 16. Add documentation
-COMMENT ON TABLE customization_groups IS 'Unified customization groups for all modules (restaurant, chalets, pool, etc.)';
+COMMENT ON TABLE customization_groups IS 'Unified customization groups for all engine types';
 COMMENT ON TABLE customization_options IS 'Individual customization options within groups';
-COMMENT ON TABLE entity_customizations IS 'Links customization groups to specific entities (menu items, chalets, etc.)';
+COMMENT ON TABLE entity_customizations IS 'Links customization groups to specific entities (catalog items, accommodation units, etc.)';
 COMMENT ON TABLE order_customizations IS 'Immutable snapshot of customizations applied to orders/bookings';
 
 COMMENT ON TYPE customizable_entity_type IS 'All entity types that support customizations. Use add_customizable_entity_type() to add new types.';

@@ -38,7 +38,7 @@ const initialForm: ContactForm = {
 };
 
 export default function ContactPage() {
-  const { settings } = useSiteSettings();
+  const { settings, modules } = useSiteSettings();
   const [form, setForm] = useState<ContactForm>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -73,13 +73,13 @@ export default function ContactPage() {
     {
       icon: Mail,
       label: 'Email',
-      value: settings.email || 'info@yourresort.com',
-      href: `mailto:${settings.email || 'info@yourresort.com'}`,
+      value: settings.email || 'info@example.com',
+      href: `mailto:${settings.email || 'info@example.com'}`,
     },
     {
       icon: MapPin,
       label: 'Address',
-      value: settings.address || 'Your Resort, Lebanon',
+      value: settings.address || 'Your Business Location',
       href: '#',
     },
     {
@@ -256,18 +256,14 @@ export default function ContactPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">Restaurant</span>
-                      <span className="font-medium text-slate-900 dark:text-white">
-                        {settings.restaurantHours || '8:00 AM - 11:00 PM'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">Pool</span>
-                      <span className="font-medium text-slate-900 dark:text-white">
-                        {settings.poolHours || '9:00 AM - 7:00 PM'}
-                      </span>
-                    </div>
+                    {modules && modules.map((mod) => (
+                      <div key={mod.id} className="flex justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">{mod.name}</span>
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          {(mod.settings?.hours as string) || '9:00 AM - 6:00 PM'}
+                        </span>
+                      </div>
+                    ))}
                     <div className="flex justify-between">
                       <span className="text-slate-600 dark:text-slate-400">Reception</span>
                       <span className="font-medium text-slate-900 dark:text-white">

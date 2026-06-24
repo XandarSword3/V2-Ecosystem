@@ -9,9 +9,9 @@
  * ```tsx
  * import { CustomizationSelector } from '@/components/customization';
  * 
- * // For restaurant menu items
+ * // For instant_transaction catalog items (e.g. menu items)
  * <CustomizationSelector
- *   entityType="menu_item"
+ *   entityType="catalog_item"
  *   entityId={menuItem.id}
  *   entity={{
  *     name: menuItem.name,
@@ -23,13 +23,13 @@
  *   onConfirm={(data) => addToCart(data)}
  * />
  * 
- * // For chalets (accommodation)
+ * // For time_exclusive_reservation units (e.g. accommodation)
  * <CustomizationSelector
- *   entityType="chalet"
- *   entityId={chalet.id}
+ *   entityType="accommodation_unit"
+ *   entityId={unit.id}
  *   entity={{
- *     name: chalet.name,
- *     basePrice: chalet.price_per_night,
+ *     name: unit.name,
+ *     basePrice: unit.price_per_night,
  *   }}
  *   isOpen={showModal}
  *   onClose={() => setShowModal(false)}
@@ -39,9 +39,9 @@
  *   showQuantitySelector={false}
  * />
  * 
- * // For pool sessions
+ * // For shared_capacity_access sessions
  * <CustomizationSelector
- *   entityType="pool_session"
+ *   entityType="capacity_session"
  *   entityId={session.id}
  *   entity={{
  *     name: session.name,

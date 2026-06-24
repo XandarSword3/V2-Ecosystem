@@ -88,7 +88,7 @@ export class FamilyVacationerBot extends GuestBot {
       complaintLikelihood: 0.3,
       tipPercentage: 15,
       preferredDiningTimes: [8, 12, 18], // Family-friendly times
-      preferredActivities: ['pool', 'kids_club', 'restaurant'],
+      preferredActivities: ['capacity', 'kids_club', 'menu_service'],
       dietaryRestrictions: [],
       specialRequests: ['Connecting rooms', 'Crib', 'Kids menu'],
     };
@@ -122,7 +122,7 @@ export class FamilyVacationerBot extends GuestBot {
       name: 'order_kids_meals',
       weight: 4,
       preconditions: () => 
-        this.guestState.currentLocation === 'restaurant' && 
+        this.guestState.currentLocation === 'menu_service' && 
         this.childrenCount > 0,
       execute: async () => this.orderKidsMeals(),
     });
@@ -169,7 +169,7 @@ export class LuxurySeekerBot extends GuestBot {
       complaintLikelihood: 0.5, // High standards = more complaints
       tipPercentage: 25,
       preferredDiningTimes: [10, 14, 20], // Leisurely times
-      preferredActivities: ['spa', 'fine_dining', 'pool', 'cabana'],
+      preferredActivities: ['spa', 'fine_dining', 'capacity', 'cabana'],
       dietaryRestrictions: ['gluten-free'],
       specialRequests: ['Suite upgrade', 'Champagne on arrival', 'Turn-down service'],
     };
@@ -244,9 +244,9 @@ export class LuxurySeekerBot extends GuestBot {
   }
 
   private async bookFineDining(): Promise<{ success: boolean; action: string; data?: any; error?: string }> {
-    const result = await this.apiCall('POST', '/api/v1/restaurants/reservations', {
+    const result = await this.apiCall('POST', '/api/v1/menu services/reservations', {
       guestId: this.id,
-      restaurant: 'fine_dining',
+      menu service: 'fine_dining',
       partySize: this.partySize,
       time: '19:30',
       specialRequests: 'Window table preferred',
@@ -283,7 +283,7 @@ export class BudgetConsciousBot extends GuestBot {
       complaintLikelihood: 0.2,
       tipPercentage: 10,
       preferredDiningTimes: [7, 11, 17], // Off-peak for deals
-      preferredActivities: ['pool', 'beach', 'free_amenities'],
+      preferredActivities: ['capacity', 'beach', 'free_amenities'],
       dietaryRestrictions: [],
       specialRequests: [],
     };
@@ -314,7 +314,7 @@ export class BudgetConsciousBot extends GuestBot {
       cooldown: 60 * 60 * 1000,
       preconditions: () => this.guestState.isCheckedIn,
       execute: async () => {
-        const amenities = ['pool', 'beach', 'gym', 'garden'];
+        const amenities = ['capacity', 'beach', 'gym', 'garden'];
         const selected = amenities[Math.floor(Math.random() * amenities.length)];
         this.guestState.currentLocation = selected;
         return { success: true, action: 'use_free_amenities', data: { amenity: selected } };

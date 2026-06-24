@@ -12,6 +12,9 @@
  *   POST /api/platform/tenants/:id/cancel       — hard-cancel a tenant
  *   PATCH /api/platform/tenants/:id/tier        — change subscription tier
  *   GET  /api/platform/revenue                  — MRR overview (aggregated from tenants)
+ *
+ * Public (no auth):
+ *   GET  /api/tenants/by-slug/:slug             — validate tenant exists by slug
  */
 
 import { Request, Response } from 'express';
@@ -202,10 +205,20 @@ export async function changeTier(req: Request, res: Response): Promise<void> {
       tier,
     );
 
-    // Sync tier locally
+    // Sync tier locally — also re-resolve plan_id so feature_limits switch
+    // to the new plan immediately (same fix as the webhook path in
+    // provisioning.service.ts's updateBillingStatus; this is the manual
+    // admin-initiated equivalent of that same tier-change event).
+    const { data: newPlan } = await supabase
+      .from('plans')
+      .select('id')
+      .eq('code', tier)
+      .eq('is_active', true)
+      .maybeSingle();
+
     await supabase
       .from('tenants')
-      .update({ subscription_tier: tier, updated_at: new Date().toISOString() })
+      .update({ subscription_tier: tier, plan_id: newPlan?.id ?? null, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     invalidateTenantCache(id, tenant.subdomain);
@@ -234,11 +247,11 @@ export async function getRevenueOverview(_req: Request, res: Response): Promise<
       return;
     }
 
-    const tierMrr: Record<SubscriptionTier, number> = {
-      starter: parseInt(process.env.PRICE_STARTER_MONTHLY_CENTS || '9900', 10),
-      growth: parseInt(process.env.PRICE_GROWTH_MONTHLY_CENTS || '29900', 10),
-      enterprise: parseInt(process.env.PRICE_ENTERPRISE_MONTHLY_CENTS || '99900', 10),
-    };
+    // Prices come from the live plans table — the admin-editable source of
+    // truth — not env vars. Env vars only cover as a last-resort fallback
+    // for any tier with no matching plan row, so MRR never silently reads
+    // as $0 just because a plan is missing.
+    const tierMrr = await resolveTierMrrMap();
 
     const counts = { starter: 0, growth: 0, enterprise: 0, total: 0 };
     let mrrCents = 0;
@@ -287,11 +300,8 @@ export async function getPlatformStats(_req: Request, res: Response): Promise<vo
 
     const rows = data ?? [];
 
-    const tierMrr: Record<string, number> = {
-      starter:    parseInt(process.env.PRICE_STARTER_MONTHLY_CENTS  || '9900',  10),
-      growth:     parseInt(process.env.PRICE_GROWTH_MONTHLY_CENTS   || '29900', 10),
-      enterprise: parseInt(process.env.PRICE_ENTERPRISE_MONTHLY_CENTS || '99900', 10),
-    };
+    // Prices come from the live plans table, same fix as getRevenueOverview above.
+    const tierMrr = await resolveTierMrrMap();
 
     let totalMrr = 0;
     let activeTenants = 0;
@@ -300,7 +310,7 @@ export async function getPlatformStats(_req: Request, res: Response): Promise<vo
 
     for (const t of rows) {
       if (t.billing_status === 'active' || t.billing_status === 'past_due') {
-        totalMrr += tierMrr[t.subscription_tier] ?? 0;
+        totalMrr += tierMrr[t.subscription_tier as SubscriptionTier] ?? 0;
         activeTenants++;
       }
       if (t.billing_status === 'trialing') trialingTenants++;
@@ -321,7 +331,7 @@ export async function getPlatformStats(_req: Request, res: Response): Promise<vo
             (t.billing_status === 'active' || t.billing_status === 'past_due')
           );
         })
-        .reduce((sum, t) => sum + (tierMrr[t.subscription_tier] ?? 0), 0);
+        .reduce((sum, t) => sum + (tierMrr[t.subscription_tier as SubscriptionTier] ?? 0), 0);
       revenueHistory.push({ date: monthKey, mrr: monthMrr });
     }
 
@@ -423,8 +433,76 @@ export async function getBillingPortal(req: Request, res: Response): Promise<voi
 }
 
 // ============================================
+// Public plans (pricing page)
+// ============================================
+
+export async function getPublicPlans(_req: Request, res: Response): Promise<void> {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('plans')
+      .select('id, code, name, description, price_monthly_cents, price_annual_cents, feature_limits, sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      res.status(500).json({ success: false, error: error.message });
+      return;
+    }
+
+    res.json({ success: true, data: data ?? [] });
+  } catch (err) {
+    logger.error('[PLATFORM] getPublicPlans error', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+// ============================================
 // Helpers
 // ============================================
+
+/**
+ * Build a tier → price_monthly_cents map from the live plans table.
+ * Used by getRevenueOverview() and getPlatformStats() so MRR reflects
+ * whatever prices are actually set in the admin Plans CRUD, instead of a
+ * separate hardcoded/env-var copy that drifts the moment someone edits a
+ * plan's price without also remembering to update these env vars.
+ *
+ * Falls back to the env var (or its hardcoded default) per-tier only if
+ * the plans table has no active row for that code — non-fatal, same
+ * pattern used everywhere else this codebase reads plan data.
+ */
+async function resolveTierMrrMap(): Promise<Record<SubscriptionTier, number>> {
+  const fallback: Record<SubscriptionTier, number> = {
+    starter: parseInt(process.env.PRICE_STARTER_MONTHLY_CENTS || '9900', 10),
+    growth: parseInt(process.env.PRICE_GROWTH_MONTHLY_CENTS || '29900', 10),
+    enterprise: parseInt(process.env.PRICE_ENTERPRISE_MONTHLY_CENTS || '99900', 10),
+  };
+
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('plans')
+      .select('code, price_monthly_cents')
+      .eq('is_active', true);
+
+    if (error || !data) {
+      logger.warn('[PLATFORM] plans lookup failed for MRR calc, falling back to env vars', { error: error?.message });
+      return fallback;
+    }
+
+    const map = { ...fallback };
+    for (const row of data) {
+      if (row.code === 'starter' || row.code === 'growth' || row.code === 'enterprise') {
+        map[row.code as SubscriptionTier] = row.price_monthly_cents;
+      }
+    }
+    return map;
+  } catch (err) {
+    logger.error('[PLATFORM] Unexpected error resolving tier MRR map, falling back to env vars', err);
+    return fallback;
+  }
+}
 
 async function updateTenantBillingStatus(
   req: Request,
@@ -457,6 +535,33 @@ async function updateTenantBillingStatus(
     res.json({ success: true, data: { id, billing_status: status } });
   } catch (err) {
     logger.error('[PLATFORM] updateBillingStatus error', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+// ============================================
+// Public: Validate tenant by slug (no auth)
+// ============================================
+
+export async function getTenantBySlug(req: Request, res: Response): Promise<void> {
+  try {
+    const { slug } = req.params;
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('id, subdomain, billing_status')
+      .eq('subdomain', slug)
+      .maybeSingle();
+
+    if (error || !data) {
+      res.status(404).json({ success: false, error: 'Tenant not found' });
+      return;
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    logger.error('[TENANT] Error validating tenant by slug', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }

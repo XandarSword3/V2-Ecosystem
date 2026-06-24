@@ -220,7 +220,7 @@ export class RealtimeAnalyticsService {
       trend: this.calculateTrend('today_revenue', revenue)
     });
 
-    // Active restaurant orders
+    // Active instant-transaction orders
     const { count: activeOrders } = await this.supabase
       .from('transactions')
       .select('*', { count: 'exact', head: true })
@@ -234,16 +234,16 @@ export class RealtimeAnalyticsService {
       timestamp: new Date()
     });
 
-    // Pool occupancy (if applicable)
+    // Shared-capacity occupancy (if applicable)
     const { count: activeSessions } = await this.supabase
-      .from('pool_sessions')
+      .from('capacity_windows')
       .select('*', { count: 'exact', head: true })
       .eq('property_id', propertyId)
       .eq('status', 'active');
 
     if (activeSessions !== null) {
       metrics.push({
-        metric: 'active_pool_sessions',
+        metric: 'active_capacity_sessions',
         value: activeSessions,
         timestamp: new Date()
       });

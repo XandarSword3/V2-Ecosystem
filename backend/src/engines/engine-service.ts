@@ -12,13 +12,13 @@
  *   import { engineService } from '../engines/engine-service.js';
  *   
  *   // Calculate pricing for any engine
- *   const pricing = await engineService.calculatePricing('menu_service', lineItems, context);
+ *   const pricing = await engineService.calculatePricing('instant_transaction', lineItems, context);
  *   
  *   // Validate + execute state transition for any engine
- *   const result = await engineService.transitionState('menu_service', currentStatus, 'confirm', 'staff');
+ *   const result = await engineService.transitionState('instant_transaction', currentStatus, 'confirm', 'staff');
  *   
  *   // Get available actions for UI display
- *   const actions = engineService.getAvailableActions('session_access', 'valid', 'staff');
+ *   const actions = engineService.getAvailableActions('shared_capacity_access', 'valid', 'staff');
  */
 
 import type {
@@ -91,7 +91,7 @@ export class EngineService {
   /**
    * Calculate complete pricing using the unified pipeline.
    * 
-   * @param templateType - Database template_type (e.g., 'menu_service')
+   * @param templateType - Engine type (e.g., 'instant_transaction')
    * @param lineItems - Items to price
    * @param context - Runtime context (moduleId, customer, discounts)
    * @returns Complete pricing breakdown

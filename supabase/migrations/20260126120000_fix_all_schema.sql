@@ -10,7 +10,7 @@ ADD COLUMN IF NOT EXISTS expiry_date TIMESTAMP WITH TIME ZONE;
 
 CREATE TABLE IF NOT EXISTS inventory_bom (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    menu_item_id UUID NOT NULL, -- Links to menu item
+    catalog_item_id UUID NOT NULL, -- Links to menu item
     inventory_item_id UUID NOT NULL REFERENCES inventory_items(id),
     quantity DECIMAL(10,4) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -21,12 +21,13 @@ CREATE TABLE IF NOT EXISTS inventory_bom (
 CREATE TYPE housekeeping_status AS ENUM ('pending', 'assigned', 'in_progress', 'cleaned', 'inspected', 'approved');
 CREATE TYPE unit_clean_state AS ENUM ('clean', 'dirty', 'cleaning', 'inspected', 'out_of_service');
 
-ALTER TABLE IF EXISTS chalet_bookings ADD COLUMN IF NOT EXISTS housekeeping_status housekeeping_status DEFAULT 'pending';
+-- housekeeping_status tracked in transactions.metadata for time_exclusive_reservation engine
+DO $$ BEGIN NULL; END $$; -- booking records now tracked in transactions table
 
 CREATE TABLE IF NOT EXISTS housekeeping_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    unit_id UUID NOT NULL, -- Could be chalet_id or other unit
-    unit_type VARCHAR(50) NOT NULL DEFAULT 'chalet',
+    unit_id UUID NOT NULL, -- Could be accommodation_unit_id or other unit
+    unit_type VARCHAR(50) NOT NULL DEFAULT 'accommodation_unit',
     task_type VARCHAR(50) NOT NULL, -- 'cleaning', 'deep_clean', 'linen'
     status housekeeping_status DEFAULT 'pending',
     priority VARCHAR(20) DEFAULT 'normal',
@@ -111,17 +112,8 @@ CREATE TABLE IF NOT EXISTS loyalty_transactions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. POS / Orders Extensions
-ALTER TABLE IF EXISTS table_orders
-ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'unpaid',
-ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50),
-ADD COLUMN IF NOT EXISTS total_amount DECIMAL(10,2) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS subtotal DECIMAL(10,2) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(10,2) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS tip_amount DECIMAL(10,2) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS coupon_id UUID REFERENCES coupons(id),
-ADD COLUMN IF NOT EXISTS waiter_id UUID REFERENCES users(id);
+-- POS extensions moved to transactions.metadata
+DO $$ BEGIN NULL; END $$; -- table_orders/orders removed
 
 -- Ensure RLS is appropriate (simplified for this iteration)
 ALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;

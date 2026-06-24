@@ -54,6 +54,14 @@ ALTER TABLE property_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_defaults ENABLE ROW LEVEL SECURITY;
 
+-- Drop before recreate — PostgreSQL has no CREATE POLICY IF NOT EXISTS
+DROP POLICY IF EXISTS property_settings_read ON property_settings;
+DROP POLICY IF EXISTS property_settings_write ON property_settings;
+DROP POLICY IF EXISTS group_settings_read ON group_settings;
+DROP POLICY IF EXISTS group_settings_write ON group_settings;
+DROP POLICY IF EXISTS system_defaults_read ON system_defaults;
+DROP POLICY IF EXISTS system_defaults_write ON system_defaults;
+
 CREATE POLICY property_settings_read ON property_settings FOR SELECT USING (true);
 CREATE POLICY property_settings_write ON property_settings FOR ALL USING (
     EXISTS (SELECT 1 FROM user_property_access WHERE user_id = auth.uid() AND property_id = property_settings.property_id AND access_level IN ('admin', 'manage'))

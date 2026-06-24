@@ -74,7 +74,7 @@ const reviewsPayload = {
           id: 'r1',
           rating: 5,
           text: 'Amazing food and service',
-          service_type: 'restaurant',
+          service_type: 'menu_service',
           created_at: '2026-01-01T10:00:00.000Z',
           users: {
             full_name: 'Maya Reed',
@@ -127,7 +127,7 @@ describe('TestimonialsCarousel behavior', () => {
 
     expect(await screen.findByText(/Amazing food and service/i)).toBeInTheDocument();
     expect(screen.getByText('Maya Reed')).toBeInTheDocument();
-    expect(screen.getByText('Restaurant Guest')).toBeInTheDocument();
+    expect(screen.getByText('MenuService Guest')).toBeInTheDocument();
     expect(screen.getByText('4.8')).toBeInTheDocument();
     expect(screen.getByText('120+')).toBeInTheDocument();
   });

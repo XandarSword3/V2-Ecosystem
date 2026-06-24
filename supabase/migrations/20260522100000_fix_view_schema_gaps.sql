@@ -91,7 +91,7 @@ BEGIN
 END $$;
 
 -- Only create the sessions VIEW if sessions is not already a base table
-DO $$
+DO $outer$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.tables
@@ -108,10 +108,11 @@ BEGIN
             end_time,
             max_capacity,
             COALESCE(
-                (SELECT COUNT(*)::integer
-                 FROM pool_tickets pt
-                 WHERE pt.session_id = pool_sessions.id
-                   AND pt.status != 'cancelled'),
+                (SELECT SUM(COALESCE((t.metadata->>'number_of_guests')::integer, 1))::integer
+                 FROM transactions t
+                 WHERE (t.metadata->>'session_id')::UUID = capacity_windows.id
+                   AND t.engine_type = 'shared_capacity_access'
+                   AND t.status NOT IN ('cancelled', 'expired')),
                 0
             ) AS current_count,
             adult_price  AS price,
@@ -121,14 +122,14 @@ BEGIN
             module_id,
             created_at,
             updated_at
-        FROM pool_sessions;
+        FROM capacity_windows;
 
         -- Recreate INSTEAD OF trigger
         CREATE OR REPLACE FUNCTION sessions_view_trigger()
         RETURNS TRIGGER AS $fn$
         BEGIN
             IF TG_OP = 'INSERT' THEN
-                INSERT INTO pool_sessions (
+                INSERT INTO capacity_windows (
                     name, date, start_time, end_time, max_capacity,
                     adult_price, child_price, gender_restriction, is_active, module_id
                 ) VALUES (
@@ -138,7 +139,7 @@ BEGIN
                 ) RETURNING id INTO NEW.id;
                 RETURN NEW;
             ELSIF TG_OP = 'UPDATE' THEN
-                UPDATE pool_sessions SET
+                UPDATE capacity_windows SET
                     name              = NEW.name,
                     date              = NEW.date,
                     start_time        = NEW.start_time,
@@ -153,7 +154,7 @@ BEGIN
                 WHERE id = OLD.id;
                 RETURN NEW;
             ELSIF TG_OP = 'DELETE' THEN
-                DELETE FROM pool_sessions WHERE id = OLD.id;
+                DELETE FROM capacity_windows WHERE id = OLD.id;
                 RETURN OLD;
             END IF;
             RETURN NULL;
@@ -165,25 +166,25 @@ BEGIN
             INSTEAD OF INSERT OR UPDATE OR DELETE ON sessions
             FOR EACH ROW EXECUTE FUNCTION sessions_view_trigger();
     END IF;
-END $$;
+END $outer$;
 
 -- =============================================
--- 3. ENSURE pool_sessions HAS name COLUMN
+-- 3. ENSURE capacity_windows HAS name COLUMN
 -- base_schema_shim has name VARCHAR(255) but later migrations
 -- may have dropped or missed it; add if absent
 -- =============================================
 
-DO $$
+DO $col$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_schema = 'public'
-          AND table_name   = 'pool_sessions'
+          AND table_name   = 'capacity_windows'
           AND column_name  = 'name'
     ) THEN
-        ALTER TABLE pool_sessions ADD COLUMN name VARCHAR(255);
+        ALTER TABLE capacity_windows ADD COLUMN name VARCHAR(255);
     END IF;
-END $$;
+END $col$;
 
 -- =============================================
 -- 4. ENSURE accommodation_units HAS deleted_at

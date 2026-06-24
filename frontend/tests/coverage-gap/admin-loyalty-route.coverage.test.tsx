@@ -45,6 +45,18 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', type: 'resort' },
+    properties: [],
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
+  PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 import LoyaltyAdminPage from '../../src/app/admin/loyalty/page';
 
 const tiersSeed = [
@@ -159,7 +171,8 @@ describe('Admin loyalty route coverage', () => {
         expect.objectContaining({
           points: expect.any(Number),
           reason: expect.any(String),
-        })
+        }),
+        expect.any(Object)
       );
     });
 

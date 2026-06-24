@@ -8,16 +8,16 @@ describe('Cache Module (Source)', () => {
   });
 
   describe('CacheKeys', () => {
-    it('should have MENU prefix', () => {
-      expect(CacheKeys.MENU).toBe('menu:');
+    it('should have CATALOG prefix', () => {
+      expect(CacheKeys.CATALOG).toBe('catalog:');
     });
 
-    it('should have MENU_ITEM prefix', () => {
-      expect(CacheKeys.MENU_ITEM).toBe('menu:item:');
+    it('should have CATALOG_ITEM prefix', () => {
+      expect(CacheKeys.CATALOG_ITEM).toBe('catalog:item:');
     });
 
-    it('should have MENU_CATEGORY prefix', () => {
-      expect(CacheKeys.MENU_CATEGORY).toBe('menu:category:');
+    it('should have CATALOG_CATEGORY prefix', () => {
+      expect(CacheKeys.CATALOG_CATEGORY).toBe('catalog:category:');
     });
 
     it('should have SETTINGS prefix', () => {
@@ -36,8 +36,8 @@ describe('Cache Module (Source)', () => {
       expect(CacheKeys.RATE_LIMIT).toBe('rate:');
     });
 
-    it('should have CHALET prefix', () => {
-      expect(CacheKeys.CHALET).toBe('chalet:');
+    it('should have UNIT prefix', () => {
+      expect(CacheKeys.UNIT).toBe('unit:');
     });
 
     it('should have AVAILABILITY prefix', () => {
@@ -68,22 +68,22 @@ describe('Cache Module (Source)', () => {
   });
 
   describe('Cache key generation patterns', () => {
-    it('should generate proper menu key with module id', () => {
+    it('should generate proper catalog key with module id', () => {
       const moduleId = 'mod-123';
-      const key = `${CacheKeys.MENU}${moduleId}`;
-      expect(key).toBe('menu:mod-123');
+      const key = `${CacheKeys.CATALOG}${moduleId}`;
+      expect(key).toBe('catalog:mod-123');
     });
 
-    it('should generate proper menu item key', () => {
+    it('should generate proper catalog item key', () => {
       const itemId = 'item-456';
-      const key = `${CacheKeys.MENU_ITEM}${itemId}`;
-      expect(key).toBe('menu:item:item-456');
+      const key = `${CacheKeys.CATALOG_ITEM}${itemId}`;
+      expect(key).toBe('catalog:item:item-456');
     });
 
-    it('should generate proper menu category key', () => {
+    it('should generate proper catalog category key', () => {
       const categoryId = 'cat-789';
-      const key = `${CacheKeys.MENU_CATEGORY}${categoryId}`;
-      expect(key).toBe('menu:category:cat-789');
+      const key = `${CacheKeys.CATALOG_CATEGORY}${categoryId}`;
+      expect(key).toBe('catalog:category:cat-789');
     });
 
     it('should generate proper settings key', () => {
@@ -110,10 +110,10 @@ describe('Cache Module (Source)', () => {
       expect(key).toBe('rate:192.168.1.1');
     });
 
-    it('should generate proper chalet key', () => {
-      const chaletId = 'chalet-ghi';
-      const key = `${CacheKeys.CHALET}${chaletId}`;
-      expect(key).toBe('chalet:chalet-ghi');
+    it('should generate proper accommodation unit key', () => {
+      const unitId = 'unit-ghi';
+      const key = `${CacheKeys.UNIT}${unitId}`;
+      expect(key).toBe('unit:unit-ghi');
     });
 
     it('should generate proper availability key', () => {
@@ -124,14 +124,14 @@ describe('Cache Module (Source)', () => {
   });
 
   describe('Cache wildcard patterns', () => {
-    it('should create wildcard pattern for all menus', () => {
-      const pattern = `${CacheKeys.MENU}*`;
-      expect(pattern).toBe('menu:*');
+    it('should create wildcard pattern for all catalog entries', () => {
+      const pattern = `${CacheKeys.CATALOG}*`;
+      expect(pattern).toBe('catalog:*');
     });
 
-    it('should create wildcard pattern for all menu items', () => {
-      const pattern = `${CacheKeys.MENU_ITEM}*`;
-      expect(pattern).toBe('menu:item:*');
+    it('should create wildcard pattern for all catalog items', () => {
+      const pattern = `${CacheKeys.CATALOG_ITEM}*`;
+      expect(pattern).toBe('catalog:item:*');
     });
 
     it('should create wildcard pattern for all sessions', () => {

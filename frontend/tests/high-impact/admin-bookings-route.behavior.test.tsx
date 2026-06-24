@@ -27,13 +27,13 @@ vi.mock('framer-motion', async () => {
 });
 
 vi.mock('next/navigation', () => ({
-  useParams: () => ({ slug: 'chalets' }),
+  useParams: () => ({ slug: 'accommodation_units' }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
 vi.mock('@/lib/settings-context', () => ({
   useSiteSettings: () => ({
-    modules: [{ id: 'mod-1', slug: 'chalets', name: 'Chalets' }],
+    modules: [{ id: 'mod-1', slug: 'accommodation_units', name: 'AccommodationUnits' }],
   }),
 }));
 
@@ -65,7 +65,7 @@ const bookingsPayload = [
     customer_name: 'Alice Guest',
     customer_email: 'alice@example.com',
     customer_phone: '70112233',
-    chalets: { name: 'Palm Chalet', capacity: 4 },
+    accommodation_units: { name: 'Palm AccommodationUnit', capacity: 4 },
     created_at: '2026-06-20T12:00:00Z',
   },
 ];
@@ -87,7 +87,7 @@ describe('Admin bookings route behavior', () => {
     render(<DynamicBookingsPage />);
 
     expect(await screen.findByText('BK-001')).toBeInTheDocument();
-    expect(screen.getByText('Palm Chalet')).toBeInTheDocument();
+    expect(screen.getByText('Palm AccommodationUnit')).toBeInTheDocument();
     expect(screen.getByText('Alice Guest')).toBeInTheDocument();
 
     await user.type(screen.getByRole('textbox'), 'bk-001');
@@ -103,7 +103,7 @@ describe('Admin bookings route behavior', () => {
     await user.click(confirmButton as HTMLButtonElement);
 
     await waitFor(() => {
-      expect(apiPatchMock).toHaveBeenCalledWith('/chalets/staff/bookings/b1/status', {
+      expect(apiPatchMock).toHaveBeenCalledWith('/accommodation_units/staff/bookings/b1/status', {
         status: 'confirmed',
       });
     });
@@ -126,7 +126,7 @@ describe('Admin bookings route behavior', () => {
     const modalCard = modalHeading.closest('div')?.parentElement;
     expect(modalCard).not.toBeNull();
     expect(within(modalCard as HTMLElement).getByText('alice@example.com')).toBeInTheDocument();
-    expect(within(modalCard as HTMLElement).getByText('Palm Chalet')).toBeInTheDocument();
+    expect(within(modalCard as HTMLElement).getByText('Palm AccommodationUnit')).toBeInTheDocument();
 
     expect(toastSuccessMock).toHaveBeenCalledWith('success.updated');
   });

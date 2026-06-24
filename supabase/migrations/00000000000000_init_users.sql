@@ -65,7 +65,7 @@ BEGIN
 END $$;
 
 DO $$ BEGIN
-	CREATE TYPE business_unit AS ENUM ('restaurant', 'snack_bar', 'chalets', 'pool', 'admin');
+	CREATE TYPE business_unit AS ENUM ('menu_service', 'kiosk', 'accommodation', 'shared_capacity', 'admin');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -93,7 +93,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-	CREATE TYPE snack_category AS ENUM ('sandwich', 'drink', 'snack', 'ice_cream');
+	CREATE TYPE kiosk_item_category AS ENUM ('sandwich', 'drink', 'savory', 'ice_cream');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN

@@ -13,22 +13,11 @@ import { motion } from 'framer-motion';
 import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
 import { Container } from '@/components/layout/Container';
 import { Button } from '@/components/ui/Button';
+import type { Module } from '@/lib/settings-context';
 
-interface ModuleWithLayout {
-  id: string;
-  template_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
-  name: string;
-  slug: string;
-  description?: string;
-  is_active: boolean;
-  sort_order: number;
-  settings?: {
+interface ModuleWithLayout extends Module {
+  settings?: Module['settings'] & {
     layout?: any[];
-    showInNavigation?: boolean;
-    icon?: string;
-    theme?: string;
-    primaryColor?: string;
-    [key: string]: any;
   };
 }
 

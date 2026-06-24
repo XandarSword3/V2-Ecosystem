@@ -378,12 +378,12 @@ DECLARE
     v_deduction_count INTEGER := 0;
     v_total_needed DECIMAL;
 BEGIN
-    FOR v_order_item IN SELECT oi.menu_item_id, oi.quantity FROM restaurant_order_items oi WHERE oi.order_id = p_order_id
+    FOR v_order_item IN SELECT oi.catalog_item_id, oi.quantity FROM restaurant_order_items oi WHERE oi.order_id = p_order_id
     LOOP
         FOR v_ingredient IN SELECT mii.inventory_item_id, mii.quantity_required, ii.name, ii.current_stock 
             FROM menu_item_ingredients mii 
             JOIN inventory_items ii ON ii.id = mii.inventory_item_id 
-            WHERE mii.menu_item_id = v_order_item.menu_item_id FOR UPDATE OF ii
+            WHERE mii.catalog_item_id = v_order_item.catalog_item_id FOR UPDATE OF ii
         LOOP
             v_total_needed := v_ingredient.quantity_required * v_order_item.quantity;
             UPDATE inventory_items SET current_stock = current_stock - v_total_needed, updated_at = NOW() WHERE id = v_ingredient.inventory_item_id;

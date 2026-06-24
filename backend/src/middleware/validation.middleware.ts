@@ -103,6 +103,7 @@ export function validate(schema: ZodSchema, source: 'body' | 'query' | 'params' 
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({
+          success: false,
           error: 'Validation failed',
           details: error.errors.map(e => ({
             path: e.path.join('.'),
@@ -187,10 +188,12 @@ export const authSchemas = {
 
 /**
  * Booking validation schemas
+ * All field names use canonical engine-layer terminology.
  */
 export const bookingSchemas = {
-  createChaletBooking: z.object({
-    chaletId: schemas.uuid,
+  // Q53 — createBooking: uses canonical unitId (replaces legacy chaletId)
+  createBooking: z.object({
+    unitId: schemas.uuid,
     checkIn: schemas.date,
     checkOut: schemas.date,
     guests: z.number().int().positive().max(20),
@@ -205,7 +208,7 @@ export const bookingSchemas = {
     (data) => new Date(data.checkOut) > new Date(data.checkIn),
     { message: 'Check-out must be after check-in' }
   ),
-  
+
   modifyDates: z.object({
     newCheckIn: schemas.date,
     newCheckOut: schemas.date,
@@ -213,54 +216,9 @@ export const bookingSchemas = {
     (data) => new Date(data.newCheckOut) > new Date(data.newCheckIn),
     { message: 'Check-out must be after check-in' }
   ),
-  
+
   cancel: z.object({
     reason: z.string().max(500).optional(),
-  }),
-};
-
-/**
- * Pool validation schemas
- */
-export const poolSchemas = {
-  purchaseTicket: z.object({
-    date: schemas.date,
-    slot: z.enum(['morning', 'afternoon', 'full_day']),
-    adults: z.number().int().min(1).max(10),
-    children: z.number().int().min(0).max(10),
-    guestNames: z.array(z.string().max(100)).optional(),
-  }),
-  
-  createMembership: z.object({
-    planId: z.enum(['individual', 'family', 'corporate', 'vip']),
-    billingCycle: z.enum(['monthly', 'quarterly', 'annually']),
-    members: z.array(z.object({
-      name: z.string().min(1).max(100),
-      relationship: z.string().max(50),
-    })).optional(),
-  }),
-};
-
-/**
- * Restaurant validation schemas
- */
-export const restaurantSchemas = {
-  createReservation: z.object({
-    date: schemas.date,
-    time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Invalid time format (HH:MM)'),
-    partySize: z.number().int().positive().max(20),
-    guestName: z.string().min(1).max(100),
-    guestPhone: schemas.phone,
-    specialRequests: z.string().max(500).optional(),
-  }),
-  
-  createOrder: z.object({
-    tableId: z.union([schemas.uuid, z.number().int().positive()]),
-    items: z.array(z.object({
-      menuItemId: schemas.uuid,
-      quantity: z.number().int().positive().max(50),
-      notes: z.string().max(200).optional(),
-    })).min(1, 'Order must contain at least one item'),
   }),
 };
 

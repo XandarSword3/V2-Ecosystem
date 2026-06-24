@@ -33,6 +33,14 @@ export const ENGINE_TO_TEMPLATE: Record<EngineType, string> = {
   platform_entitlement:       'platform_entitlement',
 };
 
+/** Maps canonical engine_type → legacy modules.template_type enum value (deprecated column). */
+export const ENGINE_TO_LEGACY_TEMPLATE_TYPE: Partial<Record<EngineType, string>> = {
+  instant_transaction:        'menu_service',
+  time_exclusive_reservation: 'multi_day_booking',
+  shared_capacity_access:     'session_access',
+  ongoing_entitlement:        'subscription',
+};
+
 export interface StateTransition<TStatus extends string = string> {
   from: TStatus;
   to: TStatus;
@@ -135,7 +143,7 @@ export interface PricingResult extends EconomicsReporting {
 export interface InteractionContract {
   name: string;
   applicableEngines: EngineType[];
-  trigger: 'on_purchase' | 'on_payment' | 'on_refund' | 'on_cancel' | 'on_check_in' | 'on_check_out';
+  trigger: 'on_purchase' | 'on_payment' | 'on_refund' | 'on_cancel' | 'on_check_in' | 'on_check_out' | 'on_plan_change';
   guardDescription: string;
   idempotent: boolean;
   failureMode: 'block' | 'log_and_continue' | 'retry';

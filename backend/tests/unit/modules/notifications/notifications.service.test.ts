@@ -153,7 +153,7 @@ const mockTemplate = {
 const mockInactiveTemplate = {
   id: 'template-2',
   name: 'Welcome Deprecated',
-  title: 'Welcome to our resort',
+  title: 'Welcome to our property',
   message: 'Thank you for joining us',
   type: 'info',
   target_type: 'user',

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
+import { useProperty } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -20,7 +21,6 @@ import {
   MessageSquare,
   UtensilsCrossed,
   Home,
-  Waves,
   Cookie,
   HelpCircle,
   Filter,
@@ -32,7 +32,7 @@ interface Review {
   id: string;
   rating: number;
   text: string;
-  service_type: 'general' | 'restaurant' | 'chalets' | 'pool' | 'snack_bar';
+  service_type: string;
   is_approved: boolean;
   created_at: string;
   users?: {
@@ -45,46 +45,67 @@ interface Review {
 
 const serviceConfig: Record<string, { icon: React.ElementType; color: string }> = {
   general: { icon: HelpCircle, color: 'text-slate-500' },
-  restaurant: { icon: UtensilsCrossed, color: 'text-blue-500' },
-  chalets: { icon: Home, color: 'text-green-500' },
-  pool: { icon: Waves, color: 'text-primary-500' },
-  snack_bar: { icon: Cookie, color: 'text-orange-500' },
+  menu_service: { icon: UtensilsCrossed, color: 'text-blue-500' },
+  accommodation: { icon: Home, color: 'text-green-500' },
+  kiosk: { icon: Cookie, color: 'text-orange-500' },
 };
+
+interface Module {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+}
 
 export default function AdminReviewsPage() {
   const t = useTranslations('admin');
+  const { activePropertyId } = useProperty();
+  const propertyHeader = activePropertyId ? { 'x-property-id': activePropertyId } : undefined;
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [serviceFilter, setServiceFilter] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [modules, setModules] = useState<Module[]>([]);
 
   const fetchReviews = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/reviews/admin');
+      const response = await api.get('/reviews/admin', { headers: propertyHeader });
       setReviews(response.data.data || []);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch reviews');
     } finally {
       setLoading(false);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePropertyId]);
+
+  const fetchModules = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/modules', { headers: propertyHeader });
+      if (res.data.success) {
+        setModules((res.data.data as Module[]).filter((m) => m.is_active));
+      }
+    } catch {
+      // silently ignore — hardcoded fallback still renders
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePropertyId]);
 
   useEffect(() => {
     fetchReviews();
-  }, [fetchReviews]);
+    fetchModules();
+  }, [fetchReviews, fetchModules]);
 
   const approveReview = async (id: string) => {
     try {
       setActionLoading(id);
-      await api.put(`/reviews/${id}/approve`);
-      setReviews((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, is_approved: true } : r))
-      );
+      await api.put(`/reviews/${id}/approve`, {}, { headers: propertyHeader });
+      setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, is_approved: true } : r)));
       toast.success('Review approved');
-    } catch (error) {
+    } catch {
       toast.error('Failed to approve review');
     } finally {
       setActionLoading(null);
@@ -94,12 +115,10 @@ export default function AdminReviewsPage() {
   const rejectReview = async (id: string) => {
     try {
       setActionLoading(id);
-      await api.put(`/reviews/${id}/reject`);
-      setReviews((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, is_approved: false } : r))
-      );
+      await api.put(`/reviews/${id}/reject`, {}, { headers: propertyHeader });
+      setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, is_approved: false } : r)));
       toast.success('Review rejected');
-    } catch (error) {
+    } catch {
       toast.error('Failed to reject review');
     } finally {
       setActionLoading(null);
@@ -108,13 +127,12 @@ export default function AdminReviewsPage() {
 
   const deleteReview = async (id: string) => {
     if (!confirm('Are you sure you want to delete this review?')) return;
-    
     try {
       setActionLoading(id);
-      await api.delete(`/reviews/${id}`);
+      await api.delete(`/reviews/${id}`, { headers: propertyHeader });
       setReviews((prev) => prev.filter((r) => r.id !== id));
       toast.success('Review deleted');
-    } catch (error) {
+    } catch {
       toast.error('Failed to delete review');
     } finally {
       setActionLoading(null);
@@ -272,10 +290,12 @@ export default function AdminReviewsPage() {
             >
               <option value="all">All Services</option>
               <option value="general">General</option>
-              <option value="restaurant">Restaurant</option>
-              <option value="chalets">Chalets</option>
-              <option value="pool">Pool</option>
-              <option value="snack_bar">Snack Bar</option>
+              {modules.map((m) => (
+                  <option key={m.id} value={m.slug}>
+                    {m.name}
+                  </option>
+                ))
+              }
             </select>
           </div>
         </CardContent>

@@ -17,9 +17,9 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
 }) => {
   const getTitle = () => {
     switch (engineType) {
-      case 'instant_transaction': return 'Restaurant Floor Plan';
-      case 'shared_capacity_access': return 'Pool Area Layout';
-      case 'time_exclusive_reservation': return 'Chalet Layout';
+      case 'instant_transaction': return 'Order Service Floor Plan';
+      case 'shared_capacity_access': return 'Capacity Area Layout';
+      case 'time_exclusive_reservation': return 'Accommodation Layout';
       default: return 'Floor Plan';
     }
   };

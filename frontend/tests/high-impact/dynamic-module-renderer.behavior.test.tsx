@@ -82,7 +82,7 @@ import { DynamicModuleRenderer } from '../../src/components/module-builder/Dynam
 
 const moduleData = {
   id: 'mod-1',
-  slug: 'restaurant',
+  slug: 'menu_service',
   name: 'Module One',
   description: 'Sample module',
   settings: {},

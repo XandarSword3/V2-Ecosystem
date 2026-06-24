@@ -180,7 +180,7 @@ JOIN customization_groups cg ON cg.name = mg.name;
 INSERT INTO entity_customizations (entity_type, entity_id, group_id, sort_order)
 SELECT 
   'menu_item',
-  mimg.menu_item_id,
+  mimg.catalog_item_id,
   cg.id,
   mimg.sort_order
 FROM menu_item_modifier_groups mimg

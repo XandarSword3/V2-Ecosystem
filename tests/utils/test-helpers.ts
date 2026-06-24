@@ -12,7 +12,7 @@ export const CONFIG = {
   API_URL: process.env.API_URL || 'http://localhost:3005',
   ADMIN_EMAIL: process.env.E2E_ADMIN_EMAIL || 'admin@v2ecosystem.com',
   ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD || 'admin123',
-  STAFF_EMAIL: process.env.E2E_STAFF_EMAIL || 'restaurant.staff@v2ecosystem.com',
+  STAFF_EMAIL: process.env.E2E_STAFF_EMAIL || 'menu.service.staff@v2ecosystem.com',
   STAFF_PASSWORD: process.env.E2E_STAFF_PASSWORD || 'staff123',
   DEFAULT_TIMEOUT: 15000,
 };

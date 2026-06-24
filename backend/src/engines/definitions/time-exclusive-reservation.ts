@@ -3,10 +3,10 @@
  * 
  * Economic Pattern: Reserve → Confirm → Check-In → Occupy → Check-Out
  * Commercial Entity: Booking
- * Examples: Chalets, Hotel Rooms, Villas, Private Cabanas
+ * Examples: Accommodation units, hotel rooms, villas, private cabanas
  * 
  * This engine handles:
- *   - Bookable units (chalets, rooms) with capacity, amenities, images
+ *   - Bookable units (accommodation, rooms) with capacity, amenities, images
  *   - Night-by-night pricing with weekend/holiday/seasonal rules
  *   - Add-ons (per-night or one-time): BBQ, extra bedding, etc.
  *   - Deposit collection (fixed or percentage)

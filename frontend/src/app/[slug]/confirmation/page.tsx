@@ -65,7 +65,7 @@ interface OrderConfirmation {
   items?: Array<{
     id: string;
     quantity: number;
-    menu_items?: { name: string };
+    catalog_items?: { name: string };
   }>;
 }
 
@@ -80,7 +80,7 @@ interface BookingConfirmation {
   total_price: number;
   guests?: number;
   special_requests?: string;
-  chalet?: { name: string };
+  unit?: { name: string };
 }
 
 // ============================
@@ -90,9 +90,7 @@ interface BookingConfirmation {
 function ConfirmationContent() {
   const searchParams = useSearchParams();
   const params = useParams();
-  const t = useTranslations('pool');
   const tCommon = useTranslations('common');
-  const tErrors = useTranslations('errors');
   const currency = useSettingsStore((s) => s.currency);
   const { modules } = useSiteSettings();
 
@@ -121,14 +119,14 @@ function ConfirmationContent() {
   const fetchConfirmation = async () => {
     try {
       if (confirmationType === 'order') {
-        const response = await api.get(`/restaurant/orders/${itemId}`);
+        const response = await api.get(`/${slug}/orders/${itemId}`);
         setOrder(response.data.data);
       } else if (confirmationType === 'booking') {
-        const response = await api.get(`/chalets/bookings/${itemId}`);
+        const response = await api.get(`/${slug}/bookings/${itemId}`);
         setBooking(response.data.data);
       } else {
         // Default: session ticket
-        const response = await api.get(`/pool/tickets/${itemId}`);
+        const response = await api.get(`/${slug}/tickets/${itemId}`);
         setTicket(response.data.data);
       }
     } catch (err) {
@@ -183,12 +181,12 @@ function ConfirmationContent() {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
             {confirmationType === 'order' ? 'Order Confirmed!' :
              confirmationType === 'booking' ? 'Booking Confirmed!' :
-             t('ticketConfirmed')}
+             'Ticket Confirmed!'}
           </h1>
           <p className="text-slate-600 dark:text-slate-400">
             {confirmationType === 'order' ? 'Your order has been placed successfully.' :
              confirmationType === 'booking' ? 'Your booking is confirmed. We look forward to hosting you!' :
-             t('ticketConfirmationMessage')}
+             'Your ticket has been confirmed.'}
           </p>
         </motion.div>
 
@@ -219,7 +217,7 @@ function ConfirmationContent() {
                   <Ticket className="w-6 h-6 text-primary-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">{t('sessionLabel')}</p>
+                  <p className="text-sm text-slate-500">{'Session'}</p>
                   <p className="font-semibold">{ticket.session?.name || 'Session'}</p>
                 </div>
               </div>
@@ -228,7 +226,7 @@ function ConfirmationContent() {
                   <Calendar className="w-6 h-6 text-primary-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-slate-500">{t('date')}</p>
+                  <p className="text-sm text-slate-500">{'Date'}</p>
                   <p className="font-semibold">{formatDate(ticket.ticket_date)}</p>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
@@ -246,7 +244,7 @@ function ConfirmationContent() {
                 </div>
               </div>
               <div className="py-4 space-y-2">
-                <p className="text-sm text-slate-500">{t('contactInfo')}</p>
+                <p className="text-sm text-slate-500">{'Contact Information'}</p>
                 <p className="font-medium">{ticket.customer_name}</p>
                 <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                   <Phone className="w-4 h-4" />
@@ -324,7 +322,7 @@ function ConfirmationContent() {
                           {item.quantity}x
                         </span>
                         <span className="text-slate-700 dark:text-slate-300 text-sm">
-                          {item.menu_items?.name || 'Menu Item'}
+                          {item.catalog_items?.name || 'Item'}
                         </span>
                       </div>
                     ))}
@@ -376,14 +374,14 @@ function ConfirmationContent() {
               </CardTitle>
             </CardHeader>
             <CardContent className="divide-y divide-slate-200 dark:divide-slate-700">
-              {booking.chalet?.name && (
+              {booking.unit?.name && (
                 <div className="py-4 flex items-center gap-4">
                   <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
                     <Home className="w-6 h-6 text-emerald-600" />
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Unit</p>
-                    <p className="font-semibold">{booking.chalet.name}</p>
+                    <p className="font-semibold">{booking.unit.name}</p>
                   </div>
                 </div>
               )}
@@ -445,7 +443,7 @@ function ConfirmationContent() {
         {ticket && (
           <div className="mt-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
             <p className="text-sm text-amber-800 dark:text-amber-300">
-              <strong>{t('importantNote')}:</strong> {t('showQrAtEntrance')}
+              <strong>{'Important Note'}:</strong> {'Please show your QR code at the entrance to gain access.'}
             </p>
           </div>
         )}
@@ -471,7 +469,7 @@ function ConfirmationContent() {
           </Link>
           <Link href="/profile">
             <Button className="gap-2">
-              {confirmationType === 'order' ? 'View My Orders' : confirmationType === 'booking' ? 'View My Bookings' : t('viewMyTickets')}
+              {confirmationType === 'order' ? 'View My Orders' : confirmationType === 'booking' ? 'View My Bookings' : 'View My Tickets'}
               <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>

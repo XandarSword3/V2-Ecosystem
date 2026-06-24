@@ -293,14 +293,10 @@ describe('Loyalty Controller', () => {
   });
 
   describe('getStats', () => {
-    // SKIPPED: This test requires 3 sequential mockFrom calls that are not
-    // correctly chained due to the mock pattern. The controller makes parallel
-    // database queries that the mock setup cannot properly sequence.
-    // Coverage provided by integration tests.
-    it.skip('should return loyalty statistics (requires integration test)', async () => {
+    it('should return loyalty statistics', async () => {
       const mockAccounts = [
-        { current_points: 500, lifetime_points: 1000 },
-        { current_points: 300, lifetime_points: 800 },
+        { available_points: 500, lifetime_points: 1000 },
+        { available_points: 300, lifetime_points: 800 },
       ];
 
       const mockTierAccounts = [
@@ -308,27 +304,53 @@ describe('Loyalty Controller', () => {
         { tier_id: 'tier-2', tier: { name: 'Silver', color: '#C0C0C0' } },
       ];
 
-      // Mock accounts query
-      mockFrom.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: mockAccounts, error: null }),
-        }),
-      });
+      mockFrom.mockImplementation((table: string) => {
+        if (table === 'loyalty_members') {
+          const makeThenable = (promise: Promise<any>) => {
+            const chain: any = {
+              eq: vi.fn().mockImplementation(() => chain),
+              in: vi.fn().mockImplementation(() => chain),
+              gte: vi.fn().mockImplementation(() => chain),
+              order: vi.fn().mockImplementation(() => chain),
+              limit: vi.fn().mockImplementation(() => chain),
+              single: vi.fn().mockImplementation(() => chain),
+              then: (resolve: any, reject: any) => promise.then(resolve, reject),
+            };
+            return chain;
+          };
 
-      // Mock tier distribution query  
-      mockFrom.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: mockTierAccounts, error: null }),
-        }),
-      });
+          return {
+            select: vi.fn().mockImplementation((selectStr: string, options: any) => {
+              let resPromise;
+              if (options && options.count === 'exact') {
+                resPromise = Promise.resolve({ count: 2, data: null, error: null });
+              } else if (selectStr.includes('available_points')) {
+                resPromise = Promise.resolve({ data: mockAccounts, error: null });
+              } else if (selectStr.includes('tier_id')) {
+                resPromise = Promise.resolve({ data: mockTierAccounts, error: null });
+              } else if (selectStr === 'id') {
+                resPromise = Promise.resolve({ data: [{ id: 'member-1' }, { id: 'member-2' }], error: null });
+              } else {
+                resPromise = Promise.resolve({ data: [], error: null });
+              }
+              return makeThenable(resPromise);
+            })
+          };
+        }
 
-      // Mock recent transactions
-      mockFrom.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          gte: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
+        if (table === 'loyalty_transactions') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                gte: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        return createMockQueryBuilder();
       });
 
       await controller.getStats(

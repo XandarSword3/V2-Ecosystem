@@ -105,12 +105,12 @@ async function seed() {
     const { error } = await supabase
       .from('menu_item_ingredients')
       .upsert({
-        menu_item_id: fattoushId,
+        catalog_item_id: fattoushId,
         inventory_item_id: invId,
         quantity_required: ing.qty,
         unit: 'kg', // Defaulting unit for simplicity of this script
         is_optional: false
-      }, { onConflict: 'menu_item_id,inventory_item_id' }); // Schema constraint unique
+      }, { onConflict: 'catalog_item_id,inventory_item_id' }); // Schema constraint unique
 
     if (error) console.error(`Failed to link ${ing.name}:`, error.message);
   }
@@ -132,12 +132,12 @@ async function seed() {
     const { error } = await supabase
       .from('menu_item_ingredients')
       .upsert({
-        menu_item_id: babaId,
+        catalog_item_id: babaId,
         inventory_item_id: invId,
         quantity_required: ing.qty,
         unit: 'kg',
         is_optional: false
-      }, { onConflict: 'menu_item_id,inventory_item_id' });
+      }, { onConflict: 'catalog_item_id,inventory_item_id' });
 
     if (error) console.error(`Failed to link ${ing.name}:`, error.message);
   }

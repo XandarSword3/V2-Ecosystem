@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { useProperty } from '@/context/PropertyContext';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -58,15 +59,15 @@ interface FooterConfig {
 }
 
 const DEFAULT_CONFIG: FooterConfig = {
-  logo: { text: 'Your Resort', showIcon: true },
-  description: 'Premium resort experience in the heart of Lebanon.',
+  logo: { text: 'Your Business', showIcon: true },
+  description: 'Premium hospitality experience.',
   columns: [
     {
       title: 'Quick Links',
       links: [
-        { label: 'Restaurant', href: '/restaurant' },
-        { label: 'Chalets', href: '/chalets' },
-        { label: 'Pool', href: '/pool' },
+        { label: 'Our Services', href: '/#services' },
+        { label: 'Book Now', href: '/#modules' },
+        { label: 'Reservations', href: '/reservations' },
         { label: 'Gift Cards', href: '/giftcards' }
       ]
     },
@@ -88,13 +89,15 @@ const DEFAULT_CONFIG: FooterConfig = {
     showPhone: true,
     showEmail: true
   },
-  copyright: '© {year} Your Resort. All rights reserved.'
+  copyright: '© {year} Your Business. All rights reserved.'
 };
 
 export default function FooterSettingsPage() {
   const [config, setConfig] = useState<FooterConfig>(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { activePropertyId } = useProperty();
+  const propertyHeader = activePropertyId ? { 'x-property-id': activePropertyId } : {};
 
   useEffect(() => {
     fetchSettings();
@@ -102,7 +105,7 @@ export default function FooterSettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const { data } = await api.get('/admin/settings');
+      const { data } = await api.get('/admin/settings', { headers: propertyHeader });
       if (data?.data?.footer) {
         // deeply merge with default config to ensure all properties exist
         setConfig(prev => ({
@@ -132,7 +135,7 @@ export default function FooterSettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.put('/admin/settings', { footer: config });
+      await api.put('/admin/settings', { footer: config }, { headers: propertyHeader });
       toast.success('Footer configuration saved successfully');
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { error?: string } } };
@@ -239,16 +242,16 @@ export default function FooterSettingsPage() {
                 <Info className="w-5 h-5 text-blue-500" />
                 Branding & Info
               </CardTitle>
-              <CardDescription>Resort name and description</CardDescription>
+              <CardDescription>Business name and description</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Resort Name (Logo Text)</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Business Name (Logo Text)</label>
                 <div className="flex gap-2">
                   <Input
                     value={config.logo.text}
                     onChange={(e) => setConfig({ ...config, logo: { ...config.logo, text: e.target.value } })}
-                    placeholder="Your Resort"
+                    placeholder="Your Business"
                   />
                   <Button
                     variant={config.logo.showIcon ? 'primary' : 'outline'}
@@ -266,7 +269,7 @@ export default function FooterSettingsPage() {
                   className="w-full min-h-[100px] p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
                   value={config.description}
                   onChange={(e) => setConfig({ ...config, description: e.target.value })}
-                  placeholder="A short description of your resort..."
+                  placeholder="A short description of your business..."
                 />
               </div>
               <div className="space-y-3 pt-2">
@@ -351,7 +354,7 @@ export default function FooterSettingsPage() {
               <Input
                 value={config.copyright}
                 onChange={(e) => setConfig({ ...config, copyright: e.target.value })}
-                placeholder="© {year} Your Resort. All rights reserved."
+                placeholder="© {year} Your Business. All rights reserved."
               />
               <p className="text-xs text-slate-500 mt-2">Use {'{year}'} to insert the current year.</p>
             </CardContent>

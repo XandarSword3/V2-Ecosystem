@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -9,19 +9,12 @@ import { Input } from '@/components/ui/Input';
 import { ArrowLeft, UserPlus, Mail, Phone, Lock, User, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Valid roles matching backend schema
-type ValidRole = 
-  | 'customer' 
-  | 'admin' 
-  | 'super_admin'
-  | 'restaurant_staff' 
-  | 'restaurant_admin'
-  | 'chalet_staff' 
-  | 'chalet_admin'
-  | 'pool_staff' 
-  | 'pool_admin'
-  | 'snack_bar_staff' 
-  | 'snack_bar_admin';
+interface Role {
+  id: string;
+  name: string;
+  description?: string;
+  business_unit?: string;
+}
 
 interface FormData {
   email: string;
@@ -29,26 +22,13 @@ interface FormData {
   confirmPassword: string;
   fullName: string;
   phone: string;
-  role: ValidRole;
+  role: string;
 }
-
-const ROLE_OPTIONS: { value: ValidRole; label: string; description: string; category: string }[] = [
-  { value: 'customer', label: 'Customer', description: 'Regular customer with booking and ordering access.', category: 'General' },
-  { value: 'admin', label: 'Admin', description: 'Administrator with full access to the admin dashboard.', category: 'General' },
-  { value: 'super_admin', label: 'Super Admin', description: 'Super administrator with system-wide access.', category: 'General' },
-  { value: 'restaurant_staff', label: 'Restaurant Staff', description: 'Staff member for restaurant operations.', category: 'Restaurant' },
-  { value: 'restaurant_admin', label: 'Restaurant Admin', description: 'Administrator for restaurant management.', category: 'Restaurant' },
-  { value: 'chalet_staff', label: 'Chalet Staff', description: 'Staff member for chalet operations.', category: 'Chalet' },
-  { value: 'chalet_admin', label: 'Chalet Admin', description: 'Administrator for chalet management.', category: 'Chalet' },
-  { value: 'pool_staff', label: 'Pool Staff', description: 'Staff member for pool operations.', category: 'Pool' },
-  { value: 'pool_admin', label: 'Pool Admin', description: 'Administrator for pool management.', category: 'Pool' },
-  { value: 'snack_bar_staff', label: 'Snack Bar Staff', description: 'Staff member for snack bar operations.', category: 'Snack Bar' },
-  { value: 'snack_bar_admin', label: 'Snack Bar Admin', description: 'Administrator for snack bar management.', category: 'Snack Bar' },
-];
 
 export default function CreateUserPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
@@ -58,6 +38,21 @@ export default function CreateUserPage() {
     role: 'customer',
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
+
+  useEffect(() => {
+    api.get('/admin/roles')
+      .then(res => setRoles(res.data?.data || res.data || []))
+      .catch(() => {
+        // Fallback to core roles if API fetch fails
+        setRoles([
+          { id: 'customer', name: 'customer', description: 'Regular customer with booking and ordering access.' },
+          { id: 'admin', name: 'admin', description: 'Administrator with full access to the admin dashboard.' },
+          { id: 'super_admin', name: 'super_admin', description: 'Super administrator with system-wide access.' },
+          { id: 'manager', name: 'manager', description: 'Property manager with operational access.' },
+          { id: 'staff', name: 'staff', description: 'Generic staff member.' },
+        ]);
+      });
+  }, []);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<FormData> = {};
@@ -218,20 +213,14 @@ export default function CreateUserPage() {
                 onChange={handleChange('role')}
                 className="w-full px-3 py-2 border rounded-lg bg-background focus:ring-2 focus:ring-primary focus:border-primary"
               >
-                {['General', 'Restaurant', 'Chalet', 'Pool', 'Snack Bar'].map(category => (
-                  <optgroup key={category} label={category}>
-                    {ROLE_OPTIONS
-                      .filter(role => role.category === category)
-                      .map(role => (
-                        <option key={role.value} value={role.value}>
-                          {role.label}
-                        </option>
-                      ))}
-                  </optgroup>
+                {roles.map(role => (
+                  <option key={role.id} value={role.name}>
+                    {role.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                  </option>
                 ))}
               </select>
               <p className="text-xs text-muted-foreground">
-                {ROLE_OPTIONS.find(r => r.value === formData.role)?.description}
+                {roles.find(r => r.name === formData.role)?.description}
               </p>
             </div>
 

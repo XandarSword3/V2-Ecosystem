@@ -45,6 +45,18 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', type: 'resort' },
+    properties: [],
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
+  PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 import GiftCardsAdminPage from '../../src/app/admin/giftcards/page';
 
 const giftCardsSeed = [
@@ -133,7 +145,8 @@ describe('Admin gift cards route coverage', () => {
         '/giftcards/admin',
         expect.objectContaining({
           initialValue: expect.any(Number),
-        })
+        }),
+        expect.any(Object)
       );
     });
 

@@ -825,7 +825,7 @@ export function createStaffBot(
 }
 
 /**
- * Restaurant Host
+ * MenuService Host
  * Manages reservations, waitlist, and seating
  */
 export class RestaurantHost extends StaffBot {
@@ -916,7 +916,7 @@ export class RestaurantHost extends StaffBot {
     const now = this.eventBus.getSimulationTime();
     const result = await this.apiCall<{ reservations: any[] }>(
       'GET',
-      `/api/v1/restaurant/reservations?date=${now.toISOString().split('T')[0]}`
+      `/api/v1/${slug}/reservations?date=${now.toISOString().split('T')[0]}`
     );
 
     if (result.success && result.data) {
@@ -941,7 +941,7 @@ export class RestaurantHost extends StaffBot {
 
     const result = await this.apiCall<{ tableNumber: string }>(
       'POST',
-      '/api/v1/restaurant/tables/seat',
+      '/api/v1/${slug}/tables/seat',
       {
         partySize,
         type: 'walk_in',
@@ -950,7 +950,7 @@ export class RestaurantHost extends StaffBot {
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.TABLE_SEATED, 'restaurant', {
+      this.emitEvent(EventTypes.TABLE_SEATED, 'menu_service', {
         tableNumber: result.data.tableNumber,
         partySize,
         type: 'walk_in',
@@ -978,7 +978,7 @@ export class RestaurantHost extends StaffBot {
     // Check if table is available
     const result = await this.apiCall<{ tableNumber: string }>(
       'POST',
-      '/api/v1/restaurant/waitlist/call',
+      '/api/v1/${slug}/waitlist/call',
       {
         waitlistId: next.id,
         partySize: next.partySize,
@@ -986,7 +986,7 @@ export class RestaurantHost extends StaffBot {
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.WAITLIST_CALLED, 'restaurant', {
+      this.emitEvent(EventTypes.WAITLIST_CALLED, 'menu_service', {
         waitlistId: next.id,
         guestName: next.guestName,
         tableNumber: result.data.tableNumber,
@@ -1012,7 +1012,7 @@ export class RestaurantHost extends StaffBot {
       const entry = this.waitlist[i];
       const estimatedWait = baseWait * (i + 1);
       
-      await this.apiCall('PUT', `/api/v1/restaurant/waitlist/${entry.id}`, {
+      await this.apiCall('PUT', `/api/v1/${slug}/waitlist/${entry.id}`, {
         estimatedWait,
       });
     }
@@ -1027,7 +1027,7 @@ export class RestaurantHost extends StaffBot {
   private async sendReminders(): Promise<{ success: boolean; action: string; data?: any }> {
     const result = await this.apiCall<{ sent: number }>(
       'POST',
-      '/api/v1/restaurant/reservations/send-reminders',
+      '/api/v1/${slug}/reservations/send-reminders',
       {
         hoursAhead: 2,
       }
@@ -1174,7 +1174,7 @@ export class Concierge extends StaffBot {
   }
 
   private async makeExternalBooking(): Promise<{ success: boolean; action: string; data?: any }> {
-    const bookingTypes = ['restaurant', 'tour', 'transportation', 'theater', 'spa_external'];
+    const bookingTypes = ['menu_service', 'tour', 'transportation', 'theater', 'spa_external'];
     const type = bookingTypes[Math.floor(Math.random() * bookingTypes.length)];
 
     const result = await this.apiCall<{ bookingId: string }>(
@@ -1253,10 +1253,10 @@ export class PoolAttendant extends StaffBot {
     super.subscribeToEvents();
 
     // Track bracelet issues
-    this.eventBus.subscribe(EventTypes.POOL_BRACELET_ISSUED, () => {
+    this.eventBus.subscribe(EventTypes.CAPACITY_ACCESS_ISSUED, () => {
       this.currentCapacity++;
       if (this.currentCapacity > this.maxCapacity * 0.9) {
-        this.emitEvent(EventTypes.POOL_CAPACITY_ALERT, 'pool', {
+        this.emitEvent(EventTypes.POOL_CAPACITY_ALERT, 'capacity', {
           currentCapacity: this.currentCapacity,
           maxCapacity: this.maxCapacity,
         });
@@ -1338,7 +1338,7 @@ export class PoolAttendant extends StaffBot {
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.POOL_BRACELET_ISSUED, 'pool', {
+      this.emitEvent(EventTypes.CAPACITY_ACCESS_ISSUED, 'capacity', {
         braceletId: result.data.braceletId,
         lockerNumber: result.data.lockerNumber,
         issuedBy: this.id,
@@ -1348,7 +1348,7 @@ export class PoolAttendant extends StaffBot {
         success: true,
         action: 'issue_bracelet',
         data: result.data,
-        cascades: [EventTypes.POOL_BRACELET_ISSUED],
+        cascades: [EventTypes.CAPACITY_ACCESS_ISSUED],
       };
     }
 
@@ -1365,7 +1365,7 @@ export class PoolAttendant extends StaffBot {
     );
 
     if (result.success) {
-      this.emitEvent(EventTypes.POOL_BRACELET_RETURNED, 'pool', {
+      this.emitEvent(EventTypes.POOL_BRACELET_RETURNED, 'capacity', {
         collectedBy: this.id,
       });
 
@@ -1420,9 +1420,9 @@ export class PoolAttendant extends StaffBot {
                      result.data.chlorine >= 1 && result.data.chlorine <= 3;
 
       if (!isGood) {
-        this.emitEvent(EventTypes.ALERT_TRIGGERED, 'pool', {
+        this.emitEvent(EventTypes.ALERT_TRIGGERED, 'capacity', {
           type: 'water_quality_issue',
-          system: 'pool',
+          system: 'capacity',
           readings: result.data,
         });
       }
@@ -1452,8 +1452,8 @@ export class PoolAttendant extends StaffBot {
 }
 
 /**
- * Chalet Staff
- * Handles chalet check-ins, check-outs, maintenance
+ * AccommodationUnit Staff
+ * Handles accommodation unit check-ins, check-outs, maintenance
  */
 export class ChaletStaff extends StaffBot {
   constructor(config: Omit<StaffConfig, 'department' | 'type' | 'profile' | 'role'> & { profile?: Partial<StaffProfile>; role?: string }) {
@@ -1468,7 +1468,7 @@ export class ChaletStaff extends StaffBot {
 
     super({
       ...config,
-      department: 'chalets',
+      department: 'accommodation_units',
       role: config.role || 'chalet_attendant',
       profile: { ...defaultProfile, ...config.profile },
     });
@@ -1477,7 +1477,7 @@ export class ChaletStaff extends StaffBot {
   protected registerActions(): void {
     super.registerActions();
 
-    // Process chalet check-in
+    // Process accommodation unit check-in
     this.registerAction({
       name: 'process_chalet_checkin',
       weight: 8,
@@ -1485,7 +1485,7 @@ export class ChaletStaff extends StaffBot {
       execute: async () => this.processChaletCheckIn(),
     });
 
-    // Process chalet check-out
+    // Process accommodation unit check-out
     this.registerAction({
       name: 'process_chalet_checkout',
       weight: 8,
@@ -1493,7 +1493,7 @@ export class ChaletStaff extends StaffBot {
       execute: async () => this.processChaletCheckOut(),
     });
 
-    // Prepare chalet
+    // Prepare accommodation unit
     this.registerAction({
       name: 'prepare_chalet',
       weight: 6,
@@ -1501,7 +1501,7 @@ export class ChaletStaff extends StaffBot {
       execute: async () => this.prepareChalet(),
     });
 
-    // Inspect chalet
+    // Inspect accommodation unit
     this.registerAction({
       name: 'inspect_chalet',
       weight: 5,
@@ -1517,7 +1517,7 @@ export class ChaletStaff extends StaffBot {
       execute: async () => this.deliverChaletAddOn(),
     });
 
-    // Handle chalet maintenance request
+    // Handle accommodation unit maintenance request
     this.registerAction({
       name: 'handle_chalet_maintenance',
       weight: 5,
@@ -1539,7 +1539,7 @@ export class ChaletStaff extends StaffBot {
   }
 
   private async processChaletCheckIn(): Promise<{ success: boolean; action: string; data?: any; error?: string; cascades?: string[] }> {
-    const result = await this.apiCall<{ bookingId: string; chaletId: string }>(
+    const result = await this.apiCall<{ bookingId: string; unitId: string }>(
       'POST',
       '/api/v1/units/bookings/check-in',
       {
@@ -1548,17 +1548,17 @@ export class ChaletStaff extends StaffBot {
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.CHALET_CHECKED_IN, 'chalet', {
+      this.emitEvent(EventTypes.ACCOMMODATION_UNIT_CHECKED_IN, 'accommodation unit', {
         staffId: this.id,
         bookingId: result.data.bookingId,
-        chaletId: result.data.chaletId,
+        unitId: result.data.unitId,
       });
 
       return {
         success: true,
         action: 'process_chalet_checkin',
         data: result.data,
-        cascades: [EventTypes.CHALET_CHECKED_IN],
+        cascades: [EventTypes.ACCOMMODATION_UNIT_CHECKED_IN],
       };
     }
 
@@ -1566,7 +1566,7 @@ export class ChaletStaff extends StaffBot {
   }
 
   private async processChaletCheckOut(): Promise<{ success: boolean; action: string; data?: any; error?: string; cascades?: string[] }> {
-    const result = await this.apiCall<{ bookingId: string; chaletId: string; damageCharges?: number }>(
+    const result = await this.apiCall<{ bookingId: string; unitId: string; damageCharges?: number }>(
       'POST',
       '/api/v1/units/bookings/check-out',
       {
@@ -1575,10 +1575,10 @@ export class ChaletStaff extends StaffBot {
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.CHALET_CHECKED_OUT, 'chalet', {
+      this.emitEvent(EventTypes.ACCOMMODATION_UNIT_CHECKED_OUT, 'accommodation unit', {
         staffId: this.id,
         bookingId: result.data.bookingId,
-        chaletId: result.data.chaletId,
+        unitId: result.data.unitId,
         damageCharges: result.data.damageCharges,
       });
 
@@ -1586,7 +1586,7 @@ export class ChaletStaff extends StaffBot {
         success: true,
         action: 'process_chalet_checkout',
         data: result.data,
-        cascades: [EventTypes.CHALET_CHECKED_OUT],
+        cascades: [EventTypes.ACCOMMODATION_UNIT_CHECKED_OUT],
       };
     }
 
@@ -1594,7 +1594,7 @@ export class ChaletStaff extends StaffBot {
   }
 
   private async prepareChalet(): Promise<{ success: boolean; action: string; data?: any }> {
-    const result = await this.apiCall<{ chaletId: string; prepared: boolean }>(
+    const result = await this.apiCall<{ unitId: string; prepared: boolean }>(
       'POST',
       '/api/v1/units/prepare',
       {
@@ -1611,7 +1611,7 @@ export class ChaletStaff extends StaffBot {
   }
 
   private async inspectChalet(): Promise<{ success: boolean; action: string; data?: any }> {
-    const result = await this.apiCall<{ chaletId: string; issues: any[]; passed: boolean }>(
+    const result = await this.apiCall<{ unitId: string; issues: any[]; passed: boolean }>(
       'POST',
       '/api/v1/units/inspect',
       {
@@ -1621,9 +1621,9 @@ export class ChaletStaff extends StaffBot {
     );
 
     if (result.success && result.data && !result.data.passed) {
-      this.emitEvent(EventTypes.ISSUE_REPORTED, 'chalet', {
+      this.emitEvent(EventTypes.ISSUE_REPORTED, 'accommodation unit', {
         type: 'chalet_inspection_failed',
-        chaletId: result.data.chaletId,
+        unitId: result.data.unitId,
         issues: result.data.issues,
         reportedBy: this.id,
       });
@@ -1637,7 +1637,7 @@ export class ChaletStaff extends StaffBot {
   }
 
   private async deliverChaletAddOn(): Promise<{ success: boolean; action: string; data?: any; cascades?: string[] }> {
-    const result = await this.apiCall<{ deliveryId: string; addOnType: string; chaletId: string }>(
+    const result = await this.apiCall<{ deliveryId: string; addOnType: string; unitId: string }>(
       'POST',
       '/api/v1/units/add-ons/deliver',
       {
@@ -1646,10 +1646,10 @@ export class ChaletStaff extends StaffBot {
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.CHALET_ADD_ON_PURCHASED, 'chalet', {
+      this.emitEvent(EventTypes.CHALET_ADD_ON_PURCHASED, 'accommodation unit', {
         deliveryId: result.data.deliveryId,
         addOnType: result.data.addOnType,
-        chaletId: result.data.chaletId,
+        unitId: result.data.unitId,
         deliveredBy: this.id,
       });
 
@@ -1665,7 +1665,7 @@ export class ChaletStaff extends StaffBot {
   }
 
   private async handleChaletMaintenance(): Promise<{ success: boolean; action: string; data?: any }> {
-    const result = await this.apiCall<{ maintenanceId: string; chaletId: string; issue: string; resolved: boolean }>(
+    const result = await this.apiCall<{ maintenanceId: string; unitId: string; issue: string; resolved: boolean }>(
       'POST',
       '/api/v1/units/maintenance/handle',
       {
@@ -1682,8 +1682,8 @@ export class ChaletStaff extends StaffBot {
 }
 
 /**
- * Snack Bar Staff
- * Handles snack bar orders, preparation, and delivery
+ * KioskItem Bar Staff
+ * Handles kiosk orders, preparation, and delivery
  */
 export class SnackBarStaff extends StaffBot {
   constructor(config: Omit<StaffConfig, 'department' | 'type' | 'profile' | 'role'> & { profile?: Partial<StaffProfile>; role?: string }) {
@@ -1707,7 +1707,7 @@ export class SnackBarStaff extends StaffBot {
   protected registerActions(): void {
     super.registerActions();
 
-    // Take snack order
+    // Take kiosk item order
     this.registerAction({
       name: 'take_snack_order',
       weight: 7,
@@ -1715,7 +1715,7 @@ export class SnackBarStaff extends StaffBot {
       execute: async () => this.takeSnackOrder(),
     });
 
-    // Prepare snack order
+    // Prepare kiosk item order
     this.registerAction({
       name: 'prepare_snack_order',
       weight: 8,
@@ -1723,7 +1723,7 @@ export class SnackBarStaff extends StaffBot {
       execute: async () => this.prepareSnackOrder(),
     });
 
-    // Deliver snack order
+    // Deliver kiosk item order
     this.registerAction({
       name: 'deliver_snack_order',
       weight: 6,
@@ -1765,7 +1765,7 @@ export class SnackBarStaff extends StaffBot {
   private async takeSnackOrder(): Promise<{ success: boolean; action: string; data?: any; error?: string }> {
     const result = await this.apiCall<{ orderId: string; items: number }>(
       'POST',
-      '/api/v1/snack/orders/take',
+      '/api/v1/kiosk item/orders/take',
       {
         staffId: this.id,
       }
@@ -1782,14 +1782,14 @@ export class SnackBarStaff extends StaffBot {
   private async prepareSnackOrder(): Promise<{ success: boolean; action: string; data?: any; cascades?: string[] }> {
     const result = await this.apiCall<{ orderId: string; items: any[]; estimatedTime: number }>(
       'POST',
-      '/api/v1/snack/orders/prepare',
+      '/api/v1/kiosk item/orders/prepare',
       {
         preparedBy: this.id,
       }
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.SNACK_ORDER_PREPARED, 'snack', {
+      this.emitEvent(EventTypes.KIOSK_ORDER_PREPARED, 'kiosk item', {
         orderId: result.data.orderId,
         preparedBy: this.id,
         itemCount: result.data.items?.length || 0,
@@ -1799,7 +1799,7 @@ export class SnackBarStaff extends StaffBot {
         success: true,
         action: 'prepare_snack_order',
         data: result.data,
-        cascades: [EventTypes.SNACK_ORDER_PREPARED],
+        cascades: [EventTypes.KIOSK_ORDER_PREPARED],
       };
     }
 
@@ -1809,14 +1809,14 @@ export class SnackBarStaff extends StaffBot {
   private async deliverSnackOrder(): Promise<{ success: boolean; action: string; data?: any; cascades?: string[] }> {
     const result = await this.apiCall<{ orderId: string; deliveredTo: string; deliveryLocation: string }>(
       'POST',
-      '/api/v1/snack/orders/deliver',
+      '/api/v1/kiosk item/orders/deliver',
       {
         deliveredBy: this.id,
       }
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.SNACK_ORDER_DELIVERED, 'snack', {
+      this.emitEvent(EventTypes.KIOSK_ORDER_DELIVERED, 'kiosk item', {
         orderId: result.data.orderId,
         deliveredTo: result.data.deliveredTo,
         deliveryLocation: result.data.deliveryLocation,
@@ -1827,7 +1827,7 @@ export class SnackBarStaff extends StaffBot {
         success: true,
         action: 'deliver_snack_order',
         data: result.data,
-        cascades: [EventTypes.SNACK_ORDER_DELIVERED],
+        cascades: [EventTypes.KIOSK_ORDER_DELIVERED],
       };
     }
 
@@ -1837,7 +1837,7 @@ export class SnackBarStaff extends StaffBot {
   private async restockSnackItems(): Promise<{ success: boolean; action: string; data?: any }> {
     const result = await this.apiCall<{ itemsRestocked: number }>(
       'POST',
-      '/api/v1/snack/inventory/restock',
+      '/api/v1/kiosk item/inventory/restock',
       {
         restockedBy: this.id,
         items: ['hot_dogs', 'buns', 'drinks', 'chips', 'ice_cream'],
@@ -1854,16 +1854,16 @@ export class SnackBarStaff extends StaffBot {
   private async checkSnackInventory(): Promise<{ success: boolean; action: string; data?: any }> {
     const result = await this.apiCall<{ items: Array<{ name: string; stock: number; lowStock: boolean }> }>(
       'GET',
-      '/api/v1/snack/inventory'
+      '/api/v1/kiosk item/inventory'
     );
 
     if (result.success && result.data) {
       const lowStockItems = result.data.items.filter(i => i.lowStock);
       
       if (lowStockItems.length > 0) {
-        this.emitEvent(EventTypes.ALERT_TRIGGERED, 'snack', {
+        this.emitEvent(EventTypes.ALERT_TRIGGERED, 'kiosk item', {
           type: 'low_inventory',
-          system: 'snack',
+          system: 'kiosk item',
           items: lowStockItems,
         });
       }

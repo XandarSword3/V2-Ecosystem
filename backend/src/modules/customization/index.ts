@@ -3,10 +3,10 @@
  * 
  * This module provides a centralized customization system for ALL modules in the V2 Ecosystem platform.
  * It supports:
- * - Restaurant menu items
- * - Snack bar items
- * - Chalets and accommodations
- * - Pool sessions
+ * - Catalog (menu service) items
+ * - Kiosk items
+ * - Accommodation units
+ * - Capacity windows
  * - Spa services (future)
  * - Activities (future)
  * - Any future module
