@@ -1,8 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { restaurantApi, api } from '@/lib/api';
-import { Loader2, AlertCircle, Sparkles, Star, UtensilsCrossed, ShoppingCart, Plus, Minus, Search, X, Flame, Leaf, Wheat } from 'lucide-react';
+import { api } from '@/lib/api';
+import { Loader2, AlertCircle, Sparkles, Star, ShoppingCart, Plus, Minus, Search, X, Flame, Leaf, Wheat } from 'lucide-react';
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useCartStore } from '@/stores/cartStore';
@@ -13,10 +13,10 @@ import { formatCurrency } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { ModifierSelectionModal, type SelectedModifier } from '@/components/restaurant/ModifierSelectionModal';
+import { ModifierSelectionModal, type SelectedModifier } from '@/components/modules/ModifierSelectionModal';
 import { CustomizationSelector } from '@/components/customization/CustomizationSelector';
 import { ModuleHero, GlassSearch, CategoryPills, GlassCard, FloatingActionButton } from './';
-import { isOnline, menuItemsStore, menuCategoriesStore } from '@/lib/offline/offline-storage';
+import { isOnline, catalogItemsStore, catalogCategoriesStore } from '@/lib/offline/offline-storage';
 
 interface MenuServiceProps {
   module: Module;
@@ -51,7 +51,6 @@ interface MenuItemData {
 }
 
 export function MenuService({ module }: MenuServiceProps) {
-  const t = useTranslations('restaurant');
   const tCommon = useTranslations('common');
   const { translateContent } = useContentTranslation();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -70,8 +69,6 @@ export function MenuService({ module }: MenuServiceProps) {
   const removeItem = useCartStore((s) => s.removeItem);
   const allItems = useCartStore((s) => s.items);
 
-  const isSnackBar = module.slug === 'snack-bar';
-
   // Modifier/Customization modal state
   const [selectedItemForModifiers, setSelectedItemForModifiers] = useState<MenuItemData | null>(null);
   const [selectedItemForCustomization, setSelectedItemForCustomization] = useState<MenuItemData | null>(null);
@@ -81,7 +78,7 @@ export function MenuService({ module }: MenuServiceProps) {
   const handleItemClick = useCallback(async (item: MenuItemData) => {
     setCheckingCustomizations(true);
     try {
-      const response = await api.get(`/customizations/for-entity/menu_item/${item.id}`);
+      const response = await api.get(`/customizations/for-entity/catalog_item/${item.id}`);
       const customizationGroups = response.data || [];
       if (customizationGroups.length > 0) {
         setSelectedItemForCustomization(item);
@@ -137,7 +134,6 @@ export function MenuService({ module }: MenuServiceProps) {
         moduleId: module.id,
         moduleSlug: module.slug,
         moduleName: module.name,
-        type: isSnackBar ? 'snack' : 'restaurant',
         imageUrl: selectedItemForCustomization.image_url || selectedItemForCustomization.image,
         selectedModifiers: customizationDetails,
         modifierTotal: data.totalPriceAdjustment,
@@ -146,7 +142,7 @@ export function MenuService({ module }: MenuServiceProps) {
     
     toast.success(`${translatedName} added to cart`);
     setSelectedItemForCustomization(null);
-  }, [selectedItemForCustomization, translateContent, addItem, module, isSnackBar]);
+  }, [selectedItemForCustomization, translateContent, addItem, module]);
 
   // Handle modifier modal add to cart (legacy system)
   const handleModifierAddToCart = useCallback((item: {
@@ -167,54 +163,50 @@ export function MenuService({ module }: MenuServiceProps) {
       moduleId: module.id,
       moduleSlug: module.slug,
       moduleName: module.name,
-      type: isSnackBar ? 'snack' : 'restaurant',
       imageUrl: item.imageUrl,
       selectedModifiers: item.selectedModifiers,
       modifierTotal: item.modifierTotal,
       specialInstructions: item.specialInstructions,
     });
     toast.success(`${item.name} added to cart`);
-  }, [addItem, module, isSnackBar]);
+  }, [addItem, module]);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['menu', module.id],
+    queryKey: ['catalog', module.slug],
     queryFn: async () => {
       if (isOnline()) {
         try {
-          const response = await restaurantApi.getMenu(module.id);
-          // Update offline store
-          if (response.data?.data) {
-            const { items, categories } = response.data.data;
-            if (items) await menuItemsStore.putMany(items);
-            if (categories) await menuCategoriesStore.putMany(categories);
-          }
-          return response;
+          const [itemsRes, catsRes] = await Promise.all([
+            api.get(`/${module.slug}/items`),
+            api.get(`/${module.slug}/categories`),
+          ]);
+          const items = itemsRes.data?.data || itemsRes.data || [];
+          const categories = catsRes.data?.data || catsRes.data || [];
+          if (items.length) await catalogItemsStore.putMany(items);
+          if (categories.length) await catalogCategoriesStore.putMany(categories);
+          return { data: { success: true, data: { items, categories } } };
         } catch (err) {
-          console.warn('Online menu fetch failed, falling back to cache');
+          console.warn('Online catalog fetch failed, falling back to cache');
         }
       }
 
-      // Offline or online failed - try cache
-      const cachedItems = await menuItemsStore.getAll();
-      const cachedCategories = await menuCategoriesStore.getAll();
-      
-      // Filter by module if applicable (assuming stores contain all modules)
-      // Actually, menuItemsStore is global, so we might need to filter by module_id if present
-      // For now, assume it's scoped or we return what we have
-      
+      // Offline or online failed — try cache
+      const cachedItems = await catalogItemsStore.getAll();
+      const cachedCategories = await catalogCategoriesStore.getAll();
+
       if (cachedItems.length > 0) {
         return {
           data: {
             success: true,
             data: {
               items: cachedItems,
-              categories: cachedCategories
-            }
-          }
+              categories: cachedCategories,
+            },
+          },
         };
       }
-      
-      throw new Error('Menu not available offline');
+
+      throw new Error('Catalog not available offline');
     },
   });
 
@@ -286,9 +278,7 @@ export function MenuService({ module }: MenuServiceProps) {
       moduleId: module.id,
       moduleSlug: module.slug,
       moduleName: module.name,
-      type: isSnackBar ? 'snack' : 'restaurant',
-      // Ensure image is mapped correctly if it's 'image_url' in API response
-      imageUrl: item.image_url || item.image 
+      imageUrl: item.image_url || item.image,
     };
 
     addItem(cartItem);
@@ -341,10 +331,10 @@ export function MenuService({ module }: MenuServiceProps) {
       {/* Hero Section - New glassmorphic component */}
       <ModuleHero
         title={module.name}
-        description={module.description || t('authenticLebanese')}
+        description={module.description}
         headerColor={headerColor}
         accentColor={accentColor}
-        badgeText={isSnackBar ? 'Quick Bites' : 'Fresh & Delicious'}
+        badgeText={typeof module.settings?.badge_text === 'string' ? module.settings.badge_text : 'Fresh & Delicious'}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-6 relative z-10">
@@ -537,7 +527,7 @@ export function MenuService({ module }: MenuServiceProps) {
                     ) : (
                       <ShoppingCart className="w-5 h-5" />
                     )}
-                    {t('addToCart')}
+                    {'Add to Cart'}
                   </button>
                 )}
               </div>
@@ -577,7 +567,7 @@ export function MenuService({ module }: MenuServiceProps) {
       {/* Unified Customization Selector (New System) */}
       {selectedItemForCustomization && (
         <CustomizationSelector
-          entityType="menu_item"
+          entityType="catalog_item"
           entityId={selectedItemForCustomization.id}
           entity={{
             name: selectedItemForCustomization.name,

@@ -4,9 +4,9 @@
  * Unit tests for the Package/Promotion Service with DI.
  */
 
-import { createPackageService, PackageServiceError } from '../../src/lib/services/package.service';
-import { InMemoryPackageRepository } from '../../src/lib/repositories/package.repository.memory';
-import type { Container } from '../../src/lib/container/types';
+import { createPackageService, PackageServiceError } from '../../../src/lib/services/package.service';
+import { InMemoryPackageRepository } from '../../../src/lib/repositories/package.repository.memory';
+import type { Container } from '../../../src/lib/container/types';
 
 // Test UUIDs
 const GUEST_1 = '11111111-1111-1111-1111-111111111111';

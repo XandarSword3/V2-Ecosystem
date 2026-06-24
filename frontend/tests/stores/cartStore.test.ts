@@ -14,7 +14,7 @@ const createItem = (overrides: Record<string, any> = {}) => ({
 
 describe('cartStore', () => {
   beforeEach(() => {
-    useCartStore.setState({ items: [], restaurantItems: [], snackItems: [] });
+    useCartStore.setState({ items: [] });
   });
 
   describe('addItem', () => {
@@ -148,77 +148,83 @@ describe('cartStore', () => {
     });
   });
 
-  describe('restaurant cart', () => {
-    it('addToRestaurant adds with restaurant metadata', () => {
-      useCartStore.getState().addToRestaurant({
-        id: 'r1',
-        name: 'Pasta',
-        price: 15,
+  describe('menu service cart', () => {
+    it('addItem with menu_service type stamps correct metadata', () => {
+      useCartStore.getState().addItem({
+        id: 'r1', name: 'Pasta', price: 15, quantity: 1,
+        moduleId: 'menu_service', moduleName: 'MenuService', type: 'menu_service',
       });
       const items = useCartStore.getState().items;
       expect(items).toHaveLength(1);
-      expect(items[0].moduleId).toBe('restaurant');
-      expect(items[0].moduleName).toBe('Restaurant');
-      expect(items[0].type).toBe('restaurant');
+      expect(items[0].moduleId).toBe('menu_service');
+      expect(items[0].moduleName).toBe('MenuService');
+      expect(items[0].type).toBe('menu_service');
     });
 
-    it('clearRestaurantCart only removes restaurant items', () => {
-      useCartStore.getState().addToRestaurant({ id: 'r1', name: 'Pasta', price: 15 });
-      useCartStore.getState().addToSnack({ id: 's1', name: 'Chips', price: 5 });
-      useCartStore.getState().clearRestaurantCart();
-
-      const items = useCartStore.getState().items;
-      expect(items).toHaveLength(1);
-      expect(items[0].moduleId).toBe('snack-bar');
+    it('clearing menu_service items leaves kiosk items intact', () => {
+      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
+      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
+      useCartStore.setState(s => ({ items: s.items.filter(i => i.moduleId !== 'menu_service') }));
+      expect(useCartStore.getState().items).toHaveLength(1);
+      expect(useCartStore.getState().items[0].moduleId).toBe('kiosk');
     });
 
-    it('getRestaurantTotal only sums restaurant items', () => {
-      useCartStore.getState().addToRestaurant({ id: 'r1', name: 'Pasta', price: 15 });
-      useCartStore.getState().addToSnack({ id: 's1', name: 'Chips', price: 5 });
-      expect(useCartStore.getState().getRestaurantTotal()).toBe(15);
+    it('total for menu_service items only', () => {
+      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
+      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
+      const total = useCartStore.getState().items
+        .filter(i => i.moduleId === 'menu_service')
+        .reduce((sum, i) => sum + (i.price + (i.modifierTotal ?? 0)) * i.quantity, 0);
+      expect(total).toBe(15);
     });
 
-    it('getRestaurantCount only counts restaurant items', () => {
-      useCartStore.getState().addToRestaurant({ id: 'r1', name: 'Pasta', price: 15 });
-      useCartStore.getState().addToSnack({ id: 's1', name: 'Chips', price: 5 });
-      expect(useCartStore.getState().getRestaurantCount()).toBe(1);
+    it('count for menu_service items only', () => {
+      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
+      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
+      const count = useCartStore.getState().items
+        .filter(i => i.moduleId === 'menu_service')
+        .reduce((sum, i) => sum + i.quantity, 0);
+      expect(count).toBe(1);
     });
   });
 
-  describe('snack cart', () => {
-    it('addToSnack adds with snack metadata', () => {
-      useCartStore.getState().addToSnack({
-        id: 's1',
-        name: 'Chips',
-        price: 5,
+  describe('kiosk item cart', () => {
+    it('addItem with kiosk type stamps correct metadata', () => {
+      useCartStore.getState().addItem({
+        id: 's1', name: 'Chips', price: 5, quantity: 1,
+        moduleId: 'kiosk', moduleName: 'KioskItem Bar', type: 'kiosk item',
       });
       const items = useCartStore.getState().items;
       expect(items).toHaveLength(1);
-      expect(items[0].moduleId).toBe('snack-bar');
-      expect(items[0].moduleName).toBe('Snack Bar');
-      expect(items[0].type).toBe('snack');
+      expect(items[0].moduleId).toBe('kiosk');
+      expect(items[0].moduleName).toBe('KioskItem Bar');
+      expect(items[0].type).toBe('kiosk item');
     });
 
-    it('clearSnackCart only removes snack items', () => {
-      useCartStore.getState().addToRestaurant({ id: 'r1', name: 'Pasta', price: 15 });
-      useCartStore.getState().addToSnack({ id: 's1', name: 'Chips', price: 5 });
-      useCartStore.getState().clearSnackCart();
-
-      const items = useCartStore.getState().items;
-      expect(items).toHaveLength(1);
-      expect(items[0].moduleId).toBe('restaurant');
+    it('clearing kiosk items leaves menu_service items intact', () => {
+      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
+      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
+      useCartStore.setState(s => ({ items: s.items.filter(i => i.moduleId !== 'kiosk') }));
+      expect(useCartStore.getState().items).toHaveLength(1);
+      expect(useCartStore.getState().items[0].moduleId).toBe('menu_service');
     });
 
-    it('getSnackTotal only sums snack items', () => {
-      useCartStore.getState().addToRestaurant({ id: 'r1', name: 'Pasta', price: 15 });
-      useCartStore.getState().addToSnack({ id: 's1', name: 'Chips', price: 5 });
-      expect(useCartStore.getState().getSnackTotal()).toBe(5);
+    it('total for kiosk items only', () => {
+      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
+      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
+      const total = useCartStore.getState().items
+        .filter(i => i.moduleId === 'kiosk')
+        .reduce((sum, i) => sum + (i.price + (i.modifierTotal ?? 0)) * i.quantity, 0);
+      expect(total).toBe(5);
     });
 
-    it('getSnackCount only counts snack items', () => {
-      useCartStore.getState().addToRestaurant({ id: 'r1', name: 'Pasta', price: 15 });
-      useCartStore.getState().addToSnack({ id: 's1', name: 'Chips', price: 5 });
-      expect(useCartStore.getState().getSnackCount()).toBe(1);
+    it('count for kiosk items only', () => {
+      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
+      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
+      const count = useCartStore.getState().items
+        .filter(i => i.moduleId === 'kiosk')
+        .reduce((sum, i) => sum + i.quantity, 0);
+      expect(count).toBe(1);
     });
   });
 });

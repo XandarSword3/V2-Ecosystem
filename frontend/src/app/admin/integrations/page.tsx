@@ -57,7 +57,7 @@ export default function IntegrationsPage() {
           🔌 Integrations
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Connect your resort with third-party services and platforms
+          Connect your business with third-party services and platforms
         </p>
       </div>
 

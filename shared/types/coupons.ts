@@ -5,7 +5,7 @@
 import type { UUID, BaseEntity } from './index';
 
 export type CouponDiscountType = 'percentage' | 'fixed' | 'free_item';
-export type CouponScope = 'all' | 'restaurant' | 'chalets' | 'pool' | 'snack';
+export type CouponScope = 'all' | 'menu_service' | 'accommodation' | 'pool' | 'kiosk';
 
 export interface Coupon extends BaseEntity {
   code: string;

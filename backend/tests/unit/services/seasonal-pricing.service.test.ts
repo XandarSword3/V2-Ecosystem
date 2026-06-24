@@ -1,10 +1,13 @@
 
 // Mock supabase - use inline definition
-vi.mock('../../../src/lib/supabase', () => ({
-  supabase: {
-    from: vi.fn(),
-  },
-}));
+vi.mock('../../../src/lib/supabase', () => {
+  const mockClient = { from: vi.fn() };
+  return {
+    supabase: mockClient,
+    getSupabase: vi.fn().mockReturnValue(mockClient),
+    getSupabaseAdmin: vi.fn(),
+  };
+});
 
 vi.mock('../../../src/utils/logger', () => ({
   logger: {
@@ -42,7 +45,7 @@ describe('SeasonalPricingService', () => {
           start_date: '06-01',
           end_date: '08-31',
           price_multiplier: 1.5,
-          applicable_to: ['chalets', 'pool'],
+          applicable_to: ['accommodation_units', 'capacity'],
           specific_items: null,
           priority: 1,
           is_active: true,
@@ -64,7 +67,7 @@ describe('SeasonalPricingService', () => {
         startDate: '06-01',
         endDate: '08-31',
         priceMultiplier: 1.5,
-        applicableTo: ['chalets', 'pool'],
+        applicableTo: ['accommodation_units', 'capacity'],
         specificItems: null,
         priority: 1,
         isActive: true,
@@ -92,8 +95,8 @@ describe('SeasonalPricingService', () => {
         start_date: '12-20',
         end_date: '01-05',
         price_multiplier: 1.8,
-        applicable_to: ['chalets'],
-        specific_items: ['chalet-1'],
+        applicable_to: ['accommodation_units'],
+        specific_items: ['accommodation unit-1'],
         priority: 2,
         is_active: true,
       };
@@ -111,8 +114,8 @@ describe('SeasonalPricingService', () => {
         startDate: '12-20',
         endDate: '01-05',
         priceMultiplier: 1.8,
-        applicableTo: ['chalets'],
-        specificItems: ['chalet-1'],
+        applicableTo: ['accommodation_units'],
+        specificItems: ['accommodation unit-1'],
         priority: 2,
         isActive: true,
       });
@@ -137,7 +140,7 @@ describe('SeasonalPricingService', () => {
           startDate: '01-01',
           endDate: '01-31',
           priceMultiplier: 1.0,
-          applicableTo: ['chalets'],
+          applicableTo: ['accommodation_units'],
           priority: 1,
           isActive: true,
         })

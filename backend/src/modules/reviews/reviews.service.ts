@@ -9,7 +9,7 @@ import { getSupabase } from '../../database/supabase';
 // TYPES
 // =============================================
 
-export type ServiceType = 'general' | 'restaurant' | 'chalets' | 'pool' | 'snack_bar';
+export type ServiceType = 'general' | 'menu_service' | 'accommodation' | 'pool' | 'kiosk';
 export type ReviewStatus = 'pending' | 'approved';
 
 export interface Review {

@@ -15,10 +15,10 @@ const toastErrorMock = vi.hoisted(() => vi.fn());
 const siteSettingsMock = vi.hoisted(() => ({
   modules: [
     {
-      id: 'module-restaurant',
+      id: 'module-menu service',
       template_type: 'menu_service',
-      name: 'Restaurant',
-      slug: 'restaurant',
+      name: 'MenuService',
+      slug: 'menu_service',
       is_active: true,
       sort_order: 1,
     },
@@ -105,7 +105,7 @@ const groupsSeed = [
 
 describe('Admin module modifiers route coverage', () => {
   beforeEach(() => {
-    useParamsMock.mockReturnValue({ slug: 'restaurant' });
+    useParamsMock.mockReturnValue({ slug: 'menu_service' });
 
     apiGetMock.mockReset();
     apiPostMock.mockReset();
@@ -134,7 +134,7 @@ describe('Admin module modifiers route coverage', () => {
 
     render(<DynamicModifiersPage />);
 
-    await screen.findByText('Restaurant Modifiers');
+    await screen.findByText('MenuService Modifiers');
     await screen.findByText('Toppings');
 
     await user.click(screen.getByText('Toppings'));
@@ -162,7 +162,7 @@ describe('Admin module modifiers route coverage', () => {
 
     render(<DynamicModifiersPage />);
 
-    await screen.findByText('Restaurant Modifiers');
+    await screen.findByText('MenuService Modifiers');
 
     await user.click(screen.getByRole('button', { name: /New Group/i }));
     expect(await screen.findByText('New Modifier Group')).toBeInTheDocument();

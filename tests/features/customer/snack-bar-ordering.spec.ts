@@ -3,13 +3,13 @@ import { test, expect } from '../../fixtures/auth.fixture';
 const FRONTEND = 'http://localhost:3000';
 const API = 'http://localhost:3005/api';
 
-test.describe('Customer Snack Bar Ordering [CUS-SNCK]', () => {
+test.describe('Customer KioskItem Bar Ordering [CUS-SNCK]', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${FRONTEND}/snack-bar`);
+    await page.goto(`${FRONTEND}/kiosk`);
   });
 
-  test('CUS-SNCK-001: browse snack categories', async ({ page }) => {
-    const heading = page.getByRole('heading', { name: /snack|bar|refreshment/i });
+  test('CUS-SNCK-001: browse kiosk item categories', async ({ page }) => {
+    const heading = page.getByRole('heading', { name: /kiosk item|bar|refreshment/i });
     await expect(heading).toBeVisible();
     const categories = page.locator('[class*="categor"], [class*="tab"], [role="tablist"]');
     await expect(categories.first()).toBeVisible();

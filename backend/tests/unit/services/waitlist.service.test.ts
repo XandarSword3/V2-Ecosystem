@@ -5,9 +5,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createWaitlistService, WaitlistServiceError } from '../../src/lib/services/waitlist.service';
-import { InMemoryWaitlistRepository } from '../../src/lib/repositories/waitlist.repository.memory';
-import type { Container, WaitlistEntry } from '../../src/lib/container/types';
+import { createWaitlistService, WaitlistServiceError } from '../../../src/lib/services/waitlist.service';
+import { InMemoryWaitlistRepository } from '../../../src/lib/repositories/waitlist.repository.memory';
+import type { Container, WaitlistEntry } from '../../../src/lib/container/types';
 
 // Test UUIDs
 const ENTRY_1 = '11111111-1111-1111-1111-111111111111';

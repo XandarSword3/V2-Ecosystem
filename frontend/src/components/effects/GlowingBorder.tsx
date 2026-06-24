@@ -22,3 +22,5 @@ export function MagneticButton({ children, className = '', style }: Props) {
 export function GlowBorder({ children, className = '', style }: Props) {
   return <div className={className} style={style}>{children}</div>;
 }
+
+export const GlowingBorder = GlowBorder;

@@ -12,7 +12,7 @@ const toastSuccessMock = vi.hoisted(() => vi.fn());
 const authState = vi.hoisted(() => ({
   user: {
     fullName: 'Sam Staff',
-    roles: ['restaurant_staff'],
+    roles: ['menu_service_staff'],
   },
   isAuthenticated: true,
   isLoading: false,
@@ -96,7 +96,7 @@ describe('Staff layout route coverage', () => {
 
     authState.user = {
       fullName: 'Sam Staff',
-      roles: ['restaurant_staff'],
+      roles: ['menu_service_staff'],
     };
     authState.isAuthenticated = true;
     authState.isLoading = false;
@@ -109,7 +109,7 @@ describe('Staff layout route coverage', () => {
           data: {
             success: true,
             data: [
-              { id: 'm-1', name: 'Restaurant', slug: 'restaurant', is_active: true },
+              { id: 'm-1', name: 'MenuService', slug: 'menu_service', is_active: true },
               { id: 'm-2', name: 'Spa', slug: 'spa', is_active: true },
             ],
           },

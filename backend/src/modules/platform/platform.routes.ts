@@ -3,6 +3,7 @@
  *
  * Public:
  *   POST /api/platform/checkout          — create Stripe checkout session (landing page CTA)
+ *   GET  /api/tenants/by-slug/:slug      — validate tenant exists by slug (no auth)
  *
  * Operator (authenticated, any billing status):
  *   GET  /api/platform/billing/portal    — Stripe billing portal redirect
@@ -28,6 +29,7 @@ import { resolveTenant } from '../../middleware/tenantAccess.middleware.js';
 import {
   listTenants,
   getTenant,
+  getTenantBySlug,
   suspendTenant,
   reactivateTenant,
   cancelTenant,
@@ -36,6 +38,7 @@ import {
   getPlatformStats,
   createCheckoutSession,
   getBillingPortal,
+  getPublicPlans,
 } from './platform-admin.controller.js';
 
 const router = Router();
@@ -56,7 +59,11 @@ async function requirePlatformAdmin(req: Request, res: Response, next: NextFunct
 // Public routes
 // ============================================
 
+router.get('/plans', getPublicPlans);
 router.post('/checkout', createCheckoutSession);
+
+// Public tenant validation (no auth) - for frontend 404 handling
+router.get('/tenants/by-slug/:slug', getTenantBySlug);
 
 // ============================================
 // Operator routes (authenticated)

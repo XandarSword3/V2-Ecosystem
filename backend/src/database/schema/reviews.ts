@@ -35,7 +35,7 @@ export const reviews = pgTable('reviews', {
 });
 
 // ============================================
-// Product Reviews (restaurant / snack menu items)
+// Product Reviews (catalog items / order line items)
 // ============================================
 export const productReviews = pgTable('product_reviews', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -55,13 +55,13 @@ export const productReviews = pgTable('product_reviews', {
 });
 
 // ============================================
-// Booking Reviews (chalets / rooms)
+// Booking Reviews (accommodation units)
 // ============================================
 export const bookingReviews = pgTable('booking_reviews', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id).notNull(),
   bookingId: uuid('booking_id').notNull(),
-  bookingType: varchar('booking_type', { length: 50 }).default('chalet'),
+  bookingType: varchar('booking_type', { length: 50 }).default('accommodation_unit'),
   overallRating: integer('overall_rating').notNull(),
   cleanlinessRating: integer('cleanliness_rating'),
   comfortRating: integer('comfort_rating'),

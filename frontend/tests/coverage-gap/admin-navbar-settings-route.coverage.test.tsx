@@ -38,7 +38,7 @@ vi.mock('@/lib/settings-context', () => ({
   useSiteSettings: () => ({
     modules: [
       { id: 'm-1', slug: 'spa', name: 'Spa Module' },
-      { id: 'm-2', slug: 'restaurant', name: 'Restaurant Module' },
+      { id: 'm-2', slug: 'menu_service', name: 'MenuService Module' },
     ],
     refetch: refetchSettingsMock,
   }),
@@ -49,6 +49,18 @@ vi.mock('sonner', () => ({
     success: toastSuccessMock,
     error: toastErrorMock,
   },
+}));
+
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', type: 'resort' },
+    properties: [],
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
+  PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 import NavbarSettingsPage from '../../src/app/admin/settings/navbar/page';

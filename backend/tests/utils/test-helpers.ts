@@ -19,7 +19,7 @@ import type {
   Container,
 } from '../../src/lib/container/types';
 import type { AuthenticatedUser } from '../../src/types/index';
-import { InMemoryPoolRepository } from '../../src/lib/repositories/pool.repository.memory';
+import { InMemoryCapacityRepository } from '../../src/lib/repositories/pool.repository.memory';
 
 // ============================================
 // Mock Factories
@@ -129,7 +129,7 @@ export function createTestConfig(overrides?: Partial<AppConfig>): AppConfig {
 // ============================================
 
 export interface TestContainer extends Omit<Container, 'database'> {
-  poolRepository: InMemoryPoolRepository;
+  poolRepository: InMemoryCapacityRepository;
   emailService: ReturnType<typeof createMockEmailService>;
   logger: ReturnType<typeof createMockLogger>;
   activityLogger: ReturnType<typeof createMockActivityLogger>;
@@ -141,7 +141,7 @@ export interface TestContainer extends Omit<Container, 'database'> {
  */
 export function createTestContainer(overrides?: Partial<TestContainer>): TestContainer {
   const defaults: TestContainer = {
-    poolRepository: new InMemoryPoolRepository(),
+    poolRepository: new InMemoryCapacityRepository(),
     emailService: createMockEmailService(),
     qrCodeService: createMockQRCodeService(),
     logger: createMockLogger(),

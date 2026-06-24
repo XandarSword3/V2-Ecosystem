@@ -1,0 +1,100 @@
+/**
+ * Shared Capacity Access Ticket Expiry Job
+ * 
+ * Automatically expires shared_capacity_access tickets whose session date has passed.
+ * Run this as a cron job daily or at the end of each day.
+ * 
+ * Usage: npx tsx src/scripts/expire-capacity-access-tickets.ts
+ * Or via cron: 0 0 * * * cd /app && node dist/scripts/expire-capacity-access-tickets.js
+ */
+
+import { getSupabase, initializeDatabase } from '../database/connection.js';
+import { logger } from '../utils/logger.js';
+import dayjs from 'dayjs';
+
+async function expireCapacityAccessTickets() {
+  try {
+    logger.info('Starting capacity access ticket expiry job...');
+    
+    const supabase = getSupabase();
+
+    // Get current date at midnight
+    const today = dayjs().startOf('day').toISOString();
+
+    // Find all valid tickets where the ticket_date is before today
+    const { data: expiredTickets, error: fetchError } = await supabase
+      .from('transactions')
+      .select('id, metadata')
+      .eq('engine_type', 'shared_capacity_access')
+      .eq('status', 'valid')
+      .filter('metadata->>ticket_date', 'lt', today);
+
+    if (fetchError) {
+      logger.error('Failed to fetch expired tickets:', fetchError);
+      throw fetchError;
+    }
+
+    if (!expiredTickets || expiredTickets.length === 0) {
+      logger.info('No tickets to expire.');
+      return { expired: 0 };
+    }
+
+    logger.info(`Found ${expiredTickets.length} tickets to expire.`);
+
+    // Update all expired tickets
+    const ticketIds = expiredTickets.map(t => t.id);
+    
+    const { error: updateError } = await supabase
+      .from('transactions')
+      .update({ 
+        status: 'expired',
+        updated_at: new Date().toISOString()
+      })
+      .in('id', ticketIds);
+
+    if (updateError) {
+      logger.error('Failed to update expired tickets:', updateError);
+      throw updateError;
+    }
+
+    logger.info(`Successfully expired ${ticketIds.length} capacity access tickets.`);
+    
+    // Log audit entries for expired tickets
+    const auditEntries = expiredTickets.map(ticket => ({
+      user_id: 'system',
+      action: 'ticket_expired',
+      resource: 'transaction',
+      resource_id: ticket.id,
+      new_value: JSON.stringify({
+        expired_by: 'scheduled_job',
+        original_date: (ticket.metadata as any)?.ticket_date
+      }),
+    }));
+
+    await supabase.from('audit_logs').insert(auditEntries);
+
+    return { expired: ticketIds.length };
+  } catch (error) {
+    logger.error('Capacity access ticket expiry job failed:', error);
+    throw error;
+  }
+}
+
+// Only run directly if called as main module
+// Use require.main for CommonJS compatibility
+const isMainModule = require.main === module;
+
+if (isMainModule) {
+  initializeDatabase()
+    .then(() => expireCapacityAccessTickets())
+    .then((result) => {
+      console.log(`✅ Expired ${result.expired} capacity access tickets.`);
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('❌ Expiry job failed:', error);
+      process.exit(1);
+    });
+}
+
+export { expireCapacityAccessTickets };

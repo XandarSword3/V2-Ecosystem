@@ -164,7 +164,7 @@ describe('Housekeeping Controller', () => {
     it('should create a new task', async () => {
       mockRequest.body = {
         taskTypeId: '00000000-0000-0000-0000-000000000001',
-        chaletId: '00000000-0000-0000-0000-000000000002',
+        unitId: '00000000-0000-0000-0000-000000000002',
         priority: 'high',
         notes: 'Deep clean needed',
       };
@@ -172,7 +172,7 @@ describe('Housekeeping Controller', () => {
       const createdTask = {
         id: 'task-new',
         task_type_id: '00000000-0000-0000-0000-000000000001',
-        chalet_id: '00000000-0000-0000-0000-000000000002',
+        unit_id: '00000000-0000-0000-0000-000000000002',
         status: 'pending',
         priority: 'high',
         notes: 'Deep clean needed',

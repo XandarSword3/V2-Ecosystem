@@ -8,9 +8,9 @@ import { logger } from '../../../utils/logger.js';
 export type CustomizationType = 'add' | 'remove' | 'swap' | 'upgrade' | 'replace';
 export type CustomizableEntityType =
   | 'menu_item'
-  | 'snack_bar_item'
-  | 'chalet'
-  | 'pool_session'
+  | 'kiosk_item'
+  | 'accommodation_unit'
+  | 'capacity_window'
   | 'spa_service'
   | 'activity'
   | 'rental_item'

@@ -32,8 +32,6 @@ interface CartItem {
 
 interface CartState {
   items: CartItem[];
-  restaurantItems: CartItem[];
-  snackItems: CartItem[];
 
   addItem: (item: CartItem) => void;
   removeItem: (itemId: string, uniqueKey?: string) => void;
@@ -42,22 +40,6 @@ interface CartState {
   clearCart: () => void;
   getTotal: () => number;
   getCount: () => number;
-
-  addToRestaurant: (item: Omit<CartItem, 'quantity'>) => void;
-  removeFromRestaurant: (itemId: string, uniqueKey?: string) => void;
-  updateRestaurantQuantity: (itemId: string, quantity: number, uniqueKey?: string) => void;
-  updateRestaurantInstructions: (itemId: string, instructions: string, uniqueKey?: string) => void;
-  clearRestaurantCart: () => void;
-
-  addToSnack: (item: Omit<CartItem, 'quantity'>) => void;
-  removeFromSnack: (itemId: string, uniqueKey?: string) => void;
-  updateSnackQuantity: (itemId: string, quantity: number, uniqueKey?: string) => void;
-  clearSnackCart: () => void;
-
-  getRestaurantTotal: () => number;
-  getRestaurantCount: () => number;
-  getSnackTotal: () => number;
-  getSnackCount: () => number;
 }
 
 function generateUniqueKey(itemId: string, modifiers?: SelectedModifier[]): string {
@@ -73,8 +55,6 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
-      restaurantItems: [],
-      snackItems: [],
 
       addItem: (item) => set((state) => {
         const uniqueKey = item.uniqueKey || generateUniqueKey(item.id, item.selectedModifiers);
@@ -133,59 +113,6 @@ export const useCartStore = create<CartState>()(
       getCount: () => {
         return get().items.reduce((sum, item) => sum + item.quantity, 0);
       },
-
-      // Restaurant cart actions
-      addToRestaurant: (item) => get().addItem({
-        ...item,
-        quantity: 1,
-        type: 'restaurant',
-        moduleId: 'restaurant',
-        moduleName: 'Restaurant'
-      }),
-
-      removeFromRestaurant: (itemId, uniqueKey) => get().removeItem(itemId, uniqueKey),
-
-      updateRestaurantQuantity: (id, q, uniqueKey) => get().updateQuantity(id, q, uniqueKey),
-
-      updateRestaurantInstructions: (id, i, uniqueKey) => get().updateInstructions(id, i, uniqueKey),
-
-      clearRestaurantCart: () => set((state) => ({
-        items: state.items.filter(i => i.moduleId !== 'restaurant')
-      })),
-
-      // Snack bar cart actions  
-      addToSnack: (item) => get().addItem({
-        ...item,
-        quantity: 1,
-        type: 'snack',
-        moduleId: 'snack-bar',
-        moduleName: 'Snack Bar'
-      }),
-
-      removeFromSnack: (itemId, uniqueKey) => get().removeItem(itemId, uniqueKey),
-
-      updateSnackQuantity: (id, q, uniqueKey) => get().updateQuantity(id, q, uniqueKey),
-
-      clearSnackCart: () => set((state) => ({
-        items: state.items.filter(i => i.moduleId !== 'snack-bar')
-      })),
-
-      // Computed getters
-      getRestaurantCount: () => get().items
-        .filter(i => i.moduleId === 'restaurant')
-        .reduce((sum, i) => sum + i.quantity, 0),
-
-      getSnackCount: () => get().items
-        .filter(i => i.moduleId === 'snack-bar')
-        .reduce((sum, i) => sum + i.quantity, 0),
-
-      getRestaurantTotal: () => get().items
-        .filter(i => i.moduleId === 'restaurant')
-        .reduce((sum, i) => sum + (i.price + (i.modifierTotal || 0)) * i.quantity, 0),
-
-      getSnackTotal: () => get().items
-        .filter(i => i.moduleId === 'snack-bar')
-        .reduce((sum, i) => sum + (i.price + (i.modifierTotal || 0)) * i.quantity, 0),
     }),
     {
       name: 'v2-ecosystem-cart',

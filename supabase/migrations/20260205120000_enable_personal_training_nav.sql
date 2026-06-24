@@ -1,5 +1,4 @@
--- Enable Personal Training module in navigation
-UPDATE modules 
-SET show_in_main = true,
-    settings = settings || '{"show_in_nav": true}'::jsonb
-WHERE id = '4e8a00d8-7ad4-4220-b6cf-6743cd949c0e';
+-- Migration no-oped: attempted to SET show_in_main on a hardcoded module UUID.
+-- Column does not exist in the canonical modules schema; hardcoded UUID is
+-- seed-specific and absent from a fresh database. Safe to skip.
+DO $$ BEGIN NULL; END $$;

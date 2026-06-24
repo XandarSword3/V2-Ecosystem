@@ -72,7 +72,7 @@ export default function RegisterPage() {
             <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-primary-foreground font-bold text-xl">V2</span>
             </div>
-            <span className="text-2xl font-bold text-foreground">Resort</span>
+            <span className="text-2xl font-bold text-foreground">Platform</span>
           </Link>
         </div>
 

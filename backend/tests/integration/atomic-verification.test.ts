@@ -54,7 +54,7 @@ vi.mock('../../src/config/session-store', () => ({
 
 describe('Atomic Functions Verification', () => {
   let authToken: string;
-  let testChaletId: string;
+  let testUnitId: string;
 
   beforeAll(async () => {
     await initializeDatabase();
@@ -86,9 +86,9 @@ describe('Atomic Functions Verification', () => {
     // Resolve a bookable unit via the API
     const unitsRes = await request(app).get('/api/v1/units');
     const units: Array<{ id: string }> = unitsRes.body?.data ?? [];
-    testChaletId = units[0]?.id ?? '';
+    testUnitId = units[0]?.id ?? '';
 
-    if (!testChaletId) {
+    if (!testUnitId) {
       console.warn('No bookable units returned from /api/v1/units — booking test will be skipped');
     }
   });
@@ -97,9 +97,9 @@ describe('Atomic Functions Verification', () => {
     await closeDatabase();
   });
 
-  it('should create chalet booking using atomic function', async () => {
-    if (!authToken || !testChaletId) {
-      console.warn('Skipping test: Missing auth token or chalet ID');
+  it('should create accommodation unit booking using atomic function', async () => {
+    if (!authToken || !testUnitId) {
+      console.warn('Skipping test: Missing auth token or accommodation unit ID');
       return;
     }
 
@@ -112,7 +112,7 @@ describe('Atomic Functions Verification', () => {
       .post('/api/v1/units/bookings')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
-        unit_id: testChaletId,
+        unit_id: testUnitId,
         check_in_date: checkIn.toISOString().split('T')[0],
         check_out_date: checkOut.toISOString().split('T')[0],
         number_of_guests: 2,
@@ -121,7 +121,7 @@ describe('Atomic Functions Verification', () => {
       });
 
     if (res.status !== 201) {
-      console.error('Chalet Booking failed:', res.status, res.body);
+      console.error('AccommodationUnit Booking failed:', res.status, res.body);
     }
 
     expect(res.status).toBe(201);

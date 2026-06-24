@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ResortTheme, defaultTheme } from '../lib/theme-config';
+import { SiteTheme, defaultTheme } from '../lib/theme-config';
 
 export type Currency = 'USD' | 'EUR' | 'LBP';
 export type TransitionStyle = 'fade' | 'slideRight' | 'slideUp' | 'scale' | 'reveal';
@@ -26,7 +26,7 @@ export const exchangeRates: Record<Currency, number> = {
 
 interface SettingsState {
   // Visual settings
-  resortTheme: ResortTheme;
+  siteTheme: SiteTheme;
   animationsEnabled: boolean;
   reducedMotion: boolean;
   
@@ -43,7 +43,7 @@ interface SettingsState {
   currency: Currency;
   
   // Actions
-  setResortTheme: (theme: ResortTheme) => void;
+  setSiteTheme: (theme: SiteTheme) => void;
   setAnimationsEnabled: (enabled: boolean) => void;
   setReducedMotion: (reduced: boolean) => void;
   setSoundEnabled: (enabled: boolean) => void;
@@ -58,7 +58,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       // Initial state
-      resortTheme: defaultTheme,
+      siteTheme: defaultTheme,
       animationsEnabled: true,
       reducedMotion: false,
       soundEnabled: true,
@@ -69,7 +69,7 @@ export const useSettingsStore = create<SettingsState>()(
       enableLoadingAnimation: true,
       
       // Actions
-      setResortTheme: (theme) => set({ resortTheme: theme }),
+      setSiteTheme: (theme) => set({ siteTheme: theme }),
       setAnimationsEnabled: (enabled) => set({ animationsEnabled: enabled }),
       setReducedMotion: (reduced) => set({ reducedMotion: reduced }),
       setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),

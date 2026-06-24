@@ -69,10 +69,10 @@ describe('useCustomizations hooks', () => {
       'groups',
       'group-1',
     ]);
-    expect(customizationKeys.order('restaurant', 'order-1')).toEqual([
+    expect(customizationKeys.order('menu_service', 'order-1')).toEqual([
       'customizations',
       'order',
-      'restaurant',
+      'menu_service',
       'order-1',
     ]);
   });
@@ -111,7 +111,7 @@ describe('useCustomizations hooks', () => {
   });
 
   it('configures order customizations query with optional orderItemId param', async () => {
-    renderHook(() => useOrderCustomizations('restaurant', 'ord-1', 'line-1'));
+    renderHook(() => useOrderCustomizations('menu_service', 'ord-1', 'line-1'));
 
     const withItem = useQueryMock.mock.calls[0][0] as {
       queryKey: unknown[];
@@ -121,18 +121,18 @@ describe('useCustomizations hooks', () => {
     expect(withItem.queryKey).toEqual([
       'customizations',
       'order',
-      'restaurant',
+      'menu_service',
       'ord-1',
       'line-1',
     ]);
 
     apiGetMock.mockResolvedValueOnce({ data: [{ groupName: 'Sauces' }] });
     const resultWithItem = await withItem.queryFn();
-    expect(apiGetMock).toHaveBeenCalledWith('/customizations/orders/restaurant/ord-1?orderItemId=line-1');
+    expect(apiGetMock).toHaveBeenCalledWith('/customizations/orders/menu_service/ord-1?orderItemId=line-1');
     expect(resultWithItem).toEqual([{ groupName: 'Sauces' }]);
 
     useQueryMock.mockClear();
-    renderHook(() => useOrderCustomizations('restaurant', 'ord-2'));
+    renderHook(() => useOrderCustomizations('menu_service', 'ord-2'));
 
     const withoutItem = useQueryMock.mock.calls[0][0] as {
       queryKey: unknown[];
@@ -142,14 +142,14 @@ describe('useCustomizations hooks', () => {
     expect(withoutItem.queryKey).toEqual([
       'customizations',
       'order',
-      'restaurant',
+      'menu_service',
       'ord-2',
       undefined,
     ]);
 
     apiGetMock.mockResolvedValueOnce({ data: [] });
     await withoutItem.queryFn();
-    expect(apiGetMock).toHaveBeenLastCalledWith('/customizations/orders/restaurant/ord-2');
+    expect(apiGetMock).toHaveBeenLastCalledWith('/customizations/orders/menu_service/ord-2');
   });
 
   it('uses mutation endpoint for selection validation', async () => {

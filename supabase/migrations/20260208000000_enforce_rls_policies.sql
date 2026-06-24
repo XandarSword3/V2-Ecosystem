@@ -99,14 +99,6 @@ DROP POLICY IF EXISTS "gap_rem_cash_tx_all"     ON cash_transactions;
 DROP POLICY IF EXISTS "gap_rem_waitlist_all"    ON waitlist_entries;
 DROP POLICY IF EXISTS "gap_rem_2fa_all"         ON two_factor_auth;
 
--- --- From 20260203100000_menu_modifiers_complete (conditional table) ---
-DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables
-             WHERE table_schema = 'public' AND table_name = 'snack_bar_item_modifiers') THEN
-    EXECUTE 'DROP POLICY IF EXISTS "snack_modifiers_all" ON snack_bar_item_modifiers';
-  END IF;
-END $$;
-
 -- --- From 20260202195646_advanced_features_tier3 (44 policies) ---
 DROP POLICY IF EXISTS "retention_policies_admin"       ON gdpr_retention_policies;
 DROP POLICY IF EXISTS "processing_activities_admin"     ON gdpr_processing_activities;
@@ -262,20 +254,6 @@ CREATE POLICY "staff_manage_modifier_options"
   TO authenticated
   USING  (user_has_role('staff') OR user_has_role('manager') OR user_has_role('admin'))
   WITH CHECK (user_has_role('staff') OR user_has_role('manager') OR user_has_role('admin'));
-
--- Snack bar item modifiers (conditional table)
-DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables
-             WHERE table_schema = 'public' AND table_name = 'snack_bar_item_modifiers') THEN
-    EXECUTE $x$
-      CREATE POLICY "staff_manage_snack_modifiers"
-        ON snack_bar_item_modifiers FOR ALL
-        TO authenticated
-        USING  (user_has_role('staff') OR user_has_role('manager') OR user_has_role('admin'))
-        WITH CHECK (user_has_role('staff') OR user_has_role('manager') OR user_has_role('admin'))
-    $x$;
-  END IF;
-END $$;
 
 -- Cash drawers and transactions: staff/admin
 CREATE POLICY "staff_manage_cash_drawers"

@@ -17,7 +17,9 @@ import {
   Tags,
   Settings,
   Ticket,
-  Users
+  Users,
+  CreditCard,
+  Building2
 } from 'lucide-react';
 
 export default function DynamicModuleDashboard() {
@@ -150,12 +152,43 @@ export default function DynamicModuleDashboard() {
     </div>
   );
 
+  const renderPlatformEntitlementDashboard = () => (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <Link href={`/admin/${moduleSlug}/plans`}>
+        <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Subscription Plans</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">Plans</div>
+            <p className="text-xs text-muted-foreground">Create and manage pricing tiers</p>
+          </CardContent>
+        </Card>
+      </Link>
+
+      <Link href={`/admin/${moduleSlug}/tenants`}>
+        <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tenants</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">Tenants</div>
+            <p className="text-xs text-muted-foreground">Billing status, MRR, control plane</p>
+          </CardContent>
+        </Card>
+      </Link>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      {currentModule.template_type === 'instant_transaction' && renderMenuServiceDashboard()}
-      {currentModule.template_type === 'time_exclusive_reservation' && renderBookingDashboard()}
-      {currentModule.template_type === 'shared_capacity_access' && renderSessionDashboard()}
-      {currentModule.template_type === 'ongoing_entitlement' && renderSessionDashboard()}
+      {currentModule.engine_type === 'instant_transaction' && renderMenuServiceDashboard()}
+      {currentModule.engine_type === 'time_exclusive_reservation' && renderBookingDashboard()}
+      {currentModule.engine_type === 'shared_capacity_access' && renderSessionDashboard()}
+      {currentModule.engine_type === 'ongoing_entitlement' && renderSessionDashboard()}
+      {currentModule.engine_type === 'platform_entitlement' && renderPlatformEntitlementDashboard()}
     </div>
   );
 }

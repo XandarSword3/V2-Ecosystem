@@ -110,7 +110,7 @@ describe('Customer loyalty route behavior', () => {
                 id: 'txn-1',
                 type: 'earned',
                 points: 120,
-                description: 'Chalet booking bonus',
+                description: 'AccommodationUnit booking bonus',
                 createdAt: '2026-08-02T10:00:00Z',
               },
             ],
@@ -137,7 +137,7 @@ describe('Customer loyalty route behavior', () => {
     render(<CustomerLoyaltyPage />);
 
     expect(await screen.findByText('Available Points')).toBeInTheDocument();
-    expect(screen.getByText('Chalet booking bonus')).toBeInTheDocument();
+    expect(screen.getByText('AccommodationUnit booking bonus')).toBeInTheDocument();
     expect(screen.getByText('Membership Tiers')).toBeInTheDocument();
 
     expect(apiGetMock).toHaveBeenCalledWith('/loyalty/me', expect.any(Object));

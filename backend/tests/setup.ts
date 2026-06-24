@@ -1,16 +1,57 @@
 /**
  * Test Setup and Utilities
- * 
+ *
  * Provides mock implementations and test utilities for unit testing.
  */
 
 import { vi, beforeAll, afterAll, beforeEach } from 'vitest';
 
-// Mock environment variables
+// Mock environment variables FIRST before any imports
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing';
 process.env.JWT_EXPIRES_IN = '15m';
 process.env.JWT_REFRESH_EXPIRES_IN = '7d';
+
+// Mock dotenv before config is loaded - must be hoisted
+vi.mock('dotenv', () => ({
+  default: {
+    config: vi.fn(),
+  },
+}));
+
+// Mock config module - must be hoisted
+vi.mock('../src/config/index', () => ({
+  config: {
+    env: 'test',
+    port: 3005,
+    apiUrl: 'http://localhost:3005',
+    frontendUrl: 'http://localhost:3000',
+    corsOrigins: ['http://localhost:3000'],
+    database: { url: '' },
+    supabase: { url: '', anonKey: '', serviceKey: '' },
+    jwt: { secret: 'test-secret-key-min-32-characters-long', refreshSecret: 'test-refresh-secret-key-min-32-chars', expiresIn: '15m', refreshExpiresIn: '7d' },
+    stripe: { secretKey: '', webhookSecret: '' },
+    email: { host: 'smtp.sendgrid.net', port: 587, user: '', pass: '', from: '' },
+    storage: { endpoint: '', bucket: 'v2-ecosystem-files', accessKey: '', secretKey: '' },
+    rateLimit: { windowMs: 60000, maxRequests: 1000 },
+    oauth: { google: { clientId: '', clientSecret: '', callbackUrl: '' }, facebook: { clientId: '', clientSecret: '', callbackUrl: '' }, apple: { clientId: '', teamId: '', keyId: '', privateKey: '', callbackUrl: '' } },
+    firebase: { serviceAccountPath: '', projectId: '' },
+    mobile: { bundleId: { ios: 'com.v2ecosystem.app', android: 'com.v2ecosystem.app' }, appleTeamId: '', deepLinkScheme: 'v2ecosystem' },
+  },
+  resolveCorsOrigins: (env: NodeJS.ProcessEnv = process.env) => {
+    const rawOrigins = env.CORS_ORIGINS || env.CORS_ORIGIN || env.FRONTEND_URL;
+    const envOrigins: string[] = rawOrigins
+      ? rawOrigins.split(',').map(o => o.trim()).filter(Boolean)
+      : [];
+    const base = envOrigins.length > 0 ? envOrigins : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3005'];
+    if (env.NODE_ENV === 'production') {
+      const merged = Array.from(new Set([...base, 'https://v2-ecosystem.vercel.app']));
+      return [...merged, /^https:\/\/v2-ecosystem(-[a-z0-9-]+)?\.vercel\.app$/];
+    }
+    return base;
+  },
+  validateEnvironment: vi.fn(),
+}));
 
 // Create a mock Supabase client
 export const mockSupabaseClient = {
@@ -87,7 +128,7 @@ export function createMockBooking(overrides = {}) {
   return {
     id: 'test-booking-id-123',
     confirmation_number: 'BK-001',
-    chalet_id: 'test-chalet-id',
+    unit_id: 'test-accommodation unit-id',
     status: 'confirmed',
     check_in_date: '2026-01-15',
     check_out_date: '2026-01-17',

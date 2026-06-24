@@ -13,19 +13,19 @@ async function loginAsAdmin(page: Page) {
   await page.waitForURL(/\/admin/, { timeout: 30000 });
 }
 
-test.describe('Admin Restaurant Management [ADM-REST-001 → 016]', () => {
+test.describe('Admin MenuService Management [ADM-REST-001 → 016]', () => {
 test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
   });
 
   test('ADM-REST-001: View menu categories', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/restaurant/menu`);
+    await page.goto(`${FRONTEND_URL}/admin/${slug}/menu`);
     await expect(page.getByRole('heading', { name: /menu|categor/i }).first()).toBeVisible({ timeout: 15000 });
     await expect(page.locator('text=/categor/i').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('ADM-REST-003: Create/edit category form', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/restaurant/menu`);
+    await page.goto(`${FRONTEND_URL}/admin/${slug}/menu`);
     const addBtn = page.getByRole('button', { name: /add.*categor|new.*categor|create/i }).first();
     await expect(addBtn).toBeVisible({ timeout: 15000 });
     await addBtn.click();
@@ -33,13 +33,13 @@ test.beforeEach(async ({ page }) => {
   });
 
   test('ADM-REST-005: View menu items', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/restaurant/menu`);
+    await page.goto(`${FRONTEND_URL}/admin/${slug}/menu`);
     await expect(page.locator('table, .grid, [data-testid*="menu"]').first()).toBeVisible({ timeout: 15000 });
     await expect(page.locator('text=/item|dish|product/i').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('ADM-REST-007: Create/edit menu item form', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/restaurant/menu`);
+    await page.goto(`${FRONTEND_URL}/admin/${slug}/menu`);
     const addBtn = page.getByRole('button', { name: /add.*item|new.*item|create.*item/i }).first();
     await expect(addBtn).toBeVisible({ timeout: 15000 });
     await addBtn.click();
@@ -47,14 +47,14 @@ test.beforeEach(async ({ page }) => {
   });
 
   test('ADM-REST-009: Toggle item availability', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/restaurant/menu`);
+    await page.goto(`${FRONTEND_URL}/admin/${slug}/menu`);
     await expect(page.locator('table, .grid').first()).toBeVisible({ timeout: 15000 });
     const toggle = page.locator('button[role="switch"], input[type="checkbox"], [data-testid*="toggle"]').first();
     await expect(toggle).toBeVisible({ timeout: 10000 });
   });
 
   test('ADM-REST-011: Manage modifier groups', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/admin/restaurant/menu`);
+    await page.goto(`${FRONTEND_URL}/admin/${slug}/menu`);
     await expect(page.locator('text=/modifier|addon|extra|variation/i').first()).toBeVisible({ timeout: 15000 });
   });
 

@@ -23,8 +23,8 @@ vi.mock('../../../src/services/backup.service', () => ({
   }
 }));
 
-vi.mock('../../../src/scripts/expire-pool-tickets.js', () => ({
-  expirePoolTickets: vi.fn().mockResolvedValue({ expired: 5 })
+vi.mock('../../../src/scripts/expire-capacity-access-tickets.js', () => ({
+  expireCapacityAccessTickets: vi.fn().mockResolvedValue({ expired: 5 })
 }));
 
 vi.mock('../../../src/services/booking-reminders.service.js', () => ({
@@ -71,8 +71,8 @@ describe('SchedulerService', () => {
     it('should initialize all cron jobs', () => {
       SchedulerService.init();
 
-      // Should schedule 8 cron jobs including membership renewal, KPI alerts, and GDPR deletion.
-      expect(cron.schedule).toHaveBeenCalledTimes(8);
+      // Should schedule 9 cron jobs including membership renewal, KPI alerts, GDPR deletion, and OTP purge.
+      expect(cron.schedule).toHaveBeenCalledTimes(9);
       expect(logger.info).toHaveBeenCalledWith('Scheduler service initialized.');
     });
 
@@ -121,7 +121,7 @@ describe('SchedulerService', () => {
 
   describe('scheduled job callbacks', () => {
     it('should execute backup job callback without errors', async () => {
-      let backupCallback: Function | undefined;
+      let backupCallback: any;
       
       vi.mocked(cron.schedule).mockImplementation((expression, callback) => {
         if (expression === '0 3 * * *') {
@@ -140,7 +140,7 @@ describe('SchedulerService', () => {
     });
 
     it('should execute pool ticket expiry callback without errors', async () => {
-      let poolCallback: Function | undefined;
+      let poolCallback: any;
       
       vi.mocked(cron.schedule).mockImplementation((expression, callback) => {
         if (expression === '0 0 * * *') {
@@ -154,7 +154,7 @@ describe('SchedulerService', () => {
       // Execute the pool ticket callback
       if (poolCallback) {
         await poolCallback();
-        expect(logger.info).toHaveBeenCalledWith('Starting scheduled pool ticket expiry (midnight)...');
+        expect(logger.info).toHaveBeenCalledWith('Starting scheduled capacity access ticket expiry (midnight)...');
       }
     });
   });

@@ -13,6 +13,10 @@ const authState = vi.hoisted(() => ({
   user: { id: 'user-1' } as { id: string } | null,
 }));
 
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+}));
+
 vi.mock('@tanstack/react-query', () => ({
   useQuery: useQueryMock,
   useMutation: useMutationMock,
@@ -92,7 +96,7 @@ import { SessionService } from '../../src/components/modules/SessionService';
 
 const moduleData = {
   id: 'mod-pool',
-  slug: 'pool',
+  slug: 'capacity',
   name: 'Pool Sessions',
   description: 'Daily sessions',
   settings: {
@@ -256,7 +260,7 @@ describe('SessionService behavior', () => {
     });
 
     expect(toastSuccessMock).toHaveBeenCalledWith('ticketPurchased');
-    expect(pushMock).toHaveBeenCalledWith('/pool/confirmation?id=ticket-123');
+    expect(pushMock).toHaveBeenCalledWith('/capacity/confirmation?id=ticket-123');
   });
 
   it('renders user tickets section with view-all link when tickets exceed six', () => {

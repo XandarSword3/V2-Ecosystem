@@ -92,7 +92,7 @@ describe('Gift Card Controller', () => {
     };
     
     mockRequest = {
-      user: { id: 'user-123', role: 'customer' },
+      user: { id: 'user-123', userId: 'user-123', email: 'user@example.com', roles: ['customer'] },
       params: {},
       query: {},
       body: {},
@@ -110,56 +110,13 @@ describe('Gift Card Controller', () => {
     mockBuilder.reset();
   });
 
-  describe('getTemplates', () => {
-    it('should return active gift card templates', async () => {
-      const mockTemplates = [
-        { id: 'tmpl-25', name: '$25 Gift Card', amount: 25, is_active: true },
-        { id: 'tmpl-50', name: '$50 Gift Card', amount: 50, is_active: true },
-        { id: 'tmpl-100', name: '$100 Gift Card', amount: 100, is_active: true },
-      ];
-
-      mockBuilder.queueResponse(mockTemplates, null);
-
-      await controller.getTemplates(
-        mockRequest as Request,
-        mockResponse as Response
-      );
-
-      expect(mockFrom).toHaveBeenCalledWith('gift_card_templates');
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: true,
-        data: mockTemplates,
-      });
-    });
-
-    it('should handle database errors', async () => {
-      mockBuilder.queueResponse(null, { message: 'Database error' });
-
-      await controller.getTemplates(
-        mockRequest as Request,
-        mockResponse as Response
-      );
-
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(responseJson.success).toBe(false);
-    });
-  });
-
   describe('purchaseGiftCard', () => {
-    it('should purchase a gift card from template', async () => {
+    it('should purchase a gift card with customAmount', async () => {
       mockRequest.body = {
-        templateId: '550e8400-e29b-41d4-a716-446655440050',
+        customAmount: 50,
         recipientEmail: 'friend@example.com',
         recipientName: 'John',
         message: 'Happy Birthday!',
-      };
-
-      const mockTemplate = {
-        id: '550e8400-e29b-41d4-a716-446655440050',
-        name: '$50 Gift Card',
-        amount: 50,
-        design: { background: '#7c3aed' },
-        is_active: true,
       };
 
       const createdGiftCard = {
@@ -174,7 +131,6 @@ describe('Gift Card Controller', () => {
       };
 
       // Queue responses in order
-      mockBuilder.queueResponse(mockTemplate, null);  // Get template
       mockBuilder.queueResponse(null, null);          // Check code uniqueness
       mockBuilder.queueResponse(createdGiftCard, null); // Insert gift card
       mockBuilder.queueResponse(null, null);          // Insert transaction
@@ -199,7 +155,6 @@ describe('Gift Card Controller', () => {
         message: 'Gift card created successfully',
       });
 
-      expect(mockFrom).toHaveBeenCalledWith('gift_card_templates');
       expect(mockFrom).toHaveBeenCalledWith('gift_cards');
       expect(mockFrom).toHaveBeenCalledWith('gift_card_transactions');
       expect(sendGiftCardMock).toHaveBeenCalledWith(
@@ -213,8 +168,8 @@ describe('Gift Card Controller', () => {
 
     it('should reject missing required fields', async () => {
       mockRequest.body = {
-        templateId: '550e8400-e29b-41d4-a716-446655440050',
-        // missing recipientEmail and recipientName
+        customAmount: 50,
+        // missing recipientEmail
       };
 
       await controller.purchaseGiftCard(
@@ -224,23 +179,6 @@ describe('Gift Card Controller', () => {
 
       expect(mockResponse.status).toHaveBeenCalledWith(400);
       expect(responseJson.error).toBe('Validation failed');
-    });
-
-    it('should reject non-existent template', async () => {
-      mockRequest.body = {
-        templateId: '550e8400-e29b-41d4-a716-446655449999', // Valid UUID format, but not found
-        recipientEmail: 'friend@example.com',
-        recipientName: 'John',
-      };
-
-      mockBuilder.queueResponse(null, null);  // Template not found
-
-      await controller.purchaseGiftCard(
-        mockRequest as Request,
-        mockResponse as Response
-      );
-
-      expect(mockResponse.status).toHaveBeenCalledWith(404);
     });
   });
 
@@ -415,7 +353,7 @@ describe('Gift Card Controller', () => {
   describe('getAllGiftCards (Admin)', () => {
     it('should return paginated gift cards', async () => {
       mockRequest.query = { page: '1', limit: '10' };
-      mockRequest.user = { id: 'admin-123', role: 'admin' };
+      mockRequest.user = { id: 'admin-123', userId: 'admin-123', email: 'admin@example.com', roles: ['admin'] };
 
       const mockGiftCards = [
         { id: 'gc-1', code: 'GIFT-1', current_balance: 50, status: 'active' },

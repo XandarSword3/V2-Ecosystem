@@ -87,7 +87,7 @@ export interface GuestProfile {
 }
 
 // ─── Amenity ──────────────────────────────────────────────────────────────────
-export type AmenityCategory = 'pool' | 'spa' | 'fitness' | 'dining' | 'entertainment' | 'sports' | 'recreation' | 'business' | 'kids' | 'other';
+export type AmenityCategory = 'aquatic' | 'spa' | 'fitness' | 'dining' | 'entertainment' | 'sports' | 'recreation' | 'business' | 'kids' | 'other';
 export type AmenityStatus = 'available' | 'maintenance' | 'closed' | 'reserved';
 
 export interface AmenitySchedule {
@@ -142,7 +142,7 @@ export interface Amenity {
 export type MaintenanceCategory = 'plumbing' | 'electrical' | 'hvac' | 'carpentry' | 'painting' | 'cleaning' | 'landscaping' | 'appliance' | 'structural' | 'safety' | 'it' | 'general';
 export type MaintenancePriority = 'low' | 'medium' | 'high' | 'critical';
 export type MaintenanceStatus = 'open' | 'assigned' | 'in_progress' | 'pending_parts' | 'completed' | 'cancelled';
-export type LocationType = 'room' | 'lobby' | 'pool' | 'gym' | 'restaurant' | 'parking' | 'exterior' | 'common_area' | 'office' | 'other';
+export type LocationType = 'room' | 'lobby' | 'aquatic_area' | 'gym' | 'dining_area' | 'parking' | 'exterior' | 'common_area' | 'office' | 'other';
 
 export interface WorkOrderPart {
   id: string;

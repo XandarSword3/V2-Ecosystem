@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Module, ModuleSettings } from '@/lib/settings-context';
 import { useRouter } from 'next/navigation';
+import { SYSTEM_PAGE_SLUGS } from '@/config/admin-navigation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,7 +16,7 @@ interface ModuleFormData {
   name: string;
   slug: string;
   description: string;
-  template_type: string;
+  engine_type: string;
   is_active: boolean;
   show_in_main: boolean;
   settings: ModuleSettings;
@@ -25,213 +26,39 @@ interface ApiError {
   response?: { data?: { message?: string } };
 }
 
-// ─── Built-in templates (fallback if backend returns nothing) ─────────────────
+interface TemplateEntry {
+  id: string;
+  name: string;
+  description: string;
+  engine_type: string;
+  template_type?: string; // Backward compatibility alias for engine_type
+  category?: string;
+  thumbnail_url?: string;
+  layout: any[];
+  default_settings?: any;
+  seed_data?: any;
+  is_official?: boolean;
+  usage_count?: number;
+  created_at?: string;
+  // UI properties (computed from engine_type/category)
+  icon?: string;
+  color?: string;
+  accent?: string;
+}
 
-const BUILTIN_TEMPLATES = [
-  {
-    id: 'blank',
-    name: 'Blank',
-    description: 'Start from scratch with an empty canvas.',
-    template_type: 'instant_transaction',
-    icon: '⬜',
-    color: '#6366f1',
-    accent: '#a5b4fc',
-    layout: [],
-  },
-  {
-    id: 'restaurant',
-    name: 'Restaurant / Bar',
-    description: 'Hero section, menu grid, and a call-to-action. Ready for food & drink modules.',
-    template_type: 'instant_transaction',
-    icon: '🍽️',
-    color: '#f97316',
-    accent: '#fbbf24',
-    layout: [
-      {
-        id: 'tpl-hero',
-        type: 'hero_v2',
-        label: 'Hero',
-        props: { title: 'Welcome', subtitle: 'Discover our menu', primaryButton: 'View Menu', primaryUrl: '#menu' },
-        style: {},
-        position: { x: 0, y: 0, width: '100%', height: '400px', z: 1 },
-      },
-      {
-        id: 'tpl-menu',
-        type: 'menu_list',
-        label: 'Menu',
-        props: {},
-        style: {},
-        position: { x: 0, y: 420, width: '100%', height: '500px', z: 1 },
-      },
-      {
-        id: 'tpl-cta',
-        type: 'cta',
-        label: 'CTA',
-        props: { title: 'Reserve a Table', description: 'Book your spot today.', buttonText: 'Make a Reservation', buttonUrl: '#reserve' },
-        style: {},
-        position: { x: 0, y: 940, width: '100%', height: '280px', z: 1 },
-      },
-    ],
-  },
-  {
-    id: 'pool',
-    name: 'Pool / Beach Club',
-    description: 'Hero, session picker, and pricing table. Built for session-based access.',
-    template_type: 'shared_capacity_access',
-    icon: '🏊',
-    color: '#0ea5e9',
-    accent: '#38bdf8',
-    layout: [
-      {
-        id: 'tpl-hero',
-        type: 'hero_v2',
-        label: 'Hero',
-        props: { title: 'Pool Access', subtitle: 'Book your session', primaryButton: 'View Sessions', primaryUrl: '#sessions' },
-        style: {},
-        position: { x: 0, y: 0, width: '100%', height: '400px', z: 1 },
-      },
-      {
-        id: 'tpl-sessions',
-        type: 'session_list',
-        label: 'Sessions',
-        props: {},
-        style: {},
-        position: { x: 0, y: 420, width: '100%', height: '520px', z: 1 },
-      },
-      {
-        id: 'tpl-pricing',
-        type: 'pricing_table',
-        label: 'Pricing',
-        props: { title: 'Admission Rates' },
-        style: {},
-        position: { x: 0, y: 960, width: '100%', height: '400px', z: 1 },
-      },
-    ],
-  },
-  {
-    id: 'gym',
-    name: 'Gym / Fitness',
-    description: 'Hero, class schedule, stats, and testimonials. Ideal for fitness centres.',
-    template_type: 'shared_capacity_access',
-    icon: '🏋️',
-    color: '#7c3aed',
-    accent: '#a78bfa',
-    layout: [
-      {
-        id: 'tpl-hero',
-        type: 'hero_v2',
-        label: 'Hero',
-        props: { title: 'Train Hard', eyebrow: 'Strength · Wellness · You', primaryButton: 'See Schedule', primaryUrl: '#schedule' },
-        style: {},
-        position: { x: 0, y: 0, width: '100%', height: '420px', z: 1 },
-      },
-      {
-        id: 'tpl-stats',
-        type: 'stats',
-        label: 'Stats',
-        props: { stats: [{ value: '50+', label: 'Classes per week' }, { value: '10', label: 'Expert trainers' }, { value: '500+', label: 'Active members' }, { value: '24/7', label: 'Facility access' }] },
-        style: {},
-        position: { x: 0, y: 440, width: '100%', height: '240px', z: 1 },
-      },
-      {
-        id: 'tpl-schedule',
-        type: 'class_schedule',
-        label: 'Schedule',
-        props: { title: 'Today\'s Classes', subtitle: 'UPCOMING SESSIONS' },
-        style: {},
-        position: { x: 0, y: 700, width: '100%', height: '480px', z: 1 },
-      },
-      {
-        id: 'tpl-testimonials',
-        type: 'testimonials_carousel',
-        label: 'Reviews',
-        props: { title: 'Stronger Together', subtitle: 'WHAT OUR MEMBERS SAY' },
-        style: {},
-        position: { x: 0, y: 1200, width: '100%', height: '400px', z: 1 },
-      },
-    ],
-  },
-  {
-    id: 'hotel',
-    name: 'Hotel / Chalets',
-    description: 'Hero, availability calendar, features, and a booking CTA.',
-    template_type: 'time_exclusive_reservation',
-    icon: '🏡',
-    color: '#15803d',
-    accent: '#4ade80',
-    layout: [
-      {
-        id: 'tpl-hero',
-        type: 'hero_v2',
-        label: 'Hero',
-        props: { title: 'Your Home Away', subtitle: 'Book your stay', primaryButton: 'Check Availability', primaryUrl: '#book' },
-        style: {},
-        position: { x: 0, y: 0, width: '100%', height: '420px', z: 1 },
-      },
-      {
-        id: 'tpl-features',
-        type: 'features',
-        label: 'Amenities',
-        props: { title: 'Everything You Need', features: [{ title: 'Private Pool', description: 'Each chalet has its own pool.' }, { title: 'Full Kitchen', description: 'Fully-equipped kitchen included.' }, { title: 'Free Wi-Fi', description: 'High-speed internet throughout.' }] },
-        style: {},
-        position: { x: 0, y: 440, width: '100%', height: '380px', z: 1 },
-      },
-      {
-        id: 'tpl-booking',
-        type: 'booking_calendar',
-        label: 'Booking Calendar',
-        props: { title: 'Select Your Dates' },
-        style: {},
-        position: { x: 0, y: 840, width: '100%', height: '500px', z: 1 },
-      },
-    ],
-  },
-  {
-    id: 'spa',
-    name: 'Spa / Wellness',
-    description: 'Elegant hero, features list, and a booking CTA. Designed for spa experiences.',
-    template_type: 'shared_capacity_access',
-    icon: '🧖',
-    color: '#db2777',
-    accent: '#f9a8d4',
-    layout: [
-      {
-        id: 'tpl-hero',
-        type: 'hero_v2',
-        label: 'Hero',
-        props: { title: 'Pure Serenity', subtitle: 'Escape the everyday', primaryButton: 'Book a Session', primaryUrl: '#sessions' },
-        style: {},
-        position: { x: 0, y: 0, width: '100%', height: '440px', z: 1 },
-      },
-      {
-        id: 'tpl-features',
-        type: 'features',
-        label: 'Services',
-        props: { title: 'Our Treatments', features: [{ title: 'Deep Tissue Massage', description: 'Relieve tension and restore balance.' }, { title: 'Aromatherapy', description: 'Soothing scents for mind and body.' }, { title: 'Facial Treatments', description: 'Rejuvenate and refresh your skin.' }] },
-        style: {},
-        position: { x: 0, y: 460, width: '100%', height: '380px', z: 1 },
-      },
-      {
-        id: 'tpl-sessions',
-        type: 'session_list',
-        label: 'Sessions',
-        props: {},
-        style: {},
-        position: { x: 0, y: 860, width: '100%', height: '500px', z: 1 },
-      },
-      {
-        id: 'tpl-cta',
-        type: 'cta',
-        label: 'CTA',
-        props: { title: 'Ready to Unwind?', description: 'Book your treatment today.', buttonText: 'Reserve Now' },
-        style: {},
-        position: { x: 0, y: 1380, width: '100%', height: '260px', z: 1 },
-      },
-    ],
-  },
-];
+// ─── Blank module defaults (no template required) ─────────────────────────────
 
-type TemplateEntry = typeof BUILTIN_TEMPLATES[number];
+const BLANK_TEMPLATE: TemplateEntry = {
+  id: 'blank',
+  name: '',
+  description: '',
+  engine_type: 'instant_transaction',
+  template_type: 'instant_transaction',
+  layout: [],
+  icon: '⬜',
+  color: '#6366f1',
+  accent: '#a5b4fc',
+};
 
 // ─── Template Picker ──────────────────────────────────────────────────────────
 
@@ -244,18 +71,33 @@ function TemplatePicker({
 }) {
   const [selected, setSelected] = useState<string | null>(null);
 
-  // Try to fetch backend templates; fall back to built-ins on any error
-  const { data: backendTemplates } = useQuery({
+  // Fetch backend templates
+  const { data: backendTemplates, isLoading: templatesLoading } = useQuery({
     queryKey: ['module-templates'],
     queryFn: () => api.get('/admin/module-templates'),
     retry: false,
     staleTime: Infinity,
   });
 
-  const templates: TemplateEntry[] =
-    (backendTemplates?.data?.data?.length
-      ? backendTemplates.data.data
-      : null) ?? BUILTIN_TEMPLATES;
+  // Helper to compute UI properties from engine_type/category
+  const getTemplateUI = (engineType: string, category?: string) => {
+    const uiMap: Record<string, { icon: string; color: string; accent: string }> = {
+      instant_transaction: { icon: '🍽️', color: '#f97316', accent: '#fbbf24' },
+      time_exclusive_reservation: { icon: '🏡', color: '#15803d', accent: '#4ade80' },
+      shared_capacity_access: { icon: '🏊', color: '#0ea5e9', accent: '#38bdf8' },
+      ongoing_entitlement: { icon: '⭐', color: '#7c3aed', accent: '#a78bfa' },
+    };
+    return uiMap[engineType] || { icon: '📦', color: '#6366f1', accent: '#a5b4fc' };
+  };
+
+  // Official "Blank" is offered via the main page — hide duplicate from the grid
+  const templates: TemplateEntry[] = (backendTemplates?.data?.data || [])
+    .filter((tpl: any) => tpl.name?.toLowerCase() !== 'blank')
+    .map((tpl: any) => ({
+      ...tpl,
+      template_type: tpl.engine_type, // Add for backward compatibility
+      ...getTemplateUI(tpl.engine_type, tpl.category),
+    }));
 
   const TYPE_LABEL: Record<string, string> = {
     instant_transaction:        'Instant Transaction',
@@ -293,7 +135,17 @@ function TemplatePicker({
 
       {/* Grid */}
       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {templates.map((tpl) => {
+        {templatesLoading ? (
+          <div className="col-span-full flex items-center justify-center py-12 text-slate-500 dark:text-slate-400 gap-2">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            Loading templates…
+          </div>
+        ) : templates.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-slate-500 dark:text-slate-400 text-sm">
+            No pre-built templates available. Use &ldquo;Skip to blank&rdquo; below to start from scratch.
+          </div>
+        ) : null}
+        {!templatesLoading && templates.map((tpl) => {
           const isSelected = selected === tpl.id;
           return (
             <button
@@ -326,7 +178,7 @@ function TemplatePicker({
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                   style={{ backgroundColor: tpl.color + '22', color: tpl.color }}
                 >
-                  {TYPE_LABEL[tpl.template_type] ?? tpl.template_type}
+                  {TYPE_LABEL[tpl.engine_type] ?? tpl.engine_type}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{tpl.description}</p>
@@ -344,12 +196,20 @@ function TemplatePicker({
 
       {/* Footer */}
       <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-slate-700">
-        <button
-          onClick={onCancel}
-          className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-        >
-          Cancel
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSelect(BLANK_TEMPLATE)}
+            className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+          >
+            Skip to blank
+          </button>
+        </div>
         <button
           disabled={!selected}
           onClick={() => {
@@ -384,7 +244,6 @@ export default function ModulesPage() {
   });
 
   const modules = data?.data?.data || [];
-  const SYSTEM_PAGE_SLUGS = ['home-page', 'privacy-policy', 'terms-of-service'];
   const businessModules = modules.filter((m: Module) => !SYSTEM_PAGE_SLUGS.includes(m.slug));
   const systemPages    = modules.filter((m: Module) =>  SYSTEM_PAGE_SLUGS.includes(m.slug));
 
@@ -429,6 +288,15 @@ export default function ModulesPage() {
     setCreationStep('forming');
   };
 
+  const startBlankModule = () => {
+    setSelectedTemplate(BLANK_TEMPLATE);
+    setCreationStep('forming');
+  };
+
+  const startTemplatePicker = () => {
+    setCreationStep('picking');
+  };
+
   const handleCreateSubmit = (formData: ModuleFormData) => {
     // Inject the template's pre-built layout into settings so the builder
     // opens with blocks already placed.
@@ -454,13 +322,22 @@ export default function ModulesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Module Management</h1>
-        <button
-          onClick={() => setCreationStep('picking')}
-          className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Module
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={startBlankModule}
+            className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Blank Module
+          </button>
+          <button
+            onClick={startTemplatePicker}
+            className="flex items-center px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+          >
+            <LayoutTemplate className="w-4 h-4 mr-2" />
+            From Template
+          </button>
+        </div>
       </div>
 
       {/* ── Step 1: Template picker ─────────────────────────────────────────── */}
@@ -487,7 +364,11 @@ export default function ModulesPage() {
           <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 w-fit">
             <span className="text-lg">{selectedTemplate.icon}</span>
             <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-              Starting from: <strong>{selectedTemplate.name}</strong>
+              {selectedTemplate.id === 'blank' ? (
+                <>Starting from: <strong>blank canvas</strong></>
+              ) : (
+                <>Starting from: <strong>{selectedTemplate.name}</strong></>
+              )}
             </span>
             {selectedTemplate.layout.length > 0 && (
               <span className="text-xs text-indigo-500 dark:text-indigo-400">
@@ -661,7 +542,7 @@ function ModuleForm({ initialData, templateDefaults, onSubmit, onCancel, isLoadi
     name:          initialData?.name          ?? templateDefaults?.name        ?? '',
     slug:          initialData?.slug          ?? (templateDefaults?.name ? normalizeSlug(templateDefaults.name) : ''),
     description:   initialData?.description   ?? templateDefaults?.description ?? '',
-    template_type: initialData?.template_type ?? templateDefaults?.template_type ?? 'instant_transaction',
+    engine_type:   initialData?.engine_type ?? initialData?.template_type ?? templateDefaults?.engine_type ?? templateDefaults?.template_type ?? 'instant_transaction',
     is_active:     initialData?.is_active     ?? true,
     show_in_main:  initialData?.show_in_main  ?? true,
     settings:      initialData?.settings      ?? {
@@ -728,15 +609,15 @@ function ModuleForm({ initialData, templateDefaults, onSubmit, onCancel, isLoadi
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Template Type</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Engine Type</label>
             <select
-              value={formData.template_type}
-              onChange={(e) => setFormData({ ...formData, template_type: e.target.value })}
+              value={formData.engine_type}
+              onChange={(e) => setFormData({ ...formData, engine_type: e.target.value })}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500"
               disabled={!!initialData}
             >
-              <option value="instant_transaction">Instant Transaction — Restaurant / Bar / Retail</option>
-              <option value="time_exclusive_reservation">Time-Exclusive Reservation — Chalets / Hotel / Courts</option>
+              <option value="instant_transaction">Instant Transaction — Food, Retail &amp; Service</option>
+              <option value="time_exclusive_reservation">Time-Exclusive Reservation — Hotel, Units &amp; Courts</option>
               <option value="shared_capacity_access">Shared Capacity Access — Pool / Gym / Spa</option>
               <option value="ongoing_entitlement">Ongoing Entitlement — Membership / Subscription</option>
             </select>
@@ -773,7 +654,7 @@ function ModuleForm({ initialData, templateDefaults, onSubmit, onCancel, isLoadi
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Icon Style</label>
               <select value={(formData.settings as any).icon || 'default'} onChange={(e) => updateSettings('icon', e.target.value)} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500">
                 <option value="default">Default</option>
-                <option value="utensils">Utensils (Restaurant)</option>
+                <option value="utensils">Utensils (Menu Service)</option>
                 <option value="home">Home (Accommodation)</option>
                 <option value="waves">Waves (Pool / Beach)</option>
                 <option value="dumbbell">Dumbbell (Gym)</option>

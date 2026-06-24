@@ -1,0 +1,3 @@
+-- Rename legacy maintenance table to maintenance_logs (already applied in canonical DDL).
+-- Maintenance logging is a generic capacity-access feature.
+-- No-op: maintenance_logs already exists in canonical DDL. Retained for migration chain continuity.

@@ -1,17 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
 // Create a properly chainable Supabase mock
-const createChainableMock = () => {
-  let responseQueue: Array<{ data: any; error: any; count?: number }> = [];
-  let responseIndex = 0;
-
-  const getNextResponse = () => {
-    if (responseIndex < responseQueue.length) {
-      return responseQueue[responseIndex++];
-    }
-    return { data: null, error: null };
-  };
-
+const createChainableMock = (response: { data: any; error: any; count?: number }) => {
   const builder: any = {};
   
   const chainMethods = [
@@ -22,33 +12,27 @@ const createChainableMock = () => {
   ];
   
   chainMethods.forEach(method => {
-    builder[method] = vi.fn().mockImplementation(() => builder);
+    builder[method] = vi.fn().mockReturnValue(builder);
   });
 
-  builder.single = vi.fn().mockImplementation(() => {
-    return Promise.resolve(getNextResponse());
-  });
-  builder.maybeSingle = vi.fn().mockImplementation(() => {
-    return Promise.resolve(getNextResponse());
-  });
+  builder.single = vi.fn().mockResolvedValue(response);
+  builder.maybeSingle = vi.fn().mockResolvedValue(response);
+  
+  // Make the builder itself thenable for await
   builder.then = (resolve: any, reject: any) => {
-    return Promise.resolve(getNextResponse()).then(resolve, reject);
+    return Promise.resolve(response).then(resolve, reject);
   };
-
-  return {
-    builder,
-    queueResponse: (data: any, error: any = null, count?: number) => {
-      responseQueue.push({ data, error, count });
-    },
-    reset: () => {
-      responseQueue = [];
-      responseIndex = 0;
-    },
-  };
+  
+  return builder;
 };
 
-let mockBuilder: ReturnType<typeof createChainableMock>;
-const mockFrom = vi.fn();
+let mockResponses: Array<{ data: any; error: any; count?: number }> = [];
+let responseIndex = 0;
+
+const mockFrom = vi.fn(() => {
+  const response = responseIndex < mockResponses.length ? mockResponses[responseIndex++] : { data: null, error: null };
+  return createChainableMock(response);
+});
 
 vi.mock('../../../src/database/connection', () => ({
   getSupabase: vi.fn(() => ({
@@ -114,28 +98,26 @@ const createMockReqRes = (overrides: { params?: any; query?: any; body?: any; us
 
 describe('Translations Controller', () => {
   beforeEach(() => {
-    mockBuilder = createChainableMock();
-    mockFrom.mockReturnValue(mockBuilder.builder);
+    mockResponses = [];
+    responseIndex = 0;
     vi.clearAllMocks();
-    mockFrom.mockReturnValue(mockBuilder.builder);
   });
 
   afterEach(() => {
     vi.clearAllMocks();
-    mockBuilder.reset();
   });
 
   describe('getMissingTranslations', () => {
     it('should return missing translations', async () => {
       // Mock data for multiple tables
       const mockModules = [
-        { id: 'mod-1', name: 'Restaurant', name_ar: null, name_fr: 'Restaurant' },
+        { id: 'mod-1', name: 'MenuService', name_ar: null, name_fr: 'MenuService' },
       ];
       
-      mockBuilder.queueResponse(mockModules);
+      mockResponses.push({ data: mockModules, error: null });
       // Queue empty responses for other tables
       for (let i = 0; i < 6; i++) {
-        mockBuilder.queueResponse([]);
+        mockResponses.push({ data: [], error: null });
       }
       
       const { req, res, next } = createMockReqRes();
@@ -148,7 +130,7 @@ describe('Translations Controller', () => {
     });
 
     it('should handle database errors gracefully', async () => {
-      mockBuilder.queueResponse(null, { message: 'Database error' });
+      mockResponses.push({ data: null, error: { message: 'Database error' } });
       
       const { req, res, next } = createMockReqRes();
       
@@ -165,9 +147,9 @@ describe('Translations Controller', () => {
         { id: 'mod-1', name: 'Test', name_ar: 'تست', name_fr: 'Test' },
       ];
       
-      mockBuilder.queueResponse(mockModules);
+      mockResponses.push({ data: mockModules, error: null });
       for (let i = 0; i < 6; i++) {
-        mockBuilder.queueResponse([]);
+        mockResponses.push({ data: [], error: null });
       }
       
       const { req, res, next } = createMockReqRes();
@@ -184,7 +166,7 @@ describe('Translations Controller', () => {
     it('should update a translation', async () => {
       const mockItem = { id: 'item-1', name: 'Test', name_ar: 'Updated' };
       
-      mockBuilder.queueResponse(mockItem);
+      mockResponses.push({ data: mockItem, error: null });
       
       const { req, res, next } = createMockReqRes({
         body: {
@@ -218,13 +200,13 @@ describe('Translations Controller', () => {
 
   describe('autoTranslate', () => {
     it('should auto-translate a single item', async () => {
-      const mockItem = { id: 'item-1', name: 'Restaurant', name_ar: null, name_fr: null };
-      const updatedItem = { ...mockItem, name_ar: 'مطعم', name_fr: 'Restaurant' };
+      const mockItem = { id: 'item-1', name: 'MenuService', name_ar: null, name_fr: null };
+      const updatedItem = { ...mockItem, name_ar: 'مطعم', name_fr: 'MenuService' };
       
-      mockBuilder.queueResponse(mockItem); // fetch item
-      mockBuilder.queueResponse(updatedItem); // update item
+      mockResponses.push({ data: mockItem, error: null }); // fetch item
+      mockResponses.push({ data: updatedItem, error: null }); // update item
       
-      vi.mocked(translateText).mockResolvedValue({ ar: 'مطعم', fr: 'Restaurant' });
+      vi.mocked(translateText).mockResolvedValue({ ar: 'مطعم', fr: 'MenuService' });
       
       const { req, res, next } = createMockReqRes({
         body: {
@@ -274,9 +256,9 @@ describe('Translations Controller', () => {
         { id: 'item-2', name: 'Item 2', name_ar: null, name_fr: null },
       ];
       
-      mockBuilder.queueResponse(mockItems); // fetch items
-      mockBuilder.queueResponse({ id: 'item-1' }); // update first
-      mockBuilder.queueResponse({ id: 'item-2' }); // update second
+      mockResponses.push({ data: mockItems, error: null }); // fetch items
+      mockResponses.push({ data: { id: 'item-1' }, error: null }); // update first
+      mockResponses.push({ data: { id: 'item-2' }, error: null }); // update second
       
       vi.mocked(translateText).mockResolvedValue({ ar: 'مترجم', fr: 'Traduit' });
       
@@ -301,7 +283,7 @@ describe('Translations Controller', () => {
         { code: 'ar', name: 'Arabic', is_active: true },
       ];
       
-      mockBuilder.queueResponse(mockLanguages);
+      mockResponses.push({ data: mockLanguages, error: null });
       
       const { req, res, next } = createMockReqRes();
       
@@ -318,7 +300,7 @@ describe('Translations Controller', () => {
     it('should add a new language', async () => {
       const mockLanguage = { code: 'de', name: 'German', is_active: true };
       
-      mockBuilder.queueResponse(mockLanguage);
+      mockResponses.push({ data: mockLanguage, error: null });
       
       const { req, res, next } = createMockReqRes({
         body: {
@@ -352,7 +334,7 @@ describe('Translations Controller', () => {
     it('should update a language', async () => {
       const mockLanguage = { code: 'ar', name: 'Arabic Updated', is_active: true };
       
-      mockBuilder.queueResponse(mockLanguage);
+      mockResponses.push({ data: mockLanguage, error: null });
       
       const { req, res, next } = createMockReqRes({
         params: { code: 'ar' },
@@ -372,7 +354,7 @@ describe('Translations Controller', () => {
 
   describe('deleteLanguage', () => {
     it('should delete a language', async () => {
-      mockBuilder.queueResponse({ code: 'de' });
+      mockResponses.push({ data: { code: 'de' }, error: null });
       
       const { req, res, next } = createMockReqRes({
         params: { code: 'de' },
@@ -444,7 +426,7 @@ describe('Translations Controller', () => {
         { key: 'common.cancel', value: 'Cancel' },
       ];
       
-      mockBuilder.queueResponse(mockTranslations);
+      mockResponses.push({ data: mockTranslations, error: null });
       
       const { req, res, next } = createMockReqRes({
         query: { locale: 'en' },
@@ -462,7 +444,7 @@ describe('Translations Controller', () => {
     it('should upsert a UI translation', async () => {
       const mockTranslation = { key: 'common.save', locale: 'ar', value: 'حفظ' };
       
-      mockBuilder.queueResponse(mockTranslation);
+      mockResponses.push({ data: mockTranslation, error: null });
       
       const { req, res, next } = createMockReqRes({
         body: {
@@ -496,7 +478,7 @@ describe('Translations Controller', () => {
 
   describe('publishTranslations', () => {
     it('should return message when no translations to publish', async () => {
-      mockBuilder.queueResponse([]); // Empty data
+      mockResponses.push({ data: [], error: null }); // Empty data
       
       const { req, res, next } = createMockReqRes({
         body: {

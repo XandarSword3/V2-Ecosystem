@@ -75,15 +75,15 @@ test.describe('SMOKE - Admin button wiring (refresh)', () => {
     await wait;
   });
 
-  test('SMOKE-13 @smoke dynamic-menu refresh calls GET /restaurant/modifiers', async ({ page, auth }) => {
+  test('SMOKE-13 @smoke dynamic-menu refresh calls GET /${slug}/modifiers', async ({ page, auth }) => {
     await auth.loginAs('admin');
-    await page.goto('/admin/restaurant/menu', { waitUntil: 'domcontentloaded' });
+    await page.goto('/admin/${slug}/menu', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle');
 
     const refreshBtn = page.getByRole('button', { name: /refresh/i }).first();
     await refreshBtn.waitFor({ state: 'visible', timeout: 15000 });
 
-    const wait = waitForApiRequest(page, { method: 'GET', apiPath: '/restaurant/modifiers' });
+    const wait = waitForApiRequest(page, { method: 'GET', apiPath: '/${slug}/modifiers' });
     await refreshBtn.click();
     await wait;
   });

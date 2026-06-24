@@ -22,9 +22,9 @@ export type CustomizationType =
  * Add new types as modules are built
  */
 export type CustomizableEntityType =
-  | 'menu_item'      // Restaurant menu items
-  | 'snack_bar_item' // Snack bar items
-  | 'chalet'         // Chalet/accommodation units
+  | 'menu_item'      // Menu service items
+  | 'kiosk_item'         // Kiosk items
+  | 'accommodation_unit' // Accommodation units
   | 'pool_session'   // Pool sessions/bookings
   | 'spa_service'    // Spa services (future)
   | 'activity'       // Activities/excursions (future)
@@ -426,7 +426,7 @@ export interface OrderCustomizationOptionDisplay {
 
 /**
  * Generic order item with customizations
- * Used by all modules (restaurant, chalet, pool, etc.)
+ * Used by all modules (menu service, accommodation, pool, etc.)
  */
 export interface CustomizableOrderItem {
   itemId: UUID;

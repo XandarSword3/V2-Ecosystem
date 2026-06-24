@@ -80,11 +80,11 @@ interface FrontendComparison {
 const getTableIcon = (table: string) => {
   const icons: Record<string, typeof Package> = {
     modules: Package,
-    menu_categories: Utensils,
-    menu_items: Utensils,
+    catalog_categories: Utensils,
+    catalog_items: Utensils,
     accommodation_units: Home,
-    chalet_add_ons: Home,
-    pool_sessions: Waves,
+    accommodation_add_ons: Home,
+    capacity_windows: Waves,
   };
   return icons[table] || FileText;
 };
@@ -435,7 +435,7 @@ export default function TranslationsPage() {
               </div>
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-              Menu items, chalets, pool sessions stored in database
+              Menu items, accommodation units, pool sessions stored in database
             </p>
             <div className="flex items-center gap-4">
               <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-3">

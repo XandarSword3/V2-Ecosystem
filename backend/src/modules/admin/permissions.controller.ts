@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection";
 import { logActivity } from "../../utils/activityLogger";
+import { permissionCache } from "../../security/permission-cache.service.js";
 // import type { PermissionRow } from './types.js'; // Deprecated
 
 // -- Permissions --
@@ -87,6 +88,10 @@ export const updateRolePermissions = asyncHandler(async (req: Request, res: Resp
       
       if (insError) throw insError;
     }
+
+    // Refresh permission cache so the changes take effect immediately in-memory
+    await permissionCache.refreshCache();
+
     // Log Activity
     await logActivity({
       user_id: req.user!.userId,

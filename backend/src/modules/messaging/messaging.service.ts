@@ -977,7 +977,7 @@ export class MessagingService {
 
       if (booking) {
         variables.room_number = (booking.accommodation_units as any)?.name || '';
-        variables.room_type = 'Chalet';
+        variables.room_type = 'Accommodation Unit';
         const meta = booking.metadata as any;
         const checkIn = meta?.check_in_date || booking.created_at;
         const checkOut = meta?.check_out_date || booking.created_at;

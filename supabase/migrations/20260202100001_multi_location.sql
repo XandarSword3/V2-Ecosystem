@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS property_groups (
 ALTER TABLE properties 
     ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES property_groups(id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS property_code VARCHAR(50),
-    ADD COLUMN IF NOT EXISTS property_type VARCHAR(50) DEFAULT 'hotel', -- hotel, resort, spa, restaurant, etc
+    ADD COLUMN IF NOT EXISTS property_type VARCHAR(50) DEFAULT 'property',
     ADD COLUMN IF NOT EXISTS star_rating DECIMAL(2, 1),
     ADD COLUMN IF NOT EXISTS chain_brand VARCHAR(100),
     ADD COLUMN IF NOT EXISTS gds_codes JSONB DEFAULT '{}', -- Sabre, Amadeus, etc
@@ -71,7 +71,7 @@ CREATE INDEX IF NOT EXISTS idx_user_group_user ON user_group_access(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_group_group ON user_group_access(group_id);
 
 -- Cross-property inventory sharing
-CREATE TABLE IF NOT EXISTS shared_inventory_pools (
+CREATE TABLE IF NOT EXISTS shared_inventory_allocations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     group_id UUID REFERENCES property_groups(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -142,7 +142,7 @@ CREATE INDEX IF NOT EXISTS idx_benchmarks_period ON property_benchmarks(period_s
 ALTER TABLE property_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_property_access ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_group_access ENABLE ROW LEVEL SECURITY;
-ALTER TABLE shared_inventory_pools ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shared_inventory_allocations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_rate_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_report_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE property_benchmarks ENABLE ROW LEVEL SECURITY;
@@ -222,12 +222,12 @@ CREATE POLICY "Admin can manage property access" ON user_property_access
         )
     );
 
-CREATE POLICY "Admin access to shared inventory pools" ON shared_inventory_pools
+CREATE POLICY "Admin access to shared inventory allocations" ON shared_inventory_allocations
     FOR ALL USING (
         EXISTS (
             SELECT 1 FROM user_group_access uga
             WHERE uga.user_id = auth.uid()
-            AND uga.group_id = shared_inventory_pools.group_id
+            AND uga.group_id = shared_inventory_allocations.group_id
             AND uga.access_level IN ('manage', 'admin')
         )
     );
@@ -248,7 +248,7 @@ CREATE TRIGGER update_property_groups_timestamp
     FOR EACH ROW EXECUTE FUNCTION update_channel_updated_at();
 
 CREATE TRIGGER update_shared_inventory_timestamp
-    BEFORE UPDATE ON shared_inventory_pools
+    BEFORE UPDATE ON shared_inventory_allocations
     FOR EACH ROW EXECUTE FUNCTION update_channel_updated_at();
 
 CREATE TRIGGER update_group_rate_templates_timestamp

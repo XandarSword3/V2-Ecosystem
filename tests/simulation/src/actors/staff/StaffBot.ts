@@ -16,9 +16,9 @@ export type StaffDepartment =
   | 'maintenance'
   | 'concierge'
   | 'security'
-  | 'chalets'
-  | 'snack_bar'
-  | 'pool';
+  | 'accommodation_units'
+  | 'kiosk'
+  | 'capacity';
 
 export interface StaffProfile {
   skillLevel: 'junior' | 'mid' | 'senior';

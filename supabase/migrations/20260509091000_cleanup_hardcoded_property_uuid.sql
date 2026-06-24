@@ -5,26 +5,10 @@ UPDATE modules
 SET property_id = (SELECT id FROM properties ORDER BY created_at ASC LIMIT 1)
 WHERE property_id = '00000000-0000-0000-0000-000000000001'::UUID;
 
--- Note: The following updates will work via the views created in the establish_unified_engine_tables migration
--- We use DO blocks to handle cases where views might not be ready yet or tables are already renamed
-
--- 2. Remove hardcoded UUID fallback from restaurant_orders (view/table)
+-- 2. Remove hardcoded UUID fallback from transactions (unified table)
+-- restaurant_orders, chalet_bookings, pool_tickets no longer exist.
 DO $$ BEGIN
-  UPDATE restaurant_orders
-  SET property_id = (SELECT id FROM properties ORDER BY created_at ASC LIMIT 1)
-  WHERE property_id = '00000000-0000-0000-0000-000000000001'::UUID;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
-
--- 3. Remove hardcoded UUID fallback from chalet_bookings (view/table)
-DO $$ BEGIN
-  UPDATE chalet_bookings
-  SET property_id = (SELECT id FROM properties ORDER BY created_at ASC LIMIT 1)
-  WHERE property_id = '00000000-0000-0000-0000-000000000001'::UUID;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
-
--- 4. Remove hardcoded UUID fallback from pool_tickets (view/table)
-DO $$ BEGIN
-  UPDATE pool_tickets
+  UPDATE transactions
   SET property_id = (SELECT id FROM properties ORDER BY created_at ASC LIMIT 1)
   WHERE property_id = '00000000-0000-0000-0000-000000000001'::UUID;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;

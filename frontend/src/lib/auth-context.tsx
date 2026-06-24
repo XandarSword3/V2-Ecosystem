@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, API_BASE_URL } from './api';
+import { useCartStore } from '@/stores/cartStore';
 import { authLogger } from './logger';
 
 interface User {
@@ -12,7 +14,9 @@ interface User {
   phone?: string;
   profileImageUrl?: string;
   preferredLanguage: string;
+  scope?: string;
   roles: string[];
+  is_platform_admin?: boolean;
 }
 
 interface TwoFactorRequired {
@@ -42,6 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const clearCart = useCartStore((state) => state.clearCart);
 
   useEffect(() => {
     // Handle OAuth callback - check for tokens in URL
@@ -57,6 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Store tokens from OAuth callback
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
+        // Set accessToken cookie for middleware to read
+        document.cookie = `accessToken=${accessToken}; path=/; max-age=604800; SameSite=Lax`;
 
         // Clean URL by removing OAuth params
         const cleanUrl = window.location.pathname;
@@ -95,7 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             phone: response.data.data.phone,
             profileImageUrl: response.data.data.profile_image_url || response.data.data.profileImageUrl,
             preferredLanguage: response.data.data.preferred_language || response.data.data.preferredLanguage || 'en',
-            roles: response.data.data.roles || []
+            scope: response.data.data.scope,
+            roles: response.data.data.roles || [],
+            is_platform_admin: response.data.data.is_platform_admin || false
           };
           setUser(validatedUser);
           // Update localStorage with validated data
@@ -150,6 +160,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('refreshToken', tokens.refreshToken);
     localStorage.setItem('user', JSON.stringify(userData));
 
+    // Set accessToken cookie for middleware to read
+    document.cookie = `accessToken=${tokens.accessToken}; path=/; max-age=604800; SameSite=Lax`;
+
     setUser(userData);
 
     return userData;
@@ -173,6 +186,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('refreshToken', tokens.refreshToken);
     localStorage.setItem('user', JSON.stringify(userData));
 
+    // Set accessToken cookie for middleware to read
+    document.cookie = `accessToken=${tokens.accessToken}; path=/; max-age=604800; SameSite=Lax`;
+
     setUser(userData);
 
     return userData;
@@ -187,6 +203,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    localStorage.removeItem('activePropertyId');
+    // Clear accessToken cookie
+    document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Lax';
+    clearCart();
+    queryClient.clear();
     setUser(null);
     router.push('/');
   };

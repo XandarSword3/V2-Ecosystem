@@ -13,7 +13,7 @@ export interface SeasonalPricingRule {
   startDate: string; // MM-DD format
   endDate: string; // MM-DD format
   priceMultiplier: number; // e.g., 1.5 for 50% increase
-  applicableTo: ('chalets' | 'pool' | 'restaurant' | 'accommodation_units')[];
+  applicableTo: ('time_exclusive_reservation' | 'shared_capacity_access' | 'instant_transaction' | 'accommodation_units')[];
   specificItems?: string[]; // Optional specific item IDs
   priority: number; // Higher priority rules override lower ones
   isActive: boolean;
@@ -197,7 +197,7 @@ class SeasonalPricingService {
 
   // Calculate price for a given item and date range
   async calculatePrice(
-    itemType: 'chalets' | 'pool' | 'restaurant' | 'accommodation_units',
+    itemType: 'time_exclusive_reservation' | 'shared_capacity_access' | 'instant_transaction' | 'accommodation_units',
     itemId: string,
     basePrice: number,
     checkInDate: Date,
@@ -257,7 +257,7 @@ class SeasonalPricingService {
 
     // Apply dynamic pricing
     const dynamicConfig = await this.getDynamicPricingConfig();
-    if (dynamicConfig.enabled && (itemType === 'chalets' || itemType === 'accommodation_units')) {
+    if (dynamicConfig.enabled && (itemType === 'time_exclusive_reservation' || itemType === 'accommodation_units')) {
       const daysUntilBooking = Math.ceil(
         (checkInDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );
@@ -342,12 +342,12 @@ class SeasonalPricingService {
   }
 
   private async getCurrentOccupancy(
-    itemType: 'chalets' | 'pool' | 'restaurant' | 'accommodation_units',
+    itemType: 'time_exclusive_reservation' | 'shared_capacity_access' | 'instant_transaction' | 'accommodation_units',
     date: Date
   ): Promise<number | null> {
     const dateString = date.toISOString().split('T')[0];
 
-    if (itemType === 'chalets' || itemType === 'accommodation_units') {
+    if (itemType === 'time_exclusive_reservation' || itemType === 'accommodation_units') {
       const { count: totalChalets } = await supabase
         .from('accommodation_units')
         .select('*', { count: 'exact', head: true })
@@ -364,7 +364,7 @@ class SeasonalPricingService {
       if (totalChalets && totalChalets > 0) {
         return ((bookedChalets || 0) / totalChalets) * 100;
       }
-    } else if (itemType === 'pool') {
+    } else if (itemType === 'shared_capacity_access') {
       const { data: capacity } = await supabase
         .from('pool_daily_capacity')
         .select('current_count, max_capacity')
@@ -398,7 +398,7 @@ class SeasonalPricingService {
   }
 
   async getPricingCalendar(
-    itemType: 'chalets' | 'pool' | 'restaurant' | 'accommodation_units',
+    itemType: 'time_exclusive_reservation' | 'shared_capacity_access' | 'instant_transaction' | 'accommodation_units',
     itemId: string,
     basePrice: number,
     startDate: Date,

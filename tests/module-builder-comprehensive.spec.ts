@@ -217,7 +217,7 @@ let moduleId: string;
     
     const altField = page.getByLabel('Alt Text');
     if (await altField.isVisible()) {
-      await altField.fill('E2E Test Resort Image');
+      await altField.fill('E2E Test Property Image');
     }
     
     const fitSelect = page.getByLabel('Object Fit');

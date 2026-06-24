@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useProperty } from '@/context/PropertyContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { api, API_BASE_URL } from '@/lib/api';
@@ -115,6 +116,8 @@ interface LoyaltySettings {
 
 export default function LoyaltyAdminPage() {
   const router = useRouter();
+  const { activePropertyId } = useProperty();
+  const propertyHeader = activePropertyId ? { 'x-property-id': activePropertyId } : undefined;
   const [activeTab, setActiveTab] = useState('overview');
   const [tiers, setTiers] = useState<LoyaltyTier[]>([]);
   const [accounts, setAccounts] = useState<LoyaltyAccount[]>([]);
@@ -132,15 +135,16 @@ export default function LoyaltyAdminPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePropertyId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [tiersRes, statsRes, settingsRes] = await Promise.all([
-        api.get('/loyalty/tiers'),
-        api.get('/loyalty/stats'),
-        api.get('/loyalty/settings'),
+        api.get('/loyalty/tiers', { headers: propertyHeader }),
+        api.get('/loyalty/stats', { headers: propertyHeader }),
+        api.get('/loyalty/settings', { headers: propertyHeader }),
       ]);
 
       if (tiersRes.data.success) setTiers(tiersRes.data.data);
@@ -155,7 +159,7 @@ export default function LoyaltyAdminPage() {
 
   const loadAccounts = async () => {
     try {
-      const res = await api.get('/loyalty/accounts', { params: { search: searchQuery } });
+      const res = await api.get('/loyalty/accounts', { params: { search: searchQuery }, headers: propertyHeader });
       if (res.data.success) setAccounts(res.data.data);
     } catch (error) {
       toast.error('Failed to load accounts');
@@ -166,12 +170,13 @@ export default function LoyaltyAdminPage() {
     if (activeTab === 'members') {
       loadAccounts();
     }
-  }, [activeTab, searchQuery]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, searchQuery, activePropertyId]);
 
   const handleUpdateSettings = async () => {
     if (!settings) return;
     try {
-      const res = await api.put('/loyalty/settings', settings);
+      const res = await api.put('/loyalty/settings', settings, { headers: propertyHeader });
       if (res.data.success) {
         toast.success('Settings updated');
       }
@@ -186,7 +191,7 @@ export default function LoyaltyAdminPage() {
       const res = await api.post(`/loyalty/accounts/${selectedAccount.id}/adjust`, {
         points: parseInt(adjustAmount),
         reason: adjustReason || 'Manual adjustment by admin',
-      });
+      }, { headers: propertyHeader });
       if (res.data.success) {
         toast.success('Points adjusted');
         setShowAdjustModal(false);
@@ -208,6 +213,17 @@ export default function LoyaltyAdminPage() {
       default: return <Star className="w-5 h-5" />;
     }
   };
+
+  if (!activePropertyId) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Trophy className="w-10 h-10 mx-auto mb-3 opacity-40" />
+          <p className="text-slate-500 dark:text-slate-400">Select a property to view the loyalty program</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -515,7 +531,7 @@ export default function LoyaltyAdminPage() {
                               csrfToken = res.data?.csrfToken;
                             }
                             await api.delete(`/loyalty/tiers/${tier.id}`, {
-                              headers: { 'X-CSRF-Token': csrfToken },
+                              headers: { 'X-CSRF-Token': csrfToken, ...(activePropertyId ? { 'x-property-id': activePropertyId } : {}) },
                               withCredentials: true,
                             });
                             toast.success('Tier deleted successfully');
@@ -671,12 +687,12 @@ export default function LoyaltyAdminPage() {
             onSave={async (tierData) => {
               try {
                 if (editingTier) {
-                  const res = await api.put(`/loyalty/tiers/${editingTier.id}`, tierData);
+                  const res = await api.put(`/loyalty/tiers/${editingTier.id}`, tierData, { headers: propertyHeader });
                   if (res.data.success) {
                     toast.success('Tier updated');
                   }
                 } else {
-                  const res = await api.post('/loyalty/tiers', tierData);
+                  const res = await api.post('/loyalty/tiers', tierData, { headers: propertyHeader });
                   if (res.data.success) {
                     toast.success('Tier created');
                   }

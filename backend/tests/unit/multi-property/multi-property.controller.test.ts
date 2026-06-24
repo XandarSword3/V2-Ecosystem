@@ -65,7 +65,7 @@ describe('Multi-Property Controller', () => {
       const mockGroup = { id: 'group-1', name: 'European Hotels' };
       const mockProperties = [
         { id: 'prop-1', name: 'Paris Hotel' },
-        { id: 'prop-2', name: 'Rome Resort' }
+        { id: 'prop-2', name: 'Rome Property' }
       ];
       vi.mocked(multiPropertyService.getPropertyGroup).mockResolvedValue(mockGroup);
       vi.mocked(multiPropertyService.getPropertiesInGroup).mockResolvedValue(mockProperties);

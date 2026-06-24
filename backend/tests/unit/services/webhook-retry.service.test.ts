@@ -1,7 +1,7 @@
 
 // Mock supabase
-vi.mock('../../../src/lib/supabase.js', () => ({
-  supabase: {
+vi.mock('../../../src/lib/supabase.js', () => {
+  const mockClient = {
     from: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
@@ -12,8 +12,13 @@ vi.mock('../../../src/lib/supabase.js', () => ({
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     single: vi.fn(),
-  },
-}));
+  };
+  return {
+    supabase: mockClient,
+    getSupabase: vi.fn().mockReturnValue(mockClient),
+    getSupabaseAdmin: vi.fn(),
+  };
+});
 
 // Mock activity logger
 vi.mock('../../../src/utils/activityLogger.js', () => ({

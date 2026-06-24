@@ -2,7 +2,7 @@
  * Phase 2 Verification Program — Extended API Client
  *
  * Engine-refit aligned (ARCHITECTURE_LAW.md):
- * - Commerce records are `transactions` rows (never restaurant_orders / pool_tickets / …).
+ * - Commerce records are `transactions` rows (never menu_service_orders / capacity_access_tickets / …).
  * - Customer module routes: `/{moduleSlug}/orders|bookings|tickets|sessions`.
  * - Staff module routes: `/staff/modules/{slug}/…` (entry, exit, capacity, validate-ticket).
  */
@@ -194,7 +194,7 @@ export class Phase2Client {
     return this.put(`/admin/modules/${id}`, data);
   }
 
-  // ───────── Restaurant ─────────
+  // ───────── MenuService ─────────
 
   async getMenu(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
@@ -352,12 +352,12 @@ export class Phase2Client {
     section?: string;
     module_id?: string;
   }): Promise<ApiResponse> {
-    return this.post('/restaurant/admin/tables', data);
+    return this.post('/${slug}/admin/tables', data);
   }
 
   async getTables(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
-    return this.get(`/restaurant/tables${qs}`);
+    return this.get(`/${slug}/tables${qs}`);
   }
 
   async createOrder(data: {
@@ -380,7 +380,7 @@ export class Phase2Client {
     loyaltyPointsDollarValue?: number;
   }): Promise<ApiResponse> {
     const items = data.items.map((item) => ({
-      menu_item_id: item.menuItemId,
+      catalog_item_id: item.menuItemId,
       quantity: item.quantity,
     }));
     const res = await this.post(`/${ModuleSlug.RESTAURANT}/orders`, {
@@ -408,17 +408,17 @@ export class Phase2Client {
     return this.patch(`/${ModuleSlug.RESTAURANT}/orders/${id}/status`, { status });
   }
 
-  // ───────── Chalets ─────────
+  // ───────── AccommodationUnits ─────────
 
-  async getChalets(): Promise<ApiResponse> {
-    return this.get(`/${ModuleSlug.CHALETS}/availability`);
+  async getAccommodationUnits(): Promise<ApiResponse> {
+    return this.get(`/${ModuleSlug.ACCOMMODATION_UNITS}/availability`);
   }
 
   async getChalet(id: string): Promise<ApiResponse> {
-    return this.get(`/${ModuleSlug.CHALETS}/bookings/${id}`);
+    return this.get(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings/${id}`);
   }
 
-  async createChalet(data: {
+  async createAccommodationUnit(data: {
     name: string;
     description?: string;
     capacity?: number;
@@ -429,7 +429,7 @@ export class Phase2Client {
     is_active?: boolean;
     module_id?: string;
   }): Promise<ApiResponse> {
-    const res = await this.post(`/${ModuleSlug.CHALETS}/import/commit`, {
+    const res = await this.post(`/${ModuleSlug.ACCOMMODATION_UNITS}/import/commit`, {
       moduleId: data.module_id,
       items: [
         {
@@ -441,13 +441,13 @@ export class Phase2Client {
       ],
     });
     if (!res.success) {
-      return this.post(`/${ModuleSlug.CHALETS}/bookings`, data);
+      return this.post(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings`, data);
     }
     return res;
   }
 
   async createPriceRule(data: {
-    chalet_id?: string | null;
+    unit_id?: string | null;
     name: string;
     start_date: string;
     end_date: string;
@@ -456,7 +456,7 @@ export class Phase2Client {
     priority?: number;
     is_active?: boolean;
   }): Promise<ApiResponse> {
-    return this.post('/chalets/admin/price-rules', data);
+    return this.post('/accommodation_units/admin/price-rules', data);
   }
 
   async createAddOn(data: {
@@ -466,26 +466,26 @@ export class Phase2Client {
     price_type?: string;
     is_active?: boolean;
   }): Promise<ApiResponse> {
-    return this.post('/chalets/admin/add-ons', data);
+    return this.post('/accommodation_units/admin/add-ons', data);
   }
 
   async getAddOns(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
-    return this.get(`/chalets/add-ons${qs}`);
+    return this.get(`/accommodation_units/add-ons${qs}`);
   }
 
-  async getChaletAvailability(
-    chaletId: string,
+  async getAccommodationAvailability(
+    unitId: string,
     startDate: string,
     endDate: string
   ): Promise<ApiResponse> {
     return this.get(
-      `/${ModuleSlug.CHALETS}/availability?start=${startDate}&end=${endDate}`,
+      `/${ModuleSlug.ACCOMMODATION_UNITS}/availability?start=${startDate}&end=${endDate}`,
     );
   }
 
   async createBooking(data: {
-    chaletId: string;
+    unitId: string;
     checkInDate: string;
     checkOutDate: string;
     customerName: string;
@@ -496,8 +496,8 @@ export class Phase2Client {
     addOns?: { addOnId: string; quantity?: number }[];
     notes?: string;
   }): Promise<ApiResponse> {
-    const res = await this.post(`/${ModuleSlug.CHALETS}/bookings`, {
-      unit_id: data.chaletId,
+    const res = await this.post(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings`, {
+      unit_id: data.unitId,
       check_in_date: data.checkInDate,
       check_out_date: data.checkOutDate,
       total_amount: 0,
@@ -517,32 +517,32 @@ export class Phase2Client {
   }
 
   async getBooking(id: string): Promise<ApiResponse> {
-    return this.get(`/${ModuleSlug.CHALETS}/bookings/${id}`);
+    return this.get(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings/${id}`);
   }
 
   async checkInBooking(bookingId: string): Promise<ApiResponse> {
-    return this.patch(`/${ModuleSlug.CHALETS}/bookings/${bookingId}/status`, { status: 'active' });
+    return this.patch(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings/${bookingId}/status`, { status: 'active' });
   }
 
   async checkOutBooking(bookingId: string): Promise<ApiResponse> {
-    return this.patch(`/${ModuleSlug.CHALETS}/bookings/${bookingId}/status`, { status: 'used' });
+    return this.patch(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings/${bookingId}/status`, { status: 'used' });
   }
 
   async cancelBooking(bookingId: string): Promise<ApiResponse> {
-    return this.patch(`/${ModuleSlug.CHALETS}/bookings/${bookingId}/status`, { status: 'cancelled' });
+    return this.patch(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings/${bookingId}/status`, { status: 'cancelled' });
   }
 
-  async getChaletSettings(): Promise<ApiResponse> {
-    return this.get('/chalets/admin/settings');
+  async getAccommodationSettings(): Promise<ApiResponse> {
+    return this.get('/accommodation_units/admin/settings');
   }
 
-  async updateChaletSettings(data: any): Promise<ApiResponse> {
-    return this.put('/chalets/admin/settings', data);
+  async updateAccommodationSettings(data: any): Promise<ApiResponse> {
+    return this.put('/accommodation_units/admin/settings', data);
   }
 
   // ───────── Pool ─────────
 
-  async getPoolSessions(moduleId?: string): Promise<ApiResponse> {
+  async getCapacityWindows(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
     return this.get(`/${ModuleSlug.POOL}/sessions${qs}`);
   }
@@ -574,7 +574,7 @@ export class Phase2Client {
     });
   }
 
-  async purchasePoolTicket(data: {
+  async purchaseCapacityTicket(data: {
     sessionId: string;
     customerName: string;
     customerPhone?: string;
@@ -601,11 +601,11 @@ export class Phase2Client {
     return res;
   }
 
-  async getPoolTicket(id: string): Promise<ApiResponse> {
+  async getCapacityTicket(id: string): Promise<ApiResponse> {
     return this.get(`/${ModuleSlug.POOL}/tickets/${id}`);
   }
 
-  async validatePoolTicket(transactionId: string): Promise<ApiResponse> {
+  async validateCapacityTicket(transactionId: string): Promise<ApiResponse> {
     const patchRes = await this.patch(`/${ModuleSlug.POOL}/tickets/${transactionId}/validate`);
     if (patchRes.status !== 404) return patchRes;
     return this.post(`/staff/modules/${ModuleSlug.POOL}/validate-ticket`, {

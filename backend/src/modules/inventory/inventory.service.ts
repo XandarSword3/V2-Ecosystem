@@ -82,7 +82,7 @@ export class InventoryService {
     /**
      * Processes deductions for a list of items (menu items or sessions).
      * @param recipeTable The table to fetch recipes from ('menu_item_ingredients' or 'session_ingredients')
-     * @param foreignKey The column name for the item ID in the recipe table ('menu_item_id' or 'session_id')
+     * @param foreignKey The column name for the item ID in the recipe table ('catalog_item_id' or 'session_id')
      */
     async processDeductions(
         referenceId: string,

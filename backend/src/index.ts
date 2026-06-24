@@ -1,5 +1,5 @@
 import app, { loadDynamicModules } from './app.js';
-import { config } from './config/index.js';
+import { config } from './config/index';
 import { logger } from './utils/logger.js';
 import { initializeDatabase, closeDatabase } from './database/connection.js';
 import { seedSystemModules } from './database/system-modules.seeder.js';

@@ -12,6 +12,15 @@ type PeriodAggregateRow = {
   revenue: string | number;
 };
 
+type ModuleAggregateRow = {
+  module_id: string | null;
+  name: string;
+  slug: string;
+  engine_type: string;
+  count: number;
+  revenue: string;
+};
+
 function toNumber(value: string | number | null | undefined): number {
   return Number(value || 0);
 }
@@ -66,51 +75,35 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
   try {
     const pool = getPool();
 
+    // Dynamic aggregation — groups ALL transactions by module (via LEFT JOIN) +
+    // engine_type. No hardcoded slugs. Works for any module configuration.
+    const DYNAMIC_AGG_SQL = `
+      SELECT
+        m.id        AS module_id,
+        COALESCE(m.name, t.engine_type) AS name,
+        COALESCE(m.slug, t.engine_type) AS slug,
+        t.engine_type,
+        COUNT(*)::int                    AS count,
+        COALESCE(SUM(t.amount), 0)       AS revenue
+      FROM transactions t
+      LEFT JOIN modules m ON t.module_id = m.id
+      WHERE t.property_id = $3 AND t.created_at BETWEEN $1 AND $2
+      GROUP BY m.id,
+               COALESCE(m.name, t.engine_type),
+               COALESCE(m.slug, t.engine_type),
+               t.engine_type
+      ORDER BY revenue DESC
+    `;
+
     const [
-      currentRestaurant,
-      currentChalets,
-      currentPool,
-      currentSnack,
-      previousRestaurant,
-      previousChalets,
-      previousPool,
-      previousSnack,
+      currentAgg,
+      previousAgg,
       monthlyRevenueRows,
       topItemsResult,
       usersResult
     ] = await Promise.all([
-      pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(t.amount), 0) AS revenue FROM transactions t JOIN modules m ON t.module_id = m.id WHERE t.property_id = $3 AND m.slug = \'restaurant\' AND t.created_at BETWEEN $1 AND $2',
-        [startISO, endISO, propertyId]
-      ),
-      pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE property_id = $3 AND engine_type = \'time_exclusive_reservation\' AND created_at BETWEEN $1 AND $2',
-        [startISO, endISO, propertyId]
-      ),
-      pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE property_id = $3 AND engine_type = \'shared_capacity_access\' AND created_at BETWEEN $1 AND $2',
-        [startISO, endISO, propertyId]
-      ),
-      pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(t.amount), 0) AS revenue FROM transactions t JOIN modules m ON t.module_id = m.id WHERE t.property_id = $3 AND m.slug = \'snack-bar\' AND t.created_at BETWEEN $1 AND $2',
-        [startISO, endISO, propertyId]
-      ),
-      pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(t.amount), 0) AS revenue FROM transactions t JOIN modules m ON t.module_id = m.id WHERE t.property_id = $3 AND m.slug = \'restaurant\' AND t.created_at BETWEEN $1 AND $2',
-        [prevStartISO, prevEndISO, propertyId]
-      ),
-      pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE property_id = $3 AND engine_type = \'time_exclusive_reservation\' AND created_at BETWEEN $1 AND $2',
-        [prevStartISO, prevEndISO, propertyId]
-      ),
-      pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS revenue FROM transactions WHERE property_id = $3 AND engine_type = \'shared_capacity_access\' AND created_at BETWEEN $1 AND $2',
-        [prevStartISO, prevEndISO, propertyId]
-      ),
-      pool.query<PeriodAggregateRow>(
-        'SELECT COUNT(*)::int AS count, COALESCE(SUM(t.amount), 0) AS revenue FROM transactions t JOIN modules m ON t.module_id = m.id WHERE t.property_id = $3 AND m.slug = \'snack-bar\' AND t.created_at BETWEEN $1 AND $2',
-        [prevStartISO, prevEndISO, propertyId]
-      ),
+      pool.query<ModuleAggregateRow>(DYNAMIC_AGG_SQL, [startISO, endISO, propertyId]),
+      pool.query<ModuleAggregateRow>(DYNAMIC_AGG_SQL, [prevStartISO, prevEndISO, propertyId]),
       pool.query<{ month_key: string; revenue: string }>(`
         WITH all_items AS (
           SELECT date_trunc('month', created_at) AS month_start, amount
@@ -124,14 +117,14 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
       `, [dayjs().subtract(5, 'month').startOf('month').toISOString(), endISO, propertyId]),
       pool.query<{
         id: string;
-        menu_item_id: string;
+        catalog_item_id: string;
         quantity: number;
         unit_price: string;
         name: string | null;
       }>(`
         SELECT
           item->>'id' as id,
-          item->>'menu_item_id' as menu_item_id,
+          COALESCE(item->>'catalog_item_id', item->>'catalog_item_id') as catalog_item_id,
           (item->>'quantity')::int as quantity,
           item->>'unit_price' as unit_price,
           item->>'name' as name
@@ -144,10 +137,51 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
       pool.query<{ count: string | number }>('SELECT COUNT(DISTINCT user_id)::int AS count FROM user_property_access WHERE property_id = $1', [propertyId]),
     ]);
 
+    // Engine types that count as "bookings" vs "orders"
+    const BOOKING_ENGINES = new Set(['time_exclusive_reservation', 'shared_capacity_access', 'time_slot_booking']);
+    const ORDER_ENGINES = new Set(['instant_transaction']);
+
+    // Fold per-(module, engine_type) rows into per-module entries
+    const moduleMap = new Map<string, { slug: string; name: string; revenue: number; count: number }>();
+    let totalOrders = 0;
+    let totalBookings = 0;
+    for (const row of currentAgg.rows) {
+      const key = row.module_id ?? row.engine_type;
+      const existing = moduleMap.get(key) ?? { slug: row.slug, name: row.name, revenue: 0, count: 0 };
+      existing.revenue += toNumber(row.revenue);
+      existing.count += toNumber(row.count);
+      moduleMap.set(key, existing);
+      if (ORDER_ENGINES.has(row.engine_type)) totalOrders += toNumber(row.count);
+      if (BOOKING_ENGINES.has(row.engine_type)) totalBookings += toNumber(row.count);
+    }
+    const revenueByModule = Array.from(moduleMap.values()).sort((a, b) => b.revenue - a.revenue);
+    const totalRevenue = revenueByModule.reduce((sum, m) => sum + m.revenue, 0);
+
+    // Previous-period totals for change calculations
+    const prevRevenue = (previousAgg.rows || []).reduce((sum, row) => sum + toNumber(row.revenue), 0);
+    const prevOrders = (previousAgg.rows || []).filter(r => ORDER_ENGINES.has(r.engine_type)).reduce((sum, row) => sum + toNumber(row.count), 0);
+
+    const revenueChange = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
+    const ordersChange = prevOrders > 0 ? ((totalOrders - prevOrders) / prevOrders) * 100 : 0;
+
+    // Legacy revenueByService shape — built dynamically from aggregation rows.
+    // Keeps backward-compat for any consumer that still uses the old keyed shape.
+    const legacyService: Record<string, number> = {};
+    for (const row of currentAgg.rows) {
+      if (row.engine_type === 'time_exclusive_reservation') {
+        legacyService.reservation_units = (legacyService.reservation_units ?? 0) + toNumber(row.revenue);
+      } else if (row.engine_type === 'shared_capacity_access') {
+        legacyService.capacity_access = (legacyService.capacity_access ?? 0) + toNumber(row.revenue);
+      } else {
+        // Fold all other engine types (instant_transaction etc.) by module slug
+        const svcKey = row.slug.replace(/-([a-z])/g, (_, c) => c.toUpperCase()); // e.g. my-module -> myModule
+        legacyService[svcKey] = (legacyService[svcKey] ?? 0) + toNumber(row.revenue);
+      }
+    }
+
     const revenueByMonthMap = new Map(
       (monthlyRevenueRows.rows || []).map((row) => [row.month_key, toNumber(row.revenue)])
     );
-
     const revenueByMonth = Array.from({ length: 6 }, (_, index) => {
       const month = dayjs().subtract(5 - index, 'month').startOf('month');
       const key = month.format('YYYY-MM');
@@ -156,20 +190,6 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
         revenue: revenueByMonthMap.get(key) || 0,
       };
     });
-
-    const restaurantRevenue = toNumber(currentRestaurant.rows[0]?.revenue);
-    const chaletRevenue = toNumber(currentChalets.rows[0]?.revenue);
-    const poolRevenue = toNumber(currentPool.rows[0]?.revenue);
-    const snackRevenue = toNumber(currentSnack.rows[0]?.revenue);
-    const totalRevenue = restaurantRevenue + chaletRevenue + poolRevenue + snackRevenue;
-    const totalOrders = toNumber(currentRestaurant.rows[0]?.count) + toNumber(currentSnack.rows[0]?.count);
-    const totalBookings = toNumber(currentChalets.rows[0]?.count) + toNumber(currentPool.rows[0]?.count);
-
-    const prevRevenue = toNumber(previousRestaurant.rows[0]?.revenue) + toNumber(previousChalets.rows[0]?.revenue) + toNumber(previousPool.rows[0]?.revenue) + toNumber(previousSnack.rows[0]?.revenue);
-    const prevOrders = toNumber(previousRestaurant.rows[0]?.count) + toNumber(previousSnack.rows[0]?.count);
-
-    const revenueChange = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
-    const ordersChange = prevOrders > 0 ? ((totalOrders - prevOrders) / prevOrders) * 100 : 0;
 
     const topItems = (topItemsResult.rows || []).map((item) => ({
       name: item.name || 'Unknown',
@@ -188,12 +208,8 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
           revenueChange: Math.round(revenueChange * 10) / 10,
           ordersChange: Math.round(ordersChange * 10) / 10,
         },
-        revenueByService: {
-          restaurant: restaurantRevenue,
-          snackBar: snackRevenue,
-          chalets: chaletRevenue,
-          pool: poolRevenue,
-        },
+        revenueByModule,       // canonical: dynamic array of { slug, name, revenue, count }
+        revenueByService: legacyService, // legacy compat — derived from aggregation, not hardcoded
         revenueByMonth,
         topItems,
       },
@@ -203,87 +219,85 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
     // Fall back to the existing Supabase client path when a direct pool is unavailable.
   }
 
-  // Fetch active modules first to map slugs to IDs
-  const { data: modulesList } = await supabase.from('modules').select('id, slug').eq('property_id', propertyId);
-  const modulesMap = new Map((modulesList || []).map(m => [m.slug, m.id]));
-  const restaurantModuleId = modulesMap.get('restaurant') || '00000000-0000-0000-0000-000000000000';
-  const snackModuleId = modulesMap.get('snack-bar') || '00000000-0000-0000-0000-000000000000';
-
-  // Current period queries
-  const [ordersRes, chaletBookingsRes, poolTicketsRes, snackOrdersRes, usersRes] = await Promise.all([
-    supabase.from('transactions').select('id, amount, created_at').eq('property_id', propertyId).eq('module_id', restaurantModuleId).gte('created_at', startISO).lte('created_at', endISO),
-    supabase.from('transactions').select('id, amount, created_at').eq('property_id', propertyId).eq('engine_type', 'time_exclusive_reservation').gte('created_at', startISO).lte('created_at', endISO),
-    supabase.from('transactions').select('id, amount, created_at').eq('property_id', propertyId).eq('engine_type', 'shared_capacity_access').gte('created_at', startISO).lte('created_at', endISO),
-    supabase.from('transactions').select('id, amount, created_at').eq('property_id', propertyId).eq('module_id', snackModuleId).gte('created_at', startISO).lte('created_at', endISO),
+  // Supabase fallback — dynamic aggregation, no hardcoded slugs.
+  // Fetch all transactions + join modules for name/slug in JS.
+  const [allCurrentRes, allPreviousRes, usersRes, txsForTop] = await Promise.all([
+    supabase
+      .from('transactions')
+      .select('id, amount, created_at, engine_type, module_id')
+      .eq('property_id', propertyId)
+      .gte('created_at', startISO)
+      .lte('created_at', endISO),
+    supabase
+      .from('transactions')
+      .select('id, amount, engine_type, module_id')
+      .eq('property_id', propertyId)
+      .gte('created_at', prevStartISO)
+      .lte('created_at', prevEndISO),
     supabase.from('user_property_access').select('user_id', { count: 'exact', head: true }).eq('property_id', propertyId),
+    supabase
+      .from('transactions')
+      .select('metadata')
+      .eq('property_id', propertyId)
+      .eq('engine_type', 'instant_transaction')
+      .order('created_at', { ascending: false })
+      .limit(100),
   ]);
 
-  // Previous period for change calculation
-  const [prevOrdersRes, prevChaletRes, prevPoolRes, prevSnackRes] = await Promise.all([
-    supabase.from('transactions').select('id, amount').eq('property_id', propertyId).eq('module_id', restaurantModuleId).gte('created_at', prevStartISO).lte('created_at', prevEndISO),
-    supabase.from('transactions').select('id, amount').eq('property_id', propertyId).eq('engine_type', 'time_exclusive_reservation').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
-    supabase.from('transactions').select('id, amount').eq('property_id', propertyId).eq('engine_type', 'shared_capacity_access').gte('created_at', prevStartISO).lte('created_at', prevEndISO),
-    supabase.from('transactions').select('id, amount').eq('property_id', propertyId).eq('module_id', snackModuleId).gte('created_at', prevStartISO).lte('created_at', prevEndISO),
-  ]);
+  // Fetch modules for name resolution
+  const { data: modulesList } = await supabase.from('modules').select('id, slug, name').eq('property_id', propertyId);
+  const modulesById = new Map((modulesList || []).map(m => [m.id, m]));
 
-  const orders = ordersRes.data || [];
-  const chaletBookings = chaletBookingsRes.data || [];
-  const poolTickets = poolTicketsRes.data || [];
-  const snackOrders = snackOrdersRes.data || [];
+  const BOOKING_ENGINES = new Set(['time_exclusive_reservation', 'shared_capacity_access', 'time_slot_booking']);
+  const ORDER_ENGINES = new Set(['instant_transaction']);
 
-  const restaurantRevenue = orders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0);
-  const chaletRevenue = chaletBookings.reduce((sum: number, b: any) => sum + (Number(b.amount) || 0), 0);
-  const poolRevenue = poolTickets.reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
-  const snackRevenue = snackOrders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0);
-  const totalRevenue = restaurantRevenue + chaletRevenue + poolRevenue + snackRevenue;
-  const totalOrders = orders.length + snackOrders.length;
-  const totalBookings = chaletBookings.length + poolTickets.length;
+  // Aggregate current period dynamically
+  const moduleMap = new Map<string, { slug: string; name: string; revenue: number; count: number }>();
+  let totalOrders = 0;
+  let totalBookings = 0;
+  (allCurrentRes.data || []).forEach((tx: any) => {
+    const mod = tx.module_id ? modulesById.get(tx.module_id) : null;
+    const slug = mod?.slug ?? tx.engine_type;
+    const name = mod?.name ?? tx.engine_type;
+    const key = tx.module_id ?? tx.engine_type;
+    const existing = moduleMap.get(key) ?? { slug, name, revenue: 0, count: 0 };
+    existing.revenue += Number(tx.amount) || 0;
+    existing.count += 1;
+    moduleMap.set(key, existing);
+    if (ORDER_ENGINES.has(tx.engine_type)) totalOrders++;
+    if (BOOKING_ENGINES.has(tx.engine_type)) totalBookings++;
+  });
+  const revenueByModule = Array.from(moduleMap.values()).sort((a, b) => b.revenue - a.revenue);
+  const totalRevenue = revenueByModule.reduce((sum, m) => sum + m.revenue, 0);
 
-  // Previous period revenue
-  const prevRevenue = [
-    ...(prevOrdersRes.data || []),
-    ...(prevChaletRes.data || []),
-    ...(prevPoolRes.data || []),
-    ...(prevSnackRes.data || []),
-  ].reduce((sum: number, r: any) => sum + (Number(r.amount) || 0), 0);
-  const prevOrders = (prevOrdersRes.data || []).length + (prevSnackRes.data || []).length;
+  // Previous period
+  const prevRevenue = (allPreviousRes.data || []).reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+  const prevOrders = (allPreviousRes.data || []).filter((tx: any) => ORDER_ENGINES.has(tx.engine_type)).length;
 
   const revenueChange = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
   const ordersChange = prevOrders > 0 ? ((totalOrders - prevOrders) / prevOrders) * 100 : 0;
 
-  // Revenue by month (last 6 months)
+  // Revenue by month (last 6 months) — computed from already-fetched current transactions
+  const allCurrentTxs = allCurrentRes.data || [];
   const revenueByMonth: Array<{ month: string; revenue: number }> = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
     const monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
     const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
-    const monthLabel = monthStart.toLocaleDateString('en', { month: 'short', year: 'numeric' });
-
-    const allItems = [
-      ...orders.filter((o: any) => new Date(o.created_at) >= monthStart && new Date(o.created_at) <= monthEnd),
-      ...chaletBookings.filter((b: any) => new Date(b.created_at) >= monthStart && new Date(b.created_at) <= monthEnd),
-      ...poolTickets.filter((t: any) => new Date(t.created_at) >= monthStart && new Date(t.created_at) <= monthEnd),
-      ...snackOrders.filter((o: any) => new Date(o.created_at) >= monthStart && new Date(o.created_at) <= monthEnd),
-    ];
-    const monthRevenue = allItems.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0);
-    revenueByMonth.push({ month: monthLabel, revenue: monthRevenue });
+    const monthRevenue = allCurrentTxs
+      .filter((tx: any) => new Date(tx.created_at) >= monthStart && new Date(tx.created_at) <= monthEnd)
+      .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+    revenueByMonth.push({ month: monthStart.toLocaleDateString('en', { month: 'short', year: 'numeric' }), revenue: monthRevenue });
   }
 
-  // Top items from transactions metadata (Js mapping for property_id filtering capability)
-  const { data: txsForTop } = await supabase
-    .from('transactions')
-    .select('metadata')
-    .eq('property_id', propertyId)
-    .eq('engine_type', 'instant_transaction')
-    .order('created_at', { ascending: false })
-    .limit(100);
-
+  // Top items
   const itemCounts = new Map<string, { name: string; quantity: number; unit_price: number }>();
-  (txsForTop || []).forEach(tx => {
-    const items = tx.metadata?.items || [];
+  (txsForTop.data || []).forEach(tx => {
+    const items = (tx as any).metadata?.items || [];
     items.forEach((item: any) => {
-      const id = item.id || item.menu_item_id;
+      // Q65 — prefer catalog_item_id; fall back to catalog_item_id (legacy) then item.id
+      const id = item.catalog_item_id || item.catalog_item_id || item.id;
       if (!id) return;
       const quantity = Number(item.quantity) || 1;
       const price = Number(item.unit_price) || 0;
@@ -293,15 +307,26 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
       itemCounts.set(id, existing);
     });
   });
-
   const topItems = Array.from(itemCounts.values())
     .sort((a, b) => b.quantity - a.quantity)
     .slice(0, 5)
-    .map(item => ({
-      name: item.name,
-      quantity: item.quantity,
-      revenue: item.quantity * item.unit_price,
-    }));
+    .map(item => ({ name: item.name, quantity: item.quantity, revenue: item.quantity * item.unit_price }));
+
+  // Legacy revenueByService shape — derived from aggregation rows, not hardcoded
+  const legacyService: Record<string, number> = {};
+  (allCurrentRes.data || []).forEach((tx: any) => {
+    const mod = tx.module_id ? modulesById.get(tx.module_id) : null;
+    const amount = Number(tx.amount) || 0;
+    if (tx.engine_type === 'time_exclusive_reservation') {
+      legacyService.reservation_units = (legacyService.reservation_units ?? 0) + amount;
+    } else if (tx.engine_type === 'shared_capacity_access') {
+      legacyService.capacity_access = (legacyService.capacity_access ?? 0) + amount;
+    } else {
+      const slug = mod?.slug ?? tx.engine_type;
+      const svcKey = slug.replace(/-([a-z])/g, (_: string, c: string) => c.toUpperCase());
+      legacyService[svcKey] = (legacyService[svcKey] ?? 0) + amount;
+    }
+  });
 
   res.json({
     success: true,
@@ -314,12 +339,8 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
         revenueChange: Math.round(revenueChange * 10) / 10,
         ordersChange: Math.round(ordersChange * 10) / 10,
       },
-      revenueByService: {
-        restaurant: restaurantRevenue,
-        snackBar: snackRevenue,
-        chalets: chaletRevenue,
-        pool: poolRevenue,
-      },
+      revenueByModule,         // canonical: dynamic array of { slug, name, revenue, count }
+      revenueByService: legacyService, // legacy compat — derived from aggregation
       revenueByMonth,
       topItems,
     },
@@ -339,58 +360,58 @@ export const getOccupancyReport = asyncHandler(async (req: Request, res: Respons
   const startISO = start.toISOString();
   const endISO = end.toISOString();
 
-  // Chalets occupancy
-  const [chaletsRes, chaletBookingsRes] = await Promise.all([
+  // Reservation unit occupancy (engine B — time_exclusive_reservation)
+  const [unitsRes, unitBookingsRes] = await Promise.all([
     supabase.from('accommodation_units').select('id', { count: 'exact' }).eq('property_id', propertyId).eq('is_active', true),
     supabase.from('transactions').select('id, metadata').eq('property_id', propertyId).eq('engine_type', 'time_exclusive_reservation').gte('created_at', startISO).lte('created_at', endISO),
   ]);
-  const activeChalets = chaletsRes.count || 0;
-  const chaletBookings = chaletBookingsRes.data || [];
-  const totalNights = chaletBookings.reduce((sum: number, b: any) => {
+  const activeUnits = unitsRes.count || 0;
+  const unitBookings = unitBookingsRes.data || [];
+  const totalNights = unitBookings.reduce((sum: number, b: any) => {
     const checkIn = new Date(b.metadata?.check_in_date);
     const checkOut = new Date(b.metadata?.check_out_date);
     return sum + Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
   }, 0);
   const daysInRange = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-  const chaletCapacity = activeChalets * daysInRange;
-  const chaletOccupancy = chaletCapacity > 0 ? (totalNights / chaletCapacity) * 100 : 0;
+  const unitCapacity = activeUnits * daysInRange;
+  const unitOccupancy = unitCapacity > 0 ? (totalNights / unitCapacity) * 100 : 0;
 
-  // Pool occupancy (via property settings inheritance)
-  let dailyPoolCapacity = 100;
+  // Shared capacity access occupancy (engine C — shared_capacity_access)
+  let dailyCapacityLimit = 100;
   try {
     const { resolveSetting } = await import('../../multi-property/settings-resolution.service.js');
-    const poolSetting = await resolveSetting(propertyId, 'pool');
-    const poolVal = poolSetting?.value;
-    dailyPoolCapacity = poolVal?.maxCapacity || poolVal?.max_capacity || 100;
+    const capacitySetting = await resolveSetting(propertyId, 'shared_capacity_access');
+    const capacityVal = capacitySetting?.value;
+    dailyCapacityLimit = capacityVal?.maxCapacity || capacityVal?.max_capacity || 100;
   } catch {
     // fallback
   }
 
-  const { data: poolTickets } = await supabase
+  const { data: capacityTickets } = await supabase
     .from('transactions')
     .select('id, metadata')
     .eq('property_id', propertyId)
     .eq('engine_type', 'shared_capacity_access')
     .gte('created_at', startISO)
     .lte('created_at', endISO);
-  const totalTickets = (poolTickets || []).reduce((sum: number, t: any) => sum + (Number(t.metadata?.number_of_guests) || 0), 0);
-  const totalPoolCapacity = dailyPoolCapacity * daysInRange;
-  const poolOccupancy = totalPoolCapacity > 0 ? (totalTickets / totalPoolCapacity) * 100 : 0;
+  const totalTickets = (capacityTickets || []).reduce((sum: number, t: any) => sum + (Number(t.metadata?.number_of_guests) || 0), 0);
+  const totalCapacitySlots = dailyCapacityLimit * daysInRange;
+  const capacityOccupancy = totalCapacitySlots > 0 ? (totalTickets / totalCapacitySlots) * 100 : 0;
 
   res.json({
     success: true,
     data: {
-      chalets: {
-        occupancyRate: Math.round(chaletOccupancy * 10) / 10,
+      units: {
+        occupancyRate: Math.round(unitOccupancy * 10) / 10,
         bookedNights: totalNights,
-        totalCapacity: chaletCapacity,
-        activeUnits: activeChalets,
+        totalCapacity: unitCapacity,
+        activeUnits,
       },
-      pool: {
-        occupancyRate: Math.round(poolOccupancy * 10) / 10,
+      capacity_access: {
+        occupancyRate: Math.round(capacityOccupancy * 10) / 10,
         ticketsSold: totalTickets,
-        totalCapacity: totalPoolCapacity,
-        dailyCapacity: dailyPoolCapacity,
+        totalCapacity: totalCapacitySlots,
+        dailyCapacity: dailyCapacityLimit,
       },
     },
   });
@@ -470,49 +491,79 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
 
   const supabase = getSupabase();
   const range = (req.query.range as string) || 'month';
-  const type = (req.query.type as string) || 'restaurant';
   const { start, end } = getDateRange(range);
   const startISO = start.toISOString();
   const endISO = end.toISOString();
 
-  // Fetch active modules first to map slugs to IDs
-  const { data: modulesList } = await supabase.from('modules').select('id, slug').eq('property_id', propertyId);
-  const modulesMap = new Map((modulesList || []).map(m => [m.slug, m.id]));
-  const restaurantModuleId = modulesMap.get('restaurant') || '00000000-0000-0000-0000-000000000000';
-  const snackModuleId = modulesMap.get('snack-bar') || '00000000-0000-0000-0000-000000000000';
+  // Q53 — Generic export: accepts moduleSlug, moduleId, or engineType directly.
+  // The `type` query param is retained only for the 'users' export; all other exports use moduleSlug, moduleId, or engineType.
+  const legacyType = (req.query.type as string) || '';
+  const moduleSlug = (req.query.moduleSlug as string) || '';
+  const moduleId = (req.query.moduleId as string) || '';
+  const engineTypeParam = (req.query.engineType as string) || '';
 
-  let csvData = '';
-  const filename = `${type}-report.csv`;
-
-  switch (type) {
-    case 'restaurant': {
-      const { data } = await supabase.from('transactions').select('id, metadata, amount, status, created_at').eq('property_id', propertyId).eq('module_id', restaurantModuleId).gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
-      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.metadata?.order_number || ''},${o.amount},${o.status},${o.created_at}`).join('\n');
-      break;
-    }
-    case 'chalets': {
-      const { data } = await supabase.from('transactions').select('id, metadata, amount, status, created_at').eq('property_id', propertyId).eq('engine_type', 'time_exclusive_reservation').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
-      csvData = 'ID,Chalet,Total,Status,Check In,Check Out,Created\n' + (data || []).map((b: any) => `${b.id},${b.metadata?.chalet_id || ''},${b.amount},${b.status},${b.metadata?.check_in_date || ''},${b.metadata?.check_out_date || ''},${b.created_at}`).join('\n');
-      break;
-    }
-    case 'pool': {
-      const { data } = await supabase.from('transactions').select('id, amount, status, metadata, created_at').eq('property_id', propertyId).eq('engine_type', 'shared_capacity_access').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
-      csvData = 'ID,Ticket,Total,Status,Guests,Date\n' + (data || []).map((t: any) => `${t.id},${t.metadata?.ticket_number || ''},${t.amount},${t.status},${t.metadata?.number_of_guests || 0},${t.created_at}`).join('\n');
-      break;
-    }
-    case 'snack': {
-      const { data } = await supabase.from('transactions').select('id, metadata, amount, status, created_at').eq('property_id', propertyId).eq('module_id', snackModuleId).gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: false });
-      csvData = 'ID,Order Number,Total,Status,Date\n' + (data || []).map((o: any) => `${o.id},${o.metadata?.order_number || ''},${o.amount},${o.status},${o.created_at}`).join('\n');
-      break;
-    }
-    case 'users': {
-      const { data: userAccessList } = await supabase.from('user_property_access').select('user_id').eq('property_id', propertyId);
-      const userIds = (userAccessList || []).map(u => u.user_id);
-      const { data } = await supabase.from('users').select('id, full_name, email, role, created_at').in('id', userIds).order('created_at', { ascending: false });
-      csvData = 'ID,Name,Email,Role,Joined\n' + (data || []).map((u: any) => `${u.id},${u.full_name || ''},${u.email},${u.role},${u.created_at}`).join('\n');
-      break;
-    }
+  // Handle users export separately — not a transaction-based export
+  if (legacyType === 'users') {
+    const { data: userAccessList } = await supabase.from('user_property_access').select('user_id').eq('property_id', propertyId);
+    const userIds = (userAccessList || []).map(u => u.user_id);
+    const { data } = await supabase.from('users').select('id, full_name, email, role, created_at').in('id', userIds).order('created_at', { ascending: false });
+    const csvData = 'ID,Name,Email,Role,Joined\n' + (data || []).map((u: any) => `${u.id},${u.full_name || ''},${u.email},${u.role},${u.created_at}`).join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="users-report.csv"');
+    res.send(csvData);
+    return;
   }
+
+  // Resolve query strategy from most-specific to least-specific:
+  // 1. Direct moduleId param
+  // 2. moduleSlug param — look up from modules table
+  // 3. engineType param — filter by engine_type column
+  // 4. Legacy `type` param — map to engine_type or slug
+  let queryFilter: { by: 'module_id' | 'engine_type'; value: string } | null = null;
+
+  if (moduleId) {
+    queryFilter = { by: 'module_id', value: moduleId };
+  } else if (moduleSlug || legacyType) {
+    const targetSlug = moduleSlug || legacyType;
+    const { data: modulesList } = await supabase.from('modules').select('id, slug').eq('property_id', propertyId);
+    const modulesMap = new Map((modulesList || []).map((m: any) => [m.slug, m.id]));
+    const resolvedId = modulesMap.get(targetSlug);
+    if (resolvedId) {
+      queryFilter = { by: 'module_id', value: resolvedId };
+    }
+    // If slug doesn't match any active module, queryFilter stays null → 400 below.
+  } else if (engineTypeParam) {
+    queryFilter = { by: 'engine_type', value: engineTypeParam };
+  }
+
+  if (!queryFilter) {
+    res.status(400).json({ success: false, error: 'Provide moduleSlug, moduleId, or engineType query parameter.' });
+    return;
+  }
+
+  // Generic transaction fetch — no hardcoded column references
+  let txQuery = supabase
+    .from('transactions')
+    .select('id, metadata, amount, status, created_at, engine_type')
+    .eq('property_id', propertyId)
+    .gte('created_at', startISO)
+    .lte('created_at', endISO)
+    .order('created_at', { ascending: false });
+
+  if (queryFilter.by === 'module_id') {
+    txQuery = txQuery.eq('module_id', queryFilter.value);
+  } else {
+    txQuery = txQuery.eq('engine_type', queryFilter.value);
+  }
+
+  const { data } = await txQuery;
+
+  // Build CSV with generic columns — engine_type drives which metadata fields to surface
+  const filename = `${moduleSlug || legacyType || engineTypeParam}-report.csv`;
+  const csvData = 'ID,Amount,Status,Engine Type,Created\n' +
+    (data || []).map((tx: any) =>
+      `${tx.id},${tx.amount},${tx.status},${tx.engine_type},${tx.created_at}`
+    ).join('\n');
 
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

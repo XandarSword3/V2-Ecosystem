@@ -1,8 +1,12 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
-import { config } from "../config/index.js";
+import { config } from "../config/index";
 import { logger } from "../utils/logger.js";
 import { verifyToken } from "../modules/auth/auth.utils.js";
+
+// Matches any subdomain (including multi-level, e.g. resort-1.tenant-a.v2platform.local)
+// used by the property-level dev URLs introduced in session 7-8.
+const DEV_SUBDOMAIN_PATTERN = /^http:\/\/(?:[a-z0-9-]+\.)+(?:v2platform\.local|localhost)(?::\d+)?$/;
 
 let io: Server;
 
@@ -45,7 +49,15 @@ function isAllowedOrigin(origin: string | undefined): boolean {
     ...extraOrigins,
   ].filter(Boolean) as string[];
 
-  return allowedOrigins.includes(origin);
+  // Check exact match first
+  if (allowedOrigins.includes(origin)) return true;
+
+  // In development, also check against subdomain pattern for multi-property routing
+  if (process.env.NODE_ENV !== 'production' && DEV_SUBDOMAIN_PATTERN.test(origin)) {
+    return true;
+  }
+
+  return false;
 }
 
 export function getOnlineUsers(): string[] {
@@ -62,9 +74,33 @@ export function getOnlineUsers(): string[] {
   return Array.from(userIds);
 }
 
-// Get detailed online users info for admin dashboard
+/**
+ * Get detailed online users info for admin dashboard.
+ *
+ * Deduplicates by userId: if a user has multiple tabs/sockets open, only
+ * their most-recently-active connection is included. Anonymous connections
+ * (no userId) are included as-is since they cannot be deduplicated.
+ *
+ * This mirrors the behaviour of getAuthenticatedUserCount() — one user
+ * with 3 tabs counts as 1 entry, not 3.
+ */
 export function getOnlineUsersDetailed(): ActiveConnection[] {
-  return Array.from(activeConnections.values());
+  // userId → most-recently-active connection
+  const byUser = new Map<string, ActiveConnection>();
+  const anon: ActiveConnection[] = [];
+
+  activeConnections.forEach(conn => {
+    if (!conn.userId) {
+      anon.push(conn);
+      return;
+    }
+    const existing = byUser.get(conn.userId);
+    if (!existing || conn.lastActivity > existing.lastActivity) {
+      byUser.set(conn.userId, conn);
+    }
+  });
+
+  return [...Array.from(byUser.values()), ...anon];
 }
 
 // Get count of authenticated users only
@@ -143,6 +179,17 @@ export function initializeSocketServer(httpServer: HttpServer) {
     // Standard heartbeat
     socket.on('heartbeat', () => socket.emit('heartbeat:ack', { timestamp: Date.now() }));
 
+    // Route tracking: client emits 'page:update' on every navigation.
+    // Updates currentPage and lastActivity on the stored connection so the
+    // admin cockpit reflects where each user currently is.
+    // The payload is capped at 200 chars to prevent abuse.
+    socket.on('page:update', (page: unknown) => {
+      const conn = activeConnections.get(socket.id);
+      if (!conn) return;
+      conn.currentPage = typeof page === 'string' ? page.slice(0, 200) : conn.currentPage;
+      conn.lastActivity = new Date();
+    });
+
     socket.on('disconnect', (reason: string) => {
       activeConnections.delete(socket.id);
       logger.info(`Socket disconnected [${namespaceType}]: ${socket.id} - ${reason}`);
@@ -192,7 +239,10 @@ export function initializeSocketServer(httpServer: HttpServer) {
     });
 
     socket.on('join:unit', (unit: string) => {
-      if (['restaurant', 'snack_bar', 'chalets', 'pool'].includes(unit)) socket.join(`unit:${unit}`);
+      // Accept any valid module slug — modules are dynamically created so
+      // the server cannot maintain a hardcoded allowlist. Data security is
+      // enforced by RLS on the database layer, not by socket room membership.
+      if (unit && typeof unit === 'string') socket.join(`unit:${unit}`);
     });
   });
 
@@ -215,9 +265,9 @@ export function initializeSocketServer(httpServer: HttpServer) {
     // Join role rooms so public-namespace clients receive role-targeted events
     socket.data.roles?.forEach((r: string) => socket.join(`role:${r}`));
 
-    // Allow public-namespace clients to join unit rooms (restaurant, snack_bar, etc.)
+    // Allow public-namespace clients to join unit rooms (any active module slug)
     socket.on('join:unit', (unit: string) => {
-      if (['restaurant', 'snack_bar', 'chalets', 'pool'].includes(unit)) socket.join(`unit:${unit}`);
+      if (unit && typeof unit === 'string') socket.join(`unit:${unit}`);
     });
 
     // Allow public-namespace clients to request online users

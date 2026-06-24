@@ -14,22 +14,32 @@ vi.mock('../../src/utils/activityLogger.js', () => ({
 
 // email.service is only used in alertMaxRetriesExceeded (dynamic import) — no top-level mock needed
 
-const mockChain = {
-  from: vi.fn(),
-  select: vi.fn(),
-  insert: vi.fn(),
-  update: vi.fn(),
-  eq: vi.fn(),
-  lte: vi.fn(),
-  gte: vi.fn(),
-  single: vi.fn(),
-  order: vi.fn(),
-  limit: vi.fn(),
-  range: vi.fn(),
-};
-Object.keys(mockChain).forEach((k) => {
-  (mockChain as any)[k].mockReturnValue(mockChain);
+const mockChain = vi.hoisted(() => {
+  const chain = {
+    from: vi.fn(),
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+    eq: vi.fn(),
+    lte: vi.fn(),
+    gte: vi.fn(),
+    single: vi.fn(),
+    order: vi.fn(),
+    limit: vi.fn(),
+    range: vi.fn(),
+  };
+  Object.keys(chain).forEach((k) => {
+    (chain as any)[k] = vi.fn().mockReturnValue(chain);
+  });
+  return chain;
 });
+
+vi.mock('../../src/lib/supabase.js', () => ({
+  getSupabase: vi.fn(() => mockChain),
+  getSupabaseAdmin: vi.fn(() => mockChain),
+  supabase: mockChain,
+  supabaseAdmin: mockChain,
+}));
 
 vi.mock('../../src/database/connection.js', () => ({
   getSupabase: vi.fn(() => mockChain),
@@ -40,9 +50,12 @@ import { webhookRetryService, type WebhookFailure } from '../../src/services/web
 // ─────────────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  vi.clearAllMocks();
   Object.keys(mockChain).forEach((k) => {
-    (mockChain as any)[k].mockReturnValue(mockChain);
+    const fn = (mockChain as any)[k];
+    if (fn && typeof fn.mockReset === 'function') {
+      fn.mockReset();
+      fn.mockReturnValue(mockChain);
+    }
   });
   webhookRetryService.stopBackgroundProcessing();
 });
@@ -117,11 +130,6 @@ describe('processFailure', () => {
   };
 
   it('returns false and marks for manual review when no handler registered', async () => {
-    // update → retrying
-    mockChain.eq.mockResolvedValueOnce({ error: null });
-    // markForManualReview update
-    mockChain.eq.mockResolvedValueOnce({ error: null });
-
     const result = await webhookRetryService.processFailure({
       ...failure,
       event_type: 'unregistered.event',
@@ -133,11 +141,6 @@ describe('processFailure', () => {
   it('returns true and marks resolved when handler succeeds', async () => {
     const handler = vi.fn().mockResolvedValue(undefined);
     webhookRetryService.registerHandler('test.event', handler);
-
-    // update to retrying
-    mockChain.eq.mockResolvedValueOnce({ error: null });
-    // update to resolved
-    mockChain.eq.mockResolvedValueOnce({ error: null });
 
     const result = await webhookRetryService.processFailure({
       ...failure,
@@ -151,11 +154,6 @@ describe('processFailure', () => {
   it('returns false and increments retry on handler failure', async () => {
     const failingHandler = vi.fn().mockRejectedValue(new Error('handler error'));
     webhookRetryService.registerHandler('failing.event', failingHandler);
-
-    // update to retrying
-    mockChain.eq.mockResolvedValueOnce({ error: null });
-    // schedule next retry update
-    mockChain.eq.mockResolvedValueOnce({ error: null });
 
     const result = await webhookRetryService.processFailure({
       ...failure,
@@ -198,11 +196,6 @@ describe('processPendingRetries', () => {
 
     const handler = vi.fn().mockResolvedValue(undefined);
     webhookRetryService.registerHandler('test.event2', handler);
-
-    // processFailure internals: update to retrying, update to resolved
-    mockChain.eq
-      .mockResolvedValueOnce({ error: null })
-      .mockResolvedValueOnce({ error: null });
 
     const result = await webhookRetryService.processPendingRetries();
 

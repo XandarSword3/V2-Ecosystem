@@ -12,7 +12,10 @@ import { logger } from '../../../utils/logger.js';
 
 export const getSettings = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+    // Only use propertyId set by middleware (validated UUID). Never read the raw
+    // x-property-id header directly — an invalid UUID would be truthy and silently
+    // route all reads through the multi-property path, returning empty results.
+    const propertyId = (req as any).propertyId as string | undefined;
 
     // Combine all settings into a flat object
     const combinedSettings: Record<string, unknown> = {};
@@ -20,11 +23,49 @@ export const getSettings = asyncHandler(async (req: Request, res: Response) => {
     if (propertyId) {
       // Multi-property settings resolution (property -> group -> system defaults cascade)
       try {
-        const { getEffectiveSettings } = await import('../../multi-property/settings-resolution.service.js');
+        const { getEffectiveSettings, resolveSettings } = await import('../../multi-property/settings-resolution.service.js');
         const resolvedSettings = await getEffectiveSettings(propertyId);
         resolvedSettings.forEach(s => {
           combinedSettings[s.key] = s.value;
         });
+        
+        // Fetch and merge branding sections
+        const brandingSections = ['identity', 'colors', 'fonts', 'style'] as const;
+        const brandingKeys = brandingSections.map(s => `branding.${s}`);
+        const resolvedBranding = await resolveSettings(propertyId, brandingKeys);
+        
+        // Map branding data to settings fields
+        const identity = resolvedBranding['branding.identity']?.value || {};
+        const colors = resolvedBranding['branding.colors']?.value || {};
+        const fonts = resolvedBranding['branding.fonts']?.value || {};
+        const style = resolvedBranding['branding.style']?.value || {};
+        
+        // Map to themeColors for ThemeInjector
+        combinedSettings.themeColors = {
+          primary: colors.primaryColor,
+          secondary: colors.secondaryColor,
+          accent: colors.accentColor,
+          border: colors.borderColor,
+          borderDark: colors.borderColor,
+        };
+        
+        // Identity fields
+        combinedSettings.logoUrl = identity.logoUrl;
+        combinedSettings.logoDarkUrl = identity.logoDarkUrl;
+        combinedSettings.faviconUrl = identity.faviconUrl;
+        combinedSettings.logoMaxWidth = identity.logoMaxWidth;
+        
+        // Font fields
+        combinedSettings.fontHeading = fonts.headingFont;
+        combinedSettings.fontBody = fonts.bodyFont;
+        combinedSettings.fontScale = fonts.fontScale;
+        combinedSettings.headingTracking = fonts.headingTracking;
+        
+        // Style fields
+        combinedSettings.borderRadius = style.borderRadius;
+        combinedSettings.density = style.density;
+        combinedSettings.glassmorphism = style.glassmorphism;
+        
       } catch (err) {
         logger.error('Failed to fetch effective multi-property settings:', err);
       }
@@ -42,32 +83,15 @@ export const getSettings = asyncHandler(async (req: Request, res: Response) => {
     }
 
     // Flatten nested settings keys into root to match default response structure
-    // This supports frontend expecting flat properties (e.g. resortName at root)
-    const nestedKeys = ['appearance', 'general', 'contact', 'hours', 'chalets', 'pool', 'legal'];
+    const nestedKeys = ['appearance', 'general', 'contact', 'hours', 'legal'];
     nestedKeys.forEach(key => {
       if (combinedSettings[key] && typeof combinedSettings[key] === 'object') {
         Object.assign(combinedSettings, combinedSettings[key] as object);
       }
     });
 
-    // Map mismatched keys to preserve default schema (DB uses shorter names in some groups)
-    const chalets = combinedSettings.chalets as Record<string, unknown> | undefined;
-    if (chalets) {
-      combinedSettings.chaletCheckIn = (combinedSettings as Record<string, unknown>).checkIn || chalets.checkIn;
-      combinedSettings.chaletCheckOut = (combinedSettings as Record<string, unknown>).checkOut || chalets.checkOut;
-      combinedSettings.chaletDeposit = (combinedSettings as Record<string, unknown>).depositPercent || chalets.depositPercent;
-    }
-
-    const pool = combinedSettings.pool as Record<string, unknown> | undefined;
-    if (pool) {
-      combinedSettings.poolAdultPrice = (combinedSettings as Record<string, unknown>).adultPrice || pool.adultPrice;
-      combinedSettings.poolChildPrice = (combinedSettings as Record<string, unknown>).childPrice || pool.childPrice;
-      combinedSettings.poolInfantPrice = (combinedSettings as Record<string, unknown>).infantPrice || pool.infantPrice;
-      combinedSettings.poolCapacity = (combinedSettings as Record<string, unknown>).capacity || pool.capacity;
-    }
-
     // Ensure core sections exist even on sparse/legacy seed data.
-    const requiredSections = ['general', 'payments', 'appearance', 'contact', 'hours', 'chalets', 'pool', 'legal'];
+    const requiredSections = ['general', 'payments', 'appearance', 'contact', 'hours', 'legal'];
     requiredSections.forEach((section) => {
       if (!combinedSettings[section] || typeof combinedSettings[section] !== 'object') {
         combinedSettings[section] = {};
@@ -82,14 +106,14 @@ export const getSettings = asyncHandler(async (req: Request, res: Response) => {
       || general.currency
       || payments.currency
       || 'USD';
-    const resolvedResortName = (combinedSettings as Record<string, unknown>).resortName
-      || general.resortName
+    const resolvedSiteName = (combinedSettings as Record<string, unknown>).siteName
+      || general.siteName
       || general.businessName
       || 'V2 Ecosystem';
 
     combinedSettings.general = {
-      businessName: resolvedResortName,
-      resortName: resolvedResortName,
+      businessName: resolvedSiteName,
+      siteName: resolvedSiteName,
       currency: resolvedCurrency,
       ...general,
     };
@@ -98,7 +122,7 @@ export const getSettings = asyncHandler(async (req: Request, res: Response) => {
       ...payments,
     };
     combinedSettings.currency = resolvedCurrency;
-    combinedSettings.resortName = resolvedResortName;
+    combinedSettings.siteName = resolvedSiteName;
 
     res.json({ success: true, data: combinedSettings });
 });
@@ -107,7 +131,11 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
     const supabase = getSupabase();
     const settings = req.body;
     const userId = req.user?.userId;
-    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+    // Only use propertyId set by middleware (validated UUID). Never read the raw
+    // x-property-id header directly — an invalid UUID would be truthy and silently
+    // route all writes through the multi-property path, swallow the error in the
+    // try/catch, and return 200 while leaving site_settings untouched.
+    const propertyId = (req as any).propertyId as string | undefined;
 
     // Helper to check if an object has any non-undefined values
     const hasValidData = (obj: Record<string, unknown>) => 
@@ -118,10 +146,16 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       Object.fromEntries(Object.entries(obj).filter(([_, v]) => v !== undefined));
 
     const updates: { key: string; value: unknown }[] = [];
+    const changedFields: Record<string, unknown> = {}; // only the fields actually sent, not the merged blob
 
     // Generic key/value payload shape used by admin clients and phase2 harness.
     if (typeof settings.key === 'string' && settings.value !== undefined) {
       updates.push({ key: settings.key, value: settings.value });
+      if (typeof settings.value === 'object' && !Array.isArray(settings.value)) {
+        Object.assign(changedFields, settings.value as object);
+      } else {
+        changedFields[settings.key] = settings.value;
+      }
     }
 
     // Fetch resolution/override helpers if in property context
@@ -133,7 +167,7 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       setPropertySettingHelper = resolutionService.setPropertySetting;
     }
 
-    // Appearance settings (theme, weather, animations)
+    // Appearance settings (theme, weather, animations, brand)
     const appearanceData = {
       theme: settings.theme,
       themeColors: settings.themeColors,
@@ -143,6 +177,18 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
       showWeatherWidget: settings.showWeatherWidget,
       weatherLocation: settings.weatherLocation,
       weatherEffect: settings.weatherEffect,
+      // Brand & Identity fields
+      logoUrl: settings.logoUrl,
+      logoDarkUrl: settings.logoDarkUrl,
+      faviconUrl: settings.faviconUrl,
+      logoMaxWidth: settings.logoMaxWidth,
+      fontHeading: settings.fontHeading,
+      fontBody: settings.fontBody,
+      fontScale: settings.fontScale,
+      headingTracking: settings.headingTracking,
+      borderRadius: settings.borderRadius,
+      density: settings.density,
+      glassmorphism: settings.glassmorphism,
     };
     if (hasValidData(appearanceData)) {
       let existingAppearanceValue = {};
@@ -163,11 +209,12 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
         ...filterUndefined(appearanceData)
       };
       updates.push({ key: 'appearance', value: mergedAppearance });
+      Object.assign(changedFields, filterUndefined(appearanceData));
     }
 
     // General settings
     const generalData = {
-      resortName: settings.resortName,
+      siteName: settings.siteName,
       tagline: settings.tagline,
       description: settings.description,
     };
@@ -181,6 +228,7 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
         existingGeneralValue = existing?.value || {};
       }
       updates.push({ key: 'general', value: { ...existingGeneralValue, ...filterUndefined(generalData) } });
+      Object.assign(changedFields, filterUndefined(generalData));
     }
 
     // Contact settings
@@ -199,12 +247,11 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
         existingContactValue = existing?.value || {};
       }
       updates.push({ key: 'contact', value: { ...existingContactValue, ...filterUndefined(contactData) } });
+      Object.assign(changedFields, filterUndefined(contactData));
     }
 
     // Hours settings
     const hoursData = {
-      poolHours: settings.poolHours,
-      restaurantHours: settings.restaurantHours,
       receptionHours: settings.receptionHours,
     };
     if (hasValidData(hoursData)) {
@@ -217,44 +264,7 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
         existingHoursValue = existing?.value || {};
       }
       updates.push({ key: 'hours', value: { ...existingHoursValue, ...filterUndefined(hoursData) } });
-    }
-
-    // Chalet settings
-    const chaletData = {
-      checkIn: settings.chaletCheckIn,
-      checkOut: settings.chaletCheckOut,
-      depositPercent: settings.chaletDeposit,
-      cancellationPolicy: settings.cancellationPolicy,
-    };
-    if (hasValidData(chaletData)) {
-      let existingChaletValue = {};
-      if (propertyId) {
-        const resolved = await resolveSettingHelper(propertyId, 'chalets', {});
-        existingChaletValue = resolved?.value || {};
-      } else {
-        const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'chalets').single();
-        existingChaletValue = existing?.value || {};
-      }
-      updates.push({ key: 'chalets', value: { ...existingChaletValue, ...filterUndefined(chaletData) } });
-    }
-
-    // Pool settings
-    const poolData = {
-      adultPrice: settings.poolAdultPrice,
-      childPrice: settings.poolChildPrice,
-      infantPrice: settings.poolInfantPrice,
-      capacity: settings.poolCapacity,
-    };
-    if (hasValidData(poolData)) {
-      let existingPoolValue = {};
-      if (propertyId) {
-        const resolved = await resolveSettingHelper(propertyId, 'pool', {});
-        existingPoolValue = resolved?.value || {};
-      } else {
-        const { data: existing } = await supabase.from('site_settings').select('value').eq('key', 'pool').single();
-        existingPoolValue = existing?.value || {};
-      }
-      updates.push({ key: 'pool', value: { ...existingPoolValue, ...filterUndefined(poolData) } });
+      Object.assign(changedFields, filterUndefined(hoursData));
     }
 
     // Legal settings
@@ -273,17 +283,21 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
         existingLegalValue = existing?.value || {};
       }
       updates.push({ key: 'legal', value: { ...existingLegalValue, ...filterUndefined(legalData) } });
+      Object.assign(changedFields, filterUndefined(legalData));
     }
 
     // CMS settings - homepage, footer, navbar (these come as complete objects)
     if (settings.homepage) {
       updates.push({ key: 'homepage', value: settings.homepage });
+      changedFields.homepage = settings.homepage;
     }
     if (settings.footer) {
       updates.push({ key: 'footer', value: settings.footer });
+      changedFields.footer = settings.footer;
     }
     if (settings.navbar) {
       updates.push({ key: 'navbar', value: settings.navbar });
+      changedFields.navbar = settings.navbar;
     }
 
     // Perform all updates
@@ -325,7 +339,7 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
         Object.assign(flattenedSettings, update.value as object);
       }
     }
-    emitToAll('settings.updated', flattenedSettings);
+    emitToAll('settings.updated', changedFields);
 
     await logActivity({
       user_id: userId!,
@@ -345,7 +359,10 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
 // Dedicated homepage settings endpoints
 export const getHomepageSettings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
-  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+  // Only use propertyId set by middleware (validated UUID). Never read the raw
+  // x-property-id header directly — a non-UUID string like "null" would be truthy
+  // and silently route all reads through multi-property, returning empty data.
+  const propertyId = (req as any).propertyId as string | undefined;
 
   if (propertyId) {
     try {
@@ -374,7 +391,8 @@ export const getHomepageSettings = asyncHandler(async (req: Request, res: Respon
 export const updateHomepageSettings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
   const homepageData = req.body;
-  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+  // Only use propertyId set by middleware (validated UUID). Same reason as getHomepageSettings.
+  const propertyId = (req as any).propertyId as string | undefined;
 
   if (propertyId) {
     try {
@@ -425,7 +443,8 @@ export const updateHomepageSettings = asyncHandler(async (req: Request, res: Res
 // Tax settings endpoints
 export const getTaxSettings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
-  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+  // Only use propertyId set by middleware (validated UUID). Same reason as getHomepageSettings.
+  const propertyId = (req as any).propertyId as string | undefined;
 
   if (propertyId) {
     try {
@@ -454,7 +473,8 @@ export const getTaxSettings = asyncHandler(async (req: Request, res: Response) =
 export const updateTaxSettings = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
   const taxData = req.body;
-  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+  // Only use propertyId set by middleware (validated UUID). Same reason as getHomepageSettings.
+  const propertyId = (req as any).propertyId as string | undefined;
 
   if (propertyId) {
     try {

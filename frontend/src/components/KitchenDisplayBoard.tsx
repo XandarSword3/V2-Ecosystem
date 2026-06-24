@@ -126,12 +126,18 @@ export function KitchenDisplayBoard() {
   const fetchOrders = useCallback(async () => {
     try {
       const [ordersRes, statsRes] = await Promise.all([
-        api.get('/restaurant/kitchen/orders'),
-        api.get('/restaurant/kitchen/stats'),
+      api.get('/orders/kitchen'),
+      api.get('/orders/kitchen/stats'),
       ]);
 
-      setOrders(ordersRes.data.data);
-      setStats(statsRes.data.data);
+      setOrders(ordersRes.data.data ?? []);
+      setStats(statsRes.data.data ?? {
+        pendingOrders: 0,
+        inProgressOrders: 0,
+        averageWaitTime: 0,
+        completedToday: 0,
+        rushOrders: 0,
+      });
     } catch (error) {
       console.error('Failed to fetch kitchen orders:', error);
     } finally {
@@ -199,7 +205,7 @@ export function KitchenDisplayBoard() {
   // Start cooking an order
   const handleStartOrder = async (orderId: string) => {
     try {
-      await api.post(`/restaurant/kitchen/orders/${orderId}/start`);
+      await api.post(`/orders/kitchen/${orderId}/start`);
       toast.success('Order started');
     } catch (error) {
       toast.error('Failed to start order');
@@ -209,7 +215,7 @@ export function KitchenDisplayBoard() {
   // Mark item as prepared
   const handleItemReady = async (orderId: string, itemId: string) => {
     try {
-      await api.post(`/restaurant/kitchen/orders/${orderId}/items/${itemId}/ready`);
+      await api.post(`/orders/kitchen/${orderId}/items/${itemId}/ready`);
     } catch (error) {
       toast.error('Failed to update item');
     }
@@ -224,7 +230,7 @@ export function KitchenDisplayBoard() {
     if (!selectedOrder) return;
 
     try {
-      await api.post(`/restaurant/kitchen/orders/${selectedOrder.id}/ready`, {
+      await api.post(`/orders/kitchen/${selectedOrder.id}/ready`, {
         notes: bumpNote || undefined,
       });
       toast.success('Order ready for pickup!');

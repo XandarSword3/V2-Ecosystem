@@ -59,24 +59,46 @@ import {
 
 function createQueryMock(mockDataFn: () => unknown[]) {
   const mockObj: Record<string, unknown> = {};
+  const filters: Array<{ field: string; value: unknown }> = [];
   const chainMethods = [
     'select', 'eq', 'neq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt',
     'limit', 'not', 'in', 'contains', 'ilike', 'range',
   ];
-  chainMethods.forEach(m => { mockObj[m] = vi.fn().mockReturnValue(mockObj); });
+  chainMethods.forEach(m => { mockObj[m] = vi.fn().mockImplementation((field?: string, value?: unknown) => {
+    if (m === 'eq' && field !== undefined && value !== undefined) {
+      filters.push({ field, value });
+    }
+    return mockObj;
+  }); });
+
+  const getFilteredData = () => {
+    const d = mockDataFn();
+    if (!Array.isArray(d) || filters.length === 0) return d;
+    return d.filter((item: any) => {
+      return filters.every(({ field, value }) => {
+        if (field === 'slug') {
+          return item.slug === value;
+        }
+        if (field === 'id') {
+          return item.id === value;
+        }
+        return true;
+      });
+    });
+  };
 
   mockObj.then = function (resolve: (v: { data: unknown; error: unknown; count?: number }) => void) {
-    const d = mockDataFn();
+    const d = getFilteredData();
     resolve({ data: d, error: null, count: Array.isArray(d) ? d.length : 0 });
     return Promise.resolve({ data: d, error: null });
   };
   mockObj.single = vi.fn().mockImplementation(() => {
-    const d = mockDataFn();
+    const d = getFilteredData();
     const first = Array.isArray(d) && d.length > 0 ? d[0] : null;
     return Promise.resolve({ data: first, error: first ? null : { code: 'PGRST116', message: 'Not found' } });
   });
   mockObj.maybeSingle = vi.fn().mockImplementation(() => {
-    const d = mockDataFn();
+    const d = getFilteredData();
     const first = Array.isArray(d) && d.length > 0 ? d[0] : null;
     return Promise.resolve({ data: first, error: null });
   });
@@ -133,8 +155,8 @@ function createQueryMock(mockDataFn: () => unknown[]) {
 
 const MOD_RESTAURANT = {
   id: 'mod-1',
-  name: 'Restaurant',
-  slug: 'restaurant',
+  name: 'MenuService',
+  slug: 'menu_service',
   template_type: 'menu_service',
   is_active: true,
   show_in_main: true,
@@ -146,7 +168,7 @@ const MOD_RESTAURANT = {
 const MOD_POOL = {
   id: 'mod-2',
   name: 'Pool',
-  slug: 'pool',
+  slug: 'capacity',
   template_type: 'session_access',
   is_active: true,
   show_in_main: true,
@@ -199,12 +221,12 @@ describe('ModulesController', () => {
       modules: [MOD_RESTAURANT, MOD_POOL],
       app_permissions: [],
       app_role_permissions: [],
-      roles: [{ id: 'role-1', name: 'restaurant_admin' }, { id: 'role-2', name: 'restaurant_staff' }],
+      roles: [{ id: 'role-1', name: 'menu_service_admin' }, { id: 'role-2', name: 'menu_service_staff' }],
       users: [],
       user_roles: [],
       site_settings: [{ id: 1, navbar: { links: [] } }],
-      menu_items: [],
-      menu_categories: [],
+      catalog_items: [],
+      catalog_categories: [],
     };
   });
 
@@ -253,7 +275,7 @@ describe('ModulesController', () => {
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
-        data: expect.objectContaining({ slug: 'restaurant' }),
+        data: expect.objectContaining({ slug: 'menu_service' }),
       }));
     });
 
@@ -266,7 +288,7 @@ describe('ModulesController', () => {
         return createQueryMock(() => callCount >= 2 ? [MOD_RESTAURANT] : []);
       });
 
-      const req = mockReq({ params: { id: 'restaurant' } });
+      const req = mockReq({ params: { id: 'menu_service' } });
       const res = mockRes();
       await (getModule as Function)(req, res, mockNext());
 
@@ -322,8 +344,8 @@ describe('ModulesController', () => {
       const res = mockRes();
       await (createModule as Function)(req, res, mockNext());
 
-      expect(sb.from).toHaveBeenCalledWith('users');
-      expect(sb.from).toHaveBeenCalledWith('roles');
+      // Staff user creation is no longer part of module creation
+      expect(res.status).toHaveBeenCalledWith(201);
     });
 
     it('should emit modules.updated socket event', async () => {
@@ -359,7 +381,7 @@ describe('ModulesController', () => {
       setupSupabase();
       const req = mockReq({
         params: { id: 'mod-1' },
-        body: { name: 'Updated Restaurant', settings_version: 1 },
+        body: { name: 'Updated MenuService', settings_version: 1 },
       });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
@@ -527,7 +549,7 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         query: {},
-        user: { userId: 'mod-admin', roles: ['restaurant_admin'] },
+        user: { userId: 'mod-admin', roles: ['menu_service_admin'] },
       });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
@@ -604,16 +626,19 @@ describe('ModulesController', () => {
   // ── Edge Cases: getModule ────────────────────────────────────────
 
   describe('getModule – edge cases', () => {
-    it('should throw when both id and slug lookup fail', async () => {
+    it('should return 404 when both id and slug lookup fail', async () => {
       tableData.modules = [];
       setupSupabase();
       const req = mockReq({ params: { id: 'nonexistent' } });
       const res = mockRes();
-      const next = mockNext();
 
-      await expect(
-        (getModule as Function)(req, res, next)
-      ).rejects.toThrow();
+      await (getModule as Function)(req, res, mockNext());
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: 'Module not found',
+      }));
     });
 
     it('should handle numeric-like id param', async () => {
@@ -789,13 +814,13 @@ describe('ModulesController', () => {
 
     it('should allow non-super_admin with correct module permission', async () => {
       tableData.app_role_permissions = [
-        { role_name: 'restaurant_admin', permission_slug: 'module:restaurant:manage' },
+        { role_name: 'menu_service_admin', permission_slug: 'module:menu service:manage' },
       ];
       setupSupabase();
       const req = mockReq({
         params: { id: 'mod-1' },
         body: { name: 'Updated by manager' },
-        user: { userId: 'mgr-1', roles: ['restaurant_admin'] },
+        user: { userId: 'mgr-1', roles: ['menu_service_admin'] },
       });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
@@ -866,18 +891,18 @@ describe('ModulesController', () => {
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
-      expect(clearModuleCache).toHaveBeenCalledWith('restaurant');
+      expect(clearModuleCache).toHaveBeenCalledWith('menu_service');
     });
 
-    it('should cascade delete menu_items on force delete with items present', async () => {
-      tableData.menu_items = [{ id: 'item-1', module_id: 'mod-1' }];
+    it('should cascade delete catalog_items on force delete with items present', async () => {
+      tableData.catalog_items = [{ id: 'item-1', module_id: 'mod-1' }];
       const sb = setupSupabase();
       const req = mockReq({ params: { id: 'mod-1' }, query: { force: 'true' } });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
-      expect(sb.from).toHaveBeenCalledWith('menu_items');
+      expect(sb.from).toHaveBeenCalledWith('catalog_items');
     });
 
     it('should clean up permissions and roles on force delete', async () => {
@@ -891,7 +916,7 @@ describe('ModulesController', () => {
     });
 
     it('should remove module from navbar CMS on force delete', async () => {
-      tableData.site_settings = [{ id: 1, navbar: { links: [{ moduleSlug: 'restaurant', label: 'Restaurant' }] } }];
+      tableData.site_settings = [{ id: 1, navbar: { links: [{ moduleSlug: 'menu_service', label: 'MenuService' }] } }];
       const sb = setupSupabase();
       const req = mockReq({ params: { id: 'mod-1' }, query: { force: 'true' } });
       const res = mockRes();

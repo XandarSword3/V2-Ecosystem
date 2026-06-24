@@ -6,7 +6,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection';
-import { logActivity } from '../../../utils/activityLogger';
+// logActivity intentionally NOT imported here — calling logActivity inside
+// getAuditLogs created a circular dependency: reading audit logs → attempted
+// to write an audit log → if that write failed (RLS / schema mismatch), the
+// entire read handler threw before returning data. Viewing audit logs is
+// low-signal to audit and the circular pattern is never worth the risk.
 
 interface ActivityLogRow {
   id: string;
@@ -43,15 +47,6 @@ export const getAuditLogs = asyncHandler(async (req: Request, res: Response) => 
 
     const supabase = getSupabase();
     const { limit = 50, offset = 0 } = req.query;
-    const userId = (req.user as any)?.userId || 'system';
-
-    // Log the access to audit logs
-    await logActivity({
-      user_id: userId,
-      action: 'VIEW_AUDIT_LOGS',
-      resource: 'audit_logs',
-      property_id: propertyId
-    });
 
     let query = supabase
       .from('audit_logs')

@@ -4,15 +4,12 @@
  * Engine-generic modification, cancellation, and rescheduling.
  *
  * time_exclusive_reservation → reservations (any unit: accommodation, courts, spaces)
- * shared_capacity_access     → access tickets (any session: pool, gym, class, cinema)
+ * shared_capacity_access     → access tickets (any session: pool, fitness, class, cinema)
  *
  * ALL transaction records live in the `transactions` table.
  * Unit/session config lives in `accommodation_units` / `capacity_windows`.
  * Customer email is read from `metadata.customer_email` (reservations)
  * or fetched from `users` table by `customer_id` (access tickets).
- *
- * Dead references eliminated:
- *   chalet, chalets, pool_tickets, pool-tickets, calculateChaletPrice
  */
 
 import { getSupabase } from '../database/connection.js';

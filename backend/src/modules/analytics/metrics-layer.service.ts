@@ -101,7 +101,7 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
     dataType: 'currency',
     calculation: {
       type: 'aggregated',
-      sourceTable: 'bookings',
+      sourceTable: 'transactions',
       sourceField: 'total_amount',
       aggregation: 'sum',
       filters: [{ field: 'status', operator: 'in', value: ['confirmed', 'checked_in', 'checked_out'] }]
@@ -117,7 +117,7 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
     calculation: {
       type: 'calculated',
       formula: 'SUM(room_rate * nights) / SUM(nights)',
-      sourceTable: 'bookings'
+      sourceTable: 'transactions'
     },
     format: { prefix: '$', decimals: 2 }
   },
@@ -130,7 +130,7 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
     calculation: {
       type: 'calculated',
       formula: 'revenue / total_rooms',
-      sourceTable: 'bookings'
+      sourceTable: 'transactions'
     },
     format: { prefix: '$', decimals: 2 }
   },
@@ -143,7 +143,7 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
     calculation: {
       type: 'calculated',
       formula: '(occupied_rooms / total_rooms) * 100',
-      sourceTable: 'bookings'
+      sourceTable: 'transactions'
     },
     targets: { daily: 75, monthly: 78 },
     alertThresholds: {
@@ -160,7 +160,7 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
     dataType: 'count',
     calculation: {
       type: 'aggregated',
-      sourceTable: 'bookings',
+      sourceTable: 'transactions',
       aggregation: 'count',
       filters: [{ field: 'status', operator: 'eq', value: 'checked_in' }]
     },
@@ -175,7 +175,7 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
     calculation: {
       type: 'calculated',
       formula: '((actual_revenue - forecasted_revenue) / forecasted_revenue) * 100',
-      sourceTable: 'bookings'
+      sourceTable: 'transactions'
     },
     alertThresholds: {
       warning: { min: -20, max: 20 },
@@ -227,7 +227,7 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
     dataType: 'currency',
     calculation: {
       type: 'aggregated',
-      sourceTable: 'bookings',
+      sourceTable: 'transactions',
       sourceField: 'total_amount',
       aggregation: 'sum'
     },
@@ -254,7 +254,7 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
     dataType: 'number',
     calculation: {
       type: 'calculated',
-      formula: 'active_orders + todays_checkins + active_pool_sessions',
+      formula: 'active_orders + todays_checkins + active_capacity_access_sessions',
       sourceTable: 'system_snapshot'
     },
     format: { decimals: 0 }
@@ -267,7 +267,7 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
     dataType: 'number',
     calculation: {
       type: 'aggregated',
-      sourceTable: 'bookings',
+      sourceTable: 'transactions',
       sourceField: 'guest_count',
       aggregation: 'sum',
       filters: [{ field: 'status', operator: 'eq', value: 'checked_in' }]
@@ -293,6 +293,28 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
     format: { decimals: 0 }
   }
 ];
+
+// =============================================
+// LEGACY ALIAS RESOLVER
+// =============================================
+
+/**
+ * Resolve a legacy template_type alias to its canonical engine type.
+ * Keeps backward-compatibility for DB rows that were created before the
+ * template_type → engine_type migration completed.
+ */
+export function resolveEngineType(templateType: string | null | undefined): string {
+  const LEGACY_MAP: Record<string, string> = {
+    menu_service:       'instant_transaction',
+    multi_day_booking:  'time_exclusive_reservation',
+    session_access:     'shared_capacity_access',
+    subscription:       'ongoing_entitlement',
+    membership_access:  'ongoing_entitlement',
+    appointment_booking:'time_exclusive_reservation',
+    class_scheduling:   'shared_capacity_access',
+  };
+  return LEGACY_MAP[templateType ?? ''] ?? templateType ?? 'instant_transaction';
+}
 
 // =============================================
 // METRICS LAYER SERVICE
@@ -959,12 +981,7 @@ export class MetricsLayerService {
 
     const engineModuleCounts: Record<string, number> = {};
     for (const m of (modules || [])) {
-      const engine = m.engine_type || (
-        m.template_type === 'menu_service' ? 'instant_transaction' :
-        m.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
-        m.template_type === 'session_access' ? 'shared_capacity_access' :
-        'instant_transaction'
-      );
+      const engine = m.engine_type || resolveEngineType(m.template_type);
       engineModuleCounts[engine] = (engineModuleCounts[engine] || 0) + 1;
     }
 
@@ -1168,11 +1185,7 @@ export class MetricsLayerService {
     for (const m of (modules || [])) {
       moduleMap[m.id] = {
         name: m.name,
-        engine: m.engine_type || (
-          m.template_type === 'menu_service' ? 'instant_transaction' :
-          m.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
-          m.template_type === 'session_access' ? 'shared_capacity_access' : 'instant_transaction'
-        )
+        engine: m.engine_type || resolveEngineType(m.template_type),
       };
     }
 
@@ -1197,7 +1210,7 @@ export class MetricsLayerService {
       });
     }
 
-    // Recent transactions (replaces separate restaurant_orders + chalet_bookings queries)
+    // Recent transactions (replaces separate per-module transaction queries)
     const { data: recentTx } = await this.supabase
       .from('transactions')
       .select('id, created_at, status, engine_type, module_id, reference_table, metadata')
@@ -1368,11 +1381,7 @@ export class MetricsLayerService {
     }>> = {};
 
     for (const m of (modules || [])) {
-      const engineType = m.engine_type || (
-        m.template_type === 'menu_service' ? 'instant_transaction' :
-        m.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
-        m.template_type === 'session_access' ? 'shared_capacity_access' : 'instant_transaction'
-      );
+      const engineType = m.engine_type || resolveEngineType(m.template_type);
       if (!moduleGroups[engineType]) moduleGroups[engineType] = [];
       moduleGroups[engineType].push({
         moduleId: m.id,

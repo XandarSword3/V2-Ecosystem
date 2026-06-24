@@ -48,6 +48,18 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', type: 'resort' },
+    properties: [],
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
+  PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 import InventoryAdminPage from '../../src/app/admin/inventory/page';
 
 const itemsSeed = [
@@ -172,7 +184,8 @@ describe('Admin inventory route coverage', () => {
           type: 'in',
           quantity: 5,
           referenceType: 'manual',
-        })
+        }),
+        expect.any(Object)
       );
     });
 
@@ -180,7 +193,11 @@ describe('Admin inventory route coverage', () => {
     await user.click(await screen.findByRole('button', { name: /Resolve$/i }));
 
     await waitFor(() => {
-      expect(apiPostMock).toHaveBeenCalledWith('/inventory/alerts/alert-1/resolve');
+      expect(apiPostMock).toHaveBeenCalledWith(
+        '/inventory/alerts/alert-1/resolve',
+        {},
+        expect.any(Object)
+      );
     });
   });
 

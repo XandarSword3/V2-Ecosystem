@@ -11,7 +11,7 @@ export function HydrateSettingsFromBackend() {
         const data = await res.json();
         if (data.success && data.data) {
           if (data.data.theme) {
-            useSettingsStore.getState().setResortTheme(data.data.theme);
+            useSettingsStore.getState().setSiteTheme(data.data.theme);
           }
           if (typeof data.data.animationsEnabled === 'boolean') {
             useSettingsStore.getState().setAnimationsEnabled(data.data.animationsEnabled);

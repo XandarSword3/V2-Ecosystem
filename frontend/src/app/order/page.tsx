@@ -71,7 +71,7 @@ interface Category {
 }
 
 function TableOrderContent() {
-  const t = useTranslations('restaurant');
+  const t = useTranslations('order');
   const tc = useTranslations('common');
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -88,12 +88,12 @@ function TableOrderContent() {
   const [submitting, setSubmitting] = useState(false);
   const [customerName, setCustomerName] = useState('');
 
-  const restaurantModule = modules?.find(m => m.template_type === 'instant_transaction' && m.slug === 'restaurant' && m.is_active);
+  const restaurantModule = modules?.find(m => m.template_type === 'instant_transaction' && m.is_active);
 
   const fetchMenu = useCallback(async () => {
     try {
       const moduleParam = restaurantModule?.id ? `?moduleId=${restaurantModule.id}` : '';
-      const response = await api.get(`/restaurant/menu${moduleParam}`);
+      const response = await api.get(`/${restaurantModule?.slug}/menu${moduleParam}`);
       const menuData = response.data.data?.menuByCategory || [];
       setCategories(menuData);
       if (menuData.length > 0) {
@@ -165,7 +165,7 @@ function TableOrderContent() {
       // FIX Iter-3: i18n fallback
       customer_name: customerName || `${tc('table')} ${tableNumber}`,
       items: cart.map(item => ({
-        menu_item_id: item.id,
+        catalog_item_id: item.id,
         quantity: item.quantity,
         unit_price: item.discount_price || item.price,
         notes: item.notes,
@@ -174,7 +174,7 @@ function TableOrderContent() {
     };
 
     try {
-      await api.post('/restaurant/orders', orderData);
+      await api.post(`/${restaurantModule?.slug}/orders`, orderData);
       // FIX Iter-3: i18n
       toast.success(t('order.submittedSuccessfully'));
       setCart([]);
@@ -210,7 +210,7 @@ function TableOrderContent() {
             <p className="text-slate-600 dark:text-slate-400 mb-6">
               {t('order.scanQRToOrder')}
             </p>
-            <Button onClick={() => router.push('/restaurant')}>
+            <Button onClick={() => router.push('/')}>
               {t('order.goToRestaurant')}
             </Button>
           </CardContent>
@@ -246,7 +246,7 @@ function TableOrderContent() {
               <div>
                 <h1 className="text-lg font-bold text-slate-900 dark:text-white">
                   {/* FIX Iter-3: i18n */}
-                  {t('order.headerTitle', { name: settings.resortName || t('title') })}
+                  {t('order.headerTitle', { name: settings.siteName || t('title') })}
                 </h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   {tc('table')} {tableNumber}

@@ -34,34 +34,17 @@ END $$;
 -- Inspections
 DO $$
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'chalets'
-  ) THEN
-    CREATE TABLE IF NOT EXISTS housekeeping_inspections (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      task_id UUID NOT NULL REFERENCES housekeeping_tasks(id),
-      chalet_id UUID NOT NULL REFERENCES chalets(id),
-      inspector_id UUID REFERENCES users(id),
-      checklist_items JSONB DEFAULT '[]'::jsonb,
-      overall_rating INTEGER CHECK (overall_rating BETWEEN 1 AND 5),
-      passed BOOLEAN DEFAULT false,
-      notes TEXT,
-      created_at TIMESTAMPTZ DEFAULT now()
-    );
-  ELSE
-    CREATE TABLE IF NOT EXISTS housekeeping_inspections (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      task_id UUID NOT NULL REFERENCES housekeeping_tasks(id),
-      chalet_id UUID NOT NULL,
-      inspector_id UUID REFERENCES users(id),
-      checklist_items JSONB DEFAULT '[]'::jsonb,
-      overall_rating INTEGER CHECK (overall_rating BETWEEN 1 AND 5),
-      passed BOOLEAN DEFAULT false,
-      notes TEXT,
-      created_at TIMESTAMPTZ DEFAULT now()
-    );
-  END IF;
+  CREATE TABLE IF NOT EXISTS housekeeping_inspections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id UUID NOT NULL REFERENCES housekeeping_tasks(id),
+    unit_id UUID NOT NULL REFERENCES accommodation_units(id),
+    inspector_id UUID REFERENCES users(id),
+    checklist_items JSONB DEFAULT '[]'::jsonb,
+    overall_rating INTEGER CHECK (overall_rating BETWEEN 1 AND 5),
+    passed BOOLEAN DEFAULT false,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+  );
 END $$;
 
 -- Supplies per task type (links housekeeping to inventory)
@@ -87,61 +70,42 @@ DO $$ BEGIN
   ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS parent_task_id UUID;
 END $$;
 
--- Add columns to chalets if they don't exist
+-- Add columns to accommodation_units if they don't exist
 DO $$ BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'chalets'
-  ) THEN
-    ALTER TABLE chalets ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT false;
-    ALTER TABLE chalets ADD COLUMN IF NOT EXISTS block_reason TEXT;
-    ALTER TABLE chalets ADD COLUMN IF NOT EXISTS blocked_until TIMESTAMPTZ;
-    ALTER TABLE chalets ADD COLUMN IF NOT EXISTS last_cleaned TIMESTAMPTZ;
-    ALTER TABLE chalets ADD COLUMN IF NOT EXISTS last_inspected TIMESTAMPTZ;
-    ALTER TABLE chalets ADD COLUMN IF NOT EXISTS cleaning_status TEXT DEFAULT 'clean';
-  END IF;
+  ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT false;
+  ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS block_reason TEXT;
+  ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS blocked_until TIMESTAMPTZ;
+  ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS last_cleaned TIMESTAMPTZ;
+  ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS last_inspected TIMESTAMPTZ;
+  ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS cleaning_status TEXT DEFAULT 'clean';
 END $$;
 
 -- Check-in readiness function
 DO $do$
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'chalets'
-  ) THEN
-    EXECUTE $fn$
-      CREATE OR REPLACE FUNCTION can_check_in(p_chalet_id UUID)
-      RETURNS BOOLEAN AS $$
-      DECLARE
-        v_chalet RECORD;
-        v_pending_count INTEGER;
-      BEGIN
-        SELECT cleaning_status, is_blocked INTO v_chalet
-        FROM chalets WHERE id = p_chalet_id;
+  EXECUTE $fn$
+    CREATE OR REPLACE FUNCTION can_check_in(p_unit_id UUID)
+    RETURNS BOOLEAN AS $$
+    DECLARE
+      v_unit RECORD;
+      v_pending_count INTEGER;
+    BEGIN
+      SELECT cleaning_status, is_blocked INTO v_unit
+      FROM accommodation_units WHERE id = p_unit_id;
 
-        IF NOT FOUND THEN RETURN FALSE; END IF;
-        IF v_chalet.is_blocked THEN RETURN FALSE; END IF;
-        IF v_chalet.cleaning_status != 'clean' THEN RETURN FALSE; END IF;
+      IF NOT FOUND THEN RETURN FALSE; END IF;
+      IF v_unit.is_blocked THEN RETURN FALSE; END IF;
+      IF v_unit.cleaning_status != 'clean' THEN RETURN FALSE; END IF;
 
-        SELECT COUNT(*) INTO v_pending_count
-        FROM housekeeping_tasks
-        WHERE chalet_id = p_chalet_id
-          AND status IN ('pending', 'in_progress', 'rework_needed');
+      SELECT COUNT(*) INTO v_pending_count
+      FROM housekeeping_tasks
+      WHERE unit_id = p_unit_id
+        AND status IN ('pending', 'in_progress', 'rework_needed');
 
-        RETURN v_pending_count = 0;
-      END;
-      $$ LANGUAGE plpgsql;
-    $fn$;
-  ELSE
-    EXECUTE $fn$
-      CREATE OR REPLACE FUNCTION can_check_in(p_chalet_id UUID)
-      RETURNS BOOLEAN AS $$
-      BEGIN
-        RETURN FALSE;
-      END;
-      $$ LANGUAGE plpgsql;
-    $fn$;
-  END IF;
+      RETURN v_pending_count = 0;
+    END;
+    $$ LANGUAGE plpgsql;
+  $fn$;
 END $do$;
 
 -- Indexes

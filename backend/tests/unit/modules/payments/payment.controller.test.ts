@@ -27,19 +27,32 @@ vi.mock('../../../../src/modules/payments/loyalty-integration.js', () => ({
   awardLoyaltyPointsForPayment: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../../../src/engines/idempotency-guard.js', () => ({
+  getIdempotencyGuard: () => ({
+    executeOnce: vi.fn().mockImplementation(async (key, actor, category, referenceId, action, callback) => {
+      return await callback();
+    }),
+  }),
+}));
+
 // Stripe mock — must be hoisted before the module under test
-const mockStripeRefundsCreate = vi.fn();
-const mockStripePaymentIntentsCreate = vi.fn();
-const mockStripeWebhooksConstructEvent = vi.fn();
+const { mockStripeRefundsCreate, mockStripePaymentIntentsCreate, mockStripeWebhooksConstructEvent } = vi.hoisted(() => ({
+  mockStripeRefundsCreate: vi.fn(),
+  mockStripePaymentIntentsCreate: vi.fn(),
+  mockStripeWebhooksConstructEvent: vi.fn(),
+}));
 
 vi.mock('stripe', () => {
-  function MockStripe() {
+  const MockStripe = vi.fn().mockImplementation(function () {
     return {
       paymentIntents: { create: mockStripePaymentIntentsCreate },
       refunds: { create: mockStripeRefundsCreate },
       webhooks: { constructEvent: mockStripeWebhooksConstructEvent },
     };
-  }
+  });
+  (MockStripe as any).paymentIntents = { create: mockStripePaymentIntentsCreate };
+  (MockStripe as any).refunds = { create: mockStripeRefundsCreate };
+  (MockStripe as any).webhooks = { constructEvent: mockStripeWebhooksConstructEvent };
   return {
     default: MockStripe,
   };
@@ -115,7 +128,7 @@ function createQueryMock(mockDataFn: () => unknown[]) {
 
 const PAYMENT = {
   id: 'pay-1',
-  reference_type: 'restaurant_order',
+  reference_type: 'menu_service_order',
   reference_id: 'order-1',
   amount: '45.00',
   currency: 'USD',
@@ -171,7 +184,7 @@ describe('PaymentController', () => {
       site_settings: [{ key: 'payments', value: { stripeSecretKey: 'sk_test_fake', stripeWebhookSecret: 'whsec_test', currency: 'usd' } }],
       payments: [PAYMENT],
       payment_ledger: [],
-      restaurant_orders: [],
+      menu_service_orders: [],
     };
   });
 
@@ -186,7 +199,7 @@ describe('PaymentController', () => {
       });
 
       const req = mockReq({
-        body: { amount: 50, currency: 'usd', referenceType: 'restaurant_order', referenceId: 'order-1' },
+        body: { amount: 50, currency: 'usd', referenceType: 'menu_service_order', referenceId: 'order-1' },
       });
       const res = mockRes();
       await (createPaymentIntent as Function)(req, res, mockNext());
@@ -202,7 +215,7 @@ describe('PaymentController', () => {
       mockStripePaymentIntentsCreate.mockResolvedValue({ id: 'pi_test_2', client_secret: 'cs_2' });
 
       const req = mockReq({
-        body: { amount: 99.99, currency: 'usd', referenceType: 'restaurant_order', referenceId: 'order-1' },
+        body: { amount: 99.99, currency: 'usd', referenceType: 'menu_service_order', referenceId: 'order-1' },
       });
       const res = mockRes();
       await (createPaymentIntent as Function)(req, res, mockNext());
@@ -236,7 +249,7 @@ describe('PaymentController', () => {
             amount: 5000,
             currency: 'usd',
             latest_charge: 'ch_123',
-            metadata: { referenceType: 'restaurant_order', referenceId: 'order-1' },
+            metadata: { referenceType: 'menu_service_order', referenceId: 'order-1' },
           },
         },
       };
@@ -265,7 +278,7 @@ describe('PaymentController', () => {
         data: {
           object: {
             id: 'pi_abc', amount: 1000, currency: 'usd',
-            metadata: { referenceType: 'restaurant_order', referenceId: 'order-1' },
+            metadata: { referenceType: 'menu_service_order', referenceId: 'order-1' },
           },
         },
       };
@@ -286,7 +299,7 @@ describe('PaymentController', () => {
         data: {
           object: {
             id: 'pi_fail', amount: 2000, currency: 'usd',
-            metadata: { referenceType: 'restaurant_order', referenceId: 'order-2' },
+            metadata: { referenceType: 'menu_service_order', referenceId: 'order-2' },
             last_payment_error: { message: 'Card declined' },
           },
         },
@@ -369,7 +382,7 @@ describe('PaymentController', () => {
       tableData.payments = [];
       setupSupabase();
       const req = mockReq({
-        body: { referenceType: 'restaurant_order', referenceId: 'order-1', amount: 30, notes: 'Exact change' },
+        body: { referenceType: 'menu_service_order', referenceId: 'order-1', amount: 30, notes: 'Exact change' },
       });
       const res = mockRes();
       await (recordCashPayment as Function)(req, res, mockNext());
@@ -383,7 +396,7 @@ describe('PaymentController', () => {
       tableData.payments = [{ ...PAYMENT, method: 'cash', status: 'completed' }];
       setupSupabase();
       const req = mockReq({
-        body: { referenceType: 'restaurant_order', referenceId: 'order-1', amount: 30 },
+        body: { referenceType: 'menu_service_order', referenceId: 'order-1', amount: 30 },
       });
       const res = mockRes();
       await (recordCashPayment as Function)(req, res, mockNext());
@@ -401,7 +414,7 @@ describe('PaymentController', () => {
     it('should record a manual payment with method', async () => {
       setupSupabase();
       const req = mockReq({
-        body: { referenceType: 'restaurant_order', referenceId: 'order-1', amount: 25, method: 'whish' },
+        body: { referenceType: 'menu_service_order', referenceId: 'order-1', amount: 25, method: 'whish' },
       });
       const res = mockRes();
       await (recordManualPayment as Function)(req, res, mockNext());

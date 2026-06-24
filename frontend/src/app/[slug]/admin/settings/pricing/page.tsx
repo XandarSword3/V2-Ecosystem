@@ -112,11 +112,8 @@ interface DynamicPricingConfig {
   lastMinutePremium: number;
 }
 
-const CATEGORIES = [
-  { value: 'chalets', label: 'Chalets' },
-  { value: 'pool', label: 'Pool' },
-  { value: 'restaurant', label: 'Restaurant' },
-];
+const CATEGORIES: { value: string; label: string }[] = [];
+// NOTE: Categories now loaded dynamically from active modules — see fetchCategories()
 
 const MONTHS = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -141,6 +138,7 @@ export default function SeasonalPricingPage() {
   const [editingRule, setEditingRule] = useState<SeasonalRule | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSavingDynamic, setIsSavingDynamic] = useState(false);
+  const [categories, setCategories] = useState<{ value: string; label: string }[]>([]);
 
   const form = useForm<SeasonalRuleFormData>({
     resolver: zodResolver(seasonalRuleSchema),
@@ -149,7 +147,7 @@ export default function SeasonalPricingPage() {
       startDate: '',
       endDate: '',
       priceMultiplier: 1,
-      applicableTo: ['chalets'],
+      applicableTo: [],
       priority: 5,
       isActive: true,
     },
@@ -158,12 +156,15 @@ export default function SeasonalPricingPage() {
   // Fetch data
   const fetchData = useCallback(async () => {
     try {
-      const [rulesRes, configRes] = await Promise.all([
+      const [rulesRes, configRes, modulesRes] = await Promise.all([
         api.get('/admin/pricing/seasonal-rules'),
         api.get('/admin/pricing/dynamic-config'),
+        api.get('/admin/modules').catch(() => ({ data: { data: [] } })),
       ]);
       setRules(rulesRes.data.data);
       setDynamicConfig(configRes.data.data);
+      const mods = (modulesRes.data.data || []) as { id: string; name: string; slug: string; is_active: boolean }[];
+      setCategories(mods.filter(m => m.is_active).map(m => ({ value: m.slug, label: m.name })));
     } catch (error) {
       console.error('Failed to fetch pricing data:', error);
       toast.error('Failed to load pricing settings');
@@ -394,7 +395,7 @@ export default function SeasonalPricingPage() {
                           <FormItem>
                             <FormLabel>Apply To</FormLabel>
                             <div className="flex flex-wrap gap-2">
-                              {CATEGORIES.map((category) => (
+                              {categories.map((category) => (
                                 <FormField
                                   key={category.value}
                                   control={form.control}

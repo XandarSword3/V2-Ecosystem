@@ -15,3 +15,5 @@ export function LoadingScreenWrapper({ children }: Props) {
 export function LoadingScreen() {
   return null;
 }
+
+export default LoadingScreen;

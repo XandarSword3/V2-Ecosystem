@@ -3,7 +3,8 @@ import { pgTable, uuid, varchar, text, boolean, timestamp, integer, jsonb, pgEnu
 // ============================================
 // Enums
 // ============================================
-export const businessUnitEnum = pgEnum('business_unit', ['restaurant', 'snack_bar', 'chalets', 'pool', 'admin']);
+// NOTE: DB migration required to update the PostgreSQL enum type to match these values
+export const businessUnitEnum = pgEnum('business_unit', ['menu_service', 'kiosk', 'accommodation', 'capacity', 'admin']);
 
 // ============================================
 // Users & Auth

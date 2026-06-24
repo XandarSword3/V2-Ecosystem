@@ -7,11 +7,17 @@
 
 
 // ── Mock Stripe before service loads ────────────────────────────────────────
+const mockStripe = vi.hoisted(() => ({
+  prices: { create: vi.fn().mockResolvedValue({ id: 'price_mock' }) },
+}));
+
 vi.mock('stripe', () => {
-  const mockStripe = vi.fn().mockImplementation(() => ({
-    prices: { create: vi.fn().mockResolvedValue({ id: 'price_mock' }) },
-  }));
-  return { default: mockStripe };
+  class MockStripe {
+    constructor() {
+      return mockStripe;
+    }
+  }
+  return { default: MockStripe };
 });
 
 // ── Mock logger ──────────────────────────────────────────────────────────────
@@ -20,22 +26,30 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 // ── DB mock ──────────────────────────────────────────────────────────────────
-const mockChain = {
-  from: vi.fn(),
-  select: vi.fn(),
-  insert: vi.fn(),
-  update: vi.fn(),
-  delete: vi.fn(),
-  upsert: vi.fn(),
-  eq: vi.fn(),
-  in: vi.fn(),
-  single: vi.fn(),
-  order: vi.fn(),
-  filter: vi.fn(),
-};
-Object.keys(mockChain).forEach((k) => {
-  (mockChain as any)[k].mockReturnValue(mockChain);
+const mockChain = vi.hoisted(() => {
+  const chain = {
+    from: vi.fn(),
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    upsert: vi.fn(),
+    eq: vi.fn(),
+    in: vi.fn(),
+    single: vi.fn(),
+    order: vi.fn(),
+    filter: vi.fn(),
+  };
+  Object.keys(chain).forEach((k) => (chain as any)[k].mockReturnValue(chain));
+  return chain;
 });
+
+vi.mock('../../src/lib/supabase.js', () => ({
+  getSupabase: vi.fn(() => mockChain),
+  getSupabaseAdmin: vi.fn(() => mockChain),
+  supabase: mockChain,
+  supabaseAdmin: mockChain,
+}));
 
 vi.mock('../../src/database/connection.js', () => ({
   getSupabase: vi.fn(() => mockChain),
@@ -51,7 +65,7 @@ const baseRule = {
   start_date: '07-01',
   end_date: '08-31',
   price_multiplier: 1.4,
-  applicable_to: ['chalets', 'pool'],
+  applicable_to: ['accommodation_units', 'shared_capacity_access'],
   specific_items: null,
   priority: 10,
   is_active: true,
@@ -106,7 +120,7 @@ describe('createSeasonalRule', () => {
       startDate: '07-01',
       endDate: '08-31',
       priceMultiplier: 1.4,
-      applicableTo: ['chalets', 'pool'],
+      applicableTo: ['accommodation_units', 'shared_capacity_access'],
       priority: 10,
       isActive: true,
     });
@@ -128,7 +142,7 @@ describe('createSeasonalRule', () => {
         startDate: '01-01',
         endDate: '12-31',
         priceMultiplier: 1.2,
-        applicableTo: ['pool'],
+        applicableTo: ['shared_capacity_access'],
         priority: 1,
         isActive: true,
       })
@@ -235,7 +249,7 @@ describe('calculatePrice', () => {
 
     // Tuesday → not weekend
     const tuesday = new Date('2026-06-16'); // a Tuesday
-    const result = await seasonalPricingService.calculatePrice('pool', 'item-1', 100, tuesday);
+    const result = await seasonalPricingService.calculatePrice('shared_capacity_access', 'item-1', 100, tuesday);
 
     expect(result.basePrice).toBe(100);
     expect(result.finalPrice).toBe(100);
@@ -252,7 +266,7 @@ describe('calculatePrice', () => {
     mockChain.single.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
 
     const july15 = new Date('2026-07-15');
-    const result = await seasonalPricingService.calculatePrice('pool', 'item-1', 100, july15);
+    const result = await seasonalPricingService.calculatePrice('shared_capacity_access', 'item-1', 100, july15);
 
     expect(result.appliedRules).toHaveLength(1);
     expect(result.appliedRules[0].name).toBe('Summer Peak');
@@ -262,15 +276,15 @@ describe('calculatePrice', () => {
   });
 
   it('does not apply rule when item type does not match', async () => {
-    // Rule only applies to chalets and pool — test with restaurant
-    const restrictedRule = { ...baseRule, applicable_to: ['chalets'] };
+    // Rule only applies to accommodation_units and pool — test with menu service
+    const restrictedRule = { ...baseRule, applicable_to: ['accommodation_units'] };
     mockChain.order.mockResolvedValueOnce({ data: [restrictedRule], error: null });
     mockChain.single.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
     mockChain.single.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
 
     const july15 = new Date('2026-07-15');
     const result = await seasonalPricingService.calculatePrice(
-      'restaurant',
+      'instant_transaction',
       'item-1',
       100,
       july15
@@ -287,7 +301,7 @@ describe('calculatePrice', () => {
     mockChain.single.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
 
     const july15 = new Date('2026-07-15');
-    const result = await seasonalPricingService.calculatePrice('pool', 'item-1', 100, july15);
+    const result = await seasonalPricingService.calculatePrice('shared_capacity_access', 'item-1', 100, july15);
 
     expect(result.appliedRules).toHaveLength(0);
     expect(result.finalPrice).toBe(100);

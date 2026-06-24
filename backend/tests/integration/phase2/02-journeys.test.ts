@@ -43,14 +43,14 @@ afterAll(() => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// J-01: Restaurant Dine-In — Cash Payment (Happy Path)
+// J-01: MenuService Dine-In — Cash Payment (Happy Path)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('J-01: Restaurant Dine-In Cash Payment', () => {
+describe('J-01: MenuService Dine-In Cash Payment', () => {
   it('should place a dine-in order with 2x Bruschetta + 1x Wagyu Steak (Medium Rare + Fries)', async () => {
     const alice = client(requireState('aliceToken'));
 
     // Browse menu
-    const menuRes = await alice.getMenu(state.restaurantModuleId);
+    const menuRes = await alice.getMenu(state.menuServiceModuleId);
     expect(menuRes.success, `Menu fetch failed: ${menuRes.error}`).toBe(true);
 
     // Place order
@@ -137,9 +137,9 @@ describe('J-01: Restaurant Dine-In Cash Payment', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// J-02: Restaurant Dine-In — Card Payment with Coupon
+// J-02: MenuService Dine-In — Card Payment with Coupon
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('J-02: Restaurant Card Payment with Coupon', () => {
+describe('J-02: MenuService Card Payment with Coupon', () => {
   it('should validate FIXED5 coupon before ordering', async () => {
     const bob = client(requireState('bobToken'));
     const res = await bob.validateCoupon('FIXED5', 32);
@@ -187,17 +187,17 @@ describe('J-02: Restaurant Card Payment with Coupon', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// J-03: Chalet Booking with Add-ons
+// J-03: AccommodationUnit Booking with Add-ons
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('J-03: Chalet Booking — Weekend with Add-ons', () => {
+describe('J-03: AccommodationUnit Booking — Weekend with Add-ons', () => {
   let j03CheckIn = futureDate(140);
   let j03CheckOut = futureDate(142);
 
   it('should check Mountain View A availability', async () => {
-    const chaletId = requireState('chaletAId');
+    const unitId = requireState('unitAId');
     const alice = client(requireState('aliceToken'));
 
-    const res = await alice.getChaletAvailability(chaletId, j03CheckIn, j03CheckOut);
+    const res = await alice.getAccommodationAvailability(unitId, j03CheckIn, j03CheckOut);
     expect(res.status).toBeLessThan(500);
   });
 
@@ -209,7 +209,7 @@ describe('J-03: Chalet Booking — Weekend with Add-ons', () => {
     if (state.basketAddonId) addOns.push({ addOnId: state.basketAddonId, quantity: 1 });
 
     const payloadBase = {
-      chaletId: requireState('chaletAId'),
+      unitId: requireState('unitAId'),
       customerName: 'Alice Johnson',
       customerEmail: 'alice@test.com',
       customerPhone: '+1-555-1001',
@@ -267,7 +267,7 @@ describe('J-03: Chalet Booking — Weekend with Add-ons', () => {
     const alice = client(requireState('aliceToken'));
 
     const res = await alice.createBooking({
-      chaletId: requireState('chaletAId'),
+      unitId: requireState('unitAId'),
       checkInDate: j03CheckIn,
       checkOutDate: j03CheckOut,
       customerName: 'Alice Johnson',
@@ -296,7 +296,7 @@ describe('J-04: Shared Capacity Access Purchase — Multiple Guests', () => {
   it('should purchase pool ticket for 2 adults + 1 child', async () => {
     const bob = client(requireState('bobToken'));
     let sessionId = requireState('afternoonSessionId');
-    let res = await bob.purchasePoolTicket({
+    let res = await bob.purchaseCapacityTicket({
       sessionId,
       customerName: 'Bob Smith',
       customerPhone: '+1-555-1002',
@@ -308,7 +308,7 @@ describe('J-04: Shared Capacity Access Purchase — Multiple Guests', () => {
     });
 
     if (!res.success && /session not found/i.test(String(res.error || ''))) {
-      const sessionsRes = await bob.getPoolSessions();
+      const sessionsRes = await bob.getCapacityWindows();
       const sessions = Array.isArray(sessionsRes.data)
         ? sessionsRes.data
         : sessionsRes.data?.sessions || [];
@@ -320,7 +320,7 @@ describe('J-04: Shared Capacity Access Purchase — Multiple Guests', () => {
       if (fallback?.id && fallback.id !== sessionId) {
         sessionId = fallback.id;
         state.afternoonSessionId = sessionId;
-        res = await bob.purchasePoolTicket({
+        res = await bob.purchaseCapacityTicket({
           sessionId,
           customerName: 'Bob Smith',
           customerPhone: '+1-555-1002',
@@ -349,20 +349,20 @@ describe('J-04: Shared Capacity Access Purchase — Multiple Guests', () => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 describe('J-05: Access Validation Flow', () => {
   it('should record pool entry for Bob\'s ticket', async () => {
-    const poolStaff = client(requireState('poolStaffToken'));
+    const capacityStaff = client(requireState('capacityStaffToken'));
     const ticketId = requireState('j04TicketId');
 
-    const res = await poolStaff.recordPoolEntry(ticketId);
+    const res = await capacityStaff.recordPoolEntry(ticketId);
     // Entry may require validation first
     if (!res.success) {
       // Try validate first, then entry
-      await poolStaff.validatePoolTicket(ticketId);
-      const retryRes = await poolStaff.recordPoolEntry(ticketId);
+      await capacityStaff.validateCapacityTicket(ticketId);
+      const retryRes = await capacityStaff.recordPoolEntry(ticketId);
       expect(retryRes.status).toBeLessThan(500);
     }
 
     // Check ticket is now active
-    const ticketRes = await poolStaff.getPoolTicket(ticketId);
+    const ticketRes = await capacityStaff.getCapacityTicket(ticketId);
     if (ticketRes.success) {
       // Schema only has 'valid' | 'used'. 'used' means entered.
       expect(ticketRes.data?.status).toMatch(/valid|active|checked_in|entered|used/);
@@ -370,65 +370,65 @@ describe('J-05: Access Validation Flow', () => {
   });
 
   it('should record pool exit', async () => {
-    const poolStaff = client(requireState('poolStaffToken'));
+    const capacityStaff = client(requireState('capacityStaffToken'));
     const ticketId = requireState('j04TicketId');
 
-    const res = await poolStaff.recordPoolExit(ticketId);
+    const res = await capacityStaff.recordPoolExit(ticketId);
     expect(res.status).toBeLessThan(500);
 
     // Ticket should now be used
-    const ticketRes = await poolStaff.getPoolTicket(ticketId);
+    const ticketRes = await capacityStaff.getCapacityTicket(ticketId);
     if (ticketRes.success) {
       expect(ticketRes.data?.status).toMatch(/valid|used|completed|exited/);
     }
   });
 
   it('should reject re-entry on used ticket (F2)', async () => {
-    const poolStaff = client(requireState('poolStaffToken'));
+    const capacityStaff = client(requireState('capacityStaffToken'));
     const ticketId = requireState('j04TicketId');
 
-    const res = await poolStaff.recordPoolEntry(ticketId);
+    const res = await capacityStaff.recordPoolEntry(ticketId);
     // Should fail — ticket already used
     expect(res.success).toBe(false);
   });
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// J-06: Chalet Check-in/Check-out with Housekeeping
+// J-06: AccommodationUnit Check-in/Check-out with Housekeeping
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('J-06: Chalet Check-in Through Check-out with Housekeeping', () => {
+describe('J-06: AccommodationUnit Check-in Through Check-out with Housekeeping', () => {
   it('should confirm booking', async () => {
     const admin = client(requireState('adminToken'));
     const bookingId = requireState('j03BookingId');
 
     const res = await admin.patch(
-      `/${ModuleSlug.CHALETS}/bookings/${bookingId}/status`,
+      `/${ModuleSlug.ACCOMMODATION_UNITS}/bookings/${bookingId}/status`,
       { status: 'confirmed' }
     );
     expect(res.status).toBeLessThan(500);
   });
 
   it('should check-in guest', async () => {
-    const chaletStaff = client(requireState('chaletStaffToken'));
+    const accommodationStaff = client(requireState('accommodationStaffToken'));
     const bookingId = requireState('j03BookingId');
 
-    const res = await chaletStaff.checkInBooking(bookingId);
+    const res = await accommodationStaff.checkInBooking(bookingId);
     expect(res.status).toBeLessThan(500);
 
-    const bookingRes = await chaletStaff.getBooking(bookingId);
+    const bookingRes = await accommodationStaff.getBooking(bookingId);
     if (bookingRes.success) {
       expect(bookingRes.data?.status).toMatch(/confirmed|checked_in|in_progress/);
     }
   });
 
   it('should check-out guest', async () => {
-    const chaletStaff = client(requireState('chaletStaffToken'));
+    const accommodationStaff = client(requireState('accommodationStaffToken'));
     const bookingId = requireState('j03BookingId');
 
-    const res = await chaletStaff.checkOutBooking(bookingId);
+    const res = await accommodationStaff.checkOutBooking(bookingId);
     expect(res.status).toBeLessThan(500);
 
-    const bookingRes = await chaletStaff.getBooking(bookingId);
+    const bookingRes = await accommodationStaff.getBooking(bookingId);
     if (bookingRes.success) {
       expect(bookingRes.data?.status).toMatch(/confirmed|checked_out|completed/);
     }
@@ -560,7 +560,7 @@ describe('J-09: Booking Cancellation and Refund', () => {
     const checkOut = futureDate(j09Offset + 2);
 
     const res = await carol.createBooking({
-      chaletId: requireState('chaletCId'),
+      unitId: requireState('unitCId'),
       checkInDate: checkIn,
       checkOutDate: checkOut,
       customerName: 'Carol Williams',
@@ -590,13 +590,13 @@ describe('J-09: Booking Cancellation and Refund', () => {
     }
   });
 
-  it('should release chalet dates after cancellation', async () => {
+  it('should release accommodation unit dates after cancellation', async () => {
     const carol = client(requireState('carolToken'));
     const checkIn = futureDate(j09Offset);
     const checkOut = futureDate(j09Offset + 2);
-    const chaletId = requireState('chaletCId');
+    const unitId = requireState('unitCId');
 
-    const res = await carol.getChaletAvailability(chaletId, checkIn, checkOut);
+    const res = await carol.getAccommodationAvailability(unitId, checkIn, checkOut);
     // Dates should be available again
     if (res.success && res.data?.available !== undefined) {
       expect(res.data.available).toBe(true);
@@ -636,7 +636,7 @@ describe('J-10: Registration through GDPR Deletion', () => {
     userToken = c.getToken()!;
   });
 
-  it('should place a restaurant order to create user activity', async () => {
+  it('should place a menu service order to create user activity', async () => {
     const c = client(userToken);
     const res = await c.createOrder({
       customerName: 'GDPR TestUser',
@@ -728,13 +728,13 @@ describe('J-11: Dynamic Module — Gym', () => {
     }
     // Session might already exist
     if (!gymSessionId) {
-      const sessRes = await admin.getPoolSessions(gymModuleId);
+      const sessRes = await admin.getCapacityWindows(gymModuleId);
       const sessions = Array.isArray(sessRes.data) ? sessRes.data : sessRes.data?.sessions || [];
       const found = sessions.find((s: any) => s.name === 'Open Gym');
       if (found) gymSessionId = found.id;
 
       if (!gymSessionId) {
-        const fallbackSessions = await admin.getPoolSessions();
+        const fallbackSessions = await admin.getCapacityWindows();
         const all = Array.isArray(fallbackSessions.data)
           ? fallbackSessions.data
           : fallbackSessions.data?.sessions || [];
@@ -754,7 +754,7 @@ describe('J-11: Dynamic Module — Gym', () => {
   it('should purchase ticket for the dynamic Gym module', async () => {
     if (!gymSessionId) return;
     const alice = client(requireState('aliceToken'));
-    const res = await alice.purchasePoolTicket({
+    const res = await alice.purchaseCapacityTicket({
       sessionId: gymSessionId,
       customerName: 'Alice Johnson',
       numberOfGuests: 1,
@@ -783,7 +783,7 @@ describe('J-12: Full Guest Stay — Cross-Engine Grand Journey', () => {
   it('should book Mountain View A for Alice (Mon-Wed, 2 nights)', async () => {
     const alice = client(requireState('aliceToken'));
     const payloadBase = {
-      chaletId: requireState('chaletAId'),
+      unitId: requireState('unitAId'),
       customerName: 'Alice Johnson',
       customerEmail: 'alice@test.com',
       customerPhone: '+1-555-1001',
@@ -829,14 +829,14 @@ describe('J-12: Full Guest Stay — Cross-Engine Grand Journey', () => {
     const admin = client(requireState('adminToken'));
     const id = requireState('j12BookingId');
 
-    await admin.patch(`/${ModuleSlug.CHALETS}/bookings/${id}/status`, { status: 'confirmed' });
+    await admin.patch(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings/${id}/status`, { status: 'confirmed' });
 
-    const chaletStaff = client(requireState('chaletStaffToken'));
-    const res = await chaletStaff.checkInBooking(id);
+    const accommodationStaff = client(requireState('accommodationStaffToken'));
+    const res = await accommodationStaff.checkInBooking(id);
     expect(res.status).toBeLessThan(500);
   });
 
-  it('should order dinner from restaurant (1x Salmon + 1x Cake)', async () => {
+  it('should order dinner from menu service (1x Salmon + 1x Cake)', async () => {
     const alice = client(requireState('aliceToken'));
     const res = await alice.createOrder({
       customerName: 'Alice Johnson',
@@ -866,7 +866,7 @@ describe('J-12: Full Guest Stay — Cross-Engine Grand Journey', () => {
     const alice = client(requireState('aliceToken'));
     const tomorrow = futureDate(j12Offset + 1);
 
-    const res = await alice.purchasePoolTicket({
+    const res = await alice.purchaseCapacityTicket({
       sessionId: requireState('morningSessionId'),
       customerName: 'Alice Johnson',
       numberOfGuests: 1,
@@ -881,13 +881,13 @@ describe('J-12: Full Guest Stay — Cross-Engine Grand Journey', () => {
   });
 
   it('should check-out the booking', async () => {
-    const chaletStaff = client(requireState('chaletStaffToken'));
+    const accommodationStaff = client(requireState('accommodationStaffToken'));
     const id = requireState('j12BookingId');
 
-    const res = await chaletStaff.checkOutBooking(id);
+    const res = await accommodationStaff.checkOutBooking(id);
     expect(res.status).toBeLessThan(500);
 
-    const check = await chaletStaff.getBooking(id);
+    const check = await accommodationStaff.getBooking(id);
     if (check.success) {
       expect(check.data?.status).toMatch(/confirmed|checked_out|completed/);
     }
@@ -912,9 +912,9 @@ describe('J-13: Admin Financial Reports Verification', () => {
     expect(res.status).toBeLessThan(500);
   });
 
-  it('should export restaurant reports', async () => {
+  it('should export menu service reports', async () => {
     const admin = client(requireState('adminToken'));
-    const res = await admin.get('/admin/reports/export?type=restaurant&range=today');
+    const res = await admin.get('/admin/reports/export?type=menu service&range=today');
     expect(res.status).toBeLessThan(500);
   });
 });
@@ -923,14 +923,14 @@ describe('J-13: Admin Financial Reports Verification', () => {
 // J-14: Staff Role Authorization Boundaries
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 describe('J-14: Staff Role Authorization Boundaries', () => {
-  it('staff CAN list restaurant instant_transaction rows', async () => {
+  it('staff CAN list menu service instant_transaction rows', async () => {
     const staff = client(requireState('kitchenStaffToken'));
     const res = await staff.get(`/${ModuleSlug.RESTAURANT}/orders`);
     expect([200, 304]).toContain(res.status);
   });
 
   it('staff CAN access pool operations', async () => {
-    const staff = client(requireState('poolStaffToken'));
+    const staff = client(requireState('capacityStaffToken'));
     const res = await staff.getPoolCapacity();
     expect(res.status).toBeLessThan(500);
   });
@@ -941,14 +941,14 @@ describe('J-14: Staff Role Authorization Boundaries', () => {
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
-  it('staff CAN list chalet time_exclusive_reservation rows', async () => {
-    const staff = client(requireState('chaletStaffToken'));
-    const res = await staff.get(`/${ModuleSlug.CHALETS}/bookings`);
+  it('staff CAN list accommodation unit time_exclusive_reservation rows', async () => {
+    const staff = client(requireState('accommodationStaffToken'));
+    const res = await staff.get(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings`);
     expect(res.status).toBeLessThan(500);
   });
 
-  it('chalet staff CANNOT access admin dashboard', async () => {
-    const staff = client(requireState('chaletStaffToken'));
+  it('accommodation unit staff CANNOT access admin dashboard', async () => {
+    const staff = client(requireState('accommodationStaffToken'));
     const res = await staff.getDashboard();
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
@@ -979,7 +979,7 @@ describe('J-14: Staff Role Authorization Boundaries', () => {
 // J-15: Ghost Role Verification
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 describe('J-15: Ghost Role Ground Truth Verification', () => {
-  it('staff can view restaurant transactions', async () => {
+  it('staff can view menu service transactions', async () => {
     const staff = client(requireState('kitchenStaffToken'));
     const res = await staff.get(`/${ModuleSlug.RESTAURANT}/orders`);
     expect(res.status).toBeLessThan(400);
@@ -1000,7 +1000,7 @@ describe('J-15: Ghost Role Ground Truth Verification', () => {
   });
 
   it('staff can validate pool access transactions', async () => {
-    const staff = client(requireState('poolStaffToken'));
+    const staff = client(requireState('capacityStaffToken'));
     const res = await staff.patch(
       `/${ModuleSlug.POOL}/tickets/00000000-0000-0000-0000-000000000001/validate`,
     );

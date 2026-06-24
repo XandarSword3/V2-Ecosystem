@@ -4,9 +4,9 @@
  * Unit tests for the Event/Venue Service with DI.
  */
 
-import { createEventService, EventServiceError } from '../../src/lib/services/event.service';
-import { InMemoryEventRepository } from '../../src/lib/repositories/event.repository.memory';
-import type { Container, Venue, Event } from '../../src/lib/container/types';
+import { createEventService, EventServiceError } from '../../../src/lib/services/event.service';
+import { InMemoryEventRepository } from '../../../src/lib/repositories/event.repository.memory';
+import type { Container, Venue, Event } from '../../../src/lib/container/types';
 
 // Test UUIDs
 const VENUE_1 = '11111111-1111-1111-1111-111111111111';

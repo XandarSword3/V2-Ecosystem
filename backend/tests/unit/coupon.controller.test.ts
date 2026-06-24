@@ -114,7 +114,7 @@ describe('Coupon Controller', () => {
     it('should validate a percentage coupon successfully', async () => {
       mockRequest.body = {
         code: 'SAVE20',
-        orderType: 'chalets',
+        orderType: 'accommodation_units',
         orderAmount: 100,
       };
 
@@ -151,7 +151,7 @@ describe('Coupon Controller', () => {
     it('should validate a fixed discount coupon', async () => {
       mockRequest.body = {
         code: 'FLAT10',
-        orderType: 'chalets',
+        orderType: 'accommodation_units',
         orderAmount: 50,
       };
 
@@ -181,7 +181,7 @@ describe('Coupon Controller', () => {
     it('should reject invalid coupon code', async () => {
       mockRequest.body = {
         code: 'INVALID',
-        orderType: 'chalets',
+        orderType: 'accommodation_units',
         orderAmount: 100,
       };
 
@@ -198,7 +198,7 @@ describe('Coupon Controller', () => {
     it('should reject expired coupon', async () => {
       mockRequest.body = {
         code: 'EXPIRED',
-        orderType: 'chalets',
+        orderType: 'accommodation_units',
         orderAmount: 100,
       };
 
@@ -227,7 +227,7 @@ describe('Coupon Controller', () => {
     it('should reject coupon below minimum order', async () => {
       mockRequest.body = {
         code: 'MINORDER',
-        orderType: 'chalets',
+        orderType: 'accommodation_units',
         orderAmount: 30,
       };
 

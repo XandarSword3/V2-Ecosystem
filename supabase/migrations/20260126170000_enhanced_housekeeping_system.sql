@@ -15,13 +15,13 @@ ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS overridden_at TIMESTAMPT
 ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS photo_urls TEXT[];
 ALTER TABLE housekeeping_tasks ADD COLUMN IF NOT EXISTS issues_found TEXT;
 
--- Add cleaning_status and block fields to chalets if they don't exist
-ALTER TABLE chalets ADD COLUMN IF NOT EXISTS cleaning_status VARCHAR(30) DEFAULT 'clean';
-ALTER TABLE chalets ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT false;
-ALTER TABLE chalets ADD COLUMN IF NOT EXISTS block_reason TEXT;
-ALTER TABLE chalets ADD COLUMN IF NOT EXISTS blocked_until DATE;
-ALTER TABLE chalets ADD COLUMN IF NOT EXISTS last_cleaned TIMESTAMPTZ;
-ALTER TABLE chalets ADD COLUMN IF NOT EXISTS last_inspected TIMESTAMPTZ;
+-- Add cleaning_status and block fields to accommodation_units if they don't exist
+ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS cleaning_status VARCHAR(30) DEFAULT 'clean';
+ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT false;
+ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS block_reason TEXT;
+ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS blocked_until DATE;
+ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS last_cleaned TIMESTAMPTZ;
+ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS last_inspected TIMESTAMPTZ;
 
 -- SLA Configuration table
 CREATE TABLE IF NOT EXISTS housekeeping_sla (
@@ -69,7 +69,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS housekeeping_inspections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   task_id UUID NOT NULL REFERENCES housekeeping_tasks(id) ON DELETE CASCADE,
-  chalet_id UUID NOT NULL REFERENCES chalets(id),
+  unit_id UUID NOT NULL REFERENCES accommodation_units(id),
   inspector_id UUID REFERENCES users(id),
   checklist_items JSONB,
   overall_rating INTEGER CHECK (overall_rating >= 1 AND overall_rating <= 5),
@@ -94,41 +94,41 @@ CREATE TABLE IF NOT EXISTS housekeeping_supplies (
 CREATE INDEX IF NOT EXISTS idx_tasks_booking ON housekeeping_tasks(booking_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_sla ON housekeeping_tasks(sla_due) WHERE sla_due IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_tasks_parent ON housekeeping_tasks(parent_task_id) WHERE parent_task_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_chalets_cleaning_status ON chalets(cleaning_status);
+CREATE INDEX IF NOT EXISTS idx_accommodation_units_cleaning_status ON accommodation_units(cleaning_status);
 CREATE INDEX IF NOT EXISTS idx_inspections_task ON housekeeping_inspections(task_id);
-CREATE INDEX IF NOT EXISTS idx_inspections_chalet ON housekeeping_inspections(chalet_id);
+CREATE INDEX IF NOT EXISTS idx_inspections_unit ON housekeeping_inspections(unit_id);
 CREATE INDEX IF NOT EXISTS idx_supplies_task_type ON housekeeping_supplies(task_type);
 
 -- Function to check if chalet can accept check-in
 DROP FUNCTION IF EXISTS can_check_in(UUID);
-CREATE OR REPLACE FUNCTION can_check_in(p_chalet_id UUID)
+CREATE OR REPLACE FUNCTION can_check_in(p_unit_id UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
-  v_chalet RECORD;
+  v_unit RECORD;
   v_pending_tasks INTEGER;
 BEGIN
-  -- Get chalet status
-  SELECT cleaning_status, is_blocked INTO v_chalet
-  FROM chalets WHERE id = p_chalet_id;
+  -- Get unit status
+  SELECT cleaning_status, is_blocked INTO v_unit
+  FROM accommodation_units WHERE id = p_unit_id;
   
   IF NOT FOUND THEN
     RETURN FALSE;
   END IF;
   
   -- Check if blocked
-  IF v_chalet.is_blocked THEN
+  IF v_unit.is_blocked THEN
     RETURN FALSE;
   END IF;
   
   -- Check if clean
-  IF v_chalet.cleaning_status != 'clean' THEN
+  IF v_unit.cleaning_status != 'clean' THEN
     RETURN FALSE;
   END IF;
   
   -- Check for pending tasks that would prevent check-in
   SELECT COUNT(*) INTO v_pending_tasks
   FROM housekeeping_tasks
-  WHERE chalet_id = p_chalet_id
+  WHERE unit_id = p_unit_id
     AND status IN ('pending', 'assigned', 'in_progress', 'rework_needed')
     AND task_type IN ('turnover', 'deep_cleaning');
   
@@ -142,30 +142,30 @@ RETURNS TRIGGER AS $$
 DECLARE
   v_new_status TEXT;
   v_old_status TEXT;
-  v_chalet_id UUID;
+  v_unit_id UUID;
   v_booking_id UUID;
 BEGIN
   v_new_status := COALESCE(to_jsonb(NEW)->>'status', '');
   v_old_status := COALESCE(to_jsonb(OLD)->>'status', '');
-  v_chalet_id := COALESCE(
+  v_unit_id := COALESCE(
     NULLIF(to_jsonb(NEW)->>'unit_id', '')::UUID,
-    NULLIF(to_jsonb(NEW)->>'chalet_id', '')::UUID
+    NULLIF(to_jsonb(NEW)->>'accommodation_unit_id', '')::UUID
   );
   v_booking_id := NULLIF(to_jsonb(NEW)->>'id', '')::UUID;
 
   -- Only trigger when booking status changes to 'checked_out'
-  IF v_new_status = 'checked_out' AND v_old_status IS DISTINCT FROM 'checked_out' AND v_chalet_id IS NOT NULL THEN
-    -- Update chalet status to dirty
-    UPDATE chalets 
+  IF v_new_status = 'checked_out' AND v_old_status IS DISTINCT FROM 'checked_out' AND v_unit_id IS NOT NULL THEN
+    -- Update unit status to dirty
+    UPDATE accommodation_units 
     SET cleaning_status = 'dirty', updated_at = NOW()
-    WHERE id = v_chalet_id;
+    WHERE id = v_unit_id;
     
     -- Create turnover task
     INSERT INTO housekeeping_tasks (
-      chalet_id, task_type, priority, status, 
+      unit_id, task_type, priority, status, 
       notes, booking_id, created_at
     ) VALUES (
-      v_chalet_id, 'turnover', 'high', 'pending',
+      v_unit_id, 'turnover', 'high', 'pending',
       'Auto-generated from checkout', v_booking_id, NOW()
     );
   END IF;
@@ -174,28 +174,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger for auto-housekeeping on checkout
+-- Trigger always fires on transactions (time_exclusive_reservation)
 DO $$
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'bookings'
-  ) THEN
-    DROP TRIGGER IF EXISTS booking_checkout_housekeeping ON bookings;
-    CREATE TRIGGER booking_checkout_housekeeping
-      AFTER UPDATE ON bookings
-      FOR EACH ROW
-      EXECUTE FUNCTION trigger_checkout_housekeeping();
-  ELSIF EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'chalet_bookings'
-  ) THEN
-    DROP TRIGGER IF EXISTS booking_checkout_housekeeping ON chalet_bookings;
-    CREATE TRIGGER booking_checkout_housekeeping
-      AFTER UPDATE ON chalet_bookings
-      FOR EACH ROW
-      EXECUTE FUNCTION trigger_checkout_housekeeping();
-  END IF;
+  DROP TRIGGER IF EXISTS booking_checkout_housekeeping ON transactions;
+  CREATE TRIGGER booking_checkout_housekeeping
+    AFTER UPDATE ON transactions
+    FOR EACH ROW
+    EXECUTE FUNCTION trigger_checkout_housekeeping();
 END $$;
 
 -- Row Level Security

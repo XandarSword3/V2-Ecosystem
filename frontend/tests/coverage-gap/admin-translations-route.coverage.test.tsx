@@ -61,7 +61,7 @@ import TranslationsPage from '../../src/app/admin/settings/translations/page';
 const statsSeed = {
   overall: { total: 10, translated: 4, missing: 6 },
   byTable: {
-    menu_items: { total: 6, translated: 2, missing: 4 },
+    catalog_items: { total: 6, translated: 2, missing: 4 },
     modules: { total: 4, translated: 2, missing: 2 },
   },
   percentage: 40,
@@ -69,11 +69,11 @@ const statsSeed = {
 
 const missingSeed = {
   byTable: {
-    menu_items: {
+    catalog_items: {
       displayName: 'Menu Items',
       items: [
         {
-          table: 'menu_items',
+          table: 'catalog_items',
           tableDisplayName: 'Menu Items',
           id: 'menu-1',
           itemLabel: 'Lemonade',
@@ -187,7 +187,7 @@ describe('Admin translations route coverage', () => {
     await user.click(screen.getByRole('button', { name: /Auto-translate All/i }));
 
     await waitFor(() => {
-      expect(apiPostMock).toHaveBeenCalledWith('/admin/translations/batch-translate', { table: 'menu_items' });
+      expect(apiPostMock).toHaveBeenCalledWith('/admin/translations/batch-translate', { table: 'catalog_items' });
     });
 
     await user.click(screen.getByRole('button', { name: /tabs\.languages/i }));

@@ -2,8 +2,8 @@
  * Customer Flow E2E Tests
  * 
  * Tests the critical revenue-generating customer journeys:
- * 1. Restaurant ordering flow
- * 2. Chalet booking flow
+ * 1. MenuService ordering flow
+ * 2. AccommodationUnit booking flow
  * 3. Pool ticket purchase flow
  * 
  * These tests validate the complete customer experience from browsing to payment.
@@ -24,15 +24,15 @@ const TEST_CUSTOMER = {
 // ============================================
 // RESTAURANT ORDERING FLOW
 // ============================================
-test.describe('Restaurant Ordering Flow', () => {
+test.describe('MenuService Ordering Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/restaurant`);
+    await page.goto(`${FRONTEND_URL}/menu service`);
     await page.waitForLoadState('networkidle');
   });
 
-  test('should display restaurant menu page', async ({ page }) => {
+  test('should display menu service menu page', async ({ page }) => {
     // Verify page loaded
-    await expect(page).toHaveTitle(/restaurant|menu/i);
+    await expect(page).toHaveTitle(/menu service|menu/i);
     
     // Should show menu categories or items
     const menuContent = page.locator('[data-testid="menu-items"], .menu-category, .menu-item, [class*="menu"]');
@@ -96,28 +96,28 @@ test.describe('Restaurant Ordering Flow', () => {
 // ============================================
 // CHALET BOOKING FLOW
 // ============================================
-test.describe('Chalet Booking Flow', () => {
+test.describe('AccommodationUnit Booking Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/chalets`);
+    await page.goto(`${FRONTEND_URL}/accommodation_units`);
     await page.waitForLoadState('networkidle');
   });
 
-  test('should display chalets page', async ({ page }) => {
+  test('should display accommodation_units page', async ({ page }) => {
     // Verify page loaded
     const pageContent = page.locator('h1, h2');
     await expect(pageContent.first()).toBeVisible({ timeout: 10000 });
     
-    // Should show chalet listings
-    const chaletCards = page.locator('[data-testid="chalet-card"], .chalet-card, [class*="ChaletCard"]');
-    await expect(chaletCards.first()).toBeVisible({ timeout: 10000 });
+    // Should show accommodation unit listings
+    const unitCards = page.locator('[data-testid="accommodation unit-card"], .accommodation unit-card, [class*="ChaletCard"]');
+    await expect(unitCards.first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('should display chalet cards with key information', async ({ page }) => {
+  test('should display accommodation unit cards with key information', async ({ page }) => {
     await page.waitForLoadState('networkidle');
     
-    // Should show chalet names
-    const chaletCards = page.locator('[data-testid="chalet-card"], .chalet-card, [class*="chalet"]');
-    const count = await chaletCards.count();
+    // Should show accommodation unit names
+    const unitCards = page.locator('[data-testid="accommodation unit-card"], .accommodation unit-card, [class*="accommodation unit"]');
+    const count = await unitCards.count();
     expect(count).toBeGreaterThan(0);
     
     // Should show prices
@@ -129,10 +129,10 @@ test.describe('Chalet Booking Flow', () => {
     // Look for date picker
     const datePicker = page.locator('[data-testid="date-picker"], input[type="date"], [class*="DatePicker"], [class*="calendar"]');
     
-    // Click on first chalet to see booking form
-    const chaletCard = page.locator('[data-testid="chalet-card"], .chalet-card').first();
-    if (await chaletCard.isVisible()) {
-      await chaletCard.click();
+    // Click on first accommodation unit to see booking form
+    const unitCard = page.locator('[data-testid="accommodation unit-card"], .accommodation unit-card').first();
+    if (await unitCard.isVisible()) {
+      await unitCard.click();
       await page.waitForLoadState('networkidle');
       
       // Date picker should be visible on booking page
@@ -140,16 +140,16 @@ test.describe('Chalet Booking Flow', () => {
     }
   });
 
-  test('should navigate to chalet detail page', async ({ page }) => {
-    // Click on first chalet
-    const chaletLink = page.locator('[data-testid="chalet-card"] a, .chalet-card a, a[href*="/chalets/"]').first();
+  test('should navigate to accommodation unit detail page', async ({ page }) => {
+    // Click on first accommodation unit
+    const chaletLink = page.locator('[data-testid="accommodation unit-card"] a, .accommodation unit-card a, a[href*="/accommodation_units/"]').first();
     
     if (await chaletLink.isVisible()) {
       await chaletLink.click();
       await page.waitForLoadState('networkidle');
       
       // Should be on detail page
-      expect(page.url()).toMatch(/\/chalets\/[a-zA-Z0-9-]+/);
+      expect(page.url()).toMatch(/\/accommodation_units\/[a-zA-Z0-9-]+/);
       
       // Should show booking form or button
       const bookButton = page.locator('button:has-text("Book"), button:has-text("Reserve"), [data-testid="book-button"]');
@@ -158,8 +158,8 @@ test.describe('Chalet Booking Flow', () => {
   });
 
   test('should show availability calendar', async ({ page }) => {
-    // Navigate to a specific chalet
-    const chaletLink = page.locator('a[href*="/chalets/"]').first();
+    // Navigate to a specific accommodation unit
+    const chaletLink = page.locator('a[href*="/accommodation_units/"]').first();
     if (await chaletLink.isVisible()) {
       await chaletLink.click();
       await page.waitForLoadState('networkidle');
@@ -235,8 +235,8 @@ test.describe('Pool Ticket Purchase Flow', () => {
 // ============================================
 test.describe('Checkout Flow', () => {
   test('should have working payment integration indicators', async ({ page }) => {
-    // Go to restaurant and add item
-    await page.goto(`${FRONTEND_URL}/restaurant`);
+    // Go to menu service and add item
+    await page.goto(`${FRONTEND_URL}/menu service`);
     await page.waitForLoadState('networkidle');
     await page.waitForLoadState('networkidle');
     
@@ -265,8 +265,8 @@ test.describe('Checkout Flow', () => {
 // API TESTS FOR CUSTOMER ENDPOINTS
 // ============================================
 test.describe('Customer API Endpoints', () => {
-  test('GET /api/restaurant/menu - should return menu items', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/v1/restaurant/menu`);
+  test('GET /api/${slug}/menu - should return menu items', async ({ request }) => {
+    const response = await request.get(`${API_URL}/api/v1/${slug}/menu`);
     expect(response.status()).toBe(200);
     
     const data = await response.json();
@@ -274,21 +274,21 @@ test.describe('Customer API Endpoints', () => {
     expect(data.data).toBeDefined();
   });
 
-  test('GET /api/restaurant/menu/items - should support dietary filters', async ({ request }) => {
+  test('GET /api/${slug}/menu/items - should support dietary filters', async ({ request }) => {
     // Test vegetarian filter
-    const vegResponse = await request.get(`${API_URL}/api/v1/restaurant/menu/items?vegetarian=true`);
+    const vegResponse = await request.get(`${API_URL}/api/v1/${slug}/menu/items?vegetarian=true`);
     expect(vegResponse.status()).toBe(200);
     
     const vegData = await vegResponse.json();
     expect(vegData.success).toBe(true);
     
     // Test multiple filters
-    const multiResponse = await request.get(`${API_URL}/api/v1/restaurant/menu/items?vegan=true&glutenFree=true`);
+    const multiResponse = await request.get(`${API_URL}/api/v1/${slug}/menu/items?vegan=true&glutenFree=true`);
     expect(multiResponse.status()).toBe(200);
   });
 
-  test('GET /api/chalets - should return chalet listings', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/chalets`);
+  test('GET /api/accommodation_units - should return accommodation unit listings', async ({ request }) => {
+    const response = await request.get(`${API_URL}/api/accommodation_units`);
     expect(response.status()).toBe(200);
     
     const data = await response.json();
@@ -296,7 +296,7 @@ test.describe('Customer API Endpoints', () => {
     expect(Array.isArray(data.data)).toBe(true);
   });
 
-  test('GET /api/chalets/availability - should return availability', async ({ request }) => {
+  test('GET /api/accommodation_units/availability - should return availability', async ({ request }) => {
     const today = new Date().toISOString().split('T')[0];
     const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
@@ -337,9 +337,9 @@ test.describe('Customer API Endpoints', () => {
 // RESPONSIVE DESIGN TESTS
 // ============================================
 test.describe('Responsive Design', () => {
-  test('restaurant page works on mobile', async ({ page }) => {
+  test('menu service page works on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto(`${FRONTEND_URL}/restaurant`);
+    await page.goto(`${FRONTEND_URL}/menu service`);
     await page.waitForLoadState('networkidle');
     
     // Content should be visible and usable
@@ -352,14 +352,14 @@ test.describe('Responsive Design', () => {
     expect(bodyWidth).toBeLessThanOrEqual(viewportWidth + 1); // +1 for rounding
   });
 
-  test('chalets page works on tablet', async ({ page }) => {
+  test('accommodation_units page works on tablet', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto(`${FRONTEND_URL}/chalets`);
+    await page.goto(`${FRONTEND_URL}/accommodation_units`);
     await page.waitForLoadState('networkidle');
     
     // Content should be visible
-    const chaletCards = page.locator('[data-testid="chalet-card"], .chalet-card, [class*="chalet"]');
-    await expect(chaletCards.first()).toBeVisible({ timeout: 10000 });
+    const unitCards = page.locator('[data-testid="accommodation unit-card"], .accommodation unit-card, [class*="accommodation unit"]');
+    await expect(unitCards.first()).toBeVisible({ timeout: 10000 });
   });
 });
 

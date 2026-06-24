@@ -6,7 +6,7 @@ import type { UUID, BaseEntity } from './index';
 
 export type HousekeepingTaskPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type HousekeepingTaskStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'verified' | 'cancelled';
-export type HousekeepingLocationType = 'chalet' | 'pool' | 'restaurant' | 'common_area' | 'other';
+export type HousekeepingLocationType = 'unit' | 'common_area' | 'other';
 export type HousekeepingFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'on_checkout' | 'on_checkin';
 
 export interface HousekeepingTaskType extends BaseEntity {

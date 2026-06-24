@@ -3,7 +3,7 @@
  */
 
 export type DiscountType = 'percentage' | 'fixed';
-export type AppliesTo = 'all' | 'restaurant' | 'pool' | 'chalets' | 'snack' | 'giftcards';
+export type AppliesTo = 'all' | 'menu_service' | 'pool' | 'accommodation' | 'kiosk' | 'giftcards';
 
 export interface ImportedCoupon {
   code?: string;

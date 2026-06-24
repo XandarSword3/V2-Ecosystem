@@ -304,7 +304,7 @@ export default function WeatherWidget({ variant = 'compact', className = '' }: W
             condition: 'Partly Cloudy',
             description: 'Demo data — weather service unavailable',
             icon: 'cloud-sun',
-            location: settings.weatherLocation || 'Resort Location',
+            location: settings.weatherLocation || 'Business Location',
             isDemo: true, // FIX Iter-12: flag for UI indicator
           });
           return;
@@ -328,7 +328,7 @@ export default function WeatherWidget({ variant = 'compact', className = '' }: W
           condition: 'Partly Cloudy',
           description: 'Demo data — weather service unavailable',
           icon: 'cloud-sun',
-          location: settings.weatherLocation || 'Resort Location',
+          location: settings.weatherLocation || 'Business Location',
           isDemo: true, // FIX Iter-12: flag for UI indicator
         });
       } finally {

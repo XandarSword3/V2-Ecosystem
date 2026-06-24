@@ -11,9 +11,7 @@
  * Booking creation delegates to reserve_unit_exclusive_atomic for
  * atomic double-booking prevention via pg_advisory_xact_lock.
  *
- * Dead references eliminated:
- *   chalets, chalet_price_rules, chalet_settings, chalet_booking_add_ons
- * Replaced with:
+ * Previous module-specific tables replaced with:
  *   accommodation_units, unit_price_rules, modules.config, transaction metadata
  */
 
@@ -417,7 +415,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
 
   let enginePricing;
   try {
-    enginePricing = await engineService.calculatePricing('multi_day_booking', lineItems, pricingContext);
+    enginePricing = await engineService.calculatePricing('time_exclusive_reservation', lineItems, pricingContext);
   } catch (err: any) {
     logger.warn('[booking] Engine pricing failed, falling back to base calculation', {
       unitId,
@@ -715,7 +713,7 @@ export async function cancelBooking(
   const engineService = getEngineService();
   const actor = userId ? 'staff' : 'customer';
   const transitionResult = await engineService.transitionState(
-    'multi_day_booking',
+    'time_exclusive_reservation',
     booking.status,
     'cancel',
     actor
@@ -768,7 +766,7 @@ export async function checkIn(bookingId: string, staffId: string): Promise<Booki
 
   const engineService = getEngineService();
   const transitionResult = await engineService.transitionState(
-    'multi_day_booking',
+    'time_exclusive_reservation',
     booking.status,
     'check_in',
     'staff'
@@ -817,7 +815,7 @@ export async function checkOut(bookingId: string, staffId: string): Promise<Book
 
   const engineService = getEngineService();
   const transitionResult = await engineService.transitionState(
-    'multi_day_booking',
+    'time_exclusive_reservation',
     booking.status,
     'check_out',
     'staff'

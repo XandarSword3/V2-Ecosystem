@@ -13,7 +13,7 @@ test.describe('Admin functional - Reports', () => {
 
     // API export (csv)
     const exportResp = await page.request.get(
-      `${API_URL}/api/v1/admin/reports/export?type=restaurant&format=csv&range=month`,
+      `${API_URL}/api/v1/admin/reports/export?type=menu service&format=csv&range=month`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     expect(exportResp.ok()).toBeTruthy();

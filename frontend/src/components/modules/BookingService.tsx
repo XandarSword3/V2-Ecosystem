@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { chaletsApi as chaletApi } from '@/lib/api';
+import { api } from '@/lib/api';
 import { Loader2, AlertCircle, Calendar, Users, Home, Bed, Bath, Wifi, Wind, UtensilsCrossed, Car, Star, Sparkles, MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useContentTranslation } from '@/lib/translate';
@@ -71,15 +71,15 @@ const cardVariants = {
 };
 
 export function BookingService({ module }: BookingServiceProps) {
-  const t = useTranslations('chalets');
+  const t = useTranslations('bookingService');
   const tCommon = useTranslations('common');
   const { translateContent } = useContentTranslation();
   const currency = useSettingsStore((s) => s.currency);
   const router = useRouter();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['chalets', module.id],
-    queryFn: () => chaletApi.getChalets(module.id),
+    queryKey: ['bookable_units', module.id],
+    queryFn: () => api.get(`/${module.slug}/availability`),
   });
 
   const units: BookingUnit[] = data?.data?.data || [];

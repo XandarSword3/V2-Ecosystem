@@ -139,10 +139,10 @@ export const testContext: TestContext = {
 
 /** @see ARCHITECTURE_LAW.md — these tables/views must never be used again. */
 const DEAD_LEGACY_TABLES = new Set([
-  'restaurant_orders',
-  'pool_tickets',
-  'chalet_bookings',
-  'snack_orders',
+  'menu_service_orders',
+  'capacity_access_tickets',
+  'unit_bookings',
+  'kiosk_orders',
   'tickets',
   'bookings',
   'orders',
@@ -328,7 +328,7 @@ export async function seedTestDatabaseViaSupabase(): Promise<void> {
     },
   ];
 
-  const { error: usersError } = await supabase.from('users').upsert(users, { onConflict: 'email' });
+  const { error: usersError } = await supabase.from('users').upsert(users, { onConflict: 'id' });
   if (usersError) {
     throw new Error(`Supabase seed users failed: ${usersError.message}`);
   }
@@ -460,7 +460,8 @@ export async function seedTestDatabase(): Promise<void> {
         ('11111111-1111-1111-1111-111111111111', $1, $2, $3, true, true),
         ('22222222-2222-2222-2222-222222222222', $4, $5, $6, true, true),
         ('33333333-3333-3333-3333-333333333333', $7, $8, $9, true, true)
-      ON CONFLICT (email) DO UPDATE SET
+      ON CONFLICT (id) DO UPDATE SET
+        email = EXCLUDED.email,
         password_hash = EXCLUDED.password_hash,
         full_name = EXCLUDED.full_name,
         email_verified = EXCLUDED.email_verified,

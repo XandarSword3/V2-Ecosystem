@@ -3,7 +3,7 @@
  * 
  * Economic Pattern: Subscribe → Activate → Use → Renew/Cancel
  * Commercial Entity: Subscription/Membership
- * Examples: Pool Membership, Gym Membership, VIP Club, Season Pass
+ * Examples: Pool Membership, Facility Membership, VIP Club, Season Pass
  * 
  * This engine handles:
  *   - Subscription plans with billing cycles (monthly, quarterly, annual)
@@ -96,6 +96,25 @@ export const ongoingEntitlementStateMachine: StateMachineDefinition<OngoingEntit
       allowedActors: ['system'],
       guardDescription: 'Successful renewal extends end_date',
     },
+
+    // active -> active (plan change)
+    {
+      from: 'active',
+      to: 'active',
+      action: 'change_plan',
+      allowedActors: ['admin', 'staff'],
+      guardDescription: 'Plan tier changed mid-cycle; Stripe proration applied via create_prorations',
+    },
+
+    // expired -> pending (customer resubscribes — new billing cycle, same membership record)
+    {
+      from: 'expired',
+      to: 'pending',
+      action: 'resubscribe',
+      allowedActors: ['customer', 'system'],
+      guardDescription: 'Customer initiates a new subscription on an expired membership; new Stripe billing cycle begins; setup_recurring_billing fires to recreate the Stripe subscription',
+    },
+
   ],
 };
 
@@ -146,6 +165,15 @@ export const ongoingEntitlementInteractions: InteractionContract[] = [
     idempotent: true,
     failureMode: 'block',
     compensatingAction: 'Cancel Stripe subscription if activation fails',
+  },
+  {
+    name: 'prorate_plan_change',
+    applicableEngines: ['ongoing_entitlement'],
+    trigger: 'on_plan_change',
+    guardDescription: 'Retrieve current Stripe subscription; call stripe.subscriptions.update with new price and proration_behavior: create_prorations',
+    idempotent: true,
+    failureMode: 'block',
+    compensatingAction: 'Revert to previous plan tier if Stripe update fails',
   },
 ];
 

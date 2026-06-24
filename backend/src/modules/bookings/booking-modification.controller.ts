@@ -7,7 +7,7 @@
  * shared_capacity_access       →  /access-tickets/:id/...
  *
  * Route names no longer reference legacy module concepts
- * (chalets, pool-tickets, etc.).
+ * (time_exclusive_reservation, shared_capacity_access, etc.).
  */
 
 import { Router, Request, Response } from 'express';

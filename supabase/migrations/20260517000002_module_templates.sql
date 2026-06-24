@@ -25,6 +25,10 @@ CREATE INDEX IF NOT EXISTS idx_module_templates_active ON module_templates(is_ac
 
 ALTER TABLE module_templates ENABLE ROW LEVEL SECURITY;
 
+-- Drop before recreate — PostgreSQL has no CREATE POLICY IF NOT EXISTS
+DROP POLICY IF EXISTS module_templates_read ON module_templates;
+DROP POLICY IF EXISTS module_templates_admin_write ON module_templates;
+
 CREATE POLICY module_templates_read ON module_templates FOR SELECT USING (is_active = true);
 CREATE POLICY module_templates_admin_write ON module_templates FOR ALL USING (
     EXISTS (SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role IN ('admin', 'super_admin'))
@@ -33,20 +37,32 @@ CREATE POLICY module_templates_admin_write ON module_templates FOR ALL USING (
 -- Seed official templates for each engine type
 
 INSERT INTO module_templates (name, description, engine_type, category, is_official, layout, default_settings, seed_data) VALUES
--- Restaurant (instant_transaction)
+-- Blank (no engine type - user chooses in form)
 (
-    'Classic Restaurant',
-    'Full-featured restaurant module with menu categories, ordering, and kitchen display.',
+    'Blank',
+    'Start from scratch with an empty canvas. Choose your engine type in the next step.',
+    'instant_transaction',
+    'general',
+    true,
+    '[]'::jsonb,
+    '{"show_in_nav": true}'::jsonb,
+    NULL::jsonb
+),
+
+-- Food & Beverage (instant_transaction)
+(
+    'Classic Menu Service',
+    'Full-featured menu service module with catalog categories, ordering, and kitchen display.',
     'instant_transaction',
     'food_beverage',
     true,
     '[
-        {"id":"hero-1","type":"hero_v2","label":"Restaurant Hero","props":{"eyebrow":"WELCOME TO","title":"Our Restaurant","subtitle":"Fresh ingredients, exceptional flavors","primaryButton":"View Menu","align":"center"},"style":{"width":"100%"}},
+        {"id":"hero-1","type":"hero_v2","label":"Service Hero","props":{"eyebrow":"WELCOME TO","title":"Our Menu Service","subtitle":"Fresh ingredients, exceptional flavors","primaryButton":"View Menu","align":"center"},"style":{"width":"100%"}},
         {"id":"grid-1","type":"grid","label":"Menu Grid","props":{"columns":"3","dataSource":"menu","title":"Our Menu"},"style":{"width":"100%"},"children":[]},
         {"id":"cta-1","type":"cta","label":"Order CTA","props":{"title":"Ready to Order?","buttonText":"Place Order","align":"center"},"style":{"width":"100%"}}
     ]'::jsonb,
     '{"show_in_nav": true, "allow_ordering": true, "kitchen_display": true, "accept_tips": true}'::jsonb,
-    '{"menu_categories": ["Appetizers", "Main Course", "Desserts", "Beverages"]}'::jsonb
+    '{"catalog_categories": ["Appetizers", "Main Course", "Desserts", "Beverages"]}'::jsonb
 ),
 
 -- Hotel/Chalet (time_exclusive_reservation)
@@ -59,22 +75,22 @@ INSERT INTO module_templates (name, description, engine_type, category, is_offic
     '[
         {"id":"hero-1","type":"hero_v2","label":"Hotel Hero","props":{"eyebrow":"LUXURY STAY","title":"Your Perfect Getaway","subtitle":"Experience comfort and elegance","primaryButton":"Book Now","align":"center"},"style":{"width":"100%"}},
         {"id":"calendar-1","type":"calendar","label":"Availability","props":{"title":"Check Availability"},"style":{"width":"100%"}},
-        {"id":"features-1","type":"features","label":"Amenities","props":{"title":"Room Amenities","features":"[{\"icon\":\"Wifi\",\"title\":\"Free Wi-Fi\",\"description\":\"High-speed internet\"},{\"icon\":\"Coffee\",\"title\":\"Mini Bar\",\"description\":\"Complimentary refreshments\"},{\"icon\":\"Tv\",\"title\":\"Smart TV\",\"description\":\"Streaming services included\"}]"},"style":{"width":"100%"}},
+        {"id":"features-1","type":"features","label":"Amenities","props":{"title":"Room Amenities","features":"[{\"icon\":\"Wifi\",\"title\":\"Free Wi-Fi\",\"description\":\"High-speed internet\"},{\"icon\":\"Coffee\",\"title\":\"Beverage Station\",\"description\":\"Complimentary refreshments\"},{\"icon\":\"Tv\",\"title\":\"Smart TV\",\"description\":\"Streaming services included\"}]"},"style":{"width":"100%"}},
         {"id":"testimonials-1","type":"testimonials_carousel","label":"Guest Reviews","props":{"title":"What Our Guests Say","subtitle":"REVIEWS"},"style":{"width":"100%"}}
     ]'::jsonb,
     '{"show_in_nav": true, "check_in_time": "15:00", "check_out_time": "11:00", "require_deposit": true, "deposit_percentage": 30}'::jsonb,
     '{"room_types": ["Standard", "Deluxe", "Suite", "Presidential"]}'::jsonb
 ),
 
--- Pool/Day Pass (shared_capacity_access)
+-- Day Access (shared_capacity_access)
 (
     'Day Access Pass',
-    'Capacity-managed day pass system for pools, parks, or attractions with real-time availability.',
+    'Capacity-managed day pass system for venues, parks, or attractions with real-time availability.',
     'shared_capacity_access',
     'recreation',
     true,
     '[
-        {"id":"hero-1","type":"hero_v2","label":"Pool Hero","props":{"eyebrow":"SUN & SWIM","title":"Pool & Beach Access","subtitle":"Reserve your spot under the sun","primaryButton":"Get Tickets","align":"center"},"style":{"width":"100%"}},
+        {"id":"hero-1","type":"hero_v2","label":"Access Hero","props":{"eyebrow":"SUN & SWIM","title":"Day Pass Access","subtitle":"Reserve your spot under the sun","primaryButton":"Get Tickets","align":"center"},"style":{"width":"100%"}},
         {"id":"stats-1","type":"stats","label":"Availability","props":{"title":"Today''s Status","stats":"[{\"value\":\"Open\",\"label\":\"Status\",\"icon\":\"CheckCircle\"},{\"value\":\"85\",\"label\":\"Spots Left\",\"icon\":\"Users\"},{\"value\":\"9-6PM\",\"label\":\"Hours\",\"icon\":\"Clock\"}]"},"style":{"width":"100%"}},
         {"id":"pricing-1","type":"pricing_table","label":"Pricing","props":{"title":"Ticket Options","plans":"[{\"name\":\"Adult\",\"price\":\"$25\",\"features\":[\"Full day access\",\"Locker included\",\"Towel provided\"]},{\"name\":\"Child\",\"price\":\"$15\",\"features\":[\"Full day access\",\"Kids area\"],\"popular\":false},{\"name\":\"VIP\",\"price\":\"$50\",\"features\":[\"Full day access\",\"Private cabana\",\"Complimentary drinks\"],\"popular\":true}]"},"style":{"width":"100%"}}
     ]'::jsonb,

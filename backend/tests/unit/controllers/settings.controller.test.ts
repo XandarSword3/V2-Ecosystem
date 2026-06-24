@@ -33,7 +33,7 @@ describe('SettingsController', () => {
   describe('getSettings', () => {
     it('should return all settings successfully', async () => {
       const mockSettings = [
-        { key: 'general', value: { resortName: 'V2 Ecosystem', tagline: 'Paradise Awaits' } },
+        { key: 'general', value: { propertyName: 'V2 Ecosystem', tagline: 'Paradise Awaits' } },
         { key: 'contact', value: { phone: '+1234567890', email: 'info@v2ecosystem.com' } },
         { key: 'appearance', value: { theme: 'light', animationsEnabled: true } }
       ];
@@ -47,7 +47,7 @@ describe('SettingsController', () => {
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
         data: expect.objectContaining({
-          resortName: 'V2 Ecosystem',
+          propertyName: 'V2 Ecosystem',
           tagline: 'Paradise Awaits',
           phone: '+1234567890',
           email: 'info@v2ecosystem.com',
@@ -67,10 +67,10 @@ describe('SettingsController', () => {
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
         data: expect.objectContaining({
-          resortName: 'V2 Ecosystem',
+          siteName: 'V2 Ecosystem',
           currency: 'USD',
           general: expect.objectContaining({
-            resortName: 'V2 Ecosystem',
+            siteName: 'V2 Ecosystem',
             businessName: 'V2 Ecosystem',
             currency: 'USD',
           }),
@@ -91,9 +91,9 @@ describe('SettingsController', () => {
       expect(next).toHaveBeenCalledWith(expect.any(Error));
     });
 
-    it('should flatten chalet settings correctly', async () => {
+    it('should flatten accommodation unit settings correctly', async () => {
       const mockSettings = [
-        { key: 'chalets', value: { checkIn: '14:00', checkOut: '11:00', depositPercent: 30 } }
+        { key: 'accommodation_units', value: { checkIn: '14:00', checkOut: '11:00', depositPercent: 30 } }
       ];
 
       const queryBuilder = createChainableMock(mockSettings);
@@ -105,16 +105,18 @@ describe('SettingsController', () => {
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
         data: expect.objectContaining({
-          chaletCheckIn: '14:00',
-          chaletCheckOut: '11:00',
-          chaletDeposit: 30
+          accommodation_units: {
+            checkIn: '14:00',
+            checkOut: '11:00',
+            depositPercent: 30
+          }
         })
       }));
     });
 
     it('should flatten pool settings correctly', async () => {
       const mockSettings = [
-        { key: 'pool', value: { adultPrice: 25, childPrice: 15, infantPrice: 0, capacity: 100 } }
+        { key: 'capacity', value: { adultPrice: 25, childPrice: 15, infantPrice: 0, capacity: 100 } }
       ];
 
       const queryBuilder = createChainableMock(mockSettings);
@@ -126,10 +128,12 @@ describe('SettingsController', () => {
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
         data: expect.objectContaining({
-          poolAdultPrice: 25,
-          poolChildPrice: 15,
-          poolInfantPrice: 0,
-          poolCapacity: 100
+          capacity: {
+            adultPrice: 25,
+            childPrice: 15,
+            infantPrice: 0,
+            capacity: 100
+          }
         })
       }));
     });
@@ -184,7 +188,7 @@ describe('SettingsController', () => {
 
       const { req, res, next } = createMockReqRes({
         body: {
-          resortName: 'New Resort Name',
+          siteName: 'New Property Name',
           tagline: 'New Tagline'
         },
         user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
@@ -196,7 +200,7 @@ describe('SettingsController', () => {
         success: true,
         message: 'Settings saved successfully',
         data: {
-          resortName: 'New Resort Name',
+          siteName: 'New Property Name',
           tagline: 'New Tagline',
         },
         updatedCategories: ['general'],
@@ -268,7 +272,7 @@ describe('SettingsController', () => {
 
       const { req, res, next } = createMockReqRes({
         body: {
-          resortName: 'Name',
+          propertyName: 'Name',
           tagline: undefined, // Should be skipped
           description: undefined // Should be skipped
         },

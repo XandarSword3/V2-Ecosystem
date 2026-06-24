@@ -100,8 +100,8 @@ describe('ModulesController', () => {
   describe('getModules', () => {
     it('should return all modules', async () => {
       const mockModules = [
-        { id: 'mod-1', name: 'Restaurant', slug: 'restaurant', is_active: true },
-        { id: 'mod-2', name: 'Pool', slug: 'pool', is_active: true },
+        { id: 'mod-1', name: 'MenuService', slug: 'menu_service', is_active: true },
+        { id: 'mod-2', name: 'Pool', slug: 'capacity', is_active: true },
       ];
       mockBuilder.queueResponse(mockModules);
 
@@ -118,7 +118,7 @@ describe('ModulesController', () => {
     });
 
     it('should filter active modules only when activeOnly is true', async () => {
-      const mockModules = [{ id: 'mod-1', name: 'Restaurant', is_active: true }];
+      const mockModules = [{ id: 'mod-1', name: 'MenuService', is_active: true }];
       mockBuilder.queueResponse(mockModules);
 
       const { req, res, next } = createMockReqRes({
@@ -134,7 +134,7 @@ describe('ModulesController', () => {
     });
 
     it('should filter modules shown in main when showInMain is true', async () => {
-      const mockModules = [{ id: 'mod-1', name: 'Restaurant', show_in_main: true }];
+      const mockModules = [{ id: 'mod-1', name: 'MenuService', show_in_main: true }];
       mockBuilder.queueResponse(mockModules);
 
       const { req, res, next } = createMockReqRes({
@@ -168,7 +168,7 @@ describe('ModulesController', () => {
 
   describe('getModule', () => {
     it('should return a module by ID', async () => {
-      const mockModule = { id: 'mod-1', name: 'Restaurant', slug: 'restaurant' };
+      const mockModule = { id: 'mod-1', name: 'MenuService', slug: 'menu_service' };
       mockBuilder.queueResponse(mockModule);
 
       const { req, res, next } = createMockReqRes({
@@ -184,12 +184,12 @@ describe('ModulesController', () => {
     });
 
     it('should return a module by slug when ID not found', async () => {
-      const mockModule = { id: 'mod-1', name: 'Restaurant', slug: 'restaurant' };
+      const mockModule = { id: 'mod-1', name: 'MenuService', slug: 'menu_service' };
       mockBuilder.queueResponse(null, { code: 'PGRST116' }); // First query fails
       mockBuilder.queueResponse(mockModule); // Fallback to slug query
 
       const { req, res, next } = createMockReqRes({
-        params: { id: 'restaurant' },
+        params: { id: 'menu_service' },
       });
 
       await modulesController.getModule(req as any, res as any, next);
@@ -271,12 +271,12 @@ describe('ModulesController', () => {
 
   describe('updateModule', () => {
     it('should update an existing module', async () => {
-      const mockModule = { id: 'mod-1', name: 'Updated Restaurant', slug: 'restaurant' };
+      const mockModule = { id: 'mod-1', name: 'Updated MenuService', slug: 'menu_service' };
       mockBuilder.queueResponse(mockModule);
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'mod-1' },
-        body: { name: 'Updated Restaurant' },
+        body: { name: 'Updated MenuService' },
       });
 
       await modulesController.updateModule(req as any, res as any, next);

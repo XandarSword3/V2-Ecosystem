@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { useSiteSettings } from '@/lib/settings-context';
-import { resortThemes } from '@/lib/theme-config';
+import { siteThemes } from '@/lib/theme-config';
 
 // Color manipulation utilities
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -85,14 +85,17 @@ export function ThemeInjector() {
   const isDark = resolvedTheme === 'dark';
 
   useEffect(() => {
-    // Get the resort theme
-    const theme = settings.theme && resortThemes[settings.theme as keyof typeof resortThemes] 
-      ? resortThemes[settings.theme as keyof typeof resortThemes] 
-      : resortThemes.beach;
+    console.log('ThemeInjector - settings:', settings);
 
-    // Get colors - use custom colors if available, otherwise use theme preset
-    const baseColors = settings.themeColors || theme.colors;
+    // Get the site theme
+    const theme = settings.theme && siteThemes[settings.theme as keyof typeof siteThemes] 
+      ? siteThemes[settings.theme as keyof typeof siteThemes] 
+      : siteThemes.beach;
+
+    // Get colors - merge custom colors with theme preset
+    const baseColors = { ...theme.colors, ...settings.themeColors };
     const themeColors = theme.colors;
+    console.log('ThemeInjector - baseColors:', baseColors);
 
     // Apply CSS custom properties to :root
     const root = document.documentElement;
@@ -219,7 +222,57 @@ export function ThemeInjector() {
     // Set theme identifier for conditional styling
     root.setAttribute('data-theme', settings.theme || 'beach');
     root.setAttribute('data-color-mode', isDark ? 'dark' : 'light');
-    
+
+    // Apply typography settings
+    if (settings.fontHeading) {
+      root.style.setProperty('--font-heading', settings.fontHeading === 'system-ui' ? 'system-ui' : `'${settings.fontHeading}', sans-serif`);
+    }
+    if (settings.fontBody) {
+      root.style.setProperty('--font-body', settings.fontBody === 'system-ui' ? 'system-ui' : `'${settings.fontBody}', sans-serif`);
+    }
+
+    // Load Google Fonts dynamically for any non-system font selected
+    const fontsToLoad = [settings.fontHeading, settings.fontBody]
+      .filter((f): f is string => !!f && f !== 'system-ui')
+      .filter((v, i, a) => a.indexOf(v) === i); // dedupe
+    if (fontsToLoad.length > 0) {
+      const fontQuery = fontsToLoad
+        .map((f) => `family=${encodeURIComponent(f)}:wght@400;500;600;700`)
+        .join('&');
+      const href = `https://fonts.googleapis.com/css2?${fontQuery}&display=swap`;
+      const linkId = 'v2-brand-fonts';
+      let link = document.getElementById(linkId) as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement('link');
+        link.id = linkId;
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+      }
+      if (link.href !== href) link.href = href;
+    }
+    if (settings.fontScale) {
+      const scaleMap = { sm: '14px', md: '16px', lg: '18px' };
+      root.style.setProperty('--font-scale-base', scaleMap[settings.fontScale] || '16px');
+    }
+    if (settings.headingTracking) {
+      const trackingMap = { tight: '-0.025em', normal: '0em', wide: '0.05em' };
+      root.style.setProperty('--heading-tracking', trackingMap[settings.headingTracking] || '0em');
+    }
+
+    // Apply feel settings
+    if (settings.borderRadius) {
+      const radiusMap = { sharp: '0px', rounded: '8px', pill: '9999px' };
+      root.style.setProperty('--radius', radiusMap[settings.borderRadius] || '8px');
+    }
+    if (settings.density) {
+      const densityMap = { compact: '0.5rem', default: '1rem', spacious: '1.5rem' };
+      root.style.setProperty('--spacing-base', densityMap[settings.density] || '1rem');
+    }
+    if (settings.glassmorphism) {
+      const glassMap = { none: '0px', subtle: '8px', heavy: '24px' };
+      root.style.setProperty('--blur-glass', glassMap[settings.glassmorphism] || '8px');
+    }
+
     // Persist theme to localStorage for the inline script on next page load
     // This prevents theme flash on subsequent visits
     try {
@@ -228,7 +281,7 @@ export function ThemeInjector() {
       // localStorage not available (e.g., private browsing)
     }
 
-  }, [settings.theme, settings.themeColors, isDark]);
+  }, [settings.theme, settings.themeColors, settings.fontHeading, settings.fontBody, settings.fontScale, settings.headingTracking, settings.borderRadius, settings.density, settings.glassmorphism, isDark]);
 
   return null;
 }

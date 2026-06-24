@@ -7,6 +7,16 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig = {
   // Enable React strict mode for better development experience
   reactStrictMode: true,
+
+  // Allow HMR WebSocket connections from multi-level subdomains used in dev
+  // e.g. resort-1.tenant-a.v2platform.local, any.tenant.v2platform.local
+  // Note: * does not cross dots, so two-level patterns need explicit *.* entries
+  allowedDevOrigins: [
+    '*.v2platform.local',      // tenant-a.v2platform.local
+    '*.*.v2platform.local',    // resort-1.tenant-a.v2platform.local
+    '*.localhost',             // tenant-a.localhost
+    '*.*.localhost',           // resort-1.tenant-a.localhost
+  ],
   
   // Enable standalone output for Docker deployment
   output: 'standalone',
@@ -49,6 +59,11 @@ const nextConfig = {
       ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com"
       : "script-src 'self' 'unsafe-inline' https://js.stripe.com";
     
+    // In development, allow connections to v2platform.local subdomains for multi-tenant routing
+    const connectSrc = isDev
+      ? "connect-src 'self' https: wss: ws: http://localhost:3005 http://*.v2platform.local:* http://*.localhost:*"
+      : "connect-src 'self' https: wss: ws:";
+    
     return [
       {
         source: '/(.*)',
@@ -61,7 +76,7 @@ const nextConfig = {
               "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: https: blob:",
-              "connect-src 'self' https: wss: ws: http://localhost:3005",
+              connectSrc,
               "frame-src 'self' https://js.stripe.com",
               "object-src 'none'",
               "base-uri 'self'",

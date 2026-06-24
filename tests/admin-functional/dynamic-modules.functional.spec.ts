@@ -78,11 +78,11 @@ test.describe('Admin functional - Dynamic module admin', () => {
   test('DYN-10 menu_service: create menu item then UI shows it', async ({ page, auth }) => {
     const token = await auth.getApiToken('admin');
 
-    // The database seed does not always include a `restaurant` module row.
+    // The database seed does not always include a `menu_service` module row.
     // Ensure it exists (admin endpoints expect a module_id for scoping).
     const restaurantModule = await ensureModuleBySlug(page, token, {
-      slug: 'restaurant',
-      name: 'Restaurant',
+      slug: 'menu_service',
+      name: 'MenuService',
       template_type: 'menu_service',
     });
     expect(restaurantModule?.id).toBeTruthy();
@@ -92,12 +92,12 @@ test.describe('Admin functional - Dynamic module admin', () => {
     const publicModules = await getActiveModules(page);
     const publicAll = await getAllModulesPublic(page);
     expect(
-      publicAll.some((m) => String(m.slug).toLowerCase() === 'restaurant'),
-      `Expected /api/modules (all) to include 'restaurant'; got: ${publicAll.map((m) => m.slug).join(', ')}`
+      publicAll.some((m) => String(m.slug).toLowerCase() === 'menu_service'),
+      `Expected /api/modules (all) to include 'menu_service'; got: ${publicAll.map((m) => m.slug).join(', ')}`
     ).toBeTruthy();
     expect(
-      publicModules.some((m) => String(m.slug).toLowerCase() === 'restaurant'),
-      `Expected /api/modules?activeOnly=true to include 'restaurant'; got: ${publicModules.map((m) => m.slug).join(', ')}`
+      publicModules.some((m) => String(m.slug).toLowerCase() === 'menu_service'),
+      `Expected /api/modules?activeOnly=true to include 'menu_service'; got: ${publicModules.map((m) => m.slug).join(', ')}`
     ).toBeTruthy();
 
     // Now load UI (SettingsProvider fetches module list on mount).
@@ -106,7 +106,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
     // Need a category to create an item.
     const catResp = await apiJson(page.request, {
       method: 'GET',
-      path: '/restaurant/categories',
+      path: '/${slug}/categories',
       token,
       params: { moduleId: restaurantModule!.id },
     });
@@ -118,7 +118,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
     const name = `E2E Menu Item ${Date.now()}`;
     const createResp = await apiJson(page.request, {
       method: 'POST',
-      path: '/restaurant/admin/items',
+      path: '/${slug}/admin/items',
       token,
       data: {
         name,
@@ -140,7 +140,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
     // DB-effect via API: item appears in list.
     const listResp = await apiJson(page.request, {
       method: 'GET',
-      path: '/restaurant/items',
+      path: '/${slug}/items',
       token,
       params: { moduleId: restaurantModule!.id },
     });
@@ -149,7 +149,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
     expect(items.some((i: any) => i.id === createdId), 'Expected created item in GET list').toBeTruthy();
 
     // UI: can find it by searching.
-    await page.goto('/admin/restaurant/menu', { waitUntil: 'domcontentloaded' });
+    await page.goto('/admin/${slug}/menu', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle');
     // Placeholder text is translated in some builds; use a robust selector.
     await page.locator('input[type="text"]').first().fill(name);
@@ -158,7 +158,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
     // Cleanup
     const delResp = await apiJson(page.request, {
       method: 'DELETE',
-      path: `/restaurant/admin/items/${createdId}`,
+      path: `/${slug}/admin/items/${createdId}`,
       token,
     });
     expect([200, 204]).toContain(delResp.status);
@@ -219,15 +219,15 @@ test.describe('Admin functional - Dynamic module admin', () => {
   test('DYN-15 menu_service: categories CRUD (API + UI render)', async ({ page, auth }) => {
     const token = await auth.getApiToken('admin');
     const restaurantModule = await ensureModuleBySlug(page, token, {
-      slug: 'restaurant',
-      name: 'Restaurant',
+      slug: 'menu_service',
+      name: 'MenuService',
       template_type: 'menu_service',
     });
 
     const name = `E2E Category ${Date.now()}`;
     const created = await apiJson(page.request, {
       method: 'POST',
-      path: '/restaurant/admin/categories',
+      path: '/${slug}/admin/categories',
       token,
       data: { name, description: 'e2e', moduleId: restaurantModule!.id },
     });
@@ -238,7 +238,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
     const updatedName = `${name} Updated`;
     const updated = await apiJson(page.request, {
       method: 'PUT',
-      path: `/restaurant/admin/categories/${catId}`,
+      path: `/${slug}/admin/categories/${catId}`,
       token,
       data: { name: updatedName, description: 'e2e2', moduleId: restaurantModule!.id },
     });
@@ -246,7 +246,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
 
     const list = await apiJson(page.request, {
       method: 'GET',
-      path: '/restaurant/categories',
+      path: '/${slug}/categories',
       token,
       params: { moduleId: restaurantModule!.id },
     });
@@ -254,13 +254,13 @@ test.describe('Admin functional - Dynamic module admin', () => {
     expect((list.body?.data || []).some((c: any) => c.id === catId && c.name === updatedName)).toBeTruthy();
 
     await loginAdminUi(page, auth);
-    await page.goto('/admin/restaurant/categories', { waitUntil: 'domcontentloaded' });
+    await page.goto('/admin/${slug}/categories', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle');
     await expect(page.getByText(updatedName).first()).toBeVisible({ timeout: 15000 });
 
     const del = await apiJson(page.request, {
       method: 'DELETE',
-      path: `/restaurant/admin/categories/${catId}`,
+      path: `/${slug}/admin/categories/${catId}`,
       token,
     });
     expect([200, 204]).toContain(del.status);
@@ -269,15 +269,15 @@ test.describe('Admin functional - Dynamic module admin', () => {
   test('DYN-16 menu_service: modifiers create group+option then UI shows group (API + UI)', async ({ page, auth }) => {
     const token = await auth.getApiToken('admin');
     const restaurantModule = await ensureModuleBySlug(page, token, {
-      slug: 'restaurant',
-      name: 'Restaurant',
+      slug: 'menu_service',
+      name: 'MenuService',
       template_type: 'menu_service',
     });
 
     const groupName = `E2E Mod Group ${Date.now()}`;
     const created = await apiJson(page.request, {
       method: 'POST',
-      path: '/restaurant/modifiers',
+      path: '/${slug}/modifiers',
       token,
       data: {
         name: groupName,
@@ -295,7 +295,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
 
     const list = await apiJson(page.request, {
       method: 'GET',
-      path: '/restaurant/modifiers',
+      path: '/${slug}/modifiers',
       token,
       params: { moduleId: restaurantModule!.id },
     });
@@ -303,13 +303,13 @@ test.describe('Admin functional - Dynamic module admin', () => {
     expect((list.body?.data || []).some((g: any) => g.id === groupId)).toBeTruthy();
 
     await loginAdminUi(page, auth);
-    await page.goto('/admin/restaurant/modifiers', { waitUntil: 'domcontentloaded' });
+    await page.goto('/admin/${slug}/modifiers', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle');
     await expect(page.getByText(groupName).first()).toBeVisible({ timeout: 15000 });
 
     const del = await apiJson(page.request, {
       method: 'DELETE',
-      path: `/restaurant/modifiers/${groupId}`,
+      path: `/${slug}/modifiers/${groupId}`,
       token,
     });
     expect([200, 204]).toContain(del.status);
@@ -318,11 +318,11 @@ test.describe('Admin functional - Dynamic module admin', () => {
   test('DYN-30 multi_day_booking: create price rule then UI shows count increase', async ({ page, auth }) => {
     const token = await auth.getApiToken('admin');
 
-    // Chalets module usually exists, but we treat it as required for dynamic admin.
+    // AccommodationUnits module usually exists, but we treat it as required for dynamic admin.
     // If missing, create it (tests run against a dedicated local test DB).
     const chaletsModule = await ensureModuleBySlug(page, token, {
-      slug: 'chalets',
-      name: 'Chalets',
+      slug: 'accommodation_units',
+      name: 'AccommodationUnits',
       template_type: 'multi_day_booking',
     });
     expect(chaletsModule?.id).toBeTruthy();
@@ -331,7 +331,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
 
     const listBefore = await apiJson(page.request, {
       method: 'GET',
-      path: '/chalets/admin/price-rules',
+      path: '/accommodation_units/admin/price-rules',
       token,
       params: { moduleId: chaletsModule!.id },
     });
@@ -342,7 +342,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
     const name = `E2E Price Rule ${Date.now()}`;
     const createResp = await apiJson(page.request, {
       method: 'POST',
-      path: '/chalets/admin/price-rules',
+      path: '/accommodation_units/admin/price-rules',
       token,
       data: {
         name,
@@ -366,7 +366,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
 
     const listAfter = await apiJson(page.request, {
       method: 'GET',
-      path: '/chalets/admin/price-rules',
+      path: '/accommodation_units/admin/price-rules',
       token,
       params: { moduleId: chaletsModule!.id },
     });
@@ -376,14 +376,14 @@ test.describe('Admin functional - Dynamic module admin', () => {
     expect(afterRules.some((r: any) => r.id === createdId)).toBeTruthy();
 
     // UI: open pricing page and ensure new rule name appears.
-    await page.goto('/admin/chalets/pricing', { waitUntil: 'domcontentloaded' });
+    await page.goto('/admin/accommodation_units/pricing', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle');
     await expect(page.getByText(name).first()).toBeVisible({ timeout: 15000 });
 
     // Cleanup
     const del = await apiJson(page.request, {
       method: 'DELETE',
-      path: `/chalets/admin/price-rules/${createdId}`,
+      path: `/accommodation_units/admin/price-rules/${createdId}`,
       token,
     });
     expect([200, 204]).toContain(del.status);

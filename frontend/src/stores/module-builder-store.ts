@@ -211,7 +211,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
     })),
 
   setPreviewDevice: (previewDevice) => set({ previewDevice }),
-  setZoom: (zoom) => set({ zoom: Math.max(25, Math.min(200, zoom)) }),
+  setZoom: (zoom) => set({ zoom: Math.max(50, Math.min(150, zoom)) }),
 
   undo: () =>
     set((state) => {

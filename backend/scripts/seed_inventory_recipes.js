@@ -108,12 +108,12 @@ async function seed() {
       const { error: linkError } = await supabase
         .from('menu_item_ingredients')
         .upsert({
-            menu_item_id: fattoushId,
+            catalog_item_id: fattoushId,
             inventory_item_id: invId,
             quantity_required: ing.qty,
             unit: 'kg',
             is_optional: false
-        }, { onConflict: 'menu_item_id, inventory_item_id' });
+        }, { onConflict: 'catalog_item_id, inventory_item_id' });
 
       if (linkError) {
           console.error(`Error linking ${ing.name}:`, linkError.message);
@@ -135,12 +135,12 @@ async function seed() {
         const { error: linkError } = await supabase
           .from('menu_item_ingredients')
           .upsert({
-              menu_item_id: babaId,
+              catalog_item_id: babaId,
               inventory_item_id: invId,
               quantity_required: ing.qty,
               unit: 'kg',
               is_optional: false
-          }, { onConflict: 'menu_item_id, inventory_item_id' }); // Assuming composite PK
+          }, { onConflict: 'catalog_item_id, inventory_item_id' }); // Assuming composite PK
           
         if (linkError) {
              console.error(`Error linking ${ing.name} to Baba Ganoush:`, linkError.message);

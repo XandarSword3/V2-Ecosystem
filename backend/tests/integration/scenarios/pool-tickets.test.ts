@@ -106,7 +106,7 @@ describeIf('Pool Ticket Lifecycle Integration', () => {
         paymentMethod: 'cash',
       };
 
-      const response = await guestClient.purchasePoolTicket(purchaseData);
+      const response = await guestClient.purchaseCapacityTicket(purchaseData);
 
       // Handle case where ticket type doesn't exist
       if (response.status === 404 || response.status === 400) {
@@ -128,7 +128,7 @@ describeIf('Pool Ticket Lifecycle Integration', () => {
         return;
       }
 
-      const response = await guestClient.getPoolTicket(ticketId);
+      const response = await guestClient.getCapacityTicket(ticketId);
 
       if (response.status === 404) {
         console.warn('⚠️ Get ticket endpoint not implemented');
@@ -150,7 +150,7 @@ describeIf('Pool Ticket Lifecycle Integration', () => {
         return;
       }
 
-      const response = await staffClient.validatePoolTicket(ticketId);
+      const response = await staffClient.validateCapacityTicket(ticketId);
 
       if (response.status === 404) {
         console.warn('⚠️ Validate ticket endpoint not implemented');
@@ -160,7 +160,7 @@ describeIf('Pool Ticket Lifecycle Integration', () => {
       assertSuccess(response);
 
       // Verify ticket is now used
-      const ticketResponse = await guestClient.getPoolTicket(ticketId);
+      const ticketResponse = await guestClient.getCapacityTicket(ticketId);
       if (ticketResponse.success) {
         expect(['used', 'validated']).toContain(ticketResponse.data.status);
       }
@@ -172,7 +172,7 @@ describeIf('Pool Ticket Lifecycle Integration', () => {
       }
 
       // Try to validate already used ticket
-      const response = await staffClient.validatePoolTicket(ticketId);
+      const response = await staffClient.validateCapacityTicket(ticketId);
 
       // Should fail - ticket already used
       if (response.status !== 404) {
@@ -196,7 +196,7 @@ describeIf('Pool Ticket Lifecycle Integration', () => {
         quantity: 1,
       };
 
-      const response = await guestClient.purchasePoolTicket(pastTicket);
+      const response = await guestClient.purchaseCapacityTicket(pastTicket);
 
       // Should reject past dates
       if (response.status !== 404) {
@@ -207,7 +207,7 @@ describeIf('Pool Ticket Lifecycle Integration', () => {
 
     it('should handle non-existent ticket validation', async () => {
       const fakeId = '00000000-0000-0000-0000-000000000000';
-      const response = await staffClient.validatePoolTicket(fakeId);
+      const response = await staffClient.validateCapacityTicket(fakeId);
 
       if (response.status !== 404) {
         assertFailure(response);
@@ -227,7 +227,7 @@ describeIf('Pool Ticket Lifecycle Integration', () => {
         quantity: -1,
       };
 
-      const response = await guestClient.purchasePoolTicket(invalidQuantity);
+      const response = await guestClient.purchaseCapacityTicket(invalidQuantity);
 
       if (response.status !== 404) {
         assertFailure(response);

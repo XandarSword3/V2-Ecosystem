@@ -37,12 +37,12 @@ describe('Admin terminology route coverage', () => {
     toastErrorMock.mockReset();
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url.includes('business_type=resort')) {
+      if (url.includes('business_type=property')) {
         return Promise.resolve({
           data: {
             data: {
-              unit_singular: 'Chalet',
-              unit_plural: 'Chalets',
+              unit_singular: 'AccommodationUnit',
+              unit_plural: 'AccommodationUnits',
             },
           },
         });
@@ -73,7 +73,7 @@ describe('Admin terminology route coverage', () => {
     expect(await screen.findByText('Terminology Configuration')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(apiGetMock).toHaveBeenCalledWith('/terminology?business_type=resort');
+      expect(apiGetMock).toHaveBeenCalledWith('/terminology?business_type=hotel');
     });
 
     const businessTypeSelect = screen.getByRole('combobox');

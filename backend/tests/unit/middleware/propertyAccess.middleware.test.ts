@@ -42,6 +42,20 @@ describe('Property Access Middleware', () => {
       expect(res.status).not.toHaveBeenCalledWith(400);
     });
 
+    it('should accept the seeded default property UUID for super_admin', async () => {
+      const propertyId = '00000000-0000-0000-0000-000000000001';
+      const { req, res, next } = createMockReqRes({
+        headers: { 'x-property-id': propertyId },
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+      });
+      req.user!.roles = ['super_admin'];
+
+      await validatePropertyAccess(req, res, next);
+
+      expect((req as any).propertyId).toBe(propertyId);
+      expect(next).toHaveBeenCalled();
+    });
+
     it('should bypass check if user is super_admin', async () => {
       const propertyId = '12345678-1234-4567-a123-1234567890ab';
       const { req, res, next } = createMockReqRes({
@@ -254,7 +268,7 @@ describe('Property Access Middleware', () => {
 
   describe('requireModulePropertyAccess', () => {
     it('should return 401 if user is not authenticated', async () => {
-      const middleware = requireModulePropertyAccess('restaurant');
+      const middleware = requireModulePropertyAccess('menu_service');
       const { req, res, next } = createMockReqRes({});
       (req as any).user = undefined;
 
@@ -265,7 +279,7 @@ describe('Property Access Middleware', () => {
     });
 
     it('should return 500 if module lookup fails', async () => {
-      const middleware = requireModulePropertyAccess('restaurant');
+      const middleware = requireModulePropertyAccess('menu_service');
       const { req, res, next } = createMockReqRes({
         user: { id: 'user-1', role: 'staff', userId: 'user-1' }
       });
@@ -282,7 +296,7 @@ describe('Property Access Middleware', () => {
     });
 
     it('should bypass if module has no property scoping', async () => {
-      const middleware = requireModulePropertyAccess('restaurant');
+      const middleware = requireModulePropertyAccess('menu_service');
       const { req, res, next } = createMockReqRes({
         user: { id: 'user-1', role: 'staff', userId: 'user-1' }
       });
@@ -299,7 +313,7 @@ describe('Property Access Middleware', () => {
 
     it('should allow if user has access to module property', async () => {
       const propertyId = '12345678-1234-4567-a123-1234567890ab';
-      const middleware = requireModulePropertyAccess('restaurant');
+      const middleware = requireModulePropertyAccess('menu_service');
       const { req, res, next } = createMockReqRes({
         user: { id: 'user-1', role: 'staff', userId: 'user-1' }
       });

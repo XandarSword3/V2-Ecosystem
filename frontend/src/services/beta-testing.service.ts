@@ -535,7 +535,7 @@ class BetaTestingService {
       dynamicTemplateData: {
         name,
         inviteLink,
-        appName: 'Your Resort'
+        appName: 'V2 Ecosystem'
       }
     });
   }
