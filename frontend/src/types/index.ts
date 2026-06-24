@@ -202,12 +202,15 @@ export interface PoolTicket {
 }
 
 // ============================================
-// Chalet Types
+// Accommodation Unit Types
 // ============================================
 
 export type BookingStatus = 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled' | 'no_show';
 
-export interface Chalet {
+
+
+
+export interface AccommodationUnit {
   id: string;
   name: string;
   nameAr?: string;

@@ -62,14 +62,14 @@ export default function DynamicAddonsPage() {
   const fetchAddons = useCallback(async () => {
     if (!currentModule) return;
     try {
-      const response = await api.get('/chalets/add-ons', { params: { moduleId: currentModule.id } });
+      const response = await api.get(`/${slug}/add-ons`, { params: { moduleId: currentModule.id } });
       setAddons(response.data.data || []);
     } catch (error) {
       toast.error(tc('errors.failedToLoad'));
     } finally {
       setLoading(false);
     }
-  }, [currentModule]);
+  }, [currentModule, slug]);
 
   useEffect(() => {
     if (currentModule) {
@@ -86,10 +86,10 @@ export default function DynamicAddonsPage() {
       setSaving(true);
       const payload = { ...formData, module_id: currentModule.id };
       if (editing) {
-        await api.put(`/chalets/admin/add-ons/${editing.id}`, payload);
+        await api.put(`/${slug}/admin/add-ons/${editing.id}`, payload);
         toast.success(tc('success.updated'));
       } else {
-        await api.post('/chalets/admin/add-ons', payload);
+        await api.post(`/${slug}/admin/add-ons`, payload);
         toast.success(tc('success.created'));
       }
       setShowModal(false);
@@ -118,7 +118,7 @@ export default function DynamicAddonsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm(tc('addons.confirmDelete'))) return;
     try {
-      await api.delete(`/chalets/admin/add-ons/${id}`);
+      await api.delete(`/${slug}/admin/add-ons/${id}`);
       setAddons((prev) => prev.filter((a) => a.id !== id));
       toast.success(tc('success.deleted'));
     } catch (error) {
@@ -128,7 +128,7 @@ export default function DynamicAddonsPage() {
 
   const toggleAvailability = async (addon: Addon) => {
     try {
-      await api.put(`/chalets/admin/add-ons/${addon.id}`, { is_available: !addon.is_available });
+      await api.put(`/${slug}/admin/add-ons/${addon.id}`, { is_available: !addon.is_available });
       setAddons((prev) => prev.map((a) => (a.id === addon.id ? { ...a, is_available: !a.is_available } : a)));
       toast.success(addon.is_available ? tc('addons.hidden') : tc('addons.shown'));
     } catch (error) {

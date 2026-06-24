@@ -20,10 +20,10 @@ describe('AuditController', () => {
           id: 'log-1',
           user_id: 'user-1',
           action: 'CREATE',
-          resource: 'chalet',
-          resource_id: 'chalet-1',
+          resource: 'accommodation unit',
+          resource_id: 'accommodation unit-1',
           old_value: null,
-          new_value: '{"name": "Beach Chalet"}',
+          new_value: '{"name": "Beach AccommodationUnit"}',
           created_at: '2026-01-15T10:00:00Z',
           users: { full_name: 'John Doe', email: 'john@example.com' }
         },
@@ -52,8 +52,8 @@ describe('AuditController', () => {
           expect.objectContaining({
             id: 'log-1',
             action: 'CREATE',
-            entity_type: 'chalet',
-            entity_id: 'chalet-1'
+            entity_type: 'accommodation unit',
+            entity_id: 'accommodation unit-1'
           })
         ])
       }));
@@ -174,8 +174,8 @@ describe('AuditController', () => {
           id: 'log-1',
           user_id: 'user-1',
           action: 'UPDATE',
-          resource: 'chalet',
-          resource_id: 'chalet-1',
+          resource: 'accommodation unit',
+          resource_id: 'accommodation unit-1',
           created_at: '2026-01-15T10:00:00Z',
           users: { full_name: 'John', email: 'john@example.com' }
         }
@@ -185,12 +185,12 @@ describe('AuditController', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
       const { req, res, next } = createMockReqRes({
-        params: { resource: 'chalet' },
+        params: { resource: 'accommodation unit' },
         query: {}
       });
       await getAuditLogsByResource(req, res, next);
 
-      expect(queryBuilder.eq).toHaveBeenCalledWith('resource', 'chalet');
+      expect(queryBuilder.eq).toHaveBeenCalledWith('resource', 'accommodation unit');
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         data: mockLogs
@@ -203,13 +203,13 @@ describe('AuditController', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
       const { req, res, next } = createMockReqRes({
-        params: { resource: 'chalet', resourceId: 'chalet-123' },
+        params: { resource: 'accommodation unit', resourceId: 'accommodation unit-123' },
         query: {}
       });
       await getAuditLogsByResource(req, res, next);
 
-      expect(queryBuilder.eq).toHaveBeenCalledWith('resource', 'chalet');
-      expect(queryBuilder.eq).toHaveBeenCalledWith('resource_id', 'chalet-123');
+      expect(queryBuilder.eq).toHaveBeenCalledWith('resource', 'accommodation unit');
+      expect(queryBuilder.eq).toHaveBeenCalledWith('resource_id', 'accommodation unit-123');
     });
 
     it('should respect limit parameter', async () => {
@@ -217,7 +217,7 @@ describe('AuditController', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
       const { req, res, next } = createMockReqRes({
-        params: { resource: 'chalet' },
+        params: { resource: 'accommodation unit' },
         query: { limit: '10' }
       });
       await getAuditLogsByResource(req, res, next);
@@ -230,7 +230,7 @@ describe('AuditController', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
       const { req, res, next } = createMockReqRes({
-        params: { resource: 'chalet' },
+        params: { resource: 'accommodation unit' },
         query: {}
       });
       await getAuditLogsByResource(req, res, next);
@@ -243,7 +243,7 @@ describe('AuditController', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
       const { req, res, next } = createMockReqRes({
-        params: { resource: 'chalet' },
+        params: { resource: 'accommodation unit' },
         query: {}
       });
       await getAuditLogsByResource(req, res, next);

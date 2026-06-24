@@ -35,21 +35,21 @@ const EXPECTED_ROUTES = {
     '/devices/register',
     '/devices/{deviceId}',
   ],
-  restaurant: [
-    '/restaurant/menu',
-    '/restaurant/orders',
-    '/restaurant/orders/{id}',
-    '/restaurant/orders/{id}/status',
+  menu_service: [
+    '/${slug}/menu',
+    '/${slug}/orders',
+    '/${slug}/orders/{id}',
+    '/${slug}/orders/{id}/status',
   ],
-  chalets: [
-    '/chalets',
-    '/chalets/{id}',
-    '/chalets/{id}/availability',
-    '/chalets/bookings',
+  accommodation_units: [
+    '/accommodation_units',
+    '/accommodation_units/{id}',
+    '/accommodation_units/{id}/availability',
+    '/accommodation_units/bookings',
   ],
-  pool: [
-    '/pool/sessions',
-    '/pool/tickets',
+  capacity_access: [
+    '/${slug}/sessions',
+    '/${slug}/tickets',
   ],
   payments: [
     '/payments/create-intent',
@@ -102,9 +102,9 @@ describe('OpenAPI Contract Validation', () => {
       expect(tagNames).toContain('Auth');
       expect(tagNames).toContain('Users');
       expect(tagNames).toContain('Devices');
-      expect(tagNames).toContain('Restaurant');
-      expect(tagNames).toContain('Chalets');
-      expect(tagNames).toContain('Pool');
+      expect(tagNames).toContain('MenuService');
+      expect(tagNames).toContain('AccommodationUnits');
+      expect(tagNames).toContain('CapacityAccess');
       expect(tagNames).toContain('Payments');
       expect(tagNames).toContain('Loyalty');
       expect(tagNames).toContain('Admin');
@@ -158,7 +158,7 @@ describe('OpenAPI Contract Validation', () => {
       'Category',
       'CreateOrderRequest',
       'Order',
-      'Chalet',
+      'AccommodationUnit',
       'CreateBookingRequest',
       'Booking',
       'PoolSession',
@@ -210,8 +210,8 @@ describe('OpenAPI Contract Validation', () => {
       '/auth/refresh',
       '/auth/2fa/verify',
       '/',
-      '/restaurant/menu',
-      '/chalets',
+      '/${slug}/menu',
+      '/accommodation_units',
       '/pool/sessions',
       '/loyalty/tiers',
       '/loyalty/calculate',
@@ -294,8 +294,8 @@ describe('Route File Coverage', () => {
     'auth.routes.ts',
     'user.routes.ts',
     'devices.routes.ts',
-    'restaurant.routes.ts',
-    'chalet.routes.ts',
+    'menu_service.routes.ts',
+    'accommodation.routes.ts',
     'pool.routes.ts',
     'payment.routes.ts',
     'loyalty.routes.ts',
@@ -307,7 +307,7 @@ describe('Route File Coverage', () => {
     'housekeeping.routes.ts',
     'inventory.routes.ts',
     'manager.routes.ts',
-    'snack.routes.ts',
+    'kiosk.routes.ts',
   ];
 
   routeFiles.forEach((file) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSiteSettings } from '@/lib/settings-context';
 import { api } from '@/lib/api';
@@ -17,6 +17,7 @@ import {
   Upload,
   Loader2,
   RotateCcw,
+  X,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ interface BrandState {
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
+  borderColor: string;
 
   // Typography
   fontHeading: string;
@@ -220,7 +222,54 @@ function OptionCard<T extends string>({
 
 // ─── Step panels ──────────────────────────────────────────────────────────────
 
-function LogoStep({ brand, onChange }: { brand: BrandState; onChange: (patch: Partial<BrandState>) => void }) {
+function LogoStep({
+  brand,
+  onChange,
+  onImageUpload,
+  uploadingField,
+  dragOverField,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+}: {
+  brand: BrandState;
+  onChange: (patch: Partial<BrandState>) => void;
+  onImageUpload: (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl', file: File) => void;
+  uploadingField: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl' | null;
+  dragOverField: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl' | null;
+  onDragOver: (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl') => void;
+  onDragLeave: () => void;
+  onDrop: (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl', e: React.DragEvent) => void;
+}) {
+  const fileInputRefs = useRef<{
+    logoUrl?: HTMLInputElement | null;
+    logoDarkUrl?: HTMLInputElement | null;
+    faviconUrl?: HTMLInputElement | null;
+  }>({});
+
+  const handleUploadClick = (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl') => {
+    fileInputRefs.current[field]?.click();
+  };
+
+  const handleFileChange = (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) onImageUpload(field, file);
+  };
+
+  const handleRemoveImage = (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl') => {
+    onChange({ [field]: '' });
+  };
+
+  const handleDragOver = (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl', e: React.DragEvent) => {
+    e.preventDefault();
+    onDragOver(field);
+  };
+
+  const handleDrop = (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl', e: React.DragEvent) => {
+    e.preventDefault();
+    onDragLeave();
+    onDrop(field, e);
+  };
   return (
     <div className="space-y-6">
       <div>
@@ -235,18 +284,62 @@ function LogoStep({ brand, onChange }: { brand: BrandState; onChange: (patch: Pa
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
           Logo (light mode)
         </label>
-        <input
-          type="url"
-          placeholder="https://yourdomain.com/logo.svg"
-          value={brand.logoUrl}
-          onChange={(e) => onChange({ logoUrl: e.target.value })}
-          className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white"
-        />
-        {brand.logoUrl && (
-          <div className="mt-2 p-4 rounded-lg bg-white border border-slate-100 inline-block">
-            <img src={brand.logoUrl} alt="Logo preview" className="max-h-12 object-contain" style={{ maxWidth: brand.logoMaxWidth }} />
+        <div className="space-y-3">
+          {brand.logoUrl && (
+            <div className="relative rounded-lg overflow-hidden h-16 bg-slate-100 dark:bg-slate-800">
+              <img src={brand.logoUrl} alt="Logo preview" className="w-full h-full object-contain p-2" style={{ maxWidth: brand.logoMaxWidth }} />
+              <button
+                type="button"
+                onClick={() => handleRemoveImage('logoUrl')}
+                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          <div
+            onDragOver={(e) => handleDragOver('logoUrl', e)}
+            onDragLeave={onDragLeave}
+            onDrop={(e) => handleDrop('logoUrl', e)}
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+              dragOverField === 'logoUrl'
+                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'
+            }`}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              ref={(el) => { fileInputRefs.current.logoUrl = el; }}
+              onChange={(e) => handleFileChange('logoUrl', e)}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => handleUploadClick('logoUrl')}
+              disabled={uploadingField === 'logoUrl'}
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+            >
+              {uploadingField === 'logoUrl'
+                ? <><Loader2 className="w-4 h-4 animate-spin" />Uploading...</>
+                : <><Upload className="w-4 h-4" />Upload Image</>
+              }
+            </button>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              or drag and drop an image here
+            </p>
           </div>
-        )}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">or enter URL:</span>
+            <input
+              type="url"
+              placeholder="https://yourdomain.com/logo.svg"
+              value={brand.logoUrl}
+              onChange={(e) => onChange({ logoUrl: e.target.value })}
+              className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Logo dark */}
@@ -254,18 +347,62 @@ function LogoStep({ brand, onChange }: { brand: BrandState; onChange: (patch: Pa
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
           Logo (dark mode) <span className="text-slate-400 font-normal">— optional</span>
         </label>
-        <input
-          type="url"
-          placeholder="https://yourdomain.com/logo-white.svg"
-          value={brand.logoDarkUrl}
-          onChange={(e) => onChange({ logoDarkUrl: e.target.value })}
-          className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white"
-        />
-        {brand.logoDarkUrl && (
-          <div className="mt-2 p-4 rounded-lg bg-slate-900 border border-slate-700 inline-block">
-            <img src={brand.logoDarkUrl} alt="Dark logo preview" className="max-h-12 object-contain" style={{ maxWidth: brand.logoMaxWidth }} />
+        <div className="space-y-3">
+          {brand.logoDarkUrl && (
+            <div className="relative rounded-lg overflow-hidden h-16 bg-slate-900 border border-slate-700">
+              <img src={brand.logoDarkUrl} alt="Dark logo preview" className="w-full h-full object-contain p-2" style={{ maxWidth: brand.logoMaxWidth }} />
+              <button
+                type="button"
+                onClick={() => handleRemoveImage('logoDarkUrl')}
+                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          <div
+            onDragOver={(e) => handleDragOver('logoDarkUrl', e)}
+            onDragLeave={onDragLeave}
+            onDrop={(e) => handleDrop('logoDarkUrl', e)}
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+              dragOverField === 'logoDarkUrl'
+                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'
+            }`}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              ref={(el) => { fileInputRefs.current.logoDarkUrl = el; }}
+              onChange={(e) => handleFileChange('logoDarkUrl', e)}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => handleUploadClick('logoDarkUrl')}
+              disabled={uploadingField === 'logoDarkUrl'}
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+            >
+              {uploadingField === 'logoDarkUrl'
+                ? <><Loader2 className="w-4 h-4 animate-spin" />Uploading...</>
+                : <><Upload className="w-4 h-4" />Upload Image</>
+              }
+            </button>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              or drag and drop an image here
+            </p>
           </div>
-        )}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">or enter URL:</span>
+            <input
+              type="url"
+              placeholder="https://yourdomain.com/logo-white.svg"
+              value={brand.logoDarkUrl}
+              onChange={(e) => onChange({ logoDarkUrl: e.target.value })}
+              className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Favicon */}
@@ -273,19 +410,62 @@ function LogoStep({ brand, onChange }: { brand: BrandState; onChange: (patch: Pa
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
           Favicon <span className="text-slate-400 font-normal">— 32×32 or 64×64 PNG/SVG</span>
         </label>
-        <input
-          type="url"
-          placeholder="https://yourdomain.com/favicon.png"
-          value={brand.faviconUrl}
-          onChange={(e) => onChange({ faviconUrl: e.target.value })}
-          className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white"
-        />
-        {brand.faviconUrl && (
-          <div className="mt-2 flex items-center gap-3">
-            <img src={brand.faviconUrl} alt="Favicon preview" className="w-8 h-8 object-contain rounded" />
-            <span className="text-xs text-slate-500">32px preview</span>
+        <div className="space-y-3">
+          {brand.faviconUrl && (
+            <div className="relative rounded-lg overflow-hidden h-12 bg-slate-100 dark:bg-slate-800 inline-block">
+              <img src={brand.faviconUrl} alt="Favicon preview" className="w-full h-full object-contain p-2" />
+              <button
+                type="button"
+                onClick={() => handleRemoveImage('faviconUrl')}
+                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          <div
+            onDragOver={(e) => handleDragOver('faviconUrl', e)}
+            onDragLeave={onDragLeave}
+            onDrop={(e) => handleDrop('faviconUrl', e)}
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+              dragOverField === 'faviconUrl'
+                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'
+            }`}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              ref={(el) => { fileInputRefs.current.faviconUrl = el; }}
+              onChange={(e) => handleFileChange('faviconUrl', e)}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => handleUploadClick('faviconUrl')}
+              disabled={uploadingField === 'faviconUrl'}
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+            >
+              {uploadingField === 'faviconUrl'
+                ? <><Loader2 className="w-4 h-4 animate-spin" />Uploading...</>
+                : <><Upload className="w-4 h-4" />Upload Image</>
+              }
+            </button>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              or drag and drop an image here
+            </p>
           </div>
-        )}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">or enter URL:</span>
+            <input
+              type="url"
+              placeholder="https://yourdomain.com/favicon.png"
+              value={brand.faviconUrl}
+              onChange={(e) => onChange({ faviconUrl: e.target.value })}
+              className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Logo max width */}
@@ -333,6 +513,11 @@ function ColorsStep({ brand, onChange }: { brand: BrandState; onChange: (patch: 
         label="Accent — highlight & decorative usage"
         value={brand.accentColor}
         onChange={(v) => onChange({ accentColor: v })}
+      />
+      <ColorInput
+        label="Border — outlines & dividers"
+        value={brand.borderColor}
+        onChange={(v) => onChange({ borderColor: v })}
       />
 
       {/* Live mini preview */}
@@ -551,7 +736,7 @@ function FeelStep({ brand, onChange }: { brand: BrandState; onChange: (patch: Pa
           />
           <OptionCard
             value="heavy" current={brand.glassmorphism} onClick={(v) => onChange({ glassmorphism: v })}
-            label="Heavy" description="Deep frosted glass — luxury resort"
+            label="Heavy" description="Deep frosted glass — luxury experience"
             preview={
               <div
                 className="w-full h-12 rounded-lg border border-white/20"
@@ -572,6 +757,8 @@ export default function BrandConfigPage() {
   const [step, setStep] = useState<StepId>('logo');
   const [isSaving, setIsSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [uploadingField, setUploadingField] = useState<'logoUrl' | 'logoDarkUrl' | 'faviconUrl' | null>(null);
+  const [dragOverField, setDragOverField] = useState<'logoUrl' | 'logoDarkUrl' | 'faviconUrl' | null>(null);
 
   const [brand, setBrand] = useState<BrandState>({
     logoUrl:         '',
@@ -581,6 +768,7 @@ export default function BrandConfigPage() {
     primaryColor:    '#6366f1',
     secondaryColor:  '#0ea5e9',
     accentColor:     '#f59e0b',
+    borderColor:     '#e2e8f0',
     fontHeading:     'Inter',
     fontBody:        'Inter',
     fontScale:       'md',
@@ -590,61 +778,108 @@ export default function BrandConfigPage() {
     glassmorphism:   'subtle',
   });
 
-  // Sync from backend on first load
+  // Sync from backend on first load — fetch from section-based branding endpoint
   useEffect(() => {
-    if (loading || initialized) return;
-    setBrand({
-      logoUrl:         (settings as any).logoUrl         || '',
-      logoDarkUrl:     (settings as any).logoDarkUrl     || '',
-      faviconUrl:      (settings as any).faviconUrl      || '',
-      logoMaxWidth:    (settings as any).logoMaxWidth     || 160,
-      primaryColor:    settings.themeColors?.primary     || '#6366f1',
-      secondaryColor:  settings.themeColors?.secondary   || '#0ea5e9',
-      accentColor:     settings.themeColors?.accent      || '#f59e0b',
-      fontHeading:     (settings as any).fontHeading     || 'Inter',
-      fontBody:        (settings as any).fontBody        || 'Inter',
-      fontScale:       (settings as any).fontScale       || 'md',
-      headingTracking: (settings as any).headingTracking || 'tight',
-      borderRadius:    (settings as any).borderRadius    || 'rounded',
-      density:         (settings as any).density         || 'default',
-      glassmorphism:   (settings as any).glassmorphism   || 'subtle',
-    });
-    setInitialized(true);
-  }, [loading, settings, initialized]);
+    if (initialized) return;
+    const fetchBranding = async () => {
+      try {
+        const res = await api.get('/admin/branding');
+        const d = res.data?.data || {};
+        setBrand({
+          logoUrl:         d.identity?.logoUrl         || '',
+          logoDarkUrl:     d.identity?.logoDarkUrl     || '',
+          faviconUrl:      d.identity?.faviconUrl      || '',
+          logoMaxWidth:    d.identity?.logoMaxWidth     || 160,
+          primaryColor:    d.colors?.primaryColor       || '#6366f1',
+          secondaryColor:  d.colors?.secondaryColor    || '#0ea5e9',
+          accentColor:     d.colors?.accentColor       || '#f59e0b',
+          borderColor:     d.colors?.borderColor       || '#e2e8f0',
+          fontHeading:     d.fonts?.headingFont         || 'Inter',
+          fontBody:        d.fonts?.bodyFont            || 'Inter',
+          fontScale:       d.fonts?.fontScale           || 'md',
+          headingTracking: d.fonts?.headingTracking     || 'tight',
+          borderRadius:    d.style?.borderRadius        || 'rounded',
+          density:         d.style?.density             || 'default',
+          glassmorphism:   d.style?.glassmorphism       || 'subtle',
+        });
+      } catch (err) {
+        console.error('Failed to fetch branding sections, using defaults', err);
+      }
+      setInitialized(true);
+    };
+    fetchBranding();
+  }, [initialized]);
 
   const patch = useCallback((p: Partial<BrandState>) => {
     setBrand((prev) => ({ ...prev, ...p }));
   }, []);
 
+  const handleImageUpload = (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl', file: File) => {
+    if (!file.type.startsWith('image/')) { toast.error('Please upload an image file'); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Image must be less than 10MB'); return; }
+    setUploadingField(field);
+    const reader = new FileReader();
+    reader.onload = () => {
+      // Store the image inline as a base64 data URI directly — no server upload/storage round-trip.
+      patch({ [field]: reader.result as string });
+      toast.success('Image added');
+      setUploadingField(null);
+    };
+    reader.onerror = () => { toast.error('Failed to read file'); setUploadingField(null); };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDragOver = (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl') => {
+    setDragOverField(field);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverField(null);
+  };
+
+  const handleDrop = (field: 'logoUrl' | 'logoDarkUrl' | 'faviconUrl', e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverField(null);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleImageUpload(field, file);
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const payload = {
-        ...settings,
-        // Brand identity fields
-        logoUrl:         brand.logoUrl,
-        logoDarkUrl:     brand.logoDarkUrl,
-        faviconUrl:      brand.faviconUrl,
-        logoMaxWidth:    brand.logoMaxWidth,
-        fontHeading:     brand.fontHeading,
-        fontBody:        brand.fontBody,
-        fontScale:       brand.fontScale,
-        headingTracking: brand.headingTracking,
-        borderRadius:    brand.borderRadius,
-        density:         brand.density,
-        glassmorphism:   brand.glassmorphism,
-        // Merge colors into themeColors so ThemeInjector picks them up
-        themeColors: {
-          ...(settings.themeColors || {}),
-          primary:   brand.primaryColor,
-          secondary: brand.secondaryColor,
-          accent:    brand.accentColor,
-        },
-      };
-      await api.put('/admin/settings', payload);
+      // Section-based PATCH — each section writes to its own row,
+      // only the provided fields are deep-merged, nothing is overwritten.
+      await Promise.all([
+        api.patch('/admin/branding/identity', {
+          logoUrl:      brand.logoUrl,
+          logoDarkUrl:  brand.logoDarkUrl,
+          faviconUrl:   brand.faviconUrl,
+          logoMaxWidth: brand.logoMaxWidth,
+        }),
+        api.patch('/admin/branding/colors', {
+          primaryColor:   brand.primaryColor,
+          secondaryColor: brand.secondaryColor,
+          accentColor:    brand.accentColor,
+          borderColor:    brand.borderColor,
+        }),
+        api.patch('/admin/branding/fonts', {
+          headingFont:     brand.fontHeading,
+          bodyFont:        brand.fontBody,
+          fontScale:       brand.fontScale,
+          headingTracking: brand.headingTracking,
+        }),
+        api.patch('/admin/branding/style', {
+          borderRadius: brand.borderRadius,
+          density:      brand.density,
+          glassmorphism: brand.glassmorphism,
+        }),
+      ]);
       await refetch();
       toast.success('Brand config saved.');
-    } catch {
+    } catch (error) {
+      console.error('Brand page - save error:', error);
       toast.error('Failed to save brand config.');
     } finally {
       setIsSaving(false);
@@ -711,7 +946,7 @@ export default function BrandConfigPage() {
             exit={{ opacity: 0, x: -12 }}
             transition={{ duration: 0.18 }}
           >
-            {step === 'logo'       && <LogoStep       brand={brand} onChange={patch} />}
+            {step === 'logo'       && <LogoStep       brand={brand} onChange={patch} onImageUpload={handleImageUpload} uploadingField={uploadingField} dragOverField={dragOverField} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} />}
             {step === 'colors'     && <ColorsStep     brand={brand} onChange={patch} />}
             {step === 'typography' && <TypographyStep brand={brand} onChange={patch} />}
             {step === 'feel'       && <FeelStep       brand={brand} onChange={patch} />}

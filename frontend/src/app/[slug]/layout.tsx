@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: `${title} | V2 Ecosystem`,
     description: `Explore ${title} at V2 Ecosystem. Browse offerings, make reservations, and enjoy a premium experience.`,
-    keywords: [slug, 'V2 Ecosystem', title, 'booking', 'resort experience'],
+    keywords: [slug, 'V2 Ecosystem', title, 'booking', 'booking experience'],
     openGraph: {
       title: `${title} | V2 Ecosystem`,
       description: `Explore ${title} at V2 Ecosystem. Book now for an unforgettable experience.`,

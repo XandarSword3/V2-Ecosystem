@@ -56,7 +56,7 @@ export default function DynamicTablesPage() {
   const fetchTables = useCallback(async () => {
     if (!currentModule) return;
     try {
-      const response = await api.get('/restaurant/staff/tables', { params: { moduleId: currentModule.id } });
+      const response = await api.get(`/${slug}/staff/tables`, { params: { moduleId: currentModule.id } });
       setTables(response.data.data || []);
     } catch (error) {
       toast.error(tc('errors.failedToLoad'));
@@ -86,10 +86,10 @@ export default function DynamicTablesPage() {
       };
 
       if (editingTable) {
-        await api.patch(`/restaurant/staff/tables/${editingTable.id}`, payload);
+        await api.patch(`/${slug}/staff/tables/${editingTable.id}`, payload);
         toast.success(tc('success.updated'));
       } else {
-        await api.post('/restaurant/admin/tables', payload);
+        await api.post(`/${slug}/admin/tables`, payload);
         toast.success(tc('success.created'));
       }
       setShowModal(false);
@@ -104,7 +104,7 @@ export default function DynamicTablesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm(tc('tables.confirmDelete'))) return;
     try {
-      await api.delete(`/restaurant/admin/tables/${id}`);
+      await api.delete(`/${slug}/admin/tables/${id}`);
       toast.success(tc('success.deleted'));
       fetchTables();
     } catch (error) {
@@ -114,7 +114,7 @@ export default function DynamicTablesPage() {
 
   const toggleAvailability = async (table: Table) => {
     try {
-      await api.patch(`/restaurant/staff/tables/${table.id}`, { is_available: !table.is_available });
+      await api.patch(`/${slug}/staff/tables/${table.id}`, { is_available: !table.is_available });
       setTables((prev) => prev.map((t) => (t.id === table.id ? { ...t, is_available: !t.is_available } : t)));
       toast.success(table.is_available ? tc('tables.markedOccupied') : tc('tables.markedAvailable'));
     } catch (error) {

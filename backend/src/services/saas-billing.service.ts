@@ -23,6 +23,7 @@
 
 import Stripe from 'stripe';
 import { logger } from '../utils/logger.js';
+import { getSupabase } from '../database/connection.js';
 import type { SubscriptionTier, BillingStatus } from '../middleware/tenantAccess.middleware.js';
 
 // ============================================
@@ -46,21 +47,45 @@ function getStripe(): Stripe {
 }
 
 // ============================================
-// Tier → Price ID mapping
+// Tier → Price ID mapping (DB-backed)
 // ============================================
 
-function getPriceId(tier: SubscriptionTier): string {
-  const map: Record<SubscriptionTier, string | undefined> = {
+/**
+ * Look up the Stripe monthly price ID for a given plan code from the
+ * `plans` table. This is the canonical source of truth — price IDs
+ * are set via the admin Plans CRUD UI, not env vars.
+ *
+ * Falls back to the legacy env var only if the DB row has no price ID
+ * set yet (e.g. during initial setup before Stripe products are created).
+ */
+async function getPriceId(tier: SubscriptionTier): Promise<string> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('plans')
+    .select('stripe_monthly_price_id, stripe_annual_price_id')
+    .eq('code', tier)
+    .eq('is_active', true)
+    .single();
+
+  if (!error && data?.stripe_monthly_price_id) {
+    return data.stripe_monthly_price_id;
+  }
+
+  if (error) {
+    logger.warn(`[SAAS BILLING] plans table lookup failed for tier '${tier}', falling back to env var`, { error: error.message });
+  }
+
+  // Fallback: legacy env var path (only used if DB row has no price ID yet)
+  const envMap: Record<SubscriptionTier, string | undefined> = {
     starter: process.env.STRIPE_PRICE_STARTER,
     growth: process.env.STRIPE_PRICE_GROWTH,
     enterprise: process.env.STRIPE_PRICE_ENTERPRISE,
   };
-
-  const priceId = map[tier];
+  const priceId = envMap[tier];
   if (!priceId) {
     throw new Error(
-      `Stripe Price ID not configured for tier '${tier}'. ` +
-      `Set STRIPE_PRICE_${tier.toUpperCase()} in environment.`,
+      `No Stripe Price ID found for tier '${tier}'. ` +
+      `Set stripe_monthly_price_id on the '${tier}' row in the plans table via the admin UI.`,
     );
   }
   return priceId;
@@ -101,12 +126,14 @@ export interface SubscriptionTierUpdateResult {
 // ============================================
 
 export class SaasBillingService {
-  private readonly stripe: Stripe;
   private readonly trialDays: number;
   private readonly frontendUrl: string;
 
   constructor() {
-    this.stripe = getStripe();
+    // Do NOT call getStripe() here — it throws if STRIPE_SECRET_KEY is absent,
+    // which would break getSaasBillingService() even for callers that never
+    // touch Stripe (e.g. reading plans from the DB). Stripe is lazy-initialized
+    // inside each method that actually needs it.
     this.trialDays = parseInt(process.env.SAAS_TRIAL_DAYS || '14', 10);
     this.frontendUrl = process.env.FRONTEND_URL || 'https://v2platform.com';
   }
@@ -127,7 +154,7 @@ export class SaasBillingService {
     logger.info('[SAAS BILLING] Creating checkout session', { tenantId, tier, subdomain });
 
     // Create or retrieve Stripe customer
-    const customer = await this.stripe.customers.create({
+    const customer = await getStripe().customers.create({
       email: operatorEmail,
       name: operatorName,
       metadata: {
@@ -137,13 +164,13 @@ export class SaasBillingService {
       },
     });
 
-    const session = await this.stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       customer: customer.id,
       payment_method_types: ['card'],
       mode: 'subscription',
       line_items: [
         {
-          price: getPriceId(tier),
+          price: await getPriceId(tier),
           quantity: 1,
         },
       ],
@@ -188,7 +215,7 @@ export class SaasBillingService {
    * payment method, view invoices, or cancel their subscription.
    */
   async createPortalSession(stripeCustomerId: string, returnPath = '/admin/settings/billing'): Promise<PortalSessionResult> {
-    const session = await this.stripe.billingPortal.sessions.create({
+    const session = await getStripe().billingPortal.sessions.create({
       customer: stripeCustomerId,
       return_url: `${this.frontendUrl}${returnPath}`,
     });
@@ -213,16 +240,16 @@ export class SaasBillingService {
       throw new Error(`Tenant is already on the '${newTier}' tier`);
     }
 
-    const subscription = await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const subscription = await getStripe().subscriptions.retrieve(stripeSubscriptionId);
     const currentItem = subscription.items.data[0];
 
     if (!currentItem) {
       throw new Error(`Subscription ${stripeSubscriptionId} has no line items`);
     }
 
-    const newPriceId = getPriceId(newTier);
+    const newPriceId = await getPriceId(newTier);
 
-    const updated = await this.stripe.subscriptions.update(stripeSubscriptionId, {
+    const updated = await getStripe().subscriptions.update(stripeSubscriptionId, {
       items: [
         {
           id: currentItem.id,
@@ -262,11 +289,11 @@ export class SaasBillingService {
     const { atPeriodEnd = true } = options;
 
     if (atPeriodEnd) {
-      await this.stripe.subscriptions.update(stripeSubscriptionId, {
+      await getStripe().subscriptions.update(stripeSubscriptionId, {
         cancel_at_period_end: true,
       });
     } else {
-      await this.stripe.subscriptions.cancel(stripeSubscriptionId);
+      await getStripe().subscriptions.cancel(stripeSubscriptionId);
     }
 
     logger.info('[SAAS BILLING] Subscription cancellation scheduled', {
@@ -288,7 +315,7 @@ export class SaasBillingService {
     if (!secret) {
       throw new Error('STRIPE_SAAS_WEBHOOK_SECRET is not configured');
     }
-    return this.stripe.webhooks.constructEvent(rawBody, signature, secret);
+    return getStripe().webhooks.constructEvent(rawBody, signature, secret);
   }
 
   // ------------------------------------------

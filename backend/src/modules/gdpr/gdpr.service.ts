@@ -295,7 +295,7 @@ This archive contains all personal data associated with your account.
 Files included:
 - profile.json: Your account information
 - reservations.json: Your booking history (Accommodation)
-- orders.json: Your purchase history (Restaurant/Retail)
+- orders.json: Your purchase history (Menu Service/Retail)
 - tickets.json: Your access history (Pool/Events)
 - payments.json: Your payment records (card numbers redacted)
 - consents.json: Your consent preferences

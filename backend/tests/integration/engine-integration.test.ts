@@ -103,7 +103,7 @@ describe('Engine Integration Tests', () => {
       const lineItems = [
         {
           id: 'chalet1',
-          name: 'Lake View Chalet',
+          name: 'Lake View AccommodationUnit',
           quantity: 3, // 3 nights
           unitPrice: 150, // 450
           type: 'accommodation'

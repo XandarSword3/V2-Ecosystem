@@ -6,7 +6,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { config } from '../../config/index.js';
+import { config } from '../../config/index';
 import { logger } from '../../utils/logger.js';
 import * as oauthService from './oauth.service.js';
 

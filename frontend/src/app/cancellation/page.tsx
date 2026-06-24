@@ -12,8 +12,8 @@ export default function CancellationPage() {
 
   const sections = [
     { key: 'general', icon: AlertTriangle },
-    { key: 'chalets', icon: Home },
-    { key: 'restaurant', icon: UtensilsCrossed },
+    { key: 'accommodations', icon: Home },
+    { key: 'dining', icon: UtensilsCrossed },
     { key: 'pool', icon: Waves },
     { key: 'refunds', icon: RefreshCw },
     { key: 'exceptions', icon: Clock },

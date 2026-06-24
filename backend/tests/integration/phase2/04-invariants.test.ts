@@ -185,13 +185,13 @@ describe('I-03: Shared Capacity Access Accuracy', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// I-04: Chalet Availability — No Overlapping Bookings
+// I-04: AccommodationUnit Availability — No Overlapping Bookings
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('I-04: Chalet Availability — No Overlapping Reservations', () => {
+describe('I-04: AccommodationUnit Availability — No Overlapping Reservations', () => {
   it('should have no overlapping non-cancelled time_exclusive_reservation rows per unit', async () => {
     const admin = client(requireState('adminToken'));
 
-    const res = await admin.get(`/${ModuleSlug.CHALETS}/bookings?limit=500`);
+    const res = await admin.get(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings?limit=500`);
 
     if (!res.success) {
       console.log('I-04: Reservations endpoint unavailable; skipping.');
@@ -211,7 +211,7 @@ describe('I-04: Chalet Availability — No Overlapping Reservations', () => {
     // Group by unit id (metadata.unit_id from engine-refit reservations)
     const byUnitId = new Map<string, any[]>();
     for (const b of active) {
-      const uid = b.metadata?.unit_id || b.chalet_id || b.chaletId || b.unit_id;
+      const uid = b.metadata?.unit_id || b.unit_id || b.unitId || b.unit_id;
       if (!uid) continue;
       if (!byUnitId.has(uid)) byUnitId.set(uid, []);
       byUnitId.get(uid)!.push(b);
@@ -300,19 +300,19 @@ describe('I-05: Coupon Usage Count Matches Actual Orders', () => {
 // I-06: Audit Log Completeness
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 describe('I-06: Audit Log Completeness', () => {
-  it('should list recent instant_transaction rows for the restaurant module', async () => {
+  it('should list recent instant_transaction rows for the menu service module', async () => {
     const admin = client(requireState('adminToken'));
 
     const res = await admin.get(`/${ModuleSlug.RESTAURANT}/orders?limit=50`);
     if (!res.success) {
-      console.log('I-06: Restaurant transactions endpoint unavailable; skipping.');
+      console.log('I-06: MenuService transactions endpoint unavailable; skipping.');
       return;
     }
 
     const data = res.data;
     const transactions = Array.isArray(data) ? data : data?.orders || [];
     expect(transactions.length).toBeGreaterThanOrEqual(0);
-    console.log(`I-06: Found ${transactions.length} restaurant instant_transaction row(s).`);
+    console.log(`I-06: Found ${transactions.length} menu service instant_transaction row(s).`);
   });
 
   it('should have audit log entries accessible via admin', async () => {

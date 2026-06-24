@@ -35,6 +35,7 @@ import {
   getInitialExpandedCategories,
   saveExpandedCategories,
   SIDEBAR_EXPANDED_KEY,
+  SYSTEM_PAGE_SLUGS,
 } from '@/config/admin-navigation';
 
 interface AdminLayoutProps {
@@ -50,8 +51,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const onboardingBypassEnabled = process.env.NEXT_PUBLIC_ADMIN_SETUP_BYPASS === 'true';
   
   // Dynamic branding from CMS
-  const resortName = settings.resortName || 'Your Business';
-  const logoText = resortName.substring(0, 2).toUpperCase();
+  const businessName = settings.siteName || 'Your Business';
+  const logoText = businessName.substring(0, 2).toUpperCase();
 
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -86,12 +87,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     const modulesCategory = categories.find(c => c.id === 'modules');
     if (modulesCategory && modules && modules.length > 0) {
       const activeModules = modules
-        .filter(m => m.is_active)
+        .filter(m => m.is_active && !SYSTEM_PAGE_SLUGS.includes(m.slug))
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
       
       modulesCategory.items = activeModules.map(module => {
-        const icon = moduleTypeIcons[module.template_type] || moduleTypeIcons.default;
-        const children = getModuleChildren(module.slug, module.template_type, t);
+        const icon = moduleTypeIcons[module.engine_type] || moduleTypeIcons.default;
+        const children = getModuleChildren(module.slug, module.engine_type, t);
         
         return {
           name: module.name,

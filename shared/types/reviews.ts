@@ -4,7 +4,7 @@
 
 import type { UUID, BaseEntity } from './index';
 
-export type ReviewServiceType = 'general' | 'restaurant' | 'chalets' | 'pool' | 'snack_bar';
+export type ReviewServiceType = 'general' | 'menu_service' | 'accommodation' | 'pool' | 'kiosk';
 
 export interface Review extends BaseEntity {
   userId: UUID;

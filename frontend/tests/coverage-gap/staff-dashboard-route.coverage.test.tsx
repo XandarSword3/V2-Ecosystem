@@ -11,7 +11,7 @@ const socketHandlers = vi.hoisted(() => new Map<string, (...args: unknown[]) => 
 const authState = vi.hoisted(() => ({
   user: {
     fullName: 'Alex Staff',
-    roles: ['restaurant_staff'],
+    roles: ['menu_service_staff'],
   },
   isAuthenticated: true,
   isLoading: false,
@@ -121,7 +121,7 @@ describe('Staff dashboard route coverage', () => {
 
     authState.user = {
       fullName: 'Alex Staff',
-      roles: ['restaurant_staff'],
+      roles: ['menu_service_staff'],
     };
     authState.isAuthenticated = true;
     authState.isLoading = false;

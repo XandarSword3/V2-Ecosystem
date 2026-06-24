@@ -51,14 +51,14 @@ describe('offline hydration service', () => {
         return Promise.resolve({
           data: {
             modules: [
-              { id: 'm1', slug: 'restaurant', name: 'Restaurant', template_type: 'menu_service', is_active: true },
+              { id: 'm1', slug: 'menu_service', name: 'MenuService', template_type: 'menu_service', is_active: true },
               { id: 'm2', slug: 'cabanas', name: 'Cabanas', template_type: 'multi_day_booking', is_active: true }
             ]
           }
         });
       }
-      if (url === '/v1/restaurant/items') return Promise.resolve({ data: [{ id: 'item1' }] });
-      if (url === '/v1/restaurant/modifiers') return Promise.resolve({ data: [{ id: 'mod1' }] });
+      if (url === '/v1/menu_service/items') return Promise.resolve({ data: [{ id: 'item1' }] });
+      if (url === '/v1/menu_service/modifiers') return Promise.resolve({ data: [{ id: 'mod1' }] });
       if (url === '/v1/cabanas/bookable_units') return Promise.resolve({ data: [{ id: 'unit1' }] });
       if (url === '/v1/cabanas/bookings') return Promise.resolve({ data: [{ id: 'booking1' }] });
       if (url.includes('/users')) return Promise.resolve({ data: { users: [] } });

@@ -16,8 +16,8 @@ const getBaseUrl = () => {
 };
 
 const fallbackSettings = {
-  resortName: 'Your Resort',
-  description: 'Premier resort platform.'
+  siteName: 'Your Business',
+  description: 'Premier hospitality platform.'
 };
 
 const isLocalApiUrl = (url: string) => /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?/i.test(url);
@@ -47,13 +47,13 @@ async function getSiteSettings() {
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings();
-  const title = settings.resortName || 'Your Resort';
+  const title = settings.siteName || 'Your Business';
   const description = settings.description || 'Experience the perfect blend of relaxation and entertainment.';
 
   return {
     title: `${title} | Luxury Experience`,
     description,
-    keywords: 'resort, luxury, dining, experience, vacation',
+    keywords: 'hospitality, luxury, dining, experience, vacation',
     manifest: '/manifest.json',
     icons: {
       icon: '/favicon.svg',
@@ -88,18 +88,18 @@ export default async function RootLayout({
   const settings = await getSiteSettings();
 
   const resortSchema = generateResortSchema({
-    name: settings.resortName || 'Your Resort',
-    description: settings.description || 'Premier resort experience.',
+    name: settings.siteName || 'Your Business',
+    description: settings.description || 'Premier hospitality experience.',
     url: 'https://v2-ecosystem.vercel.app',
     telephone: '+1 234 567 8900',
-    email: settings.email || 'bookings@yourresort.com',
+    email: settings.email || 'bookings@example.com',
     address: {
-      street: '123 Resort Boulevard',
+      street: '123 Main Street',
       city: 'Global City',
       region: 'State',
       country: 'Country',
     },
-    images: ['https://v2-ecosystem.vercel.app/images/resort-cover.jpg'],
+    images: ['https://v2-ecosystem.vercel.app/images/site-cover.jpg'],
     priceRange: '$$',
     openingHours: ['10:00-23:00'],
   });

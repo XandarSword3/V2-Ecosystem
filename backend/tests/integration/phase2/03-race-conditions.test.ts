@@ -133,7 +133,7 @@ describe('R-02: Concurrent Capacity Allocation', () => {
 
     const results = await fireSimultaneously(
       [clientA, clientB],
-      async (c) => c.purchasePoolTicket({
+      async (c) => c.purchaseCapacityTicket({
         sessionId,
         customerName: 'Race Test',
         numberOfGuests: 2,
@@ -203,11 +203,11 @@ describe('R-03: Payment Webhook Partial Failure — Orphan State', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// R-04: Chalet Double-Booking (Redis Lock)
+// R-04: AccommodationUnit Double-Booking (Redis Lock)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('R-04: Chalet Double-Booking — Concurrent Requests', () => {
+describe('R-04: AccommodationUnit Double-Booking — Concurrent Requests', () => {
   it('should only allow one booking when two clients book same dates simultaneously', async () => {
-    const chaletId = requireState('chaletBId');
+    const unitId = requireState('unitBId');
     const checkIn = futureDate(45);
     const checkOut = futureDate(47);
 
@@ -215,7 +215,7 @@ describe('R-04: Chalet Double-Booking — Concurrent Requests', () => {
     const clientB = client(requireState('bobToken'));
 
     const bookingPayload = {
-      chaletId,
+      unitId,
       checkInDate: checkIn,
       checkOutDate: checkOut,
       customerName: 'Race Tester',
@@ -382,7 +382,7 @@ describe('R-07: Booking Created Without Add-ons (Orphan)', () => {
     let res: any;
     for (const offset of bookingWindows) {
       const attempt = await alice.createBooking({
-        chaletId: requireState('chaletCId'),
+        unitId: requireState('unitCId'),
         checkInDate: futureDate(offset),
         checkOutDate: futureDate(offset + 2),
         customerName: 'Add-on Orphan Test',

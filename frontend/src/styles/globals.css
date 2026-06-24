@@ -33,6 +33,19 @@
   }
 }
 
+/* Cockpit (Command Center) theme tokens
+   These shadow the hardcoded hex values that used to be inline-styled.
+   Light values defined here in :root, dark overrides in .dark below. */
+:root {
+  --cockpit-bg-page:       #f8fafc;
+  --cockpit-bg-card:       #ffffff;
+  --cockpit-bg-inner:      #f1f5f9;
+  --cockpit-border:        #e2e8f0;
+  --cockpit-text-primary:  #0f172a;
+  --cockpit-text-secondary:#475569;
+  --cockpit-text-muted:    #94a3b8;
+}
+
 /* ========================================
    CMS THEME UTILITY CLASSES
    These classes use CSS variables set by ThemeInjector
@@ -318,6 +331,15 @@
   --foreground-rgb: 255, 255, 255;
   --background-start-rgb: 10, 15, 30;
   --background-end-rgb: 20, 30, 50;
+
+  /* Cockpit dark overrides */
+  --cockpit-bg-page:       #0B0F14;
+  --cockpit-bg-card:       #0B0F14;
+  --cockpit-bg-inner:      #111820;
+  --cockpit-border:        #1A222C;
+  --cockpit-text-primary:  #E8ECF1;
+  --cockpit-text-secondary:#8A95A5;
+  --cockpit-text-muted:    #5B6B7F;
   
   /* Dark mode glassmorphism */
   --glass-bg: rgba(20, 30, 50, 0.7);
@@ -552,14 +574,29 @@ body {
   font-family: var(--font-arabic), 'Noto Sans Arabic', system-ui, sans-serif;
 }
 
-/* LTR default font */
+/* LTR default font — uses brand CSS var if set by ThemeInjector */
 [dir="ltr"] {
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-body, var(--font-inter), system-ui, sans-serif);
+}
+
+body {
+  font-family: var(--font-body, var(--font-inter), system-ui, sans-serif);
+}
+
+/* Base font size — controlled by brand font scale setting */
+html {
+  font-size: var(--font-scale-base, 16px);
+}
+
+/* Heading font and tracking — separate from body font */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading, var(--font-body), system-ui, sans-serif);
+  letter-spacing: var(--heading-tracking, 0em);
 }
 
 /* Font family utilities */
 .font-sans {
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-body, var(--font-inter), system-ui, sans-serif);
 }
 
 .font-arabic {
@@ -769,6 +806,29 @@ body {
     0 2px 8px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
+
+/* ========================================
+   BRAND DESIGN TOKEN OVERRIDES
+   These override Tailwind utility values inside component
+   classes to respect the brand settings from the admin panel.
+   --radius-base, --blur-glass, --spacing-base are set
+   at runtime by ThemeInjector.
+   ======================================== */
+
+/* Brand border-radius applied to interactive and container elements */
+.btn, .card, .card-glass, .card-solid, .card-glass,
+.input, .input-glass, .badge {
+  border-radius: var(--radius-base, 0.5rem);
+}
+
+/* Brand blur applied to all glass surfaces */
+.glass, .glass-strong, .glass-subtle, .glass-card,
+.glass-panel, .glass-modal, .glass-sidebar, .glass-nav,
+.glass-frosted, .card-glass {
+  backdrop-filter: blur(var(--blur-glass, 16px));
+  -webkit-backdrop-filter: blur(var(--blur-glass, 16px));
+}
+
 
 /* Resort theme backgrounds */
 .bg-resort-beach {

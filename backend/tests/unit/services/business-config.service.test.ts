@@ -24,21 +24,25 @@ vi.mock('../../../src/services/terminology.service', () => ({
 }));
 
 vi.mock('../../../src/config/business-types', () => ({
-  BUSINESS_TYPES: {
-    hotel: {
-      id: 'hotel',
-      name: 'Hotel',
+  ENGINE_TYPE_DEFAULTS: {
+    instant_transaction: {
+      id: 'instant_transaction',
+      description: 'Immediate point-of-sale transactions.',
       terminologyOverrides: {
-        room: 'Room',
-        guest: 'Guest',
+        item_singular:  'Item',
+        item_plural:    'Items',
+        order_singular: 'Order',
+        order_plural:   'Orders',
       },
     },
-    spa: {
-      id: 'spa',
-      name: 'Spa Resort',
+    shared_capacity_access: {
+      id: 'shared_capacity_access',
+      description: 'Shared-capacity access sold by the session.',
       terminologyOverrides: {
-        room: 'Treatment Room',
-        guest: 'Client',
+        unit_singular:    'Session',
+        unit_plural:      'Sessions',
+        booking_singular: 'Booking',
+        booking_plural:   'Bookings',
       },
     },
   },
@@ -59,15 +63,15 @@ describe('BusinessConfigService', () => {
         upsert: vi.fn().mockResolvedValue({ error: null }),
       });
 
-      const result = await businessConfigService.switchBusinessType('hotel');
+      const result = await businessConfigService.switchBusinessType('instant_transaction');
 
       expect(result).toBe(true);
       expect(terminologyService.bulkUpdateTerminology).toHaveBeenCalledWith(
-        'hotel',
+        'instant_transaction',
         'en',
         expect.objectContaining({
-          room: 'Room',
-          guest: 'Guest',
+          item_singular:  'Item',
+          order_singular: 'Order',
         })
       );
     });
@@ -83,7 +87,7 @@ describe('BusinessConfigService', () => {
         upsert: vi.fn().mockResolvedValue({ error: new Error('DB Error') }),
       });
 
-      const result = await businessConfigService.switchBusinessType('hotel');
+      const result = await businessConfigService.switchBusinessType('instant_transaction');
 
       expect(result).toBe(false);
     });
@@ -94,14 +98,14 @@ describe('BusinessConfigService', () => {
         upsert: upsertMock,
       });
 
-      await businessConfigService.switchBusinessType('spa');
+      await businessConfigService.switchBusinessType('shared_capacity_access');
 
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('site_settings');
       expect(upsertMock).toHaveBeenCalledWith(
         expect.objectContaining({
           key: 'business_type',
           value: expect.objectContaining({
-            id: 'spa',
+            id: 'shared_capacity_access',
           }),
         }),
         expect.any(Object)

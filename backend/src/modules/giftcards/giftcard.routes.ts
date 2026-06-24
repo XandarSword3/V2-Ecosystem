@@ -5,7 +5,7 @@ import { authenticate, authorize, optionalAuth } from '../../middleware/auth.mid
 const router = Router();
 
 // Public routes
-router.get('/templates', giftCardController.getTemplates.bind(giftCardController));
+// Note: GET /templates removed — gift card templates (static hardcoded products) are removed per Issue 17.
 router.get('/check/:code', giftCardController.checkBalance.bind(giftCardController));
 
 // Customer routes (purchase is open to guests; optionalAuth attaches user when logged in)
@@ -25,9 +25,5 @@ router.post('/', authenticate, authorize('admin', 'super_admin'), giftCardContro
 router.post('/admin', authenticate, authorize('admin', 'super_admin'), giftCardController.createGiftCard.bind(giftCardController));
 router.put('/:id/disable', authenticate, authorize('admin', 'super_admin'), giftCardController.disableGiftCard.bind(giftCardController));
 router.put('/admin/:id/disable', authenticate, authorize('admin', 'super_admin'), giftCardController.disableGiftCard.bind(giftCardController));
-
-// Template management (admin)
-router.post('/templates', authenticate, authorize('admin', 'super_admin'), giftCardController.createTemplate.bind(giftCardController));
-router.put('/templates/:id', authenticate, authorize('admin', 'super_admin'), giftCardController.updateTemplate.bind(giftCardController));
 
 export default router;

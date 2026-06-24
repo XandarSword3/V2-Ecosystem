@@ -45,132 +45,10 @@ async function serverFetch<T>(endpoint: string, options: FetchOptions = {}): Pro
 }
 
 // ============================================
-// Restaurant API (Server-side)
-// ============================================
-export interface MenuItem {
-  id: string;
-  name: string;
-  name_ar?: string;
-  name_fr?: string;
-  description?: string;
-  description_ar?: string;
-  description_fr?: string;
-  price: number;
-  category: {
-    id: string;
-    name: string;
-    name_ar?: string;
-    name_fr?: string;
-  };
-  preparation_time_minutes?: number;
-  is_vegetarian?: boolean;
-  is_vegan?: boolean;
-  is_gluten_free?: boolean;
-  is_spicy?: boolean;
-  discount_price?: number;
-  image_url?: string;
-  is_available?: boolean;
-  is_featured?: boolean;
-}
-
-export async function getMenuItems(): Promise<MenuItem[]> {
-  const data = await serverFetch<{ items?: MenuItem[]; menuItems?: MenuItem[] } | MenuItem[]>(
-    '/restaurant/menu',
-    { tags: ['menu'], revalidate: 300 }
-  );
-  if (Array.isArray(data)) return data;
-  return data?.items ?? data?.menuItems ?? [];
-}
-
-// ============================================
-// Chalets API (Server-side)
-// ============================================
-export interface Chalet {
-  id: string;
-  name: string;
-  name_ar?: string;
-  name_fr?: string;
-  description?: string;
-  description_ar?: string;
-  description_fr?: string;
-  capacity: number;
-  bedroom_count?: number;
-  bathroom_count?: number;
-  amenities?: string[];
-  images?: string[];
-  base_price?: number;
-  weekend_price?: number;
-  is_active?: boolean;
-  is_featured?: boolean;
-}
-
-export async function getChalets(): Promise<Chalet[]> {
-  const data = await serverFetch<{ chalets?: Chalet[] } | Chalet[]>(
-    '/chalets',
-    { tags: ['chalets'], revalidate: 300 }
-  );
-  if (Array.isArray(data)) return data;
-  return data?.chalets ?? [];
-}
-
-export async function getChaletById(id: string): Promise<Chalet | null> {
-  return serverFetch<Chalet>(`/chalets/${id}`, { tags: ['chalets', `chalet-${id}`] });
-}
-
-// ============================================
-// Pool API (Server-side)
-// ============================================
-export interface PoolSession {
-  id: string;
-  name: string;
-  start_time: string;
-  end_time: string;
-  capacity: number;
-  adult_price?: number;
-  child_price?: number;
-  is_active?: boolean;
-}
-
-export async function getPoolSessions(): Promise<PoolSession[]> {
-  const data = await serverFetch<{ sessions?: PoolSession[] } | PoolSession[]>(
-    '/pool/sessions',
-    { tags: ['pool'], revalidate: 300 }
-  );
-  if (Array.isArray(data)) return data;
-  return data?.sessions ?? [];
-}
-
-// ============================================
-// Snack Bar API (Server-side)
-// ============================================
-export interface SnackItem {
-  id: string;
-  name: string;
-  name_ar?: string;
-  name_fr?: string;
-  description?: string;
-  description_ar?: string;
-  description_fr?: string;
-  price: number;
-  category: string;
-  image_url?: string;
-  is_available?: boolean;
-}
-
-export async function getSnackItems(): Promise<SnackItem[]> {
-  const data = await serverFetch<{ items?: SnackItem[] } | SnackItem[]>(
-    '/snack/items',
-    { tags: ['snacks'], revalidate: 300 }
-  );
-  if (Array.isArray(data)) return data;
-  return data?.items ?? [];
-}
-
-// ============================================
 // Settings API (Server-side)
 // ============================================
 export interface SiteSettings {
-  resortName?: string;
+  siteName?: string;
   contactEmail?: string;
   contactPhone?: string;
   address?: string;
@@ -189,4 +67,92 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     { tags: ['settings'], revalidate: 600 } // 10 minutes
   );
   return data ?? {};
+}
+
+// ============================================
+// Catalog (Menu) Items
+// ============================================
+export interface CatalogItem {
+  id: string;
+  name: string;
+  price: number;
+  category?: { id: string; name: string } | string;
+  [key: string]: unknown;
+}
+
+export async function getCatalogItems(): Promise<CatalogItem[]> {
+  const data = await serverFetch<CatalogItem[] | { items: CatalogItem[] }>(
+    '/menu',
+    { tags: ['menu'], revalidate: 300 }
+  );
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  return (data as { items?: CatalogItem[] }).items ?? [];
+}
+
+// ============================================
+// Accommodation Units
+// ============================================
+export interface AccommodationUnit {
+  id: string;
+  name: string;
+  capacity?: number;
+  [key: string]: unknown;
+}
+
+export async function getAccommodationUnits(): Promise<AccommodationUnit[]> {
+  const data = await serverFetch<AccommodationUnit[] | { units: AccommodationUnit[] }>(
+    '/accommodation_units',
+    { tags: ['accommodation_units'], revalidate: 300 }
+  );
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  return (data as { units?: AccommodationUnit[] }).units ?? [];
+}
+
+export async function getAccommodationUnitById(id: string): Promise<AccommodationUnit | null> {
+  return serverFetch<AccommodationUnit>(`/accommodation_units/${id}`, { tags: ['accommodation_units'] });
+}
+
+// ============================================
+// Capacity Windows (Sessions)
+// ============================================
+export interface CapacityWindow {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  capacity?: number;
+  [key: string]: unknown;
+}
+
+export async function getCapacityWindows(): Promise<CapacityWindow[]> {
+  const data = await serverFetch<CapacityWindow[] | { sessions: CapacityWindow[] }>(
+    '/capacity',
+    { tags: ['capacity'], revalidate: 300 }
+  );
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  return (data as { sessions?: CapacityWindow[] }).sessions ?? [];
+}
+
+// ============================================
+// Kiosk Items
+// ============================================
+export interface KioskItem {
+  id: string;
+  name: string;
+  price: number;
+  category?: string;
+  [key: string]: unknown;
+}
+
+export async function getKioskItems(): Promise<KioskItem[]> {
+  const data = await serverFetch<KioskItem[] | { items: KioskItem[] }>(
+    '/kiosk/items',
+    { tags: ['kiosk'], revalidate: 300 }
+  );
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  return (data as { items?: KioskItem[] }).items ?? [];
 }

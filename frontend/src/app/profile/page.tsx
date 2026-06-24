@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth-context';
-import { api, restaurantApi, poolApi, chaletsApi, snackApi } from '@/lib/api';
+import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { toast } from 'sonner';
@@ -57,7 +57,7 @@ interface BookingRecord {
   check_out_date: string;
   number_of_guests: number;
   total_amount: number;
-  chalet?: { name: string };
+  unit?: { name: string };
 }
 
 interface TicketRecord {
@@ -133,28 +133,28 @@ export default function ProfilePage() {
   // Fetch user orders
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
     queryKey: ['my-orders'],
-    queryFn: () => restaurantApi.getMyOrders(),
+    queryFn: () => api.get('/orders/me'),
     enabled: activeTab === 'orders' && !!user,
   });
 
   // Fetch user bookings
   const { data: bookingsData, isLoading: bookingsLoading } = useQuery({
     queryKey: ['my-bookings'],
-    queryFn: () => chaletsApi.getMyBookings(),
+    queryFn: () => api.get('/reservations/me'),
     enabled: activeTab === 'bookings' && !!user,
   });
 
   // Fetch user pool tickets
   const { data: ticketsData, isLoading: ticketsLoading } = useQuery({
     queryKey: ['my-tickets'],
-    queryFn: () => poolApi.getMyTickets(),
+    queryFn: () => api.get('/capacity-access/me'),
     enabled: activeTab === 'tickets' && !!user,
   });
 
-  // Fetch user snack orders
+  // Fetch user kiosk orders
   const { data: snackOrdersData, isLoading: snackOrdersLoading } = useQuery({
-    queryKey: ['my-snack-orders'],
-    queryFn: () => snackApi.getMyOrders(),
+    queryKey: ['my-kiosk-orders'],
+    queryFn: () => api.get('/orders/kiosk/me'),
     enabled: activeTab === 'snacks' && !!user,
   });
 
@@ -607,7 +607,7 @@ export default function ProfilePage() {
                           className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium">{booking.chalet?.name || 'Chalet'}</span>
+                            <span className="font-medium">{booking.unit?.name || 'Unit'}</span>
                             <span className={`px-2 py-1 rounded-full text-xs ${statusColors[booking.status] || statusColors.pending}`}>
                               {booking.status?.toUpperCase()}
                             </span>

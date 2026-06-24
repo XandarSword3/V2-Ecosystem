@@ -1,10 +1,10 @@
 /**
- * Chalet Booking Complete Workflow E2E Test
+ * AccommodationUnit Booking Complete Workflow E2E Test
  * 
- * This test simulates a REAL end-to-end chalet booking workflow:
- * 1. Customer searches for available chalets
+ * This test simulates a REAL end-to-end accommodation unit booking workflow:
+ * 1. Customer searches for available accommodation_units
  * 2. Customer makes a booking and pays
- * 3. Staff confirms and prepares the chalet
+ * 3. Staff confirms and prepares the accommodation unit
  * 4. Customer checks in and checks out
  * 5. Customer leaves a review
  * 6. Admin verifies everything in reports
@@ -78,7 +78,7 @@ function getFutureDate(daysFromNow: number): string {
 // ============================================
 // PHASE 1: CUSTOMER SEARCHES & BOOKS CHALET
 // ============================================
-test.describe('Phase 1: Customer Books Chalet', () => {
+test.describe('Phase 1: Customer Books AccommodationUnit', () => {
 let customerPage: Page;
   
   test.beforeAll(async ({ browser }) => {
@@ -90,15 +90,15 @@ let customerPage: Page;
     await customerPage.close();
   });
 
-  test('Step 1.1: Customer views chalets page', async () => {
-    await customerPage.goto(`${FRONTEND_URL}/chalets`);
+  test('Step 1.1: Customer views accommodation_units page', async () => {
+    await customerPage.goto(`${FRONTEND_URL}/accommodation_units`);
     await customerPage.waitForLoadState('load');
     
     // Should show main content area
     await expect(customerPage.locator('main').first()).toBeVisible();
     
-    // Check for chalet-related content text
-    const chaletContent = customerPage.locator('text=/Chalet|Book|Stay|Accommodation|Night|Reserve/i').first();
+    // Check for accommodation unit-related content text
+    const chaletContent = customerPage.locator('text=/AccommodationUnit|Book|Stay|Accommodation|Night|Reserve/i').first();
     await expect(chaletContent).toBeVisible({ timeout: 10000 });
   });
 
@@ -123,36 +123,36 @@ let customerPage: Page;
     }
   });
 
-  test('Step 1.3: Customer views available chalets', async () => {
-    // Check for any content related to chalets
+  test('Step 1.3: Customer views available accommodation_units', async () => {
+    // Check for any content related to accommodation_units
     await customerPage.waitForLoadState('networkidle');
-    const chaletContent = customerPage.locator('text=/chalet|cabin|stay|book|reserve/i');
+    const chaletContent = customerPage.locator('text=/accommodation unit|cabin|stay|book|reserve/i');
     const count = await chaletContent.count();
     
     expect(count).toBeGreaterThan(0);
     
-    // Try to get first chalet name if available
-    const chaletCards = customerPage.locator('[data-testid="chalet-card"], a[href*="/chalets/"]');
-    if (await chaletCards.first().isVisible().catch(() => false)) {
-      selectedChaletName = await chaletCards.first().locator('h2, h3, [class*="title"]').textContent().catch(() => null);
+    // Try to get first accommodation unit name if available
+    const unitCards = customerPage.locator('[data-testid="accommodation unit-card"], a[href*="/accommodation_units/"]');
+    if (await unitCards.first().isVisible().catch(() => false)) {
+      selectedChaletName = await unitCards.first().locator('h2, h3, [class*="title"]').textContent().catch(() => null);
     }
   });
 
-  test('Step 1.4: Customer selects a chalet', async () => {
-    // Click on first available chalet
-    const chaletCard = customerPage.locator('[data-testid="chalet-card"], a[href*="/chalets/"]').first();
+  test('Step 1.4: Customer selects a accommodation unit', async () => {
+    // Click on first available accommodation unit
+    const unitCard = customerPage.locator('[data-testid="accommodation unit-card"], a[href*="/accommodation_units/"]').first();
     
-    if (await chaletCard.isVisible().catch(() => false)) {
-      await chaletCard.click();
+    if (await unitCard.isVisible().catch(() => false)) {
+      await unitCard.click();
       await customerPage.waitForLoadState('load');
     }
-    // Accept any URL state - chalet selection may not work as expected
-    expect(customerPage.url()).toContain('chalet');
+    // Accept any URL state - accommodation unit selection may not work as expected
+    expect(customerPage.url()).toContain('accommodation unit');
   });
 
-  test('Step 1.5: Customer views chalet details', async () => {
+  test('Step 1.5: Customer views accommodation unit details', async () => {
     await customerPage.waitForLoadState('networkidle');
-    // Check for any chalet-related content
+    // Check for any accommodation unit-related content
     await expect(customerPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -245,7 +245,7 @@ let customerPage: Page;
     if (await confirmButton.isVisible()) {
       // Listen for booking creation
       const bookingPromise = customerPage.waitForResponse(
-        response => (response.url().includes('/bookings') || response.url().includes('/chalets')) && 
+        response => (response.url().includes('/bookings') || response.url().includes('/accommodation_units')) && 
                     (response.status() === 200 || response.status() === 201),
         { timeout: 10000 }
       ).catch(() => null);
@@ -292,14 +292,14 @@ let staffPage: Page;
     }
   });
 
-  test('Step 2.2: Staff views chalet bookings', async () => {
-    await staffPage.goto(`${FRONTEND_URL}/admin/chalets`);
+  test('Step 2.2: Staff views accommodation unit bookings', async () => {
+    await staffPage.goto(`${FRONTEND_URL}/admin/accommodation_units`);
     await staffPage.waitForLoadState('load');
     
     // Page should load
     await expect(staffPage.locator('main').first()).toBeVisible({ timeout: 10000 });
-    // Check for chalet-related content
-    const pageContent = staffPage.locator('text=/Chalet|Booking|No bookings|Empty/i').first();
+    // Check for accommodation unit-related content
+    const pageContent = staffPage.locator('text=/AccommodationUnit|Booking|No bookings|Empty/i').first();
     await expect(pageContent).toBeVisible({ timeout: 10000 });
   });
 
@@ -326,7 +326,7 @@ let staffPage: Page;
     }
   });
 
-  test('Step 2.5: Staff marks chalet as preparing', async () => {
+  test('Step 2.5: Staff marks accommodation unit as preparing', async () => {
     // Find status update control
     const statusSelect = staffPage.locator('select:has-text("pending"), select[name="status"]').first();
     
@@ -336,7 +336,7 @@ let staffPage: Page;
     }
   });
 
-  test('Step 2.6: Staff marks chalet as ready', async () => {
+  test('Step 2.6: Staff marks accommodation unit as ready', async () => {
     const statusSelect = staffPage.locator('select[name="status"], select').first();
     
     if (await statusSelect.isVisible()) {
@@ -386,7 +386,7 @@ let customerPage: Page;
       
       const reviewText = customerPage.locator('textarea[name="review"], textarea[placeholder*="review" i]').first();
       if (await reviewText.isVisible()) {
-        await reviewText.fill('Amazing stay! The chalet was beautiful and clean. Will definitely come back!');
+        await reviewText.fill('Amazing stay! The accommodation unit was beautiful and clean. Will definitely come back!');
       }
       
       const submitButton = customerPage.locator('button:has-text("Submit"), button:has-text("Post")').first();
@@ -420,8 +420,8 @@ let adminPage: Page;
     }
   });
 
-  test('Step 4.2: Admin views chalet dashboard', async () => {
-    await adminPage.goto(`${FRONTEND_URL}/admin/chalets`);
+  test('Step 4.2: Admin views accommodation unit dashboard', async () => {
+    await adminPage.goto(`${FRONTEND_URL}/admin/accommodation_units`);
     await adminPage.waitForLoadState('load');
     
     // Page should load
@@ -483,7 +483,7 @@ test.describe('Phase 5: Verify Data Persistence', () => {
     expect([200, 404]).toContain(response.status());
   });
 
-  test('API: Verify chalets are available', async ({ request }) => {
+  test('API: Verify accommodation_units are available', async ({ request }) => {
     const response = await request.get(`${API_URL}/api/v1/units`);
     // Accept 200, 401 (needs auth), or 404 (endpoint doesn't exist)
     expect([200, 401, 404]).toContain(response.status());

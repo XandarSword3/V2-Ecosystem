@@ -5,10 +5,10 @@
 import type { UUID, BaseEntity } from './index';
 
 export type ModuleTemplateType =
-  | 'menu_service'
-  | 'booking_core'
-  | 'pool_tickets'
-  | 'custom';
+  | 'instant_transaction'
+  | 'time_exclusive_reservation'
+  | 'shared_capacity_access'
+  | 'ongoing_entitlement';
 
 export interface Module extends BaseEntity {
   templateType: ModuleTemplateType;

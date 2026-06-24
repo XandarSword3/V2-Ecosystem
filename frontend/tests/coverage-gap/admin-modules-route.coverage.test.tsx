@@ -124,8 +124,15 @@ describe('Admin modules route coverage', () => {
 
     expect(toastSuccessMock).toHaveBeenCalledWith('Module updated successfully');
 
+    // Creation: click Add Module → template picker → pick Blank → Use this template → form
     await user.click(screen.getByRole('button', { name: /Add Module/i }));
-    expect(await screen.findByText('Create New Module')).toBeInTheDocument();
+    expect(await screen.findByText('Choose a starting template')).toBeInTheDocument();
+
+    // Select the Blank template
+    await user.click(screen.getByRole('button', { name: /Blank/i }));
+    await user.click(screen.getByRole('button', { name: /Use this template/i }));
+
+    expect(await screen.findByText('Configure Module')).toBeInTheDocument();
 
     const createNameInput = screen.getAllByRole('textbox')[0];
     await user.clear(createNameInput);
@@ -169,6 +176,10 @@ describe('Admin modules route coverage', () => {
     await screen.findByText('Module Management');
 
     await user.click(screen.getByRole('button', { name: /Add Module/i }));
+    await screen.findByText('Choose a starting template');
+
+    await user.click(screen.getByRole('button', { name: /Blank/i }));
+    await user.click(screen.getByRole('button', { name: /Use this template/i }));
 
     const createNameInput = (await screen.findAllByRole('textbox'))[0];
     await user.clear(createNameInput);

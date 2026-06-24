@@ -150,11 +150,11 @@ describe('KitchenDisplayBoard behavior', () => {
     audioPlayMock.mockResolvedValue(undefined);
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/restaurant/kitchen/orders') {
+      if (url === '/orders/kitchen') {
         return Promise.resolve({ data: { data: buildOrders() } });
       }
 
-      if (url === '/restaurant/kitchen/stats') {
+      if (url === '/orders/kitchen/stats') {
         return Promise.resolve({
           data: {
             data: {
@@ -192,7 +192,7 @@ describe('KitchenDisplayBoard behavior', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh orders' }));
 
     await waitFor(() => {
-      const orderFetchCalls = apiGetMock.mock.calls.filter((call) => call[0] === '/restaurant/kitchen/orders');
+      const orderFetchCalls = apiGetMock.mock.calls.filter((call) => call[0] === '/orders/kitchen');
       expect(orderFetchCalls.length).toBeGreaterThanOrEqual(2);
     });
   });
@@ -207,7 +207,7 @@ describe('KitchenDisplayBoard behavior', () => {
     await user.click(screen.getByRole('button', { name: /Start Cooking/i }));
 
     await waitFor(() => {
-      expect(apiPostMock).toHaveBeenCalledWith('/restaurant/kitchen/orders/order-pending/start');
+      expect(apiPostMock).toHaveBeenCalledWith('/orders/kitchen/order-pending/start');
     });
     expect(toastSuccessMock).toHaveBeenCalledWith('Order started');
 
@@ -218,7 +218,7 @@ describe('KitchenDisplayBoard behavior', () => {
     await user.click(screen.getByRole('button', { name: /Bump Order/i }));
 
     await waitFor(() => {
-      expect(apiPostMock).toHaveBeenCalledWith('/restaurant/kitchen/orders/order-inprogress/ready', {
+      expect(apiPostMock).toHaveBeenCalledWith('/orders/kitchen/order-inprogress/ready', {
         notes: 'Ready at pass',
       });
     });

@@ -3,9 +3,9 @@ import { test, expect } from './fixtures/auth.fixture';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 test('End-to-End Inventory & Ordering Check', async ({ page }) => {
-  // 1. Navigate to Restaurant Page
-  console.log(`Navigating to ${FRONTEND_URL}/restaurant...`);
-  await page.goto(`${FRONTEND_URL}/restaurant`);
+  // 1. Navigate to MenuService Page
+  console.log(`Navigating to ${FRONTEND_URL}/menu service...`);
+  await page.goto(`${FRONTEND_URL}/menu service`);
   
   // 2. Wait for Menu Items
   console.log('Waiting for menu items...');

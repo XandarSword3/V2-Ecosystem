@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
-import { api, chaletsApi } from '@/lib/api';
+import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useContentTranslation } from '@/lib/translate';
@@ -74,7 +74,6 @@ export default function DynamicUnitDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const t = useTranslations('chalets');
   const tCommon = useTranslations('common');
   const currency = useSettingsStore((s) => s.currency);
   const { translateContent } = useContentTranslation();
@@ -100,16 +99,16 @@ export default function DynamicUnitDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
 
-  // Fetch unit details (uses same chalets API — shared table)
+  // Fetch unit details
   const { data: unitData, isLoading, error: unitError } = useQuery({
-    queryKey: ['chalet', unitId],
-    queryFn: () => chaletsApi.getChalet(unitId),
+    queryKey: ['unit', unitId],
+    queryFn: () => api.get(`/${slug}/units/${unitId}`),
   });
 
   // Fetch add-ons
   const { data: addOnsData } = useQuery({
-    queryKey: ['chalet-addons', moduleId],
-    queryFn: () => chaletsApi.getAddOns(moduleId),
+    queryKey: ['unit-addons', moduleId],
+    queryFn: () => api.get(`/${slug}/addons`, { params: { moduleId } }),
     enabled: !!moduleId,
   });
 
@@ -131,7 +130,7 @@ export default function DynamicUnitDetailPage() {
 
   const fetchAvailability = async () => {
     try {
-      const response = await api.get(`/chalets/${unitId}/availability`, {
+      const response = await api.get(`/${slug}/units/${unitId}/availability`, {
         params: { startDate: checkInDate, endDate: checkOutDate },
       });
       setBlockedDates(response.data.data?.blockedDates || []);
@@ -178,8 +177,8 @@ export default function DynamicUnitDetailPage() {
 
     setIsSubmitting(true);
     try {
-      const response = await api.post('/chalets/bookings', {
-        chaletId: unit.id,
+      const response = await api.post(`/${slug}/bookings`, {
+        unitId: unit.id,
         customerName, customerEmail, customerPhone,
         checkInDate, checkOutDate, numberOfGuests,
         addOns: selectedAddOns, specialRequests,

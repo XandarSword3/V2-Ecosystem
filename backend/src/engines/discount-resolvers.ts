@@ -5,7 +5,7 @@
  * These implement the CouponResolver, GiftCardResolver, and LoyaltyResolver interfaces.
  * 
  * Each resolver wraps the existing atomic RPC call patterns from order.service.ts
- * but makes them reusable across ALL engines (not just restaurant).
+ * but makes them reusable across ALL engines (not just a single engine type).
  */
 
 import { getSupabase } from '../database/connection.js';

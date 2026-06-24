@@ -45,9 +45,9 @@ import {
 function createModule(overrides: Partial<Module> = {}): Module {
   return {
     id: 'mod-1',
-    template_type: 'menu_service',
-    name: 'Restaurant',
-    slug: 'restaurant',
+    template_type: 'instant_transaction',
+    name: 'MenuService',
+    slug: 'instant_transaction',
     is_active: true,
     sort_order: 1,
     ...overrides,
@@ -57,20 +57,20 @@ function createModule(overrides: Partial<Module> = {}): Module {
 describe('module-utils', () => {
   it('prefers custom icon from settings before slug fallback', () => {
     const withCustomIcon = createModule({ settings: { icon: 'coffee' } });
-    const withSlugIcon = createModule({ slug: 'pool' });
+    const withSlugIcon = createModule({ slug: 'capacity' });
 
     expect(getModuleIcon(withCustomIcon).displayName).toBe('Coffee');
     expect(getModuleIcon(withSlugIcon).displayName).toBe('Waves');
   });
 
   it('falls back to template type icon when slug is unknown', () => {
-    const module = createModule({ slug: 'unknown-module', template_type: 'session_access' });
+    const module = createModule({ slug: 'unknown-module', template_type: 'shared_capacity_access' });
 
     expect(getModuleIcon(module).displayName).toBe('Ticket');
   });
 
   it('normalizes icon names for getIconByName', () => {
-    expect(getIconByName('snack bar').displayName).toBe('Cookie');
+    expect(getIconByName('kiosk').displayName).toBe('Cookie');
     expect(getIconByName('hotel_rooms').displayName).toBe('Bed');
     expect(getIconByName('does-not-exist').displayName).toBe('Home');
   });
@@ -98,9 +98,9 @@ describe('module-utils', () => {
   });
 
   it('returns template-specific descriptions and stats', () => {
-    const menuModule = createModule({ name: 'Snack Bar', template_type: 'menu_service' });
-    const bookingModule = createModule({ name: 'Chalets', template_type: 'multi_day_booking' });
-    const sessionModule = createModule({ name: 'Pool', template_type: 'session_access' });
+    const menuModule = createModule({ name: 'KioskItem Bar', template_type: 'instant_transaction' });
+    const bookingModule = createModule({ name: 'AccommodationUnits', template_type: 'time_exclusive_reservation' });
+    const sessionModule = createModule({ name: 'Pool', template_type: 'shared_capacity_access' });
 
     expect(getModuleDefaultDescription(menuModule)).toContain('menu and place orders');
     expect(getModuleDefaultDescription(bookingModule)).toContain('Book your stay');

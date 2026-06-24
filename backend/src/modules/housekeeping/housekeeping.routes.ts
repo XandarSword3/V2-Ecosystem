@@ -6,21 +6,21 @@ import housekeepingImportRoutes from './housekeeping-import.routes.js';
 
 const router = Router();
 
-const staffAuth = [authenticate, authorize('staff', 'housekeeping_staff', 'chalet_staff', 'admin', 'super_admin')] as const;
+const staffAuth = [authenticate, authorize('staff', 'housekeeping_staff', 'admin', 'super_admin')] as const;
 const adminAuth = [authenticate, authorize('admin', 'super_admin')] as const;
 
 // Task types (staff can view)
 router.get('/task-types', authenticate, housekeepingController.getTaskTypes.bind(housekeepingController));
 
 // Staff routes
-router.get('/my-tasks', authenticate, authorize('staff', 'housekeeping_staff', 'chalet_staff', 'admin', 'super_admin'), housekeepingController.getMyTasks.bind(housekeepingController));
-router.post('/tasks/:id/start', authenticate, authorize('staff', 'housekeeping_staff', 'chalet_staff', 'admin', 'super_admin'), housekeepingController.startTask.bind(housekeepingController));
-router.post('/tasks/:id/complete', authenticate, authorize('staff', 'housekeeping_staff', 'chalet_staff', 'admin', 'super_admin'), housekeepingController.completeTask.bind(housekeepingController));
-router.post('/tasks/:id/issue', authenticate, authorize('staff', 'housekeeping_staff', 'chalet_staff', 'admin', 'super_admin'), housekeepingController.reportIssue.bind(housekeepingController));
+router.get('/my-tasks', authenticate, authorize('staff', 'housekeeping_staff', 'admin', 'super_admin'), housekeepingController.getMyTasks.bind(housekeepingController));
+router.post('/tasks/:id/start', authenticate, authorize('staff', 'housekeeping_staff', 'admin', 'super_admin'), housekeepingController.startTask.bind(housekeepingController));
+router.post('/tasks/:id/complete', authenticate, authorize('staff', 'housekeeping_staff', 'admin', 'super_admin'), housekeepingController.completeTask.bind(housekeepingController));
+router.post('/tasks/:id/issue', authenticate, authorize('staff', 'housekeeping_staff', 'admin', 'super_admin'), housekeepingController.reportIssue.bind(housekeepingController));
 
 // Admin routes - Tasks
 router.get('/tasks', authenticate, authorize('admin', 'super_admin'), housekeepingController.getTasks.bind(housekeepingController));
-router.get('/tasks/:id', authenticate, authorize('admin', 'super_admin', 'staff', 'housekeeping_staff', 'chalet_staff'), housekeepingController.getTask.bind(housekeepingController));
+router.get('/tasks/:id', authenticate, authorize('admin', 'super_admin', 'staff', 'housekeeping_staff'), housekeepingController.getTask.bind(housekeepingController));
 router.post('/tasks', authenticate, authorize('admin', 'super_admin'), housekeepingController.createTask.bind(housekeepingController));
 router.put('/tasks/:id', authenticate, authorize('admin', 'super_admin'), housekeepingController.updateTask.bind(housekeepingController));
 router.post('/tasks/:id/assign', authenticate, authorize('admin', 'super_admin'), housekeepingController.assignTask.bind(housekeepingController));
@@ -46,17 +46,17 @@ router.put('/sla-config', ...adminAuth, housekeepingAdvancedController.updateSLA
 router.post('/tasks/:id/inspect', ...adminAuth, housekeepingAdvancedController.submitInspection.bind(housekeepingAdvancedController));
 router.post('/inspections/:id/override', ...adminAuth, housekeepingAdvancedController.overrideInspection.bind(housekeepingAdvancedController));
 
-// ── Advanced: Chalet Management ──
-router.get('/check-in/:chaletId', ...staffAuth, housekeepingAdvancedController.canCheckIn.bind(housekeepingAdvancedController));
-router.post('/chalets/:chaletId/block', ...adminAuth, housekeepingAdvancedController.blockChalet.bind(housekeepingAdvancedController));
-router.post('/chalets/:chaletId/unblock', ...adminAuth, housekeepingAdvancedController.unblockChalet.bind(housekeepingAdvancedController));
+// ── Advanced: Unit Management ──
+router.get('/check-in/:unitId', ...staffAuth, housekeepingAdvancedController.canCheckIn.bind(housekeepingAdvancedController));
+router.post('/units/:unitId/block', ...adminAuth, housekeepingAdvancedController.blockUnit.bind(housekeepingAdvancedController));
+router.post('/units/:unitId/unblock', ...adminAuth, housekeepingAdvancedController.unblockUnit.bind(housekeepingAdvancedController));
 
 // ── Advanced: Reports & Room States ──
 router.get('/sla-report', ...adminAuth, housekeepingAdvancedController.getSLAReport.bind(housekeepingAdvancedController));
 router.get('/room-states', ...staffAuth, housekeepingAdvancedController.getRoomStates.bind(housekeepingAdvancedController));
 
 // ── Advanced: Checkout & Supplies ──
-router.post('/chalets/:chaletId/checkout-clean', ...adminAuth, housekeepingAdvancedController.triggerCheckoutClean.bind(housekeepingAdvancedController));
+router.post('/units/:unitId/checkout-clean', ...adminAuth, housekeepingAdvancedController.triggerCheckoutClean.bind(housekeepingAdvancedController));
 router.get('/tasks/:taskId/supplies', ...staffAuth, housekeepingAdvancedController.getTaskSupplies.bind(housekeepingAdvancedController));
 router.put('/tasks/:taskId/supplies', ...adminAuth, housekeepingAdvancedController.configureTaskSupplies.bind(housekeepingAdvancedController));
 

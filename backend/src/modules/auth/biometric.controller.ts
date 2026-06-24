@@ -5,6 +5,7 @@ import { logger } from '../../utils/logger.js';
 import { AppError } from '../../utils/AppError.js';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
+import { verifyRegistrationResponse, verifyAuthenticationResponse } from '@simplewebauthn/server';
 
 /**
  * Biometric/WebAuthn Authentication Controller
@@ -138,16 +139,32 @@ export async function registerComplete(req: Request, res: Response) {
     // Clean up session
     challengeStore.delete(sessionId);
 
-    // In production, verify the credential response properly using a WebAuthn library
-    // For now, we'll store the credential details
-    const { id: credentialId, response } = credential;
+    // Verify registration response cryptographically using @simplewebauthn/server
+    const expectedChallenge = session.challenge;
+    const expectedOrigin = req.headers.origin || process.env.WEBAUTHN_ORIGIN || 'http://localhost:3000';
+    const expectedRPID = process.env.WEBAUTHN_RP_ID || 'localhost';
 
-    if (!credentialId || !response?.attestationObject || !response?.clientDataJSON) {
-      return res.status(400).json({ success: false, error: 'Invalid credential format' });
+    let verification;
+    try {
+      verification = await verifyRegistrationResponse({
+        response: credential,
+        expectedChallenge,
+        expectedOrigin,
+        expectedRPID,
+        requireUserVerification: true,
+      });
+    } catch (verifError: any) {
+      logger.error('WebAuthn registration verification error:', verifError);
+      return res.status(400).json({ success: false, error: `Registration verification failed: ${verifError.message}` });
     }
 
-    // Extract public key (simplified - use @simplewebauthn/server in production)
-    const publicKey = response.attestationObject; // Simplified
+    if (!verification.verified || !verification.registrationInfo) {
+      return res.status(400).json({ success: false, error: 'Registration verification failed' });
+    }
+
+    const { credential: verifiedCredential } = verification.registrationInfo;
+    const { publicKey: credentialPublicKey, id: credentialID, counter } = verifiedCredential;
+    const publicKeyBase64 = Buffer.from(credentialPublicKey).toString('base64url');
 
     const supabase = getSupabase();
 
@@ -156,9 +173,9 @@ export async function registerComplete(req: Request, res: Response) {
       .from('biometric_credentials')
       .insert({
         user_id: userId,
-        credential_id: credentialId,
-        public_key: publicKey,
-        counter: 0,
+        credential_id: credentialID,
+        public_key: publicKeyBase64,
+        counter: counter || 0,
         device_type: deviceType || 'unknown',
         device_name: deviceName || 'Unnamed Device',
       })
@@ -311,42 +328,41 @@ export async function authenticateComplete(req: Request, res: Response) {
       return res.status(401).json({ success: false, error: 'Invalid credential' });
     }
 
-    // SECURITY FIX (HIGH-005): Verify counter to detect cloned authenticators
-    // The counter in authenticatorData should be greater than the stored counter.
-    // If it's not, the authenticator may have been cloned.
-    const authDataBuffer = Buffer.from(response.authenticatorData, 'base64url');
-    // Counter is bytes 33-36 of authenticatorData (big-endian uint32)
-    const presentedCounter = authDataBuffer.length >= 37
-      ? authDataBuffer.readUInt32BE(33)
-      : 0;
+    // Verify authentication response cryptographically using @simplewebauthn/server
+    const expectedChallenge = session.challenge;
+    const expectedOrigin = req.headers.origin || process.env.WEBAUTHN_ORIGIN || 'http://localhost:3000';
+    const expectedRPID = process.env.WEBAUTHN_RP_ID || 'localhost';
 
-    if (storedCredential.counter > 0 && presentedCounter <= storedCredential.counter) {
-      logger.warn(`WebAuthn counter mismatch for user ${userId} - possible authenticator clone`, {
-        storedCounter: storedCredential.counter,
-        presentedCounter,
-        credentialId,
+    let verification;
+    try {
+      verification = await verifyAuthenticationResponse({
+        response: credential,
+        expectedChallenge,
+        expectedOrigin,
+        expectedRPID,
+        credential: {
+          id: storedCredential.credential_id,
+          publicKey: Buffer.from(storedCredential.public_key, 'base64url'),
+          counter: storedCredential.counter,
+        },
+        requireUserVerification: true,
       });
-      // Deactivate the credential as a precaution
-      await supabase
-        .from('biometric_credentials')
-        .update({ is_active: false })
-        .eq('id', storedCredential.id);
-
-      return res.status(401).json({
-        success: false,
-        error: 'Credential security check failed. Please re-register your biometric.',
-      });
+    } catch (verifError: any) {
+      logger.error('WebAuthn authentication verification error:', verifError);
+      return res.status(401).json({ success: false, error: `Authentication verification failed: ${verifError.message}` });
     }
 
-    // TODO: For full production security, integrate @simplewebauthn/server
-    // to perform cryptographic signature verification against the stored public key.
-    // The current implementation trusts credential ID match + counter validation.
+    if (!verification.verified || !verification.authenticationInfo) {
+      return res.status(401).json({ success: false, error: 'Authentication verification failed' });
+    }
+
+    const { newCounter } = verification.authenticationInfo;
 
     // Update counter and last_used_at
     await supabase
       .from('biometric_credentials')
       .update({
-        counter: storedCredential.counter + 1,
+        counter: newCounter,
         last_used_at: new Date().toISOString(),
       })
       .eq('id', storedCredential.id);

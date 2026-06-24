@@ -27,7 +27,7 @@ export async function validatePropertyAccess(req: Request, res: Response, next: 
   // automated callers may send stale or placeholder values; blocking them with
   // a hard error breaks the hydration loop. Treat an invalid value the same
   // as a missing header (no property scoping applied).
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(propertyId)) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(propertyId)) {
     logger.warn('x-property-id header present but not a valid UUID — ignoring', {
       path: req.path,
       prefix: propertyId.substring(0, 8),

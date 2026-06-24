@@ -589,7 +589,7 @@ function renderDomain() {
       ${field({
         id: 'domain', label: 'Domain Name', badge: 'optional', value: state.config.domain,
         hint: 'Enter your domain without <code>https://</code>. Example: <code>admin.myresort.com</code> or <code>myresort.com</code>. Leave blank to run on localhost only (no SSL).',
-        placeholder: 'admin.myresort.com',
+        placeholder: 'admin.myproperty.com',
       })}
     </div>
 
@@ -804,7 +804,7 @@ function renderSuccess() {
         <div class="success-title">V2 Ecosystem is live!</div>
         <div class="success-sub">
           Docker containers are running, the database is migrated, and your stack is ready.
-          The next step is <strong>Wizard 2</strong> — opening the install page in your browser to create your owner account and configure your resort.
+          The next step is <strong>Wizard 2</strong> — opening the install page in your browser to create your owner account and configure your property.
         </div>
 
         <div style="margin-top:28px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
@@ -821,7 +821,7 @@ function renderSuccess() {
         <div class="form-section-title">What happens next (Wizard 2)</div>
         <ul class="what-list">
           <li class="what-item"><span class="what-icon">👤</span><div class="what-text"><strong>Create your owner account</strong> — name, email, and password for the super admin.</div></li>
-          <li class="what-item"><span class="what-icon">🏨</span><div class="what-text"><strong>Configure your resort</strong> — name, branding, modules, rooms, and menus.</div></li>
+          <li class="what-item"><span class="what-icon">🏨</span><div class="what-text"><strong>Configure your property</strong> — name, branding, modules, rooms, and menus.</div></li>
           <li class="what-item"><span class="what-icon">🔒</span><div class="what-text"><strong>Locked for good</strong> — the install page disappears after setup and can't be accessed again without reinstalling.</div></li>
         </ul>
       </div>

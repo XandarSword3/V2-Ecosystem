@@ -1,32 +1,26 @@
--- File: supabase/migrations/20260130180000_fix_chalets_schema.sql
+-- Migration: add deleted_at soft-delete columns to renamed platform tables
 -- UP Migration
 BEGIN;
 
 DO $$
 BEGIN
-	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'chalets') THEN
-		ALTER TABLE chalets ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'accommodation_units') THEN
+		ALTER TABLE accommodation_units ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	END IF;
 
 	-- Also check other generated tables
-	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'chalet_bookings') THEN
-		ALTER TABLE chalet_bookings ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	-- unit reservations: soft-delete handled via transactions.status (no standalone table)
+	-- capacity access tickets: soft-delete handled via transactions.status (no standalone table)
+	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'capacity_windows') THEN
+		ALTER TABLE capacity_windows ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	END IF;
-	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'pool_tickets') THEN
-		ALTER TABLE pool_tickets ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'catalog_categories') THEN
+		ALTER TABLE catalog_categories ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	END IF;
-	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'pool_sessions') THEN
-		ALTER TABLE pool_sessions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'catalog_items') THEN
+		ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	END IF;
-	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'menu_categories') THEN
-		ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-	END IF;
-	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'menu_items') THEN
-		ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-	END IF;
-	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'snack_items') THEN
-		ALTER TABLE snack_items ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-	END IF;
+	-- standalone kiosk catalog: demolished; no-op
 	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'inventory_items') THEN
 		ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	END IF;

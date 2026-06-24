@@ -34,8 +34,8 @@ test.describe('Admin Settings → Customer Experience Workflow', () => {
     await expect(page.locator('footer').first()).toBeVisible();
   });
 
-  test('Phase 4: Customer experiences restaurant with configured settings', async ({ page }) => {
-    await page.goto(`${BASE}/restaurant`);
+  test('Phase 4: Customer experiences menu service with configured settings', async ({ page }) => {
+    await page.goto(`${BASE}/menu service`);
     await expect(page.locator('main').first()).toBeVisible();
     // Menu should load with items
     const body = await page.locator('body').textContent() || '';

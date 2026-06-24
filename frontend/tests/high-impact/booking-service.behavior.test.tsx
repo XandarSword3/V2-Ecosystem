@@ -11,7 +11,7 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/lib/api', () => ({
   chaletsApi: {
-    getChalets: vi.fn(),
+    getAccommodationUnits: vi.fn(),
   },
 }));
 
@@ -75,8 +75,8 @@ import { BookingService } from '../../src/components/modules/BookingService';
 
 const moduleData = {
   id: 'mod-booking',
-  slug: 'chalets',
-  name: 'Chalet Stays',
+  slug: 'accommodation_units',
+  name: 'AccommodationUnit Stays',
   description: 'Stay with us',
   settings: {
     header_color: '#ff6b6b',
@@ -165,7 +165,7 @@ describe('BookingService behavior', () => {
     expect(screen.getAllByText('40% deposit required')[0]).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /booknow/i })[0]);
-    expect(pushMock).toHaveBeenCalledWith('/chalets/unit-1?module=mod-booking');
+    expect(pushMock).toHaveBeenCalledWith('/accommodation_units/unit-1?module=mod-booking');
   });
 
   it('renders empty-state card when no units are available', () => {

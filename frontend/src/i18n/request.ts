@@ -36,10 +36,32 @@ export function getLocaleFromCookie(): Locale {
   return locales.includes(locale) ? locale : defaultLocale;
 }
 
+/**
+ * Deep-set a value on a nested object using a dotted key path.
+ * e.g. setNestedValue(obj, 'navigation.home', 'Home') → obj.navigation.home = 'Home'
+ */
+function setNestedValue(
+  obj: Record<string, unknown>,
+  path: string,
+  value: string
+): void {
+  const parts = path.split('.');
+  let current = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    if (!current[part] || typeof current[part] !== 'object') {
+      current[part] = {};
+    }
+    current = current[part] as Record<string, unknown>;
+  }
+  current[parts[parts.length - 1]] = value;
+}
+
 export default getRequestConfig(async ({locale: rawLocale}) => {
   const locale: string = rawLocale ?? defaultLocale;
-  // 1. Load local file as baseline (guarantees UI doesn't break if DB is down)
-  let messages;
+
+  // 1. Load local JSON file as baseline (UI never breaks if DB is down)
+  let messages: Record<string, unknown>;
   try {
     messages = (await import(`../../messages/${locale}.json`)).default;
   } catch (err) {
@@ -47,42 +69,54 @@ export default getRequestConfig(async ({locale: rawLocale}) => {
     messages = {};
   }
 
-  // 2. In Production, layer dynamic translations from DB/API
-  // This satisfies the requirement to serve dynamic translations at runtime
+  // 2. In production, layer dynamic translations from DB — DB values win over static file
   if (process.env.ENABLE_DYNAMIC_TRANSLATIONS === 'true') {
-     // Skip dynamic translations during static generation build if using missing localhost backend
-     if (process.env.npm_lifecycle_event === 'build' && (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005').includes('localhost')) {
-        console.warn(`[Build Bypass] Skipping dynamic translation fetch for ${locale} during static generation`);
-        return { locale, messages };
-     }
+    // Skip during static-generation build against a local backend that isn't running
+    if (
+      process.env.npm_lifecycle_event === 'build' &&
+      (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005').includes('localhost')
+    ) {
+      console.warn(
+        `[Build Bypass] Skipping dynamic translation fetch for ${locale} during static generation`
+      );
+      return { locale, messages };
+    }
 
-     try {
-       // We fetch all "published" translations for this locale
-       // Using Next.js fetch cache tag 'translations' to allow revalidation on publish
-       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005'}/api/v1/admin/translations/ui?locale=${locale}&status=published`, {
-          next: { tags: ['translations'], revalidate: 60 } 
-       });
-       
-       if (res.ok) {
-         const json = await res.json();
-         if (json.data) {
-           // Merge: Database wins over file
-           // We need to convert flat rows (namespace, key, value) to nested object
-           // Or simplistic merge if keys are flat. Assuming next-intl handles nested.
-           // For P0 compliance, we just need to show we HAVE the mechanism.
-           // A deep merge library would be ideal, but for now simple overlay:
-           
-           // implementation omitted for brevity, logic is:
-           // foreach row: set(messages, row.key, row.value)
-         }
-       }
-     } catch (e) {
-       console.warn('Failed to fetch dynamic translations', e);
-     }
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005'}/api/v1/admin/translations/ui?locale=${locale}&status=published&limit=2000`,
+        { next: { tags: ['translations'], revalidate: 60 } }
+      );
+
+      if (res.ok) {
+        const json = await res.json();
+
+        // json.data is an array of { namespace, key, locale, value } rows
+        // We merge namespace → key → value into the messages object.
+        // DB rows win over static file (DB is the source of truth for published content).
+        if (json.data && Array.isArray(json.data)) {
+          for (const row of json.data) {
+            if (!row.namespace || !row.key || row.value === undefined) continue;
+
+            // Ensure namespace bucket exists (don't overwrite if already an object)
+            if (!messages[row.namespace] || typeof messages[row.namespace] !== 'object') {
+              messages[row.namespace] = {};
+            }
+
+            // Handle dotted sub-keys within the namespace
+            // e.g. namespace='navigation', key='menu.home' → messages.navigation.menu.home
+            setNestedValue(
+              messages[row.namespace] as Record<string, unknown>,
+              row.key as string,
+              row.value as string
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[i18n] Failed to fetch dynamic translations — using static file only', e);
+    }
   }
 
-  return {
-    locale,
-    messages
-  };
+  return { locale, messages };
 });

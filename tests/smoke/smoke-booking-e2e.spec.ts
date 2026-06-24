@@ -36,19 +36,19 @@ async function findBookableChalet(
   expect(chaletsResponse.status()).toBe(200);
 
   const chaletsBody = await chaletsResponse.json();
-  const chalets = (chaletsBody?.data || []) as ChaletSummary[];
-  expect(chalets.length).toBeGreaterThan(0);
+  const accommodation_units = (chaletsBody?.data || []) as ChaletSummary[];
+  expect(accommodation_units.length).toBeGreaterThan(0);
 
   const startDay = checkInDate.slice(0, 10);
   const endDay = checkOutDate.slice(0, 10);
 
-  for (const chalet of chalets) {
-    if (!chalet?.id) {
+  for (const accommodationUnit of accommodation_units) {
+    if (!accommodationUnit?.id) {
       continue;
     }
 
     const availabilityResponse = await request.get(
-      `${API_BASE_URL}/api/v1/units/${chalet.id}/availability`,
+      `${API_BASE_URL}/api/v1/units/${accommodationUnit.id}/availability`,
       {
         params: { startDate: startDay, endDate: endDay },
       },
@@ -67,7 +67,7 @@ async function findBookableChalet(
     );
 
     if (!hasOverlap) {
-      return chalet;
+      return accommodation unit;
     }
   }
 
@@ -75,7 +75,7 @@ async function findBookableChalet(
 }
 
 test.describe('Smoke 02 - Core Booking Flow', () => {
-  test('SMOKE-02 @smoke customer can create and retrieve a chalet booking', async ({ request, auth }) => {
+  test('SMOKE-02 @smoke customer can create and retrieve a accommodation unit booking', async ({ request, auth }) => {
     const customerToken = await auth.getApiToken('customer');
     const csrfToken = await getCsrfToken(request);
 
@@ -86,22 +86,22 @@ test.describe('Smoke 02 - Core Booking Flow', () => {
       { checkInDate: getIsoDate(30), checkOutDate: getIsoDate(32) },
     ];
 
-    let selectedWindow: { checkInDate: string; checkOutDate: string; chalet: ChaletSummary } | null = null;
+    let selectedWindow: { checkInDate: string; checkOutDate: string; accommodation unit: ChaletSummary } | null = null;
     for (const window of candidateWindows) {
-      const chalet = await findBookableChalet(request, window.checkInDate, window.checkOutDate);
-      if (chalet) {
-        selectedWindow = { ...window, chalet };
+      const accommodation unit = await findBookableChalet(request, window.checkInDate, window.checkOutDate);
+      if (accommodation unit) {
+        selectedWindow = { ...window, accommodation unit };
         break;
       }
     }
 
-    test.skip(!selectedWindow, 'No available chalet found across smoke booking windows');
+    test.skip(!selectedWindow, 'No available accommodation unit found across smoke booking windows');
     if (!selectedWindow) {
       return;
     }
 
-    const { checkInDate, checkOutDate, chalet } = selectedWindow;
-    const maxGuests = Number(chalet.max_guests ?? chalet.maxGuests ?? 2);
+    const { checkInDate, checkOutDate, accommodation unit } = selectedWindow;
+    const maxGuests = Number(accommodation unit.max_guests ?? accommodation unit.maxGuests ?? 2);
     const numberOfGuests = Math.max(1, Math.min(2, Number.isFinite(maxGuests) ? maxGuests : 2));
 
     const createResponse = await request.post(`${API_BASE_URL}/api/v1/units/bookings`, {
@@ -110,7 +110,7 @@ test.describe('Smoke 02 - Core Booking Flow', () => {
         'x-csrf-token': csrfToken,
       },
       data: {
-        chaletId: chalet.id,
+        unitId: accommodation unit.id,
         customerName: 'Smoke Customer',
         customerEmail: `smoke.booking.${Date.now()}@example.com`,
         customerPhone: '+15550001234',
@@ -136,7 +136,7 @@ test.describe('Smoke 02 - Core Booking Flow', () => {
     const fetchedBody = await fetchResponse.json();
     expect(fetchedBody?.success).toBe(true);
     expect(fetchedBody?.data?.id).toBe(bookingId);
-    expect(fetchedBody?.data?.chalet_id).toBe(chalet.id);
+    expect(fetchedBody?.data?.unit_id).toBe(accommodation unit.id);
 
     const myBookingsResponse = await request.get(`${API_BASE_URL}/api/v1/units/my-bookings`, {
       headers: { Authorization: `Bearer ${customerToken}` },

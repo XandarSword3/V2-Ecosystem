@@ -98,7 +98,7 @@ router.get('/dual-write/discrepancies', authenticate, authorize('admin'),
 // PUBLIC ROUTES (customer-facing)
 // ==========================================
 
-// Get customizations for an entity (menu item, chalet, etc.)
+// Get customizations for an entity (catalog item, accommodation unit, etc.)
 router.get('/for-entity/:entityType/:entityId',
   customizationController.getCustomizationsForEntity.bind(customizationController));
 

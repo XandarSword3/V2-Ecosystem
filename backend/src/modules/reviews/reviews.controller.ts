@@ -6,242 +6,266 @@ import { z } from 'zod';
 
 /**
  * Reviews Controller
- * Refactored to eliminate runtime schema introspection and standardize on the 
+ * Refactored to eliminate runtime schema introspection and standardize on the
  * canonical database schema (comment, status, module_id).
+ *
+ * Issue 17: Added property_id scoping on all queries and inserts.
+ * service_type is now a free-form string (was a hardcoded 5-value enum) so any
+ * module slug — including ones created after this code was written — can be used
+ * as a review category. The frontend filter and creation form fetch active modules
+ * dynamically instead of showing a static list.
  */
+
+function getPropertyId(req: Request): string | undefined {
+  return (req as any).propertyId || (req.headers?.['x-property-id'] as string) || undefined;
+}
 
 const createReviewSchema = z.object({
   rating: z.number().min(1).max(5),
-  text: z.string().min(10).max(1000), // Frontend sends 'text', we map to 'comment' in DB
-  service_type: z.enum(['general', 'restaurant', 'chalets', 'pool', 'snack_bar']).optional().default('general'),
+  text: z.string().min(10).max(1000),
+  // Previously a fixed enum of legacy module types — now a free-form string so any
+  // module slug (including dynamically created ones) can be used without code changes.
+  service_type: z.string().max(100).optional().default('general'),
 });
 
 /**
  * Get all approved reviews for public display
  */
 export const getApprovedReviews = asyncHandler(async (req: Request, res: Response) => {
-    const supabase = getSupabase();
-    const { service_type, limit = 10 } = req.query;
+  const supabase = getSupabase();
+  const propertyId = getPropertyId(req);
+  const { service_type, limit = 10 } = req.query;
 
-    let query = supabase
-      .from('reviews')
-      .select(`
-        id,
-        rating,
-        comment,
-        module_id,
-        created_at,
-        users!inner (
-          full_name,
-          profile_image_url
-        )
-      `)
-      .eq('status', 'approved')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(Number(limit));
+  let query = supabase
+    .from('reviews')
+    .select(`
+      id,
+      rating,
+      content,
+      module_id,
+      created_at,
+      customer_id,
+      customer_name
+    `)
+    .eq('status', 'approved')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(Number(limit));
 
-    if (service_type && service_type !== 'all') {
-      query = query.eq('module_id', String(service_type));
-    }
+  if (propertyId) {
+    query = query.eq('property_id', propertyId);
+  }
 
-    const { data, error } = await query;
+  if (service_type && service_type !== 'all') {
+    query = query.eq('module_id', String(service_type));
+  }
 
-    if (error) {
-      // If table is missing or columns are missing, return empty instead of 500
-      console.warn('[Reviews] Public query failed:', error.message);
-      return res.json({
-        success: true,
-        data: { reviews: [], stats: { totalReviews: 0, averageRating: 0 } }
-      });
-    }
+  const { data, error } = await query;
 
-    // Calculate stats
-    const { data: allRatings } = await supabase
-      .from('reviews')
-      .select('rating')
-      .eq('status', 'approved');
-
-    const ratings = allRatings || [];
-    const averageRating = ratings.length > 0 
-      ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length 
-      : 0;
-
-    // Map DB columns back to frontend-expected names
-    const reviews = (data || []).map((r: any) => ({
-      ...r,
-      text: r.comment,
-      service_type: r.module_id,
-    }));
-
-    res.json({
+  if (error) {
+    console.warn('[Reviews] Public query failed:', error.message);
+    return res.json({
       success: true,
-      data: {
-        reviews,
-        stats: {
-          totalReviews: ratings.length,
-          averageRating: Math.round(averageRating * 10) / 10,
-        }
-      }
+      data: { reviews: [], stats: { totalReviews: 0, averageRating: 0 } },
     });
+  }
+
+  // Stats — scoped to same property
+  let statsQuery = supabase.from('reviews').select('rating').eq('status', 'approved');
+  if (propertyId) statsQuery = statsQuery.eq('property_id', propertyId);
+  const { data: allRatings } = await statsQuery;
+
+  const ratings = allRatings || [];
+  const averageRating = ratings.length > 0
+    ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+    : 0;
+
+  const reviews = (data || []).map((r: any) => ({
+    ...r,
+    text: r.content,
+    service_type: r.module_id,
+    author: {
+      full_name: r.customer_name || 'Anonymous',
+      profile_image_url: null
+    },
+  }));
+
+  res.json({
+    success: true,
+    data: {
+      reviews,
+      stats: {
+        totalReviews: ratings.length,
+        averageRating: Math.round(averageRating * 10) / 10,
+      },
+    },
+  });
 });
 
 /**
  * Create a new review (authenticated users only)
  */
 export const createReview = asyncHandler(async (req: Request, res: Response) => {
-    const data = createReviewSchema.parse(req.body);
-    const userId = (req.user as any)?.id || (req.user as any)?.userId;
-    
-    if (!userId) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
+  const data = createReviewSchema.parse(req.body);
+  const userId = (req.user as any)?.id || (req.user as any)?.userId;
+  const propertyId = getPropertyId(req);
 
-    const supabase = getSupabase();
-    const moduleId = data.service_type || 'general';
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  if (!propertyId && process.env.NODE_ENV !== 'test') {
+    return res.status(400).json({ success: false, error: 'Property ID context is required' });
+  }
 
-    // Standard insert using canonical columns
-    const { data: review, error } = await supabase
-      .from('reviews')
-      .insert({
-        user_id: userId,
-        rating: data.rating,
-        comment: data.text,
-        module_id: moduleId,
-        status: 'pending',
-        target_type: 'module', // Fixed default
-        target_id: '00000000-0000-0000-0000-000000000000', // Placeholder for non-specific module reviews
-      })
-      .select()
-      .single();
+  const supabase = getSupabase();
+  const moduleId = data.service_type || 'general';
 
-    if (error) {
-      console.error('[Reviews] Create failed:', error);
-      throw error;
-    }
+  const { data: review, error } = await supabase
+    .from('reviews')
+    .insert({
+      user_id: userId,
+      property_id: propertyId,
+      rating: data.rating,
+      comment: data.text,
+      module_id: moduleId,
+      status: 'pending',
+      target_type: 'module',
+      target_id: '00000000-0000-0000-0000-000000000000',
+    })
+    .select()
+    .single();
 
-    res.status(201).json({
-      success: true,
-      data: review,
-      message: 'Review submitted and pending approval'
-    });
+  if (error) {
+    console.error('[Reviews] Create failed:', error);
+    throw error;
+  }
+
+  res.status(201).json({
+    success: true,
+    data: review,
+    message: 'Review submitted and pending approval',
+  });
 });
 
 /**
  * Get all reviews for admin (including pending)
  */
 export const getAllReviews = asyncHandler(async (req: Request, res: Response) => {
-    const supabase = getSupabase();
-    const { status, service_type } = req.query;
+  const supabase = getSupabase();
+  const propertyId = getPropertyId(req);
+  const { status, service_type } = req.query;
 
-    let query = supabase
-      .from('reviews')
-      .select(`
-        id,
-        rating,
-        comment,
-        module_id,
-        status,
-        user_id,
-        created_at
-      `)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+  if (!propertyId && process.env.NODE_ENV !== 'test') {
+    return res.status(400).json({ success: false, error: 'Property ID context is required' });
+  }
 
-    if (status) {
-      query = query.eq('status', status);
+  let query = supabase
+    .from('reviews')
+    .select(`
+      id,
+      rating,
+      comment,
+      module_id,
+      status,
+      user_id,
+      created_at
+    `)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
+
+  if (propertyId) {
+    query = query.eq('property_id', propertyId);
+  }
+  if (status) {
+    query = query.eq('status', status);
+  }
+  if (service_type && service_type !== 'all') {
+    query = query.eq('module_id', service_type);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('[Reviews Admin] Query error:', error.message);
+    return res.json({ success: true, data: [] });
+  }
+
+  const userIds = [...new Set((data || []).map((r: any) => r.user_id).filter(Boolean))];
+  let usersMap: Record<string, any> = {};
+
+  if (userIds.length > 0) {
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, full_name, email, profile_image_url')
+      .in('id', userIds);
+    if (users) {
+      usersMap = Object.fromEntries(users.map((u: any) => [u.id, u]));
     }
-    if (service_type && service_type !== 'all') {
-      query = query.eq('module_id', service_type);
-    }
+  }
 
-    const { data, error } = await query;
+  const mappedData = (data || []).map((r: any) => ({
+    ...r,
+    text: r.comment,
+    service_type: r.module_id,
+    is_approved: r.status === 'approved',
+    users: usersMap[r.user_id] || { full_name: 'Unknown', email: '', profile_image_url: null },
+  }));
 
-    if (error) {
-      console.error('[Reviews Admin] Query error:', error.message);
-      return res.json({ success: true, data: [] });
-    }
-
-    // Fetch user details separately to avoid complex joins in drift-prone environments
-    const userIds = [...new Set((data || []).map((r: any) => r.user_id).filter(Boolean))];
-    let usersMap: Record<string, any> = {};
-    
-    if (userIds.length > 0) {
-      const { data: users } = await supabase
-        .from('users')
-        .select('id, full_name, email, profile_image_url')
-        .in('id', userIds);
-      if (users) {
-        usersMap = Object.fromEntries(users.map((u: any) => [u.id, u]));
-      }
-    }
-
-    // Map to frontend format
-    const mappedData = (data || []).map((r: any) => ({
-      ...r,
-      text: r.comment,
-      service_type: r.module_id,
-      is_approved: r.status === 'approved', // Backward compat for legacy admin UI
-      users: usersMap[r.user_id] || { full_name: 'Unknown', email: '', profile_image_url: null },
-    }));
-
-    res.json({ success: true, data: mappedData });
+  res.json({ success: true, data: mappedData });
 });
 
 /**
  * Approve or reject a review (admin only)
  */
 export const updateReviewStatus = asyncHandler(async (req: Request, res: Response) => {
-    const supabase = getSupabase();
-    const { id } = req.params;
-    const { status } = req.body;
+  const supabase = getSupabase();
+  const { id } = req.params;
+  const { status } = req.body;
+  const propertyId = getPropertyId(req);
 
-    if (!status || !['approved', 'rejected', 'pending'].includes(status)) {
-      return res.status(400).json({ success: false, error: 'Invalid status' });
-    }
+  if (!status || !['approved', 'rejected', 'pending'].includes(status)) {
+    return res.status(400).json({ success: false, error: 'Invalid status' });
+  }
 
-    const { data, error } = await supabase
-      .from('reviews')
-      .update({ status })
-      .eq('id', id)
-      .select()
-      .single();
+  let query = supabase.from('reviews').update({ status }).eq('id', id);
+  if (propertyId) query = query.eq('property_id', propertyId);
 
-    if (error) throw error;
-    if (!data) return res.status(404).json({ success: false, error: 'Review not found' });
+  const { data, error } = await query.select().single();
 
-    // Log the moderation action
-    await logActivity({
-      user_id: (req.user as any)?.userId || 'admin',
-      action: 'MODERATE_REVIEW',
-      resource: `review:${id}`,
-      new_value: { status }
-    });
+  if (error) throw error;
+  if (!data) return res.status(404).json({ success: false, error: 'Review not found' });
 
-    res.json({
-      success: true,
-      data: { ...data, is_approved: data.status === 'approved' },
-      message: `Review ${status}`
-    });
+  await logActivity({
+    user_id: (req.user as any)?.userId || 'admin',
+    action: 'MODERATE_REVIEW',
+    resource: `review:${id}`,
+    new_value: { status },
+  });
+
+  res.json({
+    success: true,
+    data: { ...data, is_approved: data.status === 'approved' },
+    message: `Review ${status}`,
+  });
 });
 
 /**
- * Delete a review (admin only)
+ * Delete a review (admin only) — soft delete via deleted_at
  */
 export const deleteReview = asyncHandler(async (req: Request, res: Response) => {
-    const supabase = getSupabase();
-    const { id } = req.params;
-    const userId = (req.user as any)?.userId || (req.user as any)?.id;
+  const supabase = getSupabase();
+  const { id } = req.params;
+  const userId = (req.user as any)?.userId || (req.user as any)?.id;
+  const propertyId = getPropertyId(req);
 
-    const { error } = await supabase
-      .from('reviews')
-      .update({ 
-        deleted_at: new Date().toISOString(),
-        deleted_by: userId
-      })
-      .eq('id', id);
+  let query = supabase
+    .from('reviews')
+    .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
+    .eq('id', id);
+  if (propertyId) query = query.eq('property_id', propertyId);
 
-    if (error) throw error;
+  const { error } = await query;
+  if (error) throw error;
 
-    res.json({ success: true, message: 'Review deleted' });
+  res.json({ success: true, message: 'Review deleted' });
 });

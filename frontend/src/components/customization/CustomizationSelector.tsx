@@ -29,9 +29,10 @@ import {
 
 export type CustomizationType = 'add' | 'remove' | 'swap' | 'upgrade' | 'replace';
 export type CustomizableEntityType = 
+  | 'catalog_item'
   | 'menu_item' 
-  | 'snack_bar_item' 
-  | 'chalet' 
+  | 'kiosk_item' 
+  | 'accommodation_unit' 
   | 'pool_session' 
   | 'spa_service' 
   | 'activity' 

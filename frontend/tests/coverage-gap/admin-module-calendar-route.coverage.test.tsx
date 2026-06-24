@@ -13,10 +13,10 @@ const toastErrorMock = vi.hoisted(() => vi.fn());
 const siteSettingsMock = vi.hoisted(() => ({
   modules: [
     {
-      id: 'module-chalets',
+      id: 'module-accommodation_units',
       template_type: 'multi_day_booking',
-      name: 'Chalets',
-      slug: 'chalets',
+      name: 'AccommodationUnits',
+      slug: 'accommodation_units',
       is_active: true,
       sort_order: 1,
     },
@@ -73,7 +73,7 @@ const bookingsSeed = [
 const blockedDatesSeed = [
   {
     id: 'blk-1',
-    chalet_id: 'ch-1',
+    unit_id: 'ch-1',
     blocked_date: '2026-06-15',
     reason: 'Maintenance',
   },
@@ -81,7 +81,7 @@ const blockedDatesSeed = [
 
 describe('Admin module calendar route coverage', () => {
   beforeEach(() => {
-    useParamsMock.mockReturnValue({ slug: 'chalets' });
+    useParamsMock.mockReturnValue({ slug: 'accommodation_units' });
 
     apiGetMock.mockReset();
     apiPostMock.mockReset();
@@ -90,13 +90,13 @@ describe('Admin module calendar route coverage', () => {
     toastErrorMock.mockReset();
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/chalets') {
+      if (url === '/admin/modules/accommodation_units/units') {
         return Promise.resolve({
           data: {
             data: [
               {
                 id: 'ch-1',
-                name: 'Pine Chalet',
+                name: 'Pine AccommodationUnit',
                 base_price: 120,
                 weekend_price: 150,
               },
@@ -105,7 +105,7 @@ describe('Admin module calendar route coverage', () => {
         });
       }
 
-      if (url === '/chalets/admin/chalets/ch-1/calendar') {
+      if (url === '/admin/modules/accommodation_units/units/ch-1/calendar') {
         return Promise.resolve({
           data: {
             data: {

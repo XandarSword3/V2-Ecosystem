@@ -58,12 +58,9 @@ interface ReviewsResponse {
 // Empty placeholder - no fake testimonials
 const emptyTestimonials: Testimonial[] = [];
 
-const serviceTypeLabels: Record<string, string> = {
-  general: 'Resort Guest',
-  restaurant: 'Restaurant Guest',
-  pool: 'Pool Guest',
-  chalets: 'Chalet Guest',
-  snack_bar: 'Snack Bar Guest',
+const getServiceLabel = (serviceType: string): string => {
+  if (serviceType === 'general') return 'Guest';
+  return serviceType.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('') + ' Guest';
 };
 
 export default function TestimonialsCarousel() {
@@ -110,7 +107,7 @@ export default function TestimonialsCarousel() {
                 id: review.id,
                 name,
                 avatar: review.users?.profile_image_url,
-                role: serviceTypeLabels[review.service_type] || 'Guest',
+                role: getServiceLabel(review.service_type),
                 rating: review.rating,
                 text: review.text,
                 date: review.created_at?.split('T')[0] || '',
@@ -232,7 +229,7 @@ export default function TestimonialsCarousel() {
               id: review.id,
               name: (review as any).users?.full_name || 
                 ((review as any).user ? `${(review as any).user.first_name} ${(review as any).user.last_name}` : 'Guest'),
-              role: serviceTypeLabels[review.service_type] || 'Guest',
+              role: getServiceLabel(review.service_type),
               rating: review.rating,
               text: review.text,
               date: review.created_at.split('T')[0],
@@ -320,9 +317,6 @@ export default function TestimonialsCarousel() {
                 className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
               >
                 <option value="general">{t('serviceGeneral') || 'General Experience'}</option>
-                <option value="chalets">{t('serviceChalets') || 'Chalets'}</option>
-                <option value="restaurant">{t('serviceRestaurant') || 'Restaurant'}</option>
-                <option value="pool">{t('servicePool') || 'Pool'}</option>
               </select>
             </div>
             <div className="mb-6">

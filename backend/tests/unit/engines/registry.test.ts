@@ -85,6 +85,7 @@ describe('Engine Registry', () => {
         'time_exclusive_reservation',
         'shared_capacity_access',
         'ongoing_entitlement',
+        'platform_entitlement',
       ];
 
       for (const engineType of engines) {
@@ -103,20 +104,21 @@ describe('Engine Registry', () => {
   });
 
   describe('getAllEngineTypes', () => {
-    it('should return all four engine types', () => {
+    it('should return all five engine types', () => {
       const types = getAllEngineTypes();
-      expect(types).toHaveLength(4);
+      expect(types).toHaveLength(5);
       expect(types).toContain('instant_transaction');
       expect(types).toContain('time_exclusive_reservation');
       expect(types).toContain('shared_capacity_access');
       expect(types).toContain('ongoing_entitlement');
+      expect(types).toContain('platform_entitlement');
     });
   });
 
   describe('getAllEngines', () => {
-    it('should return all four engine definitions', () => {
+    it('should return all five engine definitions', () => {
       const engines = getAllEngines();
-      expect(engines).toHaveLength(4);
+      expect(engines).toHaveLength(5);
     });
 
     it('should have complete definitions (state machine + pricing + interactions)', () => {

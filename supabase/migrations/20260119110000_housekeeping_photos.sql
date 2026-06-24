@@ -9,13 +9,13 @@ ADD COLUMN IF NOT EXISTS completion_photos JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE housekeeping_tasks
 ADD COLUMN IF NOT EXISTS before_photos JSONB DEFAULT '[]'::jsonb;
 
--- Add booking reference for checkout tasks
+-- booking_id on housekeeping_tasks now references transactions instead of chalet_bookings
 ALTER TABLE housekeeping_tasks
-ADD COLUMN IF NOT EXISTS booking_id UUID REFERENCES chalet_bookings(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS booking_id UUID; -- FK to transactions added by later migration
 
 -- Add inspection fields
 ALTER TABLE housekeeping_tasks
-ADD COLUMN IF NOT EXISTS inspected_by UUID REFERENCES users(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS inspected_by UUID; -- FK to users added by later migration
 
 ALTER TABLE housekeeping_tasks
 ADD COLUMN IF NOT EXISTS inspected_at TIMESTAMPTZ;
@@ -53,5 +53,5 @@ WHERE NOT EXISTS (
 
 COMMENT ON COLUMN housekeeping_tasks.completion_photos IS 'Array of photo URLs taken after task completion';
 COMMENT ON COLUMN housekeeping_tasks.before_photos IS 'Array of photo URLs taken before starting the task';
-COMMENT ON COLUMN housekeeping_tasks.booking_id IS 'Reference to chalet booking if this is a checkout task';
+COMMENT ON COLUMN housekeeping_tasks.booking_id IS 'Reference to accommodation booking if this is a checkout task';
 COMMENT ON COLUMN housekeeping_tasks.quality_score IS 'Quality rating 1-5 given during inspection';

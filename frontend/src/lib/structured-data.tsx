@@ -4,10 +4,11 @@
  * See: https://schema.org/
  */
 
-export interface ResortSchemaProps {
+export interface BusinessSchemaProps {
   name: string;
   description: string;
   url: string;
+  schemaType?: string; // Schema.org type e.g. 'FoodEstablishment', 'LocalBusiness'
   telephone?: string;
   email?: string;
   address?: {
@@ -24,12 +25,18 @@ export interface ResortSchemaProps {
     ratingValue: number;
     reviewCount: number;
   };
+  /** Amenities to list in schema.org amenityFeature (populated from active modules at call site) */
+  amenities?: string[];
 }
 
-export function generateResortSchema(props: ResortSchemaProps): object {
+/** @deprecated Use BusinessSchemaProps instead */
+export type ResortSchemaProps = BusinessSchemaProps; // kept for call-site compat
+
+/** Generate Schema.org JSON-LD for any business type. Defaults to LocalBusiness. */
+export function generateBusinessSchema(props: BusinessSchemaProps): object {
   return {
     '@context': 'https://schema.org',
-    '@type': 'Resort',
+    '@type': props.schemaType || 'LocalBusiness',
     name: props.name,
     description: props.description,
     url: props.url,
@@ -58,16 +65,18 @@ export function generateResortSchema(props: ResortSchemaProps): object {
       bestRating: 5,
       worstRating: 1,
     } : undefined,
-    amenityFeature: [
-      { '@type': 'LocationFeatureSpecification', name: 'Restaurant', value: true },
-      { '@type': 'LocationFeatureSpecification', name: 'Swimming Pool', value: true },
-      { '@type': 'LocationFeatureSpecification', name: 'Chalets', value: true },
-      { '@type': 'LocationFeatureSpecification', name: 'Snack Bar', value: true },
-    ],
+    amenityFeature: props.amenities?.map(name => ({
+      '@type': 'LocationFeatureSpecification',
+      name,
+      value: true,
+    })),
   };
 }
 
-export interface RestaurantSchemaProps {
+/** @deprecated Use generateBusinessSchema instead */
+export const generateResortSchema = generateBusinessSchema;
+
+export interface FoodServiceSchemaProps {
   name: string;
   description: string;
   url: string;
@@ -83,10 +92,10 @@ export interface RestaurantSchemaProps {
   };
 }
 
-export function generateRestaurantSchema(props: RestaurantSchemaProps): object {
+export function generateFoodServiceSchema(props: FoodServiceSchemaProps): object {
   return {
     '@context': 'https://schema.org',
-    '@type': 'Restaurant',
+    '@type': 'FoodEstablishment',
     name: props.name,
     description: props.description,
     url: props.url,
@@ -166,7 +175,7 @@ export interface AccommodationSchemaProps {
   currency?: string;
 }
 
-export function generateChaletSchema(props: AccommodationSchemaProps): object {
+export function generateAccommodationUnitSchema(props: AccommodationSchemaProps): object {
   return {
     '@context': 'https://schema.org',
     '@type': 'LodgingBusiness',
@@ -195,7 +204,7 @@ export function generateChaletSchema(props: AccommodationSchemaProps): object {
   };
 }
 
-export interface PoolSchemaProps {
+export interface ActivityLocationSchemaProps {
   name: string;
   description?: string;
   url: string;
@@ -204,7 +213,7 @@ export interface PoolSchemaProps {
   priceRange?: string;
 }
 
-export function generatePoolSchema(props: PoolSchemaProps): object {
+export function generateActivityLocationSchema(props: ActivityLocationSchemaProps): object {
   return {
     '@context': 'https://schema.org',
     '@type': 'SportsActivityLocation',
@@ -218,7 +227,7 @@ export function generatePoolSchema(props: PoolSchemaProps): object {
   };
 }
 
-export interface SnackBarSchemaProps {
+export interface QuickServiceSchemaProps {
   name: string;
   description?: string;
   url: string;
@@ -232,7 +241,7 @@ export interface SnackBarSchemaProps {
   }>;
 }
 
-export function generateSnackBarSchema(props: SnackBarSchemaProps): object {
+export function generateQuickServiceSchema(props: QuickServiceSchemaProps): object {
   return {
     '@context': 'https://schema.org',
     '@type': 'FastFoodRestaurant',

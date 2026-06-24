@@ -247,9 +247,9 @@ export default function AnalyticsReportsPage() {
     try {
       const response = await api.get('/admin/reports/export', {
         params: {
-          // Backend admin exportReport expects `type`, `format`, and optional `range`.
-          // This UI exports a best-effort single report type for now.
-          type: 'restaurant',
+          // Backend admin exportReport expects moduleSlug, moduleId, or engineType.
+          // This UI exports instant transactions by default.
+          engineType: 'instant_transaction',
           format,
           range: 'month',
         },

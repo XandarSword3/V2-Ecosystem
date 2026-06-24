@@ -8,11 +8,11 @@ const routerRefreshMock = vi.hoisted(() => vi.fn());
 
 const siteSettingsState = vi.hoisted(() => ({
   settings: {
-    resortName: 'Summit Resort',
+    siteName: 'Summit Property',
     navbar: {
       links: [
         { type: 'internal', label: 'Home', href: '/', icon: 'Home' },
-        { type: 'module', moduleSlug: 'chalets', label: 'Units', href: '/chalets', icon: 'Home' },
+        { type: 'module', moduleSlug: 'accommodation_units', label: 'Units', href: '/accommodation_units', icon: 'Home' },
       ],
       config: {
         showLanguageSwitcher: true,
@@ -25,7 +25,7 @@ const siteSettingsState = vi.hoisted(() => ({
     },
   },
   modules: [
-    { id: 'm-1', slug: 'chalets', name: 'Chalets', is_active: true, show_in_main: true, sort_order: 1, template_type: 'multi_day_booking' },
+    { id: 'm-1', slug: 'accommodation_units', name: 'AccommodationUnits', is_active: true, show_in_main: true, sort_order: 1, template_type: 'multi_day_booking' },
   ],
 }));
 
@@ -73,7 +73,7 @@ vi.mock('next-intl', () => ({
       signIn: 'Sign In',
       myProfile: 'My Profile',
       register: 'Register',
-      chalets: 'Chalets',
+      accommodation_units: 'AccommodationUnits',
     };
     return dictionary[key] || key;
   },
@@ -117,11 +117,11 @@ describe('Header layout component coverage', () => {
     authState.isAuthenticated = true;
 
     siteSettingsState.settings = {
-      resortName: 'Summit Resort',
+      siteName: 'Summit Property',
       navbar: {
         links: [
           { type: 'internal', label: 'Home', href: '/', icon: 'Home' },
-          { type: 'module', moduleSlug: 'chalets', label: 'Units', href: '/chalets', icon: 'Home' },
+          { type: 'module', moduleSlug: 'accommodation_units', label: 'Units', href: '/accommodation_units', icon: 'Home' },
         ],
         config: {
           showLanguageSwitcher: true,
@@ -135,7 +135,7 @@ describe('Header layout component coverage', () => {
     };
 
     siteSettingsState.modules = [
-      { id: 'm-1', slug: 'chalets', name: 'Chalets', is_active: true, show_in_main: true, sort_order: 1, template_type: 'multi_day_booking' },
+      { id: 'm-1', slug: 'accommodation_units', name: 'AccommodationUnits', is_active: true, show_in_main: true, sort_order: 1, template_type: 'multi_day_booking' },
     ];
   });
 
@@ -145,9 +145,9 @@ describe('Header layout component coverage', () => {
     render(<Header />);
 
     expect(screen.getByRole('banner')).toBeInTheDocument();
-    expect(screen.getByText('Summit Resort')).toBeInTheDocument();
+    expect(screen.getByText('Summit Property')).toBeInTheDocument();
 
-    expect(await screen.findByText('Cabins')).toBeInTheDocument();
+    expect(await screen.findByText('AccommodationUnits')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /English/i })).toBeInTheDocument();
     expect(screen.getByText('$')).toBeInTheDocument();
 

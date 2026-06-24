@@ -3,72 +3,86 @@
 import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { MapPin, Phone, Mail, Clock, Navigation, Waves, UtensilsCrossed, Home, Palmtree } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSiteSettings } from '@/lib/settings-context';
 
 interface MapLocation {
   id: string;
   name: string;
-  nameKey: string;
   x: number;
   y: number;
   icon: React.ReactNode;
   description: string;
+  slug: string;
 }
 
 export default function InteractiveResortMap() {
   const t = useTranslations('resortMap');
-  const { settings } = useSiteSettings();
+  const { settings, modules } = useSiteSettings();
   const [selectedLocation, setSelectedLocation] = useState<MapLocation | null>(null);
   const [isHovered, setIsHovered] = useState<string | null>(null);
 
-  const locations: MapLocation[] = [
-    {
-      id: 'restaurant',
-      name: 'Restaurant',
-      nameKey: 'restaurant',
-      x: 35,
-      y: 40,
-      icon: <UtensilsCrossed className="w-5 h-5" />,
-      description: 'Fine Lebanese & international cuisine',
-    },
-    {
-      id: 'pool',
-      name: 'Swimming Pool',
-      nameKey: 'pool',
-      x: 60,
-      y: 55,
-      icon: <Waves className="w-5 h-5" />,
-      description: 'Olympic-size pool with lounging area',
-    },
-    {
-      id: 'chalets',
-      name: 'Chalets',
-      nameKey: 'chalets',
-      x: 75,
-      y: 30,
-      icon: <Home className="w-5 h-5" />,
-      description: 'Luxury mountain-view accommodations',
-    },
-    {
-      id: 'snackbar',
-      name: 'Snack Bar',
-      nameKey: 'snackBar',
-      x: 50,
-      y: 70,
-      icon: <Palmtree className="w-5 h-5" />,
-      description: 'Poolside refreshments & light bites',
-    },
-    {
-      id: 'reception',
-      name: 'Reception',
-      nameKey: 'reception',
-      x: 20,
-      y: 60,
-      icon: <MapPin className="w-5 h-5" />,
-      description: 'Main entrance & guest services',
-    },
-  ];
+  const locations = useMemo(() => {
+    const list: MapLocation[] = [
+      {
+        id: 'reception',
+        name: 'Reception',
+        x: 20,
+        y: 60,
+        icon: <MapPin className="w-5 h-5" />,
+        description: 'Main entrance & guest services',
+        slug: '',
+      },
+    ];
+
+    modules.forEach((module) => {
+      if (!module.is_active) return;
+
+      if (module.template_type === 'instant_transaction') {
+        list.push({
+          id: module.id,
+          name: module.name,
+          x: 35,
+          y: 40,
+          icon: <UtensilsCrossed className="w-5 h-5" />,
+          description: module.description || 'On-site dining and services',
+          slug: module.slug,
+        });
+      } else if (module.template_type === 'shared_capacity_access') {
+        list.push({
+          id: module.id,
+          name: module.name,
+          x: 60,
+          y: 55,
+          icon: <Waves className="w-5 h-5" />,
+          description: module.description || 'Facility access and sessions',
+          slug: module.slug,
+        });
+      } else if (module.template_type === 'time_exclusive_reservation') {
+        list.push({
+          id: module.id,
+          name: module.name,
+          x: 75,
+          y: 30,
+          icon: <Home className="w-5 h-5" />,
+          description: module.description || 'Luxury accommodation booking',
+          slug: module.slug,
+        });
+      } else if (module.template_type === 'ongoing_entitlement') {
+        list.push({
+          id: module.id,
+          name: module.name,
+          x: 50,
+          y: 70,
+          icon: <Palmtree className="w-5 h-5" />,
+          description: module.description || 'Ongoing activities and entitlements',
+          slug: module.slug,
+        });
+      }
+    });
+
+    return list;
+  }, [modules]);
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl overflow-hidden">
@@ -76,9 +90,9 @@ export default function InteractiveResortMap() {
       <div className="bg-gradient-to-r from-emerald-600 to-teal-500 px-6 py-4">
         <h3 className="text-xl font-bold text-white flex items-center gap-2">
           <Navigation className="w-5 h-5" />
-          {t('title')}
+          {t('title') || 'Property Map'}
         </h3>
-        <p className="text-white/80 text-sm">{t('subtitle')}</p>
+        <p className="text-white/80 text-sm">{t('subtitle') || 'Explore our dynamic modules'}</p>
       </div>
 
       {/* Map Container */}
@@ -197,14 +211,16 @@ export default function InteractiveResortMap() {
                   {selectedLocation.description}
                 </p>
               </div>
-              <motion.a
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                href={`/${selectedLocation.id === 'snackbar' ? 'snack-bar' : selectedLocation.id}`}
-                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg font-medium shadow-lg"
-              >
-                {t('explore')}
-              </motion.a>
+              {selectedLocation.slug && (
+                <motion.a
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  href={`/${selectedLocation.slug}`}
+                  className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg font-medium shadow-lg"
+                >
+                  {t('explore') || 'Explore'}
+                </motion.a>
+              )}
             </div>
           </div>
         )}
@@ -218,7 +234,7 @@ export default function InteractiveResortMap() {
         </div>
         <div className="p-4 text-center border-r border-slate-200 dark:border-slate-700">
           <Mail className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
-          <p className="text-xs text-slate-600 dark:text-slate-400">{settings.email || 'info@yourresort.com'}</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">{settings.email || 'info@example.com'}</p>
         </div>
         <div className="p-4 text-center">
           <Clock className="w-5 h-5 text-emerald-600 mx-auto mb-1" />

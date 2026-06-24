@@ -30,6 +30,7 @@ import {
     ExternalLink
 } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings-context';
+import { useProperty } from '@/context/PropertyContext';
 
 interface NavLink {
     type: 'internal' | 'external' | 'module';
@@ -83,6 +84,11 @@ export default function NavbarSettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const { modules, refetch: refetchSettings } = useSiteSettings();
+    const { activePropertyId } = useProperty();
+
+    // Include property header on every settings request so the backend
+    // stores the value in the correct property scope rather than global.
+    const propertyHeader = activePropertyId ? { 'x-property-id': activePropertyId } : {};
 
     useEffect(() => {
         fetchSettings();
@@ -90,6 +96,7 @@ export default function NavbarSettingsPage() {
 
     const fetchSettings = async () => {
         try {
+            // Read from global row (no property header) to match what handleSave writes.
             const { data } = await api.get('/admin/settings');
             if (data?.data?.navbar) {
                 // Deep-merge with DEFAULT_CONFIG so navbar.config is always
@@ -118,7 +125,13 @@ export default function NavbarSettingsPage() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            // Send navbar directly in the body (backend expects settings.navbar)
+            // Navbar is a site-wide CMS concern, not property-scoped.
+            // The public storefront reads site_settings WHERE property_id IS NULL
+            // (global fallback path in getSettings) because the platform tenant
+            // has no property_group_id and resolveProperty returns nothing.
+            // Sending x-property-id here writes to a property-scoped row that
+            // the storefront never reads. Strip the header so the backend always
+            // writes to the global (property_id = NULL) row.
             await api.put('/admin/settings', { navbar });
             toast.success('Navbar configuration saved successfully');
             // Refetch settings to update the header immediately

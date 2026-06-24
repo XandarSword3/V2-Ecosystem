@@ -31,7 +31,7 @@ import {
 
 export interface Module {
   id: string;
-  template_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
+  engine_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
   name: string;
   slug: string;
   description?: string;
@@ -51,13 +51,6 @@ export interface Module {
  * Icon mapping for modules based on slug or template type
  */
 const ICON_MAP: Record<string, LucideIcon> = {
-  // Default modules
-  'restaurant': UtensilsCrossed,
-  'snack-bar': Cookie,
-  'snackbar': Cookie,
-  'pool': Waves,
-  'chalets': Home,
-  
   // Common module types
   'gym': Dumbbell,
   'gym-floor': Dumbbell,
@@ -82,6 +75,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   'shop': ShoppingBag,
   'tickets': Ticket,
   
+  // Capacity/pool/session slugs
+  'capacity': Waves,
+  'kiosk': Cookie,
+
   // Default by template type
   'instant_transaction': UtensilsCrossed,
   'time_exclusive_reservation': Home,
@@ -105,7 +102,7 @@ export function getModuleIcon(module: Module): LucideIcon {
   }
   
   // Finally fallback to template type
-  return ICON_MAP[module.template_type] || Home;
+  return ICON_MAP[module.engine_type] || Home;
 }
 
 /**
@@ -139,7 +136,7 @@ export function getNavModules(modules: Module[]): Module[] {
  * This is used when the module doesn't have a custom description
  */
 export function getModuleDefaultDescription(module: Module): string {
-  switch (module.template_type) {
+  switch (module.engine_type) {
     case 'instant_transaction':
       return `Browse our ${module.name.toLowerCase()} menu and place orders`;
     case 'time_exclusive_reservation':
@@ -155,7 +152,7 @@ export function getModuleDefaultDescription(module: Module): string {
  * Generate a stat label for a module
  */
 export function getModuleStatLabel(module: Module): string {
-  switch (module.template_type) {
+  switch (module.engine_type) {
     case 'instant_transaction':
       return 'Menu Items';
     case 'time_exclusive_reservation':
@@ -172,7 +169,7 @@ export function getModuleStatLabel(module: Module): string {
  * In production, this should be fetched from the actual module data
  */
 export function getModuleStatPlaceholder(module: Module): number {
-  switch (module.template_type) {
+  switch (module.engine_type) {
     case 'instant_transaction':
       return 50;
     case 'time_exclusive_reservation':

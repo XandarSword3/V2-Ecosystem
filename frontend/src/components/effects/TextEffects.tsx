@@ -30,3 +30,17 @@ export function BlurReveal({ children, className = '', style }: Props) {
 export function HighlightText({ children, className = '', style }: Props) {
   return <span className={className} style={style}>{children}</span>;
 }
+
+export function HoverLetters({ children, className = '', style }: Props) {
+  return <span className={className} style={style}>{children}</span>;
+}
+
+interface TypewriterProps {
+  text: string;
+  speed?: number;
+  className?: string;
+}
+
+export function TypewriterText({ text, className = '' }: TypewriterProps) {
+  return <span className={className}>{text}</span>;
+}

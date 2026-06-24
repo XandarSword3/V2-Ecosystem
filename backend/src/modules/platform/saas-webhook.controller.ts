@@ -77,6 +77,18 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
         break;
       }
 
+      // No platform-root check needed here. provision_tenant_on_activate's only
+      // real danger is a tenant other than platform-root owning an Engine E
+      // module and wiring its own checkout into this path — and that's already
+      // fully blocked at the source by createModule()'s platform_entitlement
+      // guard in modules.controller.ts (no other tenant can ever own such a
+      // module). This endpoint (/api/platform/checkout) is the public, anonymous
+      // landing-page signup — there is no "calling tenant" to check at all; the
+      // tenantId in metadata is a freshly-generated UUID for the prospective
+      // tenant that doesn't exist yet, not an identity to authorise against.
+      // A previous version of this guard compared that UUID to the platform-root
+      // tenant and therefore rejected every real signup, silently, always.
+
       const subscription = await resolveSubscription(session.subscription as string);
       if (!subscription) break;
 

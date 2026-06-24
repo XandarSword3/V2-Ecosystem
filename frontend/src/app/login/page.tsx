@@ -23,16 +23,34 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   // 2FA state
   const [show2FA, setShow2FA] = useState(false);
   const [pending2FAUserId, setPending2FAUserId] = useState<string | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [useBackupCode, setUseBackupCode] = useState(false);
 
+  // Get redirect parameter from URL
+  const getRedirectPath = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      if (redirect && redirect.startsWith('/')) {
+        return redirect;
+      }
+    }
+    return null;
+  };
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
+      const redirectPath = getRedirectPath();
+      if (redirectPath) {
+        router.replace(redirectPath);
+        return;
+      }
+
       const roles = user.roles || [];
       if (roles.includes('super_admin') || roles.includes('admin')) {
         router.replace('/admin');
@@ -64,6 +82,13 @@ export default function LoginPage() {
       // Normal login success - result is a User at this point
       const userData = result as { id: string; email: string; fullName: string; roles: string[] };
 
+      // Check for redirect parameter first
+      const redirectPath = getRedirectPath();
+      if (redirectPath) {
+        window.location.href = redirectPath;
+        return;
+      }
+
       // Determine redirect based on roles
       const roles = userData.roles || [];
 
@@ -92,6 +117,13 @@ export default function LoginPage() {
     try {
       const userData = await verify2FA(pending2FAUserId, twoFactorCode);
 
+      // Check for redirect parameter first
+      const redirectPath = getRedirectPath();
+      if (redirectPath) {
+        window.location.href = redirectPath;
+        return;
+      }
+
       // Determine redirect based on roles
       const roles = userData.roles || [];
 
@@ -119,7 +151,7 @@ export default function LoginPage() {
             <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-primary-foreground font-bold text-xl">V2</span>
             </div>
-            <span className="text-2xl font-bold text-foreground">Resort</span>
+            <span className="text-2xl font-bold text-foreground">Platform</span>
           </Link>
         </div>
 

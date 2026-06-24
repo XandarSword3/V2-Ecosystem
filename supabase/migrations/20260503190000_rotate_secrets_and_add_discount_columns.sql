@@ -1,5 +1,5 @@
 -- Migration: Phase 3 Financial and Security Hardening
--- Adds discount_price columns to Snack Bar and Chalets
+-- Adds discount_price columns to Kiosk items and Accommodation Units
 -- Increments token_version for all users to force session re-authentication
 
 BEGIN;
@@ -12,13 +12,12 @@ ALTER TABLE IF EXISTS users
 
 UPDATE users SET token_version = token_version + 1;
 
--- 2. Financial: Support for sale prices in Snack Bar
-ALTER TABLE IF EXISTS snack_items
-  ADD COLUMN IF NOT EXISTS discount_price NUMERIC(10,2);
+-- 2. Financial: Support for sale prices in Kiosk
+-- kiosk_items not in canonical schema — no-op.
 
--- 3. Financial: Support for sale prices in Chalets
+-- 3. Financial: Support for sale prices in Accommodation Units
 -- This provides a simpler discount mechanism alongside the complex price rules.
-ALTER TABLE IF EXISTS chalets
+ALTER TABLE IF EXISTS accommodation_units
   ADD COLUMN IF NOT EXISTS discount_price NUMERIC(10,2);
 
 -- 4. Audit Log: Record the migration

@@ -102,7 +102,7 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
 
   const createStaffBooking = async () => {
     try {
-      const chaletId = window.prompt('Chalet ID');
+      const chaletId = window.prompt('Unit ID');
       if (!chaletId) return;
       const customerName = window.prompt('Guest name') || 'Walk-in Guest';
       const customerPhone = window.prompt('Guest phone') || '';
@@ -112,8 +112,8 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
         toast.error('Check-in and check-out are required');
         return;
       }
-      await api.post('/chalets/staff/bookings', {
-        chalet_id: chaletId,
+      await api.post(`/staff/modules/${slug}/bookings`, {
+        unit_id: chaletId,
         customer_name: customerName,
         customer_phone: customerPhone,
         check_in_date: checkIn,

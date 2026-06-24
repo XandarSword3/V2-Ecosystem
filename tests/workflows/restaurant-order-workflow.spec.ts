@@ -1,5 +1,5 @@
 /**
- * Restaurant Order Complete Workflow E2E Test
+ * MenuService Order Complete Workflow E2E Test
  * 
  * This test simulates a REAL end-to-end workflow:
  * 1. Customer browses menu and places an order
@@ -101,8 +101,8 @@ let customerPage: Page;
     }
   });
 
-  test('Step 1.2: Customer browses restaurant menu', async () => {
-    await customerPage.goto(`${FRONTEND_URL}/restaurant`);
+  test('Step 1.2: Customer browses menu service menu', async () => {
+    await customerPage.goto(`${FRONTEND_URL}/menu service`);
     await customerPage.waitForLoadState('load');
     
     // Verify page is displayed
@@ -111,8 +111,8 @@ let customerPage: Page;
     // Wait for content to load
     await customerPage.waitForLoadState('networkidle');
     
-    // Check that the restaurant page has loaded - look for heading or menu items
-    const pageContent = customerPage.locator('text=/Restaurant|Menu|Order|Categories|Popular|Item/i').first();
+    // Check that the menu service page has loaded - look for heading or menu items
+    const pageContent = customerPage.locator('text=/MenuService|Menu|Order|Categories|Popular|Item/i').first();
     await expect(pageContent).toBeVisible({ timeout: 10000 });
   });
 
@@ -237,7 +237,7 @@ let staffPage: Page;
 
   test('Step 2.2: Staff navigates to orders page', async () => {
     // Staff might go to admin or staff portal
-    await staffPage.goto(`${FRONTEND_URL}/admin/restaurant/orders`);
+    await staffPage.goto(`${FRONTEND_URL}/admin/${slug}/orders`);
     await staffPage.waitForLoadState('load');
     
     // Should see orders page - check for page content
@@ -335,8 +335,8 @@ let adminPage: Page;
     await expect(dashboardContent).toBeVisible({ timeout: 10000 });
   });
 
-  test('Step 3.3: Admin views restaurant orders', async () => {
-    await adminPage.goto(`${FRONTEND_URL}/admin/restaurant/orders`);
+  test('Step 3.3: Admin views menu service orders', async () => {
+    await adminPage.goto(`${FRONTEND_URL}/admin/${slug}/orders`);
     await adminPage.waitForLoadState('load');
     
     // Page should load with main content
@@ -425,14 +425,14 @@ test.describe('Phase 4: Verify Data Persistence', () => {
     }
     
     // Call API to get order
-    const response = await request.get(`${API_URL}/api/v1/restaurant/orders/${createdOrderId}`);
+    const response = await request.get(`${API_URL}/api/v1/${slug}/orders/${createdOrderId}`);
     
     // Should exist (or at least return a valid response)
     expect([200, 404]).toContain(response.status());
   });
 
   test('API: Verify order appears in orders list', async ({ request }) => {
-    const response = await request.get(`${API_URL}/api/v1/restaurant/orders`);
+    const response = await request.get(`${API_URL}/api/v1/${slug}/orders`);
     // API might return 404 if endpoint doesn't exist or 401 if auth required
     expect([200, 401, 404]).toContain(response.status());
     

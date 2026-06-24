@@ -6,9 +6,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createWeatherService } from '../../src/lib/services/weather.service';
-import { InMemoryWeatherRepository } from '../../src/lib/repositories/weather.repository.memory';
-import type { Container, WeatherData } from '../../src/lib/container/types';
+import { createWeatherService } from '../../../src/lib/services/weather.service';
+import { InMemoryWeatherRepository } from '../../../src/lib/repositories/weather.repository.memory';
+import type { Container, WeatherData } from '../../../src/lib/container/types';
 
 describe('WeatherService', () => {
   let service: ReturnType<typeof createWeatherService>;
@@ -22,37 +22,37 @@ describe('WeatherService', () => {
 
   describe('recordWeather', () => {
     it('should record weather with required fields', async () => {
-      const result = await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 32, temperatureLow: 24, temperatureCurrent: 28, humidity: 65, windSpeed: 15 });
+      const result = await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 32, temperatureLow: 24, temperatureCurrent: 28, humidity: 65, windSpeed: 15 });
       expect(result.success).toBe(true);
-      expect(result.data!.location).toBe('Resort Beach');
+      expect(result.data!.location).toBe('Property Beach');
       expect(result.data!.condition).toBe('sunny');
       expect(result.data!.temperatureCurrent).toBe(28);
     });
     it('should set optional fields', async () => {
-      const result = await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'partly_cloudy', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 70, windSpeed: 10, windDirection: 'NE', uvIndex: 8, precipitation: 0, visibility: 15, sunrise: '06:30', sunset: '19:00' });
+      const result = await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'partly_cloudy', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 70, windSpeed: 10, windDirection: 'NE', uvIndex: 8, precipitation: 0, visibility: 15, sunrise: '06:30', sunset: '19:00' });
       expect(result.success).toBe(true);
       expect(result.data!.windDirection).toBe('NE');
       expect(result.data!.uvIndex).toBe(8);
       expect(result.data!.visibility).toBe(15);
     });
     it('should reject empty location', async () => { expect((await service.recordWeather({ location: '', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 })).error).toBe('Location is required'); });
-    it('should reject invalid date', async () => { expect((await service.recordWeather({ location: 'Resort Beach', date: 'invalid-date', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 })).error).toBe('Invalid date format'); });
-    it('should reject invalid condition', async () => { expect((await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'hot', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 })).error).toContain('Invalid condition'); });
-    it('should reject high temp lower than low temp', async () => { expect((await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 20, temperatureLow: 25, temperatureCurrent: 22, humidity: 65, windSpeed: 10 })).error).toBe('High temperature cannot be lower than low temperature'); });
-    it('should reject current temp outside range', async () => { expect((await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 35, humidity: 65, windSpeed: 10 })).error).toBe('Current temperature must be between low and high'); });
-    it('should reject invalid humidity', async () => { expect((await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 150, windSpeed: 10 })).error).toBe('Humidity must be between 0 and 100'); });
-    it('should reject negative wind speed', async () => { expect((await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: -5 })).error).toBe('Wind speed must be non-negative'); });
-    it('should reject invalid UV index', async () => { expect((await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10, uvIndex: 20 })).error).toBe('UV index must be between 0 and 15'); });
-    it('should reject negative precipitation', async () => { expect((await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'rainy', temperatureHigh: 25, temperatureLow: 20, temperatureCurrent: 22, humidity: 85, windSpeed: 10, precipitation: -5 })).error).toBe('Precipitation cannot be negative'); });
-    it('should reject negative visibility', async () => { expect((await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'foggy', temperatureHigh: 20, temperatureLow: 15, temperatureCurrent: 17, humidity: 95, windSpeed: 5, visibility: -1 })).error).toBe('Visibility cannot be negative'); });
+    it('should reject invalid date', async () => { expect((await service.recordWeather({ location: 'Property Beach', date: 'invalid-date', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 })).error).toBe('Invalid date format'); });
+    it('should reject invalid condition', async () => { expect((await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'hot', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 })).error).toContain('Invalid condition'); });
+    it('should reject high temp lower than low temp', async () => { expect((await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 20, temperatureLow: 25, temperatureCurrent: 22, humidity: 65, windSpeed: 10 })).error).toBe('High temperature cannot be lower than low temperature'); });
+    it('should reject current temp outside range', async () => { expect((await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 35, humidity: 65, windSpeed: 10 })).error).toBe('Current temperature must be between low and high'); });
+    it('should reject invalid humidity', async () => { expect((await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 150, windSpeed: 10 })).error).toBe('Humidity must be between 0 and 100'); });
+    it('should reject negative wind speed', async () => { expect((await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: -5 })).error).toBe('Wind speed must be non-negative'); });
+    it('should reject invalid UV index', async () => { expect((await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10, uvIndex: 20 })).error).toBe('UV index must be between 0 and 15'); });
+    it('should reject negative precipitation', async () => { expect((await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'rainy', temperatureHigh: 25, temperatureLow: 20, temperatureCurrent: 22, humidity: 85, windSpeed: 10, precipitation: -5 })).error).toBe('Precipitation cannot be negative'); });
+    it('should reject negative visibility', async () => { expect((await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'foggy', temperatureHigh: 20, temperatureLow: 15, temperatureCurrent: 17, humidity: 95, windSpeed: 5, visibility: -1 })).error).toBe('Visibility cannot be negative'); });
   });
 
   describe('getCurrentWeather', () => {
     it('should get current weather for location', async () => {
-      await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 });
-      const result = await service.getCurrentWeather('Resort Beach');
+      await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 });
+      const result = await service.getCurrentWeather('Property Beach');
       expect(result.success).toBe(true);
-      expect(result.data!.location).toBe('Resort Beach');
+      expect(result.data!.location).toBe('Property Beach');
     });
     it('should reject empty location', async () => { expect((await service.getCurrentWeather('')).error).toBe('Location is required'); });
     it('should return error for unknown location', async () => { expect((await service.getCurrentWeather('Unknown Place')).error).toBe('No weather data found for location'); });
@@ -60,7 +60,7 @@ describe('WeatherService', () => {
 
   describe('updateWeather', () => {
     it('should update weather data', async () => {
-      const created = await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 });
+      const created = await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 });
       const result = await service.updateWeather(created.data!.id, { condition: 'partly_cloudy', temperatureCurrent: 28 });
       expect(result.success).toBe(true);
       expect(result.data!.condition).toBe('partly_cloudy');
@@ -68,27 +68,27 @@ describe('WeatherService', () => {
     });
     it('should reject invalid ID', async () => { expect((await service.updateWeather('invalid-id', { condition: 'cloudy' })).error).toBe('Invalid weather ID'); });
     it('should reject invalid condition', async () => {
-      const created = await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 });
+      const created = await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 });
       expect((await service.updateWeather(created.data!.id, { condition: 'hot' })).error).toContain('Invalid condition');
     });
   });
 
   describe('getWeatherHistory', () => {
     it('should get weather history for date range', async () => {
-      await service.recordWeather({ location: 'Resort Beach', date: '2026-01-10', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 });
-      await service.recordWeather({ location: 'Resort Beach', date: '2026-01-12', condition: 'cloudy', temperatureHigh: 28, temperatureLow: 20, temperatureCurrent: 24, humidity: 70, windSpeed: 15 });
-      const result = await service.getWeatherHistory('Resort Beach', '2026-01-09', '2026-01-15');
+      await service.recordWeather({ location: 'Property Beach', date: '2026-01-10', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 26, humidity: 65, windSpeed: 10 });
+      await service.recordWeather({ location: 'Property Beach', date: '2026-01-12', condition: 'cloudy', temperatureHigh: 28, temperatureLow: 20, temperatureCurrent: 24, humidity: 70, windSpeed: 15 });
+      const result = await service.getWeatherHistory('Property Beach', '2026-01-09', '2026-01-15');
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(2);
     });
     it('should reject empty location', async () => { expect((await service.getWeatherHistory('', '2026-01-01', '2026-01-15')).error).toBe('Location is required'); });
-    it('should reject invalid start date', async () => { expect((await service.getWeatherHistory('Resort Beach', 'invalid', '2026-01-15')).error).toBe('Invalid start date'); });
-    it('should reject invalid end date', async () => { expect((await service.getWeatherHistory('Resort Beach', '2026-01-01', 'invalid')).error).toBe('Invalid end date'); });
-    it('should reject end before start', async () => { expect((await service.getWeatherHistory('Resort Beach', '2026-01-15', '2026-01-01')).error).toBe('End date cannot be before start date'); });
+    it('should reject invalid start date', async () => { expect((await service.getWeatherHistory('Property Beach', 'invalid', '2026-01-15')).error).toBe('Invalid start date'); });
+    it('should reject invalid end date', async () => { expect((await service.getWeatherHistory('Property Beach', '2026-01-01', 'invalid')).error).toBe('Invalid end date'); });
+    it('should reject end before start', async () => { expect((await service.getWeatherHistory('Property Beach', '2026-01-15', '2026-01-01')).error).toBe('End date cannot be before start date'); });
   });
 
   describe('createAlert', () => {
-    const baseAlert = { type: 'warning' as const, severity: 'moderate' as const, title: 'Storm Warning', description: 'Severe storm expected this evening', location: 'Resort Beach', startTime: '2026-01-15T18:00:00Z', endTime: '2026-01-16T06:00:00Z' };
+    const baseAlert = { type: 'warning' as const, severity: 'moderate' as const, title: 'Storm Warning', description: 'Severe storm expected this evening', location: 'Property Beach', startTime: '2026-01-15T18:00:00Z', endTime: '2026-01-16T06:00:00Z' };
     it('should create alert with required fields', async () => {
       const result = await service.createAlert(baseAlert);
       expect(result.success).toBe(true);
@@ -105,8 +105,8 @@ describe('WeatherService', () => {
 
   describe('getAlerts', () => {
     it('should get alerts for location', async () => {
-      await service.createAlert({ type: 'warning', severity: 'moderate', title: 'Storm Warning', description: 'Severe storm expected', location: 'Resort Beach', startTime: '2026-01-15T18:00:00Z', endTime: '2026-01-16T06:00:00Z' });
-      const result = await service.getAlerts('Resort Beach');
+      await service.createAlert({ type: 'warning', severity: 'moderate', title: 'Storm Warning', description: 'Severe storm expected', location: 'Property Beach', startTime: '2026-01-15T18:00:00Z', endTime: '2026-01-16T06:00:00Z' });
+      const result = await service.getAlerts('Property Beach');
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(1);
     });
@@ -115,7 +115,7 @@ describe('WeatherService', () => {
 
   describe('deactivateAlert', () => {
     it('should deactivate alert', async () => {
-      const created = await service.createAlert({ type: 'warning', severity: 'moderate', title: 'Storm Warning', description: 'Severe storm expected', location: 'Resort Beach', startTime: '2026-01-15T18:00:00Z', endTime: '2026-01-16T06:00:00Z' });
+      const created = await service.createAlert({ type: 'warning', severity: 'moderate', title: 'Storm Warning', description: 'Severe storm expected', location: 'Property Beach', startTime: '2026-01-15T18:00:00Z', endTime: '2026-01-16T06:00:00Z' });
       const result = await service.deactivateAlert(created.data!.id);
       expect(result.success).toBe(true);
       expect(result.data!.isActive).toBe(false);
@@ -125,7 +125,7 @@ describe('WeatherService', () => {
 
   describe('deleteAlert', () => {
     it('should delete alert', async () => {
-      const created = await service.createAlert({ type: 'warning', severity: 'moderate', title: 'Storm Warning', description: 'Severe storm expected', location: 'Resort Beach', startTime: '2026-01-15T18:00:00Z', endTime: '2026-01-16T06:00:00Z' });
+      const created = await service.createAlert({ type: 'warning', severity: 'moderate', title: 'Storm Warning', description: 'Severe storm expected', location: 'Property Beach', startTime: '2026-01-15T18:00:00Z', endTime: '2026-01-16T06:00:00Z' });
       expect((await service.deleteAlert(created.data!.id)).success).toBe(true);
     });
     it('should reject invalid ID', async () => { expect((await service.deleteAlert('invalid')).error).toBe('Invalid alert ID'); });
@@ -195,10 +195,10 @@ describe('WeatherService', () => {
 
   describe('getRecommendedActivities', () => {
     it('should get activities matching weather conditions', async () => {
-      await service.recordWeather({ location: 'Resort Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 28, humidity: 65, windSpeed: 10, precipitation: 0 });
+      await service.recordWeather({ location: 'Property Beach', date: '2026-01-15', condition: 'sunny', temperatureHigh: 30, temperatureLow: 22, temperatureCurrent: 28, humidity: 65, windSpeed: 10, precipitation: 0 });
       await service.createActivity({ name: 'Beach Volleyball', description: 'Beach sports', category: 'sports', suitableConditions: ['sunny', 'partly_cloudy'], minTemperature: 20, maxTemperature: 35, maxWindSpeed: 25, maxPrecipitation: 0 });
       await service.createActivity({ name: 'Indoor Spa', description: 'Relaxation indoors', category: 'relaxation', suitableConditions: ['rainy', 'stormy'], minTemperature: 0, maxTemperature: 40 });
-      const result = await service.getRecommendedActivities('Resort Beach');
+      const result = await service.getRecommendedActivities('Property Beach');
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(1);
       expect(result.data![0].name).toBe('Beach Volleyball');

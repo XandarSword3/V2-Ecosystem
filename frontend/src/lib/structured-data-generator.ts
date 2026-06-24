@@ -22,18 +22,15 @@ export function generateLocalBusinessSchema(
     config: any, // Site configuration
     terms: any   // Current terminology
 ) {
-    let schemaType = 'LocalBusiness';
-
-    if (businessType === 'resort') schemaType = 'Resort';
-    if (businessType === 'hotel') schemaType = 'Hotel';
-    if (businessType === 'restaurant') schemaType = 'Restaurant';
+    // Schema.org type is config-driven; no hardcoded business type assumptions
+    const schemaType = config.schemaType || 'LocalBusiness';
 
     const schema: any = {
         '@context': 'https://schema.org',
         '@type': schemaType,
         'name': businessName,
         'description': config.description || `Welcome to ${businessName}, your premium ${terms.unit_singular} provider.`,
-        'url': config.url || 'https://ironparadisegym.com',
+        'url': config.url || 'https://example.com',
         'address': {
             '@type': 'PostalAddress',
             'streetAddress': config.address,
@@ -44,12 +41,13 @@ export function generateLocalBusinessSchema(
         'telephone': config.phone,
     };
 
-    if (businessType === 'restaurant') {
-        schema.servesCuisine = config.cuisine || 'International';
-        schema.menu = `${config.url}/menu`;
+    // Cuisine info is config-driven — applies to any module that serves food
+    if (config.cuisine) {
+        schema.servesCuisine = config.cuisine;
+        if (config.url) schema.menu = `${config.url}/menu`;
     }
 
-    if (businessType === 'resort' || businessType === 'hotel') {
+    if (config.amenityFeature !== false && terms.facility_plural) {
         schema.amenityFeature = [
             {
                 '@type': 'LocationFeatureSpecification',

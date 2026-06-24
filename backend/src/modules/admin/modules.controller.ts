@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, Router } from 'express';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection";
 import { emitToAll } from "../../socket";
@@ -11,12 +11,19 @@ import { loadDynamicModules } from "../../routes/dynamic-modules.loader.js";
 import { buildModulePermissionRows } from "../../security/template-permission-presets.js";
 import { permissionCache } from "../../security/permission-cache.service.js";
 import { assertModuleLimit } from "../../services/feature-limits.service.js";
+import { ENGINE_TO_LEGACY_TEMPLATE_TYPE } from "../../engines/types.js";
 
 export async function getModules(req: Request, res: Response, next: NextFunction) {
   try {
     const supabase = getSupabase();
     const { activeOnly } = req.query;
-    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+    // Property context: prefer req.property (resolved request-side by
+    // resolveProperty, mounted ahead of this handler on the public
+    // /api/modules route — see CONTEXT.md "Public/Admin Property Context
+    // Contamination", session 7-9). Fall back to req.propertyId, set by
+    // validatePropertyAccess for authenticated admin callers that hit this
+    // same handler via a different mount.
+    const propertyId = req.property?.id ?? ((req as any).propertyId as string | undefined);
 
     let query = supabase
       .from('modules')
@@ -38,7 +45,7 @@ export async function getModules(req: Request, res: Response, next: NextFunction
     }
 
     // Scope to tenant — only show this tenant's modules plus any unscoped (null) global modules
-    const tenantId = (req as any).tenant?.id || (req.headers['x-tenant-id'] as string);
+    const tenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string);
     if (tenantId) {
       query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
     }
@@ -62,7 +69,7 @@ export const getModule = asyncHandler(async (req: Request, res: Response) => {
       .from('modules')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     let data = initialData;
     const error = initialError;
@@ -73,7 +80,7 @@ export const getModule = asyncHandler(async (req: Request, res: Response) => {
         .from('modules')
         .select('*')
         .eq('slug', id)
-        .single();
+        .maybeSingle();
 
       if (slugErr) throw slugErr;
       if (!bySlug) return res.status(404).json({ success: false, error: 'Module not found' });
@@ -91,19 +98,71 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
     // Enforce tenant module limit before any DB work
     await assertModuleLimit(req);
 
-    // Validate input using schema to prevent XSS and ensure data integrity
-    const { template_type, name, slug, description, settings } = validateBody(createModuleSchema, req.body);
+    // Validate input using schema to prevent XSS and ensure data integrity.
+    // NOTE: createModuleSchema's engine_type enum deliberately excludes
+    // 'platform_entitlement' — Engine E is SaaS billing between operators and
+    // V2 itself, never a module type any tenant (including platform-root) can
+    // create through this endpoint. There is therefore no platform-root guard
+    // here: the type system already makes that branch unreachable.
+    const { engine_type, name, slug, description, settings } = validateBody(createModuleSchema, req.body);
 
     // Generate slug if not provided
     const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+    // Q159 — Reserved slug protection: prevent modules from shadowing system routes
+    const RESERVED_SLUGS = [
+      'admin', 'auth', 'api', 'health', 'install', 'modules', 'webhooks', 'docs',
+      'csrf-token', 'search', 'units', 'i18n', 'translations', 'terminology',
+      'integrations', 'onboarding', 'platform', 'saas', 'gdpr', 'payments',
+      'reports', 'support', 'analytics', 'loyalty', 'giftcards', 'users',
+    ];
+    if (RESERVED_SLUGS.includes(finalSlug)) {
+      return res.status(422).json({
+        success: false,
+        error: 'Reserved slug',
+        message: `The slug "${finalSlug}" is reserved for system use. Please choose a different name.`,
+        slug: finalSlug,
+      });
+    }
+
+    // Q171 — Scope slug uniqueness check to tenant so two tenants can share the same slug
+    const tenantIdForSlugCheck = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+
+    // Pre-check: if a module with this slug already exists within this tenant (active or inactive),
+    // surface a clear 409 rather than a cryptic 500 from the DB unique constraint.
+    let slugCheckQuery = supabase
+      .from('modules')
+      .select('id, is_active')
+      .eq('slug', finalSlug);
+
+    if (tenantIdForSlugCheck) {
+      slugCheckQuery = slugCheckQuery.eq('tenant_id', tenantIdForSlugCheck);
+    }
+
+    const { data: existing } = await slugCheckQuery.maybeSingle();
+
+    if (existing) {
+      const hint = existing.is_active
+        ? `A module with the slug "${finalSlug}" already exists and is active.`
+        : `A module with the slug "${finalSlug}" exists but is inactive. Delete it first or choose a different name.`;
+      return res.status(409).json({
+        success: false,
+        error: 'Slug conflict',
+        message: hint,
+        slug: finalSlug,
+      });
+    }
+
     // Default settings version for new modules
     const SETTINGS_VERSION = 1; 
+
+    const legacyTemplateType = ENGINE_TO_LEGACY_TEMPLATE_TYPE[engine_type as keyof typeof ENGINE_TO_LEGACY_TEMPLATE_TYPE] ?? null;
 
     const { data, error } = await supabase
       .from('modules')
       .insert({
-        template_type,
+        engine_type,
+        template_type: legacyTemplateType,
         name,
         slug: finalSlug,
         description,
@@ -111,17 +170,29 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         settings_version: SETTINGS_VERSION,
         is_active: true,
         show_in_main: true,
-        property_id: (req as any).propertyId || (req.headers['x-property-id'] as string) || null,
-        tenant_id: (req as any).tenant?.id || (req.headers['x-tenant-id'] as string) || null,
+        property_id: (req as any).propertyId ?? null,
+        tenant_id: (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null,
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Postgres unique_violation — belt-and-suspenders in case the pre-check
+      // race-conditions with a concurrent create
+      if ((error as any).code === '23505') {
+        return res.status(409).json({
+          success: false,
+          error: 'Slug conflict',
+          message: `A module with the slug "${finalSlug}" already exists. Choose a different name.`,
+          slug: finalSlug,
+        });
+      }
+      throw error;
+    }
 
     // Dynamic Permission Generation using template presets.
     try {
-        const modulePermissionSlugs = buildModulePermissionRows(finalSlug, template_type);
+        const modulePermissionSlugs = buildModulePermissionRows(finalSlug, engine_type);
         const permsToCreate = modulePermissionSlugs.map((slug) => ({
           slug,
           description: `Auto-generated permission for module ${name}`,
@@ -166,10 +237,10 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
           moduleSlug: finalSlug,
           label: name,
           // Icon mapped to real engine types (no legacy aliases)
-          icon: template_type === 'instant_transaction'        ? 'UtensilsCrossed' :
-                template_type === 'shared_capacity_access'     ? 'Waves'            :
-                template_type === 'time_exclusive_reservation' ? 'Home'             :
-                template_type === 'ongoing_entitlement'        ? 'Layers'           : 'Home',
+          icon: engine_type === 'instant_transaction'        ? 'UtensilsCrossed' :
+                engine_type === 'shared_capacity_access'     ? 'Waves'            :
+                engine_type === 'time_exclusive_reservation' ? 'Home'             :
+                engine_type === 'ongoing_entitlement'        ? 'Layers'           : 'Home',
         };
         
         const updatedLinks = [...settings.navbar.links, newNavLink];
@@ -207,7 +278,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         // 2. Permissions were already upserted in the block above — no need to call
         //    buildModulePermissionRows a second time.  Re-use the slugs we already
         //    pushed and just wire them up to the new module-specific roles.
-        const modulePermissionSlugs = buildModulePermissionRows(finalSlug, template_type);
+        const modulePermissionSlugs = buildModulePermissionRows(finalSlug, engine_type);
 
         const adminRoleName = `${finalSlug}_admin`;
         const staffRoleName = `${finalSlug}_staff`;
@@ -264,7 +335,11 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
     emitToAll('modules.updated', data);
 
     // Make the new module routes available immediately (no server restart).
-    await loadDynamicModules();
+    try {
+      await loadDynamicModules();
+    } catch (loadErr) {
+      logger.error('Module created but dynamic route reload failed:', loadErr);
+    }
 
     await logActivity({
       user_id: (req.user as any)?.userId || 'system',
@@ -289,7 +364,7 @@ export const updateModule = asyncHandler(async (req: Request, res: Response) => 
     // 1. Fetch current module to check permissions and version
     const { data: currentModule, error: fetchError } = await supabase
       .from('modules')
-      .select('slug, template_type, settings_version') 
+      .select('slug, engine_type, settings_version')
       .eq('id', id)
       .single();
 
@@ -424,35 +499,20 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
         }
       };
 
-      // Delete all transactions associated with this module
-      try {
-        const { count } = await supabase
-          .from('transactions')
-          .select('id', { count: 'exact', head: true })
-          .eq('module_id', id);
-
-        if (count && count > 0) {
-          const { error: delError } = await supabase
-            .from('transactions')
-            .delete()
-            .eq('module_id', id);
-
-          if (delError) {
-            errors.push(`transactions: ${delError.message}`);
-          } else {
-            deletedCounts['transactions'] = count;
-          }
-        }
-      } catch (e: any) {
-        errors.push(`transaction cascade: ${e.message}`);
-      }
+      // Q166 — Financial integrity: transactions MUST NOT be hard-deleted.
+      // Transaction records are the immutable financial ledger. They are retained
+      // even on force-delete; historical revenue data must survive module removal.
+      // The module_id FK becomes an orphaned reference (acceptable — the module row
+      // is gone but its slug/name was captured in the transaction at creation time).
+      logger.info(`[Modules] Skipping transaction deletion on force-delete of ${moduleData?.slug} — financial records are retained per Q166.`);
 
       // CASCADE DELETE: Delete all dependent data in correct order
       // Tables that have direct module_id column
+      // NOTE: use canonical post-Engine-Refit names — never legacy aliases
       const directModuleTables = [
-        'menu_items',
-        'menu_categories',
-        'pool_sessions',
+        'catalog_items',
+        'catalog_categories',
+        'capacity_windows',
         'accommodation_units',
         'reviews',
         'pages',
@@ -561,6 +621,27 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
     // Clear cache and notify clients
     clearModuleCache(data.slug);
     emitToAll('modules.updated', data);
+
+    // Q154 — Remove deactivated module from navbar CMS so it doesn't linger
+    // in navigation after soft-deletion (force-delete path already does this).
+    try {
+      const { data: siteSettings } = await supabase
+        .from('site_settings')
+        .select('id, navbar')
+        .single();
+      const ns = siteSettings as { id?: number; navbar?: { links?: any[] } } | null;
+      if (ns?.navbar?.links && Array.isArray(ns.navbar.links)) {
+        const updatedLinks = ns.navbar.links.filter((link: any) => link.moduleSlug !== data.slug);
+        await supabase
+          .from('site_settings')
+          .update({ navbar: { ...ns.navbar, links: updatedLinks } })
+          .eq('id', ns.id || 1);
+        logger.info(`[Modules] Removed ${data.slug} from navbar on soft-delete.`);
+      }
+    } catch (navErr) {
+      logger.error('Failed to remove deactivated module from navbar:', navErr);
+      // Non-fatal
+    }
 
     await logActivity({
       user_id: (req.user as any)?.userId || 'system',

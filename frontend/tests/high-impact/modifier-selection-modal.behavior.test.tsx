@@ -40,7 +40,7 @@ vi.mock('@/lib/settings-context', () => ({
   useSiteSettings: () => ({}),
 }));
 
-import { ModifierSelectionModal } from '../../src/components/restaurant/ModifierSelectionModal';
+import { ModifierSelectionModal } from '../../src/components/modules/ModifierSelectionModal';
 
 const menuItem = {
   id: 'menu-1',
@@ -120,7 +120,7 @@ describe('ModifierSelectionModal behavior', () => {
     );
 
     await screen.findByText('Choose Sauce');
-    expect(apiGetMock).toHaveBeenCalledWith('/restaurant/menu/items/menu-1/modifiers');
+    expect(apiGetMock).toHaveBeenCalledWith('/catalog/items/menu-1/modifiers');
     expect(screen.getByText('Extras')).toBeInTheDocument();
   });
 

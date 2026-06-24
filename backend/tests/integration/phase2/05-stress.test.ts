@@ -69,7 +69,7 @@ describe('S-01: 35 Concurrent Shared Capacity Purchases vs 30 Capacity', () => {
       CONCURRENT,
       async (c, i) => {
         try {
-          return await c.purchasePoolTicket({
+          return await c.purchaseCapacityTicket({
             sessionId,
             customerName: `Stress Tester ${i}`,
             customerPhone: `+1-555-${String(i).padStart(4, '0')}`,
@@ -184,11 +184,11 @@ describe('S-02: 20 Concurrent $100 Redemptions from $1000 Gift Card', () => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// S-03: Concurrent Same-Date Chalet Bookings
+// S-03: Concurrent Same-Date AccommodationUnit Bookings
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('S-03: 10 Concurrent Bookings for Same Chalet & Dates', () => {
+describe('S-03: 10 Concurrent Bookings for Same AccommodationUnit & Dates', () => {
   it('should allow exactly 1 booking', async () => {
-    const chaletId = requireState('chaletBId');
+    const unitId = requireState('unitBId');
     const s03Offset = 2500 + Math.floor(Math.random() * 800);
     const checkIn = futureDate(s03Offset);
     const checkOut = futureDate(s03Offset + 2);
@@ -202,7 +202,7 @@ describe('S-03: 10 Concurrent Bookings for Same Chalet & Dates', () => {
       async (c, i) => {
         try {
           return await c.createBooking({
-            chaletId,
+            unitId,
             checkInDate: checkIn,
             checkOutDate: checkOut,
             customerName: `Stress Tester ${String.fromCharCode(65 + (i % 26))}`,
@@ -226,7 +226,7 @@ describe('S-03: 10 Concurrent Bookings for Same Chalet & Dates', () => {
 
     if (successes.length > 1) {
       console.warn(
-        `⚠️  S-03 DOUBLE BOOKING: ${successes.length} bookings for same chalet/dates.`
+        `⚠️  S-03 DOUBLE BOOKING: ${successes.length} bookings for same accommodation unit/dates.`
       );
     }
 

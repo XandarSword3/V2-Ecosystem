@@ -87,7 +87,7 @@ export interface OrderItemRow {
   unit_price: string;
   subtotal: string;
   notes?: string | null;
-  menu_items?: {
+  catalog_items?: {
     id: string;
     name: string;
     image_url?: string | null;
@@ -201,19 +201,19 @@ export interface MenuItemRow {
 // ============================================
 
 export interface DashboardStats {
-  restaurant: {
+  menuService: {
     ordersToday: number;
     revenueToday: number;
     ordersTrend: number;
     revenueTrend: number;
   };
-  snack: {
+  kiosk: {
     ordersToday: number;
     revenueToday: number;
     ordersTrend: number;
     revenueTrend: number;
   };
-  chalets: {
+  accommodation: {
     bookingsToday: number;
     revenueToday: number;
     bookingsTrend: number;

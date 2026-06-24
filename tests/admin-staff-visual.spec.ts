@@ -128,7 +128,7 @@ test.describe('Admin Settings Tests', () => {
           ctaTitle: 'Ready to Book?',
           ctaSubtitle: 'Contact us today',
           ctaButtonText: 'Book Now',
-          ctaButtonLink: '/chalets'
+          ctaButtonLink: '/accommodation_units'
         }
       };
 
@@ -164,7 +164,7 @@ test.describe('Admin Settings Tests', () => {
       const response = await request.put(`${API_URL}/api/v1/admin/settings`, {
         headers: { Authorization: `Bearer ${token}` },
         data: {
-          resortName: 'V2 Ecosystem Test',
+          propertyName: 'V2 Ecosystem Test',
           tagline: 'Test Tagline',
           description: 'Test Description',
           phone: '+1 234 567 8900',
@@ -199,18 +199,18 @@ test.describe('Staff Pages Tests', () => {
     });
   });
 
-  test.describe('Staff Restaurant', () => {
-    test('should load restaurant staff page', async ({ page }) => {
-      await page.goto(`${FRONTEND_URL}/staff/restaurant`);
+  test.describe('Staff MenuService', () => {
+    test('should load menu service staff page', async ({ page }) => {
+      await page.goto(`${FRONTEND_URL}/staff/menu service`);
       await page.waitForLoadState('networkidle');
       
       // Should see order management UI
-      const orderUI = page.locator('text=/orders|pending|preparing|ready|restaurant/i').first();
+      const orderUI = page.locator('text=/orders|pending|preparing|ready|menu service/i').first();
       await expect(orderUI).toBeVisible({ timeout: 15000 });
     });
 
     test('should display live orders section', async ({ page }) => {
-      await page.goto(`${FRONTEND_URL}/staff/restaurant`);
+      await page.goto(`${FRONTEND_URL}/staff/menu service`);
       await page.waitForLoadState('networkidle');
       
       // Look for order cards or list (may be empty but container should exist)
@@ -239,18 +239,18 @@ test.describe('Staff Pages Tests', () => {
     });
   });
 
-  test.describe('Staff Chalets', () => {
-    test('should load chalets staff page', async ({ page }) => {
-      await page.goto(`${FRONTEND_URL}/staff/chalets`);
+  test.describe('Staff AccommodationUnits', () => {
+    test('should load accommodation_units staff page', async ({ page }) => {
+      await page.goto(`${FRONTEND_URL}/staff/accommodation_units`);
       await page.waitForLoadState('networkidle');
       
-      // Should see bookings/chalets UI
-      const chaletUI = page.locator('text=/bookings|check.?in|check.?out|chalets|reservations/i').first();
+      // Should see bookings/accommodation_units UI
+      const chaletUI = page.locator('text=/bookings|check.?in|check.?out|accommodation_units|reservations/i').first();
       await expect(chaletUI).toBeVisible({ timeout: 15000 });
     });
 
     test('should display booking section', async ({ page }) => {
-      await page.goto(`${FRONTEND_URL}/staff/chalets`);
+      await page.goto(`${FRONTEND_URL}/staff/accommodation_units`);
       await page.waitForLoadState('networkidle');
       
       // Main content should be visible
@@ -258,13 +258,13 @@ test.describe('Staff Pages Tests', () => {
     });
   });
 
-  test.describe('Staff Snack Bar', () => {
-    test('should load snack bar staff page', async ({ page }) => {
-      await page.goto(`${FRONTEND_URL}/staff/snack`);
+  test.describe('Staff KioskItem Bar', () => {
+    test('should load kiosk staff page', async ({ page }) => {
+      await page.goto(`${FRONTEND_URL}/staff/kiosk item`);
       await page.waitForLoadState('networkidle');
       
-      // Should see snack bar order UI
-      const snackUI = page.locator('text=/orders|pending|ready|snack/i').first();
+      // Should see kiosk order UI
+      const snackUI = page.locator('text=/orders|pending|ready|kiosk item/i').first();
       await expect(snackUI).toBeVisible({ timeout: 15000 });
     });
   });
@@ -429,26 +429,26 @@ test.describe('Purchase Flow Tests', () => {
     });
   });
 
-  test.describe('Chalet Booking Purchase', () => {
-    test('should display chalet booking page', async ({ page }) => {
-      await page.goto(`${FRONTEND_URL}/chalets`);
+  test.describe('AccommodationUnit Booking Purchase', () => {
+    test('should display accommodation unit booking page', async ({ page }) => {
+      await page.goto(`${FRONTEND_URL}/accommodation_units`);
       await page.waitForLoadState('networkidle');
       
-      // Should see chalets with booking options
-      await expect(page.locator('text=/chalet|book|reserve|accommodation/i').first()).toBeVisible({ timeout: 10000 });
+      // Should see accommodation_units with booking options
+      await expect(page.locator('text=/accommodation unit|book|reserve|accommodation/i').first()).toBeVisible({ timeout: 10000 });
       
-      await page.screenshot({ path: 'test-results/chalets-page.png' });
+      await page.screenshot({ path: 'test-results/accommodation_units-page.png' });
     });
 
-    test('should create chalet booking via API', async ({ request }) => {
-      // Get chalets
-      const chaletsRes = await request.get(`${API_URL}/api/chalets`);
+    test('should create accommodation unit booking via API', async ({ request }) => {
+      // Get accommodation_units
+      const chaletsRes = await request.get(`${API_URL}/api/accommodation_units`);
       
       if (chaletsRes.ok()) {
         const chaletsData = await chaletsRes.json();
         
         if (chaletsData.data && chaletsData.data.length > 0) {
-          const chalet = chaletsData.data[0];
+          const accommodationUnit = chaletsData.data[0];
           
           // Set dates
           const checkIn = new Date();
@@ -459,7 +459,7 @@ test.describe('Purchase Flow Tests', () => {
           // Create booking
           const bookingRes = await request.post(`${API_URL}/api/v1/units/bookings`, {
             data: {
-              chaletId: chalet.id,
+              unitId: accommodation unit.id,
               checkIn: checkIn.toISOString().split('T')[0],
               checkOut: checkOut.toISOString().split('T')[0],
               guestCount: 2,
@@ -479,20 +479,20 @@ test.describe('Purchase Flow Tests', () => {
     });
   });
 
-  test.describe('Restaurant Order Purchase', () => {
-    test('should display restaurant menu', async ({ page }) => {
-      await page.goto(`${FRONTEND_URL}/restaurant`);
+  test.describe('MenuService Order Purchase', () => {
+    test('should display menu service menu', async ({ page }) => {
+      await page.goto(`${FRONTEND_URL}/menu service`);
       await page.waitForLoadState('networkidle');
       
-      // Should see restaurant menu
-      await expect(page.locator('text=/menu|restaurant|order|food/i').first()).toBeVisible({ timeout: 10000 });
+      // Should see menu service menu
+      await expect(page.locator('text=/menu|menu service|order|food/i').first()).toBeVisible({ timeout: 10000 });
       
-      await page.screenshot({ path: 'test-results/restaurant-page.png' });
+      await page.screenshot({ path: 'test-results/menu service-page.png' });
     });
 
-    test('should create restaurant order via API', async ({ request }) => {
+    test('should create menu service order via API', async ({ request }) => {
       // Get menu items
-      const menuRes = await request.get(`${API_URL}/api/v1/restaurant/menu/items`);
+      const menuRes = await request.get(`${API_URL}/api/v1/${slug}/menu/items`);
       
       if (menuRes.ok()) {
         const menuData = await menuRes.json();
@@ -501,7 +501,7 @@ test.describe('Purchase Flow Tests', () => {
           const item = menuData.data[0];
           
           // Create order
-          const orderRes = await request.post(`${API_URL}/api/v1/restaurant/orders`, {
+          const orderRes = await request.post(`${API_URL}/api/v1/${slug}/orders`, {
             data: {
               items: [{ itemId: item.id, quantity: 2 }],
               orderType: 'dine_in',
@@ -521,20 +521,20 @@ test.describe('Purchase Flow Tests', () => {
     });
   });
 
-  test.describe('Snack Bar Order Purchase', () => {
-    test('should display snack bar menu', async ({ page }) => {
-      await page.goto(`${FRONTEND_URL}/snack-bar`);
+  test.describe('KioskItem Bar Order Purchase', () => {
+    test('should display kiosk menu', async ({ page }) => {
+      await page.goto(`${FRONTEND_URL}/kiosk`);
       await page.waitForLoadState('networkidle');
       
-      // Should see snack bar menu
-      await expect(page.locator('text=/snack|menu|order|drink/i').first()).toBeVisible({ timeout: 10000 });
+      // Should see kiosk menu
+      await expect(page.locator('text=/kiosk item|menu|order|drink/i').first()).toBeVisible({ timeout: 10000 });
       
       await page.screenshot({ path: 'test-results/snackbar-page.png' });
     });
 
-    test('should create snack order via API', async ({ request }) => {
-      // Get snack items
-      const itemsRes = await request.get(`${API_URL}/api/v1/snack/items`);
+    test('should create kiosk item order via API', async ({ request }) => {
+      // Get kiosk item items
+      const itemsRes = await request.get(`${API_URL}/api/v1/kiosk item/items`);
       
       if (itemsRes.ok()) {
         const itemsData = await itemsRes.json();
@@ -543,7 +543,7 @@ test.describe('Purchase Flow Tests', () => {
           const item = itemsData.data[0];
           
           // Create order
-          const orderRes = await request.post(`${API_URL}/api/v1/snack/orders`, {
+          const orderRes = await request.post(`${API_URL}/api/v1/kiosk item/orders`, {
             data: {
               items: [{ itemId: item.id, quantity: 1 }],
               locationCode: 'POOL-A1',
@@ -623,12 +623,12 @@ test.describe('Admin Pages Functionality', () => {
 // DYNAMIC MODULE (SLUG) TESTS
 // ============================================
 test.describe('Dynamic Module Tests', () => {
-  test('should load dynamic restaurant module', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/modules/restaurant`, { waitUntil: 'networkidle' });
+  test('should load dynamic menu service module', async ({ page }) => {
+    await page.goto(`${FRONTEND_URL}/modules/menu service`, { waitUntil: 'networkidle' });
     
-    // May redirect or show restaurant page - verify page loaded
+    // May redirect or show menu service page - verify page loaded
     await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
-    await page.screenshot({ path: 'test-results/module-restaurant.png' });
+    await page.screenshot({ path: 'test-results/module-menu service.png' });
   });
 
   test('should load dynamic pool module', async ({ page }) => {
@@ -638,28 +638,28 @@ test.describe('Dynamic Module Tests', () => {
     await page.screenshot({ path: 'test-results/module-pool.png' });
   });
 
-  test('should load dynamic chalets module', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/modules/chalets`, { waitUntil: 'networkidle' });
+  test('should load dynamic accommodation_units module', async ({ page }) => {
+    await page.goto(`${FRONTEND_URL}/modules/accommodation_units`, { waitUntil: 'networkidle' });
     
     await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
-    await page.screenshot({ path: 'test-results/module-chalets.png' });
+    await page.screenshot({ path: 'test-results/module-accommodation_units.png' });
   });
 
   test('should handle admin dynamic module pages', async ({ page, auth }) => {
     await auth.loginAs('admin');
     
     // Try admin slug pages
-    await page.goto(`${FRONTEND_URL}/admin/restaurant`, { waitUntil: 'networkidle' });
+    await page.goto(`${FRONTEND_URL}/admin/menu service`, { waitUntil: 'networkidle' });
     await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
-    await page.screenshot({ path: 'test-results/admin-slug-restaurant.png' });
+    await page.screenshot({ path: 'test-results/admin-slug-menu service.png' });
   });
 
   test('should handle staff dynamic module pages', async ({ page, auth }) => {
     await auth.loginAs('staff');
     
     // Try staff slug pages
-    await page.goto(`${FRONTEND_URL}/staff/restaurant`, { waitUntil: 'networkidle' });
+    await page.goto(`${FRONTEND_URL}/staff/menu service`, { waitUntil: 'networkidle' });
     await expect(page.locator('main, [role="main"]').first()).toBeVisible({ timeout: 10000 });
-    await page.screenshot({ path: 'test-results/staff-slug-restaurant.png' });
+    await page.screenshot({ path: 'test-results/staff-slug-menu service.png' });
   });
 });

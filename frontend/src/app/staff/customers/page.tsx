@@ -82,7 +82,7 @@ export default function CustomerLookupPage() {
           // Fetch additional data
           const [loyaltyRes, ordersRes] = await Promise.all([
             api.get(`/loyalty/accounts/${userData.id}`).catch(() => ({ data: { data: null } })),
-            api.get('/restaurant/orders', { params: { userId: userData.id, limit: 5 } }).catch(() => ({ data: { data: [] } })),
+            api.get('/orders', { params: { userId: userData.id, limit: 5 } }).catch(() => ({ data: { data: [] } })),
           ]);
 
           setCustomer({
@@ -96,7 +96,7 @@ export default function CustomerLookupPage() {
             giftCardBalance: userData.total_lifetime_spend || 0,
             recentOrders: (ordersRes.data.data || []).map((o: any) => ({
               id: o.id,
-              type: 'Restaurant',
+              type: 'Order',
               total: o.total || 0,
               status: o.status,
               date: o.created_at,
@@ -350,7 +350,7 @@ export default function CustomerLookupPage() {
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                          {booking.type === 'chalet' ? <Home className="w-5 h-5 text-blue-500" /> : <Waves className="w-5 h-5 text-blue-500" />}
+                          {booking.type === 'accommodation' ? <Home className="w-5 h-5 text-blue-500" /> : <Waves className="w-5 h-5 text-blue-500" />}
                         </div>
                         <div>
                           <p className="font-medium">{booking.type} Booking</p>

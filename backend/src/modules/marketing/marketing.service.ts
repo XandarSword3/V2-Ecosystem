@@ -983,7 +983,7 @@ export class MarketingAutomationService {
         const htmlContent = email.metadata?.html_content || '';
 
         const info = await this.transporter.sendMail({
-          from: process.env.EMAIL_FROM || '"Resort" <noreply@resort.com>',
+          from: process.env.EMAIL_FROM || '"Business" <noreply@business.com>',
           to: email.to_email,
           subject: email.subject,
           html: htmlContent

@@ -225,7 +225,7 @@ describe('Staff Controller - Service Tests', () => {
         startTime: '09:00',
         endTime: '17:00',
         breakMinutes: 30,
-        department: 'restaurant'
+        department: 'menu_service'
       };
 
       const mockCreatedShift = {
@@ -292,13 +292,13 @@ describe('Staff Controller - Service Tests', () => {
 
   describe('updateShift', () => {
     it('should update a shift', async () => {
-      const mockUpdatedShift = { id: 'shift-1', status: 'completed', department: 'restaurant' };
+      const mockUpdatedShift = { id: 'shift-1', status: 'completed', department: 'menu_service' };
       const mockQuery = createQueryMock(() => [mockUpdatedShift]);
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(mockQuery) } as any);
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'shift-1' },
-        body: { status: 'completed', department: 'restaurant' }
+        body: { status: 'completed', department: 'menu_service' }
       });
       await staffController.updateShift(req as any, res as any, next);
 
@@ -577,7 +577,7 @@ describe('Staff Controller - Service Tests', () => {
     it('should return assignments grouped by department', async () => {
       const mockShifts = [
         { id: 'shift-1', department: 'housekeeping', staff: { full_name: 'Jane' }, shift_date: '2024-06-15', start_time: '09:00', end_time: '17:00', status: 'scheduled' },
-        { id: 'shift-2', department: 'restaurant', staff: { full_name: 'John' }, shift_date: '2024-06-15', start_time: '08:00', end_time: '16:00', status: 'scheduled' }
+        { id: 'shift-2', department: 'menu_service', staff: { full_name: 'John' }, shift_date: '2024-06-15', start_time: '08:00', end_time: '16:00', status: 'scheduled' }
       ];
 
       const mockQuery = createQueryMock(() => mockShifts);
@@ -590,7 +590,7 @@ describe('Staff Controller - Service Tests', () => {
         success: true,
         data: {
           housekeeping: [expect.objectContaining({ id: 'shift-1' })],
-          restaurant: [expect.objectContaining({ id: 'shift-2' })]
+          menu_service: [expect.objectContaining({ id: 'shift-2' })]
         }
       });
     });
@@ -685,8 +685,8 @@ describe('Staff Controller - Service Tests', () => {
   describe('updateStaffAssignments', () => {
     it('should update future assignments for a staff member', async () => {
       const mockUpdated = [
-        { id: 'shift-1', department: 'restaurant' },
-        { id: 'shift-2', department: 'restaurant' }
+        { id: 'shift-1', department: 'menu_service' },
+        { id: 'shift-2', department: 'menu_service' }
       ];
 
       const mockSupabase = {
@@ -706,7 +706,7 @@ describe('Staff Controller - Service Tests', () => {
 
       const { req, res, next } = createMockReqRes({
         params: { staffId: 'staff-123' },
-        body: { department: 'restaurant', area: 'main floor' }
+        body: { department: 'menu_service', area: 'main floor' }
       });
       await staffController.updateStaffAssignments(req as any, res as any, next);
 
@@ -731,7 +731,7 @@ describe('Staff Controller - Service Tests', () => {
   describe('bulkAssignStaff', () => {
     it('should create multiple shifts at once', async () => {
       const assignments = [
-        { staffId: 'staff-1', department: 'restaurant', date: '2024-06-15', startTime: '09:00', endTime: '17:00' },
+        { staffId: 'staff-1', department: 'menu_service', date: '2024-06-15', startTime: '09:00', endTime: '17:00' },
         { staffId: 'staff-2', department: 'housekeeping', date: '2024-06-15', startTime: '08:00', endTime: '16:00' }
       ];
 
@@ -1309,7 +1309,7 @@ describe('Staff Controller - Service Tests', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(mockQuery) } as any);
 
       const { req, res, next } = createMockReqRes({
-        query: { department: 'restaurant' }
+        query: { department: 'menu_service' }
       });
       await staffController.getTimeTrackingReport(req as any, res as any, next);
 

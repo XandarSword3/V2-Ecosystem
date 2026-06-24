@@ -16,9 +16,9 @@ const reportOverviewSeed = {
     ordersChange: -3,
   },
   revenueByService: {
-    restaurant: 6000,
+    menu_service: 6000,
     snackBar: 2100,
-    chalets: 3100,
+    accommodation_units: 3100,
     pool: 1250,
   },
   revenueByMonth: [
@@ -32,13 +32,13 @@ const reportOverviewSeed = {
 };
 
 const occupancySeed = {
-  chalets: {
+  units: {
     occupancyRate: 67,
     bookedNights: 84,
     totalCapacity: 126,
     activeUnits: 12,
   },
-  pool: {
+  capacity_access: {
     occupancyRate: 73,
     ticketsSold: 640,
     totalCapacity: 880,
@@ -97,6 +97,18 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property' },
+    properties: [],
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
+  PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     success: toastSuccessMock,
@@ -138,6 +150,15 @@ describe('Admin reports route coverage', () => {
         return Promise.resolve({ data: new Blob(['id,total\n1,100']) });
       }
 
+      if (url === '/admin/modules') {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: [{ slug: 'menu_service', name: 'MenuService', is_active: true }],
+          },
+        });
+      }
+
       return Promise.reject(new Error(`Unexpected API URL: ${url}`));
     });
   });
@@ -162,14 +183,14 @@ describe('Admin reports route coverage', () => {
     });
 
     await user.click(screen.getByRole('button', { name: /export/i }));
-    await user.click(screen.getByRole('button', { name: /Restaurant Orders/i }));
+    await user.click(screen.getByRole('button', { name: /MenuService/i }));
 
     await waitFor(() => {
       expect(apiGetMock).toHaveBeenCalledWith(
         '/admin/reports/export',
         expect.objectContaining({
           params: expect.objectContaining({
-            type: 'restaurant',
+            moduleSlug: 'menu_service',
             format: 'csv',
           }),
           responseType: 'blob',

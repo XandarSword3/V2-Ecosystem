@@ -24,22 +24,22 @@ test.beforeEach(async ({ page, auth }) => {
   });
 
   // RESTAURANT TESTS
-  test('Restaurant Menu loads', async ({ page }) => {
-    await page.goto('/admin/restaurant/menu');
+  test('MenuService Menu loads', async ({ page }) => {
+    await page.goto('/admin/${slug}/menu');
     await expect(page.getByRole('heading', { name: /Menu Items|Menu/i }).first()).toBeVisible();
     await expect(page.getByText('Total Items')).toBeVisible(); 
   });
 
-  test('Restaurant Orders loads', async ({ page }) => {
-    await page.goto('/admin/restaurant/orders');
+  test('MenuService Orders loads', async ({ page }) => {
+    await page.goto('/admin/${slug}/orders');
     await expect(page.getByRole('heading', { name: /Orders/i }).first()).toBeVisible();
     await expect(page.getByPlaceholder(/Search/i)).toBeVisible(); // Just check for search input
   });
 
   // CHALET TESTS
-  test('Chalet Management loads', async ({ page }) => {
-    await page.goto('/admin/chalets');
-    await expect(page.getByRole('heading', { name: /Chalets/i }).first()).toBeVisible();
+  test('AccommodationUnit Management loads', async ({ page }) => {
+    await page.goto('/admin/accommodation_units');
+    await expect(page.getByRole('heading', { name: /AccommodationUnits/i }).first()).toBeVisible();
     // Usually a button to add new or list
     await expect(page.getByRole('button', { name: /Add|Create/i })).toBeVisible(); 
   });

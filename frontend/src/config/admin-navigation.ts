@@ -21,7 +21,6 @@ import {
   Ticket,
   Brush,
   Package,
-  Monitor,
   CalendarCheck,
   Share2,
   Building2,
@@ -63,20 +62,26 @@ export interface NavCategory {
   defaultExpanded?: boolean;
 }
 
-// Template type to icon mapping
+// System page slugs — these are editable pages managed via the Visual Builder
+// but should NOT appear in the Modules nav category or module counts.
+export const SYSTEM_PAGE_SLUGS = ['home-page', 'privacy-policy', 'terms-of-service'];
+
+// Template type to icon mapping — uses canonical engine type names
 export const moduleTypeIcons: Record<string, LucideIcon> = {
-  menu_service: UtensilsCrossed,
-  multi_day_booking: Home,
-  session_access: Waves,
+  instant_transaction: UtensilsCrossed,
+  time_exclusive_reservation: Home,
+  shared_capacity_access: Waves,
+  ongoing_entitlement: Award,
+  platform_entitlement: Cloud,
   default: Cloud,
 };
 
-// Build module children based on template type
+// Build module children based on template type — uses canonical engine type names
 export function getModuleChildren(slug: string, templateType: string, t: (key: string) => string): NavChild[] {
   const safeSlug = encodeURIComponent(slug);
   
   switch (templateType) {
-    case 'menu_service':
+    case 'instant_transaction':
       return [
         { name: t('nav.menuItems'), href: `/admin/${safeSlug}/menu`, translationKey: 'nav.menuItems' },
         { name: t('nav.categories'), href: `/admin/${safeSlug}/categories`, translationKey: 'nav.categories' },
@@ -86,18 +91,28 @@ export function getModuleChildren(slug: string, templateType: string, t: (key: s
         { name: t('nav.waitlist') || 'Waitlist', href: `/admin/${safeSlug}/waitlist`, translationKey: 'nav.waitlist' },
         { name: t('nav.modifiers') || 'Modifiers', href: `/admin/${safeSlug}/modifiers`, translationKey: 'nav.modifiers' },
       ];
-    case 'multi_day_booking':
+    case 'time_exclusive_reservation':
       return [
         { name: t('nav.allUnits') || 'All Units', href: `/admin/${safeSlug}`, translationKey: 'nav.allUnits' },
         { name: t('nav.bookings'), href: `/admin/${safeSlug}/bookings`, translationKey: 'nav.bookings' },
         { name: t('nav.pricingRules'), href: `/admin/${safeSlug}/pricing`, translationKey: 'nav.pricingRules' },
         { name: t('nav.addons'), href: `/admin/${safeSlug}/addons`, translationKey: 'nav.addons' },
       ];
-    case 'session_access':
+    case 'shared_capacity_access':
       return [
         { name: t('nav.sessions'), href: `/admin/${safeSlug}/sessions`, translationKey: 'nav.sessions' },
         { name: t('nav.tickets'), href: `/admin/${safeSlug}/tickets`, translationKey: 'nav.tickets' },
         { name: t('nav.capacity'), href: `/admin/${safeSlug}/capacity`, translationKey: 'nav.capacity' },
+      ];
+    case 'ongoing_entitlement':
+      return [
+        { name: t('nav.memberships') || 'Memberships', href: `/admin/${safeSlug}/memberships`, translationKey: 'nav.memberships' },
+        { name: t('nav.members') || 'Members', href: `/admin/${safeSlug}/members`, translationKey: 'nav.members' },
+      ];
+    case 'platform_entitlement':
+      return [
+        { name: 'Plans', href: `/admin/${safeSlug}/plans` },
+        { name: 'Tenants', href: `/admin/${safeSlug}/tenants` },
       ];
     default:
       return [];
@@ -253,12 +268,6 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
       translationKey: 'nav.system',
       icon: Cog,
       items: [
-        { 
-          name: 'Kiosk Devices', 
-          href: '/admin/kiosk', 
-          icon: Monitor,
-          translationKey: 'nav.kioskDevices'
-        },
         {
           name: t('nav.reports') || 'Reports',
           href: '/admin/cockpit',

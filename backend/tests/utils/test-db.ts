@@ -189,14 +189,14 @@ function createMockQueryBuilder(initialResponse?: SupabaseResponse): MockQueryBu
  * const supabase = createMockSupabase();
  *
  * // Option A — set response before the test acts
- * supabase._lastQueryBuilder._setResponse([{ id: '1', name: 'Chalet A' }]);
+ * supabase._lastQueryBuilder._setResponse([{ id: '1', name: 'AccommodationUnit A' }]);
  *
  * // Option B — override per-table
- * const qb = supabase._queryBuilders.get('chalets')!;
+ * const qb = supabase._queryBuilders.get('accommodation_units')!;
  * qb.select.mockReturnValue({ ...qb, then: vi.fn((r) => Promise.resolve(r).then(r)) });
  *
  * // Option C — simple one-liner
- * supabase.from('chalets').select.mockResolvedValue(mockSupabaseResponse([{ id: '1' }]));
+ * supabase.from('accommodation_units').select.mockResolvedValue(mockSupabaseResponse([{ id: '1' }]));
  * ```
  *
  * ### Using with vi.mock
@@ -264,9 +264,9 @@ export function createMockSupabase(): MockSupabaseClient {
  *
  * ```ts
  * const sb = createMockSupabase();
- * setTableResponse(sb, 'menu_items', [{ id: '1', name: 'Burger' }]);
+ * setTableResponse(sb, 'catalog_items', [{ id: '1', name: 'Burger' }]);
  *
- * // Now: await sb.from('menu_items').select()  →  { data: [{…}], error: null }
+ * // Now: await sb.from('catalog_items').select()  →  { data: [{…}], error: null }
  * ```
  */
 export function setTableResponse(

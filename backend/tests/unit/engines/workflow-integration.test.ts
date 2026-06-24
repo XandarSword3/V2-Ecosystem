@@ -605,7 +605,7 @@ describe('Cross-Engine Invariant Enforcement', () => {
       expect(r.allowed).toBe(false);
     });
 
-    it('customer cannot check_in at chalet', async () => {
+    it('customer cannot check_in at accommodation unit', async () => {
       const r = await service.transitionState('multi_day_booking', 'confirmed', 'check_in', 'customer');
       expect(r.allowed).toBe(false);
     });

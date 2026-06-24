@@ -40,8 +40,8 @@ test.describe('SMOKE - Admin sector routes render', () => {
     { route: '/admin/customizations', label: 'customizations' },
 
     // Dynamic Module Admin (representative per template-type)
-    { route: '/admin/restaurant/menu', label: 'dynamic-menu-service' },
-    { route: '/admin/chalets/pricing', label: 'dynamic-multi-day-booking' },
+    { route: '/admin/${slug}/menu', label: 'dynamic-menu-service' },
+    { route: '/admin/accommodation_units/pricing', label: 'dynamic-multi-day-booking' },
     { route: '/admin/pool/capacity', label: 'dynamic-session-access' },
   ];
 

@@ -216,7 +216,7 @@ class OrderLoadTest {
         },
         body: JSON.stringify({
           items: items.map(item => ({
-            menu_item_id: item.id,
+            catalog_item_id: item.id,
             quantity: item.quantity,
           })),
           order_type: 'dine_in',

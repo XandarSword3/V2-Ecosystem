@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
-import { config } from './config/index.js';
+import { config } from './config/index';
 import { csrfProtection, csrfTokenHandler, ensureCsrfToken } from './middleware/csrf.middleware.js';
 import { initSentry, sentryRequestHandler, sentryErrorHandler } from './utils/sentry.js';
 import { logger } from './utils/logger.js';
@@ -12,6 +12,7 @@ import { getSupabase } from './database/connection.js';
 
 // Controller imports
 import { getModules } from './modules/admin/modules.controller.js';
+import * as publicController from './modules/public/public.controller.js';
 import { authenticate, authorize } from './middleware/auth.middleware.js';
 
 // Module Routes imports
@@ -46,7 +47,10 @@ import unitsRoutes from './routes/units.routes.js';
 // legacyRouteHandler removed — dynamic module router correctly handles all module slugs
 import platformRoutes from './modules/platform/platform.routes.js';
 import { handleSaasStripeWebhook } from './modules/platform/saas-webhook.controller.js';
-import { skipTenantGate, tenantGate } from './middleware/tenantAccess.middleware.js';
+import { skipTenantGate, tenantGate, resolveTenant } from './middleware/tenantAccess.middleware.js';
+import { resolveProperty } from './middleware/propertyResolution.middleware.js';
+import { getSupabase as getSupabaseForAssets } from './database/connection.js';
+import { asyncHandler } from './middleware/async-handler.js';
 
 const app = express();
 
@@ -60,7 +64,14 @@ initSentry(app);
 app.use(sentryRequestHandler());
 
 // Security & Middleware
-app.use(helmet());
+// crossOriginResourcePolicy is relaxed to 'cross-origin' because the asset proxy route
+// (/api/v1/assets/*) serves images to a frontend running on a different origin/port
+// (e.g. localhost:3000 vs backend localhost:3005). Helmet's default 'same-origin' CORP
+// causes the browser to silently block <img> loads from that route with no console error
+// beyond a blocked-resource entry in the network tab.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(cors({ origin: config.corsOrigins, credentials: true }));
 app.use(compression());
 app.use(cookieParser());
@@ -75,6 +86,12 @@ app.post(
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Log all incoming requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
 
 // CSRF Protection - apply to all state-changing requests
 app.use(csrfProtection);
@@ -131,8 +148,41 @@ import installRoutes from './modules/install/install.routes.js';
 app.use('/api/install', installRoutes);
 
 // Public API Routes
-app.use('/api', publicRoutes);
-app.use('/api/modules', getModules);
+//
+// FIX (CONTEXT.md "Public/Admin Property Context Contamination", session 7-9):
+// These two mounts previously ran with NO tenant/property resolution at all —
+// publicController.getSettings and getModules trusted whatever x-property-id
+// header happened to arrive (often a stale value leaked from admin's
+// localStorage activePropertyId via settings-context.tsx's raw fetch()).
+// tenantGate + resolveProperty now run here so req.tenant/req.property are
+// always derived from the request itself (X-Tenant-Slug/X-Property-Slug
+// headers set by frontend/src/middleware.ts from the Host header, or the
+// single-property/single-tenant fallback) before either handler runs.
+//
+// NOTE: Mount specific routes BEFORE the general /api route to avoid
+// route conflicts - /api is more general and would catch these if mounted first.
+import { Router } from 'express';
+
+// Mount /api/settings with tenant resolution (no billing gate) and property resolution
+// resolveTenant sets req.tenant with property_group_id so resolveProperty can do
+// group-scoped property lookup. We skip the billing gate to allow public access.
+app.get('/api/settings', resolveTenant, resolveProperty, publicController.getSettings);
+
+// Mount /api/branding — public, property-scoped branding (no auth required)
+// Uses the same tenant + property resolution as /api/settings
+import brandingController from './modules/admin/branding.controller.js';
+app.get('/api/branding', resolveTenant, resolveProperty, (req, res, next) => {
+  // Rewrite to hit the /public sub-route on the branding router
+  req.url = '/public';
+  brandingController(req, res, next);
+});
+
+// Mount /api/modules with tenant and property resolution to prevent cross-tenant leaks
+app.get('/api/modules', resolveTenant, resolveProperty, getModules);
+
+// Mount the rest of public routes with tenant/property resolution
+// NOTE: This must come AFTER the specific routes above to avoid conflicts
+app.use('/api', tenantGate, resolveProperty, publicRoutes);
 
 // API Routes
 const apiRouter = express.Router();
@@ -150,6 +200,39 @@ apiRouter.use(tenantGate);
 
 // Add health check to API router
 apiRouter.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+
+// Public asset proxy — downloads files from Supabase storage server-side and streams
+// them to the client. No redirect is issued, so the Supabase project URL never appears
+// anywhere in the browser. No authentication required; these are public brand/content assets.
+// FIX: This route previously lived only in routes/v1.routes.ts, which app.ts never imports —
+// requests fell through to the global 404 handler, so every uploaded image/logo/favicon broke.
+apiRouter.get('/assets/*', asyncHandler(async (req, res) => {
+  const storagePath = (req.params as any)[0] as string;
+
+  if (!storagePath || storagePath.includes('..')) {
+    res.status(400).json({ success: false, error: 'Invalid asset path' });
+    return;
+  }
+
+  const supabase = getSupabaseForAssets();
+
+  const { data: fileData, error } = await supabase.storage
+    .from('assets')
+    .download(storagePath);
+
+  if (error || !fileData) {
+    res.status(404).json({ success: false, error: 'Asset not found' });
+    return;
+  }
+
+  const buffer = Buffer.from(await fileData.arrayBuffer());
+
+  res.setHeader('Content-Type', fileData.type || 'application/octet-stream');
+  // 24 h browser cache — filenames include a timestamp so they never collide across uploads
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.setHeader('Content-Length', buffer.length);
+  res.send(buffer);
+}));
 
 // API Module Routes mount points
 apiRouter.use('/admin', adminRoutes);
@@ -206,7 +289,7 @@ import marketingRoutes from './modules/marketing/marketing.routes.js';
 
 // Phase 4: Guest Experience - FIXED: Converted to Supabase
 import mobileCheckinRoutes from './modules/mobile-checkin/mobile-checkin.routes.js';
-import kioskRoutes from './modules/kiosk/kiosk.routes.js';
+// ARCHIVED: kiosk routes removed (Issue 7). Module files still on disk under backend/src/modules/kiosk/ and archive/kiosk/.
 import messagingRoutes from './modules/messaging/messaging.routes.js';
 import i18nRoutes from './modules/i18n/i18n.routes.js';
 
@@ -244,7 +327,7 @@ apiRouter.use('/marketing', marketingRoutes);
 
 // Phase 4: Guest Experience Routes - FIXED: Converted to Supabase
 apiRouter.use('/mobile-checkin', mobileCheckinRoutes);
-apiRouter.use('/kiosk', kioskRoutes);
+// ARCHIVED: /kiosk routes removed (Issue 7). DB tables still exist — do not drop without migration.
 apiRouter.use('/messaging', messagingRoutes);
 apiRouter.use('/i18n', i18nRoutes);
 // FIX: Mount analytics routes - executive cockpit, metrics, reports
@@ -265,7 +348,7 @@ apiRouter.use('/templates', templateRoutes);
 // Channel Webhooks - FIXED
 app.use('/webhooks/channels', channelWebhookRoutes);
 
-// Legacy chalet paths return 410 Gone (must be mounted before API routes)
+// Legacy accommodation paths return 410 Gone (must be mounted before API routes)
 app.use('/api/v1', apiRouter);
 
 // Documentation routes (Public)

@@ -1,5 +1,5 @@
 -- Ensure payments reference columns exist for legacy schemas.
--- Some bootstrap schemas create payments with chalet_booking_id/pool_ticket_id
+-- Some bootstrap schemas create payments with unit_booking_id
 -- but without reference_type/reference_id.
 BEGIN;
 
@@ -11,23 +11,15 @@ DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'payments' AND column_name = 'chalet_booking_id'
+    WHERE table_schema = 'public' AND table_name = 'payments' AND column_name = 'unit_booking_id'
   ) THEN
     UPDATE payments
     SET reference_type = COALESCE(reference_type, 'booking'),
-        reference_id = COALESCE(reference_id, chalet_booking_id)
-    WHERE chalet_booking_id IS NOT NULL;
+        reference_id = COALESCE(reference_id, unit_booking_id)
+    WHERE unit_booking_id IS NOT NULL;
   END IF;
 
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'payments' AND column_name = 'pool_ticket_id'
-  ) THEN
-    UPDATE payments
-    SET reference_type = COALESCE(reference_type, 'pool_ticket'),
-        reference_id = COALESCE(reference_id, pool_ticket_id)
-    WHERE pool_ticket_id IS NOT NULL;
-  END IF;
+  -- pool_ticket_id not in canonical schema — branch removed.
 END $$;
 
 UPDATE payments

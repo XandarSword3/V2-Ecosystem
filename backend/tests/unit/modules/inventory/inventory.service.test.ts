@@ -335,7 +335,7 @@ describe('InventoryService', () => {
         'order',
         [],
         'menu_item_ingredients',
-        'menu_item_id',
+        'catalog_item_id',
         mockSupabase as any
       );
 
@@ -344,8 +344,7 @@ describe('InventoryService', () => {
 
     it('should fetch recipes from menu_item_ingredients table', async () => {
       const recipes = [
-        { menu_item_id: 'menu-1', inventory_item_id: 'inv-1', quantity_required: 2 }
-      ];
+        { catalog_item_id: 'menu-1', inventory_item_id: 'inv-1', quantity_required: 2 }      ];
       const mockSupabase = createMockSupabase({ menu_item_ingredients: recipes });
 
       await inventoryService.processDeductions(
@@ -353,7 +352,7 @@ describe('InventoryService', () => {
         'order',
         [{ id: 'menu-1', quantity: 1 }],
         'menu_item_ingredients',
-        'menu_item_id',
+        'catalog_item_id',
         mockSupabase as any
       );
 
@@ -386,7 +385,7 @@ describe('InventoryService', () => {
         'order',
         [{ id: 'menu-1', quantity: 1 }],
         'menu_item_ingredients',
-        'menu_item_id',
+        'catalog_item_id',
         mockSupabase as any
       );
 
@@ -397,8 +396,8 @@ describe('InventoryService', () => {
 
     it('should aggregate deductions for same inventory item', async () => {
       const recipes = [
-        { menu_item_id: 'menu-1', inventory_item_id: 'inv-1', quantity_required: 2 },
-        { menu_item_id: 'menu-2', inventory_item_id: 'inv-1', quantity_required: 3 },
+        { catalog_item_id: 'menu-1', inventory_item_id: 'inv-1', quantity_required: 2 },
+        { catalog_item_id: 'menu-2', inventory_item_id: 'inv-1', quantity_required: 3 },
       ];
       const mockSupabase = createMockSupabase({ menu_item_ingredients: recipes });
 
@@ -410,7 +409,7 @@ describe('InventoryService', () => {
           { id: 'menu-2', quantity: 1 }
         ],
         'menu_item_ingredients',
-        'menu_item_id',
+        'catalog_item_id',
         mockSupabase as any
       );
 
@@ -424,7 +423,7 @@ describe('InventoryService', () => {
 
     it('should multiply quantity_required by item quantity', async () => {
       const recipes = [
-        { menu_item_id: 'menu-1', inventory_item_id: 'inv-1', quantity_required: 3 }
+        { catalog_item_id: 'menu-1', inventory_item_id: 'inv-1', quantity_required: 3 }
       ];
       const mockSupabase = createMockSupabase({ menu_item_ingredients: recipes });
 
@@ -433,7 +432,7 @@ describe('InventoryService', () => {
         'order',
         [{ id: 'menu-1', quantity: 4 }], // Ordering 4 of menu-1
         'menu_item_ingredients',
-        'menu_item_id',
+        'catalog_item_id',
         mockSupabase as any
       );
 
@@ -447,8 +446,8 @@ describe('InventoryService', () => {
 
     it('should handle multiple inventory items per menu item', async () => {
       const recipes = [
-        { menu_item_id: 'menu-1', inventory_item_id: 'inv-1', quantity_required: 2 },
-        { menu_item_id: 'menu-1', inventory_item_id: 'inv-2', quantity_required: 1 },
+        { catalog_item_id: 'menu-1', inventory_item_id: 'inv-1', quantity_required: 2 },
+        { catalog_item_id: 'menu-1', inventory_item_id: 'inv-2', quantity_required: 1 },
       ];
       const mockSupabase = createMockSupabase({ menu_item_ingredients: recipes });
 
@@ -457,7 +456,7 @@ describe('InventoryService', () => {
         'order',
         [{ id: 'menu-1', quantity: 1 }],
         'menu_item_ingredients',
-        'menu_item_id',
+        'catalog_item_id',
         mockSupabase as any
       );
 
@@ -495,7 +494,7 @@ describe('InventoryService', () => {
         'order',
         [{ id: 'menu-1', quantity: 1 }],
         'menu_item_ingredients',
-        'menu_item_id',
+        'catalog_item_id',
         mockSupabase as any
       );
 
@@ -505,11 +504,11 @@ describe('InventoryService', () => {
     it('should handle complex order with multiple items and quantities', async () => {
       const recipes = [
         // Burger uses 1 patty and 2 tomato slices
-        { menu_item_id: 'burger', inventory_item_id: 'patty', quantity_required: 1 },
-        { menu_item_id: 'burger', inventory_item_id: 'tomato', quantity_required: 2 },
+        { catalog_item_id: 'burger', inventory_item_id: 'patty', quantity_required: 1 },
+        { catalog_item_id: 'burger', inventory_item_id: 'tomato', quantity_required: 2 },
         // Salad uses 3 tomato slices and 1 lettuce
-        { menu_item_id: 'salad', inventory_item_id: 'tomato', quantity_required: 3 },
-        { menu_item_id: 'salad', inventory_item_id: 'lettuce', quantity_required: 1 },
+        { catalog_item_id: 'salad', inventory_item_id: 'tomato', quantity_required: 3 },
+        { catalog_item_id: 'salad', inventory_item_id: 'lettuce', quantity_required: 1 },
       ];
       const mockSupabase = createMockSupabase({ menu_item_ingredients: recipes });
 
@@ -521,7 +520,7 @@ describe('InventoryService', () => {
           { id: 'salad', quantity: 3 },  // 3 salads
         ],
         'menu_item_ingredients',
-        'menu_item_id',
+        'catalog_item_id',
         mockSupabase as any
       );
 
@@ -571,7 +570,7 @@ describe('InventoryService', () => {
 
     it('should filter out items with no matching recipes', async () => {
       const recipes = [
-        { menu_item_id: 'burger', inventory_item_id: 'patty', quantity_required: 1 }
+        { catalog_item_id: 'burger', inventory_item_id: 'patty', quantity_required: 1 }
         // No recipe for 'drink'
       ];
       const mockSupabase = createMockSupabase({ menu_item_ingredients: recipes });
@@ -584,7 +583,7 @@ describe('InventoryService', () => {
           { id: 'drink', quantity: 2 }  // No recipe for this
         ],
         'menu_item_ingredients',
-        'menu_item_id',
+        'catalog_item_id',
         mockSupabase as any
       );
 

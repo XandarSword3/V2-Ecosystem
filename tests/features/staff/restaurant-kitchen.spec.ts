@@ -1,13 +1,13 @@
 import { test, expect } from '../../fixtures/auth.fixture';
 
-test.describe('Restaurant Kitchen Display [STF-REST]', () => {
+test.describe('MenuService Kitchen Display [STF-REST]', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:3000/login');
     await page.fill('input[type="email"]', 'staff@v2ecosystem.com');
     await page.fill('input[type="password"]', 'staff123');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(staff|dashboard)/);
-    await page.goto('http://localhost:3000/staff/restaurant');
+    await page.goto('http://localhost:3000/staff/menu service');
     await page.waitForLoadState('networkidle');
   });
 
@@ -52,7 +52,7 @@ test.describe('Restaurant Kitchen Display [STF-REST]', () => {
     const badge = page.locator('[class*="badge"], [class*="notification"], [class*="count"]');
     const badgeCount = await badge.count();
     expect(badgeCount).toBeGreaterThanOrEqual(0);
-    const heading = page.locator('h1, h2, h3').filter({ hasText: /kitchen|restaurant|order/i });
+    const heading = page.locator('h1, h2, h3').filter({ hasText: /kitchen|menu service|order/i });
     await expect(heading.first()).toBeVisible();
   });
 });

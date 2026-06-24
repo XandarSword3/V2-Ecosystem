@@ -146,7 +146,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
   // Real-time updates
   useEffect(() => {
     if (socket) {
-      socket.emit('join:unit', 'restaurant');
+      socket.emit('join:unit', moduleSlug);
 
       const handleNewOrder = (order: Order) => {
         setOrders(prev => [order, ...prev]);

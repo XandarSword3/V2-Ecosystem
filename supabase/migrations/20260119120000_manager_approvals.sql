@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS manager_approvals (
   reason TEXT, -- Detailed reason for the request
   reference_type VARCHAR(50), -- 'restaurant_order', 'chalet_booking', 'pool_ticket', etc.
   reference_id UUID,
-  requested_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  requested_by UUID NOT NULL,
+  reviewed_by UUID,
   reviewed_at TIMESTAMPTZ,
   review_notes TEXT,
   expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 hours'), -- Auto-expire pending approvals
@@ -47,7 +47,7 @@ CREATE TRIGGER trigger_manager_approvals_updated_at
 -- Create notification preferences for managers
 CREATE TABLE IF NOT EXISTS manager_notification_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   approval_requests BOOLEAN DEFAULT true,
   approval_responses BOOLEAN DEFAULT true,
   urgent_orders BOOLEAN DEFAULT true,

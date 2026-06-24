@@ -566,7 +566,7 @@ export default function ChannelManagerPage() {
                 />
               </div>
               <p className="text-xs text-slate-500">
-                Contact each OTA to obtain your API credentials. Your Resort uses SiteMinder for channel management.
+                Contact each OTA to obtain your API credentials. Your property uses SiteMinder for channel management.
               </p>
               <div className="flex gap-3 pt-2">
                 <button

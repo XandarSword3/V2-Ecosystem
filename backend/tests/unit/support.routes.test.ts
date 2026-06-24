@@ -56,7 +56,7 @@ describe('Support Routes', () => {
         name: 'John Doe',
         email: 'john@example.com',
         subject: 'Booking Question',
-        message: 'I have a question about booking a chalet.',
+        message: 'I have a question about booking a accommodation unit.',
         status: 'new',
       };
 
@@ -77,7 +77,7 @@ describe('Support Routes', () => {
           name: 'John Doe',
           email: 'john@example.com',
           subject: 'Booking Question',
-          message: 'I have a question about booking a chalet.',
+          message: 'I have a question about booking a accommodation unit.',
         });
 
       expect(response.status).toBe(201);
@@ -90,7 +90,7 @@ describe('Support Routes', () => {
 
     it('should send admin notification email', async () => {
       const mockInquiry = { id: 'inquiry-123' };
-      const mockSiteSettings = { contact_email: 'admin@resort.com', site_name: 'V2 Ecosystem' };
+      const mockSiteSettings = { contact_email: 'admin@v2-hub.com', site_name: 'V2 Ecosystem' };
       vi.mocked(getSupabase).mockReturnValue({
         from: vi.fn().mockImplementation((table: string) => {
           if (table === 'site_settings') return createChainableMock(mockSiteSettings);
@@ -123,7 +123,7 @@ describe('Support Routes', () => {
 
     it('should send confirmation email to user', async () => {
       const mockInquiry = { id: 'inquiry-123' };
-      const mockSiteSettings = { contact_email: 'admin@resort.com', site_name: 'V2 Ecosystem' };
+      const mockSiteSettings = { contact_email: 'admin@v2-hub.com', site_name: 'V2 Ecosystem' };
       vi.mocked(getSupabase).mockReturnValue({
         from: vi.fn().mockImplementation((table: string) => {
           if (table === 'site_settings') return createChainableMock(mockSiteSettings);

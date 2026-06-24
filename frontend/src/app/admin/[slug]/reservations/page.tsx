@@ -82,7 +82,7 @@ export default function DynamicReservationsPage() {
     queryKey: ['reservations', currentModule?.id, selectedDate],
     queryFn: async () => {
       if (!currentModule) return [];
-      const res = await api.get('/restaurant/reservations', { 
+      const res = await api.get(`/${slug}/reservations`, { 
         params: { date: selectedDate, moduleId: currentModule.id } 
       });
       return res.data.data || [];
@@ -95,7 +95,7 @@ export default function DynamicReservationsPage() {
     queryKey: ['tables', currentModule?.id],
     queryFn: async () => {
       if (!currentModule) return [];
-      const res = await api.get('/restaurant/tables', { params: { moduleId: currentModule.id } });
+      const res = await api.get(`/${slug}/tables`, { params: { moduleId: currentModule.id } });
       return res.data.data || [];
     },
     enabled: !!currentModule
@@ -104,7 +104,7 @@ export default function DynamicReservationsPage() {
   // Update reservation status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await api.patch(`/restaurant/reservations/${id}`, { status });
+      const res = await api.patch(`/${slug}/reservations/${id}`, { status });
       return res.data;
     },
     onSuccess: () => {
@@ -119,7 +119,7 @@ export default function DynamicReservationsPage() {
   // Assign table
   const assignTableMutation = useMutation({
     mutationFn: async ({ reservationId, tableId }: { reservationId: string; tableId: string }) => {
-      const res = await api.post(`/restaurant/reservations/${reservationId}/assign-table`, { table_id: tableId });
+      const res = await api.post(`/${slug}/reservations/${reservationId}/assign-table`, { table_id: tableId });
       return res.data;
     },
     onSuccess: () => {
@@ -137,7 +137,7 @@ export default function DynamicReservationsPage() {
   // Create reservation
   const createReservationMutation = useMutation({
     mutationFn: async (data: typeof newReservation) => {
-      const res = await api.post('/restaurant/reservations', {
+      const res = await api.post(`/${slug}/reservations`, {
         ...data,
         module_id: currentModule?.id,
       });

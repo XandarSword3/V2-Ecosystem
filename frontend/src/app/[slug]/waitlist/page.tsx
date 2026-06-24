@@ -40,7 +40,7 @@ function WaitlistContent() {
     queryFn: async () => {
       const id = entryId || submittedEntry?.id;
       if (!id) return null;
-      const res = await api.get(`/restaurant/waitlist/${id}`);
+      const res = await api.get(`/${slug}/waitlist/${id}`);
       return res.data;
     },
     enabled: !!(entryId || submittedEntry?.id),
@@ -57,7 +57,7 @@ function WaitlistContent() {
 
   const joinMutation = useMutation({
     mutationFn: async (data: { name: string; phone: string; partySize: number }) => {
-      const res = await api.post('/restaurant/waitlist', {
+      const res = await api.post(`/${slug}/waitlist`, {
         guest_name: data.name,
         phone: data.phone,
         party_size: data.partySize,
@@ -75,7 +75,7 @@ function WaitlistContent() {
 
   const leaveMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await api.delete(`/restaurant/waitlist/${id}/leave`);
+      const res = await api.delete(`/${slug}/waitlist/${id}/leave`);
       return res.data;
     },
     onSuccess: () => {

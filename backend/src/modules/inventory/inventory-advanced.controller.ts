@@ -237,56 +237,73 @@ export class InventoryAdvancedController {
   }
 
   /**
-   * Get variance report
+   * Get variance report (property-scoped, flattened for frontend).
+   * Returns a flat array at data.data — each row has the fields the
+   * inventory/page.tsx Operations tab expects: item_name, unit,
+   * cost_per_unit, system_quantity, actual_quantity, counted_at.
    */
   async getVarianceReport(req: Request, res: Response) {
     try {
+      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
       const { startDate, endDate, status } = req.query;
       const supabase = getSupabase();
+
+      // Property scoping: resolve item IDs that belong to this property.
+      // inventory_variance has no direct property_id — scope via item FK.
+      let itemIdFilter: string[] | null = null;
+      if (propertyId) {
+        const { data: propertyItems } = await supabase
+          .from('inventory_items')
+          .select('id')
+          .eq('property_id', propertyId);
+        itemIdFilter = (propertyItems || []).map((i: any) => i.id);
+        if (itemIdFilter.length === 0) {
+          return res.json({ success: true, data: [] });
+        }
+      }
 
       let query = supabase
         .from('inventory_variance')
         .select(`
-          *,
-          item:inventory_items(name, sku, category_id),
+          id,
+          count_date,
+          system_quantity,
+          actual_quantity,
+          variance_quantity,
+          variance_cost,
+          status,
+          item:inventory_items!item_id(name, sku, unit, cost_per_unit),
           counter:users!counted_by(full_name)
         `)
         .order('count_date', { ascending: false });
 
-      if (startDate) {
-        query = query.gte('count_date', startDate);
-      }
-      if (endDate) {
-        query = query.lte('count_date', endDate);
-      }
-      if (status) {
-        query = query.eq('status', status);
-      }
+      if (itemIdFilter) query = query.in('item_id', itemIdFilter);
+      if (startDate) query = query.gte('count_date', startDate as string);
+      if (endDate) query = query.lte('count_date', endDate as string);
+      if (status) query = query.eq('status', status as string);
 
       const { data: variances, error } = await query.limit(100);
 
       if (error) throw error;
 
-      // Summary stats
-      const totalVarianceCost = (variances || [])
-        .reduce((sum, v) => sum + parseFloat(v.variance_cost || '0'), 0);
+      // Flatten: frontend iterates over data.data as an array and reads
+      // item_name, unit, cost_per_unit, system_quantity, actual_quantity, counted_at
+      const flat = (variances || []).map((v: any) => ({
+        id: v.id,
+        item_name: v.item?.name ?? 'Unknown',
+        sku: v.item?.sku ?? '',
+        unit: v.item?.unit ?? '',
+        cost_per_unit: v.item?.cost_per_unit ?? null,
+        system_quantity: v.system_quantity,
+        actual_quantity: v.actual_quantity,
+        variance_quantity: v.variance_quantity,
+        variance_cost: v.variance_cost,
+        status: v.status,
+        counted_at: v.count_date,
+        counted_by_name: v.counter?.full_name ?? null,
+      }));
 
-      const negativeVariances = (variances || []).filter(v => v.variance_quantity < 0);
-      const positiveVariances = (variances || []).filter(v => v.variance_quantity > 0);
-
-      res.json({
-        success: true,
-        data: {
-          variances,
-          summary: {
-            total_records: (variances || []).length,
-            total_variance_cost: totalVarianceCost,
-            negative_count: negativeVariances.length,
-            positive_count: positiveVariances.length,
-            pending_approval: (variances || []).filter(v => v.status === 'pending').length,
-          },
-        },
-      });
+      res.json({ success: true, data: flat });
     } catch (error: any) {
       logger.error('Error fetching variance report:', error);
       res.status(500).json({ success: false, error: 'Failed to fetch variance report', message: error.message });
@@ -544,7 +561,7 @@ export class InventoryAdvancedController {
    */
   async createRecipe(req: Request, res: Response) {
     try {
-      const { menuItemId, name, ingredients, yields, prepTime, notes } = req.body;
+      const { catalogItemId, name, ingredients, yields, prepTime, notes } = req.body;
       const supabase = getSupabase();
 
       // Validate ingredients
@@ -556,7 +573,7 @@ export class InventoryAdvancedController {
       const { data: recipe, error: recipeError } = await supabase
         .from('inventory_recipes')
         .insert({
-          menu_item_id: menuItemId,
+          catalog_item_id: catalogItemId,
           name,
           yields: yields || 1,
           prep_time_minutes: prepTime,
@@ -609,7 +626,7 @@ export class InventoryAdvancedController {
    */
   async getRecipe(req: Request, res: Response) {
     try {
-      const { menuItemId } = req.params;
+      const { catalogItemId } = req.params;
       const supabase = getSupabase();
 
       const { data: recipe, error } = await supabase
@@ -621,7 +638,7 @@ export class InventoryAdvancedController {
             inventory_item:inventory_items(id, name, unit, current_stock, cost_per_unit)
           )
         `)
-        .eq('menu_item_id', menuItemId)
+        .eq('catalog_item_id', catalogItemId)
         .eq('is_active', true)
         .single();
 
@@ -756,7 +773,7 @@ export class InventoryAdvancedController {
               is_optional
             )
           `)
-          .eq('menu_item_id', orderItem.product_id)
+          .eq('catalog_item_id', orderItem.product_id)
           .eq('is_active', true)
           .single();
 
@@ -844,14 +861,14 @@ export class InventoryAdvancedController {
    */
   async getMenuItemCostAnalysis(req: Request, res: Response) {
     try {
-      const { menuItemId } = req.params;
+      const { catalogItemId } = req.params;
       const supabase = getSupabase();
 
       // Get menu item
       const { data: menuItem, error: menuError } = await supabase
         .from('products')
         .select('id, name, price')
-        .eq('id', menuItemId)
+        .eq('id', catalogItemId)
         .single();
 
       if (menuError || !menuItem) {
@@ -869,7 +886,7 @@ export class InventoryAdvancedController {
             inventory_item:inventory_items(id, name, cost_per_unit)
           )
         `)
-        .eq('menu_item_id', menuItemId)
+        .eq('catalog_item_id', catalogItemId)
         .eq('is_active', true)
         .single();
 

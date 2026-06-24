@@ -9,12 +9,12 @@ const refetchMock = vi.hoisted(() => vi.fn());
 
 const siteSettingsState = vi.hoisted(() => ({
   settings: {
-    resortName: 'Iron Paradise',
-    tagline: 'Premier Resort Experience',
+    propertyName: 'Iron Paradise',
+    tagline: 'Premier Property Experience',
     description: 'Luxury resort and activities.',
     moduleSettings: {
-      chalets: {
-        displayName: 'Luxury Chalets',
+      accommodation_units: {
+        displayName: 'Luxury AccommodationUnits',
         checkIn: '3:00 PM',
         checkOut: '11:00 AM',
         depositPercent: 30,
@@ -30,24 +30,24 @@ const siteSettingsState = vi.hoisted(() => ({
   modules: [
     {
       id: 'mod-1',
-      name: 'Chalets',
-      slug: 'chalets',
-      template_type: 'multi_day_booking',
+      name: 'AccommodationUnits',
+      slug: 'accommodation_units',
+      template_type: 'time_exclusive_reservation',
       sort_order: 1,
       is_active: true,
     },
     {
       id: 'mod-2',
       name: 'Pool',
-      slug: 'pool',
-      template_type: 'session_access',
+      slug: 'capacity',
+      template_type: 'shared_capacity_access',
       sort_order: 2,
       is_active: true,
     },
     {
       id: 'mod-3',
-      name: 'Restaurant',
-      slug: 'restaurant',
+      name: 'MenuService',
+      slug: 'menu_service',
       template_type: 'menu_service',
       sort_order: 3,
       is_active: true,
@@ -126,7 +126,7 @@ describe('Admin settings route coverage', () => {
     await user.click(screen.getByRole('button', { name: /Modules/i }));
     expect(await screen.findByText(/Configure display names and settings/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /Chalets/i }));
+    await user.click(screen.getByRole('button', { name: /AccommodationUnits/i }));
     expect(await screen.findByText('Check-in & Check-out')).toBeInTheDocument();
     expect(screen.getByText('Deposit Configuration')).toBeInTheDocument();
 
@@ -137,16 +137,16 @@ describe('Admin settings route coverage', () => {
     expect(await screen.findByText('Phone Number')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Business Hours/i }));
-    expect(await screen.findByText('Pool Hours')).toBeInTheDocument();
+    expect(await screen.findByText('Reception Hours')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Legal Pages/i }));
     expect(await screen.findByText('Privacy Policy')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /General/i }));
 
-    const resortNameInput = screen.getByPlaceholderText('Enter your resort name');
-    await user.clear(resortNameInput);
-    await user.type(resortNameInput, 'Paradise Grand Resort');
+    const propertyNameInput = screen.getByPlaceholderText('Enter your business name');
+    await user.clear(propertyNameInput);
+    await user.type(propertyNameInput, 'Paradise Grand Resort');
 
     await user.click(screen.getByRole('button', { name: /save/i }));
 

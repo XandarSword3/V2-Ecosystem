@@ -2,7 +2,7 @@
  * QR Code Security Utility
  * 
  * Provides secure QR code generation and validation with HMAC signatures.
- * Prevents tampering and replay attacks on QR code-based access (pool, chalets, etc.)
+ * Prevents tampering and replay attacks on QR code-based access (sessions, accommodation units, etc.)
  */
 
 import crypto from 'crypto';
@@ -298,7 +298,7 @@ export async function generatePoolTicketQR(
 }
 
 /**
- * Chalet Access QR Code Generator
+ * Unit Access QR Code Generator
  */
 export async function generateChaletAccessQR(
   bookingId: string,
@@ -318,7 +318,7 @@ export async function generateChaletAccessQR(
     expirationMs: Math.max(expirationMs, QR_CONFIG.expirationMs)
   });
   
-  logger.info('Generated chalet access QR code', { bookingId, expiresAt: result.expiresAt });
+  logger.info('Generated unit access QR code', { bookingId, expiresAt: result.expiresAt });
   
   return {
     dataUrl: result.dataUrl,
@@ -327,7 +327,7 @@ export async function generateChaletAccessQR(
 }
 
 /**
- * Restaurant Order QR Code Generator (for table-side ordering)
+ * Menu Order QR Code Generator (for table-side ordering)
  */
 export async function generateRestaurantOrderQR(
   tableId: string,
@@ -342,7 +342,7 @@ export async function generateRestaurantOrderQR(
     expirationMs: 4 * 60 * 60 * 1000 // 4 hours for dining session
   });
   
-  logger.info('Generated restaurant order QR code', { tableId, expiresAt: result.expiresAt });
+  logger.info('Generated menu order QR code', { tableId, expiresAt: result.expiresAt });
   
   return {
     dataUrl: result.dataUrl,

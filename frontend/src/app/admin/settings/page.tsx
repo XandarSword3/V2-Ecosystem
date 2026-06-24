@@ -118,16 +118,16 @@ export default function AdminSettingsPage() {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Resort Name
+                Business Name
               </label>
               <Input
-                value={formSettings.resortName || ''}
-                onChange={(e) => setFormSettings({ ...formSettings, resortName: e.target.value })}
-                placeholder="Enter your resort name"
+                value={formSettings.siteName || ''}
+                onChange={(e) => setFormSettings({ ...formSettings, siteName: e.target.value })}
+                placeholder="Enter your business name"
               />
-              {!formSettings.resortName && (
+              {!formSettings.siteName && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Using default: Your Resort
+                  Using default: Your Business
                 </p>
               )}
             </div>
@@ -139,11 +139,11 @@ export default function AdminSettingsPage() {
               <Input
                 value={formSettings.tagline || ''}
                 onChange={(e) => setFormSettings({ ...formSettings, tagline: e.target.value })}
-                placeholder="Enter a catchy tagline for your resort"
+                placeholder="Enter a catchy tagline for your business"
               />
               {!formSettings.tagline && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Using default: Premier Resort Experience
+                  Using default: Premier Experience
                 </p>
               )}
             </div>
@@ -156,7 +156,7 @@ export default function AdminSettingsPage() {
                 rows={3}
                 value={formSettings.description || ''}
                 onChange={(e) => setFormSettings({ ...formSettings, description: e.target.value })}
-                placeholder="Describe your resort in a few sentences"
+                placeholder="Describe your business in a few sentences"
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
@@ -257,12 +257,12 @@ export default function AdminSettingsPage() {
                   type="email"
                   value={formSettings.email || ''}
                   onChange={(e) => setFormSettings({ ...formSettings, email: e.target.value })}
-                  placeholder="contact@yourresort.com"
+                  placeholder="contact@yourbusiness.com"
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
                 {!formSettings.email && (
                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                    Using default: support@yourresort.com
+                    Using default: support@yourbusiness.com
                   </p>
                 )}
               </div>
@@ -277,7 +277,7 @@ export default function AdminSettingsPage() {
                 type="text"
                 value={formSettings.address || ''}
                 onChange={(e) => setFormSettings({ ...formSettings, address: e.target.value })}
-                placeholder="123 Resort Boulevard, Beach City, State 12345"
+                placeholder="123 Main Street, Beach City, State 12345"
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
               {!formSettings.address && (
@@ -298,33 +298,7 @@ export default function AdminSettingsPage() {
               </p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Pool Hours
-                </label>
-                <input
-                  type="text"
-                  value={formSettings.poolHours || ''}
-                  onChange={(e) => setFormSettings({ ...formSettings, poolHours: e.target.value })}
-                  placeholder="e.g., 8:00 AM - 8:00 PM"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Restaurant Hours
-                </label>
-                <input
-                  type="text"
-                  value={formSettings.restaurantHours || ''}
-                  onChange={(e) => setFormSettings({ ...formSettings, restaurantHours: e.target.value })}
-                  placeholder="e.g., 7:00 AM - 11:00 PM"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-
+            <div className="grid grid-cols-1 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Reception Hours
@@ -523,7 +497,7 @@ export default function AdminSettingsPage() {
           const moduleSettings = (formSettings.moduleSettings as Record<string, Record<string, string | number>> || {})[moduleSlug] || {};
           
           if (module.template_type === 'time_exclusive_reservation') {
-            // Multi-day booking settings (like chalets/rooms)
+            // Multi-day booking settings (like units/rooms)
             return (
               <div className="space-y-8">
                 <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl p-4 border border-emerald-100 dark:border-emerald-800 mb-4">
@@ -687,7 +661,7 @@ export default function AdminSettingsPage() {
               {t('settings')}
             </h1>
             <p className="text-slate-600 dark:text-slate-400 mt-2">
-              Manage your resort settings, contact information, pricing, and policies
+              Manage your business settings, contact information, pricing, and policies
             </p>
           </div>
 

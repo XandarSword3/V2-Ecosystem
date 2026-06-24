@@ -34,8 +34,8 @@ test.describe('Public Pages Accessibility', () => {
     await expect(nav.first()).toBeVisible();
   });
 
-  test('Restaurant page loads correctly', async ({ page }) => {
-    await navigateToPage(page, '/restaurant');
+  test('MenuService page loads correctly', async ({ page }) => {
+    await navigateToPage(page, '/menu service');
     
     // Should have menu content
     await expect(page.locator('[class*="menu"], [data-testid*="menu"]').first()).toBeVisible({ timeout: 10000 });
@@ -57,14 +57,14 @@ test.describe('Public Pages Accessibility', () => {
     await expect(pricingContent.first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('Chalets page loads correctly', async ({ page }) => {
-    await navigateToPage(page, '/chalets');
+  test('AccommodationUnits page loads correctly', async ({ page }) => {
+    await navigateToPage(page, '/accommodation_units');
     
-    // Should have chalets content
+    // Should have accommodation_units content
     await expect(page.locator('main').first()).toBeVisible();
     
-    // Look for chalet cards or listings
-    const chaletContent = page.locator('[class*="chalet"], [class*="Chalet"], text=/chalet/i');
+    // Look for accommodation unit cards or listings
+    const chaletContent = page.locator('[class*="accommodation unit"], [class*="AccommodationUnit"], text=/accommodation unit/i');
     await expect(chaletContent.first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -153,13 +153,13 @@ test.describe('Admin User Management', () => {
 // ============================================
 // ADMIN RESTAURANT MANAGEMENT TESTS
 // ============================================
-test.describe('Admin Restaurant Management', () => {
+test.describe('Admin MenuService Management', () => {
   test.beforeEach(async ({ auth }) => {
     await auth.loginAs('admin');
   });
 
-  test('Restaurant menu page loads', async ({ page }) => {
-    await navigateToPage(page, '/admin/restaurant/menu');
+  test('MenuService menu page loads', async ({ page }) => {
+    await navigateToPage(page, '/admin/${slug}/menu');
     
     await expect(page.getByRole('heading', { name: /Menu/i }).first()).toBeVisible({ timeout: 10000 });
     
@@ -168,8 +168,8 @@ test.describe('Admin Restaurant Management', () => {
     await expect(addButton.first()).toBeVisible();
   });
 
-  test('Restaurant orders page loads', async ({ page }) => {
-    await navigateToPage(page, '/admin/restaurant/orders');
+  test('MenuService orders page loads', async ({ page }) => {
+    await navigateToPage(page, '/admin/${slug}/orders');
     
     await expect(page.getByRole('heading', { name: /Order/i }).first()).toBeVisible({ timeout: 10000 });
     
@@ -178,22 +178,22 @@ test.describe('Admin Restaurant Management', () => {
     await expect(filterContent.first()).toBeVisible();
   });
 
-  test('Restaurant categories page loads', async ({ page }) => {
-    await navigateToPage(page, '/admin/restaurant/categories');
+  test('MenuService categories page loads', async ({ page }) => {
+    await navigateToPage(page, '/admin/${slug}/categories');
     
     await expect(page.getByRole('heading', { name: /Categor/i }).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('Restaurant inventory page loads', async ({ page }) => {
-    await navigateToPage(page, '/admin/restaurant/inventory');
+  test('MenuService inventory page loads', async ({ page }) => {
+    await navigateToPage(page, '/admin/${slug}/inventory');
     
     await expect(page.locator('main').first()).toBeVisible();
     const inventoryContent = page.locator('text=/inventory|stock|item/i');
     await expect(inventoryContent.first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('Restaurant tables page loads', async ({ page }) => {
-    await navigateToPage(page, '/admin/restaurant/tables');
+  test('MenuService tables page loads', async ({ page }) => {
+    await navigateToPage(page, '/admin/${slug}/tables');
     
     await expect(page.locator('main').first()).toBeVisible();
     const tableContent = page.locator('text=/table|seating|floor/i');
@@ -235,23 +235,23 @@ test.describe('Admin Pool Management', () => {
 // ============================================
 // ADMIN CHALET MANAGEMENT TESTS
 // ============================================
-test.describe('Admin Chalet Management', () => {
+test.describe('Admin AccommodationUnit Management', () => {
   test.beforeEach(async ({ auth }) => {
     await auth.loginAs('admin');
   });
 
-  test('Chalets list page loads', async ({ page }) => {
-    await navigateToPage(page, '/admin/chalets');
+  test('AccommodationUnits list page loads', async ({ page }) => {
+    await navigateToPage(page, '/admin/accommodation_units');
     
-    await expect(page.getByRole('heading', { name: /Chalet/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /AccommodationUnit/i }).first()).toBeVisible({ timeout: 10000 });
     
     // Should have add button
     const addButton = page.locator('button:has-text("Add"), button:has-text("Create"), button:has-text("New")');
     await expect(addButton.first()).toBeVisible();
   });
 
-  test('Chalet bookings page loads', async ({ page }) => {
-    await navigateToPage(page, '/admin/chalets/bookings');
+  test('AccommodationUnit bookings page loads', async ({ page }) => {
+    await navigateToPage(page, '/admin/accommodation_units/bookings');
     
     await expect(page.locator('main').first()).toBeVisible();
     const bookingContent = page.locator('text=/booking|reservation|calendar/i');
@@ -410,7 +410,7 @@ test.describe('Admin Navigation', () => {
     await expect(sidebar.first()).toBeVisible();
     
     // Click on a navigation item
-    const navItem = page.locator('a[href*="/admin/restaurant"], a[href*="/admin/pool"], a[href*="/admin/chalets"]').first();
+    const navItem = page.locator('a[href*="/admin/menu service"], a[href*="/admin/pool"], a[href*="/admin/accommodation_units"]').first();
     if (await navItem.isVisible()) {
       await navItem.click();
       await page.waitForLoadState('networkidle');

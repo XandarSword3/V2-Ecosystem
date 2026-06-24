@@ -1,5 +1,6 @@
 // File: backend/src/services/business-config.service.ts
-import { BUSINESS_TYPES } from "../config/business-types.js";
+import { ENGINE_TYPE_DEFAULTS, EngineTypeConfig } from '../config/business-types.js';
+import type { ModuleTemplateType } from '../security/template-permission-presets.js';
 import { terminologyService } from "./terminology.service.js";
 import { getSupabase } from "../database/connection.js";
 import { logger } from "../utils/logger.js";
@@ -10,7 +11,7 @@ export class BusinessConfigService {
      * This updates terminology and potentially site settings/active modules
      */
     async switchBusinessType(typeId: string): Promise<boolean> {
-        const config = BUSINESS_TYPES[typeId];
+        const config = ENGINE_TYPE_DEFAULTS[typeId as ModuleTemplateType];
         if (!config) throw new Error(`Invalid business type: ${typeId}`);
 
         const supabase = getSupabase();

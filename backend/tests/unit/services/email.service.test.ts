@@ -115,7 +115,7 @@ describe('EmailService', () => {
         from: vi.fn().mockReturnValue({
           select: vi.fn().mockResolvedValue({
             data: [
-              { key: 'general', value: { resortName: 'Test Resort' } },
+              { key: 'general', value: { propertyName: 'Test Property' } },
               { key: 'contact', value: { email: 'contact@test.com', phone: '123-456' } }
             ],
             error: null
@@ -129,7 +129,7 @@ describe('EmailService', () => {
       
       expect(result.data).toHaveLength(2);
       expect(result.data[0].key).toBe('general');
-      expect(result.data[0].value.resortName).toBe('Test Resort');
+      expect(result.data[0].value.propertyName).toBe('Test Property');
     });
   });
 

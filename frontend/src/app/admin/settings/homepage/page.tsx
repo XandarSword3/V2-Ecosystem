@@ -52,13 +52,15 @@ interface HomepageSettings {
   ctaSubtitle: string;
   ctaButtonText: string;
   ctaButtonLink: string;
+  rotationInterval: number; // seconds between slides; 0 = manual only
+  includeDefaultSlide: boolean; // whether to include the default slide (from general settings) in rotation
 }
 
 const defaultSettings: HomepageSettings = {
   heroSlides: [
     {
       id: '1',
-      title: 'Welcome to Azure Bay Resort',
+      title: 'Welcome to Our Business',
       subtitle: 'Where the Ocean Meets Paradise',
       buttonText: 'Explore Our Services',
       buttonLink: '#services',
@@ -74,10 +76,12 @@ const defaultSettings: HomepageSettings = {
     { id: '5', type: 'map', title: 'Find Us', enabled: true, order: 5 },
     { id: '6', type: 'cta', title: 'Call to Action', enabled: true, order: 6 },
   ],
-  ctaTitle: 'Ready to Experience Azure Bay Resort?',
+  ctaTitle: 'Ready to Experience Our Services?',
   ctaSubtitle: 'Book your stay today and discover why we are the preferred destination.',
   ctaButtonText: 'Book Now',
-  ctaButtonLink: '/chalets',
+  ctaButtonLink: '/units',
+  rotationInterval: 5,
+  includeDefaultSlide: false,
 };
 
 export default function HomepageSettingsPage() {
@@ -88,38 +92,49 @@ export default function HomepageSettingsPage() {
   const [hasChanges, setHasChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<'hero' | 'sections' | 'cta'>('hero');
   const [uploadingSlideId, setUploadingSlideId] = useState<string | null>(null);
+  const [dragOverSlideId, setDragOverSlideId] = useState<string | null>(null);
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   useEffect(() => {
     loadSettings();
   }, []);
 
+  // Valid section types — 'hero' is managed separately as hero slides, not a section
+  const VALID_SECTION_TYPES: HomepageSection['type'][] = ['services', 'features', 'stats', 'testimonials', 'map', 'cta'];
+
   const normalizeSections = (raw: unknown): HomepageSection[] => {
     if (!Array.isArray(raw)) return defaultSettings.sections;
     if (raw.length === 0) return defaultSettings.sections;
-    // If sections are strings like ["hero","features",...], convert to objects
+    // If sections are strings like ["services","features",...], convert to objects
+    // Legacy 'hero' / 'programs' types are filtered out — hero is managed via hero slides
     if (typeof raw[0] === 'string') {
       const sectionTitles: Record<string, string> = {
-        hero: 'Hero', services: 'Our Services', features: 'Why Choose Us',
-        programs: 'Programs', stats: 'Our Numbers', testimonials: 'What Our Guests Say',
+        services: 'Our Services', features: 'Why Choose Us',
+        stats: 'Our Numbers', testimonials: 'What Our Guests Say',
         map: 'Find Us', cta: 'Call to Action',
       };
-      return (raw as string[]).map((type, i) => ({
-        id: String(i + 1),
-        type: type as HomepageSection['type'],
-        title: sectionTitles[type] || type,
-        enabled: true,
-        order: i + 1,
-      }));
+      const sections = (raw as string[])
+        .filter(type => VALID_SECTION_TYPES.includes(type as HomepageSection['type']))
+        .map((type, i) => ({
+          id: String(i + 1),
+          type: type as HomepageSection['type'],
+          title: sectionTitles[type] || type,
+          enabled: true,
+          order: i + 1,
+        }));
+      return sections.length > 0 ? sections : defaultSettings.sections;
     }
-    // Already objects — ensure all fields exist
-    return raw.map((s: any, i: number) => ({
-      id: s.id ?? String(i + 1),
-      type: s.type ?? 'services',
-      title: s.title ?? s.type ?? 'Section',
-      enabled: s.enabled ?? true,
-      order: s.order ?? i + 1,
-    }));
+    // Already objects — filter to valid types and ensure all fields exist
+    const sections = raw
+      .filter((s: any) => VALID_SECTION_TYPES.includes(s.type))
+      .map((s: any, i: number) => ({
+        id: s.id ?? String(i + 1),
+        type: s.type as HomepageSection['type'],
+        title: s.title ?? s.type ?? 'Section',
+        enabled: s.enabled ?? true,
+        order: s.order ?? i + 1,
+      }));
+    return sections.length > 0 ? sections : defaultSettings.sections;
   };
 
   const normalizeSlides = (raw: unknown): HeroSlide[] => {
@@ -144,6 +159,8 @@ export default function HomepageSettingsPage() {
       ctaSubtitle: d.ctaSubtitle ?? defaultSettings.ctaSubtitle,
       ctaButtonText: d.ctaButtonText ?? defaultSettings.ctaButtonText,
       ctaButtonLink: d.ctaButtonLink ?? defaultSettings.ctaButtonLink,
+      rotationInterval: typeof d.rotationInterval === 'number' ? d.rotationInterval : defaultSettings.rotationInterval,
+      includeDefaultSlide: typeof d.includeDefaultSlide === 'boolean' ? d.includeDefaultSlide : defaultSettings.includeDefaultSlide,
     });
   };
 
@@ -237,23 +254,39 @@ export default function HomepageSettingsPage() {
     setHasChanges(true);
   };
 
-  const handleImageUpload = async (slideId: string, file: File) => {
+  const handleImageUpload = (slideId: string, file: File) => {
     if (!file.type.startsWith('image/')) { toast.error('Please upload an image file'); return; }
     if (file.size > 10 * 1024 * 1024) { toast.error('Image must be less than 10MB'); return; }
     setUploadingSlideId(slideId);
     const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const response = await api.post('/admin/uploads', { file: reader.result, type: 'image', filename: file.name });
-        if (response.data?.success && response.data?.data?.url) {
-          updateHeroSlide(slideId, 'imageUrl', response.data.data.url);
-          toast.success('Image uploaded successfully');
-        } else { toast.error('Failed to upload image'); }
-      } catch { toast.error('Failed to upload image'); }
-      finally { setUploadingSlideId(null); }
+    reader.onload = () => {
+      // Store the image inline as a base64 data URI directly on the slide.
+      // No server upload/storage round-trip — this is what renders correctly
+      // in the <img> preview and is what gets saved to site_settings.
+      updateHeroSlide(slideId, 'imageUrl', reader.result as string);
+      toast.success('Image added');
+      setUploadingSlideId(null);
     };
     reader.onerror = () => { toast.error('Failed to read file'); setUploadingSlideId(null); };
     reader.readAsDataURL(file);
+  };
+
+  const handleDragOver = (slideId: string, e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverSlideId(slideId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverSlideId(null);
+  };
+
+  const handleDrop = (slideId: string, e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverSlideId(null);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleImageUpload(slideId, file);
+    }
   };
 
   const heroSlides = settings.heroSlides || [];
@@ -322,6 +355,62 @@ export default function HomepageSettingsPage() {
               </div>
             </CardHeader>
             <CardContent>
+              {/* Auto-Rotation Interval */}
+              <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Auto-Rotation Interval
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min={0}
+                    max={15}
+                    step={1}
+                    value={settings.rotationInterval}
+                    onChange={(e) => {
+                      setSettings({ ...settings, rotationInterval: Number(e.target.value) });
+                      setHasChanges(true);
+                    }}
+                    className="flex-1 accent-primary-600"
+                  />
+                  <span className="text-sm font-mono font-semibold text-slate-700 dark:text-slate-300 w-24 text-right">
+                    {settings.rotationInterval === 0 ? 'Manual only' : `${settings.rotationInterval}s`}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+                  How long each slide is shown before auto-advancing. Set to 0 to disable auto-rotation.
+                </p>
+              </div>
+
+              {/* Include Default Slide Toggle */}
+              <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                      Include Default Slide
+                    </label>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      When enabled, the default slide (from General Settings) will be included in rotation alongside your custom slides.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSettings({ ...settings, includeDefaultSlide: !settings.includeDefaultSlide });
+                      setHasChanges(true);
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settings.includeDefaultSlide ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        settings.includeDefaultSlide ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
               <div className="space-y-6">
                 {heroSlides.map((slide, index) => (
                   <div
@@ -380,7 +469,16 @@ export default function HomepageSettingsPage() {
                               </button>
                             </div>
                           )}
-                          <div className="flex gap-3">
+                          <div
+                            onDragOver={(e) => handleDragOver(slide.id, e)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(slide.id, e)}
+                            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                              dragOverSlideId === slide.id
+                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                                : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'
+                            }`}
+                          >
                             <input
                               type="file"
                               accept="image/*"
@@ -394,13 +492,16 @@ export default function HomepageSettingsPage() {
                               size="sm"
                               onClick={() => fileInputRefs.current[slide.id]?.click()}
                               disabled={uploadingSlideId === slide.id}
-                              className="flex-1"
+                              className="flex items-center justify-center gap-2"
                             >
                               {uploadingSlideId === slide.id
                                 ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading...</>
                                 : <><Upload className="w-4 h-4 mr-2" />{slide.imageUrl ? 'Change Image' : 'Upload Image'}</>
                               }
                             </Button>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                              or drag and drop an image here
+                            </p>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-slate-400">or enter URL:</span>
@@ -460,6 +561,13 @@ export default function HomepageSettingsPage() {
                   </div>
                 ))}
               </div>
+              {sections.filter(s => s.enabled).length === 0 && (
+                <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
+                    All sections are hidden. Enable at least one section above to show it on the homepage.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

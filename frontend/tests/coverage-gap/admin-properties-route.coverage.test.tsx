@@ -12,9 +12,9 @@ const toastErrorMock = vi.hoisted(() => vi.fn());
 const propertiesSeed = [
   {
     id: 'prop-1',
-    name: 'Azure Bay Resort',
+    name: 'Azure Bay Property',
     code: 'AZR-001',
-    type: 'resort',
+    type: 'property',
     status: 'active',
     city: 'Naples',
     country: 'Italy',
@@ -54,7 +54,7 @@ vi.mock('@/lib/api', () => ({
 vi.mock('@/context/PropertyContext', () => ({
   useProperty: () => ({
     activePropertyId: 'prop-1',
-    activeProperty: { id: 'prop-1', name: 'Azure Bay Resort' },
+    activeProperty: { id: 'prop-1', name: 'Azure Bay Property' },
     setActiveProperty: vi.fn(),
     properties: [],
     loading: false,
@@ -118,17 +118,17 @@ describe('Admin properties route coverage', () => {
     renderPage();
 
     expect(await screen.findByText('Property Management')).toBeInTheDocument();
-    expect(await screen.findByText('Azure Bay Resort')).toBeInTheDocument();
+    expect(await screen.findByText('Azure Bay Property')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Add Property/i }));
 
-    const nameInput = await screen.findByPlaceholderText('V2 Ecosystem & Spa');
+    const nameInput = await screen.findByPlaceholderText('My Property Name');
     await user.type(nameInput, 'Sunset Cliff Villas');
 
-    const cityInput = screen.getByPlaceholderText('Beirut');
+    const cityInput = screen.getByPlaceholderText('City');
     await user.type(cityInput, 'Naples');
 
-    const countryInput = screen.getByPlaceholderText('Lebanon');
+    const countryInput = screen.getByPlaceholderText('Country');
     await user.type(countryInput, 'Italy');
 
     await user.click(screen.getByRole('button', { name: /Deploy Property/i }));

@@ -66,7 +66,7 @@ export default function ModuleReservePage() {
     queryKey: ['available-tables', form.date, form.partySize, currentModule?.id],
     queryFn: async () => {
       try {
-        const res = await api.get(`/restaurant/tables/available?date=${form.date}&partySize=${form.partySize}`);
+        const res = await api.get(`/${slug}/tables/available?date=${form.date}&partySize=${form.partySize}`);
         return res.data?.data || [];
       } catch {
         return [];
@@ -77,7 +77,7 @@ export default function ModuleReservePage() {
 
   const submitMutation = useMutation({
     mutationFn: async (data: ReservationForm) => {
-      const res = await api.post('/restaurant/reservations', {
+      const res = await api.post(`/${slug}/reservations`, {
         date: data.date,
         time: data.time,
         party_size: data.partySize,

@@ -25,17 +25,22 @@ vi.mock('../../src/lib/offline/offline-storage', () => ({
   ordersStore: ordersStoreMock,
   menuItemsStore: { getAll: vi.fn(async () => []) },
   menuCategoriesStore: { getAll: vi.fn(async () => []) },
+  catalogItemsStore: { getAll: vi.fn(async () => []), clear: vi.fn(async () => undefined) },
+  catalogCategoriesStore: { getAll: vi.fn(async () => []), clear: vi.fn(async () => undefined) },
   modifiersStore: { getAll: vi.fn(async () => []) },
   customersStore: { getAll: vi.fn(async () => []) },
   paymentsStore: { getAll: vi.fn(async () => []) },
   ticketsStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
   chaletsStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
+  bookableUnitsStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
   bookingsStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
   housekeepingTasksStore: { getAll: vi.fn(async () => []), getById: vi.fn(async () => ({})), put: vi.fn(), update: vi.fn() },
   conflictsStore: { put: vi.fn(async () => undefined), getAll: vi.fn(async () => []) },
   offlineActivityStore: { put: vi.fn(async () => undefined), getAll: vi.fn(async () => []) },
   cacheManager: { isStale: vi.fn(async () => true), updateMetadata: vi.fn(), getAllMetadata: vi.fn(async () => []) },
   isOnline: vi.fn(() => true),
+  onOnline: vi.fn(),
+  onOffline: vi.fn(),
 }));
 
 vi.mock('@/lib/api', () => ({
@@ -86,7 +91,7 @@ describe('offline sync manager', () => {
     // 3. Pool Entry
     await createOfflinePoolEntry('t-1');
     expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
-      entityType: 'pool_ticket',
+      entityType: 'capacity_ticket',
       entityId: 't-1',
       operation: 'update',
       data: expect.objectContaining({ type: 'entry' })
@@ -95,7 +100,7 @@ describe('offline sync manager', () => {
     // 4. Pool Exit
     await createOfflinePoolExit('t-1');
     expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
-      entityType: 'pool_ticket',
+      entityType: 'capacity_ticket',
       entityId: 't-1',
       operation: 'update',
       data: expect.objectContaining({ type: 'exit' })
@@ -104,13 +109,13 @@ describe('offline sync manager', () => {
     // 5. Ticket Validation
     await createOfflineTicketValidation('VAL-123');
     expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
-      entityType: 'pool_ticket',
+      entityType: 'capacity_ticket',
       entityId: 'VAL-123',
       operation: 'update',
       data: expect.objectContaining({ type: 'validate', ticketNumber: 'VAL-123' })
     }));
 
-    // 6. Restaurant Order Status Update
+    // 6. MenuService Order Status Update
     await createOfflineOrderStatusUpdate('o-1', 'preparing');
     expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
       entityType: 'restaurant_order_status',
@@ -119,7 +124,7 @@ describe('offline sync manager', () => {
       data: { status: 'preparing' }
     }));
 
-    // 7. Chalet Status Update
+    // 7. AccommodationUnit Status Update
     await createOfflineChaletStatusUpdate('c-1', 'clean');
     expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
       entityType: 'chalet_status',
@@ -128,7 +133,7 @@ describe('offline sync manager', () => {
       data: { status: 'clean' }
     }));
 
-    // 8. Restaurant Table Status Update
+    // 8. MenuService Table Status Update
     await createOfflineTableStatusUpdate('tab-1', 'AVAILABLE');
     expect(syncQueueMock.add).toHaveBeenCalledWith(expect.objectContaining({
       entityType: 'restaurant_table_status',
@@ -141,7 +146,7 @@ describe('offline sync manager', () => {
   it('resolves complex Phase 2 state transitions during sync', async () => {
     syncQueueMock.getPending.mockResolvedValue([
       { id: '1', entityType: 'housekeeping_task', entityId: 'h-1', operation: 'update', data: { status: 'completed' }, attempts: 0 },
-      { id: '2', entityType: 'pool_ticket', entityId: 'p-1', operation: 'update', data: { type: 'exit' }, attempts: 0 }
+      { id: '2', entityType: 'capacity_ticket', entityId: 'p-1', operation: 'update', data: { type: 'exit' }, attempts: 0 }
     ]);
 
     apiPostMock.mockResolvedValue({ status: 200, data: {} });

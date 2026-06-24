@@ -18,8 +18,8 @@ const runIntegration = process.env.RUN_INTEGRATION_TESTS === 'true';
 const describeIntegration = runIntegration ? describe : describe.skip;
 
 describeIntegration('Order Creation (Integration)', () => {
-  it('should create a restaurant order successfully', async () => {
-    const menu = await request(app).get('/api/v1/restaurant/menu');
+  it('should create a menu service order successfully', async () => {
+    const menu = await request(app).get('/api/v1/${slug}/menu');
     expect(menu.status).toBeLessThan(500);
 
     const directItems = Array.isArray(menu.body?.data?.items) ? menu.body.data.items : [];
@@ -35,7 +35,7 @@ describeIntegration('Order Creation (Integration)', () => {
     }
 
     const res = await request(app)
-      .post('/api/v1/restaurant/orders')
+      .post('/api/v1/${slug}/orders')
       .send({
         customerName: 'Test User',
         customerPhone: '+1234567890',
@@ -69,19 +69,19 @@ describeIntegration('Authentication (Integration)', () => {
 });
 
 describeIntegration('Double Booking Prevention (Integration)', () => {
-  it('should prevent double booking for the same chalet and dates', async () => {
+  it('should prevent double booking for the same accommodation unit and dates', async () => {
     const chaletsRes = await request(app).get('/api/v1/units');
     expect(chaletsRes.status).toBeLessThan(500);
 
-    const chalets = Array.isArray(chaletsRes.body?.data)
+    const accommodation_units = Array.isArray(chaletsRes.body?.data)
       ? chaletsRes.body.data
-      : Array.isArray(chaletsRes.body?.data?.chalets)
-        ? chaletsRes.body.data.chalets
+      : Array.isArray(chaletsRes.body?.data?.accommodation_units)
+        ? chaletsRes.body.data.accommodation_units
         : [];
-    const chalet = chalets.find((c: any) => c?.id);
+    const accommodation_unit = accommodation_units.find((c: any) => c?.id);
 
-    if (!chalet?.id) {
-      // No chalet inventory in this environment yet.
+    if (!accommodation_unit?.id) {
+      // No accommodation unit inventory in this environment yet.
       return;
     }
 
@@ -90,7 +90,7 @@ describeIntegration('Double Booking Prevention (Integration)', () => {
     const toIsoDate = (date: Date) => date.toISOString().slice(0, 10);
 
     let bookingPayload: {
-      chaletId: string;
+      unitId: string;
       checkInDate: string;
       checkOutDate: string;
       customerName: string;
@@ -109,7 +109,7 @@ describeIntegration('Double Booking Prevention (Integration)', () => {
       checkOut.setUTCDate(checkOut.getUTCDate() + 2);
 
       const candidatePayload = {
-        unit_id: chalet.id,
+        unit_id: accommodation_unit.id,
         check_in_date: toIsoDate(checkIn),
         check_out_date: toIsoDate(checkOut),
         number_of_guests: 2,

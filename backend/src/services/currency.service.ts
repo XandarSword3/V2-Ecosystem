@@ -46,11 +46,11 @@ const SUPPORTED_CURRENCIES: Record<string, Omit<Currency, 'exchange_rate' | 'is_
   CHF: { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc', name_ar: 'فرنك سويسري', name_fr: 'Franc suisse', decimal_places: 2 },
 };
 
-const ratesCache: Map<string, { rate: number; timestamp: number }> = new Map();
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 class CurrencyService {
   private defaultCurrency = 'EUR';
+  private ratesCache: Map<string, { rate: number; timestamp: number }> = new Map();
 
   async getActiveCurrencies(): Promise<Currency[]> {
     const { data, error } = await supabase
@@ -103,11 +103,11 @@ class CurrencyService {
 
   async getExchangeRate(currencyCode: string): Promise<number> {
     currencyCode = currencyCode.toUpperCase();
-    const cached = ratesCache.get(currencyCode);
+    const cached = this.ratesCache.get(currencyCode);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.rate;
     const { data, error } = await supabase.from('currencies').select('exchange_rate').eq('code', currencyCode).single();
     if (error || !data) throw new Error(`Exchange rate not found for ${currencyCode}`);
-    ratesCache.set(currencyCode, { rate: data.exchange_rate, timestamp: Date.now() });
+    this.ratesCache.set(currencyCode, { rate: data.exchange_rate, timestamp: Date.now() });
     return data.exchange_rate;
   }
 
@@ -120,7 +120,7 @@ class CurrencyService {
       .select()
       .single();
     if (error) throw error;
-    ratesCache.delete(currencyCode);
+    this.ratesCache.delete(currencyCode);
     return data;
   }
 
@@ -157,6 +157,8 @@ class CurrencyService {
     const currency = SUPPORTED_CURRENCIES[currencyCode.toUpperCase()];
     return stripeAmount / Math.pow(10, currency?.decimal_places ?? 2);
   }
+
+  clearRatesCache(): void { this.ratesCache.clear(); }
 
   isStripeSupportedCurrency(currencyCode: string): boolean {
     return ['EUR','USD','GBP','AED','SAR','QAR','KWD','CHF','AUD','CAD','JPY','SGD','HKD','INR','BRL','MXN'].includes(currencyCode.toUpperCase());

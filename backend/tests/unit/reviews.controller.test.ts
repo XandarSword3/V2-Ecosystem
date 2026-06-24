@@ -55,7 +55,7 @@ describe('Reviews Controller', () => {
           id: 'review-2',
           rating: 4,
           comment: 'Great experience',
-          module_id: 'restaurant',
+          module_id: 'menu_service',
           created_at: '2024-01-02T00:00:00Z',
           users: { full_name: 'Jane Smith', profile_image_url: null },
         },
@@ -102,8 +102,8 @@ describe('Reviews Controller', () => {
         {
           id: 'review-1',
           rating: 5,
-          comment: 'Great restaurant!',
-          module_id: 'restaurant',
+          comment: 'Great menu service!',
+          module_id: 'menu_service',
           created_at: '2024-01-01T00:00:00Z',
           users: { full_name: 'John Doe', profile_image_url: null },
         },
@@ -122,13 +122,13 @@ describe('Reviews Controller', () => {
 
       const { getApprovedReviews } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
-        query: { service_type: 'restaurant', limit: '5' },
+        query: { service_type: 'menu_service', limit: '5' },
       });
 
       await getApprovedReviews(req, res, next);
 
       // Iteration 5: service_type maps to module_id column
-      expect(reviewsQueryMock.eq).toHaveBeenCalledWith('module_id', 'restaurant');
+      expect(reviewsQueryMock.eq).toHaveBeenCalledWith('module_id', 'menu_service');
     });
 
     it('should not filter by service type when type is "all"', async () => {
@@ -264,7 +264,7 @@ describe('Reviews Controller', () => {
         body: {
           rating: 5,
           text: 'Test review text here',
-          service_type: 'pool',
+          service_type: 'capacity',
         },
       });
       req.user = { userId: 'user-123', role: 'customer' };
@@ -328,7 +328,7 @@ describe('Reviews Controller', () => {
           id: 'review-2',
           rating: 3,
           comment: 'Okay',
-          module_id: 'restaurant',
+          module_id: 'menu_service',
           status: 'pending',
           user_id: 'user-2',
           customer_name: 'Jane',
@@ -371,7 +371,7 @@ describe('Reviews Controller', () => {
           {
             ...mockReviews[1],
             text: mockReviews[1].comment,
-            service_type: 'restaurant',
+            service_type: 'menu_service',
             is_approved: false,
             users: { id: 'user-2', full_name: 'Jane', email: 'jane@test.com', profile_image_url: null },
           },
@@ -429,13 +429,13 @@ describe('Reviews Controller', () => {
 
       const { getAllReviews } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
-        query: { service_type: 'chalets' },
+        query: { service_type: 'accommodation_units' },
       });
 
       await getAllReviews(req, res, next);
 
       // Iteration 5: service_type maps to module_id column
-      expect(queryMock.eq).toHaveBeenCalledWith('module_id', 'chalets');
+      expect(queryMock.eq).toHaveBeenCalledWith('module_id', 'accommodation_units');
     });
 
     it('should handle database error', async () => {

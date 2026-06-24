@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
-import { config } from '../../config/index.js';
+import { config } from '../../config/index';
 
 /**
  * Get public site settings
@@ -9,9 +9,54 @@ import { config } from '../../config/index.js';
 export async function getSettings(req: Request, res: Response) {
     try {
         const supabase = getSupabase();
-        const { data: settings } = await supabase
-            .from('site_settings')
-            .select('key, value');
+
+        // Property context comes ONLY from req.property, attached by
+        // resolveProperty (mounted in app.ts ahead of this router). That
+        // middleware derives property from the request itself —
+        // X-Property-Slug (set by frontend middleware from the Host header)
+        // or the single-property/single-tenant fallback — never from a
+        // client-sent x-property-id header. See CONTEXT.md, "Public/Admin
+        // Property Context Contamination" (session 7-9) for why a
+        // client-trusted header here was a real bug: it let an admin's
+        // localStorage-cached activePropertyId leak into what the public
+        // storefront rendered.
+        let resolvedPropertyId = req.property?.id;
+
+        // When no property was resolved by middleware (e.g. localhost with
+        // multiple properties and no tenant/slug to disambiguate), fall back
+        // to the default property so branding still works in development and
+        // single-deployment scenarios.
+        if (!resolvedPropertyId) {
+            const { data: defaultProp } = await supabase
+                .from('properties')
+                .select('id')
+                .order('created_at', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+            if (defaultProp) {
+                resolvedPropertyId = defaultProp.id;
+                logger.info('Public controller - no property resolved, using default property', { propertyId: resolvedPropertyId });
+            }
+        }
+
+        let settings: Array<{ key: string; value: unknown }> = [];
+
+        if (resolvedPropertyId) {
+            try {
+                const { getEffectiveSettings } = await import('../multi-property/settings-resolution.service.js');
+                const resolved = await getEffectiveSettings(resolvedPropertyId);
+                settings = resolved.map(s => ({ key: s.key, value: s.value }));
+            } catch (err) {
+                logger.error('Public controller - failed to resolve property settings, falling back to global:', err);
+                const { data } = await supabase.from('site_settings').select('key, value');
+                settings = data || [];
+            }
+        } else {
+            const { data } = await supabase.from('site_settings').select('key, value');
+            settings = data || [];
+        }
+
+        console.log('Public controller - raw settings from DB:', settings);
 
         // Build response from database settings
         const result: Record<string, unknown> = {
@@ -23,6 +68,7 @@ export async function getSettings(req: Request, res: Response) {
             for (const setting of settings) {
                 if (setting.key === 'appearance' && setting.value && typeof setting.value === 'object') {
                     const appearance = setting.value as Record<string, unknown>;
+                    console.log('Public controller - appearance data:', appearance);
                     if (appearance.theme) result.theme = appearance.theme;
                     if (appearance.themeColors) result.themeColors = appearance.themeColors;
                     if (appearance.weatherEffect) result.weatherEffect = appearance.weatherEffect;
@@ -31,6 +77,48 @@ export async function getSettings(req: Request, res: Response) {
                     if (appearance.animationsEnabled !== undefined) result.animationsEnabled = appearance.animationsEnabled;
                     if (appearance.reducedMotion !== undefined) result.reducedMotion = appearance.reducedMotion;
                     if (appearance.soundEnabled !== undefined) result.soundEnabled = appearance.soundEnabled;
+                    // Brand & Identity fields
+                    if (appearance.logoUrl) result.logoUrl = appearance.logoUrl;
+                    if (appearance.logoDarkUrl) result.logoDarkUrl = appearance.logoDarkUrl;
+                    if (appearance.faviconUrl) result.faviconUrl = appearance.faviconUrl;
+                    if (appearance.logoMaxWidth) result.logoMaxWidth = appearance.logoMaxWidth;
+                    if (appearance.fontHeading) result.fontHeading = appearance.fontHeading;
+                    if (appearance.fontBody) result.fontBody = appearance.fontBody;
+                    if (appearance.fontScale) result.fontScale = appearance.fontScale;
+                    if (appearance.headingTracking) result.headingTracking = appearance.headingTracking;
+                    if (appearance.borderRadius) result.borderRadius = appearance.borderRadius;
+                    if (appearance.density) result.density = appearance.density;
+                    if (appearance.glassmorphism) result.glassmorphism = appearance.glassmorphism;
+                }
+                if (setting.key === 'branding.colors' && setting.value && typeof setting.value === 'object') {
+                    const colors = setting.value as Record<string, string>;
+                    result.themeColors = {
+                        ...(result.themeColors as any || {}),
+                        primary: colors.primaryColor,
+                        secondary: colors.secondaryColor,
+                        accent: colors.accentColor,
+                        border: colors.borderColor,
+                    };
+                }
+                if (setting.key === 'branding.fonts' && setting.value && typeof setting.value === 'object') {
+                    const fonts = setting.value as Record<string, string>;
+                    if (fonts.headingFont) result.fontHeading = fonts.headingFont;
+                    if (fonts.bodyFont) result.fontBody = fonts.bodyFont;
+                    if (fonts.fontScale) result.fontScale = fonts.fontScale;
+                    if (fonts.headingTracking) result.headingTracking = fonts.headingTracking;
+                }
+                if (setting.key === 'branding.identity' && setting.value && typeof setting.value === 'object') {
+                    const identity = setting.value as Record<string, unknown>;
+                    if (identity.logoUrl) result.logoUrl = identity.logoUrl;
+                    if (identity.logoDarkUrl) result.logoDarkUrl = identity.logoDarkUrl;
+                    if (identity.faviconUrl) result.faviconUrl = identity.faviconUrl;
+                    if (identity.logoMaxWidth) result.logoMaxWidth = identity.logoMaxWidth;
+                }
+                if (setting.key === 'branding.style' && setting.value && typeof setting.value === 'object') {
+                    const style = setting.value as Record<string, unknown>;
+                    if (style.borderRadius) result.borderRadius = style.borderRadius;
+                    if (style.density) result.density = style.density;
+                    if (style.glassmorphism) result.glassmorphism = style.glassmorphism;
                 }
                 if (setting.key === 'contact' && setting.value && typeof setting.value === 'object') {
                     const contact = setting.value as Record<string, unknown>;
@@ -41,7 +129,11 @@ export async function getSettings(req: Request, res: Response) {
                 }
                 if (setting.key === 'general' && setting.value && typeof setting.value === 'object') {
                     const general = setting.value as Record<string, unknown>;
-                    if (general.resortName) result.resortName = general.resortName;
+                    const name = general.siteName || general.businessName || general.resortName;
+                    if (name) {
+                        result.siteName = name;
+                        result.resortName = name;
+                    }
                     if (general.tagline) result.tagline = general.tagline;
                     if (general.description) result.description = general.description;
                 }
@@ -71,8 +163,19 @@ export async function getSettings(req: Request, res: Response) {
             }
         }
 
+        console.log('Public controller - final result:', result);
+        // Settings can change at any time via the admin CMS. Without an explicit
+        // Cache-Control header, Express's default ETag behaviour causes browsers
+        // to serve stale 304s indefinitely — the ETag is computed from the last
+        // response body, not the live DB state, so a DB change is invisible until
+        // the browser decides to fully re-request on its own. no-cache forces a
+        // revalidation on every request while still allowing the browser to use
+        // its cache if the server confirms nothing changed (i.e. a true 304).
+        // In practice this means the storefront always sees fresh settings.
+        res.set('Cache-Control', 'no-cache');
         res.json(result);
     } catch (error) {
+        console.error('Public controller - error:', error);
         res.json({
             theme: 'default',
             contact: { email: null }
@@ -125,7 +228,7 @@ export async function getWeather(req: Request, res: Response) {
             data: {
                 temperature: 24, feels_like: 26, humidity: 65, wind_speed: 12, visibility: 10,
                 condition: 'Partly Cloudy', description: 'Weather data unavailable', icon: 'cloud-sun',
-                location: (req.query.location as string) || 'Resort Location'
+                location: (req.query.location as string) || 'Business Location'
             }
         });
     }

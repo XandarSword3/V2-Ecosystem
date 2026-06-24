@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useProperty } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -113,6 +114,8 @@ interface Transaction {
 }
 
 export default function InventoryAdminPage() {
+  const { activePropertyId } = useProperty();
+  const propertyHeader = activePropertyId ? { 'x-property-id': activePropertyId } : undefined;
   const [activeTab, setActiveTab] = useState('items');
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -177,7 +180,8 @@ export default function InventoryAdminPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePropertyId]);
 
   useEffect(() => {
     if (activeTab === 'transactions') {
@@ -196,7 +200,7 @@ export default function InventoryAdminPage() {
   const loadSuppliers = async () => {
     setAdvancedLoading(true);
     try {
-      const res = await api.get('/inventory/suppliers');
+      const res = await api.get('/inventory/suppliers', { headers: propertyHeader });
       setSuppliers(res.data?.data || res.data?.suppliers || []);
     } catch { toast.error('Failed to load suppliers'); }
     finally { setAdvancedLoading(false); }
@@ -205,7 +209,7 @@ export default function InventoryAdminPage() {
   const loadPurchaseOrders = async () => {
     setAdvancedLoading(true);
     try {
-      const res = await api.get('/inventory/purchase-orders');
+      const res = await api.get('/inventory/purchase-orders', { headers: propertyHeader });
       setPurchaseOrders(res.data?.data || res.data?.orders || []);
     } catch { toast.error('Failed to load purchase orders'); }
     finally { setAdvancedLoading(false); }
@@ -214,7 +218,7 @@ export default function InventoryAdminPage() {
   const loadVarianceReport = async () => {
     setAdvancedLoading(true);
     try {
-      const res = await api.get('/inventory/variance-report');
+      const res = await api.get('/inventory/variance-report', { headers: propertyHeader });
       setVarianceReport(res.data?.data || res.data?.variances || []);
     } catch { toast.error('Failed to load variance report'); }
     finally { setAdvancedLoading(false); }
@@ -224,14 +228,14 @@ export default function InventoryAdminPage() {
     setRecipeUsageItem(item);
     setRecipeUsage(null);
     try {
-      const res = await api.get(`/inventory/menu-cost-analysis/${item.id}`);
+      const res = await api.get(`/inventory/menu-cost-analysis/${item.id}`, { headers: propertyHeader });
       setRecipeUsage(res.data?.data || res.data);
     } catch { setRecipeUsage({ error: true }); }
   };
 
   const handleCreateSupplier = async () => {
     try {
-      await api.post('/inventory/suppliers', supplierForm);
+      await api.post('/inventory/suppliers', supplierForm, { headers: propertyHeader });
       toast.success('Supplier created');
       setShowSupplierForm(false);
       setSupplierForm({ name: '', contact_name: '', email: '', phone: '', address: '', notes: '' });
@@ -253,7 +257,7 @@ export default function InventoryAdminPage() {
           quantity: parseFloat(i.quantity),
           unitCost: i.unitCost ? parseFloat(i.unitCost) : undefined,
         })),
-      });
+      }, { headers: propertyHeader });
       toast.success('Purchase order created');
       setShowPOForm(false);
       setPOForm({ supplierId: '', expectedDelivery: '', notes: '', items: [{ itemId: '', quantity: '', unitCost: '' }] });
@@ -270,7 +274,7 @@ export default function InventoryAdminPage() {
           batchNumber: i.batchNumber || undefined,
           expiryDate: i.expiryDate || undefined,
         })),
-      });
+      }, { headers: propertyHeader });
       toast.success('Purchase order received — stock updated');
       setShowReceivePOModal(null);
       loadPurchaseOrders();
@@ -287,7 +291,7 @@ export default function InventoryAdminPage() {
         itemId: physicalCountForm.itemId,
         actualQuantity: parseFloat(physicalCountForm.actualQuantity),
         notes: physicalCountForm.notes || undefined,
-      });
+      }, { headers: propertyHeader });
       toast.success('Physical count recorded');
       setPhysicalCountForm({ itemId: '', actualQuantity: '', notes: '' });
       loadVarianceReport();
@@ -305,18 +309,19 @@ export default function InventoryAdminPage() {
             categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
             lowStock: stockFilter === 'low' ? 'true' : undefined,
             outOfStock: stockFilter === 'out' ? 'true' : undefined,
-          }
+          },
+          headers: propertyHeader,
         }),
-        api.get('/inventory/categories'),
-        api.get('/inventory/stats'),
-        api.get('/inventory/alerts'),
+        api.get('/inventory/categories', { headers: propertyHeader }),
+        api.get('/inventory/stats', { headers: propertyHeader }),
+        api.get('/inventory/alerts', { headers: propertyHeader }),
       ]);
 
       if (itemsRes.data.success) setItems(itemsRes.data.data);
       if (categoriesRes.data.success) setCategories(categoriesRes.data.data);
       if (statsRes.data.success) setStats(statsRes.data.data.summary);
       if (alertsRes.data.success) setAlerts(alertsRes.data.data);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load inventory data');
     } finally {
       setLoading(false);
@@ -325,24 +330,25 @@ export default function InventoryAdminPage() {
 
   const loadTransactions = async () => {
     try {
-      const res = await api.get('/inventory/transactions', { params: { limit: 100 } });
+      const res = await api.get('/inventory/transactions', { params: { limit: 100 }, headers: propertyHeader });
       if (res.data.success) setTransactions(res.data.data);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load transactions');
     }
   };
 
   const loadAlerts = async () => {
     try {
-      const res = await api.get('/inventory/alerts');
+      const res = await api.get('/inventory/alerts', { headers: propertyHeader });
       if (res.data.success) setAlerts(res.data.data);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load alerts');
     }
   };
 
   useEffect(() => {
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, categoryFilter, stockFilter]);
 
   const handleCreateItem = async () => {
@@ -370,9 +376,9 @@ export default function InventoryAdminPage() {
       
       let res;
       if (editingItem) {
-        res = await api.put(`/inventory/items/${editingItem.id}`, payload);
+        res = await api.put(`/inventory/items/${editingItem.id}`, payload, { headers: propertyHeader });
       } else {
-        res = await api.post('/inventory/items', payload);
+        res = await api.post('/inventory/items', payload, { headers: propertyHeader });
       }
       
       if (res.data.success) {
@@ -438,7 +444,7 @@ export default function InventoryAdminPage() {
         quantity: parseFloat(transactionForm.quantity),
         notes: transactionForm.notes || undefined,
         referenceType: 'manual',
-      });
+      }, { headers: propertyHeader });
       
       if (res.data.success) {
         toast.success('Transaction recorded');
@@ -454,22 +460,21 @@ export default function InventoryAdminPage() {
 
   const handleResolveAlert = async (alertId: string) => {
     try {
-      const res = await api.post(`/inventory/alerts/${alertId}/resolve`);
+      const res = await api.post(`/inventory/alerts/${alertId}/resolve`, {}, { headers: propertyHeader });
       if (res.data.success) {
         toast.success('Alert resolved');
         loadAlerts();
         loadData();
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to resolve alert');
     }
   };
 
   const handleDeleteItem = async () => {
     if (!deletingItem) return;
-    
     try {
-      const res = await api.delete(`/inventory/items/${deletingItem.id}`);
+      const res = await api.delete(`/inventory/items/${deletingItem.id}`, { headers: propertyHeader });
       if (res.data.success) {
         toast.success('Item deleted successfully');
         setShowDeleteItemModal(false);
@@ -483,9 +488,8 @@ export default function InventoryAdminPage() {
 
   const handleDeleteCategory = async () => {
     if (!deletingCategory) return;
-    
     try {
-      const res = await api.delete(`/inventory/categories/${deletingCategory.id}`);
+      const res = await api.delete(`/inventory/categories/${deletingCategory.id}`, { headers: propertyHeader });
       if (res.data.success) {
         toast.success('Category deleted successfully');
         setShowDeleteCategoryModal(false);
@@ -534,6 +538,17 @@ export default function InventoryAdminPage() {
       </Badge>
     );
   };
+
+  if (!activePropertyId) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Package className="w-10 h-10 mx-auto mb-3 opacity-40" />
+          <p className="text-slate-500 dark:text-slate-400">Select a property to view inventory</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -1596,12 +1611,12 @@ export default function InventoryAdminPage() {
               onSave={async (data) => {
                 try {
                   if (editingCategory) {
-                    const res = await api.put(`/inventory/categories/${editingCategory.id}`, data);
+                    const res = await api.put(`/inventory/categories/${editingCategory.id}`, data, { headers: propertyHeader });
                     if (res.data.success) {
                       toast.success('Category updated');
                     }
                   } else {
-                    const res = await api.post('/inventory/categories', data);
+                    const res = await api.post('/inventory/categories', data, { headers: propertyHeader });
                     if (res.data.success) {
                       toast.success('Category created');
                     }

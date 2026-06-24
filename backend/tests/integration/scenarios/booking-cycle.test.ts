@@ -1,7 +1,7 @@
 /**
  * Integration Test: Booking Cycle
  *
- * Tests the complete chalet booking workflow:
+ * Tests the complete accommodation unit booking workflow:
  * Check availability → Book → Payment → Check-in → Check-out
  *
  * Scenario extracted from stress test customer-bot and staff-bot behaviors.
@@ -27,7 +27,7 @@ const describeIf = runIntegration ? describe : describe.skip;
 describeIf('Booking Cycle Integration', () => {
   let guestClient: TestApiClient;
   let staffClient: TestApiClient;
-  let chaletId: string;
+  let unitId: string;
   let bookingId: string;
   let servicesAvailable = false;
 
@@ -60,42 +60,42 @@ describeIf('Booking Cycle Integration', () => {
   });
 
   describe('Phase 1: Browse & Check Availability', () => {
-    it('should fetch available chalets', async () => {
-      const response = await guestClient.getChalets();
+    it('should fetch available accommodation_units', async () => {
+      const response = await guestClient.getAccommodationUnits();
       assertSuccess(response);
 
-      const chalets = assertHasData<any>(response);
-      expect(Array.isArray(chalets) || chalets.data || chalets.items).toBeTruthy();
+      const accommodation_units = assertHasData<any>(response);
+      expect(Array.isArray(accommodation_units) || accommodation_units.data || accommodation_units.items).toBeTruthy();
 
-      // Store first available chalet
-      const chaletList = chalets.data || chalets.items || chalets;
+      // Store first available accommodation unit
+      const chaletList = accommodation_units.data || accommodation_units.items || accommodation_units;
       if (chaletList.length > 0) {
-        chaletId = chaletList[0].id;
+        unitId = chaletList[0].id;
       }
     });
 
-    it('should fetch chalet details', async () => {
-      if (!chaletId) {
-        console.warn('⚠️ No chalets available');
+    it('should fetch accommodation unit details', async () => {
+      if (!unitId) {
+        console.warn('⚠️ No accommodation_units available');
         return;
       }
 
-      const response = await guestClient.getChalet(chaletId);
+      const response = await guestClient.getChalet(unitId);
       assertSuccess(response);
 
-      assertHasData<any>(response, (chalet: any) => {
-        expect(chalet.id).toBe(chaletId);
+      assertHasData<any>(response, (accommodation_unit: any) => {
+        expect(accommodation_unit.id).toBe(unitId);
       });
     });
 
-    it('should check chalet availability for dates', async () => {
-      if (!chaletId) {
-        console.warn('⚠️ No chalet available for availability check');
-        chaletId = '550e8400-e29b-41d4-a716-446655440001';
+    it('should check accommodation unit availability for dates', async () => {
+      if (!unitId) {
+        console.warn('⚠️ No accommodation unit available for availability check');
+        unitId = '550e8400-e29b-41d4-a716-446655440001';
       }
 
-      const response = await guestClient.getChaletAvailability(
-        chaletId,
+      const response = await guestClient.getAccommodationAvailability(
+        unitId,
         formatDate(checkInDate),
         formatDate(checkOutDate)
       );
@@ -112,12 +112,12 @@ describeIf('Booking Cycle Integration', () => {
 
   describe('Phase 2: Create Booking', () => {
     it('should create booking as guest', async () => {
-      if (!chaletId) {
-        chaletId = '550e8400-e29b-41d4-a716-446655440001';
+      if (!unitId) {
+        unitId = '550e8400-e29b-41d4-a716-446655440001';
       }
 
       const bookingData = {
-        chaletId,
+        unitId,
         checkInDate: formatDate(checkInDate),
         checkOutDate: formatDate(checkOutDate),
         customerName: 'Integration Test Guest',
@@ -129,9 +129,9 @@ describeIf('Booking Cycle Integration', () => {
 
       const response = await guestClient.createBooking(bookingData);
 
-      // Handle case where chalet doesn't exist or is not available
+      // Handle case where accommodation unit doesn't exist or is not available
       if (response.status === 404 || response.status === 400) {
-        console.warn('⚠️ Booking creation failed - chalet may not exist');
+        console.warn('⚠️ Booking creation failed - accommodation unit may not exist');
         return;
       }
 
@@ -162,14 +162,14 @@ describeIf('Booking Cycle Integration', () => {
 
   describe('Phase 3: Double Booking Prevention', () => {
     it('should prevent double booking for same dates', async () => {
-      if (!chaletId || !bookingId) {
+      if (!unitId || !bookingId) {
         console.warn('⚠️ Skipping double booking test - no initial booking');
         return;
       }
 
-      // Try to book same chalet for overlapping dates
+      // Try to book same accommodation unit for overlapping dates
       const conflictingBooking = {
-        chaletId,
+        unitId,
         checkInDate: formatDate(checkInDate),
         checkOutDate: formatDate(checkOutDate),
         customerName: 'Conflict Test Guest',
@@ -236,7 +236,7 @@ describeIf('Booking Cycle Integration', () => {
   describe('Phase 5: Edge Cases', () => {
     it('should reject booking with invalid dates', async () => {
       const invalidBooking = {
-        chaletId: chaletId || '550e8400-e29b-41d4-a716-446655440001',
+        unitId: unitId || '550e8400-e29b-41d4-a716-446655440001',
         checkInDate: '2026-01-15',
         checkOutDate: '2026-01-10', // End before start
         customerName: 'Invalid Date Guest',
@@ -252,7 +252,7 @@ describeIf('Booking Cycle Integration', () => {
 
     it('should reject booking with past dates', async () => {
       const pastBooking = {
-        chaletId: chaletId || '550e8400-e29b-41d4-a716-446655440001',
+        unitId: unitId || '550e8400-e29b-41d4-a716-446655440001',
         checkInDate: '2020-01-01',
         checkOutDate: '2020-01-05',
         customerName: 'Past Date Guest',
@@ -266,12 +266,12 @@ describeIf('Booking Cycle Integration', () => {
       expect([400, 422]).toContain(response.status);
     });
 
-    it('should handle non-existent chalet booking', async () => {
+    it('should handle non-existent accommodation unit booking', async () => {
       const fakeChalet = {
-        chaletId: '00000000-0000-0000-0000-000000000000',
+        unitId: '00000000-0000-0000-0000-000000000000',
         checkInDate: formatDate(checkInDate),
         checkOutDate: formatDate(checkOutDate),
-        customerName: 'Non-existent Chalet Guest',
+        customerName: 'Non-existent AccommodationUnit Guest',
         customerEmail: 'fake@v2ecosystem.local',
         customerPhone: '+1234567890',
         numberOfGuests: 2,

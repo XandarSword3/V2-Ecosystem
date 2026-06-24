@@ -27,39 +27,39 @@ test.describe('Frontend UI Coverage Verification', () => {
   
   test.describe('Guest-Facing Pages', () => {
     
-    test('Chalets page has booking UI', async ({ page }) => {
-      await page.goto(`${BASE_URL}/chalets`);
+    test('AccommodationUnits page has booking UI', async ({ page }) => {
+      await page.goto(`${BASE_URL}/accommodation_units`);
 
       const hasChaletListing = await page
-        .locator('[class*="chalet"]').first()
+        .locator('[class*="accommodation unit"]').first()
         .isVisible({ timeout: 10000 })
         .catch(() => false);
       test.skip(
         !hasChaletListing,
-        `Chalets page/module unavailable in this environment (url: ${page.url()})`
+        `AccommodationUnits page/module unavailable in this environment (url: ${page.url()})`
       );
       
-      // Should have chalet listings
-      await expect(page.locator('[class*="chalet"]').first()).toBeVisible({ timeout: 10000 });
+      // Should have accommodation unit listings
+      await expect(page.locator('[class*="accommodation unit"]').first()).toBeVisible({ timeout: 10000 });
       
       // Should have book/view details buttons
       const hasBookButton = await elementExists(page, 'button:has-text("Book"), a:has-text("Book"), button:has-text("View"), a:has-text("View")');
       expect(hasBookButton).toBeTruthy();
       
-      console.log('✅ Chalets page: Has chalet listings and booking UI');
+      console.log('✅ AccommodationUnits page: Has accommodation unit listings and booking UI');
     });
     
-    test('Snack Bar page has ordering UI', async ({ page }) => {
-      await page.goto(`${BASE_URL}/snack-bar`);
+    test('KioskItem Bar page has ordering UI', async ({ page }) => {
+      await page.goto(`${BASE_URL}/kiosk`);
       
       // Should have menu items
-      await expect(page.locator('[class*="snack"], [class*="menu"], [class*="item"]').first()).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('[class*="kiosk item"], [class*="menu"], [class*="item"]').first()).toBeVisible({ timeout: 10000 });
       
       // Should have add to cart buttons
       const hasAddButton = await elementExists(page, 'button:has-text("Add"), button:has-text("+"), [class*="cart"]');
       expect(hasAddButton).toBeTruthy();
       
-      console.log('✅ Snack Bar page: Has menu items and ordering UI');
+      console.log('✅ KioskItem Bar page: Has menu items and ordering UI');
     });
     
     test('Pool page has ticket purchasing UI', async ({ page }) => {
@@ -74,13 +74,13 @@ test.describe('Frontend UI Coverage Verification', () => {
       console.log(`✅ Pool page: Has pool information${hasPurchaseButton ? ' and ticket purchasing' : ''}`);
     });
     
-    test('Restaurant page has reservation/ordering UI', async ({ page }) => {
-      await page.goto(`${BASE_URL}/restaurant`);
+    test('MenuService page has reservation/ordering UI', async ({ page }) => {
+      await page.goto(`${BASE_URL}/menu service`);
       
       // Should have menu or reservation info
       await expect(page.locator('body')).toContainText(/menu|reservation|book|order/i);
       
-      console.log('✅ Restaurant page: Has menu/reservation UI');
+      console.log('✅ MenuService page: Has menu/reservation UI');
     });
     
     test('Kiosk page has self-check-in UI', async ({ page }) => {
@@ -137,30 +137,30 @@ test.describe('Frontend UI Coverage Verification', () => {
       }
     });
     
-    test('Admin chalets management exists', async ({ page }) => {
-      await page.goto(`${BASE_URL}/admin/chalets`);
+    test('Admin accommodation_units management exists', async ({ page }) => {
+      await page.goto(`${BASE_URL}/admin/accommodation_units`);
       
       const isLoginPage = page.url().includes('login');
       
       if (isLoginPage) {
-        console.log('✅ Admin chalets: Requires authentication');
+        console.log('✅ Admin accommodation_units: Requires authentication');
       } else {
         // Should have CRUD buttons
         const hasCreateButton = await elementExists(page, 'button:has-text("Add"), button:has-text("Create"), button:has-text("New")');
-        console.log(`✅ Admin chalets: Has management UI${hasCreateButton ? ' with create button' : ''}`);
+        console.log(`✅ Admin accommodation_units: Has management UI${hasCreateButton ? ' with create button' : ''}`);
       }
     });
     
-    test('Admin snack management exists', async ({ page }) => {
-      await page.goto(`${BASE_URL}/admin/snack`);
+    test('Admin kiosk item management exists', async ({ page }) => {
+      await page.goto(`${BASE_URL}/admin/kiosk item`);
       
       const isLoginPage = page.url().includes('login');
       
       if (isLoginPage) {
-        console.log('✅ Admin snack: Requires authentication');
+        console.log('✅ Admin kiosk item: Requires authentication');
       } else {
         const hasCreateButton = await elementExists(page, 'button:has-text("Add"), button:has-text("Create")');
-        console.log(`✅ Admin snack: Has management UI${hasCreateButton ? ' with create button' : ''}`);
+        console.log(`✅ Admin kiosk item: Has management UI${hasCreateButton ? ' with create button' : ''}`);
       }
     });
     
@@ -243,17 +243,17 @@ test.describe('Frontend UI Coverage Verification', () => {
 
 test.describe('API Coverage Verification', () => {
   
-  test('Chalets API exists', async ({ request }) => {
+  test('AccommodationUnits API exists', async ({ request }) => {
     const response = await request.get(`${API_BASE_URL}/api/v1/units`);
     // 401 is fine (auth required), 404 would be bad
     expect([200, 401, 403]).toContain(response.status());
-    console.log(`✅ Chalets API: Exists (status: ${response.status()})`);
+    console.log(`✅ AccommodationUnits API: Exists (status: ${response.status()})`);
   });
   
-  test('Snack API exists', async ({ request }) => {
-    const response = await request.get(`${API_BASE_URL}/api/v1/snack/items`);
+  test('KioskItem API exists', async ({ request }) => {
+    const response = await request.get(`${API_BASE_URL}/api/v1/kiosk item/items`);
     expect([200, 401, 403]).toContain(response.status());
-    console.log(`✅ Snack API: Exists (status: ${response.status()})`);
+    console.log(`✅ KioskItem API: Exists (status: ${response.status()})`);
   });
   
   test('Pool API exists', async ({ request }) => {

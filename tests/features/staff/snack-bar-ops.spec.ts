@@ -1,18 +1,18 @@
 import { test, expect } from '../../fixtures/auth.fixture';
 
-test.describe('Snack Bar Operations [STF-SNCK]', () => {
+test.describe('KioskItem Bar Operations [STF-SNCK]', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:3000/login');
     await page.fill('input[type="email"]', 'staff@v2ecosystem.com');
     await page.fill('input[type="password"]', 'staff123');
     await page.click('button[type="submit"]');
     await page.waitForURL(/\/(staff|dashboard)/);
-    await page.goto('http://localhost:3000/staff/snack-bar');
+    await page.goto('http://localhost:3000/staff/kiosk');
     await page.waitForLoadState('networkidle');
   });
 
   test('STF-SNCK-001: Live orders display', async ({ page }) => {
-    const heading = page.locator('h1, h2, h3').filter({ hasText: /snack|bar|order/i });
+    const heading = page.locator('h1, h2, h3').filter({ hasText: /kiosk item|bar|order/i });
     await expect(heading.first()).toBeVisible();
     const orderArea = page.locator('[class*="order"], [class*="list"], [class*="queue"], [class*="card"]');
     await expect(orderArea.first()).toBeVisible();
@@ -41,7 +41,7 @@ test.describe('Snack Bar Operations [STF-SNCK]', () => {
     });
     const btnCount = await advanceBtn.count();
     expect(btnCount).toBeGreaterThanOrEqual(0);
-    const heading = page.locator('h1, h2, h3').filter({ hasText: /snack|bar/i });
+    const heading = page.locator('h1, h2, h3').filter({ hasText: /kiosk item|bar/i });
     await expect(heading.first()).toBeVisible();
   });
 

@@ -85,9 +85,8 @@ export function CouponInput({
     setError('');
     
     try {
-      // Map moduleId to the backend's expected orderType values
-      // Backend expects: 'restaurant', 'chalets', 'pool', 'snack'
-      const backendOrderType = moduleId || orderType || 'restaurant';
+      // Pass moduleId if available, otherwise use orderType (defaults to 'general')
+      const backendOrderType = moduleId || orderType;
       
       const res = await api.post('/coupons/validate', {
         code: code.trim().toUpperCase(),

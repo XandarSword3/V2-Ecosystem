@@ -3,15 +3,15 @@ import { test, expect } from '../../fixtures/auth.fixture';
 const FRONTEND = 'http://localhost:3000';
 const API = 'http://localhost:3005/api';
 
-test.describe('Customer Chalet Booking [CUS-CHAL]', () => {
+test.describe('Customer AccommodationUnit Booking [CUS-CHAL]', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${FRONTEND}/chalets`);
+    await page.goto(`${FRONTEND}/accommodation_units`);
   });
 
-  test('CUS-CHAL-001: browse chalet listings', async ({ page }) => {
-    const heading = page.getByRole('heading', { name: /chalet|accommodation|cabin/i });
+  test('CUS-CHAL-001: browse accommodation unit listings', async ({ page }) => {
+    const heading = page.getByRole('heading', { name: /accommodation unit|accommodation|cabin/i });
     await expect(heading).toBeVisible();
-    const listings = page.locator('[class*="chalet"], [class*="listing"], [class*="card"]');
+    const listings = page.locator('[class*="accommodation unit"], [class*="listing"], [class*="card"]');
     const count = await listings.count();
     expect(count).toBeGreaterThan(0);
   });
@@ -23,9 +23,9 @@ test.describe('Customer Chalet Booking [CUS-CHAL]', () => {
     await expect(checkOut).toBeVisible();
   });
 
-  test('CUS-CHAL-005: view chalet detail page', async ({ page }) => {
-    const chaletCard = page.locator('[class*="chalet"], [class*="listing"], [class*="card"]').first();
-    await chaletCard.click();
+  test('CUS-CHAL-005: view accommodation unit detail page', async ({ page }) => {
+    const unitCard = page.locator('[class*="accommodation unit"], [class*="listing"], [class*="card"]').first();
+    await unitCard.click();
     const detailHeading = page.getByRole('heading').first();
     await expect(detailHeading).toBeVisible();
     await expect(detailHeading).not.toHaveText('');
@@ -34,8 +34,8 @@ test.describe('Customer Chalet Booking [CUS-CHAL]', () => {
   });
 
   test('CUS-CHAL-007: view image gallery', async ({ page }) => {
-    const chaletCard = page.locator('[class*="chalet"], [class*="listing"], [class*="card"]').first();
-    await chaletCard.click();
+    const unitCard = page.locator('[class*="accommodation unit"], [class*="listing"], [class*="card"]').first();
+    await unitCard.click();
     const images = page.locator('[class*="gallery"] img, [class*="carousel"] img, [class*="image"] img');
     await expect(images.first()).toBeVisible();
     const imgSrc = await images.first().getAttribute('src');
@@ -43,23 +43,23 @@ test.describe('Customer Chalet Booking [CUS-CHAL]', () => {
   });
 
   test('CUS-CHAL-009: check availability calendar', async ({ page }) => {
-    const chaletCard = page.locator('[class*="chalet"], [class*="listing"], [class*="card"]').first();
-    await chaletCard.click();
+    const unitCard = page.locator('[class*="accommodation unit"], [class*="listing"], [class*="card"]').first();
+    await unitCard.click();
     const calendar = page.locator('[class*="calendar"], [class*="availability"], [class*="datepicker"]');
     await expect(calendar.first()).toBeVisible();
   });
 
   test('CUS-CHAL-011: select booking dates', async ({ page }) => {
-    const chaletCard = page.locator('[class*="chalet"], [class*="listing"], [class*="card"]').first();
-    await chaletCard.click();
+    const unitCard = page.locator('[class*="accommodation unit"], [class*="listing"], [class*="card"]').first();
+    await unitCard.click();
     const dateInput = page.getByLabel(/date|check.?in/i).or(page.getByPlaceholder(/date/i)).first();
     await expect(dateInput).toBeVisible();
     await dateInput.click();
   });
 
   test('CUS-CHAL-013: view price breakdown', async ({ page }) => {
-    const chaletCard = page.locator('[class*="chalet"], [class*="listing"], [class*="card"]').first();
-    await chaletCard.click();
+    const unitCard = page.locator('[class*="accommodation unit"], [class*="listing"], [class*="card"]').first();
+    await unitCard.click();
     const price = page.locator('[class*="price"], [class*="cost"], [class*="total"]');
     await expect(price.first()).toBeVisible();
     const priceText = await price.first().textContent();
@@ -67,8 +67,8 @@ test.describe('Customer Chalet Booking [CUS-CHAL]', () => {
   });
 
   test('CUS-CHAL-015: enter special requests', async ({ page }) => {
-    const chaletCard = page.locator('[class*="chalet"], [class*="listing"], [class*="card"]').first();
-    await chaletCard.click();
+    const unitCard = page.locator('[class*="accommodation unit"], [class*="listing"], [class*="card"]').first();
+    await unitCard.click();
     const specialReq = page.getByLabel(/special|request|note/i)
       .or(page.getByPlaceholder(/special|request|note/i))
       .or(page.locator('textarea'));
@@ -78,8 +78,8 @@ test.describe('Customer Chalet Booking [CUS-CHAL]', () => {
   });
 
   test('CUS-CHAL-017: complete booking button present', async ({ page }) => {
-    const chaletCard = page.locator('[class*="chalet"], [class*="listing"], [class*="card"]').first();
-    await chaletCard.click();
+    const unitCard = page.locator('[class*="accommodation unit"], [class*="listing"], [class*="card"]').first();
+    await unitCard.click();
     const bookBtn = page.getByRole('button', { name: /book|reserve|confirm/i });
     await expect(bookBtn.first()).toBeVisible();
   });

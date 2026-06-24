@@ -3,7 +3,7 @@
  *
  * HTTP client for integration tests. All module commerce is engine-based:
  * records are stored in `transactions` (see ARCHITECTURE_LAW.md).
- * Module slugs (`/restaurant`, `/chalets`, `/pool`, `/snack-bar`) expose REST
+ * Module slugs (`/menu service`, `/accommodation_units`, `/pool`, `/kiosk`) expose REST
  * surfaces; staff operations use `/staff/modules/:slug/*`.
  */
 
@@ -192,7 +192,7 @@ export class TestApiClient {
     return this.request(`/${ModuleSlug.RESTAURANT}/items`, 'GET');
   }
 
-  /** Creates an `instant_transaction` row via the restaurant module API. */
+  /** Creates an `instant_transaction` row via the menu service module API. */
   async createRestaurantTransaction(order: {
     customerName: string;
     customerPhone: string;
@@ -202,7 +202,7 @@ export class TestApiClient {
     notes?: string;
   }): Promise<ApiResponse> {
     const items = order.items.map((item) => ({
-      menu_item_id: item.menuItemId,
+      catalog_item_id: item.menuItemId,
       quantity: item.quantity,
     }));
     const result = await this.request(`/${ModuleSlug.RESTAURANT}/orders`, 'POST', {
@@ -232,12 +232,12 @@ export class TestApiClient {
   // ============ CHALETS (multi_day_booking → time_exclusive_reservation) ============
 
   async getChaletUnits(): Promise<ApiResponse> {
-    return this.request(`/${ModuleSlug.CHALETS}/availability`, 'GET');
+    return this.request(`/${ModuleSlug.ACCOMMODATION_UNITS}/availability`, 'GET');
   }
 
-  async getChaletAvailability(chaletIdOrStartDate: string, startDateOrEndDate: string, endDate?: string): Promise<ApiResponse> {
+  async getAccommodationAvailability(chaletIdOrStartDate: string, startDateOrEndDate: string, endDate?: string): Promise<ApiResponse> {
     if (endDate) {
-      // Called as getChaletAvailability(chaletId, startDate, endDate)
+      // Called as getAccommodationAvailability(unitId, startDate, endDate)
       return this.request(
         `/units/${chaletIdOrStartDate}/availability?startDate=${startDateOrEndDate}&endDate=${endDate}`,
         'GET',
@@ -245,9 +245,9 @@ export class TestApiClient {
         { requiresAuth: false },
       );
     }
-    // Called as getChaletAvailability(startDate, endDate)
+    // Called as getAccommodationAvailability(startDate, endDate)
     return this.request(
-      `/${ModuleSlug.CHALETS}/availability?start=${chaletIdOrStartDate}&end=${startDateOrEndDate}`,
+      `/${ModuleSlug.ACCOMMODATION_UNITS}/availability?start=${chaletIdOrStartDate}&end=${startDateOrEndDate}`,
       'GET',
     );
   }
@@ -263,7 +263,7 @@ export class TestApiClient {
     totalAmount?: number;
     paymentMethod?: string;
   }): Promise<ApiResponse> {
-    const result = await this.request(`/${ModuleSlug.CHALETS}/bookings`, 'POST', {
+    const result = await this.request(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings`, 'POST', {
       unit_id: reservation.unitId,
       check_in_date: reservation.checkInDate,
       check_out_date: reservation.checkOutDate,
@@ -283,21 +283,21 @@ export class TestApiClient {
   }
 
   async getChaletReservation(id: string): Promise<ApiResponse> {
-    return this.request(`/${ModuleSlug.CHALETS}/bookings/${id}`, 'GET');
+    return this.request(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings/${id}`, 'GET');
   }
 
   async updateChaletReservationStatus(
     reservationId: string,
     status: string,
   ): Promise<ApiResponse> {
-    return this.request(`/${ModuleSlug.CHALETS}/bookings/${reservationId}/status`, 'PATCH', {
+    return this.request(`/${ModuleSlug.ACCOMMODATION_UNITS}/bookings/${reservationId}/status`, 'PATCH', {
       status,
     });
   }
 
   // ============ POOL (session_access → shared_capacity_access) ============
 
-  async getPoolSessions(): Promise<ApiResponse> {
+  async getCapacityWindows(): Promise<ApiResponse> {
     return this.request(`/${ModuleSlug.POOL}/sessions`, 'GET');
   }
 
@@ -345,10 +345,10 @@ export class TestApiClient {
     return this.request(`/${ModuleSlug.POOL}/sessions`, 'GET');
   }
 
-  // ============ SNACK BAR (menu_service → instant_transaction) ============
+  // ============ kiosk (menu_service → instant_transaction) ============
 
   async getSnackMenu(): Promise<ApiResponse> {
-    return this.request(`/${ModuleSlug.SNACK_BAR}/items`, 'GET');
+    return this.request(`/${ModuleSlug.kiosk}/items`, 'GET');
   }
 
   async createSnackTransaction(order: {
@@ -356,10 +356,10 @@ export class TestApiClient {
     metadata?: Record<string, unknown>;
   }): Promise<ApiResponse> {
     const items = order.items.map((item) => ({
-      menu_item_id: item.menuItemId,
+      catalog_item_id: item.menuItemId,
       quantity: item.quantity,
     }));
-    const result = await this.request(`/${ModuleSlug.SNACK_BAR}/orders`, 'POST', {
+    const result = await this.request(`/${ModuleSlug.kiosk}/orders`, 'POST', {
       items,
       metadata: order.metadata,
     });
@@ -413,7 +413,7 @@ export class TestApiClient {
     return this.createRestaurantTransaction(order);
   }
 
-  async getRestaurantOrder(id: string) {
+  async getMenuServiceOrder(id: string) {
     return this.getRestaurantTransaction(id);
   }
 
@@ -422,7 +422,7 @@ export class TestApiClient {
   }
 
   async createBooking(booking: {
-    chaletId: string;
+    unitId: string;
     checkInDate: string;
     checkOutDate: string;
     customerName: string;
@@ -433,7 +433,7 @@ export class TestApiClient {
     totalAmount?: number;
   }) {
     return this.createChaletReservation({
-      unitId: booking.chaletId,
+      unitId: booking.unitId,
       checkInDate: booking.checkInDate,
       checkOutDate: booking.checkOutDate,
       customerName: booking.customerName,
@@ -461,12 +461,12 @@ export class TestApiClient {
     return this.request(`/units/${id}`, 'GET', null, { requiresAuth: false });
   }
 
-  async getChalets() {
+  async getAccommodationUnits() {
     return this.request('/units', 'GET', null, { requiresAuth: false });
   }
 
 
-  async purchasePoolTicket(ticket: {
+  async purchaseCapacityTicket(ticket: {
     sessionId: string;
     customerName?: string;
     customerPhone?: string;
@@ -485,16 +485,16 @@ export class TestApiClient {
     });
   }
 
-  async getPoolTicket(id: string) {
+  async getCapacityTicket(id: string) {
     return this.getPoolTransaction(id);
   }
 
-  async validatePoolTicket(transactionId: string) {
+  async validateCapacityTicket(transactionId: string) {
     return this.validatePoolTransaction(transactionId);
   }
 
   async getPoolStatus() {
-    return this.getPoolSessions();
+    return this.getCapacityWindows();
   }
 
   async createSnackOrder(

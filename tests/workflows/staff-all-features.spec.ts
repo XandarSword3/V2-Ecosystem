@@ -6,9 +6,9 @@
  * 
  * Features Tested:
  * - Dashboard (Staff view)
- * - Restaurant Order Processing
+ * - MenuService Order Processing
  * - Pool Session Management
- * - Chalet Booking Management
+ * - AccommodationUnit Booking Management
  * - Review Responses
  * - Customer Lookup
  */
@@ -100,7 +100,7 @@ let staffPage: Page;
 // ============================================
 // SECTION 2: RESTAURANT ORDER PROCESSING
 // ============================================
-test.describe('2. Restaurant Order Processing', () => {
+test.describe('2. MenuService Order Processing', () => {
 let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
@@ -114,10 +114,10 @@ let staffPage: Page;
     await staffPage.close();
   });
 
-  test('2.1 View restaurant orders', async () => {
-    await navigateTo(staffPage, '/admin/restaurant/orders');
+  test('2.1 View menu service orders', async () => {
+    await navigateTo(staffPage, '/admin/${slug}/orders');
     // Check for any content indicating we're on the orders page
-    const hasOrdersContent = await staffPage.locator('text=/order|restaurant/i').first().isVisible({ timeout: 10000 }).catch(() => false);
+    const hasOrdersContent = await staffPage.locator('text=/order|menu service/i').first().isVisible({ timeout: 10000 }).catch(() => false);
     const hasMainContent = await staffPage.locator('main').first().isVisible().catch(() => false);
     expect(hasOrdersContent || hasMainContent).toBe(true);
   });
@@ -272,7 +272,7 @@ let staffPage: Page;
 // ============================================
 // SECTION 4: CHALET BOOKING MANAGEMENT
 // ============================================
-test.describe('4. Chalet Booking Management', () => {
+test.describe('4. AccommodationUnit Booking Management', () => {
 let staffPage: Page;
   
   test.beforeAll(async ({ browser }) => {
@@ -286,10 +286,10 @@ let staffPage: Page;
     await staffPage.close();
   });
 
-  test('4.1 View chalet bookings', async () => {
-    await navigateTo(staffPage, '/admin/chalets');
-    // Check for any content indicating we're on the chalets page
-    const hasChaletContent = await staffPage.locator('text=/chalet|booking/i').first().isVisible({ timeout: 10000 }).catch(() => false);
+  test('4.1 View accommodation unit bookings', async () => {
+    await navigateTo(staffPage, '/admin/accommodation_units');
+    // Check for any content indicating we're on the accommodation_units page
+    const hasChaletContent = await staffPage.locator('text=/accommodation unit|booking/i').first().isVisible({ timeout: 10000 }).catch(() => false);
     const hasMainContent = await staffPage.locator('main').first().isVisible().catch(() => false);
     expect(hasChaletContent || hasMainContent).toBe(true);
   });
@@ -326,14 +326,14 @@ let staffPage: Page;
     }
   });
 
-  test('4.7 Mark chalet as cleaned', async () => {
+  test('4.7 Mark accommodation unit as cleaned', async () => {
     const cleanButton = staffPage.locator('button:has-text("Clean"), button:has-text("Ready")').first();
     if (await cleanButton.isVisible()) {
       await expect(cleanButton).toBeEnabled();
     }
   });
 
-  test('4.8 View chalet status', async () => {
+  test('4.8 View accommodation unit status', async () => {
     const statusBadges = staffPage.locator('[class*="badge"], [class*="status"]');
     const count = await statusBadges.count();
     expect(count).toBeGreaterThan(0);
@@ -376,9 +376,9 @@ let staffPage: Page;
   });
 
   test('5.1 View menu items', async () => {
-    await navigateTo(staffPage, '/admin/restaurant/menu');
+    await navigateTo(staffPage, '/admin/${slug}/menu');
     // Check for any content indicating we're on the menu page
-    const hasMenuContent = await staffPage.locator('text=/menu|restaurant|item/i').first().isVisible({ timeout: 10000 }).catch(() => false);
+    const hasMenuContent = await staffPage.locator('text=/menu|menu service|item/i').first().isVisible({ timeout: 10000 }).catch(() => false);
     const hasMainContent = await staffPage.locator('main').first().isVisible().catch(() => false);
     expect(hasMenuContent || hasMainContent).toBe(true);
   });

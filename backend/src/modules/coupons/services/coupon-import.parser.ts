@@ -7,7 +7,7 @@ import { logger } from '../../../utils/logger.js';
 import { callLlmParser, LLM_SYSTEM_PROMPTS } from '../../shared/import/llm-parser.utils.js';
 
 const VALID_DISCOUNT_TYPES: DiscountType[] = ['percentage', 'fixed'];
-const VALID_APPLIES_TO: AppliesTo[] = ['all', 'restaurant', 'pool', 'chalets', 'snack', 'giftcards'];
+const VALID_APPLIES_TO: AppliesTo[] = ['all', 'menu_service', 'pool', 'accommodation', 'kiosk', 'giftcards'];
 
 function normalizeDiscountType(type: string): DiscountType {
   const normalized = type.toLowerCase().trim();

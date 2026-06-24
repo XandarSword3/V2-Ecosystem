@@ -23,7 +23,7 @@ import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 
 /**
  * Get orders for a module by slug
- * Works for: restaurant, snack_bar, any menu_service module
+ * Works for: any menu_service module
  */
 export async function getModuleOrders(req: Request, res: Response) {
   try {
@@ -34,7 +34,7 @@ export async function getModuleOrders(req: Request, res: Response) {
     // First, get the module by slug to verify it's a menu_service type
     const { data: module, error: moduleError } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
@@ -42,7 +42,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
-    if (module.template_type !== 'menu_service') {
+    if (module.engine_type !== 'menu_service') {
       return res.status(400).json({ success: false, error: 'Module is not a menu service' });
     }
 
@@ -109,11 +109,11 @@ export async function splitModuleTable(req: Request, res: Response) {
 
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'menu_service') {
+    if (!module || module.engine_type !== 'menu_service') {
       return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
     }
 
@@ -194,11 +194,11 @@ export async function mergeModuleTables(req: Request, res: Response) {
 
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'menu_service') {
+    if (!module || module.engine_type !== 'menu_service') {
       return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
     }
 
@@ -273,11 +273,11 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     // Verify module exists and is correct type
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'menu_service') {
+    if (!module || module.engine_type !== 'menu_service') {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
     }
 
@@ -316,12 +316,12 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     // Read module config to determine the correct engine type dynamically
     const { data: moduleConfig } = await supabase
       .from('modules')
-      .select('template_type')
+      .select('engine_type')
       .eq('id', currentOrder.module_id)
       .single();
     
     // Use TEMPLATE_TO_ENGINE constant for consistent mapping
-    const engineType = TEMPLATE_TO_ENGINE[moduleConfig?.template_type] || 'instant_transaction';
+    const engineType = TEMPLATE_TO_ENGINE[moduleConfig?.engine_type] || 'instant_transaction';
 
     const transitionResult = await engineService.transitionState(
       engineType,
@@ -374,7 +374,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
 
 /**
  * Get bookings for a module by slug
- * Works for: chalets, villas, any multi_day_booking module
+ * Works for: any multi_day_booking module
  */
 export async function getModuleBookings(req: Request, res: Response) {
   try {
@@ -385,7 +385,7 @@ export async function getModuleBookings(req: Request, res: Response) {
     // Get the module
     const { data: module, error: moduleError } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
@@ -393,7 +393,7 @@ export async function getModuleBookings(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
-    if (module.template_type !== 'multi_day_booking') {
+    if (module.engine_type !== 'multi_day_booking') {
       return res.status(400).json({ success: false, error: 'Module is not a booking service' });
     }
 
@@ -469,11 +469,11 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
     // Verify module
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'multi_day_booking') {
+    if (!module || module.engine_type !== 'multi_day_booking') {
       return res.status(400).json({ success: false, error: 'Invalid module for booking operations' });
     }
 
@@ -506,11 +506,11 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
     // Execute state transition via engine
     const { data: moduleConfig } = await supabase
       .from('modules')
-      .select('template_type')
+      .select('engine_type')
       .eq('id', module.id)
       .single();
 
-    const engineType = TEMPLATE_TO_ENGINE[moduleConfig?.template_type] || 'instant_transaction';
+    const engineType = TEMPLATE_TO_ENGINE[moduleConfig?.engine_type] || 'instant_transaction';
 
     const transitionResult = await engineService.transitionState(
       engineType,
@@ -578,7 +578,7 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
 
 /**
  * Get sessions for a module by slug
- * Works for: pool, spa, any session_access module
+ * Works for: any session_access module
  */
 export async function getModuleSessions(req: Request, res: Response) {
   try {
@@ -589,7 +589,7 @@ export async function getModuleSessions(req: Request, res: Response) {
     // Get the module
     const { data: module, error: moduleError } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
@@ -597,16 +597,16 @@ export async function getModuleSessions(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
-    if (module.template_type !== 'session_access') {
+    if (module.engine_type !== 'session_access') {
       return res.status(400).json({ success: false, error: 'Module is not a session access service' });
     }
 
     // Get sessions for today or specified date
     const targetDate = date || new Date().toISOString().split('T')[0];
 
-    // Actual table is pool_sessions / transactions
+    // Actual table is capacity_windows
     const { data: sessions, error } = await supabase
-      .from('pool_sessions')
+      .from('capacity_windows')
       .select(`
         id, name, start_time, end_time, capacity, current_count, status,
         tickets:transactions(id, ticket_number, status, customer_id, user:users!customer_id(full_name))
@@ -636,11 +636,11 @@ export async function validateModuleTicket(req: Request, res: Response) {
     // Get the module
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'session_access') {
+    if (!module || module.engine_type !== 'session_access') {
       return res.status(400).json({ success: false, error: 'Invalid module for ticket validation' });
     }
 
@@ -649,7 +649,7 @@ export async function validateModuleTicket(req: Request, res: Response) {
       .from('transactions')
       .select(`
         id, ticket_number, status, customer_id, customer_name, metadata,
-        session:pool_sessions!reference_id(id, name, capacity)
+        session:capacity_windows!reference_id(id, name, capacity)
       `)
       .eq('ticket_number', ticketNumber)
       .eq('engine_type', 'shared_capacity_access')
@@ -662,7 +662,7 @@ export async function validateModuleTicket(req: Request, res: Response) {
       });
     }
 
-    // Verify ticket belongs to this module (pool_sessions may not have module_id)
+    // Verify ticket belongs to this module
     const session = Array.isArray(ticket.session) ? ticket.session[0] : ticket.session;
 
     // Check ticket status
@@ -717,11 +717,11 @@ export async function recordEntry(req: Request, res: Response) {
     // Verify module
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'session_access') {
+    if (!module || module.engine_type !== 'session_access') {
       return res.status(400).json({ success: false, error: 'Invalid module for entry operations' });
     }
 
@@ -740,7 +740,7 @@ export async function recordEntry(req: Request, res: Response) {
     
     // Execute state transition via engine (entry = validate_entry)
     const transitionResult = await engineService.transitionState(
-      module.template_type,
+      module.engine_type,
       currentTicket.status,
       'validate_entry',
       'staff',
@@ -781,11 +781,11 @@ export async function recordExit(req: Request, res: Response) {
     // Verify module
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'session_access') {
+    if (!module || module.engine_type !== 'session_access') {
       return res.status(400).json({ success: false, error: 'Invalid module for exit operations' });
     }
 
@@ -804,7 +804,7 @@ export async function recordExit(req: Request, res: Response) {
     
     // Execute state transition via engine (exit = record_exit)
     const transitionResult = await engineService.transitionState(
-      module.template_type,
+      module.engine_type,
       currentTicket.status,
       'record_exit',
       'staff',
@@ -844,18 +844,18 @@ export async function getModuleCapacity(req: Request, res: Response) {
 
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'session_access') {
+    if (!module || module.engine_type !== 'session_access') {
       return res.status(400).json({ success: false, error: 'Invalid module for capacity operations' });
     }
 
     const targetDate = (date as string) || new Date().toISOString().split('T')[0];
 
     const { data: sessions, error } = await supabase
-      .from('pool_sessions')
+      .from('capacity_windows')
       .select('id, name, max_capacity, start_time, end_time')
       .eq('module_id', module.id)
       .eq('is_active', true)
@@ -900,11 +900,11 @@ export async function getTodaysTickets(req: Request, res: Response) {
 
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'session_access') {
+    if (!module || module.engine_type !== 'session_access') {
       return res.status(400).json({ success: false, error: 'Invalid module for ticket operations' });
     }
 
@@ -915,7 +915,7 @@ export async function getTodaysTickets(req: Request, res: Response) {
       .select(`
         id, ticket_number, customer_name, customer_phone,
         status, payment_status, amount, created_at, metadata,
-        session:pool_sessions!reference_id(id, name, start_time, end_time)
+        session:capacity_windows!reference_id(id, name, start_time, end_time)
       `)
       .eq('module_id', module.id)
       .eq('engine_type', 'shared_capacity_access')
@@ -967,16 +967,16 @@ export async function getModuleMaintenanceLogs(req: Request, res: Response) {
 
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'session_access') {
+    if (!module || module.engine_type !== 'session_access') {
       return res.status(400).json({ success: false, error: 'Invalid module for maintenance operations' });
     }
 
     const { data: logs, error } = await supabase
-      .from('pool_maintenance_logs')
+      .from('maintenance_logs')
       .select('id, type, readings, notes, created_at, performed_by, users:users!performed_by(full_name)')
       .eq('module_id', module.id)
       .order('created_at', { ascending: false })
@@ -1003,16 +1003,16 @@ export async function createModuleMaintenanceLog(req: Request, res: Response) {
 
     const { data: module } = await supabase
       .from('modules')
-      .select('id, template_type')
+      .select('id, engine_type')
       .eq('slug', slug)
       .single();
 
-    if (!module || module.template_type !== 'session_access') {
+    if (!module || module.engine_type !== 'session_access') {
       return res.status(400).json({ success: false, error: 'Invalid module for maintenance operations' });
     }
 
     const { data: log, error } = await supabase
-      .from('pool_maintenance_logs')
+      .from('maintenance_logs')
       .insert({
         module_id: module.id,
         type: type || 'inspection',
@@ -1108,10 +1108,10 @@ export async function searchCustomers(req: Request, res: Response) {
     }
 
     const customerIds = rows.map((u) => u.id);
-    const [transactions, memberships, loyaltyAccounts] = await Promise.all([
-      supabase.from('transactions').select('customer_id, amount, created_at').in('customer_id', customerIds),
-      supabase.from('pool_memberships').select('customer_id, status').in('customer_id', customerIds),
-      supabase.from('loyalty_accounts').select('user_id, tier_name').in('user_id', customerIds),
+    const [orderHistory, entitlements, loyaltyAccounts] = await Promise.all([
+    supabase.from('transactions').select('customer_id, amount, created_at').in('customer_id', customerIds),
+    supabase.from('transactions').select('customer_id, status').eq('engine_type', 'ongoing_entitlement').in('customer_id', customerIds),
+    supabase.from('loyalty_accounts').select('user_id, tier_name').in('user_id', customerIds),
     ]);
 
     const spendByCustomer: Record<string, number> = {};
@@ -1120,22 +1120,22 @@ export async function searchCustomers(req: Request, res: Response) {
     const tierByCustomer: Record<string, string> = {};
 
     const rollupFinancialRows = (items: Array<{ customer_id: string; total_amount?: string | number; created_at?: string }> = []) => {
-      items.forEach((row) => {
-        const amount = Number(row.total_amount || 0);
-        spendByCustomer[row.customer_id] = (spendByCustomer[row.customer_id] || 0) + amount;
-        if (row.created_at) {
-          const existing = recentOrderByCustomer[row.customer_id];
-          if (!existing || new Date(row.created_at) > new Date(existing)) {
-            recentOrderByCustomer[row.customer_id] = row.created_at;
-          }
-        }
-      });
+    items.forEach((row) => {
+    const amount = Number(row.total_amount || 0);
+    spendByCustomer[row.customer_id] = (spendByCustomer[row.customer_id] || 0) + amount;
+    if (row.created_at) {
+    const existing = recentOrderByCustomer[row.customer_id];
+    if (!existing || new Date(row.created_at) > new Date(existing)) {
+    recentOrderByCustomer[row.customer_id] = row.created_at;
+    }
+    }
+    });
     };
 
-    rollupFinancialRows((transactions.data as any[]) || []);
+    rollupFinancialRows((orderHistory.data as any[]) || []);
 
-    ((memberships.data as any[]) || []).forEach((m) => {
-      if (!membershipByCustomer[m.customer_id]) membershipByCustomer[m.customer_id] = m.status || 'inactive';
+    ((entitlements.data as any[]) || []).forEach((m) => {
+    if (!membershipByCustomer[m.customer_id]) membershipByCustomer[m.customer_id] = m.status || 'inactive';
     });
     ((loyaltyAccounts.data as any[]) || []).forEach((l) => {
       if (!tierByCustomer[l.user_id]) tierByCustomer[l.user_id] = l.tier_name || 'Standard';

@@ -450,7 +450,7 @@ export async function createOrder(data: OrderInput) {
     const menuItem = menuItems.find(m => m.id === item.menuItemId);
     const itemSubtotal = parseFloat(menuItem.price) * item.quantity;
     subtotal += itemSubtotal;
-    return { menu_item_id: item.menuItemId, quantity: item.quantity, unit_price: menuItem.price, subtotal: itemSubtotal };
+    return { catalog_item_id: item.menuItemId, quantity: item.quantity, unit_price: menuItem.price, subtotal: itemSubtotal };
   });
   
   const taxAmount = subtotal * TAX_RATE;

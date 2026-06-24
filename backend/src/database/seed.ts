@@ -19,19 +19,13 @@ async function seed() {
       throw new Error('SEED_ADMIN_PASSWORD environment variable is required in production');
     }
 
-    // Create roles
+    // Create system roles.
+    // Module-specific roles (e.g. <slug>_admin, <slug>_staff) are auto-created
+    // when modules are added via the admin panel. Do NOT add them here.
     await pool.query(`
       INSERT INTO roles (name, display_name, description, business_unit) VALUES
         ('super_admin', 'Super Administrator', 'Full system access', 'admin'),
-        ('customer', 'Customer', 'Registered customer', NULL),
-        ('restaurant_admin', 'Restaurant Admin', 'Restaurant management', 'restaurant'),
-        ('restaurant_staff', 'Restaurant Staff', 'Restaurant operations', 'restaurant'),
-        ('snack_bar_admin', 'Snack Bar Admin', 'Snack bar management', 'snack_bar'),
-        ('snack_bar_staff', 'Snack Bar Staff', 'Snack bar operations', 'snack_bar'),
-        ('chalet_admin', 'Chalet Admin', 'Chalet management', 'chalets'),
-        ('chalet_staff', 'Chalet Staff', 'Chalet operations', 'chalets'),
-        ('pool_admin', 'Pool Admin', 'Pool management', 'pool'),
-        ('pool_staff', 'Pool Staff', 'Pool operations', 'pool')
+        ('customer', 'Customer', 'Registered customer', NULL)
       ON CONFLICT (name) DO NOTHING;
     `);
 
@@ -92,7 +86,7 @@ async function seed() {
       ON CONFLICT DO NOTHING;
     `);
 
-    // Note: Sample data (menu items, chalets, pool sessions, etc.) should be added
+    // Note: Sample data (menu items, units, sessions, etc.) should be added
     // through the admin interface after deployment. This keeps the seed clean.
     // The system is ready for module creation - roles and staff users are auto-created
     // when modules are added through the admin panel.

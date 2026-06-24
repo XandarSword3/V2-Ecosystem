@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS coupons (
     discount_value DECIMAL(10,2) NOT NULL,
     min_order_amount DECIMAL(10,2) DEFAULT 0,
     max_discount_amount DECIMAL(10,2),
-    applies_to VARCHAR(50) DEFAULT 'all' CHECK (applies_to IN ('all', 'restaurant', 'chalets', 'pool', 'snack_bar', 'specific_items')),
+    applies_to VARCHAR(50) DEFAULT 'all' CHECK (applies_to IN ('all', 'menu_service', 'accommodation', 'shared_capacity', 'kiosk', 'specific_items')),
     specific_items JSONB DEFAULT '[]',
     usage_limit INTEGER,
     usage_count INTEGER DEFAULT 0,
@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS housekeeping_tasks (
     title VARCHAR(255) NOT NULL,
     description TEXT,
     location VARCHAR(255),
-    location_type VARCHAR(50) CHECK (location_type IN ('chalet', 'room', 'pool', 'restaurant', 'common_area', 'other')),
+    location_type VARCHAR(50) CHECK (location_type IN ('accommodation_unit', 'room', 'capacity_area', 'service_area', 'common_area', 'other')),
     location_id UUID,
     priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'on_hold', 'cancelled')),
@@ -325,7 +325,7 @@ INSERT INTO inventory_categories (name, description, color) VALUES
     ('Linens & Towels', 'Bedding, towels, and textiles', '#A855F7'),
     ('Kitchen Equipment', 'Kitchen tools and equipment', '#F59E0B'),
     ('Office Supplies', 'General office supplies', '#6B7280'),
-    ('Pool Supplies', 'Pool maintenance and amenities', '#06B6D4')
+    ('Facility Supplies', 'Facility maintenance and amenities', '#06B6D4')
 ON CONFLICT DO NOTHING;
 
 -- Default Housekeeping Task Types
@@ -343,7 +343,7 @@ BEGIN
                 ('Room Cleaning', 'Standard room cleaning and turnover', 'normal', 45, '#22C55E'),
                 ('Deep Cleaning', 'Thorough deep cleaning service', 'normal', 120, '#3B82F6'),
                 ('Laundry Service', 'Washing and folding linens', 'normal', 60, '#A855F7'),
-                ('Pool Maintenance', 'Pool cleaning and chemical balance', 'high', 90, '#06B6D4'),
+                ('Facility Maintenance', 'Facility and equipment maintenance', 'high', 90, '#06B6D4'),
                 ('Repair Request', 'General repairs and maintenance', 'high', 60, '#F59E0B'),
                 ('Guest Request', 'Special guest requests', 'high', 30, '#EC4899')
         )
@@ -367,12 +367,12 @@ BEGIN
                 ('Room Cleaning', 'Standard room cleaning and turnover', 'normal', 45),
                 ('Deep Cleaning', 'Thorough deep cleaning service', 'normal', 120),
                 ('Laundry Service', 'Washing and folding linens', 'normal', 60),
-                ('Pool Maintenance', 'Pool cleaning and chemical balance', 'high', 90),
+                ('Facility Maintenance', 'Facility and equipment maintenance', 'high', 90),
                 ('Repair Request', 'General repairs and maintenance', 'high', 60),
                 ('Guest Request', 'Special guest requests', 'high', 30)
         )
         INSERT INTO housekeeping_task_types (name, description, priority, estimated_duration, checklist, applies_to, is_active)
-        SELECT d.name, d.description, d.priority_value, d.estimated_duration, '[]'::jsonb, 'chalet', true
+        SELECT d.name, d.description, d.priority_value, d.estimated_duration, '[]'::jsonb, 'accommodation_unit', true
         FROM defaults d
         WHERE NOT EXISTS (
             SELECT 1
@@ -385,7 +385,7 @@ BEGIN
                 ('Room Cleaning', 'Standard room cleaning and turnover', 45),
                 ('Deep Cleaning', 'Thorough deep cleaning service', 120),
                 ('Laundry Service', 'Washing and folding linens', 60),
-                ('Pool Maintenance', 'Pool cleaning and chemical balance', 90),
+                ('Facility Maintenance', 'Facility and equipment maintenance', 90),
                 ('Repair Request', 'General repairs and maintenance', 60),
                 ('Guest Request', 'Special guest requests', 30)
         )

@@ -235,15 +235,15 @@ export function useOrderUpdates(orderId: string, onUpdate: OrderUpdateCallback) 
   }, [socket, orderId, onUpdate, joinRoom, leaveRoom]);
 }
 
-export function useRestaurantOrders(onNewOrder: NewOrderCallback, onStatusUpdate: OrderUpdateCallback) {
+// Generic hook for real-time module order updates — works for any module slug.
+// Backend emits to room 'unit:{slug}' on order:new and order:updated.
+export function useModuleOrders(slug: string, onNewOrder: NewOrderCallback, onStatusUpdate: OrderUpdateCallback) {
   const { socket } = useSocket();
 
   useEffect(() => {
-    if (socket) {
-      // Join the restaurant unit room (backend emits to 'unit:restaurant')
-      socket.emit('join:unit', 'restaurant');
+    if (socket && slug) {
+      socket.emit('join:unit', slug);
 
-      // Listen for backend events (order:new and order:updated)
       socket.on('order:new', onNewOrder);
       socket.on('order:updated', onStatusUpdate);
 
@@ -252,28 +252,7 @@ export function useRestaurantOrders(onNewOrder: NewOrderCallback, onStatusUpdate
         socket.off('order:updated', onStatusUpdate);
       };
     }
-  }, [socket, onNewOrder, onStatusUpdate]);
-}
-
-// Hook for snack bar real-time updates
-export function useSnackBarOrders(onNewOrder: NewOrderCallback, onStatusUpdate: OrderUpdateCallback) {
-  const { socket } = useSocket();
-
-  useEffect(() => {
-    if (socket) {
-      // Join the snack bar unit room (backend emits to 'unit:snack_bar')
-      socket.emit('join:unit', 'snack_bar');
-
-      // Listen for backend events
-      socket.on('order:new', onNewOrder);
-      socket.on('order:updated', onStatusUpdate);
-
-      return () => {
-        socket.off('order:new', onNewOrder);
-        socket.off('order:updated', onStatusUpdate);
-      };
-    }
-  }, [socket, onNewOrder, onStatusUpdate]);
+  }, [socket, slug, onNewOrder, onStatusUpdate]);
 }
 
 // Hook for real-time waitlist updates

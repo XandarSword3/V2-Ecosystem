@@ -93,7 +93,7 @@ describe('NotificationsController', () => {
           }),
           expect.objectContaining({
             id: 'booking-booking-1',
-            title: 'Chalet Booking',
+            title: 'AccommodationUnit Booking',
             type: 'info'
           }),
           expect.objectContaining({

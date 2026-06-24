@@ -13,16 +13,16 @@ interface TerminologyItem {
 }
 
 const KNOWN_TERMS: TerminologyItem[] = [
-    { key: 'unit_singular', label: 'Unit (Singular)', description: 'e.g. Chalet, Room, Suite' },
-    { key: 'unit_plural', label: 'Unit (Plural)', description: 'e.g. Chalets, Rooms, Suites' },
+    { key: 'unit_singular', label: 'Unit (Singular)', description: 'e.g. Room, Suite, Cabin' },
+    { key: 'unit_plural', label: 'Unit (Plural)', description: 'e.g. Rooms, Suites, Cabins' },
     { key: 'facility_singular', label: 'Facility (Singular)', description: 'e.g. Pool, Gym, Spa' },
     { key: 'facility_plural', label: 'Facility (Plural)', description: 'e.g. Pools, Gyms, Spas' },
-    { key: 'dining_singular', label: 'Dining (Singular)', description: 'e.g. Restaurant, Bar' },
-    { key: 'dining_plural', label: 'Dining (Plural)', description: 'e.g. Restaurants, Bars' },
+    { key: 'dining_singular', label: 'Dining (Singular)', description: 'e.g. Café, Bar' },
+    { key: 'dining_plural', label: 'Dining (Plural)', description: 'e.g. Cafés, Bars' },
 ];
 
 export default function TerminologyPage() {
-    const [businessType, setBusinessType] = useState('resort');
+    const [businessType, setBusinessType] = useState('hotel');
     const [loading, setLoading] = useState(false);
     const [values, setValues] = useState<Record<string, string>>({});
 
@@ -80,7 +80,7 @@ export default function TerminologyPage() {
                 >
                     <option value="resort">Resort</option>
                     <option value="hotel">Hotel</option>
-                    <option value="restaurant">Restaurant</option>
+                    <option value="food_service">Food & Beverage</option>
                     <option value="villa">Villa / Vacation Rental</option>
                 </select>
                 <p className="text-sm text-gray-500 mt-2">

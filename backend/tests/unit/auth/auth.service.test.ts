@@ -1,3 +1,5 @@
+/// <reference types="vitest/globals" />
+
 /**
  * Auth Service Unit Tests
  * Rewired to test src/modules/auth/auth.service.ts (post-Engine-Refit).
@@ -21,7 +23,7 @@ vi.mock('../../../src/utils/logger.js', () => ({
 // ── Email ─────────────────────────────────────────────────────────────────────
 const mockSendEmail = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../../src/services/email.service.js', () => ({
-  emailService: { sendEmail: mockSendEmail },
+  emailService: { sendEmail: (...args: unknown[]) => mockSendEmail(...args) },
 }));
 
 // ── Password policy ───────────────────────────────────────────────────────────
@@ -85,8 +87,11 @@ import bcrypt from 'bcryptjs';
 // ─────────────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();   // clears call history AND mockResolvedValueOnce queues
   resetChain();
+  // Re-seed mocks whose implementations are cleared by resetAllMocks
+  vi.mocked(bcrypt.hash).mockResolvedValue('$2a$12$hashed_password' as never);
+  vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
   mockValidatePassword.mockResolvedValue({ valid: true, errors: [] });
   mockIsAccountLocked.mockResolvedValue({ locked: false });
   mockSendEmail.mockResolvedValue(undefined);
@@ -95,18 +100,19 @@ beforeEach(() => {
 // ── register ──────────────────────────────────────────────────────────────────
 
 describe('register', () => {
-  function setupRegisterMocks(existingUsers: unknown[] = []) {
-    // 1. email check
+  function setupRegisterMocks(existingUsers: unknown[] = [], userOverride: Record<string, unknown> = {}) {
+    // 1. email check: .select().eq().limit() — limit is terminal
     mockChain.limit.mockResolvedValueOnce({ data: existingUsers, error: null });
-    // 2. user insert
+    // 2. user insert: .insert().select().single() — insert returns chain, single is terminal
+    mockChain.insert.mockReturnValueOnce(mockChain); // call 1: users insert → chain continues
     mockChain.single.mockResolvedValueOnce({
-      data: { id: 'user-new', email: 'new@example.com', full_name: 'New User' },
+      data: { id: 'user-new', email: userOverride.email || 'new@example.com', full_name: 'New User', ...userOverride },
       error: null,
     });
-    // 3. role lookup
+    // 3. role lookup: .select().eq().limit() — limit is terminal
     mockChain.limit.mockResolvedValueOnce({ data: [{ id: 'role-customer' }], error: null });
-    // 4. user_roles insert (returns chain, terminal resolves automatically)
-    mockChain.insert.mockResolvedValueOnce({ data: null, error: null });
+    // 4. user_roles insert: .insert() — terminal, resolves directly
+    mockChain.insert.mockResolvedValueOnce({ data: null, error: null }); // call 2: user_roles insert
   }
 
   it('creates user and returns tokens', async () => {
@@ -128,7 +134,7 @@ describe('register', () => {
   });
 
   it('lowercases the email', async () => {
-    setupRegisterMocks();
+    setupRegisterMocks([], { email: 'upper@example.com' });
     const result = await authService.register({
       email: 'UPPER@EXAMPLE.COM',
       password: 'Password123!',
@@ -174,12 +180,15 @@ describe('login', () => {
 
   function setupLoginMocks(userOverrides = {}) {
     const user = { ...activeUser, ...userOverrides };
-    // find user
+    // find user: .select().eq('email',...).single() — eq returns chain, single is terminal
     mockChain.single.mockResolvedValueOnce({ data: user, error: null });
-    // create session
+    // create session: .insert({...}) — terminal, resolves directly
     mockChain.insert.mockResolvedValueOnce({ error: null });
-    // update last_login
-    mockChain.eq.mockResolvedValueOnce({ error: null });
+    // update last_login: .update({...}).eq('id', user.id) — eq is terminal (2nd eq call)
+    // 1st eq call (.eq('email',...)) uses resetChain default (returns mockChain)
+    mockChain.eq
+      .mockReturnValueOnce(mockChain)         // call 1: .eq('email', ...) → chain continues
+      .mockResolvedValueOnce({ error: null }); // call 2: .eq('id', user.id) on update → terminal
   }
 
   it('returns user and tokens on valid credentials', async () => {
@@ -248,17 +257,46 @@ describe('login', () => {
     await authService.login('user@example.com', 'Password123!', {});
     expect(mockRecordSuccessfulLogin).toHaveBeenCalled();
   });
+
+  it('returns requiresTwoFactorSetup when 2FA is not enabled for super_admin or tenant_admin', async () => {
+    mockChain.single.mockResolvedValueOnce({
+      data: { ...activeUser, two_factor_enabled: false, roles: ['super_admin'] },
+      error: null,
+    });
+    const result = await authService.login('admin@example.com', 'Password123!', {});
+    expect((result as any).requiresTwoFactorSetup).toBe(true);
+    expect((result as any).message).toContain('Two-factor authentication is mandatory');
+  });
 });
 
 // ── changePassword ────────────────────────────────────────────────────────────
 
 describe('changePassword', () => {
   it('updates password when current password matches', async () => {
+    // user lookup: .select(...).eq('id', userId).single() — eq call 1 returns chain, single resolves
     mockChain.single.mockResolvedValueOnce({
       data: { id: 'user-1', password_hash: '$2a$12$hashed' },
       error: null,
     });
-    mockChain.eq.mockResolvedValueOnce({ error: null });
+    // changePassword calls logout(userId) after update, which does:
+    //   sessions.update({is_active:false}).eq('user_id', userId)  — eq resolves
+    // and then tries rpc('increment_token_version') — rpc() returns mockChain (default, not resolved),
+    // so the catch block runs: users.select('token_version').eq('id',userId).single() then users.update.eq
+    // For simplicity, set enough eq resolves to cover the update + logout chain:
+    // eq call 1: user lookup .eq('id', userId) — returns mockChain
+    // eq call 2: password update .eq('id', userId) — resolves
+    // eq call 3: logout sessions .eq('user_id', userId) — resolves
+    // eq call 4: logout fallback user select .eq('id', userId) — returns mockChain (single resolves)
+    // eq call 5: logout fallback update .eq('id', userId) — resolves
+    mockChain.eq
+      .mockReturnValueOnce(mockChain)          // call 1: user lookup
+      .mockResolvedValueOnce({ error: null })  // call 2: password update
+      .mockResolvedValueOnce({ error: null })  // call 3: logout sessions update
+      .mockReturnValueOnce(mockChain)          // call 4: logout fallback select
+      .mockResolvedValueOnce({ error: null }); // call 5: logout fallback update
+    // logout fallback also calls single() to get token_version
+    mockChain.single.mockResolvedValueOnce({ data: { token_version: 0 }, error: null });
+    // rpc returns mockChain by default (not a promise) — catch block fires, which is fine
 
     await expect(
       authService.changePassword('user-1', 'OldPass123!', 'NewPass456!')
@@ -278,10 +316,12 @@ describe('changePassword', () => {
   });
 
   it('throws when new password fails policy', async () => {
+    // user lookup: .select(...).eq('id', userId).single() — eq returns chain, single resolves
     mockChain.single.mockResolvedValueOnce({
       data: { id: 'user-1', password_hash: '$2a$12$hashed' },
       error: null,
     });
+    mockChain.eq.mockReturnValueOnce(mockChain); // eq('id', userId) returns chain
     mockValidatePassword.mockResolvedValueOnce({ valid: false, errors: ['Too short'] });
     await expect(
       authService.changePassword('user-1', 'OldPass123!', 'weak')
@@ -293,12 +333,17 @@ describe('changePassword', () => {
 
 describe('sendPasswordResetEmail', () => {
   it('sends reset email for existing user', async () => {
+    // user lookup: .select().eq('email',...).single() — eq returns chain, single resolves
+    mockChain.eq.mockReturnValueOnce(mockChain); // eq('email', ...) returns chain
     mockChain.single.mockResolvedValueOnce({
       data: { id: 'user-1', full_name: 'Test', email: 'test@example.com' },
       error: null,
     });
-    // existing sessions query
-    mockChain.eq.mockResolvedValueOnce({ data: [], error: null });
+    // existing sessions query: .select().eq('user_id',...).eq('is_active', true)
+    // two chained eqs — first returns mockChain, second resolves
+    mockChain.eq
+      .mockReturnValueOnce(mockChain)           // call 1: .eq('user_id', ...) → chain continues
+      .mockResolvedValueOnce({ data: [], error: null }); // call 2: .eq('is_active', true) → terminal
     // insert reset token session
     mockChain.insert.mockResolvedValueOnce({ data: null, error: null });
 
@@ -319,40 +364,50 @@ describe('sendPasswordResetEmail', () => {
 
 describe('resetPassword', () => {
   it('throws INVALID_TOKEN for bad token', async () => {
-    mockChain.eq.mockResolvedValueOnce({ data: [], error: null });
+    // .select().eq('refresh_token', token).eq('is_active', true) — two chained eqs, second resolves
+    mockChain.eq
+      .mockReturnValueOnce(mockChain)
+      .mockResolvedValueOnce({ data: [], error: null });
     await expect(authService.resetPassword('bad-token', 'NewPass123!')).rejects.toMatchObject({
       code: 'INVALID_TOKEN',
     });
   });
 
   it('throws TOKEN_EXPIRED for expired token', async () => {
-    mockChain.eq.mockResolvedValueOnce({
-      data: [
-        {
-          id: 'sess-1',
-          user_id: 'user-1',
-          expires_at: new Date(Date.now() - 60000).toISOString(),
-          refresh_token: 'tok',
-        },
-      ],
-      error: null,
-    });
+    mockChain.eq
+      .mockReturnValueOnce(mockChain)
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 'sess-1',
+            user_id: 'user-1',
+            expires_at: new Date(Date.now() - 60000).toISOString(),
+            refresh_token: 'tok',
+          },
+        ],
+        error: null,
+      });
     await expect(authService.resetPassword('tok', 'NewPass123!')).rejects.toMatchObject({
       code: 'TOKEN_EXPIRED',
     });
   });
 
   it('updates password with valid token', async () => {
+    // Ensure validatePassword returns valid (might have stale queue from previous test)
+    mockValidatePassword.mockResolvedValue({ valid: true, errors: [] });
     const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    mockChain.eq.mockResolvedValueOnce({
-      data: [{ id: 'sess-1', user_id: 'user-1', expires_at: future, refresh_token: 'tok' }],
-      error: null,
-    });
-    // update user password
+    // token lookup: .select().eq('refresh_token', token).eq('is_active', true)
+    mockChain.eq
+      .mockReturnValueOnce(mockChain)
+      .mockResolvedValueOnce({
+        data: [{ id: 'sess-1', user_id: 'user-1', expires_at: future, refresh_token: 'tok' }],
+        error: null,
+      });
+    // update user password: .update({...}).eq('id', session.user_id)
     mockChain.eq.mockResolvedValueOnce({ error: null });
-    // delete reset session
+    // delete reset session: .delete().eq('id', session.id)
     mockChain.eq.mockResolvedValueOnce({ error: null });
-    // invalidate other sessions
+    // invalidate other sessions: .update({...}).eq('user_id', session.user_id)
     mockChain.eq.mockResolvedValueOnce({ error: null });
 
     const result = await authService.resetPassword('tok', 'NewPass123!');
@@ -365,6 +420,8 @@ describe('resetPassword', () => {
 
 describe('getCurrentUser', () => {
   it('returns user with roles', async () => {
+    // user lookup: .select(...).eq('id', userId).single() — eq returns chain, single is terminal
+    mockChain.eq.mockReturnValueOnce(mockChain); // eq('id', userId) returns chain
     mockChain.single.mockResolvedValueOnce({
       data: {
         id: 'user-1',
@@ -373,9 +430,11 @@ describe('getCurrentUser', () => {
         phone: null,
         profile_image_url: null,
         preferred_language: 'en',
+        is_platform_admin: false,
       },
       error: null,
     });
+    // roles lookup: .select('roles (name)').eq('user_id', userId) — eq is terminal
     mockChain.eq.mockResolvedValueOnce({
       data: [{ roles: { name: 'customer' } }],
       error: null,
@@ -387,6 +446,7 @@ describe('getCurrentUser', () => {
   });
 
   it('throws USER_NOT_FOUND for missing user', async () => {
+    mockChain.eq.mockReturnValueOnce(mockChain); // eq('id', userId) returns chain
     mockChain.single.mockResolvedValueOnce({ data: null, error: { message: 'not found' } });
     await expect(authService.getCurrentUser('ghost')).rejects.toMatchObject({
       code: 'USER_NOT_FOUND',

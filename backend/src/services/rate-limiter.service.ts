@@ -57,7 +57,7 @@ const ENDPOINT_LIMITS: Record<string, Partial<RateLimitConfig>> = {
   
   // Payment endpoints - moderate limits
   '/api/payments': { windowMs: 60000, maxRequests: 10 },
-  '/api/bookings/chalets': { windowMs: 60000, maxRequests: 20 },
+  '/api/bookings/reservations': { windowMs: 60000, maxRequests: 20 },
   
   // Admin endpoints - higher limits
   '/api/admin': { windowMs: 60000, maxRequests: 200 },

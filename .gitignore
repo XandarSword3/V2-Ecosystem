@@ -1,3 +1,7 @@
+# ===========================
+# V2 Ecosystem — .gitignore
+# ===========================
+
 # Dependencies
 node_modules/
 .pnp
@@ -8,14 +12,29 @@ dist/
 build/
 .next/
 out/
+*.tsbuildinfo
 
-# Environment files
+# Environment files (secrets)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.test
 supabase.env
+**/supabase.env
+**/.env
+**/.env.local
+**/.env.test
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# Keep template / example env files tracked
+!*.env.example
+!**/*.env.example
+!*.env.example*
+!**/*.env.example*
 
 # Logs
 logs/
@@ -28,37 +47,7 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
-
-# Build outputs
-dist/
-build/
-.next/
-out/
-
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-supabase.env
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
+# IDE / Editor
 .vscode/
 .idea/
 *.swp
@@ -76,21 +65,38 @@ strategic-analysis/
 screenshots/
 frontend/coverage/
 frontend/coverage-critical/
-*.tsbuildinfo
-*.bak
+coverage-output.txt
+
+# Test outputs & temp files
+*test-output.txt
+*errors.txt
+*failures.txt
+*results.json
+backend/output.txt
+backend/errors-only.txt
+backend/vitest-backend-output.txt
+schema_analysis.json
+audit-detail.txt
+audit-full.txt
+legacy_audit_detail*.txt
+legacy_audit_report.txt
+push_error.log
 
 # Misc
 *.tgz
+*.bak
 .cache/
 
-# Phase 0 security hardening
+# Security-sensitive files
 *.plist
 google-services.json
 auth-token.json
 .ci_*.json
 .ci_*.txt
+.ci_*.log
+.ci_*.utf8.log
+.ci_service_probe.log
 .tmp_*
-coverage-output.txt
 **/dist-android/
 **/archive/**/*.txt
 **/_archive/**/*.txt
@@ -103,19 +109,15 @@ screenshots/**/*.jpg
 # Archived data
 archive/
 
-# Root logs
+# Root-level scratch text
 /*.txt
 
-# Operational probe and ci logs
-.ci_*.log
-.ci_*.utf8.log
-.ci_service_probe.log
-
+# One-off scripts (agent-generated)
 add_keys.js
 refactor_economics.js
 *.agent.js
 
-# Agent scratch space and schema dumps
+# Agent scratch space & schema dumps
 scratch/
 schema_dump.sql
 .aider*

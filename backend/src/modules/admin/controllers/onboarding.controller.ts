@@ -6,6 +6,7 @@ import { logActivity } from '../../../utils/activityLogger.js';
 import Stripe from 'stripe';
 import nodemailer from 'nodemailer';
 import { secretsManager } from '../../../config/secrets.config.js';
+import { TEMPLATE_TO_ENGINE } from '../../../engines/types.js';
 
 /**
  * Onboarding Controller
@@ -262,13 +263,11 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
 
   // Extract data from completed steps
   const steps = state.steps || {};
-  const brandData = steps['resort_details']?.data || {};
+  const brandData = steps['property_details']?.data || steps['resort_details']?.data || {};
   const themeData = steps['visual_design']?.data || {};
   const hoursData = {
     timezone: 'UTC',
-    poolHours: '08:00 - 20:00',
-    restaurantHours: '07:00 - 23:00',
-    receptionHours: '24/7'
+    receptionHours: '24/7',
   };
   const modulesData = steps['modules']?.data || { modules: [] };
   const gatewayData = steps['payment_gateway']?.data || {};
@@ -276,7 +275,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
   const staffData = steps['staff_invitations']?.data || { invitations: [] };
   const taxData   = steps['taxes']?.data || {};
 
-  const propertyName = brandData.name || 'My Resort';
+  const propertyName = brandData.name || 'My Property';
 
   // Read credentials from request body with database state fallback (Bug #4)
   const stripeSecret = req.body.stripeSecretKey || gatewayData.secretKey;
@@ -389,20 +388,14 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
 
     // 6. Provision Modules
     const selectedModules: string[] = modulesData.modules || [];
-    const modulesToInsert = selectedModules.map((modSlug) => {
-      let engineType = 'instant_transaction';
-      if (modSlug === 'hotel' || modSlug === 'chalet') engineType = 'time_exclusive_reservation';
-      else if (modSlug === 'pool' || modSlug === 'beach') engineType = 'shared_capacity_access';
-      else if (modSlug === 'membership') engineType = 'ongoing_entitlement';
-
-      return {
-        property_id: propertyId,
-        name: modSlug.charAt(0).toUpperCase() + modSlug.slice(1),
-        slug: modSlug,
-        type: engineType,
-        is_active: true,
-      };
-    });
+    const modulesToInsert = selectedModules.map((modSlug) => ({
+      property_id: propertyId,
+      name: modSlug.charAt(0).toUpperCase() + modSlug.slice(1).replace(/_/g, ' '),
+      slug: modSlug,
+      template_type: modSlug,
+      type: TEMPLATE_TO_ENGINE[modSlug as keyof typeof TEMPLATE_TO_ENGINE] || 'instant_transaction',
+      is_active: true,
+    }));
 
     if (modulesToInsert.length > 0) {
       const { error: modErr } = await supabase
@@ -476,7 +469,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
 
     // 8. Generate Printable Operations Manual (Bug #9: XSS Escape user inputs)
     const manualHtml = generateOperationsManual({
-      resortName: propertyName,
+      siteName: propertyName,
       address: brandData.address || 'N/A',
       phone: brandData.phone || 'N/A',
       email: brandData.email || 'N/A',
@@ -603,7 +596,7 @@ const sanitizeColor = (color: any): string => {
  * Helper to generate a beautiful printable operations manual HTML
  */
 function generateOperationsManual(details: any): string {
-  const resortName = esc(details.resortName);
+  const siteName = esc(details.siteName);
   const email = esc(details.email);
   const phone = esc(details.phone);
   const address = esc(details.address);
@@ -614,7 +607,7 @@ function generateOperationsManual(details: any): string {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <title>${resortName} - Operations Manual</title>
+      <title>${siteName} - Operations Manual</title>
       <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 40px; }
         .header { text-align: center; border-bottom: 2px solid ${themeColor}; padding-bottom: 20px; margin-bottom: 30px; }
@@ -633,8 +626,8 @@ function generateOperationsManual(details: any): string {
     </head>
     <body>
       <div class="header">
-        <h1 class="title">${resortName}</h1>
-        <div class="subtitle">Official Resort Operations & Setup Manual</div>
+        <h1 class="title">${siteName}</h1>
+        <div class="subtitle">Official Operations &amp; Setup Manual</div>
         <p>Generated on ${new Date().toLocaleDateString()}</p>
       </div>
 
@@ -642,7 +635,7 @@ function generateOperationsManual(details: any): string {
         <h2 class="section-title">1. Directory & Contact Information</h2>
         <table>
           <tr><th>Attribute</th><th>Detail</th></tr>
-          <tr><td>Resort Name</td><td>${resortName}</td></tr>
+          <tr><td>Property Name</td><td>${siteName}</td></tr>
           <tr><td>Contact Email</td><td>${email}</td></tr>
           <tr><td>Contact Phone</td><td>${phone}</td></tr>
           <tr><td>Address</td><td>${address}</td></tr>

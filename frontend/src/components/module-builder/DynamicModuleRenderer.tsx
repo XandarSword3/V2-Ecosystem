@@ -5,7 +5,7 @@ import { Module } from '@/lib/settings-context';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { api, restaurantApi, poolApi } from '@/lib/api';
+import { api } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import { useContentTranslation } from '@/lib/translate';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -14,6 +14,10 @@ import { formatCurrency } from '@/lib/utils';
 import { Loader2, Clock, Users, ShoppingCart, Plus, Minus, Calendar, Star, Check, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
 
 // Type definitions for menu and session data
 interface MenuItem {
@@ -149,12 +153,37 @@ export function DynamicModuleRenderer({ layout, module }: RendererProps) {
   const safeLayout = result.data as UIBlock[];
 
   if (!safeLayout || safeLayout.length === 0) {
-    return <div className="p-10 text-center">No layout defined for this module.</div>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[450px] p-10 text-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-xl max-w-2xl mx-auto my-16 backdrop-blur-md">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center mb-6 shadow-lg shadow-primary-500/20">
+          <Sparkles className="w-8 h-8 text-white animate-pulse" />
+        </div>
+        <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-3">
+          Design Your Page
+        </h3>
+        <p className="text-slate-500 dark:text-slate-400 max-w-md mb-8 leading-relaxed">
+          This module does not have any layout defined yet. Open the Customization Manager to drag and drop components, customize the styling, and publish your design.
+        </p>
+        <button 
+          onClick={() => window.location.href = '/admin/customizations'}
+          className="inline-flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
+        >
+          Open Customization Manager
+        </button>
+      </div>
+    );
   }
 
-  // Check if any block has position data. If none do, fall back to stack/flow layout
-  // to handle old layouts and newly added blocks before first drag.
-  const hasPositionData = safeLayout.some((b) => b.position?.x !== undefined || b.position?.y !== undefined);
+  // Only switch to freeform canvas mode when EVERY block has explicit position data.
+  // Using `some` caused a split-state bug: the moment the builder saved position to
+  // one block (e.g. pricing_table after a drag), all blocks flipped to freeform mode.
+  // Blocks without saved positions defaulted to top:0 / left:0 and overlapped each
+  // other, making them appear to disappear in the builder preview while the live page
+  // (still stack-mode in the DB) rendered correctly. `every` means freeform mode only
+  // engages when all blocks have been explicitly placed by the builder.
+  const hasPositionData = safeLayout.length > 0 && safeLayout.every(
+    (b) => b.position?.x !== undefined && b.position?.y !== undefined
+  );
 
   // Stack fallback: render blocks in normal document flow
   if (!hasPositionData) {
@@ -481,7 +510,7 @@ export function BlockRenderer({
     'testimonials', 'pricing_table',
     // New glassmorphic components
     'hero_v2', 'card_grid', 'stats', 'features', 'cta', 'video', 'divider', 'spacer',
-    // Gym/Session specific components
+    // Session/Activity specific components
     'class_schedule', 'calendar', 'testimonials_carousel'
   ];
   if (!KNOWN_TYPES.includes(type)) {
@@ -955,7 +984,7 @@ export function BlockRenderer({
       break;
 
     // ============================================
-    // GYM/SESSION SPECIFIC COMPONENTS
+    // SESSION/ACTIVITY SPECIFIC COMPONENTS
     // ============================================
 
     case 'class_schedule':
@@ -989,7 +1018,7 @@ export function BlockRenderer({
 // Menu List Component for menu_service modules
 // ============================================
 function MenuListComponent({ module, props }: { module: Module; props: BlockProps }) {
-  const t = useTranslations('restaurant');
+  const t = useTranslations('instantTransaction');
   const tCommon = useTranslations('common');
   const { translateContent } = useContentTranslation();
   const currency = useSettingsStore((s) => s.currency);
@@ -1001,7 +1030,7 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['menu', module.id],
-    queryFn: () => restaurantApi.getMenu(module.id),
+    queryFn: () => api.get(`/${module.slug}/menu`, { params: { moduleId: module.id } }),
   });
 
   const categories: MenuCategory[] = data?.data?.data?.categories || [];
@@ -1025,7 +1054,7 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
       moduleId: module.id,
       moduleSlug: module.slug,
       moduleName: module.name,
-      type: 'restaurant' as const,
+      type: 'instant_transaction' as const,
       imageUrl: item.image_url || item.image
     };
     addItem(cartItem);
@@ -1165,7 +1194,7 @@ function SessionListComponent({ module, props }: { module: Module; props: BlockP
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['sessions', module.id, selectedDate],
-    queryFn: () => poolApi.getSessions(selectedDate, module.id),
+    queryFn: () => api.get(`/${module.slug}/sessions`, { params: { date: selectedDate } }),
   });
 
   const sessions: PoolSession[] = data?.data?.data || [];
@@ -1533,9 +1562,15 @@ function TestimonialsComponent({ props }: { props: BlockProps }) {
 // ============================================
 function PricingTableComponent({ module, props, isEditing = false, onUpdateProps }: { module: Module; props: BlockProps; isEditing?: boolean; onUpdateProps?: (updates: Record<string, any>) => void }) {
   const { data: pricingRes } = useQuery({
-    queryKey: ['module-pricing', module.slug, module.template_type],
+    queryKey: ['module-pricing', module.slug, module.engine_type],
     queryFn: async () => {
-      if (module.template_type === 'shared_capacity_access') {
+      if (module.engine_type === 'platform_entitlement') {
+        // Engine E has its own real public plans endpoint — there is no
+        // GET /{slug}/plans route for this engine type (that path is for
+        // other engines' module-scoped pricing); calling it 404s.
+        return api.get('/platform/plans');
+      }
+      if (module.engine_type === 'shared_capacity_access') {
         return api.get(`/${module.slug}/sessions`);
       }
       return api.get(`/${module.slug}/plans`);
@@ -1544,7 +1579,36 @@ function PricingTableComponent({ module, props, isEditing = false, onUpdateProps
   });
 
   let plans: any[] = [];
-  if (module.template_type === 'shared_capacity_access') {
+  if (module.engine_type === 'platform_entitlement' && pricingRes?.data?.data) {
+    plans = (pricingRes.data.data || []).map((p: any) => {
+      const fl = p.feature_limits || {};
+      // Derive human-readable bullets from the limit keys the admin UI actually stores.
+      // Unlimited is stored as -1 (the convention set by the Plans admin form).
+      const fmtLimit = (val: number | undefined | null, plural: string, singular: string): string | null => {
+        if (val === undefined || val === null) return null;
+        return val === -1 ? `Unlimited ${plural}` : `${val} ${val === 1 ? singular : plural}`;
+      };
+      const derivedFeatures = [
+        fmtLimit(fl.maxProperties, 'Properties', 'Property'),
+        fmtLimit(fl.maxModules,    'Modules',    'Module'),
+        fmtLimit(fl.maxUsers,      'Users',       'User'),
+      ].filter(Boolean) as string[];
+      return {
+        code: p.code,
+        name: p.name || 'Plan',
+        description: p.description ?? null,
+        price: p.price_monthly_cents != null
+          ? `$${(p.price_monthly_cents / 100).toFixed(0)}/mo`
+          : 'Free',
+        // Use derived limits if available; fall back to a `highlights` array if someone
+        // manually set one, so legacy / manually-crafted plans still work.
+        features: derivedFeatures.length > 0
+          ? derivedFeatures
+          : (Array.isArray(fl.highlights) ? fl.highlights : []),
+        popular: Boolean(fl.popular),
+      };
+    });
+  } else if (module.engine_type === 'shared_capacity_access') {
     plans = (pricingRes?.data?.data || []).map((s: any) => ({
       name: s.name || s.session_name || 'Session',
       price: String(s.price || s.adult_price || 0),
@@ -1568,6 +1632,60 @@ function PricingTableComponent({ module, props, isEditing = false, onUpdateProps
       console.error("Failed to parse pricing plans", e);
     }
   }
+
+  // ─────────────────────────────────────────────────────────────────
+  // Engine E (platform_entitlement) checkout — this engine's "special
+  // button," same idea as MenuListComponent's Add to Cart or
+  // SessionListComponent's Book Now elsewhere in this file. Every other
+  // engine type keeps the original static button below, unchanged.
+  // Collects email/name/subdomain, POSTs /platform/checkout, redirects
+  // to the Stripe url it returns. Requires each plan object to carry a
+  // `code` field ('starter' | 'growth' | 'enterprise') matching the
+  // `tier` the checkout endpoint expects — see the seed migration.
+  // ─────────────────────────────────────────────────────────────────
+  const isPlatformEntitlement = module.engine_type === 'platform_entitlement';
+  const [checkoutPlan, setCheckoutPlan] = useState<any | null>(null);
+  const [checkoutForm, setCheckoutForm] = useState({ name: '', email: '', subdomain: '' });
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  const openCheckout = (plan: any) => {
+    setCheckoutError(null);
+    setCheckoutForm({ name: '', email: '', subdomain: '' });
+    setCheckoutPlan(plan);
+  };
+
+  const submitCheckout = async () => {
+    if (!checkoutPlan?.code) {
+      setCheckoutError('This plan is missing a billing code and cannot be checked out yet.');
+      return;
+    }
+    setCheckoutSubmitting(true);
+    setCheckoutError(null);
+    try {
+      const res = await api.post('/platform/checkout', {
+        tier: checkoutPlan.code,
+        email: checkoutForm.email,
+        name: checkoutForm.name,
+        subdomain: checkoutForm.subdomain,
+      });
+      const url = res.data?.data?.url;
+      if (url) {
+        window.location.href = url;
+      } else {
+        setCheckoutError('Something went wrong starting checkout. Please try again.');
+      }
+    } catch (err: any) {
+      setCheckoutError(err?.response?.data?.error || 'Could not start checkout. Please try again.');
+    } finally {
+      setCheckoutSubmitting(false);
+    }
+  };
+
+  const checkoutFormValid =
+    checkoutForm.name.trim().length > 0 &&
+    /\S+@\S+\.\S+/.test(checkoutForm.email) &&
+    /^[a-z0-9-]{2,}$/.test(checkoutForm.subdomain);
 
   return (
     <div className="w-full h-full px-4 py-12">
@@ -1598,6 +1716,11 @@ function PricingTableComponent({ module, props, isEditing = false, onUpdateProps
                 onUpdateProps?.({ plans: updated });
               })}>{plan.price}</span>
             </div>
+            {plan.description && (
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-4 leading-relaxed">
+                {plan.description}
+              </p>
+            )}
             <ul className="space-y-4 mb-8 flex-grow">
               {plan.features.map((feature: string, f: number) => (
                 <li key={f} className="flex items-center gap-3 text-slate-600 dark:text-slate-400">
@@ -1610,21 +1733,80 @@ function PricingTableComponent({ module, props, isEditing = false, onUpdateProps
                 </li>
               ))}
             </ul>
-            <button className={`w-full py-3 px-6 rounded-xl font-bold transition-all ${plan.popular
-              ? 'bg-primary-600 text-white hover:bg-primary-700'
-              : 'bg-slate-800 text-white hover:bg-slate-700'
-              }`}>
+            <button
+              onClick={isPlatformEntitlement && !isEditing ? () => openCheckout(plan) : undefined}
+              className={`w-full py-3 px-6 rounded-xl font-bold transition-all ${plan.popular
+                ? 'bg-primary-600 text-white hover:bg-primary-700'
+                : 'bg-slate-800 text-white hover:bg-slate-700'
+                } ${isPlatformEntitlement && !isEditing ? 'cursor-pointer' : ''}`}
+            >
               Get Started
             </button>
           </div>
         ))}
       </div>
+
+      {isPlatformEntitlement && (
+        <Dialog open={!!checkoutPlan} onOpenChange={(open) => { if (!open) setCheckoutPlan(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Start your {checkoutPlan?.name} trial</DialogTitle>
+              <DialogDescription>
+                14-day free trial. A card is required to start — Stripe will not charge you until the trial ends.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="checkout-name">Your name</Label>
+                <Input
+                  id="checkout-name"
+                  value={checkoutForm.name}
+                  onChange={(e) => setCheckoutForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Jane Smith"
+                />
+              </div>
+              <div>
+                <Label htmlFor="checkout-email">Email</Label>
+                <Input
+                  id="checkout-email"
+                  type="email"
+                  value={checkoutForm.email}
+                  onChange={(e) => setCheckoutForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="jane@yourbusiness.com"
+                />
+              </div>
+              <div>
+                <Label htmlFor="checkout-subdomain">Subdomain</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="checkout-subdomain"
+                    value={checkoutForm.subdomain}
+                    onChange={(e) => setCheckoutForm((f) => ({ ...f, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                    placeholder="yourbusiness"
+                  />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">.v2platform.com</span>
+                </div>
+              </div>
+              {checkoutError && <p className="text-sm text-red-500">{checkoutError}</p>}
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={submitCheckout}
+                disabled={checkoutSubmitting || !checkoutFormValid}
+                fullWidth
+              >
+                {checkoutSubmitting ? 'Starting checkout…' : 'Continue to payment'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
 
 // ============================================
-// Class Schedule Component for Gym/Session modules
+// Class Schedule Component for Session/Activity modules
 // ============================================
 function ClassScheduleComponent({ module, props }: { module: Module; props: BlockProps }) {
   const t = useTranslations('common');
@@ -1764,9 +1946,9 @@ function TestimonialsCarouselComponent({ module, props, isEditing = false, onUpd
   const [activeIndex, setActiveIndex] = useState(0);
 
   const testimonials = props.testimonials || [
-    { id: '1', text: 'The gym facilities are top-notch and the trainers are incredibly supportive. It is the perfect balance with my resort stay.', name: 'Jessica M.', role: 'Member', rating: 5, avatar: 'JM' },
-    { id: '2', text: 'I love starting my day with a workout here. The environment is motivating and the classes are amazing!', name: 'David L.', role: 'Member', rating: 5, avatar: 'DL' },
-    { id: '3', text: 'From yoga to strength training, everything I need is here. Highly recommend the gym module!', name: 'Sophia K.', role: 'Member', rating: 5, avatar: 'SK' },
+    { id: '1', text: 'The facilities are top-notch and the trainers are incredibly supportive. A perfect addition to my stay.', name: 'Jessica M.', role: 'Member', rating: 5, avatar: 'JM' },
+    { id: '2', text: 'I love starting my day with a session here. The environment is motivating and the classes are amazing!', name: 'David L.', role: 'Member', rating: 5, avatar: 'DL' },
+    { id: '3', text: 'From yoga to strength training, everything I need is here. Highly recommend the fitness module!', name: 'Sophia K.', role: 'Member', rating: 5, avatar: 'SK' },
   ];
 
   const nextSlide = () => setActiveIndex((prev: number) => (prev + 1) % testimonials.length);

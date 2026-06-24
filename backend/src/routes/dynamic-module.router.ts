@@ -11,16 +11,16 @@ import { requirePropertyAccess } from '../middleware/propertyAccess.middleware.j
 import { purchaseSharedCapacityAtomic } from '../services/shared-capacity-purchase.js';
 
 // Import parsers
-import * as menuServiceParser from '../modules/shared/import/menu-service-import.parser.js';
-import * as sessionAccessParser from '../modules/shared/import/session-access-import.parser.js';
-import * as multiDayBookingParser from '../modules/shared/import/multi-day-booking-import.parser.js';
+import * as instantTransactionParser from '../modules/shared/import/instant-transaction-import.parser.js';
+import * as sharedCapacityAccessParser from '../modules/shared/import/shared-capacity-access-import.parser.js';
+import * as timeExclusiveReservationParser from '../modules/shared/import/time-exclusive-reservation-import.parser.js';
 
-type TemplateType = 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
+type TemplateType = 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement' | 'platform_entitlement';
 
 interface MountedModuleContext {
   id: string;
   slug: string;
-  template_type: string;
+  engine_type: string;
   property_id?: string | null;
 }
 
@@ -152,7 +152,7 @@ function asNumber(input: unknown, fallback = 0): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function buildMenuServiceRouter(router: Router): void {
+function buildInstantTransactionRouter(router: Router): void {
   router.get('/items', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -190,7 +190,7 @@ function buildMenuServiceRouter(router: Router): void {
       }
 
       const itemIds = items
-        .map((item: unknown) => (item as { menu_item_id?: string }).menu_item_id)
+        .map((item: unknown) => (item as { catalog_item_id?: string }).catalog_item_id)
         .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
 
       const { data: catalogRows, error: catalogError } = await supabase
@@ -203,16 +203,16 @@ function buildMenuServiceRouter(router: Router): void {
 
       const priceMap = new Map((catalogRows ?? []).map((row) => [row.id, asNumber(row.price, 0)]));
       const lineItems = items.map((item: unknown) => {
-        const currentItem = item as { menu_item_id: string; quantity?: number };
+        const currentItem = item as { catalog_item_id: string; quantity?: number };
         return {
-          itemId: currentItem.menu_item_id,
-          name: `catalog_item:${currentItem.menu_item_id}`,
+          itemId: currentItem.catalog_item_id,
+          name: `catalog_item:${currentItem.catalog_item_id}`,
           quantity: asNumber(currentItem.quantity, 1),
-          unitPrice: priceMap.get(currentItem.menu_item_id) ?? 0,
+          unitPrice: priceMap.get(currentItem.catalog_item_id) ?? 0,
         };
       });
 
-      const pricing = await engineService.calculatePricing('menu_service', lineItems, {
+      const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: mounted.id,
         customerId: req.user?.userId ?? undefined,
       });
@@ -335,9 +335,9 @@ function buildMenuServiceRouter(router: Router): void {
       if (!current) return res.status(404).json({ success: false, error: 'Order not found' });
 
       const actor = actorForUser(req);
-      const action = resolveAction(mounted.template_type, current.status, newStatus, actor);
+      const action = resolveAction(mounted.engine_type, current.status, newStatus, actor);
       const transition = await engineService.transitionState(
-        mounted.template_type,
+        mounted.engine_type,
         current.status,
         action,
         actor,
@@ -365,7 +365,7 @@ function buildMenuServiceRouter(router: Router): void {
   });
 }
 
-function buildMultiDayBookingRouter(router: Router): void {
+function buildTimeExclusiveReservationRouter(router: Router): void {
   router.get('/availability', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -427,7 +427,7 @@ function buildMultiDayBookingRouter(router: Router): void {
       }
 
       const pricing = await engineService.calculatePricing(
-        mounted.template_type,
+        mounted.engine_type,
         [{ itemId: String(unit_id), name: 'booking', quantity: 1, unitPrice: asNumber(total_amount, 0) }],
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
@@ -554,9 +554,9 @@ function buildMultiDayBookingRouter(router: Router): void {
       if (!current) return res.status(404).json({ success: false, error: 'Booking not found' });
 
       const actor = actorForUser(req);
-      const action = resolveAction(mounted.template_type, current.status, newStatus, actor);
+      const action = resolveAction(mounted.engine_type, current.status, newStatus, actor);
       const transition = await engineService.transitionState(
-        mounted.template_type,
+        mounted.engine_type,
         current.status,
         action,
         actor,
@@ -584,7 +584,7 @@ function buildMultiDayBookingRouter(router: Router): void {
   });
 }
 
-function buildSessionAccessRouter(router: Router): void {
+function buildSharedCapacityAccessRouter(router: Router): void {
   router.get('/sessions', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -592,6 +592,7 @@ function buildSessionAccessRouter(router: Router): void {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
       const supabase = getSupabase();
+      const date = req.query.date as string;
       const { data, error } = await supabase
         .from('capacity_windows')
         .select('id, name, start_time, end_time, max_capacity, price, module_id, is_active, metadata')
@@ -599,11 +600,55 @@ function buildSessionAccessRouter(router: Router): void {
         .eq('is_active', true)
         .order('start_time', { ascending: true });
       if (error) throw error;
-      const normalized = (data ?? []).map((w) => ({
+      
+      let normalized = (data ?? []).map((w) => ({
         ...w,
         adult_price: (w.metadata as Record<string, unknown>)?.adult_price ?? w.price,
         child_price: (w.metadata as Record<string, unknown>)?.child_price ?? 0,
+        available: w.max_capacity,
+        availability: { remaining: w.max_capacity }
       }));
+
+      if (date) {
+        const { data: tickets, error: ticketsError } = await supabase
+          .from('transactions')
+          .select('id, reference_id, metadata, status')
+          .eq('engine_type', 'shared_capacity_access')
+          .eq('module_id', mounted.id);
+        
+        if (ticketsError) throw ticketsError;
+
+        const validTickets = (tickets ?? []).filter((t) => 
+          !['cancelled', 'expired', 'no_show'].includes(t.status)
+        );
+
+        const dateTickets = validTickets.filter((t) => {
+          const tMeta = t.metadata as Record<string, unknown> | null;
+          const tDate = tMeta?.ticket_date ?? tMeta?.date ?? '';
+          return tDate === date;
+        });
+
+        normalized = normalized.map((w) => {
+          const windowTickets = dateTickets.filter((t) => {
+            const tMeta = t.metadata as Record<string, unknown> | null;
+            return t.reference_id === w.id || tMeta?.session_id === w.id;
+          });
+
+          const sold = windowTickets.reduce((sum, t) => {
+            const tMeta = t.metadata as Record<string, unknown> | null;
+            const quantity = Number(tMeta?.quantity ?? tMeta?.number_of_guests ?? (Number(tMeta?.adults ?? 0) + Number(tMeta?.children ?? 0))) || 1;
+            return sum + quantity;
+          }, 0);
+
+          const remaining = Math.max(0, (w.max_capacity ?? 0) - sold);
+          return {
+            ...w,
+            available: remaining,
+            availability: { remaining }
+          };
+        });
+      }
+
       res.json({ success: true, data: normalized });
     } catch (error) {
       logger.error('[Dynamic Router] GET /sessions failed', error);
@@ -632,7 +677,7 @@ function buildSessionAccessRouter(router: Router): void {
         unitPrice: asNumber(unit_price, 0),
       }];
       const pricing = await engineService.calculatePricing(
-        mounted.template_type,
+        mounted.engine_type,
         lineItems,
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
@@ -746,9 +791,9 @@ function buildSessionAccessRouter(router: Router): void {
       if (!ticket) return res.status(404).json({ success: false, error: 'Ticket not found' });
 
       const actor = actorForUser(req);
-      const action = resolveAction(mounted.template_type, ticket.status, 'validate', actor);
+      const action = resolveAction(mounted.engine_type, ticket.status, 'validate', actor);
       const transition = await engineService.transitionState(
-        mounted.template_type,
+        mounted.engine_type,
         ticket.status,
         action,
         actor,
@@ -780,7 +825,7 @@ function buildSessionAccessRouter(router: Router): void {
   });
 }
 
-function buildSubscriptionRouter(router: Router): void {
+function buildOngoingEntitlementRouter(router: Router): void {
   router.get('/plans', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -823,7 +868,7 @@ function buildSubscriptionRouter(router: Router): void {
       if (!plan) return res.status(404).json({ success: false, error: 'Plan not found' });
 
       const pricing = await engineService.calculatePricing(
-        mounted.template_type,
+        mounted.engine_type,
         [{ itemId: plan.id, name: 'subscription_plan', quantity: 1, unitPrice: asNumber(plan.price, 0) }],
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
@@ -915,9 +960,9 @@ function buildSubscriptionRouter(router: Router): void {
       if (!current) return res.status(404).json({ success: false, error: 'Subscription not found' });
 
       const actor = actorForUser(req);
-      const action = resolveAction(mounted.template_type, current.status, newStatus, actor);
+      const action = resolveAction(mounted.engine_type, current.status, newStatus, actor);
       const transition = await engineService.transitionState(
-        mounted.template_type,
+        mounted.engine_type,
         current.status,
         action,
         actor,
@@ -957,7 +1002,7 @@ function buildImportRouter(router: Router, templateType: TemplateType): void {
     asyncHandler(async (req: DynamicRequest, res: Response) => {
       try {
         const mountedModule = req.mountedModule!;
-        const engineType = mountedModule.template_type as TemplateType;
+        const engineType = mountedModule.engine_type as TemplateType;
         let result: { items: unknown[]; warnings: string[]; errors: string[]; totalParsed: number; successful: number } | null = null;
 
         // Handle file upload or text input
@@ -1003,7 +1048,7 @@ function buildImportRouter(router: Router, templateType: TemplateType): void {
     asyncHandler(async (req: DynamicRequest, res: Response) => {
       try {
         const mountedModule = req.mountedModule!;
-        const engineType = mountedModule.template_type as TemplateType;
+        const engineType = mountedModule.engine_type as TemplateType;
         const { items, moduleId } = req.body;
 
         if (!items || !Array.isArray(items) || items.length === 0) {
@@ -1045,15 +1090,15 @@ async function parseImportForEngine(
 
   switch (canonical) {
     case 'instant_transaction':
-      if (format === 'llm') return await menuServiceParser.parseLlmImport(data as string);
-      if (format === 'csv')  return await menuServiceParser.parseCsvImport(data as Buffer);
-      return menuServiceParser.parseJsonImport(data);
+      if (format === 'llm') return await instantTransactionParser.parseLlmImport(data as string);
+      if (format === 'csv')  return await instantTransactionParser.parseCsvImport(data as Buffer);
+      return instantTransactionParser.parseJsonImport(data);
     case 'shared_capacity_access':
-      if (format === 'llm') return await sessionAccessParser.parseLlmImport(data as string);
-      return sessionAccessParser.parseJsonImport(data);
+      if (format === 'llm') return await sharedCapacityAccessParser.parseLlmImport(data as string);
+      return sharedCapacityAccessParser.parseJsonImport(data);
     case 'time_exclusive_reservation':
-      if (format === 'llm') return await multiDayBookingParser.parseLlmImport(data as string);
-      return multiDayBookingParser.parseJsonImport(data);
+      if (format === 'llm') return await timeExclusiveReservationParser.parseLlmImport(data as string);
+      return timeExclusiveReservationParser.parseJsonImport(data);
     case 'ongoing_entitlement':
       // No structured parser yet — fall back gracefully
       return {
@@ -1264,16 +1309,26 @@ export function buildModuleRouter(templateType: string): Router {
 
   switch (normalizedType) {
     case 'instant_transaction':
-      buildMenuServiceRouter(router);
+      buildInstantTransactionRouter(router);
       break;
     case 'time_exclusive_reservation':
-      buildMultiDayBookingRouter(router);
+      buildTimeExclusiveReservationRouter(router);
       break;
     case 'shared_capacity_access':
-      buildSessionAccessRouter(router);
+      buildSharedCapacityAccessRouter(router);
       break;
     case 'ongoing_entitlement':
-      buildSubscriptionRouter(router);
+      buildOngoingEntitlementRouter(router);
+      break;
+    case 'platform_entitlement':
+      // Platform-level engine — billing for V2 itself. Not exposed via the tenant API.
+      // SaaS billing flows through /api/v1/platform/* routes only.
+      router.use((_req: Request, res: Response) => {
+        res.status(403).json({
+          success: false,
+          error: 'platform_entitlement is a platform-level engine and is not accessible via the tenant module API.',
+        });
+      });
       break;
     default:
       logger.warn(`[Dynamic Router] Unsupported template_type '${templateType}'`);

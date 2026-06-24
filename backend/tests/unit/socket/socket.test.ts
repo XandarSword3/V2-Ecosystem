@@ -122,12 +122,12 @@ describe('Socket Module', () => {
 
   describe('Socket event handlers', () => {
     it('should define valid unit types', () => {
-      const validUnits = ['restaurant', 'snack_bar', 'chalets', 'pool'];
+      const validUnits = ['menu_service', 'kiosk', 'accommodation_units', 'capacity'];
       
-      expect(validUnits).toContain('restaurant');
-      expect(validUnits).toContain('snack_bar');
-      expect(validUnits).toContain('chalets');
-      expect(validUnits).toContain('pool');
+      expect(validUnits).toContain('menu_service');
+      expect(validUnits).toContain('kiosk');
+      expect(validUnits).toContain('accommodation_units');
+      expect(validUnits).toContain('capacity');
       expect(validUnits).not.toContain('invalid_unit');
     });
 
@@ -205,10 +205,10 @@ describe('Socket Module', () => {
     });
 
     it('should format unit rooms correctly', () => {
-      const unit = 'restaurant';
+      const unit = 'menu_service';
       const roomName = `unit:${unit}`;
       
-      expect(roomName).toBe('unit:restaurant');
+      expect(roomName).toBe('unit:menu_service');
     });
   });
 });

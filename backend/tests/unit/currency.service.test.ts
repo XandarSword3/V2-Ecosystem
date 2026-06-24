@@ -5,33 +5,49 @@
  * Pure-function tests need no mock; DB-dependent tests mock database/connection.
  */
 
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+
 
 // ── DB mock must be declared before the service import ──────────────────────
-const mockFrom = vi.fn();
-const mockSelect = vi.fn();
-const mockEq = vi.fn();
-const mockSingle = vi.fn();
-const mockUpdate = vi.fn();
-const mockInsert = vi.fn();
+const mockChain = vi.hoisted(() => {
+  const mockFrom = vi.fn();
+  const mockSelect = vi.fn();
+  const mockEq = vi.fn();
+  const mockSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+  const mockUpdate = vi.fn();
+  const mockInsert = vi.fn();
 
-const mockChain = {
-  from: mockFrom,
-  select: mockSelect,
-  eq: mockEq,
-  single: mockSingle,
-  update: mockUpdate,
-  insert: mockInsert,
-  filter: vi.fn(),
-  order: vi.fn(),
-};
+  const chain = {
+    from: mockFrom,
+    select: mockSelect,
+    eq: mockEq,
+    single: mockSingle,
+    update: mockUpdate,
+    insert: mockInsert,
+    filter: vi.fn(),
+    order: vi.fn(),
+  };
 
-// Every chainable method returns the same object so arbitrary chains work.
-Object.keys(mockChain).forEach((k) => {
-  (mockChain as any)[k].mockReturnValue(mockChain);
+  // Every chainable method returns the same object so arbitrary chains work.
+  Object.keys(chain).forEach((k) => {
+    if (k !== 'single') {
+      (chain as any)[k].mockReturnValue(chain);
+    }
+  });
+
+  return chain;
 });
+
+// Store reference to mockSingle for use in tests
+const mockSingle = (mockChain as any).single;
 
 vi.mock('../../src/database/connection.js', () => ({
   getSupabase: vi.fn(() => mockChain),
+}));
+
+vi.mock('../../src/lib/supabase.js', () => ({
+  getSupabase: vi.fn(() => mockChain),
+  getSupabaseAdmin: vi.fn(() => mockChain),
 }));
 
 import { currencyService } from '../../src/services/currency.service.js';
@@ -42,8 +58,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Re-apply chain returns after clearAllMocks
   Object.keys(mockChain).forEach((k) => {
-    (mockChain as any)[k].mockReturnValue(mockChain);
+    if (k !== 'single') {
+      (mockChain as any)[k].mockReturnValue(mockChain);
+    }
   });
+  // Clear the in-memory rates cache so DB mocks are always consulted
+  currencyService.clearRatesCache();
 });
 
 // ── Pure utility functions ────────────────────────────────────────────────────

@@ -14,7 +14,7 @@
 import * as Sentry from '@sentry/node';
 import { Request, Response, NextFunction, Express } from 'express';
 import { logger } from './logger.js';
-import { config } from '../config/index.js';
+import { config } from '../config/index';
 
 // Check if Sentry is enabled via environment variable
 const SENTRY_DSN = process.env.SENTRY_DSN;

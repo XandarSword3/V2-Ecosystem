@@ -1,20 +1,84 @@
 /**
  * Bookings Service Unit Tests
- * 
+ *
  * Tests for bookings.service.ts using Vitest with chainable Supabase query mocks.
  */
 
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+
+// =============================================
+// MOCKS (must be before any imports)
+// =============================================
+
+// Mock the entire database connection module to prevent config from loading
+vi.mock('../../../../src/database/connection', () => ({
+  getSupabase: vi.fn(),
+}));
+
+vi.mock('../../../../src/database/connection.js', () => ({
+  getSupabase: vi.fn(),
+}));
+
+// Mock dotenv to prevent it from being called
+vi.mock('dotenv', () => ({
+  default: {
+    config: vi.fn(),
+  },
+}));
+
+// Mock config module (both TypeScript and JavaScript paths)
+vi.mock('../../../../src/config/index', () => ({
+  config: {
+    env: 'test',
+    port: 3005,
+    apiUrl: 'http://localhost:3005',
+    frontendUrl: 'http://localhost:3000',
+    corsOrigins: ['http://localhost:3000'],
+    database: { url: '' },
+    supabase: { url: '', anonKey: '', serviceKey: '' },
+    jwt: { secret: 'test-secret-key-min-32-characters-long', refreshSecret: 'test-refresh-secret-key-min-32-chars', expiresIn: '15m', refreshExpiresIn: '7d' },
+    stripe: { secretKey: '', webhookSecret: '' },
+    email: { host: 'smtp.sendgrid.net', port: 587, user: '', pass: '', from: '' },
+    storage: { endpoint: '', bucket: 'v2-ecosystem-files', accessKey: '', secretKey: '' },
+    rateLimit: { windowMs: 60000, maxRequests: 1000 },
+    oauth: { google: { clientId: '', clientSecret: '', callbackUrl: '' }, facebook: { clientId: '', clientSecret: '', callbackUrl: '' }, apple: { clientId: '', teamId: '', keyId: '', privateKey: '', callbackUrl: '' } },
+    firebase: { serviceAccountPath: '', projectId: '' },
+    mobile: { bundleId: { ios: 'com.v2ecosystem.app', android: 'com.v2ecosystem.app' }, appleTeamId: '', deepLinkScheme: 'v2ecosystem' },
+  },
+}));
+
+vi.mock('../../../../src/config/index.js', () => ({
+  config: {
+    env: 'test',
+    port: 3005,
+    apiUrl: 'http://localhost:3005',
+    frontendUrl: 'http://localhost:3000',
+    corsOrigins: ['http://localhost:3000'],
+    database: { url: '' },
+    supabase: { url: '', anonKey: '', serviceKey: '' },
+    jwt: { secret: 'test-secret-key-min-32-characters-long', refreshSecret: 'test-refresh-secret-key-min-32-chars', expiresIn: '15m', refreshExpiresIn: '7d' },
+    stripe: { secretKey: '', webhookSecret: '' },
+    email: { host: 'smtp.sendgrid.net', port: 587, user: '', pass: '', from: '' },
+    storage: { endpoint: '', bucket: 'v2-ecosystem-files', accessKey: '', secretKey: '' },
+    rateLimit: { windowMs: 60000, maxRequests: 1000 },
+    oauth: { google: { clientId: '', clientSecret: '', callbackUrl: '' }, facebook: { clientId: '', clientSecret: '', callbackUrl: '' }, apple: { clientId: '', teamId: '', keyId: '', privateKey: '', callbackUrl: '' } },
+    firebase: { serviceAccountPath: '', projectId: '' },
+    mobile: { bundleId: { ios: 'com.v2ecosystem.app', android: 'com.v2ecosystem.app' }, appleTeamId: '', deepLinkScheme: 'v2ecosystem' },
+  },
+}));
 
 // =============================================
 // MOCK DATA STORAGE
 // =============================================
 
 let mockBookings: Array<Record<string, unknown>> = [];
-let mockChalets: Array<Record<string, unknown>> = [];
+
+let mockAccommodationUnits: Array<Record<string, unknown>> = [];
 let mockBookingAddOns: Array<Record<string, unknown>> = [];
 let mockChaletAddOns: Array<Record<string, unknown>> = [];
-let mockChaletPriceRules: Array<Record<string, unknown>> = [];
-let mockChaletSettings: Array<Record<string, unknown>> = [];
+let mockAccommodationPriceRules: Array<Record<string, unknown>> = [];
+
+let mockAccommodationSettings: Array<Record<string, unknown>> = [];
 let mockUsers: Array<Record<string, unknown>> = [];
 
 // =============================================
@@ -89,37 +153,65 @@ const mockSupabase = {
   from: vi.fn((table: string) => {
     switch (table) {
       case 'transactions':
-        // Service migrated from chalet_bookings to transactions table
+
+      // Service migrated from unit_bookings to transactions table
         return createQueryMock(() => mockBookings);
-      case 'chalet_bookings':
+
+        case 'unit_bookings':
         return createQueryMock(() => mockBookings);
       case 'accommodation_units':
-        // New table name post-refit (replaces 'chalets')
-        return createQueryMock(() => mockChalets);
-      case 'chalets':
-        return createQueryMock(() => mockChalets);
+        // New table name post-refit (replaces 'accommodation_units')
+        return createQueryMock(() => mockAccommodationUnits);
+      case 'accommodation_units':
+
+      return createQueryMock(() => mockAccommodationUnits);
       case 'chalet_booking_add_ons':
         return createQueryMock(() => mockBookingAddOns);
-      case 'chalet_add_ons':
+
+        case 'accommodation_unit_add_ons':
         return createQueryMock(() => mockChaletAddOns);
       case 'accommodation_add_ons':
         // New table name post-refit
         return createQueryMock(() => mockChaletAddOns);
       case 'chalet_price_rules':
-        return createQueryMock(() => mockChaletPriceRules);
+
+      return createQueryMock(() => mockAccommodationPriceRules);
       case 'unit_price_rules':
         // New table name post-refit
-        return createQueryMock(() => mockChaletPriceRules);
-      case 'chalet_settings':
-        return createQueryMock(() => mockChaletSettings);
+        return createQueryMock(() => mockAccommodationPriceRules);
+      case 'accommodation_unit_settings':
+
+      return createQueryMock(() => mockAccommodationSettings);
       case 'modules':
         // Deposit config now lives in modules.config JSONB
-        return createQueryMock(() => mockChaletSettings.map(s => ({ config: s })));
+
+        return createQueryMock(() => mockAccommodationSettings.map(s => ({ config: s })));
       case 'users':
         return createQueryMock(() => mockUsers);
       default:
         return createQueryMock(() => []);
     }
+  }),
+  rpc: vi.fn((functionName: string, params: Record<string, unknown>) => {
+    if (functionName === 'reserve_unit_exclusive_atomic') {
+      const newBooking = {
+        id: 'new-booking-1',
+        booking_number: 'C-240101-001',
+        unit_id: params.p_unit_id as string,
+        customer_id: params.p_customer_id as string | null,
+        check_in_date: params.p_check_in_date as string,
+        check_out_date: params.p_check_out_date as string,
+        amount: params.p_amount as number,
+        metadata: params.p_metadata as Record<string, unknown>,
+        status: 'pending'
+      };
+      mockBookings.push(newBooking);
+      return Promise.resolve({
+        data: [{ success: true, transaction_id: 'new-booking-1' }],
+        error: null
+      });
+    }
+    return Promise.resolve({ data: null, error: null });
   })
 };
 
@@ -160,16 +252,20 @@ import {
 // TEST DATA BUILDERS
 // =============================================
 
-function buildChalet(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+
+function buildAccommodationUnit(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
   return {
-    id: 'chalet-1',
-    name: 'Beach Chalet',
+    id: 'accommodation unit-1',
+
+    name: 'Beach AccommodationUnit',
     name_ar: 'شاليه الشاطئ',
-    description: 'A beautiful beach chalet',
+
+    description: 'A beautiful beach accommodation unit',
     capacity: 6,
     bedroom_count: 2,
     bathroom_count: 1,
-    amenities: ['wifi', 'pool', 'bbq'],
+
+    amenities: ['wifi', 'capacity', 'bbq'],
     images: ['image1.jpg'],
     base_price: '100.00',
     weekend_price: '150.00',
@@ -184,7 +280,8 @@ function buildBooking(overrides: Partial<Record<string, unknown>> = {}): Record<
   return {
     id: 'booking-1',
     booking_number: 'C-240101-001',
-    chalet_id: 'chalet-1',
+
+    unit_id: 'accommodation unit-1',
     customer_id: 'user-1',
     customer_name: 'John Doe',
     customer_email: 'john@example.com',
@@ -247,11 +344,13 @@ describe('BookingsService', () => {
     // Restore the original from function in case it was overridden
     mockSupabase.from = originalFrom;
     mockBookings = [];
-    mockChalets = [];
+
+    mockAccommodationUnits = [];
     mockBookingAddOns = [];
     mockChaletAddOns = [];
-    mockChaletPriceRules = [];
-    mockChaletSettings = [];
+    mockAccommodationPriceRules = [];
+
+    mockAccommodationSettings = [];
     mockUsers = [];
   });
 
@@ -261,13 +360,16 @@ describe('BookingsService', () => {
 
   describe('createBooking', () => {
     it('should create a booking successfully', async () => {
-      const chalet = buildChalet();
-      mockChalets = [chalet];
-      mockChaletSettings = [buildSettings()];
+      const accommodationUnit = buildAccommodationUnit();
+      mockAccommodationUnits = [accommodationUnit];
+
+      mockAccommodationSettings = [buildSettings()];
       mockBookings = []; // No existing bookings
 
       const input = {
-        chaletId: 'chalet-1',
+
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: 'Jane Doe',
         customerEmail: 'jane@example.com',
         customerPhone: '+9876543210',
@@ -279,15 +381,19 @@ describe('BookingsService', () => {
       const result = await createBooking(input);
 
       expect(result).toBeDefined();
-      expect(mockSupabase.from).toHaveBeenCalledWith('chalets');
+
+      expect(mockSupabase.from).toHaveBeenCalledWith('accommodation_units');
       expect(mockSupabase.from).toHaveBeenCalledWith('transactions');
     });
 
-    it('should throw error if chalet not found', async () => {
-      mockChalets = [];
+    it('should throw error if accommodation unit not found', async () => {
+
+      mockAccommodationUnits = [];
 
       const input = {
-        chaletId: 'nonexistent-chalet',
+
+        unitId: 'nonexistent-accommodation unit',
+        moduleId: 'module-1',
         customerName: 'Jane Doe',
         checkInDate: '2024-04-01',
         checkOutDate: '2024-04-03',
@@ -297,11 +403,14 @@ describe('BookingsService', () => {
       await expect(createBooking(input)).rejects.toThrow();
     });
 
-    it('should throw error if chalet is inactive', async () => {
-      mockChalets = [buildChalet({ is_active: false })];
+    it('should throw error if accommodation unit is inactive', async () => {
+
+      mockAccommodationUnits = [buildAccommodationUnit({ is_active: false })];
 
       const input = {
-        chaletId: 'chalet-1',
+
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: 'Jane Doe',
         checkInDate: '2024-04-01',
         checkOutDate: '2024-04-03',
@@ -312,10 +421,13 @@ describe('BookingsService', () => {
     });
 
     it('should throw error if guest count exceeds capacity', async () => {
-      mockChalets = [buildChalet({ capacity: 4 })];
+
+      mockAccommodationUnits = [buildAccommodationUnit({ capacity: 4 })];
 
       const input = {
-        chaletId: 'chalet-1',
+
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: 'Jane Doe',
         checkInDate: '2024-04-01',
         checkOutDate: '2024-04-03',
@@ -326,10 +438,13 @@ describe('BookingsService', () => {
     });
 
     it('should throw error for invalid date range', async () => {
-      mockChalets = [buildChalet()];
+
+      mockAccommodationUnits = [buildAccommodationUnit()];
 
       const input = {
-        chaletId: 'chalet-1',
+
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: 'Jane Doe',
         checkInDate: '2024-04-03',
         checkOutDate: '2024-04-01', // Check-out before check-in
@@ -340,15 +455,18 @@ describe('BookingsService', () => {
     });
 
     it('should create booking with add-ons', async () => {
-      mockChalets = [buildChalet()];
-      mockChaletSettings = [buildSettings()];
+      mockAccommodationUnits = [buildAccommodationUnit()];
+
+      mockAccommodationSettings = [buildSettings()];
       mockChaletAddOns = [
         buildAddOn({ id: 'addon-1', price: '25.00' }),
         buildAddOn({ id: 'addon-2', price: '50.00', price_type: 'per_night' }),
       ];
 
       const input = {
-        chaletId: 'chalet-1',
+
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: 'Jane Doe',
         checkInDate: '2024-04-01',
         checkOutDate: '2024-04-03',
@@ -424,13 +542,17 @@ describe('BookingsService', () => {
       expect(result).toHaveLength(3);
     });
 
-    it('should filter bookings by chalet', async () => {
+
+    it('should filter bookings by accommodation unit', async () => {
       mockBookings = [
-        buildBooking({ chalet_id: 'chalet-1' }),
-        buildBooking({ chalet_id: 'chalet-2' }),
+        buildBooking({ unit_id: 'accommodation unit-1' }),
+
+
+
+        buildBooking({ unit_id: 'accommodation unit-2' }),
       ];
 
-      const result = await getBookings({ chaletId: 'chalet-1' });
+      const result = await getBookings({ unitId: 'accommodation unit-1' });
 
       expect(result).toBeDefined();
       expect(mockSupabase.from).toHaveBeenCalledWith('transactions');
@@ -523,7 +645,7 @@ describe('BookingsService', () => {
       mockBookings = [];
 
       await expect(
-        updateBooking('nonexistent', { special_requests: 'Test' })
+        updateBooking('nonexistent', { payment_status: 'pending' })
       ).rejects.toThrow();
     });
   });
@@ -655,7 +777,8 @@ describe('BookingsService', () => {
       mockBookings = [];
 
       const result = await checkAvailability(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-05-01',
         '2024-05-03'
       );
@@ -667,14 +790,16 @@ describe('BookingsService', () => {
       mockBookings = [
         {
           ...buildBooking({
-            chalet_id: 'chalet-1',
+
+            unit_id: 'accommodation unit-1',
             check_in_date: '2024-05-02',
             check_out_date: '2024-05-05',
             status: 'confirmed',
           }),
           // Service reads dates from metadata when querying transactions table
           metadata: {
-            chalet_id: 'chalet-1',
+
+            unit_id: 'accommodation unit-1',
             check_in_date: '2024-05-02',
             check_out_date: '2024-05-05',
           },
@@ -682,7 +807,8 @@ describe('BookingsService', () => {
       ];
 
       const result = await checkAvailability(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-05-01',
         '2024-05-03'
       );
@@ -697,7 +823,8 @@ describe('BookingsService', () => {
       mockBookings = [];
 
       const result = await checkAvailability(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-05-01',
         '2024-05-03'
       );
@@ -712,7 +839,8 @@ describe('BookingsService', () => {
       mockBookings = [];
 
       const result = await checkAvailability(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-05-01',
         '2024-05-03'
       );
@@ -723,7 +851,7 @@ describe('BookingsService', () => {
     it('should return true for adjacent bookings (checkout = checkin)', async () => {
       mockBookings = [
         buildBooking({
-          chalet_id: 'chalet-1',
+          unit_id: 'accommodation unit-1',
           check_in_date: '2024-05-01',
           check_out_date: '2024-05-03',
           status: 'confirmed',
@@ -731,7 +859,8 @@ describe('BookingsService', () => {
       ];
 
       const result = await checkAvailability(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-05-03', // Same as previous checkout
         '2024-05-05'
       );
@@ -744,7 +873,7 @@ describe('BookingsService', () => {
     it('should return blocked dates for confirmed bookings', async () => {
       mockBookings = [
         buildBooking({
-          chalet_id: 'chalet-1',
+          unit_id: 'accommodation unit-1',
           check_in_date: '2024-05-01',
           check_out_date: '2024-05-03',
           status: 'confirmed',
@@ -752,7 +881,8 @@ describe('BookingsService', () => {
       ];
 
       const result = await getAvailability(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-05-01',
         '2024-05-10'
       );
@@ -766,7 +896,8 @@ describe('BookingsService', () => {
       mockBookings = [];
 
       const result = await getAvailability(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-05-01',
         '2024-05-10'
       );
@@ -777,7 +908,7 @@ describe('BookingsService', () => {
     it('should not include cancelled booking dates', async () => {
       mockBookings = [
         buildBooking({
-          chalet_id: 'chalet-1',
+          unit_id: 'accommodation unit-1',
           check_in_date: '2024-05-01',
           check_out_date: '2024-05-03',
           status: 'cancelled',
@@ -785,7 +916,8 @@ describe('BookingsService', () => {
       ];
 
       const result = await getAvailability(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-05-01',
         '2024-05-10'
       );
@@ -800,17 +932,18 @@ describe('BookingsService', () => {
 
   describe('calculateBookingPrice', () => {
     it('should calculate base price for weekday stays', async () => {
-      const chalet = buildChalet({
+      const accommodationUnit = buildAccommodationUnit({
         base_price: '100.00',
         weekend_price: '150.00',
       });
-      mockChalets = [chalet];
-      mockChaletPriceRules = [];
-      mockChaletSettings = [buildSettings()];
+      mockAccommodationUnits = [accommodationUnit];
+      mockAccommodationPriceRules = [];
+      mockAccommodationSettings = [buildSettings()];
 
       // Monday to Wednesday (2 weekday nights)
       const result = await calculateBookingPrice(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-03-04', // Monday
         '2024-03-06', // Wednesday
         []
@@ -822,17 +955,18 @@ describe('BookingsService', () => {
     });
 
     it('should calculate higher price for weekend stays', async () => {
-      const chalet = buildChalet({
+      const accommodationUnit = buildAccommodationUnit({
         base_price: '100.00',
         weekend_price: '150.00',
       });
-      mockChalets = [chalet];
-      mockChaletPriceRules = [];
-      mockChaletSettings = [buildSettings()];
+      mockAccommodationUnits = [accommodationUnit];
+      mockAccommodationPriceRules = [];
+      mockAccommodationSettings = [buildSettings()];
 
       // Friday to Sunday (2 weekend nights)
       const result = await calculateBookingPrice(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-03-08', // Friday
         '2024-03-10', // Sunday
         []
@@ -843,12 +977,12 @@ describe('BookingsService', () => {
     });
 
     it('should apply seasonal price rules', async () => {
-      const chalet = buildChalet();
-      mockChalets = [chalet];
-      mockChaletPriceRules = [
+      const accommodationUnit = buildAccommodationUnit();
+      mockAccommodationUnits = [accommodationUnit];
+      mockAccommodationPriceRules = [
         {
           id: 'rule-1',
-          chalet_id: 'chalet-1',
+          unit_id: 'accommodation unit-1',
           name: 'Holiday Season',
           start_date: '2024-03-01',
           end_date: '2024-03-31',
@@ -856,10 +990,11 @@ describe('BookingsService', () => {
           is_active: true,
         },
       ];
-      mockChaletSettings = [buildSettings()];
+      mockAccommodationSettings = [buildSettings()];
 
       const result = await calculateBookingPrice(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-03-15',
         '2024-03-17',
         []
@@ -869,12 +1004,12 @@ describe('BookingsService', () => {
     });
 
     it('should apply price multiplier rules', async () => {
-      const chalet = buildChalet({ base_price: '100.00' });
-      mockChalets = [chalet];
-      mockChaletPriceRules = [
+      const accommodationUnit = buildAccommodationUnit({ base_price: '100.00' });
+      mockAccommodationUnits = [accommodationUnit];
+      mockAccommodationPriceRules = [
         {
           id: 'rule-1',
-          chalet_id: 'chalet-1',
+          unit_id: 'accommodation unit-1',
           name: 'Peak Season',
           start_date: '2024-07-01',
           end_date: '2024-08-31',
@@ -882,10 +1017,11 @@ describe('BookingsService', () => {
           is_active: true,
         },
       ];
-      mockChaletSettings = [buildSettings()];
+      mockAccommodationSettings = [buildSettings()];
 
       const result = await calculateBookingPrice(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-07-15',
         '2024-07-17',
         []
@@ -895,17 +1031,18 @@ describe('BookingsService', () => {
     });
 
     it('should include add-ons in total price', async () => {
-      const chalet = buildChalet({ base_price: '100.00' });
-      mockChalets = [chalet];
-      mockChaletPriceRules = [];
-      mockChaletSettings = [buildSettings()];
+      const accommodationUnit = buildAccommodationUnit({ base_price: '100.00' });
+      mockAccommodationUnits = [accommodationUnit];
+      mockAccommodationPriceRules = [];
+      mockAccommodationSettings = [buildSettings()];
       mockChaletAddOns = [
         buildAddOn({ id: 'addon-1', price: '25.00', price_type: 'one_time' }),
         buildAddOn({ id: 'addon-2', price: '10.00', price_type: 'per_night' }),
       ];
 
       const result = await calculateBookingPrice(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-03-04',
         '2024-03-06',
         [
@@ -919,13 +1056,14 @@ describe('BookingsService', () => {
     });
 
     it('should calculate deposit based on percentage', async () => {
-      const chalet = buildChalet({ base_price: '100.00' });
-      mockChalets = [chalet];
-      mockChaletPriceRules = [];
-      mockChaletSettings = [buildSettings({ deposit_type: 'percentage', deposit_percentage: 30 })];
+      const accommodationUnit = buildAccommodationUnit({ base_price: '100.00' });
+      mockAccommodationUnits = [accommodationUnit];
+      mockAccommodationPriceRules = [];
+      mockAccommodationSettings = [buildSettings({ deposit_type: 'percentage', deposit_percentage: 30 })];
 
       const result = await calculateBookingPrice(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-03-04',
         '2024-03-06',
         []
@@ -936,13 +1074,14 @@ describe('BookingsService', () => {
     });
 
     it('should calculate fixed deposit', async () => {
-      const chalet = buildChalet({ base_price: '100.00' });
-      mockChalets = [chalet];
-      mockChaletPriceRules = [];
-      mockChaletSettings = [buildSettings({ deposit_type: 'fixed', deposit_fixed: 50 })];
+      const accommodationUnit = buildAccommodationUnit({ base_price: '100.00' });
+      mockAccommodationUnits = [accommodationUnit];
+      mockAccommodationPriceRules = [];
+      mockAccommodationSettings = [buildSettings({ deposit_type: 'fixed', deposit_fixed: 50 })];
 
       const result = await calculateBookingPrice(
-        'chalet-1',
+        'accommodation unit-1',
+        'module-1',
         '2024-03-04',
         '2024-03-06',
         []
@@ -959,11 +1098,12 @@ describe('BookingsService', () => {
 
   describe('Edge Cases', () => {
     it('should handle booking with all optional fields', async () => {
-      mockChalets = [buildChalet()];
-      mockChaletSettings = [buildSettings()];
+      mockAccommodationUnits = [buildAccommodationUnit()];
+      mockAccommodationSettings = [buildSettings()];
 
       const input = {
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: 'Minimal Customer',
         checkInDate: '2024-06-01',
         checkOutDate: '2024-06-02',
@@ -977,11 +1117,12 @@ describe('BookingsService', () => {
     });
 
     it('should handle same-day check-in and check-out (1 night minimum)', async () => {
-      mockChalets = [buildChalet()];
-      mockChaletSettings = [buildSettings({ min_nights: 1 })];
+      mockAccommodationUnits = [buildAccommodationUnit()];
+      mockAccommodationSettings = [buildSettings({ min_nights: 1 })];
 
       const input = {
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: 'Short Stay Guest',
         checkInDate: '2024-06-01',
         checkOutDate: '2024-06-01', // Same day
@@ -992,14 +1133,15 @@ describe('BookingsService', () => {
     });
 
     it('should handle concurrent booking attempts', async () => {
-      mockChalets = [buildChalet()];
-      mockChaletSettings = [buildSettings()];
+      mockAccommodationUnits = [buildAccommodationUnit()];
+      mockAccommodationSettings = [buildSettings()];
       
       // First booking succeeds and creates a record
       mockBookings = [];
 
       const input = {
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: 'First Guest',
         checkInDate: '2024-06-01',
         checkOutDate: '2024-06-03',
@@ -1012,11 +1154,12 @@ describe('BookingsService', () => {
     });
 
     it('should handle very long booking durations', async () => {
-      mockChalets = [buildChalet()];
-      mockChaletSettings = [buildSettings()];
+      mockAccommodationUnits = [buildAccommodationUnit()];
+      mockAccommodationSettings = [buildSettings()];
 
       const input = {
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: 'Extended Stay Guest',
         checkInDate: '2024-06-01',
         checkOutDate: '2024-07-01', // 30 nights
@@ -1029,11 +1172,12 @@ describe('BookingsService', () => {
     });
 
     it('should handle special characters in customer name', async () => {
-      mockChalets = [buildChalet()];
-      mockChaletSettings = [buildSettings()];
+      mockAccommodationUnits = [buildAccommodationUnit()];
+      mockAccommodationSettings = [buildSettings()];
 
       const input = {
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: "O'Brien-Smith محمد",
         customerEmail: 'test@example.com',
         checkInDate: '2024-06-01',
@@ -1047,11 +1191,12 @@ describe('BookingsService', () => {
     });
 
     it('should handle maximum capacity booking', async () => {
-      mockChalets = [buildChalet({ capacity: 10 })];
-      mockChaletSettings = [buildSettings()];
+      mockAccommodationUnits = [buildAccommodationUnit({ capacity: 10 })];
+      mockAccommodationSettings = [buildSettings()];
 
       const input = {
-        chaletId: 'chalet-1',
+        unitId: 'accommodation unit-1',
+        moduleId: 'module-1',
         customerName: 'Large Group',
         checkInDate: '2024-06-01',
         checkOutDate: '2024-06-03',
